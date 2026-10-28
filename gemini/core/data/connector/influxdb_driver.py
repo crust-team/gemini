@@ -32,18 +32,48 @@ class InfluxdbDriver(DatabaseDriverAbstract):
         end_time_unix = int(datetime.fromisoformat(end_time).timestamp() + 1)
 
         if aggregate is None:
-            query = 'from(bucket: "' + self.parameters["bucket"] + '")\
-            |> range(start:' + str(start_time_unix) + ",stop:" + str(end_time_unix) + ')\
-            |> filter(fn: (r) => r._measurement == "' + plant_name + '")\
-            |> filter(fn: (r) => r._field == "' + tag_name + '")\
-            |> filter(fn: (r) => r.asset_name == "' + asset_name + '")'
+            query = (
+                'from(bucket: "'
+                + self.parameters["bucket"]
+                + '")\
+            |> range(start:'
+                + str(start_time_unix)
+                + ",stop:"
+                + str(end_time_unix)
+                + ')\
+            |> filter(fn: (r) => r._measurement == "'
+                + plant_name
+                + '")\
+            |> filter(fn: (r) => r._field == "'
+                + tag_name
+                + '")\
+            |> filter(fn: (r) => r.asset_name == "'
+                + asset_name
+                + '")'
+            )
         else:
-            query = 'from(bucket: "' + self.parameters["bucket"] + '")\
-            |> range(start:' + str(start_time_unix) + ",stop:" + str(end_time_unix) + ')\
-            |> filter(fn: (r) => r._measurement == "' + plant_name + '")\
-            |> filter(fn: (r) => r._field == "' + tag_name + '")\
-            |> filter(fn: (r) => r.asset_name == "' + asset_name + '")\
-            |> aggregateWindow(every:' + str(aggregate) + "s, fn: mean)"
+            query = (
+                'from(bucket: "'
+                + self.parameters["bucket"]
+                + '")\
+            |> range(start:'
+                + str(start_time_unix)
+                + ",stop:"
+                + str(end_time_unix)
+                + ')\
+            |> filter(fn: (r) => r._measurement == "'
+                + plant_name
+                + '")\
+            |> filter(fn: (r) => r._field == "'
+                + tag_name
+                + '")\
+            |> filter(fn: (r) => r.asset_name == "'
+                + asset_name
+                + '")\
+            |> aggregateWindow(every:'
+                + str(aggregate)
+                + "s, fn: mean)"
+            )
 
         query_result = query_api.query(org=self.parameters["org"], query=query)
 
@@ -97,12 +127,22 @@ class InfluxdbDriver(DatabaseDriverAbstract):
         """Get last data from database."""
         query_api = self.conn.query_api()
 
-        query = 'from(bucket: "' + self.parameters["bucket"] + '")\
+        query = (
+            'from(bucket: "'
+            + self.parameters["bucket"]
+            + '")\
             |> range(start: 0)\
-            |> filter(fn: (r) => r._measurement == "' + plant_name + '")\
-            |> filter(fn: (r) => r._field == "' + tag_name + '")\
-            |> filter(fn: (r) => r.asset_name == "' + asset_name + '")\
+            |> filter(fn: (r) => r._measurement == "'
+            + plant_name
+            + '")\
+            |> filter(fn: (r) => r._field == "'
+            + tag_name
+            + '")\
+            |> filter(fn: (r) => r.asset_name == "'
+            + asset_name
+            + '")\
             |> last()'
+        )
 
         query_result = query_api.query(org=self.parameters["org"], query=query)
 
@@ -120,12 +160,22 @@ class InfluxdbDriver(DatabaseDriverAbstract):
         """Get first data from database."""
         query_api = self.conn.query_api()
 
-        query = 'from(bucket: "' + self.parameters["bucket"] + '")\
+        query = (
+            'from(bucket: "'
+            + self.parameters["bucket"]
+            + '")\
             |> range(start: 0)\
-            |> filter(fn: (r) => r._measurement == "' + plant_name + '")\
-            |> filter(fn: (r) => r._field == "' + tag_name + '")\
-            |> filter(fn: (r) => r.asset_name == "' + asset_name + '")\
+            |> filter(fn: (r) => r._measurement == "'
+            + plant_name
+            + '")\
+            |> filter(fn: (r) => r._field == "'
+            + tag_name
+            + '")\
+            |> filter(fn: (r) => r.asset_name == "'
+            + asset_name
+            + '")\
             |> first()'
+        )
 
         query_result = query_api.query(org=self.parameters["org"], query=query)
 
@@ -167,11 +217,17 @@ class InfluxdbDriver(DatabaseDriverAbstract):
         """Get unitnames and tagnames from database."""
         query_api = self.conn.query_api()
 
-        query = 'import "influxdata/influxdb/schema"\n\n\
+        query = (
+            'import "influxdata/influxdb/schema"\n\n\
         schema.measurementTagValues(\
-        bucket:"' + self.parameters["bucket"] + '", \
-        measurement:"' + plant_name + '",\
+        bucket:"'
+            + self.parameters["bucket"]
+            + '", \
+        measurement:"'
+            + plant_name
+            + '",\
         tag: "_field", )'
+        )
 
         query_result = query_api.query(org=self.parameters["org"], query=query)
 
