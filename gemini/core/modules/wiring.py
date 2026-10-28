@@ -3,7 +3,7 @@
 from gemini.core.types import Stream
 
 
-def trace_wiring(plant, inputs, streams_in=None):
+def trace_wiring(plant, inputs):
     """Execute one step, recording leaf-to-leaf Stream transfers through removable hooks.
 
     Keep strong references while tracing so Python cannot reuse object identities.
@@ -23,7 +23,7 @@ def trace_wiring(plant, inputs, streams_in=None):
                         edges.add((source, source_port, path, port))
 
             def after(module, controls, streams, result, path=path):
-                for port, stream in result.streams.items():
+                for port, stream in result.outlets.items():
                     if isinstance(stream, Stream):
                         retained.append(stream)
                         producers[id(stream)] = (path, port)
@@ -31,7 +31,7 @@ def trace_wiring(plant, inputs, streams_in=None):
             handles.extend(
                 (module.register_forward_pre_hook(before), module.register_forward_hook(after))
             )
-        plant(inputs, streams_in)
+        plant(**inputs)
     finally:
         for handle in handles:
             handle.remove()

@@ -1,16 +1,15 @@
-"""Independent equipment evaluation on measured boundaries, with explicit missing-data skips."""
+"""Measured-boundary and chained module evaluation."""
 
 import math
 from collections import Counter
 from copy import deepcopy
 
 from gemini.core.physics import units
-from gemini.core.types.flows import Stream
-from gemini.core.types.results import Health
+from gemini.core.types import Fluid, Health, Stream
 
 
 class MissingMeasurement(ValueError):
-    """A required bound column is absent or nonfinite in this observation."""
+    """A required bound column is absent or nonfinite."""
 
 
 def _value(row, binding):
@@ -25,29 +24,39 @@ def _value(row, binding):
 
 
 def prepare(module, bindings, row, defaults=None):
-    """Convert a measured boundary to validated SI controls, streams and output measurements."""
-    inputs = {name: _value(row, binding) for name, binding in bindings.inputs.items()}
-    for name, binding in bindings.inputs.items():
-        if name == "m_dot" and binding.unit in ("m3/h", "m3/s"):
-            p, T = getattr(module.params, "pressure", 1e5), getattr(
-                module.params, "temperature", 300
-            )
-            inputs[name] *= module.fluid.properties(p, T).density
-    streams = {}
-    for port, fields in bindings.streams.items():
+    """Convert one measured boundary into keyword arguments and observations."""
+    kwargs = {
+        name: _value(row, binding)
+        for group in (bindings.controls, bindings.boundaries)
+        for name, binding in group.items()
+    }
+    for name, binding in (bindings.controls | bindings.boundaries).items():
+        declaration = module.inputs().get(name)
+        if (
+            declaration is not None
+            and declaration.unit == "kg/s"
+            and binding.unit
+            in {
+                "m3/h",
+                "m3/s",
+            }
+        ):
+            pressure = getattr(module, "pressure", 1e5)
+            temperature = getattr(module, "temperature", 300)
+            kwargs[name] *= module.fluid.properties(pressure, temperature).density
+    for port, fields in bindings.inlets.items():
         values = dict((defaults or {}).get(port, {}))
         values.update({name: _value(row, binding) for name, binding in fields.items()})
         values.setdefault("fluid", module.fluid)
-        if "m_dot" in fields and fields["m_dot"].unit in ("m3/h", "m3/s"):
+        values["fluid"] = Fluid.model_validate(values["fluid"])
+        if "m_dot" in fields and fields["m_dot"].unit in {"m3/h", "m3/s"}:
             if not {"p", "T"} <= values.keys():
-                raise MissingMeasurement(
-                    f"{port}: pressure and temperature required for volume flow"
-                )
+                raise MissingMeasurement(f"{port}: pressure and temperature required")
             values["m_dot"] *= values["fluid"].properties(values["p"], values["T"]).density
-        streams[port] = Stream.model_validate(values)
+        kwargs[port] = Stream.model_validate(values)
     measured = {name: _value(row, binding) for name, binding in bindings.measured.items()}
-    if module.name == "heatexchanger" and {"hot_out_T", "cold_out_T"} <= measured.keys():
-        hot, cold = streams["hot_in"], streams["cold_in"]
+    if module.name == "heat_exchanger" and {"hot_out_T", "cold_out_T"} <= measured.keys():
+        hot, cold = kwargs["hot_in"], kwargs["cold_in"]
         measured.update(
             hot_in_T=hot.T,
             cold_in_T=cold.T,
@@ -56,29 +65,25 @@ def prepare(module, bindings, row, defaults=None):
             cp_hot=hot.fluid.properties(hot.p, hot.T).cp_l,
             cp_cold=cold.fluid.properties(cold.p, cold.T).cp_l,
         )
-    return inputs, streams, measured
+    return kwargs, measured
 
 
 def health_or_unavailable(module, result, measured):
-    """Keep lack of a diagnostic model distinct from assessed nominal health."""
+    """Keep lack of diagnostics distinct from assessed nominal health."""
     health = module.health(result.outputs, measured)
-    return (
-        health
-        if health is not None
-        else Health(
-            score=1,
-            alarm=False,
-            assessed=False,
-            message="No diagnostic model or sufficient measurements",
-        )
+    return health or Health(
+        score=1,
+        alarm=False,
+        assessed=False,
+        message="No diagnostic model or sufficient measurements",
     )
 
 
 class BindingPlan:
-    """Resolve module objects and column units once for the entire run."""
+    """Resolve module objects and required columns once for a run."""
 
     def __init__(self, plant, dataset, kind, only=None, on_error="record"):
-        """Compile active bindings; root defaults permit minimal assumed-input profiles."""
+        """Compile declarations and dataset bindings for repeated evaluations."""
         from gemini.core.types.bindings import Binding, ModuleBindings
 
         self.entries, self.columns = [], set()
@@ -105,125 +110,106 @@ class BindingPlan:
                 "": bindings.get(
                     "",
                     ModuleBindings(
-                        inputs={
-                            name: Binding(column=name, unit=info.unit)
-                            for name, info in dataset.columns.items()
+                        controls={
+                            name: Binding(column=name, unit=declaration.unit or "-")
+                            for name, declaration in plant.controls().items()
+                            if name in dataset.columns
                         }
                     ),
                 )
             }
         for path, original in bindings.items():
             if kind != "simulate" and (not path or only is not None and path not in only):
-                # Standalone equipment may use root bindings for measured replay.
                 if path or plant._children or only is not None and path not in only:
                     continue
             bound = original.model_copy(deep=True)
             module = plant.get_submodule(path)
-            for group in [bound.inputs, bound.measured, bound.state, *bound.streams.values()]:
+            groups = [
+                bound.controls,
+                bound.boundaries,
+                bound.measured,
+                bound.state,
+                *bound.inlets.values(),
+            ]
+            for group in groups:
                 for field, binding in list(group.items()):
-                    if (
-                        kind == "simulate"
-                        and group is bound.inputs
-                        and binding.column not in dataset.names
-                    ):
-                        if _nested_get(plant.boundary.get("root_inputs", {}), field) is not None:
+                    if kind == "simulate" and binding.column not in dataset.names:
+                        if _default_for(plant, path, group, field, bound) is not None:
                             del group[field]
                             continue
                     if binding.column in dataset.columns:
                         binding.unit = dataset.columns[binding.column].unit
                     self.columns.add(binding.column)
-            defaults = plant.boundary.get("stream_defaults", {}).get(path)
+            defaults = deepcopy(plant.boundary.get("stream_defaults", {}).get(path, {}))
+            if path == "":
+                root = plant.boundary.get("root_inputs", {})
+                for inlet in bound.inlets:
+                    if inlet in root:
+                        defaults.setdefault(inlet, root[inlet])
             self.entries.append((path, module, bound, defaults))
         missing = sorted(self.columns - set(dataset.names))
         if missing:
             raise ValueError("Dataset is missing bound columns: " + ", ".join(missing))
 
-    def apply_parameters(self, plant, t):
-        """Apply precomputed design transitions once, retaining direct parameter overrides."""
-        if not self._started or self._next_change is not None and t >= self._next_change:
-            plant.apply_params_at(t)
+    def apply_parameters(self, plant, at):
+        """Apply dated design transitions once."""
+        if not self._started or self._next_change is not None and at >= self._next_change:
+            plant.apply_params_at(at)
             self._started = True
-            self._next_change = next((date for date in self._dates if date > t), None)
+            self._next_change = next((date for date in self._dates if date > at), None)
 
 
-def _nested_get(mapping, path):
-    for part in path.split("."):
-        if not isinstance(mapping, dict) or part not in mapping:
-            return None
-        mapping = mapping[part]
-    return mapping
-
-
-def _nested_set(mapping, path, value):
-    parts = path.split(".")
-    for part in parts[:-1]:
-        mapping = mapping.setdefault(part, {})
-    mapping[parts[-1]] = value
+def _default_for(plant, path, group, field, bound):
+    defaults = plant.boundary.get("root_inputs", {}) if path == "" else {}
+    if group is bound.controls or group is bound.boundaries:
+        return defaults.get(field)
+    for port, fields in bound.inlets.items():
+        if group is fields:
+            return defaults.get(port, {}).get(field)
+    return None
 
 
 def twin_step(plant, sample, states, plan):
-    """Evaluate measured boundaries, taking measured state or advancing retained state."""
+    """Evaluate each measured twin independently."""
     plan.apply_parameters(plant, sample.t)
     results = {}
     plan.skips, plan.errors = {}, []
     for path, module, bound, defaults in plan.entries:
         try:
-            inputs, streams, measured = prepare(module, bound, sample.row, defaults)
+            kwargs, measured = prepare(module, bound, sample.row, defaults)
             if module.stateful:
                 state = (
                     {key: _value(sample.row, binding) for key, binding in bound.state.items()}
                     if bound.state
                     else deepcopy(states[path]) if path in states else module.initial_state()
                 )
-                next_state, prediction = module.step(state, inputs, streams, sample.dt)
+                next_state, prediction = module.step(state, sample.dt, **kwargs)
             else:
-                prediction = module(inputs, streams)
+                prediction = module(**kwargs)
             results[path] = prediction, health_or_unavailable(module, prediction, measured)
             if module.stateful:
                 states[path] = state if bound.state else next_state
         except MissingMeasurement as exc:
             plan.skips.setdefault(path, Counter())[str(exc)] += 1
         except Exception as exc:
-            groups = {
-                "inputs": bound.inputs,
-                **{f"streams.{port}": fields for port, fields in bound.streams.items()},
-            }
-            boundary = ", ".join(
-                f"{section}.{field}={sample.row.get(binding.column)!r} {binding.unit}"
-                for section, fields in groups.items()
-                for field, binding in fields.items()
-            )
-            message = f"{module.path}: {exc}; boundary: {boundary}"
             if plan.on_error == "raise":
-                raise ValueError(message) from exc
-            plan.errors.append(dict(module=path, message=message, type=type(exc).__name__))
+                raise ValueError(f"{module.path}: {exc}") from exc
+            plan.errors.append(dict(module=path, message=str(exc), type=type(exc).__name__))
     return results
 
 
 def chained_step(plant, sample, states, plan):
-    """Apply root bindings to a single plant call, preserving the handwritten wiring."""
+    """Apply root bindings to one handwritten plant call."""
     plan.apply_parameters(plant, sample.t)
     plan.skips, plan.errors = {}, []
     _, _, bound, defaults = plan.entries[0]
-    inputs = deepcopy(plant.boundary.get("root_inputs", {}))
-    values, streams, _ = prepare(plant, bound, sample.row, defaults)
-    for field, value in values.items():
-        _nested_set(inputs, field, value)
-    # Nested Stream controls (such as the secondary inlet) use their own fluid density.
-    for field, binding in bound.inputs.items():
-        if field.endswith(".m_dot") and binding.unit in ("m3/h", "m3/s"):
-            prefix = field.rsplit(".", 1)[0]
-            raw = _nested_get(inputs, prefix)
-            stream = Stream.model_validate(raw)
-            _nested_set(
-                inputs, field, stream.m_dot * stream.fluid.properties(stream.p, stream.T).density
-            )
+    kwargs = deepcopy(plant.boundary.get("root_inputs", {}))
+    measured_kwargs, _ = prepare(plant, bound, sample.row, defaults)
+    kwargs.update(measured_kwargs)
     if plan.stateful:
-        states[""], result = plant.step(
-            states.get("", plant.initial_state()), inputs, streams, sample.dt
-        )
+        states[""], result = plant.step(states.get("", plant.initial_state()), sample.dt, **kwargs)
     else:
-        result = plant(inputs, streams)
+        result = plant(**kwargs)
     return {
         path: (child, health_or_unavailable(plant.get_submodule(path), child, {}))
         for path, child in result.leaves().items()

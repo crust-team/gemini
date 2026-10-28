@@ -48,13 +48,13 @@ def verification(tmp_path_factory):
         report["coverage"][name] = float(frame[name].health_alarm.notna().mean())
         report["alarm_rates"][name] = float(frame.loc[normal, (name, "health_alarm")].mean())
         report["health_assessed"][name] = bool(frame[name].health_assessed.all())
-        for field in module.soft_sensors:
+        for field in module.soft_sensors():
             assert np.isfinite(frame[name, field]).all(), (name, field)
     for module, field, column, scale in (
         ("doublet.esp", "power", "doublet.esp.power", 1),
         ("doublet.esp", "head", "doublet.esp.head", 1),
-        ("filter_hot", "pressure_drop", "filter_hot.pressure_drop", 1),
-        ("filter_return", "pressure_drop", "filter_return.pressure_drop", 1),
+        ("filters.hot", "pressure_drop", "filters.hot.pressure_drop", 1),
+        ("filters.cold", "pressure_drop", "filters.cold.pressure_drop", 1),
         ("injection_pump", "power", "injection_pump.power", 1),
     ):
         measured = data.loc[normal, column] * scale
@@ -62,7 +62,12 @@ def verification(tmp_path_factory):
         report["median_relative_errors"][module + "." + field] = float(
             np.median(abs(predicted / measured - 1))
         )
-    fit = gm.optim.calibrate(plant, dataset, "heat_exchanger", ["ua"], end=data.index[7 * 96 - 1])
+    fit = gm.optim.calibrate(
+        plant,
+        dataset,
+        params=[plant.get_parameter("heat_exchanger.ua")],
+        end=data.index[7 * 96 - 1],
+    )
     report["calibration"] = fit.__dict__
     holdout = engine.replay(
         plant, dataset, start=data.index[7 * 96], only=["heat_exchanger"]
@@ -91,7 +96,7 @@ def verification(tmp_path_factory):
 
     def audit(module, inputs, streams, result):
         nonlocal count
-        electricity.append(result.outputs.electricity)
+        electricity.append(result.outputs.electricity_use)
         if count in sampled:
             mass = gm.modules.mass_balance(module, result)
             energy = gm.modules.energy_balance(module, result)
@@ -113,7 +118,7 @@ def verification(tmp_path_factory):
         chain = engine.simulate(plant, dataset, gm.Clock.from_data(dataset)).to_frame()
     finally:
         handle.remove()
-    controls = plant.last_result.inputs
+    controls = dict(plant.last_result.inputs) | dict(plant.last_result.inlets)
     traced = gm.modules.trace_wiring(plant, controls)
     mismatches = gm.legacy.check_wiring(plant, gm.legacy.read_project(OLD))
     assert mismatches == []
@@ -154,8 +159,8 @@ def test_measured_reconciliation(verification):
     """Protect achieved accuracy and explicitly retain failures caused by supplied design data."""
     report, _ = verification
     errors = report["median_relative_errors"]
-    assert errors["filter_hot.pressure_drop"] < 0.20
-    assert errors["filter_return.pressure_drop"] < 0.20
+    assert errors["filters.hot.pressure_drop"] < 0.20
+    assert errors["filters.cold.pressure_drop"] < 0.20
     assert errors["injection_pump.power"] < 0.001
     # NOTE(refactor): source ESP power coefficients are all zero: median power error is 100%.
     # Retain the exact golden model and assert the missing-curve limitation, not invented power.

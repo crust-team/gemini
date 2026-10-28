@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
+from gemini.core import runtime
 from gemini.core.data.loader import Loader
 from gemini.core.engine import checkpoint as storage
 from gemini.core.engine.clock import Clock, LiveClock
@@ -26,6 +27,7 @@ class Engine:
         self.module_states = {}
         self._dataset_fingerprint = None
         self._in_step = False
+        self.runtime_state = runtime.state()
 
     def simulate(self, plant, dataset, clock):
         """Evaluate the handwritten plant chain using assumed, root-bound inputs."""
@@ -92,6 +94,8 @@ class Engine:
             getattr(callback, method)(self, *args)
 
     def _run(self, kind, plant, dataset, clock, step_fn, only=None, continuing=False):
+        if not continuing:
+            self.runtime_state = runtime.state()
         plan = BindingPlan(plant, dataset, kind, only, self.on_error)
         if not continuing:
             self.results, self.module_states, self.position = Results(), {}, None
@@ -146,6 +150,7 @@ class Engine:
             dataset_fingerprint=self._dataset_fingerprint,
             only=self.only,
             on_error=self.on_error,
+            runtime=self.runtime_state,
         )
         remaining = None
         if self.run_kind in {"simulate", "replay"} and self.dataset is not None:
@@ -161,6 +166,7 @@ class Engine:
         engine.plant = plant_class.from_dict(checkpoint.plant)
         engine.run_kind, engine.position = checkpoint.run_kind, checkpoint.position
         engine.module_states, engine.only = checkpoint.module_states, checkpoint.only
+        engine.runtime_state = checkpoint.runtime or runtime.state()
         engine.clock = Clock.reopen(checkpoint.clock) if checkpoint.clock is not None else None
         engine._dataset_fingerprint = checkpoint.dataset_fingerprint
         engine.dataset = (
@@ -188,12 +194,15 @@ class Engine:
         if self.dataset is None:
             raise ValueError("Checkpoint has unfinished ticks but no remaining in-memory data")
         step_fn = chained_step if self.run_kind == "simulate" else twin_step
-        return self._run(
-            self.run_kind,
-            self.plant,
-            self.dataset,
-            self.clock,
-            step_fn,
-            only=self.only,
-            continuing=True,
-        )
+        values = self.runtime_state.copy()
+        values.pop("default_fluid", None)
+        with runtime.settings(**values):
+            return self._run(
+                self.run_kind,
+                self.plant,
+                self.dataset,
+                self.clock,
+                step_fn,
+                only=self.only,
+                continuing=True,
+            )

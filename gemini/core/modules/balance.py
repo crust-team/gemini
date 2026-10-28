@@ -16,7 +16,7 @@ def collect_flows(result_tree):
     if result_tree.children:
         return collect_flows(result_tree.children)
     totals = dict(electricity=0.0, fuel=0.0, heat_loss=0.0)
-    for flow in result_tree.streams.values():
+    for flow in result_tree.outlets.values():
         if isinstance(flow, PowerFlow):
             totals["electricity"] += flow.P
         elif isinstance(flow, FuelFlow):
@@ -43,7 +43,7 @@ def _internal_flux(result, measure):
             if available.get(id(stream), 0):
                 internal += measure(stream)
                 available[id(stream)] -= 1
-        for stream in _streams(leaf.streams):
+        for stream in _streams(leaf.outlets):
             available[id(stream)] = available.get(id(stream), 0) + 1
     return internal
 
@@ -64,9 +64,9 @@ def mass_balance(module, result):
     else:
         children = {}
         incoming = sum(s.m_dot for s in _streams(result.inlets))
-        outgoing = sum(s.m_dot for s in _streams(result.streams))
+        outgoing = sum(s.m_dot for s in _streams(result.outlets))
         if module.name == "production_reservoir":
-            incoming += result.inputs.m_dot
+            incoming += result.inputs["m_dot"]
         elif module.name == "injection_reservoir":
             outgoing += sum(s.m_dot for s in _streams(result.inlets))
         residual = incoming - outgoing
@@ -104,7 +104,7 @@ def energy_balance(module, result):
     else:
         children = {}
         incoming = sum(_enthalpy(s) for s in _streams(result.inlets))
-        outgoing = sum(_enthalpy(s) for s in _streams(result.streams))
+        outgoing = sum(_enthalpy(s) for s in _streams(result.outlets))
         if module.name == "production_reservoir":
             incoming += outgoing
         elif module.name == "injection_reservoir":

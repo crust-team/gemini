@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.core.modules.module import Sequential
+from gemini.core.modules.container import Sequential
 from gemini.core.modules.treatment.filter import Filter
 from gemini.core.types.cost import Cost
 

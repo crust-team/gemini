@@ -62,7 +62,7 @@ class EventLog(Callback):
                 self.log(
                     "forward",
                     module_path=path,
-                    inputs=inputs.model_dump(mode="json"),
+                    inputs=inputs,
                     outputs=result.outputs.model_dump(mode="json"),
                     duration_ms=(perf_counter() - start) * 1000,
                 )
