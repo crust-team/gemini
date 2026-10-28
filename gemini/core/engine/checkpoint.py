@@ -34,6 +34,7 @@ class Checkpoint(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     only: list[str] | None = None
     on_error: Literal["record", "raise"] = "record"
+    runtime: dict[str, Any] = Field(default_factory=dict)
 
 
 def _write_dataset(path, dataset):
