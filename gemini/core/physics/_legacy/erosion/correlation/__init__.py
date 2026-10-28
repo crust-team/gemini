@@ -1,1 +1,0 @@
-"""Erosion correlation implementations."""

@@ -21,4 +21,4 @@ class Stream(BaseModel):
     def with_(self, **changes) -> "Stream":
         """Return a validated copy with updated SI stream fields."""
         # model_copy alone bypasses validation, including physical pressure/temperature limits.
-        return type(self).model_validate(self.model_copy(update=changes).model_dump())
+        return type(self).model_validate(self.model_dump() | changes)

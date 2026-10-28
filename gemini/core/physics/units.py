@@ -195,3 +195,8 @@ def rad_to_deg(x: float) -> float:
 def deg_to_rad(x: float) -> float:
     """Convert [deg] to [rad]."""
     return x * math.pi / 180
+
+
+def m3s_per_bar_to_si(x: float) -> float:
+    """Convert the historical runtime's m3/s/bar index to [m3/s/Pa]."""
+    return x / 1e5

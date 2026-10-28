@@ -36,7 +36,7 @@ UNIT_FACTORIES = {
 }
 
 
-def setup(project_path, plant_name):
+def setup(project_path, plant_name, *, database=None):
     """Set up the plant.
 
     :param str project_path: location of the project folder.
@@ -57,7 +57,12 @@ def setup(project_path, plant_name):
         plant.diagram = json.load(jsonfile)
 
     plant = boot_unit(plant)
-    plant = boot_database(plant)
+    if database is None:
+        plant = boot_database(plant)
+    else:
+        plant.add_database(database, "measured")
+        plant.register_tags()
+        plant.connect_database()
 
     return plant
 

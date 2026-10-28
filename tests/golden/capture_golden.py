@@ -8,26 +8,23 @@ import json
 from pathlib import Path
 
 import numpy as np
-
-from gemini.core.physics._legacy.corrosion.co2_corrosion import CO2Corrosion
-from gemini.core.physics._legacy.corrosion.co2_corrosion_opt import CO2CorrosionOpt
-from gemini.core.physics._legacy.corrosion.correlation.co2_partial_pressure_model import (
-    CO2PartialPressureModel,
-)
-from gemini.core.physics._legacy.erosion.erosion_model import ErosionModel
-from gemini.core.physics._legacy.fluid.pvt_water_stp import PVTConstantSTP
-from gemini.core.physics._legacy.pump.esp import ESP
-from gemini.core.physics._legacy.reservoir.inflow_performance import IPR
-from gemini.core.physics._legacy.reservoir.injectivity_index import injectivity_index
-from gemini.core.physics._legacy.reservoir.reservoir_pressure_estimation import reservoir_pressure
-from gemini.core.physics._legacy.reservoir.reservoir_pressuredrop import bottomhole_skin_dp
-from gemini.core.physics._legacy.well.correlation.beggsbrill import BeggsBrill
-from gemini.core.physics._legacy.well.correlation.darcyweisbach import DarcyWeisbach
-from gemini.core.physics._legacy.well.correlation.temperaturedrop import TemperatureDrop
-from gemini.core.physics._legacy.well.pressure_drop import DPDT
+from gemini_model.corrosion.co2_corrosion import CO2Corrosion
+from gemini_model.corrosion.co2_corrosion_opt import CO2CorrosionOpt
+from gemini_model.corrosion.correlation.co2_partial_pressure_model import CO2PartialPressureModel
+from gemini_model.erosion.erosion_model import ErosionModel
+from gemini_model.fluid.pvt_water_stp import PVTConstantSTP
+from gemini_model.pump.esp import ESP
+from gemini_model.reservoir.inflow_performance import IPR
+from gemini_model.reservoir.injectivity_index import injectivity_index
+from gemini_model.reservoir.reservoir_pressure_estimation import reservoir_pressure
+from gemini_model.reservoir.reservoir_pressuredrop import bottomhole_skin_dp
+from gemini_model.well.correlation.beggsbrill import BeggsBrill
+from gemini_model.well.correlation.darcyweisbach import DarcyWeisbach
+from gemini_model.well.correlation.temperaturedrop import TemperatureDrop
+from gemini_model.well.pressure_drop import DPDT
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA = ROOT / "datasets/geothermal_example"
+DATA = ROOT / "gemini-project/geothermal_example"
 
 
 def property_block(name):

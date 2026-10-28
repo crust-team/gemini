@@ -120,3 +120,45 @@ class UnitModuleAbstract(ABC):
     def update_model_parameter(self, timestamp):
         """Update model parameters for given timestamp."""
         pass
+
+
+class TwinModule(UnitModuleAbstract):
+    """Run related component outputs over the existing tag-linked time windows."""
+
+    output_tags = ()
+
+    def step(self, loop):
+        """Compute missing timestamps and keep each output's independent restart watermark."""
+        self.loop = loop
+        last = {tag: self.get_output_last_data_time(tag) for tag in self.output_tags}
+        self.loop.start_time = min(last.values())
+        self.loop.compute_n_simulation()
+        if self.loop.n_step <= 0:
+            return
+        values = {}
+        time = None
+        for category in self.tags["input"].values():
+            for tag in category:
+                timestamps, data = self.get_input_data(tag)
+                if time is not None and timestamps != time:
+                    raise ValueError(f"{type(self).__name__}: input timestamps are not aligned")
+                time = timestamps
+                values[tag] = data
+        if time is None or len(time) < self.loop.n_step + 1:
+            raise ValueError(f"{type(self).__name__}: insufficient data for requested time window")
+        output = {tag: [] for tag in self.output_tags}
+        times = {tag: [] for tag in self.output_tags}
+        for i in range(1, self.loop.n_step + 1):
+            self.update_model_parameter(time[i])
+            result = self.calculate_row({tag: data[i] for tag, data in values.items()})
+            for tag in self.output_tags:
+                if time[i] > last[tag]:
+                    times[tag].append(time[i])
+                    output[tag].append(result[tag])
+        for tag in self.output_tags:
+            if times[tag]:
+                self.write_output_data(tag, times[tag], output[tag])
+
+    @abstractmethod
+    def calculate_row(self, values: dict) -> dict:
+        """Calculate one row of tag values in their existing plant configuration units."""
