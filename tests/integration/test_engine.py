@@ -8,14 +8,12 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.engine.callbacks import AutoCheckpoint, Callback, EventLog
 from gemini.core.engine.results import Results
 from gemini.core.types import Control, Output
 from gemini.core.types.bindings import Binding, DatedParams, ModuleBindings
 
 ROOT = Path(__file__).parents[2]
-DATA = ROOT / "examples/shared/doublet_heat"
 REFERENCE = ROOT / "tests/fixtures/engine_reference"
 
 
@@ -58,12 +56,9 @@ class Accumulator(gm.modules.Module):
 
 
 @pytest.fixture
-def setup():
+def setup(fresh_plant, reference_dataset):
     """Create a fresh plant and first-day measurements."""
-    plant = DoubletHeatPlant.load(DATA / "plant.json")
-    frame = pd.read_csv(DATA / "doublet_2024_15min.csv", parse_dates=["time"])
-    data = gm.Dataset.from_frame(frame, time_column="time")
-    return plant, data.window(end="2024-06-07T23:45:00Z")
+    return fresh_plant, reference_dataset
 
 
 def test_reference_replay_and_simulate(setup):
@@ -132,6 +127,7 @@ class StopAndSave(Callback):
 def test_interrupt_resume(setup, tmp_path, kind):
     """Fresh-engine resume reproduces uninterrupted results and integration exactly."""
     plant, data = setup
+    data = data.window(end=data.start + pd.Timedelta(hours=2, minutes=45))
     clock = gm.Clock.from_data(data)
     args = [plant, data] + ([clock] if kind == "simulate" else [])
     expected = getattr(gm.Engine(on_error="raise"), kind)(*args)
@@ -152,16 +148,17 @@ def test_interrupt_resume(setup, tmp_path, kind):
 def test_live_idempotency(setup, tmp_path):
     """New engine calls process only newly available timestamps; repeated now returns no rows."""
     plant, _ = setup
-    frame = pd.read_csv(DATA / "doublet_2024_15min.csv", parse_dates=["time"])
-    data = gm.Dataset.from_frame(frame, time_column="time")
+    _, data = setup
     path = tmp_path / "live.ckpt"
-    out = gm.Engine().live(plant, data, path, now="2024-06-07T01:00:00Z")
+    first_now = data.start + pd.Timedelta(hours=1)
+    second_now = data.start + pd.Timedelta(hours=2)
+    out = gm.Engine().live(plant, data, path, now=first_now)
     assert len(out) == 5
-    second = gm.Engine().live(plant, data, path, now="2024-06-07T02:00:00Z")
+    second = gm.Engine().live(plant, data, path, now=second_now)
     assert len(second) == 4
     assert not set(out.to_frame().index) & set(second.to_frame().index)
     engine = gm.Engine()
-    assert len(engine.live(plant, data, path, now="2024-06-07T02:00:00Z")) == 0
+    assert len(engine.live(plant, data, path, now=second_now)) == 0
     assert len(engine.results) == 9
     assert len(gm.Engine.load_checkpoint(path).resume()) == 9
 
