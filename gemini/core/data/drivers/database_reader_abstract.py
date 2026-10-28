@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytz
 
-from gemini.core.data.connector.influxdb_driver import InfluxdbDriver
+from gemini.core.data.drivers.influxdb_driver import InfluxdbDriver
 
 tz_ams = pytz.timezone("Europe/Amsterdam")
 
