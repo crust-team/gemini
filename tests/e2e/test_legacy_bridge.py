@@ -33,6 +33,15 @@ def test_legacy_bridge(tmp_path):
     old_results = gm.legacy.results_to_frame(results, project)
     gm.legacy.write_csv(old_results, tmp_path / "results.csv")
     assert len(gm.legacy.read_csv(tmp_path / "results.csv")) == 1
-    gm.legacy.write_project(gm.legacy.from_plant(plant, project), tmp_path / "project")
+    converted = gm.legacy.from_plant(plant, project)
+    gm.legacy.write_project(converted, tmp_path / "project")
     reread = gm.legacy.read_project(tmp_path / "project")
     assert reread.params == project.params
+    plant.heat_exchanger.update_params(ua=123456.0)
+    updated = gm.legacy.from_plant(plant, project)
+    gm.legacy.write_project(updated, tmp_path / "updated")
+    reread = gm.legacy.read_project(tmp_path / "updated")
+    hx_id = next(
+        node_id for node_id, node in project.nodes.items() if node.type == "heat_exchanger"
+    )
+    assert reread.params[hx_id]["heat_transfer_coeff"].values == [123456.0]

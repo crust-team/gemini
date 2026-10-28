@@ -1,6 +1,7 @@
 """Faithful raw I/O for the old GEMINI project and semicolon CSV formats."""
 
 import json
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -155,7 +156,7 @@ def write_project(project, folder):
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     diagram = project._diagram
-    param_files = project._param_files
+    param_files = deepcopy(project._param_files)
     if diagram is None:
         diagram = {"cells": []}
         for node in project.nodes.values():
@@ -204,6 +205,32 @@ def write_project(project, folder):
                     ]
                 },
             }
+    else:
+        by_id = {raw["id"]: raw for raw in param_files.values()}
+        for node_id, properties in project.params.items():
+            raw = by_id[node_id]
+            if not properties:
+                # The typed old model has no place to retain a timestamp axis for an empty
+                # property block, so keep the faithful raw file unchanged.
+                continue
+            timestamps = next(iter(properties.values())).timestamps if properties else []
+            for value in properties.values():
+                if value.timestamps != timestamps:
+                    raise ValueError(f"{node_id}: old properties require one shared timestamp axis")
+            formatted = [
+                value.strftime("%Y-%m-%d %H:%M:%S") if value else None for value in timestamps
+            ]
+            raw["parameters"]["timestamps"] = formatted
+            raw["parameters"]["property"] = {
+                name: value.values for name, value in properties.items()
+            }
+            tags = project.tags.get(node_id, GeminiTags())
+            raw["tagnames"] = {
+                kind: {
+                    name: [column] * len(timestamps) for name, column in getattr(tags, kind).items()
+                }
+                for kind in ("measured", "filtered", "calculated")
+            } | {"timestamps": formatted}
     (folder / "diagram.json").write_text(json.dumps(diagram, indent=4) + "\n")
     for name, raw in param_files.items():
         (folder / name).write_text(json.dumps(raw, indent=4) + "\n")
