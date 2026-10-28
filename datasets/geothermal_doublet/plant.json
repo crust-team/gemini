@@ -1,0 +1,819 @@
+{
+  "name": "geothermal_doublet",
+  "modules": {
+    "degasser_e846": {
+      "type": "degasser",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "p_out": null,
+            "dp": 14900.0,
+            "heat_transfer_coeff": 100000.0
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "esp_1ee3": {
+      "type": "esp",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "coefficient_precision": "float64",
+            "no_stages": 15,
+            "head_coeff": [
+              125.518426,
+              -0.0020852856,
+              2.28955651e-7,
+              -1.45640214e-11,
+              2.37859645e-16,
+              -1.18258356e-21
+            ],
+            "power_coeff": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pump_type": "DEFAULT-PUMP",
+            "setting_depth": 600.0,
+            "min_flow": 0.02277777777777778,
+            "max_flow": 0.049444444444444444,
+            "bep_flow": 0.03610555555555555,
+            "correction_factor": [
+              1.0,
+              0.0
+            ],
+            "tubing": 0.1778,
+            "drift_threshold": 0.1
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "filter_b1ed": {
+      "type": "filter",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "dp_nominal": 1600.0,
+            "m_dot_nominal": 44.20333333333333,
+            "clogging_dp": 50000.0
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "filter_b2e6": {
+      "type": "filter",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "dp_nominal": 1600.0,
+            "m_dot_nominal": 44.20333333333333,
+            "clogging_dp": 50000.0
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "heat_exchanger_3410": {
+      "type": "heatexchanger",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "ua": 100000.0,
+            "arrangement": "counterflow",
+            "dp_hot_nominal": 0.0,
+            "dp_cold_nominal": 0.0,
+            "m_dot_hot_nominal": 1.0,
+            "m_dot_cold_nominal": 1.0,
+            "fouling_threshold": 0.15
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "injection_pump_3808": {
+      "type": "injectionpump",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "no_stages": 10,
+            "pump_type": "DEFAULT-PUMP",
+            "efficiency": 0.7,
+            "head_coeff": null,
+            "power_coeff": null
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "injection_well_a06b": {
+      "type": "injectionwell",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "path": {
+              "sections": [
+                {
+                  "length": 500.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 500.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 1000.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                }
+              ]
+            },
+            "friction_correlation": "darcy_weisbach",
+            "friction_correlation_2p": "BeggsBrill",
+            "correction_factors": [
+              1.0,
+              0.0
+            ],
+            "soil_temperature": 288.15,
+            "u_value": 10.0
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "production_well_c774": {
+      "type": "productionwell",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "path": {
+              "sections": [
+                {
+                  "length": 400.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 362.0,
+                  "inclination": 1.312662130424935,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 188.0,
+                  "inclination": 0.9238027730805987,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 550.0,
+                  "inclination": 0.814370628980554,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 300.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                }
+              ]
+            },
+            "friction_correlation": "darcy_weisbach",
+            "friction_correlation_2p": "BeggsBrill",
+            "correction_factors": [
+              1.0,
+              0.0
+            ],
+            "soil_temperature": 288.15,
+            "u_value": 10.0,
+            "segment": "below_esp",
+            "esp_depth": 600.0
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "reservoir_28fc": {
+      "type": "injection_reservoir",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "role": "injection",
+            "pressure": 22000000.0,
+            "temperature": 353.15,
+            "permeability": 9.869233e-12,
+            "thickness": 45.0,
+            "drainage_radius": 0.0,
+            "top_depth": 0.0,
+            "productivity_index": null,
+            "injectivity_index": 5.5555555555555555e-8,
+            "skin": 0.0,
+            "wellbore_radius": 0.0765,
+            "liquid_density": 1068.0,
+            "liquid_viscosity": 0.00065,
+            "decline_threshold": 0.15
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "reservoir_c1b5": {
+      "type": "production_reservoir",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "role": "production",
+            "pressure": 22000000.0,
+            "temperature": 353.15,
+            "permeability": 9.869233e-12,
+            "thickness": 45.0,
+            "drainage_radius": 1000.0,
+            "top_depth": 1800.0,
+            "productivity_index": 5.833333333333333e-8,
+            "injectivity_index": null,
+            "skin": 0.0,
+            "wellbore_radius": 0.0765,
+            "liquid_density": 1068.0,
+            "liquid_viscosity": 0.00065,
+            "decline_threshold": 0.15
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    },
+    "production_well_c774_riser": {
+      "type": "productionwell",
+      "params": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "path": {
+              "sections": [
+                {
+                  "length": 400.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 362.0,
+                  "inclination": 1.312662130424935,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 188.0,
+                  "inclination": 0.9238027730805987,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 550.0,
+                  "inclination": 0.814370628980554,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                },
+                {
+                  "length": 300.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 0.00002
+                }
+              ]
+            },
+            "friction_correlation": "darcy_weisbach",
+            "friction_correlation_2p": "BeggsBrill",
+            "correction_factors": [
+              1.0,
+              0.0
+            ],
+            "soil_temperature": 288.15,
+            "u_value": 10.0,
+            "segment": "above_esp",
+            "esp_depth": 600.0
+          }
+        }
+      ],
+      "fluid": "geothermal_doublet_brine"
+    }
+  },
+  "links": [
+    {
+      "source": "reservoir_c1b5",
+      "source_port": "sandface",
+      "target": "production_well_c774",
+      "target_port": "bottom"
+    },
+    {
+      "source": "production_well_c774",
+      "source_port": "wellhead",
+      "target": "esp_1ee3",
+      "target_port": "suction"
+    },
+    {
+      "source": "filter_b2e6",
+      "source_port": "outlet",
+      "target": "heat_exchanger_3410",
+      "target_port": "hot_in"
+    },
+    {
+      "source": "heat_exchanger_3410",
+      "source_port": "hot_out",
+      "target": "filter_b1ed",
+      "target_port": "inlet"
+    },
+    {
+      "source": "filter_b1ed",
+      "source_port": "outlet",
+      "target": "injection_pump_3808",
+      "target_port": "suction"
+    },
+    {
+      "source": "injection_pump_3808",
+      "source_port": "discharge",
+      "target": "injection_well_a06b",
+      "target_port": "wellhead"
+    },
+    {
+      "source": "injection_well_a06b",
+      "source_port": "bottom",
+      "target": "reservoir_28fc",
+      "target_port": "sandface"
+    },
+    {
+      "source": "production_well_c774_riser",
+      "source_port": "wellhead",
+      "target": "degasser_e846",
+      "target_port": "inlet"
+    },
+    {
+      "source": "degasser_e846",
+      "source_port": "liquid",
+      "target": "filter_b2e6",
+      "target_port": "inlet"
+    },
+    {
+      "source": "esp_1ee3",
+      "source_port": "discharge",
+      "target": "production_well_c774_riser",
+      "target_port": "bottom"
+    }
+  ],
+  "bindings": {
+    "degasser_e846": {
+      "inputs": {},
+      "streams": {
+        "inlet": {
+          "m_dot": {
+            "column": "Qp",
+            "unit": "m3/h"
+          },
+          "p": {
+            "column": "Sep_Pin",
+            "unit": "bar"
+          },
+          "T": {
+            "column": "T_p_in",
+            "unit": "degC"
+          }
+        }
+      },
+      "measured": {}
+    },
+    "esp_1ee3": {
+      "inputs": {
+        "frequency": {
+          "column": "ESP_freq",
+          "unit": "Hz"
+        }
+      },
+      "streams": {
+        "suction": {
+          "m_dot": {
+            "column": "Qp",
+            "unit": "m3/h"
+          },
+          "p": {
+            "column": "ESP_Pin",
+            "unit": "bar"
+          },
+          "T": {
+            "column": "T_p_in",
+            "unit": "degC"
+          }
+        }
+      },
+      "measured": {
+        "head": {
+          "column": "ESP_Head",
+          "unit": "bar"
+        },
+        "discharge_pressure": {
+          "column": "ESP_Pout",
+          "unit": "bar"
+        },
+        "power": {
+          "column": "ESP_PowerDraw",
+          "unit": "W"
+        }
+      }
+    },
+    "filter_b1ed": {
+      "inputs": {},
+      "streams": {
+        "inlet": {
+          "m_dot": {
+            "column": "Qp",
+            "unit": "m3/h"
+          },
+          "p": {
+            "column": "FilterB_Pin",
+            "unit": "bar"
+          },
+          "T": {
+            "column": "T_p_out",
+            "unit": "degC"
+          }
+        }
+      },
+      "measured": {
+        "pressure_drop": {
+          "column": "FilterB_PDrop",
+          "unit": "bar"
+        }
+      }
+    },
+    "filter_b2e6": {
+      "inputs": {},
+      "streams": {
+        "inlet": {
+          "m_dot": {
+            "column": "Qp",
+            "unit": "m3/h"
+          },
+          "p": {
+            "column": "FilterA_Pin",
+            "unit": "bar"
+          },
+          "T": {
+            "column": "T_p_in",
+            "unit": "degC"
+          }
+        }
+      },
+      "measured": {
+        "pressure_drop": {
+          "column": "FilterA_PDrop",
+          "unit": "bar"
+        }
+      }
+    },
+    "heat_exchanger_3410": {
+      "inputs": {},
+      "streams": {
+        "hot_in": {
+          "m_dot": {
+            "column": "Qp",
+            "unit": "m3/h"
+          },
+          "p": {
+            "column": "HEX_Pin",
+            "unit": "bar"
+          },
+          "T": {
+            "column": "T_p_in",
+            "unit": "degC"
+          }
+        },
+        "cold_in": {
+          "m_dot": {
+            "column": "Qs",
+            "unit": "m3/h"
+          },
+          "T": {
+            "column": "T_s_in",
+            "unit": "degC"
+          }
+        }
+      },
+      "measured": {
+        "hot_out_T": {
+          "column": "T_p_out",
+          "unit": "degC"
+        },
+        "cold_out_T": {
+          "column": "T_s_out",
+          "unit": "degC"
+        },
+        "duty": {
+          "column": "Thermal_PowerGen",
+          "unit": "W"
+        },
+        "dp_hot": {
+          "column": "HEX_PDrop",
+          "unit": "bar"
+        }
+      }
+    },
+    "injection_pump_3808": {
+      "inputs": {
+        "discharge_pressure": {
+          "column": "InjectorPump_Pout",
+          "unit": "bar"
+        }
+      },
+      "streams": {
+        "suction": {
+          "m_dot": {
+            "column": "Qp",
+            "unit": "m3/h"
+          },
+          "p": {
+            "column": "InjectorPump_Pin",
+            "unit": "bar"
+          },
+          "T": {
+            "column": "T_p_out",
+            "unit": "degC"
+          }
+        }
+      },
+      "measured": {
+        "power": {
+          "column": "InjectorPump_PowerDraw",
+          "unit": "W"
+        }
+      }
+    },
+    "injection_well_a06b": {
+      "inputs": {},
+      "streams": {
+        "wellhead": {
+          "m_dot": {
+            "column": "Qp",
+            "unit": "m3/h"
+          },
+          "p": {
+            "column": "InjectorPump_Pout",
+            "unit": "bar"
+          },
+          "T": {
+            "column": "T_p_out",
+            "unit": "degC"
+          }
+        }
+      },
+      "measured": {}
+    },
+    "reservoir_c1b5": {
+      "inputs": {
+        "m_dot": {
+          "column": "Qp",
+          "unit": "m3/h"
+        }
+      },
+      "streams": {},
+      "measured": {}
+    }
+  },
+  "boundary": {
+    "stream_defaults": {
+      "heat_exchanger_3410": {
+        "cold_in": {
+          "p": 500000.0
+        }
+      }
+    },
+    "fluids": {
+      "geothermal_doublet_brine": {
+        "RHOL": 1068.0,
+        "VISL": 0.00065
+      }
+    },
+    "inputs": {
+      "injection_pump_3808": {
+        "discharge_pressure": 5150000.0
+      }
+    },
+    "streams": {},
+    "well_risers": {
+      "production_well_c774": "production_well_c774_riser"
+    }
+  },
+  "timestep": 900.0,
+  "ignored": {
+    "degasser_e846.tagnames.filtered.degasser_inlet_flow": "Empty tag: no data column is bound.",
+    "degasser_e846.tagnames.filtered.degasser_level": "Empty tag: no data column is bound.",
+    "degasser_e846.tagnames.filtered.degasser_outlet_gas_flow": "Empty tag: no data column is bound.",
+    "degasser_e846.tagnames.filtered.degasser_outlet_liquid_flow": "Empty tag: no data column is bound.",
+    "degasser_e846.tagnames.filtered.degasser_pressure": "Empty tag: no data column is bound.",
+    "degasser_e846.tagnames.measured.degasser_level": "Empty tag: no data column is bound.",
+    "degasser_e846.tagnames.measured.degasser_outlet_gas_flow": "Empty tag: no data column is bound.",
+    "degasser_e846.tagnames.measured.degasser_outlet_liquid_flow": "Duplicates Qp; the liquid-only model conserves inlet mass.",
+    "esp_1ee3.tagnames.calculated.esp_efficiency": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.calculated.esp_theoretical_head": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.calculated.esp_theoretical_outlet_pressure": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.calculated.esp_theoretical_power": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.calculated.esp_vlp_head": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.calculated.esp_vlp_ipr_inlet_pressure": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.calculated.esp_vlp_outlet_pressure": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_current": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_flow": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_frequency": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_head": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_inlet_pressure": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_inlet_temperature": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_motor_temperature": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_outlet_pressure": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_outlet_temperature": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_power_consumption": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_vibration_x": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_vibration_y": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.filtered.esp_voltage": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.measured.esp_current": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.measured.esp_motor_temperature": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.measured.esp_outlet_temperature": "Isothermal pump model has no outlet-temperature output.",
+    "esp_1ee3.tagnames.measured.esp_vibration_x": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.measured.esp_vibration_y": "Empty tag: no data column is bound.",
+    "esp_1ee3.tagnames.measured.esp_voltage": "Empty tag: no data column is bound.",
+    "filter_b1ed.tagnames.filtered.filter_flow": "Empty tag: no data column is bound.",
+    "filter_b1ed.tagnames.filtered.filter_inlet_pressure": "Empty tag: no data column is bound.",
+    "filter_b1ed.tagnames.filtered.filter_inlet_temperature": "Empty tag: no data column is bound.",
+    "filter_b1ed.tagnames.filtered.filter_outlet_pressure": "Empty tag: no data column is bound.",
+    "filter_b1ed.tagnames.filtered.filter_outlet_temperature": "Empty tag: no data column is bound.",
+    "filter_b1ed.tagnames.measured.filter_outlet_pressure": "Pressure loss uses the explicit PDrop CSV column instead.",
+    "filter_b1ed.tagnames.measured.filter_outlet_temperature": "Isothermal filter has no temperature diagnostic.",
+    "filter_b2e6.tagnames.filtered.filter_flow": "Empty tag: no data column is bound.",
+    "filter_b2e6.tagnames.filtered.filter_inlet_pressure": "Empty tag: no data column is bound.",
+    "filter_b2e6.tagnames.filtered.filter_inlet_temperature": "Empty tag: no data column is bound.",
+    "filter_b2e6.tagnames.filtered.filter_outlet_pressure": "Empty tag: no data column is bound.",
+    "filter_b2e6.tagnames.filtered.filter_outlet_temperature": "Empty tag: no data column is bound.",
+    "filter_b2e6.tagnames.measured.filter_outlet_pressure": "Pressure loss uses the explicit PDrop CSV column instead.",
+    "filter_b2e6.tagnames.measured.filter_outlet_temperature": "Isothermal filter has no temperature diagnostic.",
+    "heat_exchanger_3410.tagnames.calculated.hex_primary_thermal_power": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.calculated.hex_secondary_thermal_power": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.calculated.hex_thermal_exchange": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_primary_flow": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_primary_inlet_pressure": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_primary_inlet_temperature": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_primary_outlet_pressure": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_primary_outlet_temperature": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_secondary_flow": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_secondary_inlet_pressure": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_secondary_inlet_temperature": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_secondary_outlet_pressure": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.filtered.hex_secondary_outlet_temperature": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.measured.hex_primary_outlet_pressure": "Hydraulic measurement represented by HEX_PDrop.",
+    "heat_exchanger_3410.tagnames.measured.hex_secondary_inlet_pressure": "Empty tag: no data column is bound.",
+    "heat_exchanger_3410.tagnames.measured.hex_secondary_outlet_pressure": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.calculated.injectionpump_efficiency": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.calculated.injectionpump_head": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.calculated.injectionpump_power": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_current": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_flow": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_frequency": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_head": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_inlet_pressure": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_inlet_temperature": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_motor_temperature": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_outlet_pressure": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_outlet_temperature": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_power_consumption": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.filtered.injectionpump_voltage": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.measured.injectionpump_current": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.measured.injectionpump_frequency": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.measured.injectionpump_head": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.measured.injectionpump_motor_temperature": "Empty tag: no data column is bound.",
+    "injection_pump_3808.tagnames.measured.injectionpump_outlet_temperature": "Isothermal pump model has no outlet-temperature output.",
+    "injection_pump_3808.tagnames.measured.injectionpump_voltage": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.calculated.injectionwell_bottomhole_pressure": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.calculated.injectionwell_bottomhole_temperature": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.calculated.injectionwell_flow": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.calculated.injectionwell_injectivity_index": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.calculated.injectionwell_wellhead_pressure": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.calculated.injectionwell_wellhead_temperature": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.filtered.injectionwell_bottomhole_pressure": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.filtered.injectionwell_bottomhole_temperature": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.filtered.injectionwell_flow": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.filtered.injectionwell_wellhead_pressure": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.filtered.injectionwell_wellhead_temperature": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.measured.injectionwell_annulus_a_pressure": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.measured.injectionwell_annulus_b_pressure": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.measured.injectionwell_bottomhole_pressure": "Empty tag: no data column is bound.",
+    "injection_well_a06b.tagnames.measured.injectionwell_bottomhole_temperature": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.calculated.productionwell_bottomhole_pressure": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.calculated.productionwell_bottomhole_temperature": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.calculated.productionwell_flow": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.calculated.productionwell_wellhead_pressure": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.calculated.productionwell_wellhead_temperature": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.filtered.productionwell_bottomhole_pressure": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.filtered.productionwell_bottomhole_temperature": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.filtered.productionwell_flow": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.filtered.productionwell_wellhead_pressure": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.filtered.productionwell_wellhead_temperature": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.measured.productionwell_annulus_a_pressure": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.measured.productionwell_annulus_b_pressure": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.measured.productionwell_bottomhole_pressure": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.measured.productionwell_bottomhole_temperature": "Empty tag: no data column is bound.",
+    "production_well_c774.tagnames.measured.productionwell_flow": "No measured sandface boundary: this well is evaluated in the chained scenario only.",
+    "production_well_c774.tagnames.measured.productionwell_wellhead_pressure": "No measured sandface boundary: this well is evaluated in the chained scenario only.",
+    "production_well_c774.tagnames.measured.productionwell_wellhead_temperature": "No measured sandface boundary: this well is evaluated in the chained scenario only.",
+    "reservoir_28fc.tagnames.calculated.reservoir_pressure": "Empty tag: no data column is bound.",
+    "reservoir_c1b5.tagnames.calculated.reservoir_pressure": "Empty tag: no data column is bound."
+  },
+  "unmapped": []
+}

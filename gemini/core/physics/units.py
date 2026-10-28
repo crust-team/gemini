@@ -220,3 +220,26 @@ def ms_to_mm_year(x: float) -> float:
 def mol_l_bar_to_mol_m3_pa(x: float) -> float:
     """Convert Henry solubility constant [mol/l/bar] to [mol/m3/Pa]."""
     return x * 0.01
+
+
+def to_si(value: float, unit: str) -> float:
+    """Convert a bound scalar to SI; volume flow remains [m3/s] until density is known."""
+    conversions = {
+        "bar": (1e5, 0),
+        "barg": (1e5, 101325),
+        "degC": (1, 273.15),
+        "K": (1, 0),
+        "m3/h": (1 / 3600, 0),
+        "m3/s": (1, 0),
+        "kg/s": (1, 0),
+        "Hz": (1, 0),
+        "W": (1, 0),
+        "kW": (1000, 0),
+        "MW": (1e6, 0),
+        "Pa": (1, 0),
+        "-": (1, 0),
+    }
+    if unit not in conversions:
+        raise ValueError(f"Unknown data unit {unit!r}")
+    scale, offset = conversions[unit]
+    return float(value) * scale + offset

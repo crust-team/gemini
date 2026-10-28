@@ -3,8 +3,8 @@
 from pathlib import Path
 
 from gemini.core.base.stream import Stream
+from gemini.core.config import param_mapping as mapping
 from gemini.core.modules.subsurface import InjectionWell
-from gemini.core.plant import param_mapping as mapping
 
 
 def test_injection_flow_sign_and_pressure():

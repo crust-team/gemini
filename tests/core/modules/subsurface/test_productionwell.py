@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from gemini.core.base.stream import Stream
+from gemini.core.config import param_mapping as mapping
 from gemini.core.modules.subsurface import ProductionWell
-from gemini.core.plant import param_mapping as mapping
 
 
 def test_split_esp_traversal():

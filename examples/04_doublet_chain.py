@@ -13,7 +13,7 @@ from gemini.core.modules.subsurface import (
     ProductionWell,
 )
 from gemini.core.physics import fluid, units
-from gemini.core.plant import param_mapping as mapping
+from gemini.core.config import param_mapping as mapping
 
 DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
 
