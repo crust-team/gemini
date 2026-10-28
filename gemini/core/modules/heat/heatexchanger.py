@@ -8,9 +8,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.core.base.health import Health
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
 from gemini.core.physics import fluid, heat_transfer
+from gemini.core.types.results import Health, ModuleResult
 
 
 class HeatExchanger(Module):

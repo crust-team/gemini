@@ -2,8 +2,8 @@
 
 import pytest
 
-from gemini.core.base.stream import Stream
 from gemini.core.modules.heat import Boiler
+from gemini.core.types.flows import Stream
 
 
 def test_capacity_balance_and_no_cooling():

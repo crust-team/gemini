@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from gemini.core.base.stream import Stream
 from gemini.core.config import param_mapping as mapping
 from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.core.types.flows import Stream
 
 DATA = Path(__file__).parents[4] / "datasets/geothermal_doublet"
 

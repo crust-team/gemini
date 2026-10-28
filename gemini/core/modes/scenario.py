@@ -1,8 +1,8 @@
 """Chained plant scenarios driven by explicitly assumed operating conditions."""
 
-from gemini.core.base.stream import Stream
 from gemini.core.engine.results import Results
 from gemini.core.modes.twin import health_or_unavailable
+from gemini.core.types.flows import Stream
 
 
 def run(plant, inputs_per_step, dt):

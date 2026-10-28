@@ -10,7 +10,7 @@ from . import fluid as fluid_models
 from . import geometry, heat_transfer, units
 
 if TYPE_CHECKING:
-    from gemini.core.base.stream import Stream
+    from gemini.core.types.flows import Stream
 from .constants import G_FT, G
 
 

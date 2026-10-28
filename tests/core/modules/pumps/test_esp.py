@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from gemini.core.base.stream import Stream
 from gemini.core.modules.pumps import ESP
 from gemini.core.physics import units
+from gemini.core.types.flows import Stream
 
 ESP_PARAMS = {
     "pump_type": "HC27000",

@@ -3,9 +3,9 @@
 import math
 from collections import Counter
 
-from gemini.core.base.health import Health
-from gemini.core.base.stream import Stream
 from gemini.core.physics import fluid, units
+from gemini.core.types.flows import Stream
+from gemini.core.types.results import Health
 
 
 class MissingMeasurement(ValueError):

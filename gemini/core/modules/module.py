@@ -2,32 +2,14 @@
 
 import inspect
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from functools import wraps
-from typing import Any, ClassVar, Literal, NamedTuple
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 
-from gemini.core.base.stream import Stream
 from gemini.core.physics import fluid
-
-
-class ModuleResult(NamedTuple):
-    """Validated outputs and outgoing SI streams from one evaluation."""
-
-    outputs: BaseModel
-    streams: dict[str, Stream]
-
-
-@dataclass(frozen=True)
-class ParamRef:
-    """A calibratable parameter's location, current value and numeric bounds."""
-
-    path: str
-    module_path: str
-    field: str
-    value: Any
-    bounds: tuple[float, float] | None
+from gemini.core.types.flows import Stream
+from gemini.core.types.results import ModuleResult, ParamRef
 
 
 class HookHandle:

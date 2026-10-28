@@ -1,7 +1,7 @@
 """Mass conservation and fidelity for BoosterPump."""
 
-from gemini.core.base.stream import Stream
 from gemini.core.modules.pumps import BoosterPump
+from gemini.core.types.flows import Stream
 
 
 def test_equipment_forward():

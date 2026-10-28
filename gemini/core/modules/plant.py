@@ -1,7 +1,8 @@
 """Directed plant graphs with validated ports and deterministic stream tearing."""
 
-from gemini.core.base.stream import Stream
-from gemini.core.modules.module import ChildInputs, ChildOutputs, Module, ModuleResult
+from gemini.core.modules.module import ChildInputs, ChildOutputs, Module
+from gemini.core.types.flows import Stream
+from gemini.core.types.results import ModuleResult
 
 
 class GraphPlant(Module):

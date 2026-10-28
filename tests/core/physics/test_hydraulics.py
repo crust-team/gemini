@@ -2,8 +2,8 @@
 
 import pytest
 
-from gemini.core.base.stream import Stream
 from gemini.core.physics import fluid, geometry, hydraulics
+from gemini.core.types.flows import Stream
 
 
 def test_zero_flow_and_unknown_correlation():

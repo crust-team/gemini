@@ -7,7 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
+from gemini.core.types.results import ModuleResult
 
 
 class Boiler(Module):

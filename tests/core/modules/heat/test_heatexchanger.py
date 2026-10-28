@@ -5,10 +5,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gemini.core.base.stream import Stream
 from gemini.core.config import param_mapping as mapping
 from gemini.core.modules.heat import HeatExchanger
 from gemini.core.physics import units
+from gemini.core.types.flows import Stream
 
 
 def test_measured_heat_exchanger_performance():

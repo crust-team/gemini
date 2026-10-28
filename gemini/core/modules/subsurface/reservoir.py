@@ -9,10 +9,10 @@ from typing import Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from gemini.core.base.health import Health
-from gemini.core.base.stream import Stream
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
 from gemini.core.physics import hydraulics
+from gemini.core.types.flows import Stream
+from gemini.core.types.results import Health, ModuleResult
 
 
 class _Reservoir(Module):
