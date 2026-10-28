@@ -1,0 +1,639 @@
+{
+  "esp_40": {
+    "parameters": {
+      "no_stages": 15,
+      "head_coeff": [
+        125.518426,
+        -0.0020852856,
+        2.28955651e-07,
+        -1.45640214e-11,
+        2.37859645e-16,
+        -1.18258356e-21
+      ],
+      "power_coeff": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "inputs": {
+      "pump_flow": 0.025,
+      "pump_freq": 40
+    },
+    "expected": {
+      "pump_head": 2201033.675853861,
+      "pump_power": 0.0,
+      "pump_eff": 0
+    }
+  },
+  "esp_50": {
+    "parameters": {
+      "no_stages": 15,
+      "head_coeff": [
+        125.518426,
+        -0.0020852856,
+        2.28955651e-07,
+        -1.45640214e-11,
+        2.37859645e-16,
+        -1.18258356e-21
+      ],
+      "power_coeff": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "inputs": {
+      "pump_flow": 0.03611111111111111,
+      "pump_freq": 50
+    },
+    "expected": {
+      "pump_head": 2942765.9632626665,
+      "pump_power": 0.0,
+      "pump_eff": 0
+    }
+  },
+  "esp_60": {
+    "parameters": {
+      "no_stages": 15,
+      "head_coeff": [
+        125.518426,
+        -0.0020852856,
+        2.28955651e-07,
+        -1.45640214e-11,
+        2.37859645e-16,
+        -1.18258356e-21
+      ],
+      "power_coeff": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "inputs": {
+      "pump_flow": 0.04722222222222222,
+      "pump_freq": 60
+    },
+    "expected": {
+      "pump_head": 2987487.045580167,
+      "pump_power": 0.0,
+      "pump_eff": 0
+    }
+  },
+  "esp_power": {
+    "parameters": {
+      "no_stages": 15,
+      "head_coeff": [
+        125.518426,
+        -0.0020852856,
+        2.28955651e-07,
+        -1.45640214e-11,
+        2.37859645e-16,
+        -1.18258356e-21
+      ],
+      "power_coeff": [
+        10.02089977,
+        -0.000160233,
+        6.52e-08,
+        -2.13e-12,
+        1.71e-17,
+        1.38e-23
+      ]
+    },
+    "inputs": {
+      "pump_flow": 0.03611111111111111,
+      "pump_freq": 60
+    },
+    "expected": {
+      "pump_head": 4237582.987098239,
+      "pump_power": 206534.0000445498,
+      "pump_eff": 74.00228422979913
+    }
+  },
+  "ipr_production": {
+    "parameters": {
+      "type": "production_reservoir",
+      "reservoir_pressure": 22000000.0,
+      "productivity_index": 5.833333333333333e-08,
+      "injectivity_index": 5.5555555555555555e-08
+    },
+    "inputs": {
+      "flow": 0.041666666666666664
+    },
+    "expected": {
+      "bottomhole_pressure": 21285714.285714287
+    }
+  },
+  "ipr_injection": {
+    "parameters": {
+      "type": "injection_reservoir",
+      "reservoir_pressure": 22000000.0,
+      "productivity_index": 5.833333333333333e-08,
+      "injectivity_index": 5.5555555555555555e-08
+    },
+    "inputs": {
+      "flow": 0.041666666666666664
+    },
+    "expected": {
+      "bottomhole_pressure": 22750000.0
+    }
+  },
+  "injectivity": {
+    "parameters": {
+      "reservoir_pressure": 22000000.0
+    },
+    "inputs": {
+      "flow": 0.041666666666666664,
+      "bottomhole_pressure": 23000000.0
+    },
+    "expected": {
+      "injectivity_index": 4.166666666666666e-08
+    }
+  },
+  "reservoir_estimate": {
+    "parameters": {},
+    "inputs": {
+      "flow": [
+        0.01,
+        0.02,
+        0.03,
+        0.04
+      ],
+      "bottomhole_pressure": [
+        22500000.0,
+        23000000.0,
+        23500000.0,
+        24000000.0
+      ]
+    },
+    "expected": {
+      "reservoir_pressure": 21999999.999999985,
+      "r_squared": 1.0
+    }
+  },
+  "reservoir_dp": {
+    "parameters": {
+      "reservoir_pressure": 22000000.0,
+      "reservoir_radius": 1000,
+      "reservoir_permeability": 9.869233e-12,
+      "reservoir_thickness": 45,
+      "reservoir_top": 1800
+    },
+    "inputs": {
+      "flow": 0.041666666666666664,
+      "viscosity": 0.00065,
+      "density": 1068,
+      "well_radius": 0.0765,
+      "skin_factor": 2
+    },
+    "expected": {
+      "Hydrostatic_dp": 18858744.0,
+      "skin_dp": 19411.376189260765,
+      "bottomhole_dp": 91992.64523742572,
+      "reservoir_dp": 22111404.02142669
+    }
+  },
+  "well_production": {
+    "parameters": {
+      "length": [
+        400,
+        150,
+        150,
+        362,
+        188,
+        100,
+        250,
+        550,
+        250,
+        100,
+        300
+      ],
+      "angle": [
+        1.5707963267948966,
+        1.5707963267948966,
+        1.5707963267948966,
+        1.312662130424935,
+        0.9238027730805987,
+        1.5707963267948966,
+        0.9272934315845873,
+        0.814370628980554,
+        0.9272934315845873,
+        0.5235987755982988,
+        0.5235987755982988
+      ],
+      "diameter": [
+        0.1778,
+        0.1778,
+        0.273,
+        0.273,
+        0.273,
+        0.273,
+        0.273,
+        0.273,
+        0.273,
+        0.1778,
+        0.1778
+      ],
+      "roughness": [
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05,
+        2e-05
+      ],
+      "friction_correlation": "darcy_weisbach",
+      "friction_correlation_2p": "BeggsBrill",
+      "correction_factors": [
+        1,
+        0
+      ]
+    },
+    "inputs": {
+      "flowrate": 0.041666666666666664,
+      "pressure": 25000000.0,
+      "temperature": 353.15,
+      "temperature_ambient": 288.15,
+      "direction": "up"
+    },
+    "expected": {
+      "pressure_output": 2291768.0228079604,
+      "temperature_output": 345.7197654595049,
+      "pressuredrop_fric_output": 145012.38673361592,
+      "pressuredrop_grav_output": 22563219.59045842,
+      "section_pressure_output": [
+        23491517.254820768,
+        22988689.67309436,
+        21022921.98284626,
+        17090513.643606033,
+        15124745.953357935,
+        14142237.825772382,
+        12667852.163837304,
+        9228831.913681546,
+        7755069.722303217,
+        6265078.349713602,
+        2291768.0228079604
+      ],
+      "section_temperature_output": [
+        352.5301555903109,
+        352.3255110798619,
+        351.5424632101416,
+        349.84077776404126,
+        349.08804776942685,
+        348.7906295942517,
+        348.23421242986143,
+        347.17264420363705,
+        346.74053960456587,
+        346.46117792430005,
+        345.7197654595049
+      ]
+    }
+  },
+  "well_injection": {
+    "parameters": {
+      "length": [
+        500,
+        500,
+        1000
+      ],
+      "angle": [
+        1.5707963267948966,
+        1.5707963267948966,
+        1.5707963267948966
+      ],
+      "diameter": [
+        0.1778,
+        0.1778,
+        0.1778
+      ],
+      "roughness": [
+        2e-05,
+        2e-05,
+        2e-05
+      ],
+      "friction_correlation": "darcy_weisbach",
+      "friction_correlation_2p": "BeggsBrill",
+      "correction_factors": [
+        1,
+        0
+      ]
+    },
+    "inputs": {
+      "flowrate": -0.041666666666666664,
+      "pressure": 5000000.0,
+      "temperature": 353.15,
+      "temperature_ambient": 288.15,
+      "direction": "down"
+    },
+    "expected": {
+      "pressure_output": 24373448.365471795,
+      "temperature_output": 349.09927755555395,
+      "pressuredrop_fric_output": -246551.63452820707,
+      "pressuredrop_grav_output": 19620000.0,
+      "section_pressure_output": [
+        9843362.091367949,
+        14686724.182735898,
+        24373448.365471795
+      ],
+      "section_temperature_output": [
+        352.1169259838515,
+        351.1002710742083,
+        349.09927755555395
+      ]
+    }
+  },
+  "darcy": {
+    "inputs": [
+      2,
+      1000,
+      1.2,
+      0.001,
+      0.1778,
+      2e-05,
+      100
+    ],
+    "expected": [
+      17112.58839953839,
+      914330.343333849
+    ]
+  },
+  "beggs": {
+    "inputs": [
+      0.5,
+      2,
+      1.976,
+      1000,
+      0.7,
+      2.129e-05,
+      0.001,
+      0.0728,
+      0.1778,
+      2e-05,
+      100
+    ],
+    "expected": [
+      24080.130283559385,
+      546990.5817853785
+    ]
+  },
+  "temperature": {
+    "inputs": [
+      353.15,
+      10,
+      40,
+      0,
+      4217.4,
+      819,
+      50,
+      288.15
+    ],
+    "expected": 0.1926542419500166
+  },
+  "corrosion_NORSOK_False": {
+    "parameters": {
+      "corrosion_model": "NORSOK",
+      "diameter": 0.1,
+      "roughness": 5e-05
+    },
+    "inputs": {
+      "co2_fraction": 0.1,
+      "pressure": 3,
+      "temperature": 40,
+      "water_density": 1024,
+      "water_viscosity": 0.5469,
+      "water_flow_rate": 1000,
+      "flow_rate": 0.011574074074074073,
+      "bicarb_concentration": 268,
+      "ionic_strength": 71
+    },
+    "expected": {
+      "corrosion_rate": 1.4121929436222236
+    }
+  },
+  "corrosion_DLM_False": {
+    "parameters": {
+      "corrosion_model": "DLM",
+      "diameter": 0.1,
+      "roughness": 5e-05
+    },
+    "inputs": {
+      "co2_fraction": 0.1,
+      "pressure": 3,
+      "temperature": 40,
+      "water_density": 1024,
+      "water_viscosity": 0.5469,
+      "water_flow_rate": 1000,
+      "flow_rate": 0.011574074074074073,
+      "bicarb_concentration": 268,
+      "ionic_strength": 71
+    },
+    "expected": {
+      "corrosion_rate": 0.9688895388860918
+    }
+  },
+  "corrosion_DLD_False": {
+    "parameters": {
+      "corrosion_model": "DLD",
+      "diameter": 0.1,
+      "roughness": 5e-05
+    },
+    "inputs": {
+      "co2_fraction": 0.1,
+      "pressure": 3,
+      "temperature": 40,
+      "water_density": 1024,
+      "water_viscosity": 0.5469,
+      "water_flow_rate": 1000,
+      "flow_rate": 0.011574074074074073,
+      "bicarb_concentration": 268,
+      "ionic_strength": 71
+    },
+    "expected": {
+      "corrosion_rate": 1.3804278516913842
+    }
+  },
+  "corrosion_NORSOK_True": {
+    "parameters": {
+      "corrosion_model": "NORSOK",
+      "diameter": 0.1,
+      "roughness": 5e-05,
+      "A": 1
+    },
+    "inputs": {
+      "co2_fraction": 0.1,
+      "pressure": 3,
+      "temperature": 40,
+      "water_density": 1024,
+      "water_viscosity": 0.5469,
+      "water_flow_rate": 1000,
+      "flow_rate": 0.011574074074074073,
+      "bicarb_concentration": 268,
+      "ionic_strength": 71
+    },
+    "expected": {
+      "corrosion_rate": 1.4121929436222236
+    }
+  },
+  "corrosion_DLM_True": {
+    "parameters": {
+      "corrosion_model": "DLM",
+      "diameter": 0.1,
+      "roughness": 5e-05,
+      "A": 5.8,
+      "B": 1710,
+      "C": 0.67
+    },
+    "inputs": {
+      "co2_fraction": 0.1,
+      "pressure": 3,
+      "temperature": 40,
+      "water_density": 1024,
+      "water_viscosity": 0.5469,
+      "water_flow_rate": 1000,
+      "flow_rate": 0.011574074074074073,
+      "bicarb_concentration": 268,
+      "ionic_strength": 71
+    },
+    "expected": {
+      "corrosion_rate": 0.9688895388860918
+    }
+  },
+  "corrosion_DLD_True": {
+    "parameters": {
+      "corrosion_model": "DLD",
+      "diameter": 0.1,
+      "roughness": 5e-05,
+      "A": 4.93,
+      "B": 1119,
+      "C": 0.58,
+      "D": 2.45
+    },
+    "inputs": {
+      "co2_fraction": 0.1,
+      "pressure": 3,
+      "temperature": 40,
+      "water_density": 1024,
+      "water_viscosity": 0.5469,
+      "water_flow_rate": 1000,
+      "flow_rate": 0.011574074074074073,
+      "bicarb_concentration": 268,
+      "ionic_strength": 71
+    },
+    "expected": {
+      "corrosion_rate": 1.3804278516913842
+    }
+  },
+  "chemistry": {
+    "parameters": {},
+    "inputs": {
+      "co2_mol_fraction": 0.1882,
+      "gas_pressure": 1,
+      "gas_water_ratio": 0.4224,
+      "gas_density": 1.027,
+      "gas_molecular_weight": 22.955,
+      "temperature_sample": 20,
+      "temperature_system": 85
+    },
+    "expected": {
+      "CO2 Partial Pressure [bar]": 1.2397803304952222
+    }
+  },
+  "erosion_DNV": {
+    "parameters": {
+      "erosion_model": "DNV"
+    },
+    "inputs": {
+      "alpha": 90,
+      "mater": "steel",
+      "rho_fluid": 1068,
+      "diameter": 0.1778,
+      "flowRate": 150,
+      "Hv": 1,
+      "mater_particle": "SIO2",
+      "diameter_particle": 0.1,
+      "rho_pipe": 7800,
+      "fs": 0.5
+    },
+    "expected": {
+      "erosion_rate_mm_yr": 31.67791469402017,
+      "erosion_velocity_ms": null
+    }
+  },
+  "erosion_OKA": {
+    "parameters": {
+      "erosion_model": "OKA"
+    },
+    "inputs": {
+      "alpha": 90,
+      "mater": "steel",
+      "rho_fluid": 1068,
+      "diameter": 0.1778,
+      "flowRate": 150,
+      "Hv": 1,
+      "mater_particle": "SIO2",
+      "diameter_particle": 0.1,
+      "rho_pipe": 7800,
+      "fs": 0.5
+    },
+    "expected": {
+      "erosion_rate_mm_yr": 59.683907975840654,
+      "erosion_velocity_ms": null
+    }
+  },
+  "erosion_TULSA": {
+    "parameters": {
+      "erosion_model": "TULSA"
+    },
+    "inputs": {
+      "alpha": 90,
+      "mater": "steel",
+      "rho_fluid": 1068,
+      "diameter": 0.1778,
+      "flowRate": 150,
+      "Hv": 1,
+      "mater_particle": "SIO2",
+      "diameter_particle": 0.1,
+      "rho_pipe": 7800,
+      "fs": 0.5
+    },
+    "expected": {
+      "erosion_rate_mm_yr": 173.5984653980944,
+      "erosion_velocity_ms": null
+    }
+  },
+  "erosion_API": {
+    "parameters": {
+      "erosion_model": "API"
+    },
+    "inputs": {
+      "alpha": 90,
+      "mater": "steel",
+      "rho_fluid": 1068,
+      "diameter": 0.1778,
+      "flowRate": 150,
+      "Hv": 1,
+      "mater_particle": "SIO2",
+      "diameter_particle": 0.1,
+      "rho_pipe": 7800,
+      "fs": 0.5
+    },
+    "expected": {
+      "erosion_rate_mm_yr": null,
+      "erosion_velocity_ms": 4.669539548502527
+    }
+  }
+}
