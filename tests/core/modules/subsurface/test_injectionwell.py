@@ -8,7 +8,7 @@ from gemini.core.plant import param_mapping as mapping
 
 
 def test_injection_flow_sign_and_pressure():
-    """A positive surface rate becomes the documented negative downhole stream rate."""
+    """Ports conserve mass while the internal DPDT correlation retains its negative sign."""
     data = Path(__file__).parents[4] / "datasets/geothermal_doublet"
     c = InjectionWell(
         mapping.injectionwell_params_from_gemini(
@@ -17,7 +17,7 @@ def test_injection_flow_sign_and_pressure():
     )
     out, streams = c({}, {"wellhead": Stream(m_dot=40, T=300, p=5e6)})
     assert out.dp_friction < 0 and out.dp_gravity > 0
-    assert streams["bottom"].m_dot == -40
+    assert streams["bottom"].m_dot == 40
     assert out.bottomhole_pressure > 5e6
 
 

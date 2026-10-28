@@ -5,7 +5,7 @@ Removes a controlled fraction of circulating brine. The original GEMINI unit had
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.core.modules.module import Module
+from gemini.core.modules.module import Module, ModuleResult
 
 
 class Blowdown(Module):
@@ -27,11 +27,13 @@ class Blowdown(Module):
 
         model_config = ConfigDict(extra="forbid")
 
-    class Outputs(BaseModel):
-        """Declared future performance results."""
+    fidelity = "passthrough"
 
-        mass_flow: float = Field(..., description="Discharged brine mass flow [kg/s]")
+    class Outputs(BaseModel):
+        """Explicit statement that no equipment physics is modelled."""
+
+        modelled: bool = Field(False, description="Equipment physics available [-]")
 
     def forward(self, inputs, streams_in):
-        """Report that the original equipment model is not implemented."""
-        raise NotImplementedError(f"{self.name} is not modelled yet")
+        """Preserve the inlet stream without implying a performance model."""
+        return ModuleResult(self.Outputs(), {"outlet": streams_in["inlet"]})
