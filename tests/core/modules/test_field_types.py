@@ -28,3 +28,12 @@ def test_registered_fields():
             for name, field in module[contract].get("properties", {}).items():
                 if (module["name"], contract, name) not in ALLOWLIST:
                     assert not numeric_without_unit(field), (module["name"], contract, name)
+
+
+def test_nested_numeric_schemas():
+    """Validate nested Stream, Fluid and pipe geometry schemas as well as direct fields."""
+    for module in list_modules():
+        for contract in ("params", "inputs", "outputs"):
+            for name, schema in module[contract].get("$defs", {}).items():
+                for field, value in schema.get("properties", {}).items():
+                    assert not numeric_without_unit(value), (module["name"], name, field)

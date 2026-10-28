@@ -9,11 +9,11 @@ from gemini.core.config import param_mapping as mapping
 from gemini.core.config.schema import (
     Binding,
     DatedParams,
-    Link,
     ModuleBindings,
     ModuleConfig,
     PlantConfig,
 )
+from gemini.core.modules.plants.geothermal_example import GeothermalExamplePlant
 from gemini.core.types.fluid import Fluid
 
 GEMINI_PORTS = {
@@ -49,7 +49,8 @@ PROPERTIES = {
         (
             "liquid_density liquid_viscosity reservoir_permeability reservoir_pressure "
             "reservoir_radius reservoir_temperature reservoir_thickness reservoir_top skin"
-            " wellbore_radius productivity_index injectivity_index"
+            " wellbore_radius productivity_index injectivity_index "
+            "salinity co2_mass_fraction gas_mass_fraction"
         ).split()
     ),
     "heatexchanger": set(
@@ -274,22 +275,8 @@ def load_gemini(folder: str | Path) -> PlantConfig:
             # NOTE(refactor): no injection curves are supplied; use measured discharge setpoint.
             # The example efficiency is explicit in the snapshot; no curve is fabricated.
             boundary["inputs"][name] = {"discharge_pressure": 5.15e6}
-    links = []
-    for edge in edges:
-        source, target = ids[edge["source"]["id"]], ids[edge["target"]["id"]]
-        try:
-            links.append(
-                Link(
-                    source=source,
-                    source_port=GEMINI_PORTS[types[source]][edge["source"]["port"]],
-                    target=target,
-                    target_port=GEMINI_PORTS[types[target]][edge["target"]["port"]],
-                )
-            )
-        except KeyError as exc:
-            raise ValueError(f"Unknown GEMINI port on {source} -> {target}: {exc}") from exc
     # NOTE(refactor): expand the buried pump into two physical well segments. The riser
-    # is a separate graph child so every link still carries an ordinary Stream.
+    # is an explicit handwritten child, preserving the previous physical segmentation.
     for name, item in list(modules.items()):
         esp = outgoing.get(name)
         if item.type != "productionwell" or types.get(esp) != "esp":
@@ -303,48 +290,45 @@ def load_gemini(folder: str | Path) -> PlantConfig:
         for snapshot in above.params:
             snapshot.params["segment"] = "above_esp"
         modules[riser] = above
-        for link in links:
-            if link.source == esp:
-                link.source, link.source_port = riser, "wellhead"
-        links.append(Link(source=esp, source_port="discharge", target=riser, target_port="bottom"))
         boundary.setdefault("well_risers", {})[name] = riser
-    # Consistent fluid identity is needed by Stream.volumetric_flow and hydraulic calculations.
-    reservoir = next((m for m in modules.values() if m.type == "production_reservoir"), None)
-    if reservoir:
-        p = reservoir.params[-1].params
-        fluid_name = folder.name + "_brine"
-        boundary["fluids"][fluid_name] = {
-            "RHOL": p.get("liquid_density") or 1000,
-            "VISL": p.get("liquid_viscosity") or 0.001,
-        }
-        if {"Thermal_PowerGen", "Qp", "T_p_in", "T_p_out"} <= columns:
-            # NOTE(refactor): example duty/(Q * deltaT) implies 4.410 MJ/m3/K.
-            # Use that explicit bulk heat capacity with the supplied 1068 kg/m3 density;
-            # this assumption is dataset-specific and does not alter default/golden fluids.
-            boundary["fluids"][fluid_name]["CPL"] = 4.410e6 / boundary["fluids"][fluid_name]["RHOL"]
-            boundary["assumptions"] = [
-                "Example bulk heat capacity 4.410 MJ/m3/K inferred from its heat balance.",
-                "Unmeasured secondary inlet pressure assumed 5 bar absolute.",
-                (
-                    "Injection-pump default scenario setpoint 51.5 bar; twin uses the "
-                    "measured setpoint."
-                ),
-            ]
-        for module in modules.values():
-            values = boundary["fluids"][fluid_name]
-            module.fluid = Fluid(
-                liquid_density=values["RHOL"],
-                liquid_viscosity=values["VISL"],
-                specific_heat=values.get("CPL"),
-            )
-        del boundary["fluids"]
+    reservoir_name = next(n for n, m in modules.items() if m.type == "production_reservoir")
+    p = modules[reservoir_name].params[-1].params
+    raw_fluid = properties(reservoir_name, -1)
+    brine = Fluid(
+        liquid_density=p.get("liquid_density") or 1000,
+        liquid_viscosity=p.get("liquid_viscosity") or 0.001,
+        salinity=raw_fluid.get("salinity", 0),
+        co2_mass_fraction=raw_fluid.get("co2_mass_fraction", 0),
+        gas_mass_fraction=raw_fluid.get("gas_mass_fraction", 0),
+    )
+    if {"Thermal_PowerGen", "Qp", "T_p_in", "T_p_out"} <= columns:
+        # NOTE(refactor): retain the earlier measured bulk heat-capacity assumption.
+        brine = Fluid.model_validate(
+            brine.model_dump() | {"specific_heat": 4.410e6 / brine.liquid_density}
+        )
+        boundary["assumptions"] = [
+            "Example bulk heat capacity 4.410 MJ/m3/K inferred from its heat balance.",
+            "Unmeasured secondary inlet pressure assumed 5 bar absolute.",
+            "Injection-pump scenario setpoint 51.5 bar; twin uses measured setpoint.",
+        ]
+    for item in modules.values():
+        item.fluid = brine
+    boundary.pop("fluids", None)
+    node_map = GeothermalExamplePlant.GEMINI_NODES | {"production_well_c774_riser": "doublet.riser"}
+    if set(modules) != set(node_map):
+        raise ValueError("Project nodes do not match GeothermalExamplePlant.GEMINI_NODES")
+    modules = {node_map[k]: v for k, v in modules.items()}
+    bindings = {node_map[k]: v for k, v in bindings.items()}
+    for key in ("stream_defaults", "inputs"):
+        boundary[key] = {node_map[k]: v for k, v in boundary[key].items()}
+    boundary.pop("well_risers", None)
     conf = json.loads((folder / "plant.conf").read_text())
     for key in unmapped:
         warnings.warn(f"Unmapped GEMINI field: {key}", stacklevel=2)
     return PlantConfig(
         name=folder.name,
         modules=modules,
-        links=links,
+        plant_type=GeothermalExamplePlant.name,
         bindings=bindings,
         boundary=boundary,
         timestep=conf["database"]["calculated"]["interval"],

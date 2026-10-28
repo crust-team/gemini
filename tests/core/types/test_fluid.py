@@ -25,3 +25,13 @@ def test_fluid_properties_and_identity():
         Fluid(salinity=0.9, co2_mass_fraction=0.2)
     with pytest.raises(ValidationError):
         Stream(m_dot=1, T=300, p=1e5, fluid="brine")
+
+
+def test_corrosion_composition_conversion():
+    """Dissolved mass fraction is converted through Henry law, never used as gas mole fraction."""
+    from gemini.core.physics.chemistry import henry_constant
+
+    fluid = Fluid(salinity=0.07, co2_mass_fraction=0.001, liquid_density=1068)
+    values = fluid.corrosion_inputs(1e6, 300)
+    assert values["ionic_strength"] == pytest.approx(74.76)
+    assert values["co2_partial_pressure"] * henry_constant(300) == pytest.approx(1.068 / 0.04401)

@@ -1,18 +1,14 @@
 """Public composable equipment and plant API."""
 
 from .heat import Boiler, HeatExchanger
-from .module import Module, ModuleResult, ParamRef, Sequential
-from .plant import GraphPlant
+from .module import Module, Sequential
 from .pumps import ESP, BoosterPump, InjectionPump
 from .subsurface import InjectionReservoir, InjectionWell, ProductionReservoir, ProductionWell
 from .treatment import Blowdown, Degasser, Filter
 
 __all__ = [
     "Module",
-    "ModuleResult",
-    "ParamRef",
     "Sequential",
-    "GraphPlant",
     "Boiler",
     "HeatExchanger",
     "ESP",

@@ -10,7 +10,7 @@ from typing import Any, ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 
 from gemini.core.types.cost import Cost
-from gemini.core.types.flows import Flow, Stream
+from gemini.core.types.flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
 from gemini.core.types.fluid import BRINE, Fluid
 from gemini.core.types.results import ModuleResult, ParamRef
 
@@ -69,6 +69,12 @@ class Module(ABC):
         for key in ("name", "category", "description", "Params", "Inputs", "Outputs"):
             if not hasattr(cls, key):
                 raise TypeError(f"{cls.__name__} must define {key}")
+        for key in ("inlets", "outlets"):
+            ports = getattr(cls, key)
+            if not isinstance(ports, dict) or any(
+                t not in (Stream, PowerFlow, FuelFlow, HeatFlow) for t in ports.values()
+            ):
+                raise TypeError(f"{cls.name}: {key} must map port names to Flow types")
         for key in ("Params", "Inputs", "Outputs"):
             if not issubclass(getattr(cls, key), BaseModel):
                 raise TypeError(f"{cls.__name__}.{key} must be a Pydantic model")
@@ -239,13 +245,17 @@ class Module(ABC):
             raise ValueError(f"{self.path}: duplicate streams {sorted(overlap)}")
         inlet.update(streams)
         self._check_ports(inlet, self.inlets, "inlet")
+        return self._observe(inputs, inlet, lambda: self.forward(inputs, inlet))
+
+    def _observe(self, inputs, inlet, evaluate):
+        """Capture one forward/step result and its children with the same hook semantics."""
         for fn in tuple(self._pre_hooks.values()):
             fn(self, inputs, inlet)
         children = {}
         parent = _evaluation.get()
         token = _evaluation.set((self, children))
         try:
-            result = self.forward(inputs, inlet)
+            result = evaluate()
         finally:
             _evaluation.reset(token)
         result = replace(result, inlets=inlet, inputs=inputs, children=children)
@@ -281,6 +291,7 @@ class Module(ABC):
                                 low = max(low, value)
                             else:
                                 high = min(high, value)
+                metadata = self._field_schema(module.Params)["properties"][field]
                 refs.append(
                     ParamRef(
                         f"{path}.{field}" if path else field,
@@ -288,6 +299,8 @@ class Module(ABC):
                         field,
                         getattr(module.params, field),
                         (low, high) if bounded else None,
+                        metadata["quantity"],
+                        metadata["unit"],
                     )
                 )
         return refs
@@ -411,19 +424,29 @@ class Module(ABC):
     def _field_schema(model):
         """Retain JSON schema, adding explicit names, bounds and nullable defaults."""
         schema = model.model_json_schema()
-        for name, field in schema.get("properties", {}).items():
-            variants = field.get("anyOf", [field])
-            value = next((v for v in variants if v.get("type") != "null"), field)
-            field["name"] = name
-            field["quantity"] = value.get("quantity", field.get("quantity"))
-            field["unit"] = value.get("unit", field.get("unit"))
-            field["bounds"] = {
-                k: value[k]
-                for k in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum")
-                if k in value
-            }
-            field.setdefault("description", "")
-            field.setdefault("default", None)
+
+        def annotate(properties):
+            for name, field in properties.items():
+                variants = field.get("anyOf", [field])
+                value = next((v for v in variants if v.get("type") != "null"), field)
+                scalar = value.get("items", value)
+                field["name"] = name
+                field["quantity"] = scalar.get("quantity", field.get("quantity"))
+                field["unit"] = scalar.get("unit", field.get("unit"))
+                field["bounds"] = {
+                    k: scalar[k]
+                    for k in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum")
+                    if k in scalar
+                }
+                if "prefixItems" in value:
+                    field["quantity"] = [v.get("quantity") for v in value["prefixItems"]]
+                    field["unit"] = [v.get("unit") for v in value["prefixItems"]]
+                field.setdefault("description", "")
+                field.setdefault("default", None)
+
+        annotate(schema.get("properties", {}))
+        for definition in schema.get("$defs", {}).values():
+            annotate(definition.get("properties", {}))
         return schema
 
     @classmethod
@@ -463,7 +486,7 @@ class Sequential(Module):
         )
         for name, module in items:
             if (
-                len(module.inlets) != 1
+                list(module.inlets.values()) != [Stream]
                 or len([t for t in module.outlets.values() if t is Stream]) != 1
             ):
                 raise ValueError("Sequential children require exactly one inlet and outlet")
@@ -503,4 +526,12 @@ class Sequential(Module):
             raise ValueError("dt must be positive [s]")
         inputs = self._validate_inputs(inputs)
         self._check_ports(streams_in, self.inlets, "inlet")
-        return self._chain(inputs, streams_in, state, dt)
+        next_state = state
+
+        def advance():
+            nonlocal next_state
+            next_state, result = self._chain(inputs, streams_in, state, dt)
+            return result
+
+        result = self._observe(inputs, streams_in, advance)
+        return next_state, result

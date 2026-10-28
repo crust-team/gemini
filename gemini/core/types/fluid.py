@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from gemini.core.physics.chemistry import henry_constant
 from gemini.core.physics.fluid import ConstantWater, FluidProperties
 from gemini.core.types.quantities import (
     Density,
@@ -51,6 +52,20 @@ class Fluid(BaseModel):
     def properties(self, p: Pressure, T: Temperature) -> FluidProperties:
         """Return cached constant SI properties; pressure and temperature are independent."""
         return _property_model(self).properties(p, T)
+
+    def corrosion_inputs(self, p: Pressure, T: Temperature) -> dict[str, float]:
+        """Convert dissolved CO2 and salt mass fractions for the existing corrosion boundary.
+
+        The Henry-law approximation is evaluated at the inlet temperature. Explicit
+        measured gas mole fraction/partial pressure should override it when available.
+        """
+        rho = self.properties(p, T).rho_l
+        # NOTE(refactor): dissolved mass fraction is NOT a gas mole fraction. Convert
+        # kg/m3 to mol/m3 (CO2 molar mass 0.04401 kg/mol), then invert existing Henry law.
+        return {
+            "co2_partial_pressure": self.co2_mass_fraction * rho / 0.04401 / henry_constant(T),
+            "ionic_strength": self.salinity * rho,
+        }
 
 
 @lru_cache(maxsize=256)

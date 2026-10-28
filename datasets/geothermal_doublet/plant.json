@@ -1,7 +1,7 @@
 {
   "name": "geothermal_doublet",
   "modules": {
-    "degasser_e846": {
+    "degasser": {
       "type": "degasser",
       "params": [
         {
@@ -13,15 +13,27 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "esp_1ee3": {
+    "doublet.esp": {
       "type": "esp",
       "params": [
         {
           "valid_from": "2020-01-01T00:00:00Z",
           "params": {
             "coefficient_precision": "float64",
+            "motor_efficiency": 1.0,
             "no_stages": 15,
             "head_coeff": [
               125.518426,
@@ -53,9 +65,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "filter_b1ed": {
+    "filter_return": {
       "type": "filter",
       "params": [
         {
@@ -67,9 +90,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "filter_b2e6": {
+    "filter_hot": {
       "type": "filter",
       "params": [
         {
@@ -81,9 +115,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "heat_exchanger_3410": {
+    "heat_exchanger": {
       "type": "heatexchanger",
       "params": [
         {
@@ -99,9 +144,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "injection_pump_3808": {
+    "injection_pump": {
       "type": "injectionpump",
       "params": [
         {
@@ -115,9 +171,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "injection_well_a06b": {
+    "doublet.injector": {
       "type": "injectionwell",
       "params": [
         {
@@ -156,9 +223,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "production_well_c774": {
+    "doublet.well": {
       "type": "productionwell",
       "params": [
         {
@@ -247,9 +325,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "reservoir_28fc": {
+    "doublet.sink": {
       "type": "injection_reservoir",
       "params": [
         {
@@ -272,9 +361,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "reservoir_c1b5": {
+    "doublet.reservoir": {
       "type": "production_reservoir",
       "params": [
         {
@@ -297,9 +397,20 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     },
-    "production_well_c774_riser": {
+    "doublet.riser": {
       "type": "productionwell",
       "params": [
         {
@@ -388,73 +499,23 @@
           }
         }
       ],
-      "fluid": "geothermal_doublet_brine"
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      }
     }
   },
-  "links": [
-    {
-      "source": "reservoir_c1b5",
-      "source_port": "sandface",
-      "target": "production_well_c774",
-      "target_port": "bottom"
-    },
-    {
-      "source": "production_well_c774",
-      "source_port": "wellhead",
-      "target": "esp_1ee3",
-      "target_port": "suction"
-    },
-    {
-      "source": "filter_b2e6",
-      "source_port": "outlet",
-      "target": "heat_exchanger_3410",
-      "target_port": "hot_in"
-    },
-    {
-      "source": "heat_exchanger_3410",
-      "source_port": "hot_out",
-      "target": "filter_b1ed",
-      "target_port": "inlet"
-    },
-    {
-      "source": "filter_b1ed",
-      "source_port": "outlet",
-      "target": "injection_pump_3808",
-      "target_port": "suction"
-    },
-    {
-      "source": "injection_pump_3808",
-      "source_port": "discharge",
-      "target": "injection_well_a06b",
-      "target_port": "wellhead"
-    },
-    {
-      "source": "injection_well_a06b",
-      "source_port": "bottom",
-      "target": "reservoir_28fc",
-      "target_port": "sandface"
-    },
-    {
-      "source": "production_well_c774_riser",
-      "source_port": "wellhead",
-      "target": "degasser_e846",
-      "target_port": "inlet"
-    },
-    {
-      "source": "degasser_e846",
-      "source_port": "liquid",
-      "target": "filter_b2e6",
-      "target_port": "inlet"
-    },
-    {
-      "source": "esp_1ee3",
-      "source_port": "discharge",
-      "target": "production_well_c774_riser",
-      "target_port": "bottom"
-    }
-  ],
+  "plant_type": "geothermal_example",
   "bindings": {
-    "degasser_e846": {
+    "degasser": {
       "inputs": {},
       "streams": {
         "inlet": {
@@ -474,7 +535,7 @@
       },
       "measured": {}
     },
-    "esp_1ee3": {
+    "doublet.esp": {
       "inputs": {
         "frequency": {
           "column": "ESP_freq",
@@ -512,7 +573,7 @@
         }
       }
     },
-    "filter_b1ed": {
+    "filter_return": {
       "inputs": {},
       "streams": {
         "inlet": {
@@ -537,7 +598,7 @@
         }
       }
     },
-    "filter_b2e6": {
+    "filter_hot": {
       "inputs": {},
       "streams": {
         "inlet": {
@@ -562,7 +623,7 @@
         }
       }
     },
-    "heat_exchanger_3410": {
+    "heat_exchanger": {
       "inputs": {},
       "streams": {
         "hot_in": {
@@ -609,7 +670,7 @@
         }
       }
     },
-    "injection_pump_3808": {
+    "injection_pump": {
       "inputs": {
         "discharge_pressure": {
           "column": "InjectorPump_Pout",
@@ -639,7 +700,7 @@
         }
       }
     },
-    "injection_well_a06b": {
+    "doublet.injector": {
       "inputs": {},
       "streams": {
         "wellhead": {
@@ -659,7 +720,7 @@
       },
       "measured": {}
     },
-    "reservoir_c1b5": {
+    "doublet.reservoir": {
       "inputs": {
         "m_dot": {
           "column": "Qp",
@@ -672,32 +733,22 @@
   },
   "boundary": {
     "stream_defaults": {
-      "heat_exchanger_3410": {
+      "heat_exchanger": {
         "cold_in": {
           "p": 500000.0
         }
       }
     },
-    "fluids": {
-      "geothermal_doublet_brine": {
-        "RHOL": 1068.0,
-        "VISL": 0.00065,
-        "CPL": 4129.213483146067
-      }
-    },
     "inputs": {
-      "injection_pump_3808": {
+      "injection_pump": {
         "discharge_pressure": 5150000.0
       }
     },
     "streams": {},
-    "well_risers": {
-      "production_well_c774": "production_well_c774_riser"
-    },
     "assumptions": [
       "Example bulk heat capacity 4.410 MJ/m3/K inferred from its heat balance.",
       "Unmeasured secondary inlet pressure assumed 5 bar absolute.",
-      "Injection-pump default scenario setpoint 51.5 bar; twin uses the measured setpoint."
+      "Injection-pump scenario setpoint 51.5 bar; twin uses measured setpoint."
     ]
   },
   "timestep": 900.0,

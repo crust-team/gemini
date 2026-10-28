@@ -25,10 +25,11 @@ def test_project_roundtrip_and_accounting(tmp_path):
     save_config(plant_to_config(plant), path)
     rebuilt = build_plant(load_config(path))
     assert plant.state_dict() == rebuilt.state_dict()
-    assert plant.links == rebuilt.links
-    assert len(plant.links) == 10
-    assert plant.get_submodule("production_well_c774").params.segment == "below_esp"
-    assert plant.get_submodule("production_well_c774_riser").params.segment == "above_esp"
+    assert config.plant_type == "geothermal_example"
+    assert "links" not in type(config).model_fields
+    assert len(config.modules) == 11
+    assert plant.get_submodule("doublet.well").params.segment == "below_esp"
+    assert plant.get_submodule("doublet.riser").params.segment == "above_esp"
 
 
 def test_dated_params_and_units():

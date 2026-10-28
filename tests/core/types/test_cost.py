@@ -18,8 +18,9 @@ class CostedFilter(Filter):
 def test_cost_aggregation():
     """Costs sum all components only when currency and year match."""
     first, second = CostedFilter(), CostedFilter()
-    first.estimate = Cost(capex=100, opex_fixed=10, opex_variable=0.001,
-                          price_year=2024, source="test fixture")
+    first.estimate = Cost(
+        capex=100, opex_fixed=10, opex_variable=0.001, price_year=2024, source="test fixture"
+    )
     second.estimate = first.estimate
     plant = Sequential(first, second)
     assert plant.cost().capex == 200

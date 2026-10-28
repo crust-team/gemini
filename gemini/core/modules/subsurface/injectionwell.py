@@ -119,8 +119,16 @@ class InjectionWell(Module):
             p.friction_correlation_2p,
         )
 
-    def corrosion_profile(self, stream, chemistry: dict, model: str = "NORSOK") -> list[float]:
+    def corrosion_profile(
+        self, stream, chemistry: dict | None = None, model: str = "NORSOK"
+    ) -> list[float]:
         """Return per-section CO2 corrosion [mm/year] using SI chemistry inputs."""
+        # NOTE(refactor): corrosion/erosion helpers retain their documented mm/year
+        # convention; physics and golden values are unchanged (explicit SI exception).
+        if chemistry is None:
+            chemistry = stream.fluid.corrosion_inputs(stream.p, stream.T)
+            if stream.fluid.co2_mass_fraction == 0:
+                return [0.0] * len(self.params.path.sections)
         return hydraulics.corrosion_profile(
             self.params.path,
             stream.with_(m_dot=-abs(stream.m_dot)),

@@ -130,12 +130,31 @@ class PipeSection(BaseModel):
     """A constant-diameter pipe interval, ordered from surface to bottom."""
 
     model_config = ConfigDict(frozen=True)
-    length: float = Field(..., ge=0, description="Measured interval length [m]")
-    inclination: float = Field(
-        ..., ge=-math.pi / 2, le=math.pi / 2, description="Inclination [rad]"
+    length: float = Field(
+        ...,
+        ge=0,
+        description="Measured interval length [m]",
+        json_schema_extra={"quantity": "length", "unit": "m"},
     )
-    inner_diameter: float = Field(..., gt=0, description="Internal diameter [m]")
-    roughness: float = Field(..., ge=0, description="Absolute roughness [m]")
+    inclination: float = Field(
+        ...,
+        ge=-math.pi / 2,
+        le=math.pi / 2,
+        description="Inclination [rad]",
+        json_schema_extra={"quantity": "angle", "unit": "rad"},
+    )
+    inner_diameter: float = Field(
+        ...,
+        gt=0,
+        description="Internal diameter [m]",
+        json_schema_extra={"quantity": "length", "unit": "m"},
+    )
+    roughness: float = Field(
+        ...,
+        ge=0,
+        description="Absolute roughness [m]",
+        json_schema_extra={"quantity": "length", "unit": "m"},
+    )
 
 
 class PipePath(BaseModel):
