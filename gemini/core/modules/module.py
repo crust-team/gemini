@@ -35,6 +35,7 @@ from gemini.core.types.results import ModuleResult, Values
 _evaluation = ContextVar("module_evaluation", default=None)
 _output_call = ContextVar("module_output_call", default=None)
 _input_call = ContextVar("module_input_call", default=None)
+_inlet_call = ContextVar("module_inlet_call", default=None)
 MODULE_REGISTRY = {}
 
 
@@ -546,6 +547,10 @@ class Module:
         finally:
             _input_call.reset(token)
 
+    def _current_inlets(self):
+        active = _inlet_call.get()
+        return active[1] if active is not None and active[0] is self else {}
+
     def __call__(self, *args, **kwargs):
         """Apply controls and boundaries, run hooks/forward, and validate outlets."""
         missing = self.missing_parameters()
@@ -556,21 +561,25 @@ class Module:
         inlets, supplied = self._split_call_args(args, kwargs)
         children, recorded = {}, {}
         parent = _evaluation.get()
-        with self._apply_inputs(supplied) as inputs:
-            for fn in tuple(self._pre_hooks.values()):
-                fn(self)
-            evaluation_token = _evaluation.set((self, children))
-            output_token = _output_call.set((self, recorded))
-            try:
-                returned = self.forward(**inlets)
-                for fn in tuple(self._hooks.values()):
-                    replacement = fn(self, returned)
-                    if replacement is not None:
-                        returned = replacement
-            finally:
-                _output_call.reset(output_token)
-                _evaluation.reset(evaluation_token)
-            inputs = dict(inputs)
+        inlet_token = _inlet_call.set((self, inlets))
+        try:
+            with self._apply_inputs(supplied) as inputs:
+                for fn in tuple(self._pre_hooks.values()):
+                    fn(self)
+                evaluation_token = _evaluation.set((self, children))
+                output_token = _output_call.set((self, recorded))
+                try:
+                    returned = self.forward(**inlets)
+                    for fn in tuple(self._hooks.values()):
+                        replacement = fn(self, returned)
+                        if replacement is not None:
+                            returned = replacement
+                finally:
+                    _output_call.reset(output_token)
+                    _evaluation.reset(evaluation_token)
+                inputs = dict(inputs)
+        finally:
+            _inlet_call.reset(inlet_token)
         required = {name for name, output in self._outputs.items() if not output.optional}
         if required - recorded.keys():
             missing = sorted(required - recorded.keys())

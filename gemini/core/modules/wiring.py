@@ -16,14 +16,14 @@ def trace_wiring(plant, inputs):
             if module._children:
                 continue
 
-            def before(module, controls, streams, path=path):
-                for port, stream in streams.items():
+            def before(module, path=path):
+                for port, stream in module._current_inlets().items():
                     if isinstance(stream, Stream) and id(stream) in producers:
                         source, source_port = producers[id(stream)]
                         edges.add((source, source_port, path, port))
 
-            def after(module, controls, streams, result, path=path):
-                for port, stream in result.outlets.items():
+            def after(module, outlets, path=path):
+                for port, stream in outlets.items():
                     if isinstance(stream, Stream):
                         retained.append(stream)
                         producers[id(stream)] = (path, port)

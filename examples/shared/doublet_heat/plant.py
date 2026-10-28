@@ -6,16 +6,12 @@ from gemini.core.modules.plants import Doublet
 from gemini.core.modules.pumps import InjectionPump
 from gemini.core.modules.treatment import Degasser, Filter
 from gemini.core.types import (
-    Control,
-    Frequency,
     HeatFlow,
     Inlet,
-    MassFlow,
     Outlet,
     Output,
     Power,
     PowerFlow,
-    Pressure,
     Ratio,
     Stream,
 )
@@ -38,12 +34,6 @@ class DoubletHeatPlant(Module):
         # Inlets
         self.secondary = Inlet(Stream)
 
-        # Controls
-        self.m_dot = Control(MassFlow)
-        self.esp_frequency = Control(Frequency)
-        self.injection_pressure = Control(Pressure)
-        self.injection_frequency = Control(Frequency, default=60)
-
         # Outputs
         self.thermal_power = Output(Power)
         self.electricity_use = Output(Power)
@@ -55,20 +45,16 @@ class DoubletHeatPlant(Module):
         self.electricity = Outlet(PowerFlow)
         self.heat_loss = Outlet(HeatFlow)
 
-    def forward(self, secondary, m_dot, esp_frequency, injection_pressure, injection_frequency):
+    def forward(self, secondary):
         """Connect the doublet limbs through the modeled surface equipment."""
 
         # Modules
-        supply, esp_power, production_heat = self.doublet.produce(m_dot, esp_frequency)
+        supply, esp_power, production_heat = self.doublet.produce()
         degassed = self.degasser(inlet=supply)
         filtered = self.filters.hot(inlet=degassed.outlets.liquid)
         exchanged = self.heat_exchanger(hot_in=filtered.outlets.outlet, cold_in=secondary)
         returned = self.filters.cold(inlet=exchanged.outlets.hot_out)
-        pumped = self.injection_pump(
-            suction=returned.outlets.outlet,
-            pressure_setpoint=injection_pressure,
-            frequency=injection_frequency,
-        )
+        pumped = self.injection_pump(suction=returned.outlets.outlet)
         injection_heat = self.doublet.inject(pumped.outlets.discharge)
 
         # Outputs

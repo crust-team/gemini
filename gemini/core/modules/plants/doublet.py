@@ -9,11 +9,8 @@ from gemini.core.modules.subsurface import (
     ProductionWell,
 )
 from gemini.core.types import (
-    Control,
-    Frequency,
     HeatFlow,
     Inlet,
-    MassFlow,
     Outlet,
     PowerFlow,
     Stream,
@@ -38,20 +35,16 @@ class Doublet(Module):
         # Inlets
         self.return_stream = Inlet(Stream)
 
-        # Controls
-        self.m_dot = Control(MassFlow, ge=0)
-        self.esp_frequency = Control(Frequency)
-
         # Outlets
         self.supply = Outlet(Stream)
         self.electricity = Outlet(PowerFlow)
         self.heat_loss = Outlet(HeatFlow)
 
-    def produce(self, m_dot, esp_frequency):
+    def produce(self):
         """Traverse reservoir, lower well, ESP and riser."""
-        source = self.reservoir(m_dot=m_dot)
+        source = self.reservoir()
         lower = self.well(bottom=source.outlets.sandface)
-        pump = self.esp(suction=lower.outlets.wellhead, frequency=esp_frequency)
+        pump = self.esp(suction=lower.outlets.wellhead)
         upper = self.riser(bottom=pump.outlets.discharge)
         return (
             upper.outlets.wellhead,
@@ -65,11 +58,11 @@ class Doublet(Module):
         self.sink(sandface=injection.outlets.bottom)
         return injection.outlets.heat_loss
 
-    def forward(self, return_stream, m_dot, esp_frequency):
+    def forward(self, return_stream):
         """Evaluate both limbs for an independently specified return boundary."""
 
         # Modules
-        produced_supply, produced_electricity, produced_heat = self.produce(m_dot, esp_frequency)
+        produced_supply, produced_electricity, produced_heat = self.produce()
         injection_heat = self.inject(return_stream)
 
         # Outlets
