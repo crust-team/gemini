@@ -332,3 +332,81 @@ def pipe_path_profile(
         dp_friction += friction
         dp_gravity += gravity
     return PathResult(p, T, dp_friction, dp_gravity, pressures, temperatures)
+
+
+def radial_pressure_drops(
+    flow: float,
+    viscosity: float,
+    permeability: float,
+    thickness: float,
+    drainage_radius: float,
+    wellbore_radius: float,
+    skin: float,
+) -> tuple[float, float]:
+    """Return radial Darcy and skin pressure drops [Pa] (Akin 2019).
+
+    Parameters
+    ----------
+    flow, viscosity : float
+        Liquid volume flow [m3/s] and dynamic viscosity [Pa s].
+    permeability, thickness, drainage_radius, wellbore_radius : float
+        Permeability [m2], reservoir thickness and radii [m].
+    skin : float
+        Skin factor [-].
+
+    Returns
+    -------
+    tuple of float
+        Flow and skin pressure drops [Pa].
+    """
+    if min(permeability, thickness, drainage_radius, wellbore_radius) <= 0:
+        raise ValueError("Radial-flow permeability, thickness and radii must be positive")
+    denominator = 2 * math.pi * permeability * thickness
+    return (
+        flow * viscosity * math.log(drainage_radius / wellbore_radius) / denominator,
+        flow * viscosity * skin / denominator,
+    )
+
+
+def corrosion_profile(
+    path, stream, fluid, direction, u_value, t_ambient, chemistry: dict, model: str = "NORSOK"
+) -> list[float]:
+    """Return section corrosion [mm/year] from SI path conditions and chemistry inputs."""
+    from . import corrosion
+
+    result = pipe_path_profile(path, stream, fluid, direction, u_value, t_ambient)
+    sections = path.sections if direction == "down" else list(reversed(path.sections))
+    rates = []
+    for section, p, T in zip(sections, result.section_p, result.section_T):
+        f = fluid.properties(p, T)
+        rates.append(
+            corrosion.co2_corrosion_rate(
+                model,
+                temperature=T,
+                pressure=p,
+                water_flow_rate=abs(stream.m_dot) / f.density,
+                water_density=f.rho_l,
+                water_viscosity=f.mu_l,
+                diameter=section.inner_diameter,
+                roughness=section.roughness,
+                **chemistry,
+            )
+        )
+    return rates
+
+
+def erosion_check(path, stream, fluid) -> dict:
+    """Compare section speeds [m/s] with the API RP 14E erosional velocity limit."""
+    from . import erosion
+
+    density = fluid.properties(stream.p, stream.T).density
+    limit = erosion.api_erosional_velocity(density)
+    velocity = [
+        abs(stream.m_dot) / density / (math.pi * s.inner_diameter**2 / 4) for s in path.sections
+    ]
+    return {
+        "velocity": velocity,
+        "limit": limit,
+        "sections": [erosion.api_velocity_comparison(v, limit) for v in velocity],
+        "alarm": any(v > limit for v in velocity),
+    }
