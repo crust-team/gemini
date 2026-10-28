@@ -1,4 +1,4 @@
-"""Fit HX conductance on seven days. Run: python examples/optim/calibrate/00_heat_exchanger_ua.py."""
+"""Fit heat-exchanger conductance on seven days through the public calibration API."""
 
 import pandas as pd
 
@@ -10,6 +10,9 @@ plant = DoubletHeatPlant.load(f"{shared}/plant.json")
 frame = pd.read_csv(f"{shared}/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
 fit = gm.optim.calibrate(
-    plant, data, "heat_exchanger", fields=["ua"], end=frame.loc[7 * 96 - 1, "time"]
+    plant,
+    data,
+    params=[plant.get_parameter("heat_exchanger.ua")],
+    end=frame.loc[7 * 96 - 1, "time"],
 )
 print(fit)

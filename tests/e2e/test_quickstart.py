@@ -35,7 +35,7 @@ def test_quickstart(tmp_path, monkeypatch):
     engine2 = gm.Engine.load_checkpoint("runs/replay.ckpt")
     res2 = engine2.resume()
 
-    fit = gm.optim.calibrate(plant, data, "heat_exchanger", fields=["ua"])
+    fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.ua")])
     print(fit)
     plant.save("runs/my_plant.json")
     assert DoubletHeatPlant.load("runs/my_plant.json").state_dict() == plant.state_dict()
