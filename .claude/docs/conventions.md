@@ -7,12 +7,12 @@ regression evidence. Use SI internally: K, Pa, kg/s, m, W, J and s.
 Dependencies flow:
 
 `core.physics` ← `core.types` ← `core.modules` ← `core.data` ← `core.engine`
-← `legacy` ← `optim` / `design` ← `agentic` ← `gemini/__init__`.
+← `core.legacy` ← `optim` / `design` ← `agentic` ← `gemini/__init__`.
 
-Core packages never interpret old project names, tags, tables or node mappings. Old-format
-knowledge stays in `gemini.legacy`. Equipment performs no file or database access. Calibration
-predicts only through public replay. Plants are handwritten; configuration files fill a tree but
-do not construct runtime wiring.
+Core packages outside `core.legacy` never interpret old project names, tags, tables or node
+mappings. Old-format knowledge stays in `gemini.core.legacy`, publicly available as `gm.legacy`.
+Equipment performs no file or database access. Calibration predicts only through public replay.
+Plants are handwritten; configuration files fill a tree but do not construct runtime wiring.
 
 ## Module rules
 

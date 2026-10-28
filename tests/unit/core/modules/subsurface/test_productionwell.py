@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from gemini.core.legacy import tables as mapping
 from gemini.core.modules.subsurface import ProductionWell
 from gemini.core.types.flows import Stream
-from gemini.legacy import tables as mapping
 
 
 def test_split_esp_traversal():

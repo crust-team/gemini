@@ -1,6 +1,6 @@
 """Legacy conversion table smoke tests."""
 
-from gemini.legacy import tables
+from gemini.core.legacy import tables
 
 
 def test_tables_are_centralised():

@@ -5,11 +5,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from gemini.core.legacy import tables as mapping
 from gemini.core.modules.heat import HeatExchanger
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import WATER
-from gemini.legacy import tables as mapping
 
 
 def test_measured_heat_exchanger_performance():

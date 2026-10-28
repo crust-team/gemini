@@ -12,8 +12,8 @@ gemini/
 │   ├── physics/      # SI correlations and unit conversions
 │   ├── modules/      # equipment and generic handwritten plants
 │   ├── data/         # in-memory Dataset and Loader only
-│   └── engine/       # Clock, Engine, steps, Results, callbacks, checkpoints
-├── legacy/           # all old-format I/O, tables and conversion
+│   ├── engine/       # Clock, Engine, steps, Results, callbacks, checkpoints
+│   └── legacy/       # all old-format I/O, tables and conversion
 ├── optim/            # calibration through Engine.replay
 ├── design/
 └── agentic/

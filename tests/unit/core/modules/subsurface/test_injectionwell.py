@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
+from gemini.core.legacy import tables as mapping
 from gemini.core.modules.subsurface import InjectionWell
 from gemini.core.types.flows import Stream
-from gemini.legacy import tables as mapping
 
 
 def test_injection_flow_sign_and_pressure():
