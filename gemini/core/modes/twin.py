@@ -104,21 +104,24 @@ def evaluate(plant, row, at):
 
 
 def scenario_inputs(plant, row):
-    """Use bound operating controls and external streams as inputs to a chained scenario."""
-    inputs, streams = {}, {}
+    """Translate bound observations into this handwritten plant's public operating controls."""
+    controls, streams = {}, {}
     defaults = plant.config.boundary.get("stream_defaults", {})
     for path, bindings in plant.config.bindings.items():
         module = plant.get_submodule(path)
-        controls, inlet, _ = prepare(
+        values, inlet, _ = prepare(
             module, bindings.model_copy(update={"measured": {}}), row, defaults.get(path)
         )
-        if controls:
-            inputs[path] = controls
-        streams.update(
-            {
-                f"{path}.{port}": stream
-                for port, stream in inlet.items()
-                if f"{path}.{port}" in plant.inlets
-            }
-        )
-    return inputs, streams
+        controls[path], streams[path] = values, inlet
+    if plant.name != "geothermal_example":
+        raise ValueError("scenario_inputs needs an explicit adapter for this plant type")
+    return (
+        dict(
+            m_dot=controls["doublet.reservoir"]["m_dot"],
+            esp_frequency=controls["doublet.esp"]["frequency"],
+            injection_pressure=controls["injection_pump"]["discharge_pressure"],
+            injection_frequency=controls["injection_pump"].get("frequency", 60),
+            secondary=streams["heat_exchanger"]["cold_in"],
+        ),
+        {},
+    )

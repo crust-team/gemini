@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.types.flows import Flow
-from gemini.core.types.quantities import Dimensionless, Fraction
+from gemini.core.types.quantities import Fraction
 
 
 class Health(BaseModel):
@@ -60,4 +60,6 @@ class ParamRef:
     field: str
     value: Any
     # Bounds use the owning Params field unit; they are not dimensionless physical values.
-    bounds: tuple[Dimensionless, Dimensionless] | None
+    bounds: tuple[float, float] | None
+    quantity: str | list[str | None] | None = None
+    unit: str | list[str | None] | None = None

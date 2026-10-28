@@ -1,19 +1,17 @@
-"""Construct plant graphs and round-trip their portable design configurations."""
+"""Construct handwritten plants and round-trip their portable design configurations."""
 
 from pathlib import Path
 
-from gemini.core.config.schema import DatedParams, Link, ModuleConfig, PlantConfig
+from gemini.core.config.schema import DatedParams, ModuleConfig, PlantConfig
 from gemini.core.engine import registry
-from gemini.core.modules.plant import GraphPlant
 
 
-def build_plant(config: PlantConfig, at=None) -> GraphPlant:
+def build_plant(config: PlantConfig, at=None):
     """Instantiate equipment with the parameter snapshot active at the requested instant."""
-    modules = {
-        name: registry.create(item.type, item.at(at).params, fluid=item.fluid)
-        for name, item in config.modules.items()
-    }
-    plant = GraphPlant(modules, config.links, name=config.name, boundary=config.boundary)
+    cls = registry.get(config.plant_type)
+    if cls.category != "plant" or not hasattr(cls, "from_config"):
+        raise ValueError(f"{config.plant_type!r} is not a configurable plant")
+    plant = cls.from_config(config, at=at)
     plant.config = config.model_copy(deep=True)
     plant._active_snapshots = {
         name: item.at(at).valid_from for name, item in config.modules.items()
@@ -28,12 +26,15 @@ def plant_to_config(plant) -> PlantConfig:
     config = (
         plant.config.model_copy(deep=True)
         if hasattr(plant, "config")
-        else PlantConfig(name=plant.plant_name, modules={}, links=[], boundary=plant.boundary)
+        else PlantConfig(name=plant.name, plant_type=plant.name, modules={})
     )
     state = plant.state_dict()
-    for name, module in plant.named_children():
+    for name, module in plant.named_modules():
+        if not name or module._children:
+            continue
         if name in config.modules:
             item = config.modules[name]
+            item.fluid = module._fluid
             active = getattr(plant, "_active_snapshots", {}).get(name, item.params[-1].valid_from)
             item.params = [
                 DatedParams(
@@ -48,7 +49,6 @@ def plant_to_config(plant) -> PlantConfig:
                 fluid=module.fluid,
                 params=[DatedParams(params=state[name]["params"])],
             )
-    config.links = [Link.model_validate(link) for link in plant.links]
     return PlantConfig.model_validate(config.model_dump())
 
 

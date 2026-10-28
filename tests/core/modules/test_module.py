@@ -157,7 +157,6 @@ def test_recursive_parameters_state_and_hooks():
 def test_nested_stateful_stepping():
     """A stateful leaf advances once through nested sequential and graph composites."""
     from gemini.core.modules.module import Sequential
-    from gemini.core.modules.plant import GraphPlant
 
     class Accumulator(PassThrough):
         """State fixture accumulating elapsed seconds."""
@@ -174,9 +173,9 @@ def test_nested_stateful_stepping():
             return state, self({"multiplier": state}, streams_in)
 
     seq = Sequential(Accumulator({"value": 2}))
-    graph = GraphPlant({"chain": seq}, [])
+    graph = Sequential({"chain": seq})
     state = graph.initial_state()
-    streams = {"chain.inlet": Stream(m_dot=1, p=1e5, T=300)}
+    streams = {"inlet": Stream(m_dot=1, p=1e5, T=300)}
     state, result = graph.step(state, {}, streams, 3)
     assert state == {"chain": {"0": 3}}
     assert result.outputs.root["chain"].root["0"].value == 6

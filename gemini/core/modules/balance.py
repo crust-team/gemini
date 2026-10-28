@@ -34,6 +34,20 @@ def _enthalpy(stream):
     return stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l * stream.T
 
 
+def _internal_flux(result, measure):
+    """Cancel streams actually passed between leaves in evaluation order, once per output."""
+    available = {}
+    internal = 0.0
+    for leaf in result.leaves().values():
+        for stream in _streams(leaf.inlets):
+            if available.get(id(stream), 0):
+                internal += measure(stream)
+                available[id(stream)] -= 1
+        for stream in _streams(leaf.streams):
+            available[id(stream)] = available.get(id(stream), 0) + 1
+    return internal
+
+
 def mass_balance(module, result):
     """Audit mass [kg/s], including explicit aquifer withdrawal/deposition boundaries."""
     if result.children:
@@ -43,6 +57,9 @@ def mass_balance(module, result):
         }
         incoming = sum(c["in"] for c in children.values())
         outgoing = sum(c["out"] for c in children.values())
+        internal = _internal_flux(result, lambda stream: stream.m_dot)
+        incoming -= internal
+        outgoing -= internal
         residual = sum(c["residual"] for c in children.values())
     else:
         children = {}
@@ -80,6 +97,9 @@ def energy_balance(module, result):
         unresolved = sum(c["unresolved_power"] for c in children.values())
         incoming = sum(c["in"] for c in children.values())
         outgoing = sum(c["out"] for c in children.values())
+        internal = _internal_flux(result, _enthalpy)
+        incoming -= internal
+        outgoing -= internal
         heat = getattr(result.outputs, "thermal_power", 0.0)
     else:
         children = {}

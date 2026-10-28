@@ -13,7 +13,7 @@ plant = build_plant(config)
 measurements = CSVTimeSeries(DATA / "geothermal_example_dataset.csv").frame.iloc[: 7 * 96]
 results = replay(plant, config, measurements)
 frame = results.to_frame()
-print(frame.loc[:, [("esp_1ee3", "head"), ("heat_exchanger_3410", "duty")]].head())
+print(frame.loc[:, [("doublet.esp", "head"), ("heat_exchanger", "duty")]].head())
 for name in config.bindings:
     assessed = bool(frame[name].health_assessed.all())
     print(f"{name}: assessed={assessed}, alarm rate={frame[name].health_alarm.mean():.1%}")

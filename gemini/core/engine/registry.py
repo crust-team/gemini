@@ -17,7 +17,7 @@ def _discover() -> dict[str, type[Module]]:
             if (
                 not issubclass(cls, Module)
                 or inspect.isabstract(cls)
-                or cls.category == "plant"
+                or cls.name == "sequential"
                 or cls.__module__ != module.__name__
             ):
                 continue

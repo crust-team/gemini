@@ -33,7 +33,7 @@ _UNITS = {
 
 
 class Profile(BaseModel):
-    """Strictly increasing UTC samples, evaluated as left-continuous step holds.
+    """Strictly increasing UTC samples, evaluated with previous-sample zero-order holds.
 
     `at(t)` uses the latest sample at or before t and holds the final sample.
     Queries before the first sample raise. Naive timestamps are interpreted as UTC.

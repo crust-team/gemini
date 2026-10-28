@@ -22,13 +22,17 @@ def test_csv_previous_and_resample(tmp_path):
     series = profile.to_series()
     series.iloc[0] = 0
     assert profile.values[0] == 283.15
-    constant = Profile.constant("load", "power", "W", 10, datetime(2024, 1, 1), 4,
-                                timedelta(hours=1))
+    constant = Profile.constant(
+        "load", "power", "W", 10, datetime(2024, 1, 1), 4, timedelta(hours=1)
+    )
     assert len(constant.resample(timedelta(hours=2), "mean")) == 2
     assert constant.resample(timedelta(hours=2), "sum").values == [20, 20]
     assert constant.resample(timedelta(hours=2), "first").values == [10, 10]
-    for index, values in ((profile.index[::-1], profile.values),
-                          ([profile.index[0]] * 2, [1, 2]), (profile.index, [1])):
+    for index, values in (
+        (profile.index[::-1], profile.values),
+        ([profile.index[0]] * 2, [1, 2]),
+        (profile.index, [1]),
+    ):
         with pytest.raises(ValueError):
             Profile(name="bad", quantity="power", unit="W", index=index, values=values)
 
@@ -42,7 +46,6 @@ def test_profiles_drive_scenario():
     target = Profile.constant("target", "temperature", "K", 320, start, 3, timedelta(hours=1))
     inlet = dict(m_dot=1, T=300, p=1e5)
     boiler = Boiler(dict(fuel="electric", capacity=1e6, efficiency=0.9))
-    result = run(boiler, {"setpoint_T": target}, 3600,
-                 base_inputs={"streams_in": {"inlet": inlet}})
+    result = run(boiler, {"setpoint_T": target}, 3600, base_inputs={"streams_in": {"inlet": inlet}})
     assert len(result) == 3
     assert result.to_frame()["", "outlet_T"].tolist() == [320] * 3

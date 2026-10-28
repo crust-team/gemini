@@ -1,4 +1,4 @@
-"""Serializable plant topology, dated design data and measured-boundary bindings."""
+"""Serializable plant selection, dated design data and measured-boundary bindings."""
 
 from datetime import datetime, timezone
 from typing import Any
@@ -66,15 +66,6 @@ class ModuleConfig(ConfigModel):
         return eligible[-1]
 
 
-class Link(ConfigModel):
-    """Directed stream connection between two equipment ports."""
-
-    source: str
-    source_port: str
-    target: str
-    target_port: str
-
-
 class Binding(ConfigModel):
     """Raw data column and its physical unit at the input boundary."""
 
@@ -91,11 +82,11 @@ class ModuleBindings(ConfigModel):
 
 
 class PlantConfig(ConfigModel):
-    """Portable graph and data bindings, including explicit import diagnostics."""
+    """Portable plant design and data bindings, including explicit import diagnostics."""
 
     name: str
     modules: dict[str, ModuleConfig]
-    links: list[Link]
+    plant_type: str
     bindings: dict[str, ModuleBindings] = Field(default_factory=dict)
     boundary: dict[str, Any] = Field(default_factory=dict)
     timestep: float = Field(900, gt=0)
@@ -104,13 +95,13 @@ class PlantConfig(ConfigModel):
 
     @model_validator(mode="after")
     def references(self):
-        """Reject dangling links and bindings before graph construction."""
+        """Reject invalid child paths and bindings before plant construction."""
         for name in self.modules:
-            if not name.isidentifier() or name.lower() != name or name.startswith("_"):
-                raise ValueError(f"Module name must be public snake_case: {name!r}")
-        for link in self.links:
-            if link.source not in self.modules or link.target not in self.modules:
-                raise ValueError(f"Unknown link endpoint: {link}")
+            if any(
+                not part.isidentifier() or part.lower() != part or part.startswith("_")
+                for part in name.split(".")
+            ):
+                raise ValueError(f"Module path must be public snake_case: {name!r}")
         if self.bindings.keys() - self.modules.keys():
             raise ValueError("Bindings reference unknown modules")
         return self
