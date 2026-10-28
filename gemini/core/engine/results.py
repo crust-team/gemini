@@ -87,7 +87,7 @@ class Results:
             )
             streams = [
                 flow
-                for flow in (result.inlets | dict(result.outlets)).values()
+                for flow in (dict(result.inlets) | dict(result.outlets)).values()
                 if isinstance(flow, Stream)
             ]
             row[path, "operating"] = any(flow.m_dot != 0 for flow in streams) if streams else True

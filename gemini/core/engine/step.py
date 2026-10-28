@@ -203,9 +203,9 @@ def twin_step(plant, sample, states, plan):
                     if bound.state
                     else deepcopy(states[path]) if path in states else module.initial_state()
                 )
-                next_state, prediction = module.step(state, sample.dt, **kwargs)
+                next_state, prediction = module.step(state, sample.dt, kwargs)
             else:
-                prediction = module(**kwargs)
+                prediction = module(kwargs)
             results[path] = prediction, health_or_unavailable(module, prediction, measured)
             if module.stateful:
                 states[path] = state if bound.state else next_state
@@ -230,7 +230,7 @@ def chained_step(plant, sample, states, plan):
     }
     measured_kwargs, _ = prepare(plant, bound, sample.row, defaults)
     kwargs.update(measured_kwargs)
-    input_values = {}
+    input_values = {name: kwargs.pop(name) for name in plant.inputs() if name in kwargs}
     for path, module, input_bindings in plan.chained_inputs:
         values, _ = prepare(module, input_bindings, sample.row)
         input_values.update(
@@ -238,9 +238,9 @@ def chained_step(plant, sample, states, plan):
         )
     plant.set_inputs(input_values)
     if plan.stateful:
-        states[""], result = plant.step(states.get("", plant.initial_state()), sample.dt, **kwargs)
+        states[""], result = plant.step(states.get("", plant.initial_state()), sample.dt, kwargs)
     else:
-        result = plant(**kwargs)
+        result = plant(kwargs)
     return {
         path: (child, health_or_unavailable(plant.get_submodule(path), child, {}))
         for path, child in result.leaves().items()

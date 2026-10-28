@@ -22,14 +22,15 @@ class BoosterPump(Module):
         # Outlets
         self.discharge = Outlet(Stream)
 
-    def forward(self, suction):
+    def forward(self, inlets):
         """Preserve the inlet stream without implying a performance model."""
 
         # Outlets
+        suction = inlets.suction
         discharge = suction
 
         outlets = dict(discharge=discharge)
         return outlets
 
-    def _compute_outputs(self, suction, discharge):
+    def _compute_outputs(self, inlets, outlets):
         self.modelled = False

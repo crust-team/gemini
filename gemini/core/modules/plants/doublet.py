@@ -54,10 +54,11 @@ class Doublet(Module):
         injection = self.injector(wellhead=stream)
         self.sink(sandface=injection.outlets.bottom)
 
-    def forward(self, return_stream):
+    def forward(self, inlets):
         """Evaluate both limbs for an independently specified return boundary."""
 
         # Modules
+        return_stream = inlets.return_stream
         produced_supply = self.produce()
         self.inject(return_stream)
 

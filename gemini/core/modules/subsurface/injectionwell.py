@@ -55,10 +55,11 @@ class InjectionWell(Module):
         # Outlets
         self.bottom = Outlet(Stream)
 
-    def forward(self, wellhead):
+    def forward(self, inlets):
         """Traverse the injection path with the legacy negative flow convention."""
 
         # Outlets
+        wellhead = inlets.wellhead
         # NOTE(refactor): legacy injection DPDT uses negative flow; retain that sign convention.
         stream = wellhead.with_(m_dot=-abs(wellhead.m_dot))
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
@@ -74,7 +75,9 @@ class InjectionWell(Module):
         outlets = dict(bottom=bottom)
         return outlets
 
-    def _compute_outputs(self, wellhead, bottom):
+    def _compute_outputs(self, inlets, outlets):
+        wellhead = inlets.wellhead
+        bottom = outlets.bottom
         stream = wellhead.with_(m_dot=-abs(wellhead.m_dot))
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
         self.bottomhole_pressure = bottom.p

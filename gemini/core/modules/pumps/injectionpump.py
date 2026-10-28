@@ -51,10 +51,11 @@ class InjectionPump(Module):
         # Outlets
         self.discharge = Outlet(Stream)
 
-    def forward(self, suction):
+    def forward(self, inlets):
         """Raise pressure from a supplied curve or discharge-pressure setpoint."""
 
         # Outlets
+        suction = inlets.suction
         flow = suction.volumetric_flow()
         if flow < 0:
             raise ValueError(f"{self.path}: reverse flow is unsupported")
@@ -74,7 +75,9 @@ class InjectionPump(Module):
         outlets = dict(discharge=discharge)
         return outlets
 
-    def _compute_outputs(self, suction, discharge):
+    def _compute_outputs(self, inlets, outlets):
+        suction = inlets.suction
+        discharge = outlets.discharge
         flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
         self.power = flow * self.head / self.efficiency

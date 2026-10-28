@@ -41,10 +41,11 @@ class DoubletHeatPlant(Module):
         self.secondary_out = Outlet(Stream)
         self.gas = Outlet(Stream)
 
-    def forward(self, secondary):
+    def forward(self, inlets):
         """Connect the doublet limbs through the modeled surface equipment."""
 
         # Modules
+        secondary = inlets.secondary
         supply = self.doublet.produce()
         degassed = self.degasser(inlet=supply)
         filtered = self.filters.hot(inlet=degassed.outlets.liquid)

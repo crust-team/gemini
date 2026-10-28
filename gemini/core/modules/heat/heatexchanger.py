@@ -59,10 +59,12 @@ class HeatExchanger(Module):
         self.hot_out = Outlet(Stream)
         self.cold_out = Outlet(Stream)
 
-    def forward(self, hot_in, cold_in):
+    def forward(self, inlets):
         """Solve the heat balance and retain both streams' mass flows."""
 
         # Outlets
+        hot_in = inlets.hot_in
+        cold_in = inlets.cold_in
         values = self._performance(hot_in, cold_in)
 
         hot_out = hot_in.with_(T=values["hot_out_T"], p=hot_in.p - values["dp_hot"])
@@ -71,7 +73,9 @@ class HeatExchanger(Module):
         outlets = dict(hot_out=hot_out, cold_out=cold_out)
         return outlets
 
-    def _compute_outputs(self, hot_in, cold_in, hot_out, cold_out):
+    def _compute_outputs(self, inlets, outlets):
+        hot_in = inlets.hot_in
+        cold_in = inlets.cold_in
         values = self._performance(hot_in, cold_in)
         for name, value in values.items():
             setattr(self, name, value)

@@ -89,10 +89,11 @@ class ESP(Module):
             * (units.bhp_to_w(1) / units.ft_head_to_pa(1))
         )
 
-    def forward(self, suction):
+    def forward(self, inlets):
         """Raise the suction-stream pressure by the pump-curve head."""
 
         # Outlets
+        suction = inlets.suction
         flow = suction.volumetric_flow()
         if flow < 0:
             raise ValueError(f"{self.path}: reverse volume flow {flow} is unsupported")
@@ -103,7 +104,9 @@ class ESP(Module):
         outlets = dict(discharge=discharge)
         return outlets
 
-    def _compute_outputs(self, suction, discharge):
+    def _compute_outputs(self, inlets, outlets):
+        suction = inlets.suction
+        discharge = outlets.discharge
         self.flow = suction.volumetric_flow()
         self.head = self.head_function(self.flow, self.frequency)
         self.power = self.power_function(self.flow, self.frequency)

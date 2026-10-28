@@ -42,7 +42,11 @@ class Ports(Mapping[str, Stream]):
     def __getattr__(self, name):
         """Return one stream by attribute name."""
         try:
-            return self._values[name]
+            values = object.__getattribute__(self, "_values")
+        except AttributeError:
+            raise AttributeError(name) from None
+        try:
+            return values[name]
         except KeyError as exc:
             raise AttributeError(self._unknown(name)) from exc
 
@@ -67,3 +71,12 @@ class Ports(Mapping[str, Stream]):
     def __repr__(self):
         """Represent the contained streams as a plain mapping."""
         return repr(self._values)
+
+    def __copy__(self):
+        """Reuse this immutable mapping in shallow copies."""
+        return self
+
+    def __deepcopy__(self, memo):
+        """Reuse this immutable mapping in deep copies."""
+        del memo
+        return self

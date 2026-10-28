@@ -38,21 +38,21 @@ class Accumulator(gm.modules.Module):
         """Start at zero."""
         return {"value": 0.0}
 
-    def forward(self):
+    def forward(self, inlets):
         """Expose a stateless rate observation."""
 
         outlets = dict()
         return outlets
 
-    def _compute_outputs(self):
+    def _compute_outputs(self, inlets, outlets):
         self.value = self.rate
 
-    def step(self, state, dt):
+    def step(self, state, dt, inlets):
         """Integrate with explicit state."""
 
         # Outputs
         state = {"value": state["value"] + self.rate * dt}
-        result = self(rate=state["value"])
+        result = self(inlets, rate=state["value"])
 
         return state, result
 

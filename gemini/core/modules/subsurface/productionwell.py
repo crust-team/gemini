@@ -60,10 +60,11 @@ class ProductionWell(Module):
         # Outlets
         self.wellhead = Outlet(Stream)
 
-    def forward(self, bottom):
+    def forward(self, inlets):
         """Traverse the passive full path; an internal ESP is handled with the split helpers."""
 
         # Outlets
+        bottom = inlets.bottom
         stream = bottom
         start, end = self.pipe_path.total_length, 0
         if self.segment == "below_esp":
@@ -78,7 +79,9 @@ class ProductionWell(Module):
         outlets = dict(wellhead=wellhead)
         return outlets
 
-    def _compute_outputs(self, bottom, wellhead):
+    def _compute_outputs(self, inlets, outlets):
+        bottom = inlets.bottom
+        wellhead = outlets.wellhead
         start, end = self.pipe_path.total_length, 0
         if self.segment == "below_esp":
             end = self._esp_depth()
