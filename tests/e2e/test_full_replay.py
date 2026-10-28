@@ -10,6 +10,7 @@ import pytest
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from gemini.core.engine.callbacks import Callback
 
 ROOT = Path(__file__).parents[2]
 DATA = ROOT / "examples/shared/doublet_heat"
@@ -94,32 +95,34 @@ def verification(tmp_path_factory):
     balances, electricity = [], []
     count = 0
 
-    def audit(module, inputs, streams, result):
-        nonlocal count
-        electricity.append(result.outputs.electricity_use)
-        if count in sampled:
-            mass = gm.modules.mass_balance(module, result)
-            energy = gm.modules.energy_balance(module, result)
-            assert all(abs(v["residual"]) < 1e-6 for v in mass["modules"].values())
-            assert all(v["relative_thermal_residual"] < 1e-6 for v in energy["modules"].values())
-            balances.append(
-                {
-                    "mass": mass["relative_residual"],
-                    "thermal": energy["relative_thermal_residual"],
-                    "energy": energy["relative_residual"],
-                    "unresolved_W": energy["unresolved_power"],
-                    "residual_W": energy["residual"],
-                }
-            )
-        count += 1
+    class Audit(Callback):
+        """Sample completed plant results without changing module hooks."""
 
-    handle = plant.register_forward_hook(audit)
-    try:
-        chain = engine.simulate(plant, dataset, gm.Clock.from_data(dataset)).to_frame()
-    finally:
-        handle.remove()
-    controls = dict(plant.last_result.inputs) | dict(plant.last_result.inlets)
-    traced = gm.modules.trace_wiring(plant, controls)
+        def on_step_end(self, current, sample):
+            """Audit the immutable result after the engine commits a step."""
+            nonlocal count
+            result = current.plant.last_result
+            electricity.append(result.outputs.electricity_use)
+            if count in sampled:
+                mass = gm.modules.mass_balance(current.plant, result)
+                energy = gm.modules.energy_balance(current.plant, result)
+                assert all(abs(v["residual"]) < 1e-6 for v in mass["modules"].values())
+                assert all(
+                    v["relative_thermal_residual"] < 1e-6 for v in energy["modules"].values()
+                )
+                balances.append(
+                    {
+                        "mass": mass["relative_residual"],
+                        "thermal": energy["relative_thermal_residual"],
+                        "energy": energy["relative_residual"],
+                        "unresolved_W": energy["unresolved_power"],
+                        "residual_W": energy["residual"],
+                    }
+                )
+            count += 1
+
+    chain = gm.Engine([Audit()]).simulate(plant, dataset, gm.Clock.from_data(dataset)).to_frame()
+    traced = gm.modules.trace_wiring(plant, dict(plant.last_result.inlets))
     mismatches = gm.legacy.check_wiring(plant, gm.legacy.read_project(OLD))
     assert mismatches == []
     report["wiring"] = {"edges": len(traced), "mismatches": mismatches}

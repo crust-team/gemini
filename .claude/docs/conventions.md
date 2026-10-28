@@ -20,7 +20,8 @@ do not construct runtime wiring.
 2. Section order is `Modules`, `Parameters`, `Inlets`, `Controls`, `Boundaries`, `Outputs`,
    `Outlets`, using plain `# Section` comments without decorative dashes.
 3. Controls are settable commands; boundaries are uncontrollable external conditions.
-4. `forward` has exactly the declared inlet/control/boundary names as plain arguments.
+4. `forward` has exactly the declared inlet names, in declaration order. Controls and boundaries
+   are applied before the call and read as plain attributes such as `self.frequency`.
 5. `forward` sections are `# Modules`, `# Outputs`, `# Outlets`, in that order with empty
    sections omitted. Only composites use `# Modules`.
 6. Assign every declared output only under `# Outputs`. Under `# Outlets`, create one local per

@@ -19,8 +19,11 @@ sleeping, and fetching new data belong to the caller.
 regular grid. Durations accept timedeltas and strings such as `15min`. `dt(t)` returns seconds
 to the next tick and a declared/median terminal interval.
 
-One binding plan is compiled per run. Replay applies dated parameters at each transition,
-converts raw units at the boundary, and skips only the module missing a required observation.
+One binding plan is compiled per run. Simulation validates every leaf control/boundary path
+before the first step, applies each step's values with `plant.set_inputs`, then calls the plant
+with root inlets only. Replay applies each bound module's controls and boundaries before calling
+it with only measured inlets. Replay also applies dated parameters at each transition, converts
+raw units at the boundary, and skips only the module missing a required observation.
 State bound to a sensor is authoritative for that tick; otherwise `module.step` integrates the
 previous state. Callback order is run-start, step-start, committed step-end, run-end; errors see
 a checkpoint-consistent boundary.

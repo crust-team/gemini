@@ -14,3 +14,7 @@ inventing fields. `results_to_frame` maps predicted measured outputs back to old
 Type, property, port, tag, and old-node path tables live in `legacy/tables.py` and the private
 loader. New engine/modules/examples contain no old naming or conversion logic. The bridge
 example is the only example that reads old files.
+
+Converted control columns use their owning leaf path. The shared doublet therefore uses
+`doublet.reservoir.m_dot`, `doublet.esp.frequency`, and
+`injection_pump.pressure_setpoint`, without duplicate plant-level control columns.
