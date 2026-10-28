@@ -136,7 +136,7 @@ def test_output_records_are_nested_and_thread_local():
             """Call the child and copy its recorded output."""
 
             # Modules
-            child = self.children_by_name.child(inlet=inlet)
+            child = self.children_by_name.child(inlet=inlet, multiplier=2)
 
             # Outputs
             self.child_value = child.outputs.result
@@ -148,8 +148,9 @@ def test_output_records_are_nested_and_thread_local():
             return outlets
 
     result = Parent()(inlet=stream)
-    assert result.outputs.child_value == 3
-    assert result.children["children_by_name.child"].outputs.result == 3
+    assert result.outputs.child_value == 6
+    assert result.children["children_by_name.child"].outputs.result == 6
+    assert Parent().children_by_name.child(inlet=stream).outputs.result == 3
 
 
 def test_uninitialized_and_hooks():
@@ -249,6 +250,27 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
     assert module(inlet=stream).outputs.total == 100
     assert seen == [50]
 
+    class AssignInForward(RequiredInputs):
+        """Fixture changing a control from inside its active forward context."""
+
+        def forward(self, inlet):
+            """Override frequency for only the current call."""
+            self.frequency = 10
+
+            # Outputs
+            self.total = self.frequency + self.grid_frequency
+
+            # Outlets
+            outlet = inlet
+
+            outlets = dict(outlet=outlet)
+            return outlets
+
+    assigned = AssignInForward()
+    assigned.set_inputs({"frequency": 50, "grid_frequency": 50})
+    assert assigned(inlet=stream).outputs.total == 60
+    assert assigned.frequency == 50
+
 
 def test_hooks_are_ordered_removable_and_can_replace_outlets():
     """Hooks use PyTorch-style arguments and a post-hook may replace the outlet mapping."""
@@ -268,6 +290,9 @@ def test_hooks_are_ordered_removable_and_can_replace_outlets():
     post.remove()
     first.remove()
     assert module(inlet=stream).outlets.outlet is stream
+    state = module.state_dict()
+    restored = PassThrough(value=1).load_state_dict(state)
+    assert not restored._pre_hooks and not restored._hooks
 
 
 def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
