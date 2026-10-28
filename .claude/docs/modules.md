@@ -15,7 +15,8 @@ when the class is defined. It never needs `super()._compute_outputs()`.
 from gemini.core.modules import Module
 from gemini.core.physics import pumps
 from gemini.core.types import (
-    Control, Frequency, Inlet, Outlet, Output, Power, PressureDifference, Stream, VolumeFlow,
+    Control, Count, Frequency, Inlet, Outlet, Output, Parameter, Power, PressureDifference,
+    Stream, VolumeFlow,
 )
 
 
@@ -24,6 +25,11 @@ class Pump(Module):
 
     def __init__(self):
         super().__init__()
+
+        # Parameters
+        self.no_stages = Parameter(Count)
+        self.head_coeff = Parameter(list[float], shape=(6,))
+        self.power_coeff = Parameter(list[float], shape=(6,))
 
         # Inlets
         self.suction = Inlet(Stream)
