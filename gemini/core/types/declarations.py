@@ -90,10 +90,21 @@ class Parameter(Declaration):
         self.shape = shape
         self.calibratable = calibratable
         self.value = UNSET
-        self.history: list[tuple[datetime | None, Any]] = []
+        self._history: list[tuple[datetime | None, Any]] = []
         if default is not UNSET:
             self.value = self.validate(deepcopy(default))
-            self.history.append((None, deepcopy(self.value)))
+            self._history.append((None, deepcopy(self.value)))
+
+    @property
+    def history(self):
+        """Project the owner's dated snapshots onto this parameter."""
+        if self.owner is None or not getattr(self.owner, "param_history", None):
+            return deepcopy(self._history)
+        return [
+            (snapshot.valid_from, self.validate(snapshot.params[self.name]))
+            for snapshot in self.owner.param_history
+            if self.name in snapshot.params
+        ]
 
     @property
     def initialized(self):
