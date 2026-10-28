@@ -20,10 +20,11 @@ class TreatmentTrain(gm.modules.Module):
         # Outlets
         self.outlet = Outlet(Stream)
 
-    def forward(self, inlet):
+    def forward(self, inlets):
         """Apply each filter in diagram order."""
 
         # Modules
+        inlet = inlets.inlet
         filtered = self._apply_filters(inlet)
 
         # Outlets

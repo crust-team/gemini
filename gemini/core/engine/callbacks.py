@@ -56,14 +56,17 @@ class EventLog(Callback):
         for path, module in plant.named_modules():
             module_path = path or plant.path
 
-            def before(module, path=module_path):
-                inputs = dict(module._current_inlets()) | {
-                    name: getattr(module, name) for name in module.inputs()
-                }
-                self._starts[path] = perf_counter(), to_jsonable_python(inputs)
+            def make_before(path):
+                def before(module, inlets):
+                    inputs = dict(inlets) | {
+                        name: getattr(module, name) for name in module.inputs()
+                    }
+                    self._starts[path] = perf_counter(), to_jsonable_python(inputs)
+
+                return before
 
             def make_after(path):
-                def after(module):
+                def after(module, inlets, outlets):
                     start, inputs = self._starts.pop(path)
                     self.log(
                         "forward",
@@ -79,7 +82,7 @@ class EventLog(Callback):
 
             self._handles.extend(
                 [
-                    module.register_forward_pre_hook(before),
+                    module.register_forward_pre_hook(make_before(module_path)),
                     module.register_forward_hook(make_after(module_path)),
                 ]
             )

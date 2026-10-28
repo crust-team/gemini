@@ -153,7 +153,7 @@ class ProductionReservoir(_Reservoir):
         # Outlets
         self.sandface = Outlet(Stream)
 
-    def forward(self):
+    def forward(self, inlets):
         """Apply the linear production IPR and emit the sandface stream."""
 
         # Outlets
@@ -167,7 +167,8 @@ class ProductionReservoir(_Reservoir):
         outlets = dict(sandface=sandface)
         return outlets
 
-    def _compute_outputs(self, sandface):
+    def _compute_outputs(self, inlets, outlets):
+        sandface = outlets.sandface
         flow = sandface.volumetric_flow()
         for name, value in self._calculate_outputs(flow, sandface.p).items():
             setattr(self, name, value)
@@ -183,13 +184,14 @@ class InjectionReservoir(_Reservoir):
         # Inlets
         self.sandface = Inlet(Stream)
 
-    def forward(self, sandface):
+    def forward(self, inlets):
         """Calculate required bottomhole pressure from the sandface flow."""
 
         outlets = dict()
         return outlets
 
-    def _compute_outputs(self, sandface):
+    def _compute_outputs(self, inlets, outlets):
+        sandface = inlets.sandface
         if self.injectivity_index is None:
             raise ValueError(f"{self.path}: injectivity_index is required")
         flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l

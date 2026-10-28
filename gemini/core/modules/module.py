@@ -818,11 +818,11 @@ class Module:
         }
         return states or None
 
-    def step(self, state, dt, **kwargs):
+    def step(self, state, dt, inlets):
         """Evaluate a stateless step; stateful equipment may override this method."""
         if dt <= 0:
             raise ValueError("dt must be positive [s]")
-        return state, self(**kwargs)
+        return state, self(inlets)
 
     def register_forward_pre_hook(self, fn):
         """Call ``fn(module, inlets)`` before each forward evaluation."""

@@ -38,17 +38,19 @@ class Filter(Module):
         # Outlets
         self.outlet = Outlet(Stream)
 
-    def forward(self, inlet):
+    def forward(self, inlets):
         """Apply a quadratic clean-filter pressure loss."""
 
         # Outlets
+        inlet = inlets.inlet
         pressure_drop = self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
         outlet = inlet.with_(p=inlet.p - pressure_drop)
 
         outlets = dict(outlet=outlet)
         return outlets
 
-    def _compute_outputs(self, inlet, outlet):
+    def _compute_outputs(self, inlets, outlets):
+        inlet = inlets.inlet
         self.pressure_drop = self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
 
     def health(self, predicted, measured):

@@ -23,7 +23,7 @@ assert dict(fluid_only.outputs) == {}
 assert fluid_only.outlets.discharge == b.outlets.discharge
 
 
-def clamp(module):
+def clamp(module, inlets):
     """Clamp one call without changing the persistent command."""
     module.frequency = min(module.frequency, 45.0)
 

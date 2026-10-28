@@ -44,16 +44,17 @@ class Declared(Module):
         # Outlets
         self.outlet = Outlet(Stream)
 
-    def forward(self, inlet):
+    def forward(self, inlets):
         """Return the inlet after recording a value."""
 
         # Outlets
+        inlet = inlets.inlet
         outlet = inlet
 
         outlets = dict(outlet=outlet)
         return outlets
 
-    def _compute_outputs(self, inlet, outlet):
+    def _compute_outputs(self, inlets, outlets):
         self.value = self.command + self.weather
 
 

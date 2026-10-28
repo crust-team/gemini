@@ -46,10 +46,11 @@ class Boiler(Module):
         # Outlets
         self.outlet = Outlet(Stream)
 
-    def forward(self, inlet):
+    def forward(self, inlets):
         """Heat a forward stream up to its setpoint, conserving energy."""
 
         # Outlets
+        inlet = inlets.inlet
         if inlet.m_dot < 0:
             raise ValueError(f"{self.path}: negative mass flow {inlet.m_dot}")
         cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
@@ -62,7 +63,9 @@ class Boiler(Module):
         outlets = dict(outlet=outlet)
         return outlets
 
-    def _compute_outputs(self, inlet, outlet):
+    def _compute_outputs(self, inlets, outlets):
+        inlet = inlets.inlet
+        outlet = outlets.outlet
         cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
         requested = inlet.m_dot * cp * max(0, self.setpoint_T - inlet.T)
         self.duty = min(requested, self.capacity)
