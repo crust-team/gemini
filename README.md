@@ -15,6 +15,15 @@ from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 SHARED = "examples/shared/doublet_heat"
 plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
+esp = gm.modules.ESP(
+    **{name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
+)
+out = esp(
+    suction=gm.Stream(flow="150 m3/h", T="80 C", p="20 bar"),
+    frequency="50 Hz",
+)
+print(out.outputs.get("head", unit="bar"), out.outlets.discharge)
+
 df = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(df, time_column="time")
 
@@ -27,7 +36,9 @@ engine.save_checkpoint("runs/replay.ckpt")
 restored = gm.Engine.load_checkpoint("runs/replay.ckpt")
 assert len(restored.resume()) == len(results)
 
-fit = gm.optim.calibrate(plant, data, "heat_exchanger", fields=["ua"])
+fit = gm.optim.calibrate(
+    plant, data, params=[plant.get_parameter("heat_exchanger.ua")]
+)
 print(fit)
 ```
 

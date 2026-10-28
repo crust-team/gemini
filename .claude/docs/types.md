@@ -8,14 +8,19 @@ Import public types from `gemini.core.types`; quantity aliases are also defined 
 | --- | --- | --- |
 | Tensor | `Stream` | Immutable mass flow, absolute temperature and pressure |
 | dtype | `Fluid` | Immutable composition and constant-property overrides |
-| Parameter | Quantity-typed `Params` field | Design value with physical unit and validation bounds |
-| Forward result | `ModuleResult` | Outputs, typed flows and retained evaluation tree |
+| Parameter | `Parameter` declaration | Design value with physical unit and validation bounds |
+| Forward result | `ModuleResult` | Recorded outputs, outlets and retained evaluation tree |
 | Input sequence | `Profile` | UTC time series in declared SI units |
 
 ## Quantities and schemas
 
-Use `Annotated[float, quantity(...)]` aliases for all physical numeric module fields, including
-list items. Integer stage counts use `Count`. Use signed pressure/temperature *differences*
+Use `Parameter`, `Inlet`, `Control`, `Boundary`, `Output` and `Outlet` in module constructors.
+Their `kind` may be a quantity alias, Python type or flow type. Pydantic `TypeAdapter` performs
+validation after declarations convert unit-bearing public values to SI. `UNSET` denotes an
+uninitialized parameter; `shape=` checks fixed vectors; bounds can tighten quantity defaults.
+
+Use `Annotated[float, quantity(...)]` aliases for physical numeric declarations, including list
+items. Integer stage counts use `Count`. Use signed pressure/temperature *differences*
 separately from nonnegative absolute pressure and strictly positive absolute temperature.
 Efficiencies used as design constraints are in (0, 1]; empirical ESP output efficiency remains
 `Dimensionless` because the unchanged polynomial model can return values above one.
@@ -32,12 +37,17 @@ the unused degasser coefficient has no established dimension. Core physics `Pipe
 keeps plain numeric annotations to avoid importing types upward, but its four fields carry
 identical quantity/unit JSON metadata, checked recursively by the schema test.
 `Health.metrics` is a heterogeneous diagnostic map, not a single physical quantity.
-`ParamRef.bounds` takes the unit of its referenced parameter and carries `quantity` and `unit`
-metadata; it is not falsely labelled dimensionless. Corrosion/erosion diagnostic helpers retain
+Calibration accepts the registered `Parameter` object directly, so no separate parameter
+reference type exists. Corrosion/erosion diagnostic helpers retain
 **mm/year** as an explicit literature-unit exception; `CorrosionRate` is available for new SI
 contracts, and conversion helpers remain in `physics.units`.
 
 ## Fluid
+
+`Stream(flow=..., T=..., p=..., fluid=None)` accepts mass flow (`kg/s`, `t/h`) or volumetric flow
+(`m3/s`, `m3/h`, `l/s`) and converts using the selected fluid. Plain `flow` numbers are kg/s;
+the explicit SI `m_dot` field remains supported. All public numeric declarations accept a unit
+string or `gm.Quantity(value, unit)`. `gm.units.convert` handles explicit output conversion.
 
 `BRINE` and `WATER` retain the original ConstantWater numerical properties. `Fluid` carries
 salinity, dissolved CO2 and free-gas mass fractions. Density, viscosity, heat capacity and
