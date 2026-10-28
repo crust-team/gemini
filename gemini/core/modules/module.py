@@ -9,6 +9,8 @@ from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 
+from gemini.core.types.bindings import ColumnInfo, DatedParams, utc
+from gemini.core.physics import units
 from gemini.core.types.cost import Cost
 from gemini.core.types.flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
 from gemini.core.types.fluid import BRINE, Fluid
@@ -113,6 +115,81 @@ class Module(ABC):
         self.params = self.Params.model_validate({} if params is None else params)
         self._fluid = Fluid.model_validate(fluid)
         self.fluid = self._resolve_fluid()
+        self.bindings = {}
+        self.boundary = {}
+        self.param_history = [DatedParams(params=self.params.model_dump(mode="json"))]
+        self._active_from = None
+        self._param_overrides = {}
+
+    def params_at(self, t):
+        """Return validated dated parameters with explicit user overrides applied."""
+        eligible = [p for p in self.param_history
+                    if t is None or p.valid_from is None or p.valid_from <= utc(t)]
+        if not eligible:
+            raise ValueError(f"{self.path}: no parameters valid at {t}")
+        snapshot = max(eligible, key=lambda p: p.valid_from or utc("0001-01-01"))
+        return self.Params.model_validate(snapshot.params | self._param_overrides)
+
+    def apply_params_at(self, t):
+        """Select dated snapshots recursively, retaining deliberate parameter overrides."""
+        for module in self.modules():
+            eligible = [p for p in module.param_history
+                        if t is None or p.valid_from is None or p.valid_from <= utc(t)]
+            if not eligible:
+                raise ValueError(f"{module.path}: no parameters valid at {t}")
+            snapshot = max(eligible, key=lambda p: p.valid_from or utc("0001-01-01"))
+            if snapshot.valid_from != module._active_from:
+                module.params = module.params_at(t)
+                module.fluid = module._resolve_fluid()
+                module._active_from = snapshot.valid_from
+
+    def column_units(self):
+        """Collect raw column metadata and reject conflicting unit declarations."""
+        columns = {}
+        for path, bound in self.bindings.items():
+            groups = [bound.inputs, bound.measured, bound.state, *bound.streams.values()]
+            for group in groups:
+                for field, binding in group.items():
+                    info = ColumnInfo(unit=binding.unit)
+                    if binding.column in columns and columns[binding.column] != info:
+                        raise ValueError(f"{path}.{field}: conflicting unit {binding.unit!r} "
+                                         f"for column {binding.column!r}")
+                    columns[binding.column] = info
+        return columns
+
+    def save(self, path):
+        """Save portable design, histories, explicit overrides and sensor bindings."""
+        from gemini.core.config.build import plant_to_config, save_config
+
+        save_config(plant_to_config(self), path)
+
+    def extra_repr(self):
+        """Display up to four scalar design parameters in familiar human units."""
+        fields = self._field_schema(self.Params).get("properties", {})
+        parts = []
+        for name, value in self.params.model_dump().items():
+            if value is None or isinstance(value, (dict, list)):
+                continue
+            unit = fields.get(name, {}).get("unit") or ""
+            if unit == "Pa" and isinstance(value, (float, int)):
+                value, unit = units.pa_to_bar(value), "bar"
+            elif unit == "K" and isinstance(value, (float, int)):
+                value, unit = units.k_to_c(value), "°C"
+            shown = f"{value:.5g}" if isinstance(value, float) else str(value)
+            parts.append(f"{name}={shown}{(' ' + unit) if unit != '-' else ''}")
+            if len(parts) == 4:
+                break
+        return ", ".join(parts)
+
+    def __repr__(self):
+        """Render the registered module tree with compact design summaries."""
+        extra = self.extra_repr()
+        if not self._children:
+            return f"{type(self).__name__}({extra})"
+        rows = [f"{type(self).__name__}({extra}"]
+        for name, child in self.named_children():
+            rows.append("  (" + name + "): " + repr(child).replace("\n", "\n  "))
+        return "\n".join(rows + [")"])
 
     @property
     def path(self):
@@ -212,6 +289,7 @@ class Module(ABC):
     def update_params(self, **changes):
         """Revalidate design changes before replacing the parameter snapshot."""
         self.params = self.Params.model_validate(self.params.model_dump() | changes)
+        self._param_overrides.update(changes)
         self.fluid = self._resolve_fluid()
 
     def _validate_inputs(self, inputs):
