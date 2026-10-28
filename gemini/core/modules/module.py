@@ -357,6 +357,25 @@ class Module(ABC):
         """Return optional capital expenditure when a correlation is available."""
         return None
 
+    @staticmethod
+    def _field_schema(model):
+        """Retain JSON schema, adding explicit names, bounds and nullable defaults."""
+        schema = model.model_json_schema()
+        for name, field in schema.get("properties", {}).items():
+            variants = field.get("anyOf", [field])
+            value = next((v for v in variants if v.get("type") != "null"), field)
+            field["name"] = name
+            field["quantity"] = value.get("quantity", field.get("quantity"))
+            field["unit"] = value.get("unit", field.get("unit"))
+            field["bounds"] = {
+                k: value[k]
+                for k in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum")
+                if k in value
+            }
+            field.setdefault("description", "")
+            field.setdefault("default", None)
+        return schema
+
     @classmethod
     def schema(cls):
         """Describe identity, fidelity, ports and all validated contracts."""
@@ -367,9 +386,9 @@ class Module(ABC):
             fidelity=cls.fidelity,
             inlets=cls.inlets,
             outlets=cls.outlets,
-            params=cls.Params.model_json_schema(),
-            inputs=cls.Inputs.model_json_schema(),
-            outputs=cls.Outputs.model_json_schema(),
+            params=cls._field_schema(cls.Params),
+            inputs=cls._field_schema(cls.Inputs),
+            outputs=cls._field_schema(cls.Outputs),
             soft_sensors=cls.soft_sensors,
             calibratable=cls.calibratable,
             stateful=cls.stateful,

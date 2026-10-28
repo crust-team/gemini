@@ -10,6 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import geometry, hydraulics
+from gemini.core.types.quantities import (
+    Dimensionless,
+    HeatTransferCoefficient,
+    Length,
+    Pressure,
+    PressureDifference,
+    Temperature,
+)
 from gemini.core.types.results import ModuleResult
 
 
@@ -35,17 +43,17 @@ class ProductionWell(Module):
         friction_correlation_2p: Literal["BeggsBrill"] = Field(
             "BeggsBrill", description="Two-phase correlation [-]"
         )
-        correction_factors: tuple[float, float] = Field(
+        correction_factors: tuple[Dimensionless, PressureDifference] = Field(
             (1, 0), description="Pressure correction slope [-], offset [Pa]"
         )
-        soil_temperature: float = Field(..., gt=0, description="Ambient soil temperature [K]")
-        u_value: float = Field(
+        soil_temperature: Temperature = Field(..., gt=0, description="Ambient soil temperature [K]")
+        u_value: HeatTransferCoefficient = Field(
             10, ge=0, description="Overall pipe heat transfer coefficient [W/m2/K]"
         )
         segment: Literal["full", "below_esp", "above_esp"] = Field(
             "full", description="Physical interval represented by this graph node [-]"
         )
-        esp_depth: float | None = Field(None, ge=0, description="Optional ESP measured depth [m]")
+        esp_depth: Length | None = Field(None, ge=0, description="Optional ESP measured depth [m]")
 
     class Inputs(BaseModel):
         """All operating conditions arrive through the inlet stream."""
@@ -55,12 +63,16 @@ class ProductionWell(Module):
     class Outputs(BaseModel):
         """Outlet conditions and traversed section profiles."""
 
-        wellhead_pressure: float = Field(..., description="Outlet pressure [Pa]")
-        wellhead_temperature: float = Field(..., description="Outlet temperature [K]")
-        dp_friction: float = Field(..., description="Signed friction pressure drop [Pa]")
-        dp_gravity: float = Field(..., description="Gravity pressure drop [Pa]")
-        section_pressure: list[float] = Field(..., description="Traversed section pressures [Pa]")
-        section_temperature: list[float] = Field(
+        wellhead_pressure: Pressure = Field(..., description="Outlet pressure [Pa]")
+        wellhead_temperature: Temperature = Field(..., description="Outlet temperature [K]")
+        dp_friction: PressureDifference = Field(
+            ..., description="Signed friction pressure drop [Pa]"
+        )
+        dp_gravity: PressureDifference = Field(..., description="Gravity pressure drop [Pa]")
+        section_pressure: list[Pressure] = Field(
+            ..., description="Traversed section pressures [Pa]"
+        )
+        section_temperature: list[Temperature] = Field(
             ..., description="Traversed section temperatures [K]"
         )
 

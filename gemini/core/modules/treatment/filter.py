@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import units
+from gemini.core.types.quantities import MassFlow, PressureDifference
 from gemini.core.types.results import Health, ModuleResult
 
 
@@ -23,11 +24,13 @@ class Filter(Module):
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
         # NOTE(refactor): nominal clean loss from the example (0.016 bar at 149 m3/h).
-        dp_nominal: float = Field(1600, ge=0, description="Clean nominal pressure loss [Pa]")
-        m_dot_nominal: float = Field(
+        dp_nominal: PressureDifference = Field(
+            1600, ge=0, description="Clean nominal pressure loss [Pa]"
+        )
+        m_dot_nominal: MassFlow = Field(
             149 / 3600 * 1068, gt=0, description="Nominal brine mass flow [kg/s]"
         )
-        clogging_dp: float = Field(
+        clogging_dp: PressureDifference = Field(
             units.bar_to_pa(0.5), gt=0, description="Clogging alarm pressure differential [Pa]"
         )
 
@@ -39,7 +42,7 @@ class Filter(Module):
     class Outputs(BaseModel):
         """Declared future performance results."""
 
-        pressure_drop: float = Field(..., description="Pressure loss [Pa]")
+        pressure_drop: PressureDifference = Field(..., description="Pressure loss [Pa]")
 
     def forward(self, inputs, streams_in):
         """Apply a quadratic clean-filter pressure loss, conserving mass and temperature."""
