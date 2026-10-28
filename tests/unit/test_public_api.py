@@ -11,6 +11,7 @@ def test_public_names_and_docs():
         "Dataset",
         "Profile",
         "Stream",
+        "Ports",
         "Fluid",
         "BRINE",
         "WATER",
