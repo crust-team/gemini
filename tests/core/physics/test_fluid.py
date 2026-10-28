@@ -24,3 +24,17 @@ def test_original_defaults_and_overrides():
     assert ConstantWater(RHOL=1068, VISL=0.00065).properties(1, 300).mu_l == 0.00065
     with pytest.raises(ValidationError):
         ConstantWater(RHOL=-1)
+
+
+def test_named_fluid_preserves_stream_density():
+    """A configured brine factory gives streams the same density as equipment calculations."""
+    from functools import partial
+
+    from gemini.core.base.stream import Stream
+    from gemini.core.physics import fluid
+
+    fluid.register_fluid("test_brine", partial(ConstantWater, RHOL=1068))
+    stream = Stream(m_dot=106.8, p=1e5, T=300, fluid="test_brine")
+    assert stream.volumetric_flow() == pytest.approx(0.1)
+    with pytest.raises(ValueError, match="Cannot replace"):
+        fluid.register_fluid("water", ConstantWater)

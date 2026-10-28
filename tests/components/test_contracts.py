@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from gemini.components.heat import Boiler
+from gemini.components.heat import Boiler, HeatExchanger
 from gemini.components.pumps import ESP, BoosterPump, InjectionPump
 from gemini.components.subsurface import (
     InjectionReservoir,
@@ -28,6 +28,7 @@ def example_components():
         return mapping.read_property(DATA / name)
 
     return [
+        HeatExchanger(mapping.heatexchanger_params_from_gemini(read("heat_exchanger_3410.param"))),
         ESP(mapping.esp_params_from_gemini(read("esp_1ee3.param"))),
         ProductionWell(
             mapping.productionwell_params_from_gemini(read("production_well_c774.param"))

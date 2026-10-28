@@ -1,10 +1,16 @@
 """Pipe hydraulics: Swamee–Jain (1976) and Beggs–Brill (Shoham p.59)."""
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from . import heat_transfer, units
+from . import fluid as fluid_models
+from . import geometry, heat_transfer, units
+
+if TYPE_CHECKING:
+    from gemini.core.base.stream import Stream
 from .constants import G_FT, G
 
 
@@ -17,7 +23,27 @@ def darcy_weisbach_dp(
     roughness: float,
     length: float,
 ) -> tuple[float, float]:
-    """Return friction and gravity drops [Pa] from SI inputs; inclination [rad]."""
+    """Evaluate signed friction and gravity pressure drops.
+
+    Parameters
+    ----------
+    velocity, rho, mu : float
+        Signed velocity [m/s], density [kg/m3], dynamic viscosity [Pa s].
+    inclination : float
+        Pipe angle above horizontal [rad].
+    diameter, roughness, length : float
+        Internal diameter, absolute roughness and interval length [m].
+
+    Returns
+    -------
+    tuple of float
+        Signed friction drop and gravity drop [Pa].
+
+    Notes
+    -----
+    Reference: Swamee and Jain (1976), Explicit Equations for Pipe-Flow Problems,
+    combined with Darcy–Weisbach and hydrostatic balance; retained GEMINI formulation.
+    """
     g = G  # acceleration due to gravity (m/s2)
 
     if velocity == 0:
@@ -50,7 +76,34 @@ def beggs_brill_dp(
     roughness: float,
     length: float,
 ) -> tuple[float, float]:
-    """Return friction and gravity drops [Pa] from SI inputs; inclination [rad]."""
+    """Evaluate two-phase friction and gravity pressure drops.
+
+    Parameters
+    ----------
+    us_g, us_l : float
+        Gas and liquid superficial velocities [m/s].
+    rho_g, rho_l : float
+        Phase densities [kg/m3].
+    inclination : float
+        Angle above horizontal [rad].
+    mu_g, mu_l : float
+        Phase dynamic viscosities [Pa s].
+    sigma : float
+        Gas/liquid surface tension [N/m].
+    diameter, roughness, length : float
+        Pipe internal diameter, absolute roughness and interval length [m].
+
+    Returns
+    -------
+    tuple of float
+        Friction and gravity pressure drops [Pa].
+
+    Notes
+    -----
+    Reference: Beggs and Brill (1973), A Study of Two-Phase Flow in Inclined Pipes;
+    original GEMINI implementation cites Shoham, p. 59. US-basis intermediates are
+    converted at this function boundary.
+    """
     us_g = units.m_to_ft(us_g)  # m/s -> ft/s
     us_l = units.m_to_ft(us_l)  # m/s -> ft/s
     rho_g = units.kgm3_to_lbmft3(rho_g)  # kg/m3 -> lbm/ft3
@@ -230,19 +283,34 @@ class PathResult:
 
 
 def hydrostatic_dp(rho: float, height: float) -> float:
-    """Return hydrostatic pressure [Pa] for density [kg/m3] and height [m], rho*g*h."""
+    """Evaluate hydrostatic pressure.
+
+    Parameters
+    ----------
+    rho, height : float
+        Density [kg/m3] and signed vertical height [m].
+
+    Returns
+    -------
+    float
+        Pressure difference [Pa].
+
+    Notes
+    -----
+    Reference: Hydrostatic balance dp = rho*g*height; GEMINI gravity 9.81 m/s2.
+    """
     return rho * G * height
 
 
 def pipe_path_profile(
-    path,
-    stream,
-    fluid,
+    path: geometry.PipePath,
+    stream: Stream,
+    fluid: fluid_models.ConstantWater,
     direction: Literal["up", "down"],
     u_value: float,
     t_ambient: float,
-    correlation: str = "darcy_weisbach",
-    correlation_2p: str = "BeggsBrill",
+    correlation: Literal["darcy_weisbach"] = "darcy_weisbach",
+    correlation_2p: Literal["BeggsBrill"] = "BeggsBrill",
 ) -> PathResult:
     """March the original DPDT equations along a pipe path using SI units.
 
@@ -369,9 +437,44 @@ def radial_pressure_drops(
 
 
 def corrosion_profile(
-    path, stream, fluid, direction, u_value, t_ambient, chemistry: dict, model: str = "NORSOK"
+    path: geometry.PipePath,
+    stream: Stream,
+    fluid: fluid_models.ConstantWater,
+    direction: Literal["up", "down"],
+    u_value: float,
+    t_ambient: float,
+    chemistry: dict,
+    model: Literal["NORSOK", "DLM", "DLD"] = "NORSOK",
 ) -> list[float]:
-    """Return section corrosion [mm/year] from SI path conditions and chemistry inputs."""
+    """Evaluate section corrosion along the traversed hydraulic profile.
+
+    Parameters
+    ----------
+    path : PipePath
+        Surface-to-bottom intervals [m, rad].
+    stream : Stream
+        Signed mass flow [kg/s], inlet pressure [Pa] and temperature [K].
+    fluid : ConstantWater
+        SI property model.
+    direction : str
+        Traversal direction, up or down [-].
+    u_value, t_ambient : float
+        Heat transfer coefficient [W/m2/K] and ambient temperature [K].
+    chemistry : dict
+        Keyword arguments for co2_corrosion_rate in its documented SI units.
+    model : str
+        NORSOK, DLM or DLD correlation [-].
+
+    Returns
+    -------
+    list of float
+        Wall penetration rates [mm/year] in traversal order.
+
+    Notes
+    -----
+    Reference: GEMINI WIMS composition of DPDT and CO2 corrosion correlations;
+    see pipe_path_profile and corrosion.co2_corrosion_rate.
+    """
     from . import corrosion
 
     result = pipe_path_profile(path, stream, fluid, direction, u_value, t_ambient)
@@ -395,8 +498,29 @@ def corrosion_profile(
     return rates
 
 
-def erosion_check(path, stream, fluid) -> dict:
-    """Compare section speeds [m/s] with the API RP 14E erosional velocity limit."""
+def erosion_check(
+    path: geometry.PipePath, stream: Stream, fluid: fluid_models.ConstantWater
+) -> dict:
+    """Compare section velocities with the API erosional velocity limit.
+
+    Parameters
+    ----------
+    path : PipePath
+        Surface-to-bottom pipe intervals [m, rad].
+    stream : Stream
+        Mass flow [kg/s], pressure [Pa] and temperature [K].
+    fluid : ConstantWater
+        SI property model.
+
+    Returns
+    -------
+    dict
+        Section velocities and limit [m/s], dimensionless ratios and alarm flags.
+
+    Notes
+    -----
+    Reference: API RP 14E velocity criterion, as implemented in GEMINI WIMS.
+    """
     from . import erosion
 
     density = fluid.properties(stream.p, stream.T).density

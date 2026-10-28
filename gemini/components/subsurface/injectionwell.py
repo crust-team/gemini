@@ -60,7 +60,7 @@ class InjectionWell(Component):
         )
 
     def compute(self, inputs, streams_in):
-        """Traverse the passive full path; an internal ESP is handled with the split helpers."""
+        """Traverse the injection path with the legacy negative flow convention."""
         stream = streams_in["wellhead"]
         # NOTE(refactor): legacy injection DPDT uses negative flow; retain that sign convention.
         stream = stream.with_(m_dot=-abs(stream.m_dot))
@@ -96,7 +96,7 @@ class InjectionWell(Component):
         """Return per-section CO2 corrosion [mm/year] using SI chemistry inputs."""
         return hydraulics.corrosion_profile(
             self.params.path,
-            stream,
+            stream.with_(m_dot=-abs(stream.m_dot)),
             self.fluid,
             "down",
             self.params.u_value,

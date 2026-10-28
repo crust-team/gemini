@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Validated SI equipment components, streams, health hooks and automatic component discovery.
+- Shared physics, parameter mappers, heat exchanger and boiler models, five runnable examples.
+- Immutable physics golden values and offline CSV monitoring regression checks.
+- Agent conventions in `AGENTS.md`, `CLAUDE.md` and `.claude/docs/`.
+
+### Changed
+- Consolidate the suite into the installable `gemini` Python package.
+- Rewrite monitoring modules to use components while preserving the existing eight output tags.
+- Move example plant data to `datasets/geothermal_example` and API documentation to `docs`.
+- Return ESP efficiency as a fraction; report undefined radial diagnostics as unavailable.
+
+### Removed
+- Flask interface, application/UI workflows, container stack and platform launcher scripts.
+- UI-only dependencies and obsolete model base classes; old import paths are not retained.
+
 ## [1.0.3] - 2026-10-13
 ## added
 - parameters and tagnames of geothermal_example using csv data
