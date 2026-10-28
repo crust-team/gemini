@@ -6,7 +6,9 @@ from typing import Literal
 from . import units
 
 
-def _mass_flow_and_velocity(flow_rate_m3h, rho_fluid_kgm3, diameter_m):
+def _mass_flow_and_velocity(
+    flow_rate_m3h: float, rho_fluid_kgm3: float, diameter_m: float
+) -> tuple[float, float, float]:
     """Particle mass flow, pipe area, and mixture velocity from volumetric flow.
 
     Parameters
@@ -25,7 +27,7 @@ def _mass_flow_and_velocity(flow_rate_m3h, rho_fluid_kgm3, diameter_m):
         mixture impact velocity [m/s], pipe cross-section area [m2].
     """
     # -- mass flow of particles [kg/s] ----------------------------------
-    mp_kgs = flow_rate_m3h * rho_fluid_kgm3 / units.SECONDS_PER_DAY * 24
+    mp_kgs = units.kgh_to_kgs(flow_rate_m3h * rho_fluid_kgm3)
 
     # -- pipe cross-section + mixture velocity --------------------------
     a_pipe_m2 = 0.25 * math.pi * diameter_m**2
@@ -113,7 +115,7 @@ class _ErosionDNV:
         # mp [kg/s], Up [m/s] (mixture velocity in multiphase), A_pipe [m2]
         mp, Up, A_pipe = _mass_flow_and_velocity(input["flowRate"], dens_liq, D)
 
-        aa = alpha * math.pi / 180
+        aa = units.deg_to_rad(alpha)
         F = aa * (
             9.37
             + aa
@@ -128,7 +130,7 @@ class _ErosionDNV:
         )
 
         A_t = A_pipe / math.sin(aa)  # m2
-        C_unit = 1000 * units.SECONDS_PER_YEAR  # conversion m/s --> mm/yr
+        C_unit = units.ms_to_mm_year(1)  # conversion m/s --> mm/yr
 
         EL = C_unit * mp * K * Up**n * F / (rho_pipe * A_t)  # [mm/yr]
 
@@ -208,8 +210,8 @@ class _ErosionOKA:
         a = 1
         b = 1
 
-        aa = alpha * math.pi / 180
-        A_pipe = A_pipe1 * 1e6  # [mm2]
+        aa = units.deg_to_rad(alpha)
+        A_pipe = units.m2_to_mm2(A_pipe1)  # [mm2]
         A_t = A_pipe / math.sin(aa)  # [mm2]
 
         E_alpha = K * (a * Hv) ** (k1 * b) * (Up / Upref) ** k2 * (dp / dpref) ** k3  # [mm3/kg]
@@ -263,7 +265,7 @@ class _ErosionTULSA:
         # Particle shape factor: 1 sharp, 0.53 semi-rounded, 0.2 fully rounded
         Fs = input["fs"]
 
-        aa = alpha * math.pi / 180
+        aa = units.deg_to_rad(alpha)
         F = 5.4 * aa - 10.11 * aa**2 + 10.93 * aa**3 - 6.33 * aa**4 + 1.42 * aa**5
 
         A_t = A_pipe / math.sin(aa)  # [m2]
@@ -273,7 +275,7 @@ class _ErosionTULSA:
         C = 2.17e-7
         n = 2.41
 
-        C_unit = 1000 * units.SECONDS_PER_YEAR  # conversion m/s --> mm/yr
+        C_unit = units.ms_to_mm_year(1)  # conversion m/s --> mm/yr
 
         ER = C * Hb_ ** (-0.59) * Fs * Up**n * F  # [kg/kg]
 
@@ -309,8 +311,23 @@ _RATE_CORRELATIONS = {
 }
 
 
-def normalize_model_name(name):
-    """Resolve a user-facing erosion model name to its canonical form."""
+def normalize_model_name(name: str) -> str:
+    """Resolve an erosion correlation alias.
+
+    Parameters
+    ----------
+    name : str
+        User-facing correlation name [-].
+
+    Returns
+    -------
+    str
+        Canonical DNV, OKA, TULSA or API name [-].
+
+    Notes
+    -----
+    Reference: GEMINI ErosionModel alias table; unknown names raise ValueError.
+    """
     key = str(name).strip().upper()
     canonical = _ALIASES.get(key)
     if canonical is None:
@@ -318,8 +335,23 @@ def normalize_model_name(name):
     return canonical
 
 
-def is_velocity_model(name):
-    """Return whether the model yields a velocity limit (API) rather than a rate."""
+def is_velocity_model(name: str) -> bool:
+    """Identify a velocity-limit correlation.
+
+    Parameters
+    ----------
+    name : str
+        Erosion correlation name or alias [-].
+
+    Returns
+    -------
+    bool
+        True for API; False for penetration-rate correlations [-].
+
+    Notes
+    -----
+    Reference: GEMINI ErosionModel output classification.
+    """
     return normalize_model_name(name) == MODEL_API
 
 
@@ -379,14 +411,44 @@ def erosion_rate(
 
 
 def api_erosional_velocity(rho_fluid: float) -> float:
-    """Return API RP 14E velocity limit [m/s] from mixture density [kg/m3]."""
+    """Evaluate the API erosional velocity limit.
+
+    Parameters
+    ----------
+    rho_fluid : float
+        Positive mixture density [kg/m3].
+
+    Returns
+    -------
+    float
+        Maximum flow velocity [m/s].
+
+    Notes
+    -----
+    Reference: API RP 14E; GEMINI uses C=100 with historical imperial conversions.
+    """
     if rho_fluid <= 0:
         raise ValueError(f"Density must be positive, got {rho_fluid}")
     return _ErosionAPI.calculate_erosion_velocity(rho_fluid)
 
 
 def api_velocity_comparison(actual: float, limit: float) -> dict:
-    """Compare actual and limiting speeds [m/s], preserving WIMS margin and ratio."""
+    """Compare actual and limiting flow velocities.
+
+    Parameters
+    ----------
+    actual, limit : float
+        Actual speed and positive limiting speed [m/s].
+
+    Returns
+    -------
+    dict
+        Velocity ratio [-], margin [m/s], and exceedance flag [-].
+
+    Notes
+    -----
+    Reference: GEMINI WIMS API velocity comparison; margin = limit - actual.
+    """
     if limit <= 0:
         raise ValueError("Velocity limit must be positive")
     return {

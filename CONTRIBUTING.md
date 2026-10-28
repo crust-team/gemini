@@ -1,6 +1,8 @@
-# This file
-This file should describe the development process for this project and include instruction on 
-how to run/build your project.  Any environment settings/requirements?
+# Contributing
+
+Use Python 3.11 and install development dependencies with `poetry install`. Read
+[AGENTS.md](AGENTS.md) and its linked conventions before changing equipment or physics.
+Run the validation commands in [README.md](README.md) before submitting changes.
 
 # Development guidelines
 The general proces is as follows:

@@ -1,90 +1,114 @@
-[![Test workflow status](https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open/actions/workflows/python_test.yaml/badge.svg)](https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open/actions/workflows/python_test.yaml)
-[![Lint workflow status](https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open/actions/workflows/python_lint.yaml/badge.svg)](https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open/actions/workflows/python_lint.yaml)
-[![Docs workflow status](https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open/actions/workflows/docs.yaml/badge.svg)](https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open/actions/workflows/docs.yaml)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+# GEMINI Geothermal Suite
 
-# GEMINI Geothermal Suite (Open Source)
+An installable Python package for geothermal equipment physics and time-series monitoring,
+developed by TNO and partners in the Nieuwe Warmte Nu programme. Python **3.11** and
+**Pydantic v2** are used for the component API. Package inputs and outputs use SI units.
 
-Open-source repository for the GEMINI Geothermal Digital Twin platform, developed in the
-context of the *Nieuwe Warmte Nu* innovation program.
+## Install and run
 
-## Documentation
-
-Public documentation is built from `src/gemini_documentation` and published via GitHub Pages.
-
-- Main branch docs:
-  <https://gemini-digital-twin.github.io/gemini-geothermal-suite-open/main/>
-- Branch docs (pattern):
-  `https://gemini-digital-twin.github.io/gemini-geothermal-suite-open/<branch-name>/`
-
-> Branch names are sanitized for deployment (`/` is replaced with `-`).
-
-**New to GEMINI?** Start with the [Quick Start (Beginners)](https://gemini-digital-twin.github.io/gemini-geothermal-suite-open/main/start_installation_quickstart.html)
-guide. For full detail on every service, environment variable, and the local development workflow,
-see the [Installation guide](https://gemini-digital-twin.github.io/gemini-geothermal-suite-open/main/start_installation.html).
-
-## Quick start
-
-Requirements: **Docker Desktop**, **Python 3.11**, **Poetry**, **Git**.
+From this directory:
 
 ```bash
-git clone https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open.git
-cd gemini-geothermal-suite-open
-cp .env.template .env      # fill it in, see the Quick Start doc above for a working example
-docker compose up -d       # starts MySQL, InfluxDB, Redis, MongoDB, ChromaDB, Grafana, Ollama
 pip install poetry
 poetry install
-poetry run python src/gemini_interface/app.py
+poetry run python examples/01_esp_operating_point.py
+poetry run python examples/04_doublet_chain.py
+poetry run python examples/05_list_components.py
 ```
 
-Open `http://localhost:<GEMINI_FRONTEND_PORT>` (default `5101`) and log in with the
-`GEMINI_ADMIN_EMAIL`/`GEMINI_ADMIN_PASSWORD` set in `.env`. See the Quick Start doc above for
-populating time-series data, starting Celery (required for most analysis tabs), and pulling the
-Ollama models (required for the AI Chat Assistant).
+For library use, `pip install .` installs the `gemini` import package. Examples and sample
+plant files live in the source checkout under `examples/` and `datasets/geothermal_example/`.
+No external services are needed for the components, examples or CSV engine integration test.
 
-## Development
+```python
+from gemini.core.base.stream import Stream
+from gemini.core.engine.registry import create
 
-Convenience scripts for installing dependencies, running the app/framework module, Celery/Flower,
-tests, linting, formatting, and docs builds are provided under `ci/windows` and `ci/linux`. See
-[CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow.
+boiler = create("boiler", {"fuel": "electric", "capacity": 100000, "efficiency": 0.95})
+result, streams = boiler.compute(
+    {"setpoint_T": 350},
+    {"inlet": Stream(m_dot=10, T=300, p=1000000)},
+)
+print(result.duty, streams["outlet"].T)
+```
 
-## Repository structure
+## Package structure
 
-- `src/gemini_framework` - framework/runtime logic (physics model modules, database connectors)
-- `src/gemini_model` - domain and physics models
-- `src/gemini_application` - application-level features
-- `src/gemini_interface` - Flask web app (GUI, blueprints, Celery tasks)
-- `src/gemini_documentation` - Sphinx docs source and build output
-- `ci/windows`, `ci/linux` - convenience scripts to install dependencies, run the app/framework
-  module, Celery/Flower, tests, linting, formatting, and docs builds
+- `gemini/core/base`: validated streams, component contracts, health, runtime unit interfaces.
+- `gemini/core/physics`: units, fluid properties, geometry, hydraulics, heat transfer,
+  chemistry, corrosion and erosion.
+- `gemini/core/plant`: configuration mappers, connected units and plant loading.
+- `gemini/core/data`: CSV, InfluxDB and AVEVA drivers; an offline CSV reader with in-memory outputs.
+- `gemini/core/engine`: time loops, registry and component-based monitoring modules.
+- `gemini/components`: subsurface, pumps, treatment and heat equipment, one file per equipment type.
+- `gemini/design`, `gemini/optim`, `gemini/agentic`, `gemini/core/modes`: reserved namespaces.
 
-## CI and branch documentation workflow
+Implemented equipment includes ESPs, production/injection reservoirs and wells, boilers, and
+counterflow/parallel heat exchangers. Injection/booster pumps, degassers, filters and blowdown
+have explicit unmodelled compute methods. Filter clogging monitoring is available independently.
 
-- **Test** workflow: `.github/workflows/python_test.yaml`
-- **Lint** workflow: `.github/workflows/python_lint.yaml`
-- **Docs** workflow: `.github/workflows/docs.yaml`
+## Conventions and numerical compatibility
 
-On every push, the Docs workflow builds Sphinx docs and deploys to `gh-pages` under a
-branch-specific folder, enabling side-by-side docs per branch.
+Read [AGENTS.md](AGENTS.md) and the linked [.claude/docs](.claude/docs/conventions.md) before
+changing code. Component ports carry immutable `Stream` objects. Parameters, operating inputs,
+returned output types and port names are validated on direct `compute()` calls.
 
-## Versioning and release notes
+GEMINI `.param` files retain their historical units and timestamped structure. Convert them
+through `gemini.core.plant.param_mapping`. Corrosion and erosion rates retain the documented
+`mm/year` output convention. ESP polynomial coefficients retain their historical US basis;
+efficiency is now a fraction. The example pump has zero power coefficients.
 
-- Versioning policy: [VERSIONING.md](./VERSIONING.md)
-- Release notes / change history: [CHANGELOG.md](./CHANGELOG.md)
+`tests/golden/golden_values.json` contains the original physics baseline. Do not regenerate it
+from the new API. `tests/golden/capture_golden.py` is a historical script intended to be run at
+the phase-0 commit, where the original imports still exist. `runtime_values.json` additionally
+records all eight legacy monitoring outputs from the first CSV interval, captured using the
+phase-1 implementation (`193c9a8`) before rewriting the engine adapters.
 
-## Contribution
+Public components use physically consistent SI mappings. Compatibility adapters retain old
+dashboard conventions, including the legacy IPR unit mismatch, ESP interval selection and
+float32 polynomial evaluation. Search for `NOTE(refactor)` for their precise locations.
+The injection example has an unconfigured zero drainage radius; radial diagnostics are `None`.
 
-Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request.
+The doublet example registers a named constant brine model during configuration so reservoir,
+well and pump streams use the same example density. The default `water`/`brine` properties remain
+unchanged. It imposes flow and prints the injection pressure residual; no network solver is implied.
 
-For bugs, feature requests, and technical discussions, open an
-[issue](https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open/issues).
+## Offline and service-backed monitoring
 
-## License
+```python
+from gemini.core.data.csv_memory import CSVMemoryReader
+from gemini.core.engine.mainmodule import MainModule
+from gemini.core.plant.loader import setup
 
-This content is released under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0) License.
+reader = CSVMemoryReader(
+    "datasets/geothermal_example/geothermal_example_dataset.csv",
+    end_time="2024-06-07T00:15:00Z",
+)
+plant = setup("datasets", "geothermal_example", database=reader)
+MainModule(plant).step()
+print(reader.outputs)
+```
 
-## Acknowledgments
-This project is sponsored by NWM innovatie: Datagedreven optimalisatie aardwarmtesystemen
-(https://nwn.nu/projecten/innovaties/datagedreven-optimalisatie-aardwarmte-systemen)
+Calling `setup` without a supplied reader uses the retained InfluxDB/AVEVA configuration path.
+Supply the existing `INFLUXDB_URL`, `INFLUXDB_ORG`, `INFLUXDB_USERNAME`, `INFLUXDB_PASSWORD`, and
+`INFLUXDB_BUCKET` environment variables when using that path. The runner does not load `.env`
+files or start services at import time. External-service tests are skipped without credentials.
 
-Organization: TNO, Gaia Energy, HVC, Well Engineering Partners (WEP), Helin
+## Validation and API documentation
+
+```bash
+poetry run black --check gemini tests
+poetry run isort --check-only gemini tests
+poetry run flake8 gemini tests
+poetry run pytest tests
+poetry run sphinx-build -W -b html docs docs/_build/html
+```
+
+The workflows inline these commands. Documentation consists of the Python API reference;
+GitHub Pages deployment runs only for `main`. See [CHANGELOG.md](CHANGELOG.md) and
+[VERSIONING.md](VERSIONING.md) for release policy. This migration is unreleased.
+
+## License and acknowledgments
+
+[Apache 2.0](LICENSE). Supported by NWM innovatie: Datagedreven optimalisatie
+aardwarmtesystemen, with TNO, Gaia Energy, HVC, Well Engineering Partners and Helin.

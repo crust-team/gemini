@@ -31,3 +31,13 @@ def test_partial_pressure_and_unknown_model():
     assert a == pytest.approx(b, rel=1e-12)
     with pytest.raises(ValueError, match="Unknown corrosion"):
         corrosion.co2_corrosion_rate("missing", co2_fraction=0.1, **common)
+
+
+def test_wims_remaining_wall_and_lifetime():
+    """WIMS radial loss and linear lifetime retain deposition and missing-data limits."""
+    assert corrosion.remaining_wall_thickness(0.1, 0.09, 0.002) == pytest.approx(0.008)
+    assert corrosion.remaining_wall_thickness(0.1, 0.09, -0.002) == pytest.approx(0.012)
+    assert corrosion.time_to_minimum_wall(0.008, 0.006, 1e-10) == pytest.approx(2e7)
+    assert corrosion.time_to_minimum_wall(0.005, 0.006, 1e-10) == 0
+    assert math.isinf(corrosion.time_to_minimum_wall(0.008, 0.006, 0))
+    assert math.isnan(corrosion.time_to_minimum_wall(float("nan"), 0.006, 1e-10))

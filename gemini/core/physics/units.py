@@ -200,3 +200,23 @@ def deg_to_rad(x: float) -> float:
 def m3s_per_bar_to_si(x: float) -> float:
     """Convert the historical runtime's m3/s/bar index to [m3/s/Pa]."""
     return x / 1e5
+
+
+def kgh_to_kgs(x: float) -> float:
+    """Convert [kg/h] to [kg/s]."""
+    return x / 3600
+
+
+def m2_to_mm2(x: float) -> float:
+    """Convert [m2] to [mm2]."""
+    return x * 1e6
+
+
+def ms_to_mm_year(x: float) -> float:
+    """Convert penetration speed [m/s] to [mm/year]."""
+    return x * 1000 * SECONDS_PER_YEAR
+
+
+def mol_l_bar_to_mol_m3_pa(x: float) -> float:
+    """Convert Henry solubility constant [mol/l/bar] to [mol/m3/Pa]."""
+    return x * 0.01

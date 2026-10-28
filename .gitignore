@@ -14,3 +14,5 @@ build
 .pytest_cache/
 dist/
 docs/codedocumentation/
+
+docs/_build/

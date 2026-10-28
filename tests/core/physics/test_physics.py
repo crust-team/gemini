@@ -111,6 +111,7 @@ def test_heat_balance_and_limits():
     assert heat_transfer.pipe_temperature_change(300, 10, 20, 40, 0, 4200, 800, 300) == 0
     assert heat_transfer.effectiveness_counterflow(1e6, 0.5) == 1
     assert heat_transfer.effectiveness_counterflow(1, 1) == 0.5
+    assert heat_transfer.effectiveness_counterflow(float("inf"), 1) == 1
     assert heat_transfer.effectiveness_parallel(1e6, 1) == 0.5
     assert heat_transfer.lmtd(10, 10) == 10
     with pytest.raises(ValueError):

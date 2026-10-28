@@ -612,7 +612,7 @@ class _NORSOK:
 
         # Calculate mixture properties
         density_mixture = (water_density * water_flow_rate) / (water_flow_rate)
-        viscosity_mixture = (water_viscosity * water_flow_rate) / (water_flow_rate) / 1000
+        viscosity_mixture = units.cp_to_pas((water_viscosity * water_flow_rate) / water_flow_rate)
         friction_factor = 0.001375 * (
             1
             + (
@@ -1333,7 +1333,7 @@ class _NORSOK_opt:
 
         # Calculate mixture properties
         density_mixture = (water_density * water_flow_rate) / (water_flow_rate)
-        viscosity_mixture = (water_viscosity * water_flow_rate) / (water_flow_rate) / 1000
+        viscosity_mixture = units.cp_to_pas((water_viscosity * water_flow_rate) / water_flow_rate)
         friction_factor = 0.001375 * (
             1
             + (
@@ -1498,10 +1498,83 @@ def co2_corrosion_rate(
     return float(corr.get_output()["corrosion_rate"])
 
 
-def wall_loss(rates_mm_per_year, durations_s) -> np.ndarray:
-    """Integrate WIMS interval rates [mm/year] over durations [s] to cumulative loss [mm]."""
+def wall_loss(
+    rates_mm_per_year: list[float] | np.ndarray, durations_s: list[float] | np.ndarray
+) -> np.ndarray:
+    """Integrate interval corrosion rates to cumulative wall loss.
+
+    Parameters
+    ----------
+    rates_mm_per_year : array-like
+        Signed interval penetration rates [mm/year].
+    durations_s : array-like
+        Nonnegative interval durations [s], matching the rates.
+
+    Returns
+    -------
+    numpy.ndarray
+        Cumulative radial wall loss [mm].
+
+    Notes
+    -----
+    Reference: GEMINI WIMS corroded_mm_for_interval; piecewise-constant integration
+    using a 365.25-day year.
+    """
     rates = np.asarray(rates_mm_per_year, dtype=float)
     durations = np.asarray(durations_s, dtype=float)
     if rates.shape != durations.shape or np.any(durations < 0):
         raise ValueError("Rates and nonnegative durations must have equal shapes")
     return np.cumsum(rates * durations / units.SECONDS_PER_YEAR)
+
+
+def remaining_wall_thickness(outer_radius: float, inner_radius: float, loss: float) -> float:
+    """Predict the remaining wall using WIMS' radial wall-loss convention.
+
+    Parameters
+    ----------
+    outer_radius, inner_radius : float
+        Nominal outer radius and latest measured inner radius [m].
+    loss : float
+        Signed radial loss since the latest measurement [m].
+
+    Returns
+    -------
+    float
+        Remaining thickness [m], without clipping a breached wall to zero.
+
+    Notes
+    -----
+    Reference: GEMINI WIMS corrosion_model.predict_remaining_thickness; outer radius
+    minus the predicted inner radius. A negative loss retains the original deposition case.
+    """
+    return outer_radius - (inner_radius + loss)
+
+
+def time_to_minimum_wall(thickness: float, minimum: float, rate: float) -> float:
+    """Extrapolate time to a minimum thickness at a constant penetration rate.
+
+    Parameters
+    ----------
+    thickness, minimum : float
+        Current and minimum allowable wall thickness [m].
+    rate : float
+        Signed wall penetration speed [m/s].
+
+    Returns
+    -------
+    float
+        Remaining time [s]; zero at/below the threshold, infinity for nonpositive or
+        nonfinite rates, and NaN for missing thickness/rate measurements.
+
+    Notes
+    -----
+    Reference: GEMINI WIMS corrosion_from_logs.get_remaining_days_to_min_thickness.
+    The original linear projection and special-value handling are retained in SI units.
+    """
+    if np.isnan(thickness) or np.isnan(rate):
+        return float("nan")
+    if thickness <= minimum:
+        return 0.0
+    if rate <= 0 or not np.isfinite(rate):
+        return float("inf")
+    return (thickness - minimum) / rate
