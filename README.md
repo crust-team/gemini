@@ -22,7 +22,7 @@ config = load_gemini(folder)
 plant = build_plant(config)
 data = CSVTimeSeries(folder / "geothermal_example_dataset.csv").frame
 print(replay(plant, config, data.iloc[:672]).to_frame().head())
-print(calibrate(plant, config, data.iloc[:672], "heat_exchanger_3410", ["ua"], apply=True))
+print(calibrate(plant, config, data.iloc[:672], "heat_exchanger", ["ua"], apply=True))
 PY
 ```
 
@@ -30,20 +30,28 @@ PY
 
 ```python
 from gemini.core.modules import Boiler, Sequential
-from gemini.core.base.stream import Stream
+from gemini.core.types import Stream, WATER
+from gemini.core.modules.balance import collect_flows
 
 plant = Sequential(Boiler({"fuel": "electric", "capacity": 100000, "efficiency": 0.95}))
-result = plant({"0": {"setpoint_T": 350}}, inlet=Stream(m_dot=10, T=300, p=1e6))
+result = plant({"0": {"setpoint_T": 350}}, inlet=Stream(m_dot=10, T=300, p=1e6, fluid=WATER))
 print(result.outputs.root["0"].duty)
+print(collect_flows(result))
 print(dict(plant.named_params()))
 snapshot = plant.state_dict()
 plant.load_state_dict(snapshot)
 ```
 
 `Module` supports named children, recursive parameters, bounded calibration references,
-validated state loading, hooks, optional health and stateful stepping. `GraphPlant` exposes
-unconnected ports, routes links and solves feedback through stream tearing. Imported buried
-ESPs use below-pump and riser well segments. `Sequential` chains single-inlet equipment.
+validated state loading, hooks, optional health and stateful stepping. Plants are handwritten
+Module subclasses: `__init__` registers children and `forward` connects typed streams.
+`GeothermalExamplePlant` groups wells and ESP under `doublet`, with named surface equipment.
+Configuration selects its type and dated parameters; the diagram only verifies wiring.
+`Sequential` chains modules with one fluid inlet/outlet and retains child energy reports.
+
+`core.types` supplies physical quantity aliases, immutable `Fluid`/`Stream`, electricity/fuel/heat
+reporting flows, UTC `Profile` inputs and sourced `Cost` estimates. See the
+[types guide](.claude/docs/types.md) and [small composition example](examples/10_custom_plant.py).
 
 Equipment declares `fidelity`: established correlations use `model`, filters and injection
 pumps use `simple`, and liquid-only degassing/booster/blowdown use `passthrough`. Gas separation
@@ -65,8 +73,8 @@ The original CSV, InfluxDB and AVEVA drivers remain available. A live source ada
 ## Examples and validation
 
 `examples/01`–`05` demonstrate individual equipment, a manual chain and discovery;
-`06` imports/exports a graph, `07` replays a week, `08` calibrates HX conductance and `09` runs a day.
-All nine run in the test suite.
+`06` imports/exports a handwritten plant, `07` replays a week, `08` calibrates HX conductance and `09` runs a day.
+`10` defines a custom doublet/HX/boiler plant. All ten run in the test suite.
 
 ```bash
 poetry run black --check gemini tests examples
@@ -81,15 +89,22 @@ The full 17,280-row e2e test runs by default. AVEVA requires credentials; Parque
 ## Accuracy and limits
 
 The example has **zero unmapped properties/tags** and 100% coverage for its eight bound twins.
-The three remaining graph nodes lack measured inlet boundaries and run in scenarios. Health
+The three remaining equipment nodes lack measured inlet boundaries and run in scenarios. Health
 with `assessed=False` means the model or measurements cannot support a diagnostic.
 
 The supplied ESP power curve is all zeros, and its head curve disagrees with the CSV by 63.2%
 median. These produce alarms even though all source status labels say Normal. Calibrated HX
 holdout duty error is 0.63% median; the hot temperature maximum is 0.566 K. Full-chain pressure
 and duty errors remain 57.6% and 12.4%. The e2e tests document these exceptions explicitly;
-green tests do not establish the original accuracy targets. The graph imposes flow and does
+green tests do not establish the original accuracy targets. The plant imposes flow and does
 not solve hydraulic operating-point balance.
 
 Read [AGENTS.md](AGENTS.md), [numerical decisions](.claude/docs/refactor-notes.md), and the
 [implementation report](docs/module-refactor-report.md) before changing the models.
+
+The types refactor preserves all prior numerical reconciliation results. On 100 sampled rows,
+mass and modeled thermal transfers close. **Strict energy closure does not**: isothermal pumps
+leave about 212 kW median electrical power unallocated. Total electricity median error is
+38.73% on measured boundaries and 29.80% in the full chain; the supplied ESP power curve remains
+zero. `energy_balance` exposes both residual and unresolved power; no heat loss is invented.
+See the [types refactor report](docs/types-refactor-report.md) for the complete before/after audit.

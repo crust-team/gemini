@@ -1,41 +1,33 @@
 # Implementation conventions
 
-Use the smallest clear implementation. Keep Python 3.11 compatibility, Black/isort formatting,
-100-character lines and flake8 docstrings. Preserve numerical behaviour; intentional changes
-need a `NOTE(refactor)`, a physical explanation and a regression check.
+Use the smallest clear implementation, Python 3.11, Black/isort, 100-character lines and flake8
+with docstrings. Preserve golden numbers. Intentional numerical decisions require
+`NOTE(refactor)`, physical explanation and regression evidence.
 
-## Layout and dependencies
+Dependencies flow:
 
-- `core.base`: immutable `Stream` and `Health`.
-- `core.physics`: reusable numerical functions and SI conversion.
-- `core.modules`: equipment, `Module`, `Sequential` and `GraphPlant`.
-- `core.config`: Pydantic graph schemas, GEMINI import, bindings and snapshots.
-- `core.data`: service drivers and time-series readers.
-- `core.engine`: registry discovery, result tables and event hooks.
-- `core.modes`: independent measured twins, historical calibration, live windows and scenarios.
-- `design`, `optim`, `agentic`: reserved application namespaces.
+`core.physics` ← `core.types` ← `core.modules` ← `core.config` / `core.modes` / `core.engine`
+← `design` / `optim` ← `agentic`.
 
-Dependencies flow `core.physics` ← `core.modules` ← `core.config` / `core.modes`
-← `design` / `optim` ← `agentic`. Equipment does not import configuration or data access.
-Graphs may contain other graphs; equipment shares physics functions instead of importing
-another equipment implementation. Discovery excludes abstract classes and plant composites.
+Physics owns correlations and conversions. Types owns quantities, Fluid, flows, Profile, results
+and Cost; it never imports modules. Equipment contains no configuration/data access. Plant
+`from_config` factories may import the registry locally solely for child construction. Physical
+geometry models retain direct quantity metadata without importing types upward.
 
-## Contracts and errors
+Every numeric module contract field uses a quantity alias or the documented, tested allow-list.
+Use SI internally: K, Pa, kg/s, m, W, J, s. Explicit exceptions are legacy polynomial bases and
+mm/year corrosion diagnostics. Raw data conversion occurs at input boundaries. All ports have
+explicit Flow types; built-in energy ports report consumption/release as outputs.
 
-Equipment declares class-level ports and Pydantic Params/Inputs/Outputs. Every numeric field
-has a dimensional description and physical constraints. Use K, Pa, kg/s, m, W and s internally;
-convert raw data at configuration boundaries. Correlation-specific legacy bases remain explicit.
+Plants are handwritten classes: child construction in `__init__`, wiring in `forward`.
+Configurations select plant type and dated design data; diagrams verify wiring, never build it.
+Use dotted child paths consistently across snapshots, calibration, bindings and results.
+No compatibility shims for removed modules or string fluid registries.
 
-Use `module(inputs, streams_in)` so observer hooks run. Direct `forward` still validates input
-and result contracts but bypasses hooks. Return `ModuleResult(outputs, streams)`.
-Parameter updates revalidate the complete owning schema. `state_dict` contains design data;
-transient process state travels through `initial_state` and `step` separately.
-
-Missing measured data skips only the affected twin and records a reason. Invalid physics,
-misspelled configuration and unknown ports raise clear errors; do not silently discard them.
-No sensor columns, file paths or database access belong in equipment calculations.
-
-## Verification
+Use `module(...)` for hooks and retained result trees. Reject unknown ports and parameters.
+Missing observations skip only their measured twin, recording a reason. Invalid physics raises.
+Absent diagnostic models are explicitly unassessed. Never disguise a thermal-only balance as
+full first-law closure or tune against the holdout period to meet an accuracy threshold.
 
 ```bash
 poetry run black --check gemini tests examples
@@ -44,4 +36,4 @@ poetry run flake8 gemini tests examples
 poetry run pytest tests
 ```
 
-Use the existing Python 3.11 environment. Optional Parquet export requires the `parquet` extra.
+Use the existing Python 3.11 environment; optional Parquet export requires the parquet extra.

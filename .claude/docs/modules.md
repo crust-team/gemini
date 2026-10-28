@@ -1,70 +1,85 @@
 # Writing modules
 
-An equipment module lives in `gemini/core/modules/<category>/<name>.py`. Subclass `Module`,
-declare a unique registry name, category, description and fidelity (`model`, `simple` or
-`passthrough`). `Params` holds validated design data; `Inputs` holds controls; `Outputs` holds
-predicted quantities. Ports carry immutable `Stream` values. Each Pydantic field documents its
-physical dimension. The built-in empty schemas are suitable for composites.
-
-Implement `forward(inputs, streams_in) -> ModuleResult` without I/O or hidden process state.
-Check mass and energy balance and reject invalid physical operating conditions. Stateless
-`step` calls forward; stateful equipment overrides `initial_state` and
-`step(state, inputs, streams_in, dt) -> (new_state, ModuleResult)`.
+Subclass `core.modules.module.Module`; declare a unique registry name, category, description and
+honest fidelity. Nested Pydantic `Params`, `Inputs`, `Outputs` use physical quantity aliases.
+Design parameter models are frozen. Ports are mappings from names to Stream, PowerFlow, FuelFlow
+or HeatFlow types. Both direct forward and `__call__` validate port sets and types; call the
+module normally so hooks and audit capture run.
 
 ```python
 from pydantic import BaseModel, Field
-from gemini.core.modules import Module, ModuleResult
+from gemini.core.modules.module import Module
+from gemini.core.types import ModuleResult, PressureDifference, Stream
 
 class Restriction(Module):
-    name = "restriction"
-    category = "treatment"
-    description = "A specified pressure loss without heat transfer."
-    fidelity = "simple"
-    inlets = ("inlet",)
-    outlets = ("outlet",)
-    soft_sensors = ("pressure_drop",)
-    calibratable = ("dp",)
+    name, category = "restriction", "treatment"
+    inlets, outlets = {"inlet": Stream}, {"outlet": Stream}
 
     class Params(BaseModel):
-        dp: float = Field(1000, ge=0, description="Pressure loss [Pa]")
-
-    class Outputs(BaseModel):
-        pressure_drop: float = Field(..., description="Pressure loss [Pa]")
+        dp: PressureDifference = Field(1000, ge=0, description="Pressure loss [Pa]")
 
     def forward(self, inputs, streams_in):
-        stream = streams_in["inlet"].with_(p=streams_in["inlet"].p-self.params.dp)
-        return ModuleResult(self.Outputs(pressure_drop=self.params.dp), {"outlet": stream})
+        inlet = streams_in["inlet"]
+        return ModuleResult(self.Outputs(), {"outlet": inlet.with_(p=inlet.p-self.params.dp)})
 ```
 
-## Composition and observation
+## Handwritten plants
 
-Assigning `self.pump = pump` registers a child. `add_module` also supports named registration.
-`named_modules`, `get_submodule`, `named_params`, `calibratable_params`, `set_param`, `apply`,
-`state_dict` and `load_state_dict` traverse the same tree. State loading validates every matching
-entry before applying changes. Non-strict loading ignores absent/extra paths, but still rejects
-type mismatches and invalid parameters. Equality and hashing retain object identity.
+Assigning `self.pump = pump` registers a child. `__init__` builds the module tree and `forward`
+writes each connection explicitly, exactly as a composable model. No GraphPlant, topology
+builder, link schema or stream-tearing solver remains. `Sequential` chains one-fluid-inlet,
+one-fluid-outlet modules; energy reports remain in its captured child results.
 
-`Sequential` chains equipment with one inlet and one outlet. Its controls are keyed by child
-name or positional string index. `GraphPlant` derives unconnected boundary ports, routes
-streams through validated links, and tears feedback edges until pressure, temperature and mass
-residuals converge. `last_results` and `last_link_streams` expose the most recent evaluation.
-The imported buried ESP has separate below-pump and riser nodes using the same well model.
+`Doublet` owns reservoir, lower well, ESP, riser, injection well and receiving reservoir.
+Its `forward` accepts an independently specified return stream. When surface equipment connects
+supply to return within the same call, `GeothermalExamplePlant.forward` explicitly schedules
+`doublet.produce`, surface equipment, then `doublet.inject`. These two limb methods invoke every
+equipment child through `__call__`; all leaf hooks, paths and result captures remain available.
+The grouping object's own forward hook runs only when calling Doublet as a whole.
 
-Pre-hooks receive `(module, inputs, streams_in)`; post-hooks additionally receive `result`.
-Hook handles remove only their own registration. `EventLog.attach` observes the whole tree.
-Do not use direct forward calls when event traces are required.
+`GeothermalExamplePlant.Inputs` contains production mass flow, ESP frequency, injection pressure,
+optional injection frequency, and a secondary inlet Stream. Outputs contain delivered heat,
+total electricity and COP (None for zero consumption). It follows the diagram's actual order:
+production -> degasser -> hot filter -> HX -> return filter -> injection pump -> injection.
 
-## Twins and fidelity
+Each configurable plant implements `from_config(config, at=None)` and instantiates the named
+children using the registry and dated parameters. `PlantConfig.plant_type` selects the plant;
+`modules` and `bindings` use dotted child paths. Wiring is never deserialized from configuration.
+`GEMINI_NODES` belongs to the plant class and maps imported .param stems to those paths.
+`trace_wiring` observes real Stream identities through temporary hooks and cleans up on failure.
+`check_against_diagram` checks every link after explicit port translation. The example's buried
+riser expands its logical ESP-to-surface edge into two checked physical links. Tests require zero
+missing AND extra connections. Other topologies require another handwritten class and mapping.
 
-Bindings belong in `core.config`: raw columns, raw dimensions, inlet conditions and measured
-outputs. Historical twins evaluate each bound module on measured inlet conditions; scenarios
-propagate predictions through the graph. Unbound equipment runs in scenarios only.
+## Reporting energy and diagnostics
 
-`soft_sensors` names predicted fields; `calibratable` names fit parameters. Implement `health`
-when measurements support a diagnostic. `Health.assessed=False` explicitly denotes an absent
-diagnostic model or insufficient evidence; a zero alarm flag alone does not establish health.
-`health_report` collects available diagnostics recursively. Add `capex` only with a source.
+Energy ports are outlets computed by forward; callers never supply electricity or fuel:
+`electricity: PowerFlow` reports grid draw, `fuel: FuelFlow` reports LHV draw,
+`heat_loss: HeatFlow` reports environmental release. Fluid streams carry inter-equipment heat.
 
-Fidelity must be honest. The liquid-only degasser has zero gas flow, and booster/blowdown
-passthroughs expose `modelled=False`. The injection pump uses supplied curves when available;
-otherwise its pressure setpoint and efficiency determine hydraulic power.
+ESP reports shaft power / motor efficiency (default 1). InjectionPump reports its predicted
+power. Boiler always declares both electricity and fuel, zeroing the unused one, plus conversion
+heat loss. Wells report signed m_dot*cp*(Tin-Tout) using the external flow sign. HX has two fluid
+sides and no environmental-loss model. Filter, degasser, booster and blowdown add no energy
+ports; the latter two have no modeled power consumption. See [types](types.md) for strict versus
+thermal energy balances and the retained pump-model limitation.
+
+`soft_sensors` identifies predicted fields; `calibratable` identifies fit parameters. Health
+without sufficient diagnostics is `assessed=False`. Explicit source-data disagreements remain
+visible; never suppress alarms or fabricate power to meet a reconciliation target.
+Corrosion reads Fluid composition when separate measured gas chemistry is omitted.
+
+## State and observers
+
+`named_modules`, `get_submodule`, recursive parameter APIs, `apply`, state dictionaries and costs
+traverse the registered tree. State dictionaries include validated Params and Fluid values.
+Strict state loading checks paths/types and validates all entries before applying changes.
+Pre-hooks receive `(module, inputs, streams_in)`; post-hooks additionally receive ModuleResult.
+Hook handles remove their own registration. `EventLog.attach` observes the whole tree.
+`last_results` exposes leaf results by relative path; `result.children` retains nested evaluation
+structure. Results remain unpackable into `(outputs, streams)`.
+
+Stateless `step` calls forward. Stateful equipment implements `initial_state` and
+`step(state, inputs, streams_in, dt)` with state passed explicitly. Sequential advances nested
+stateful children and captures the same hooks/result tree as ordinary calls. Custom stateful
+plants must implement their own explicit stepping schedule.

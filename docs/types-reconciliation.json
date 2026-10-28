@@ -1,0 +1,106 @@
+{
+  "rows": 17280,
+  "normal_rows": 17280,
+  "coverage": {
+    "degasser": 1.0,
+    "doublet.esp": 1.0,
+    "filter_return": 1.0,
+    "filter_hot": 1.0,
+    "heat_exchanger": 1.0,
+    "injection_pump": 1.0,
+    "doublet.injector": 1.0,
+    "doublet.reservoir": 1.0
+  },
+  "unmapped": [],
+  "ignored_count": 119,
+  "median_relative_errors": {
+    "doublet.esp.power": 1.0,
+    "doublet.esp.head": 0.6316775866204323,
+    "filter_hot.pressure_drop": 0.016961021530562004,
+    "filter_return.pressure_drop": 0.016961021530562004,
+    "injection_pump.power": 1.2319590001030889e-05
+  },
+  "alarm_rates": {
+    "degasser": 0.0,
+    "doublet.esp": 1.0,
+    "filter_return": 0.0,
+    "filter_hot": 0.0,
+    "heat_exchanger": 0.0,
+    "injection_pump": 0.0,
+    "doublet.injector": 0.0,
+    "doublet.reservoir": 0.0
+  },
+  "health_assessed": {
+    "degasser": false,
+    "doublet.esp": true,
+    "filter_return": true,
+    "filter_hot": true,
+    "heat_exchanger": true,
+    "injection_pump": false,
+    "doublet.injector": false,
+    "doublet.reservoir": false
+  },
+  "calibration": {
+    "fitted": {
+      "ua": 7138598.616760451
+    },
+    "rms_before": 0.3804315779089568,
+    "rms_after": 0.0002941831887789225,
+    "observations": 672,
+    "success": true,
+    "message": "`gtol` termination condition is satisfied.",
+    "applied": true
+  },
+  "electricity_twin_median_relative_error": 0.38734543106110564,
+  "wiring": {
+    "edges": 10,
+    "mismatches": []
+  },
+  "holdout_and_chain": {
+    "hx_hot_K": {
+      "median": 0.33878964662312683,
+      "max": 0.5660824219172014
+    },
+    "hx_cold_K": {
+      "median": 0.30371220357892525,
+      "max": 0.4888875373163728
+    },
+    "hx_duty": {
+      "median": 0.006292951472255615,
+      "max": 0.009523290513201
+    },
+    "chain_wellhead": {
+      "median": 0.5759048187207421,
+      "max": 0.5805620677373236
+    },
+    "chain_hx_duty": {
+      "median": 0.12437011060257164,
+      "max": 0.14376821449153354
+    }
+  },
+  "balances": {
+    "mass": {
+      "max": 0.0,
+      "median": 0.0
+    },
+    "thermal": {
+      "max": 2.362805990395976e-16,
+      "median": 4.374323358076579e-17
+    },
+    "energy": {
+      "max": 0.001873103077646382,
+      "median": 0.0017645615875243954
+    },
+    "unresolved_W": {
+      "max": 230371.85821881526,
+      "median": 212451.16466514635
+    },
+    "residual_W": {
+      "max": 230371.85821882635,
+      "median": 212451.1646651551
+    }
+  },
+  "balance_samples": 100,
+  "electricity_chain_median_relative_error": 0.29798558617191795,
+  "calibrated_hx_holdout_alarm_rate": 0.8324301541425819
+}
