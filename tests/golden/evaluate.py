@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-from gemini.core.base.stream import Stream
 from gemini.core.modules.pumps import ESP
 from gemini.core.modules.subsurface import (
     InjectionReservoir,
@@ -20,6 +19,7 @@ from gemini.core.physics import (
     hydraulics,
     units,
 )
+from gemini.core.types.flows import Stream
 
 
 def evaluate():

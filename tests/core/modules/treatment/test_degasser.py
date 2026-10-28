@@ -1,7 +1,7 @@
 """Mass conservation and fidelity for Degasser."""
 
-from gemini.core.base.stream import Stream
 from gemini.core.modules.treatment import Degasser
+from gemini.core.types.flows import Stream
 
 
 def test_equipment_forward():

@@ -6,11 +6,12 @@ from pathlib import Path
 import pytest
 from pydantic import Field
 
-from gemini.core.base.stream import Stream
 from gemini.core.config.build import build_plant
 from gemini.core.config.gemini_loader import load_gemini
-from gemini.core.modules.module import EmptyModel, Module, ModuleResult
+from gemini.core.modules.module import EmptyModel, Module
 from gemini.core.modules.plant import GraphPlant
+from gemini.core.types.flows import Stream
+from gemini.core.types.results import ModuleResult
 
 
 class Relaxation(Module):

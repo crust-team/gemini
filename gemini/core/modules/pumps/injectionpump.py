@@ -2,8 +2,9 @@
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
 from gemini.core.physics import pumps
+from gemini.core.types.results import ModuleResult
 
 
 class InjectionPump(Module):

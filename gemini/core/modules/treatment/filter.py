@@ -2,9 +2,9 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.core.base.health import Health
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
 from gemini.core.physics import units
+from gemini.core.types.results import Health, ModuleResult
 
 
 class Filter(Module):

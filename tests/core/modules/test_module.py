@@ -5,9 +5,9 @@ import json
 import pytest
 from pydantic import BaseModel, Field, ValidationError
 
-from gemini.core.base.health import Health
-from gemini.core.base.stream import Stream
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
+from gemini.core.types.flows import Stream
+from gemini.core.types.results import Health, ModuleResult
 
 
 class PassThrough(Module):

@@ -6,11 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from gemini.core.base.stream import Stream
 from gemini.core.config import param_mapping as mapping
 from gemini.core.data.timeseries import CSVTimeSeries
 from gemini.core.engine import registry
 from gemini.core.physics import geometry, units
+from gemini.core.types.flows import Stream
 from tests.golden.test_golden import assert_values
 
 ROOT = Path(__file__).parents[2]

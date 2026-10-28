@@ -5,7 +5,8 @@ No withdrawal physics is modelled; outputs explicitly report modelled=False.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
+from gemini.core.types.results import ModuleResult
 
 
 class Blowdown(Module):

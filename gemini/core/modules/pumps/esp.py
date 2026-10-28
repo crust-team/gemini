@@ -9,9 +9,9 @@ from typing import Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from gemini.core.base.health import Health
-from gemini.core.modules.module import Module, ModuleResult
+from gemini.core.modules.module import Module
 from gemini.core.physics import constants, pumps, units
+from gemini.core.types.results import Health, ModuleResult
 
 
 class ESP(Module):

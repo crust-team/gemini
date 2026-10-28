@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from gemini.core.base.stream import Stream
 from gemini.core.config import param_mapping as mapping
 from gemini.core.modules.subsurface import ProductionWell
 from gemini.core.physics import units
+from gemini.core.types.flows import Stream
 
 DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
 well = ProductionWell(
