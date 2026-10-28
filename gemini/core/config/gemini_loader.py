@@ -211,7 +211,7 @@ def load_gemini(folder: str | Path) -> PlantConfig:
                 # the standalone equipment default stays 0.7.
                 params["efficiency"] = 0.8
             # Geometry models become plain JSON values at the portable config boundary.
-            from gemini.core.engine.registry import get
+            from gemini.core.modules.catalogue import get
 
             params = get(kind).Params.model_validate(params).model_dump(mode="json")
             snapshots.append(DatedParams(valid_from=timestamp, params=params))
@@ -322,6 +322,22 @@ def load_gemini(folder: str | Path) -> PlantConfig:
     for key in ("stream_defaults", "inputs"):
         boundary[key] = {node_map[k]: v for k, v in boundary[key].items()}
     boundary.pop("well_risers", None)
+    bindings[""] = ModuleBindings(
+        inputs={
+            "m_dot": Binding(column="Qp", unit="m3/h"),
+            "esp_frequency": Binding(column="ESP_freq", unit="Hz"),
+            "injection_pressure": Binding(column="InjectorPump_Pout", unit="bar"),
+            "secondary.m_dot": Binding(column="Qs", unit="m3/h"),
+            "secondary.T": Binding(column="T_s_in", unit="degC"),
+        }
+    )
+    boundary["root_inputs"] = {
+        "injection_pressure": 5.15e6,
+        "secondary": {"m_dot": 40, "T": 293.15, "p": 5e5, "fluid": brine.model_dump(mode="json")},
+    }
+    boundary.setdefault("assumptions", []).append(
+        "Profiles lacking secondary measurements assume 40 kg/s at 20 C and 5 bar."
+    )
     conf = json.loads((folder / "plant.conf").read_text())
     for key in unmapped:
         warnings.warn(f"Unmapped GEMINI field: {key}", stacklevel=2)

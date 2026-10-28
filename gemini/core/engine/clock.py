@@ -25,8 +25,11 @@ class Clock(ABC):
         self.ticks = pd.DatetimeIndex(pd.to_datetime(list(ticks), utc=True))
         if not self.ticks.is_unique or not self.ticks.is_monotonic_increasing or self.ticks.hasnans:
             raise ValueError("Clock ticks must be strictly increasing and finite")
-        inferred = (pd.Timedelta(int(np.median(np.diff(self.ticks.asi8))), unit="ns")
-                    if len(self.ticks) > 1 else timedelta(hours=1))
+        inferred = (
+            pd.Timedelta(int(np.median(np.diff(self.ticks.asi8))), unit="ns")
+            if len(self.ticks) > 1
+            else timedelta(hours=1)
+        )
         self.step = duration(step if step is not None else inferred)
         self._durations = np.append(np.diff(self.ticks.asi8) / 1e9, self.step.total_seconds())
 
@@ -100,8 +103,12 @@ class FixedClock(Clock):
         """Store regular ranges compactly; preserve empty schedules explicitly."""
         if not len(self):
             return super().describe()
-        return dict(kind="fixed", start=self.ticks[0].isoformat(),
-                    end=self.ticks[-1].isoformat(), step=str(self.step))
+        return dict(
+            kind="fixed",
+            start=self.ticks[0].isoformat(),
+            end=self.ticks[-1].isoformat(),
+            step=str(self.step),
+        )
 
 
 class DataClock(Clock):

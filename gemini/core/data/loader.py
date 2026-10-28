@@ -20,8 +20,9 @@ class Sample(NamedTuple):
 class Loader:
     """Align raw rows to any finite tick iterable with bounded source reads."""
 
-    def __init__(self, dataset, ticks, columns=None, align="previous", max_gap=None,
-                 chunk=timedelta(days=7)):
+    def __init__(
+        self, dataset, ticks, columns=None, align="previous", max_gap=None, chunk=timedelta(days=7)
+    ):
         """Select exact, previous, or left-closed mean bins; stale holds become missing."""
         if align not in {"exact", "previous", "mean"}:
             raise ValueError(f"Unknown alignment {align!r}")
@@ -30,8 +31,9 @@ class Loader:
         absent = sorted(set(self.columns) - set(dataset.names))
         if absent:
             raise ValueError(f"Dataset is missing bound columns: {', '.join(absent)}")
-        self.max_gap = pd.Timedelta(max_gap if max_gap is not None else
-                                   2 * (dataset.native_step or timedelta(hours=1)))
+        self.max_gap = pd.Timedelta(
+            max_gap if max_gap is not None else 2 * (dataset.native_step or timedelta(hours=1))
+        )
         self.chunk = pd.Timedelta(chunk)
         if self.max_gap < pd.Timedelta(0) or self.chunk <= pd.Timedelta(0):
             raise ValueError("max_gap must be nonnegative and chunk positive")
@@ -42,8 +44,10 @@ class Loader:
         if not len(ticks):
             return
         ticks = pd.to_datetime(ticks, utc=True)
-        seconds = np.append(np.diff(ticks.asi8) / 1e9,
-                            (self.dataset.native_step or timedelta(hours=1)).total_seconds())
+        seconds = np.append(
+            np.diff(ticks.asi8) / 1e9,
+            (self.dataset.native_step or timedelta(hours=1)).total_seconds(),
+        )
         if hasattr(self.ticks, "dt"):
             seconds = np.asarray([self.ticks.dt(t.to_pydatetime()) for t in ticks])
         offset = 0
@@ -63,10 +67,14 @@ class Loader:
                     left = np.searchsorted(times, t.value, side="left")
                     right = np.searchsorted(times, t.value + round(dt * 1e9), side="left")
                     block = values[left:right]
-                    raw = [np.nanmean(block[:, i].astype(float)) if numeric[i]
-                           and np.isfinite(block[:, i].astype(float)).any() else
-                           (block[-1, i] if len(block) else np.nan)
-                           for i in range(len(self.columns))]
+                    raw = [
+                        (
+                            np.nanmean(block[:, i].astype(float))
+                            if numeric[i] and np.isfinite(block[:, i].astype(float)).any()
+                            else (block[-1, i] if len(block) else np.nan)
+                        )
+                        for i in range(len(self.columns))
+                    ]
                     gap = not len(block)
                 elif gap or (self.align == "exact" and times[previous] != t.value):
                     raw = [np.nan] * len(self.columns)
@@ -74,8 +82,13 @@ class Loader:
                 else:
                     raw = values[previous]
                 row = dict(zip(self.columns, raw))
-                missing = tuple(k for k, value in row.items()
-                                if value is None or (np.isscalar(value) and pd.isna(value))
-                                or isinstance(value, (int, float, np.number)) and not np.isfinite(value))
+                missing = tuple(
+                    k
+                    for k, value in row.items()
+                    if value is None
+                    or (np.isscalar(value) and pd.isna(value))
+                    or isinstance(value, (int, float, np.number))
+                    and not np.isfinite(value)
+                )
                 yield Sample(t.to_pydatetime(), dt, row, missing, bool(gap))
             offset = stop

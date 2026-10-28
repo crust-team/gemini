@@ -69,7 +69,7 @@ class GeothermalExamplePlant(Module):
     @classmethod
     def from_config(cls, config, at=None):
         """Construct known children from dated design data; topology is defined in forward."""
-        from gemini.core.engine.registry import create
+        from gemini.core.modules.catalogue import create
 
         expected = set(cls.GEMINI_NODES.values()) | {"doublet.riser"}
         if set(config.modules) != expected:

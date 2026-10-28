@@ -10,8 +10,10 @@ from gemini.core.types.bindings import ColumnInfo, utc
 
 
 def _metadata(units):
-    return {name: ColumnInfo(unit=info) if isinstance(info, str)
-            else ColumnInfo.model_validate(info) for name, info in (units or {}).items()}
+    return {
+        name: ColumnInfo(unit=info) if isinstance(info, str) else ColumnInfo.model_validate(info)
+        for name, info in (units or {}).items()
+    }
 
 
 class Dataset(ABC):
@@ -87,7 +89,9 @@ class Dataset(ABC):
         from gemini.core.data.drivers.sources import InfluxSource
 
         source = dict(kind="influx", url=url, token=token, org=org, bucket=bucket, tags=tags)
-        return DriverDataset(InfluxSource(**{k: v for k, v in source.items() if k != "kind"}), source)
+        return DriverDataset(
+            InfluxSource(**{k: v for k, v in source.items() if k != "kind"}), source
+        )
 
     @staticmethod
     def from_aveva(parameters, streams, start, end, step="15min", secret_env="AVEVA_CLIENT_SECRET"):
@@ -96,10 +100,18 @@ class Dataset(ABC):
 
         if any(k in parameters for k in ("client_secret", "password", "token")):
             raise ValueError("Pass secret_env, not credentials in parameters")
-        source = dict(kind="aveva", parameters=parameters, streams=streams,
-                      start=utc(start).isoformat(), end=utc(end).isoformat(),
-                      step=str(pd.Timedelta(step)), secret_env=secret_env)
-        return DriverDataset(AvevaSource(**{k: v for k, v in source.items() if k != "kind"}), source)
+        source = dict(
+            kind="aveva",
+            parameters=parameters,
+            streams=streams,
+            start=utc(start).isoformat(),
+            end=utc(end).isoformat(),
+            step=str(pd.Timedelta(step)),
+            secret_env=secret_env,
+        )
+        return DriverDataset(
+            AvevaSource(**{k: v for k, v in source.items() if k != "kind"}), source
+        )
 
     @staticmethod
     def reopen(description):
@@ -110,13 +122,18 @@ class Dataset(ABC):
         if kind == "window":
             return Dataset.reopen(spec["source"]).window(spec["start"], spec["end"])
         if kind == "frame":
-            frame = pd.DataFrame(spec["data"], columns=spec["columns"],
-                                 index=pd.to_datetime(spec["index"], utc=True))
+            frame = pd.DataFrame(
+                spec["data"], columns=spec["columns"], index=pd.to_datetime(spec["index"], utc=True)
+            )
             for name, dtype in spec["dtypes"].items():
                 frame[name] = frame[name].astype(dtype)
             return FrameDataset(frame, units)
-        constructors = {"csv": Dataset.from_csv, "csv_driver": Dataset.from_csv_driver,
-                        "influx": Dataset.from_influx, "aveva": Dataset.from_aveva}
+        constructors = {
+            "csv": Dataset.from_csv,
+            "csv_driver": Dataset.from_csv_driver,
+            "influx": Dataset.from_influx,
+            "aveva": Dataset.from_aveva,
+        }
         if kind not in constructors:
             raise ValueError(f"Unknown dataset kind {kind!r}")
         dataset = constructors[kind](**spec)
@@ -156,12 +173,15 @@ class FrameDataset(Dataset):
         """Return median spacing, without inventing a cadence for a single row."""
         if len(self) < 2:
             return None
-        return pd.Timedelta(int(np.median(np.diff(self.frame.index.asi8))), unit="ns").to_pytimedelta()
+        return pd.Timedelta(
+            int(np.median(np.diff(self.frame.index.asi8))), unit="ns"
+        ).to_pytimedelta()
 
     def read(self, start, end, columns=None):
         """Return an independent inclusive window and optional column selection."""
-        frame = self.frame.loc[utc(start) if start is not None else None:
-                               utc(end) if end is not None else None]
+        frame = self.frame.loc[
+            utc(start) if start is not None else None : utc(end) if end is not None else None
+        ]
         return frame.loc[:, list(columns) if columns is not None else slice(None)].copy()
 
     def __len__(self):
@@ -170,10 +190,13 @@ class FrameDataset(Dataset):
 
     def describe(self):
         """Return a file reference or lossless JSON-compatible inline observations."""
-        spec = self._source or dict(kind="frame", columns=list(self.frame.columns),
-                                    index=[t.isoformat() for t in self.frame.index],
-                                    data=self.frame.astype(object).where(self.frame.notna(), None).values.tolist(),
-                                    dtypes={k: str(v) for k, v in self.frame.dtypes.items()})
+        spec = self._source or dict(
+            kind="frame",
+            columns=list(self.frame.columns),
+            index=[t.isoformat() for t in self.frame.index],
+            data=self.frame.astype(object).where(self.frame.notna(), None).values.tolist(),
+            dtypes={k: str(v) for k, v in self.frame.dtypes.items()},
+        )
         return dict(spec, units={k: v.model_dump() for k, v in self.columns.items()})
 
 
@@ -187,8 +210,10 @@ class ProfileDataset(FrameDataset):
         index = next(iter(profiles.values())).index
         if any(p.index != index for p in profiles.values()):
             raise ValueError("Profiles must share the same index; resample explicitly")
-        super().__init__(pd.DataFrame({k: p.values for k, p in profiles.items()}, index=index),
-                         {k: ColumnInfo(unit=p.unit, quantity=p.quantity) for k, p in profiles.items()})
+        super().__init__(
+            pd.DataFrame({k: p.values for k, p in profiles.items()}, index=index),
+            {k: ColumnInfo(unit=p.unit, quantity=p.quantity) for k, p in profiles.items()},
+        )
 
 
 class DriverDataset(Dataset):
@@ -253,7 +278,9 @@ class WindowDataset(Dataset):
     def __init__(self, source, start, end):
         """Intersect requested bounds with the parent source."""
         self.source = source
-        self._start = max(utc(start), source.start) if start is not None and source.start else source.start
+        self._start = (
+            max(utc(start), source.start) if start is not None and source.start else source.start
+        )
         self._end = min(utc(end), source.end) if end is not None and source.end else source.end
         self.columns, self.names = source.columns, source.names
 
@@ -274,8 +301,11 @@ class WindowDataset(Dataset):
 
     def read(self, start, end, columns=None):
         """Intersect the requested interval with this view."""
-        return self.source.read(max(utc(start), self.start) if start else self.start,
-                                min(utc(end), self.end) if end else self.end, columns)
+        return self.source.read(
+            max(utc(start), self.start) if start else self.start,
+            min(utc(end), self.end) if end else self.end,
+            columns,
+        )
 
     def __len__(self):
         """Count observations inside the bounds."""
@@ -283,6 +313,9 @@ class WindowDataset(Dataset):
 
     def describe(self):
         """Retain both the reopenable parent and inclusive bounds."""
-        return dict(kind="window", source=self.source.describe(),
-                    start=self.start.isoformat() if self.start else None,
-                    end=self.end.isoformat() if self.end else None)
+        return dict(
+            kind="window",
+            source=self.source.describe(),
+            start=self.start.isoformat() if self.start else None,
+            end=self.end.isoformat() if self.end else None,
+        )

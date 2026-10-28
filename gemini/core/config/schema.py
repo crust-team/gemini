@@ -59,7 +59,7 @@ class PlantConfig(ConfigModel):
     def references(self):
         """Reject invalid child paths and bindings before plant construction."""
         for name in self.modules:
-            if any(
+            if name and any(
                 not part.isidentifier() or part.lower() != part or part.startswith("_")
                 for part in name.split(".")
             ):

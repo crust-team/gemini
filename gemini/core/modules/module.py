@@ -9,8 +9,8 @@ from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 
-from gemini.core.types.bindings import ColumnInfo, DatedParams, utc
 from gemini.core.physics import units
+from gemini.core.types.bindings import ColumnInfo, DatedParams, utc
 from gemini.core.types.cost import Cost
 from gemini.core.types.flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
 from gemini.core.types.fluid import BRINE, Fluid
@@ -123,8 +123,11 @@ class Module(ABC):
 
     def params_at(self, t):
         """Return validated dated parameters with explicit user overrides applied."""
-        eligible = [p for p in self.param_history
-                    if t is None or p.valid_from is None or p.valid_from <= utc(t)]
+        eligible = [
+            p
+            for p in self.param_history
+            if t is None or p.valid_from is None or p.valid_from <= utc(t)
+        ]
         if not eligible:
             raise ValueError(f"{self.path}: no parameters valid at {t}")
         snapshot = max(eligible, key=lambda p: p.valid_from or utc("0001-01-01"))
@@ -133,8 +136,11 @@ class Module(ABC):
     def apply_params_at(self, t):
         """Select dated snapshots recursively, retaining deliberate parameter overrides."""
         for module in self.modules():
-            eligible = [p for p in module.param_history
-                        if t is None or p.valid_from is None or p.valid_from <= utc(t)]
+            eligible = [
+                p
+                for p in module.param_history
+                if t is None or p.valid_from is None or p.valid_from <= utc(t)
+            ]
             if not eligible:
                 raise ValueError(f"{module.path}: no parameters valid at {t}")
             snapshot = max(eligible, key=lambda p: p.valid_from or utc("0001-01-01"))
@@ -152,8 +158,10 @@ class Module(ABC):
                 for field, binding in group.items():
                     info = ColumnInfo(unit=binding.unit)
                     if binding.column in columns and columns[binding.column] != info:
-                        raise ValueError(f"{path}.{field}: conflicting unit {binding.unit!r} "
-                                         f"for column {binding.column!r}")
+                        raise ValueError(
+                            f"{path}.{field}: conflicting unit {binding.unit!r} "
+                            f"for column {binding.column!r}"
+                        )
                     columns[binding.column] = info
         return columns
 
