@@ -5,24 +5,19 @@ mechanical work or environmental loss. Report that unresolved energy explicitly;
 never manufacture heat loss to force a first-law residual to zero.
 """
 
-from gemini.core.types.flows import FuelFlow, HeatFlow, PowerFlow, Stream
+from gemini.core.types.flows import Stream
 
 
 def collect_flows(result_tree):
-    """Sum leaf reporting ports once, ignoring repeated composite aggregate ports [W]."""
+    """Sum leaf energy outputs once, ignoring composite aggregate outputs [W]."""
     if isinstance(result_tree, dict):
         totals = [collect_flows(child) for child in result_tree.values()]
         return {key: sum(t[key] for t in totals) for key in ("electricity", "fuel", "heat_loss")}
     if result_tree.children:
         return collect_flows(result_tree.children)
     totals = dict(electricity=0.0, fuel=0.0, heat_loss=0.0)
-    for flow in result_tree.outlets.values():
-        if isinstance(flow, PowerFlow):
-            totals["electricity"] += flow.P
-        elif isinstance(flow, FuelFlow):
-            totals["fuel"] += flow.P
-        elif isinstance(flow, HeatFlow):
-            totals["heat_loss"] += flow.Q
+    for name in totals:
+        totals[name] += result_tree.outputs.get(name, 0.0)
     return totals
 
 

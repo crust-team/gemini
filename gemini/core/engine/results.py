@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from gemini.core.types.flows import FuelFlow, HeatFlow, PowerFlow, Stream
+from gemini.core.types.flows import Stream
 
 
 class Summary(pd.DataFrame):
@@ -67,7 +67,7 @@ class ModuleSeries:
 
 
 class Results:
-    """Collect finite timestep outputs, energy ports, health, errors and explicit skips."""
+    """Collect finite timestep outputs, energy totals, health, errors and explicit skips."""
 
     def __init__(self):
         """Start an independent result table."""
@@ -78,21 +78,19 @@ class Results:
         self._frame = None
 
     def append(self, at, results, dt=0, skips=None, errors=None):
-        """Append one completed step; count leaf energy ports once."""
+        """Append one completed step; count leaf energy outputs once."""
         row = {}
         for path, (result, health) in results.items():
             row.update({(path, key): value for key, value in result.outputs.model_dump().items()})
+            self._energy.update(
+                (path, key) for key in ("electricity", "fuel", "heat_loss") if key in result.outputs
+            )
             streams = [
                 flow
                 for flow in (result.inlets | dict(result.outlets)).values()
                 if isinstance(flow, Stream)
             ]
             row[path, "operating"] = any(flow.m_dot != 0 for flow in streams) if streams else True
-            for port, flow in result.outlets.items():
-                if isinstance(flow, (PowerFlow, FuelFlow, HeatFlow)):
-                    key = (path, "energy_port_" + port)
-                    row[key] = flow.Q if isinstance(flow, HeatFlow) else flow.P
-                    self._energy.add(key)
             if health is not None:
                 values = health.model_dump()
                 metrics = values.pop("metrics")
@@ -156,7 +154,8 @@ class Results:
                 peaks={
                     field: float(fields[field].max())
                     for field in fields
-                    if not field.startswith(("health_", "energy_port_"))
+                    if not field.startswith("health_")
+                    and (path, field) not in self._energy
                     and field != "operating"
                     and pd.api.types.is_numeric_dtype(fields[field])
                 },
@@ -172,7 +171,7 @@ class Results:
                 rows.append(
                     info
                     | dict(
-                        port=field.removeprefix("energy_port_"),
+                        port=field,
                         energy_J=energy,
                         energy_MWh=energy / 3.6e9,
                         peak_W=float(power.max()),

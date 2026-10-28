@@ -18,7 +18,6 @@ from gemini.core.types import (
     Output,
     Parameter,
     Power,
-    PowerFlow,
     Pressure,
     PressureDifference,
     Ratio,
@@ -65,17 +64,10 @@ class ESP(Module):
         self.flow = Output(VolumeFlow)
         self.in_operating_window = Output(bool)
         self.bep_ratio = Output(Ratio)
+        self.electricity = Output(Power)
 
         # Outlets
         self.discharge = Outlet(Stream)
-        self.electricity = Outlet(PowerFlow)
-
-    @staticmethod
-    def _coefficients(values):
-        # NOTE(refactor): old monitoring uses NumPy float32 arithmetic when selected globally.
-        return (
-            np.asarray(values, dtype=np.float32) if runtime.get_precision() == "float32" else values
-        )
 
     def head_function(self, flow: float, frequency: float) -> float:
         """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""
@@ -100,24 +92,34 @@ class ESP(Module):
     def forward(self, suction):
         """Compute head and power and raise the suction-stream pressure."""
 
-        # Outputs
+        flow = suction.volumetric_flow()
+        if flow < 0:
+            raise ValueError(f"{self.path}: reverse volume flow {flow} is unsupported")
+        head = self.head_function(flow, self.frequency)
+
+        # Outlets
+        discharge = suction.with_(p=suction.p + head)
+
+        outlets = dict(discharge=discharge)
+        return outlets
+
+    def _compute_outputs(self, suction, discharge):
         self.flow = suction.volumetric_flow()
-        if self.flow < 0:
-            raise ValueError(f"{self.path}: reverse volume flow {self.flow} is unsupported")
         self.head = self.head_function(self.flow, self.frequency)
         self.power = self.power_function(self.flow, self.frequency)
         self.efficiency = self.efficiency_function(self.flow, self.head, self.power)
         scale = self.frequency / constants.ESP_REFERENCE_FREQUENCY
-        self.discharge_pressure = suction.p + self.head
+        self.discharge_pressure = discharge.p
         self.in_operating_window = self.min_flow * scale <= self.flow <= self.max_flow * scale
         self.bep_ratio = self.flow / (self.bep_flow * scale)
+        self.electricity = self.power / self.motor_efficiency
 
-        # Outlets
-        discharge = suction.with_(p=self.discharge_pressure)
-        electricity = PowerFlow(P=self.power / self.motor_efficiency)
-
-        outlets = dict(discharge=discharge, electricity=electricity)
-        return outlets
+    @staticmethod
+    def _coefficients(values):
+        # NOTE(refactor): old monitoring uses NumPy float32 arithmetic when selected globally.
+        return (
+            np.asarray(values, dtype=np.float32) if runtime.get_precision() == "float32" else values
+        )
 
     def health(self, predicted, measured):
         """Score the worst available relative drift and the operating window."""

@@ -10,13 +10,13 @@ from gemini.core.modules.module import Module
 from gemini.core.physics import geometry, hydraulics
 from gemini.core.types import (
     Dimensionless,
-    HeatFlow,
     HeatTransferCoefficient,
     Inlet,
     Length,
     Outlet,
     Output,
     Parameter,
+    Power,
     Pressure,
     PressureDifference,
     Stream,
@@ -55,15 +55,14 @@ class ProductionWell(Module):
         self.dp_gravity = Output(PressureDifference)
         self.section_pressure = Output(list[Pressure])
         self.section_temperature = Output(list[Temperature])
+        self.heat_loss = Output(Power)
 
         # Outlets
         self.wellhead = Outlet(Stream)
-        self.heat_loss = Outlet(HeatFlow)
 
     def forward(self, bottom):
         """Traverse the passive full path; an internal ESP is handled with the split helpers."""
 
-        # Outputs
         stream = bottom
         start, end = self.pipe_path.total_length, 0
         if self.segment == "below_esp":
@@ -72,24 +71,31 @@ class ProductionWell(Module):
             start = self._esp_depth()
         result = self.traverse(stream, start, end, "up")
         a, b = self.correction_factors
-        self.wellhead_pressure = a * result.p_out + b
-        self.wellhead_temperature = result.T_out
+
+        # Outlets
+        wellhead = stream.with_(p=a * result.p_out + b, T=result.T_out)
+
+        outlets = dict(wellhead=wellhead)
+        return outlets
+
+    def _compute_outputs(self, bottom, wellhead):
+        start, end = self.pipe_path.total_length, 0
+        if self.segment == "below_esp":
+            end = self._esp_depth()
+        elif self.segment == "above_esp":
+            start = self._esp_depth()
+        result = self.traverse(bottom, start, end, "up")
+        self.wellhead_pressure = wellhead.p
+        self.wellhead_temperature = wellhead.T
         self.dp_friction = result.dp_fric
         self.dp_gravity = result.dp_grav
         self.section_pressure = result.section_p
         self.section_temperature = result.section_T
-
-        # Outlets
-        wellhead = stream.with_(p=self.wellhead_pressure, T=self.wellhead_temperature)
-        heat_loss = HeatFlow(
-            Q=wellhead.m_dot
-            * stream.fluid.properties(stream.p, stream.T).cp_l
-            * (stream.T - wellhead.T),
-            T=self.soil_temperature,
+        self.heat_loss = (
+            wellhead.m_dot
+            * bottom.fluid.properties(bottom.p, bottom.T).cp_l
+            * (bottom.T - wellhead.T)
         )
-
-        outlets = dict(wellhead=wellhead, heat_loss=heat_loss)
-        return outlets
 
     def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):
         """Traverse an arbitrary depth interval [m], returning uncorrected SI conditions."""

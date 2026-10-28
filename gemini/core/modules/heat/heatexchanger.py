@@ -62,7 +62,21 @@ class HeatExchanger(Module):
     def forward(self, hot_in, cold_in):
         """Solve the heat balance and retain both streams' mass flows."""
 
-        # Outputs
+        values = self._performance(hot_in, cold_in)
+
+        # Outlets
+        hot_out = hot_in.with_(T=values["hot_out_T"], p=hot_in.p - values["dp_hot"])
+        cold_out = cold_in.with_(T=values["cold_out_T"], p=cold_in.p - values["dp_cold"])
+
+        outlets = dict(hot_out=hot_out, cold_out=cold_out)
+        return outlets
+
+    def _compute_outputs(self, hot_in, cold_in, hot_out, cold_out):
+        values = self._performance(hot_in, cold_in)
+        for name, value in values.items():
+            setattr(self, name, value)
+
+    def _performance(self, hot_in, cold_in):
         if hot_in.m_dot < 0 or cold_in.m_dot < 0:
             raise ValueError(f"{self.path}: negative mass flow")
         if hot_in.T < cold_in.T:
@@ -72,36 +86,36 @@ class HeatExchanger(Module):
         c_hot, c_cold = hot_in.m_dot * cp_h, cold_in.m_dot * cp_c
         c_min, c_max = min(c_hot, c_cold), max(c_hot, c_cold)
         if c_min == 0:
-            self.effectiveness = self.ntu = self.duty = 0.0
+            effectiveness = ntu = duty = 0.0
             hot_T, cold_T = hot_in.T, cold_in.T
         else:
-            self.ntu = heat_transfer.ntu(self.ua, c_min)
+            ntu = heat_transfer.ntu(self.ua, c_min)
             method = (
                 heat_transfer.effectiveness_counterflow
                 if self.arrangement == "counterflow"
                 else heat_transfer.effectiveness_parallel
             )
-            self.effectiveness = method(self.ntu, c_min / c_max)
-            self.duty = self.effectiveness * c_min * (hot_in.T - cold_in.T)
-            hot_T = hot_in.T - self.duty / c_hot
-            cold_T = cold_in.T + self.duty / c_cold
-        self.dp_hot = self.dp_hot_nominal * (hot_in.m_dot / self.m_dot_hot_nominal) ** 2
-        self.dp_cold = self.dp_cold_nominal * (cold_in.m_dot / self.m_dot_cold_nominal) ** 2
+            effectiveness = method(ntu, c_min / c_max)
+            duty = effectiveness * c_min * (hot_in.T - cold_in.T)
+            hot_T = hot_in.T - duty / c_hot
+            cold_T = cold_in.T + duty / c_cold
+        dp_hot = self.dp_hot_nominal * (hot_in.m_dot / self.m_dot_hot_nominal) ** 2
+        dp_cold = self.dp_cold_nominal * (cold_in.m_dot / self.m_dot_cold_nominal) ** 2
         if self.arrangement == "counterflow":
             dt1, dt2 = hot_in.T - cold_T, hot_T - cold_in.T
         else:
             dt1, dt2 = hot_in.T - cold_in.T, hot_T - cold_T
-        self.lmtd = heat_transfer.lmtd(max(0, dt1), max(0, dt2))
-        self.hot_out_T = hot_T
-        self.cold_out_T = cold_T
-        self.approach_T = min(dt1, dt2)
-
-        # Outlets
-        hot_out = hot_in.with_(T=self.hot_out_T, p=hot_in.p - self.dp_hot)
-        cold_out = cold_in.with_(T=self.cold_out_T, p=cold_in.p - self.dp_cold)
-
-        outlets = dict(hot_out=hot_out, cold_out=cold_out)
-        return outlets
+        return {
+            "duty": duty,
+            "effectiveness": effectiveness,
+            "ntu": ntu,
+            "lmtd": heat_transfer.lmtd(max(0, dt1), max(0, dt2)),
+            "hot_out_T": hot_T,
+            "cold_out_T": cold_T,
+            "dp_hot": dp_hot,
+            "dp_cold": dp_cold,
+            "approach_T": min(dt1, dt2),
+        }
 
     @classmethod
     def ua_from_measurements(

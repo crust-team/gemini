@@ -10,12 +10,12 @@ from gemini.core.modules.module import Module
 from gemini.core.physics import geometry, hydraulics
 from gemini.core.types import (
     Dimensionless,
-    HeatFlow,
     HeatTransferCoefficient,
     Inlet,
     Outlet,
     Output,
     Parameter,
+    Power,
     Pressure,
     PressureDifference,
     Stream,
@@ -50,43 +50,42 @@ class InjectionWell(Module):
         self.dp_gravity = Output(PressureDifference)
         self.section_pressure = Output(list[Pressure])
         self.section_temperature = Output(list[Temperature])
+        self.heat_loss = Output(Power)
 
         # Outlets
         self.bottom = Outlet(Stream)
-        self.heat_loss = Outlet(HeatFlow)
 
     def forward(self, wellhead):
         """Traverse the injection path with the legacy negative flow convention."""
 
-        # Outputs
-        stream = wellhead
         # NOTE(refactor): legacy injection DPDT uses negative flow; retain that sign convention.
-        stream = stream.with_(m_dot=-abs(stream.m_dot))
+        stream = wellhead.with_(m_dot=-abs(wellhead.m_dot))
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
         a, b = self.correction_factors
+
+        # Outlets
         # NOTE(refactor): negative flow is internal to DPDT; ports preserve incoming mass sign.
-        self.bottomhole_pressure = a * result.p_out + b
-        self.bottomhole_temperature = result.T_out
+        bottom = stream.with_(
+            p=a * result.p_out + b,
+            T=result.T_out,
+            m_dot=wellhead.m_dot,
+        )
+
+        outlets = dict(bottom=bottom)
+        return outlets
+
+    def _compute_outputs(self, wellhead, bottom):
+        stream = wellhead.with_(m_dot=-abs(wellhead.m_dot))
+        result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
+        self.bottomhole_pressure = bottom.p
+        self.bottomhole_temperature = bottom.T
         self.dp_friction = result.dp_fric
         self.dp_gravity = result.dp_grav
         self.section_pressure = result.section_p
         self.section_temperature = result.section_T
-
-        # Outlets
-        bottom = stream.with_(
-            p=self.bottomhole_pressure,
-            T=self.bottomhole_temperature,
-            m_dot=wellhead.m_dot,
+        self.heat_loss = (
+            bottom.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l * (stream.T - bottom.T)
         )
-        heat_loss = HeatFlow(
-            Q=bottom.m_dot
-            * stream.fluid.properties(stream.p, stream.T).cp_l
-            * (stream.T - bottom.T),
-            T=self.soil_temperature,
-        )
-
-        outlets = dict(bottom=bottom, heat_loss=heat_loss)
-        return outlets
 
     def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):
         """Traverse an arbitrary depth interval [m], returning uncorrected SI conditions."""
