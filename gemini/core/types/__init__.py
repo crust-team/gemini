@@ -14,6 +14,7 @@ from .declarations import (
 )
 from .flows import Stream
 from .fluid import BRINE, GLYCOL_30, WATER, Fluid
+from .ports import Ports
 from .profile import Profile
 from .quantities import (
     Angle,
@@ -104,6 +105,7 @@ __all__ = [
     "WATER",
     "Fluid",
     "Profile",
+    "Ports",
     "Health",
     "ModuleResult",
     "Values",

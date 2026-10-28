@@ -8,7 +8,7 @@ from gemini.core.engine.engine import Engine
 from gemini.core.modules import plants
 from gemini.core.modules.module import no_outputs
 from gemini.core.physics import units
-from gemini.core.types import BRINE, WATER, Fluid, Profile, Quantity, Stream
+from gemini.core.types import BRINE, WATER, Fluid, Ports, Profile, Quantity, Stream
 
 __version__ = "1.0.3"
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "Dataset",
     "Profile",
     "Stream",
+    "Ports",
     "Fluid",
     "BRINE",
     "WATER",
