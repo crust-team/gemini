@@ -21,6 +21,7 @@ def test_public_names_and_docs():
         "modules",
         "plants",
         "optim",
+        "no_outputs",
         "__version__",
     }
     assert set(dir(gm)) == expected == set(gm.__all__)
