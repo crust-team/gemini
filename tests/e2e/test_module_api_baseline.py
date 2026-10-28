@@ -15,6 +15,7 @@ pytestmark = pytest.mark.e2e
 ROOT = Path(__file__).parents[2]
 SHARED = ROOT / "examples/shared/doublet_heat"
 BASELINE = ROOT / "tests/fixtures/module_api_baseline"
+FAST_BASELINE = ROOT / "tests/fixtures/module_api_fast"
 PATH_RENAMES = {"filter_hot": "filters.hot", "filter_return": "filters.cold"}
 FIELD_RENAMES = {
     "energy_port_electricity": "electricity",
@@ -63,7 +64,7 @@ def _assert_values_identical(actual, expected):
             )
 
 
-def test_state_and_full_results_match_phase_zero():
+def test_state_and_full_results_match_phase_zero(dataset_name, dataset_path):
     """State, replay and simulation remain numerically identical after documented renames."""
     plant = DoubletHeatPlant.load(SHARED / "plant.json")
     old_state = json.loads((BASELINE / "state_dict.json").read_text())
@@ -78,13 +79,19 @@ def test_state_and_full_results_match_phase_zero():
         assert old_params == new["params"]
         assert old["fluid"] == new["fluid"]
 
-    frame = pd.read_csv(SHARED / "doublet_2024_15min.csv", parse_dates=["time"])
+    frame = pd.read_csv(dataset_path, parse_dates=["time"])
     data = gm.Dataset.from_frame(frame, time_column="time")
     started = perf_counter()
     replay = gm.Engine().replay(plant, data).to_frame()
     elapsed = perf_counter() - started
     assert elapsed < 60
-    _assert_values_identical(replay, _baseline_frame("replay.csv.gz"))
+    baseline = BASELINE if dataset_name == "slow" else FAST_BASELINE
+    expected = (
+        pd.read_csv(baseline / "replay.csv.gz", header=[0, 1], index_col=0, parse_dates=True)
+        .rename(columns=PATH_RENAMES, level=0)
+        .rename(columns=FIELD_RENAMES, level=1)
+    )
+    _assert_values_identical(replay, expected)
 
     clock = gm.Clock.days(2027, 1, 1, days=1)
     profiles = {

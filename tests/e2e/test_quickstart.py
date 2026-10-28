@@ -11,7 +11,7 @@ from examples.shared.doublet_heat.plant import DoubletHeatPlant
 pytestmark = pytest.mark.e2e
 
 
-def test_quickstart(tmp_path, monkeypatch):
+def test_quickstart(tmp_path, monkeypatch, dataset_path):
     """Run the documented calls unchanged against the committed shared example."""
     root = Path(__file__).parents[2]
     (tmp_path / "examples").symlink_to(root / "examples", target_is_directory=True)
@@ -22,7 +22,7 @@ def test_quickstart(tmp_path, monkeypatch):
     plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
     print(plant)
 
-    df = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
+    df = pd.read_csv(dataset_path, parse_dates=["time"])
     data = gm.Dataset.from_frame(df, time_column="time")
 
     engine = gm.Engine()
@@ -49,20 +49,23 @@ def test_quickstart(tmp_path, monkeypatch):
     sim = engine.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     print(sim.summary())
 
-    day1 = df[df["time"] < "2024-06-08"]
-    day2 = df[(df["time"] >= "2024-06-08") & (df["time"] < "2024-06-09")]
+    start = df["time"].iloc[0]
+    second = start + pd.Timedelta(days=1)
+    third = start + pd.Timedelta(days=2)
+    day1 = df[df["time"] < second]
+    day2 = df[(df["time"] >= second) & (df["time"] < third)]
     out1 = engine.live(
         plant,
         gm.Dataset.from_frame(day1, time_column="time"),
         checkpoint="runs/live.ckpt",
-        now="2024-06-08T00:00:00Z",
+        now=second,
     )
     out2 = engine.live(
         plant,
         gm.Dataset.from_frame(day2, time_column="time"),
         checkpoint="runs/live.ckpt",
-        now="2024-06-09T00:00:00Z",
+        now=third,
     )
-    assert len(res) == len(res2) == 17280
+    assert len(res) == len(res2) == len(df)
     assert len(sim) == 24
-    assert len(out1) == len(out2) == 96
+    assert len(out1) == len(day1) and len(out2) == len(day2)

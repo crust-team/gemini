@@ -150,7 +150,25 @@ fluid-property function justifies a production cache.
 
 ## Slow-dataset golden confirmation
 
-To be completed before fast-dataset goldens are added.
+Before adding fast-data fixtures, the unchanged full-year dataset passed all 152 tests and the
+existing replay/simulate goldens in **609.40 s**. The source
+`examples/shared/doublet_heat/doublet_2024_15min.csv` remains unchanged.
+
+The fast dataset is July 2024: the first complete calendar month after the source begins on
+June 7. Its 2,976 contiguous 15-minute rows retain ordinary control variation, day boundaries,
+checkpoint cadence, calibration/holdout windows, measured replay, full-chain simulation and
+live updates without making a partial month the long-term fixture. Generate the byte-for-byte
+source slice and unchanged-code replay golden with:
+
+```bash
+PYTHONPATH=. python tests/fixtures/generate_fast_fixtures.py
+```
+
+The generated files are
+`examples/shared/doublet_heat/doublet_2024_15min_month.csv` and
+`tests/fixtures/module_api_fast/replay.csv.gz`. Never replace or shrink the full-year dataset or
+its existing goldens. `--dataset=fast` selects July by default; `--dataset=slow` selects the
+untouched full dataset.
 
 ## After
 

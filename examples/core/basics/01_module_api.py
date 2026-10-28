@@ -1,5 +1,7 @@
 """Exercise the complete PyTorch-style module API."""
 
+import os
+
 import pandas as pd
 
 import gemini as gm
@@ -67,7 +69,8 @@ with gm.runtime.settings(precision="float32", display_units="field"):
 assert gm.runtime.get_precision() == "float64"
 
 # engine and calibration with parameter objects
-df = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
+dataset_path = os.environ.get("GEMINI_EXAMPLE_DATASET", f"{SHARED}/doublet_2024_15min.csv")
+df = pd.read_csv(dataset_path, parse_dates=["time"])
 data = gm.Dataset.from_frame(df, time_column="time")
 res = gm.Engine().replay(plant, data)
 print(res["doublet.esp"].get("head", unit="bar").head())
