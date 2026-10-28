@@ -4,8 +4,11 @@ import importlib
 import inspect
 import json
 import re
+from collections import OrderedDict
+from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
+from difflib import get_close_matches
 from functools import wraps
 from pathlib import Path
 from typing import Literal
@@ -31,6 +34,7 @@ from gemini.core.types.results import ModuleResult, Values
 
 _evaluation = ContextVar("module_evaluation", default=None)
 _output_call = ContextVar("module_output_call", default=None)
+_input_call = ContextVar("module_input_call", default=None)
 MODULE_REGISTRY = {}
 
 
@@ -38,7 +42,7 @@ def _snake_case(name):
     return re.sub(r"(?<!^)(?=[A-Z][a-z])|(?<=[a-z0-9])(?=[A-Z])", "_", name).lower()
 
 
-class HookHandle:
+class RemovableHandle:
     """Removable registration; removal is idempotent."""
 
     def __init__(self, hooks, key):
@@ -127,7 +131,12 @@ class Module:
             "_pre_hooks",
             "_hooks",
         ):
-            object.__setattr__(self, name, {})
+            object.__setattr__(
+                self,
+                name,
+                OrderedDict() if name in {"_pre_hooks", "_hooks"} else {},
+            )
+        object.__setattr__(self, "_input_values", {})
         object.__setattr__(self, "_path", "")
         object.__setattr__(self, "_initialising", True)
         object.__setattr__(self, "_fluid", runtime.get_default_fluid())
@@ -181,14 +190,30 @@ class Module:
         return result
 
     def __getattr__(self, name):
-        """Resolve parameter values and registered declaration metadata."""
+        """Resolve parameter, current input and registered port values."""
         parameters = self.__dict__.get("_parameters", {})
         if name in parameters:
             parameter = parameters[name]
             if not parameter.initialized:
                 raise RuntimeError(f"{parameter.path}: parameter is uninitialized")
             return parameter.value
-        for key in ("_inlets", "_controls", "_boundaries", "_outlets"):
+        for key in ("_controls", "_boundaries"):
+            registry = self.__dict__.get(key, {})
+            if name in registry:
+                active = _input_call.get()
+                if active is not None and active[0] is self and name in active[1]:
+                    return active[1][name]
+                persistent = self.__dict__.get("_input_values", {})
+                if name in persistent:
+                    return persistent[name]
+                declaration = registry[name]
+                if declaration.default is not UNSET:
+                    return declaration.validate(deepcopy(declaration.default))
+                unit = declaration.unit or "-"
+                raise RuntimeError(
+                    f"{declaration.path}: {declaration.section} {name!r} has no value [{unit}]"
+                )
+        for key in ("_inlets", "_outlets"):
             registry = self.__dict__.get(key, {})
             if name in registry:
                 return registry[name]
@@ -208,6 +233,15 @@ class Module:
         if name in self._parameters and not isinstance(value, Declaration):
             self._parameters[name].set(value)
             object.__setattr__(self, "fluid", self._resolve_fluid())
+            return
+        inputs = self._controls | self._boundaries
+        if name in inputs and not isinstance(value, Declaration):
+            validated = inputs[name].validate(value)
+            active = _input_call.get()
+            if active is not None and active[0] is self:
+                active[1][name] = validated
+            else:
+                self._input_values[name] = validated
             return
         if name in self._outputs and not isinstance(value, Declaration):
             active = _output_call.get()
@@ -357,6 +391,41 @@ class Module:
             raise ValueError(f"{self.path}: unknown parameter {path!r}; valid: {valid}")
         return module._parameters[name]
 
+    def _get_input(self, path, registry_name, kind):
+        module_path, _, name = path.rpartition(".")
+        module = self.get_submodule(module_path)
+        registry = getattr(module, registry_name)
+        if name not in registry:
+            valid = ", ".join(registry) or "<none>"
+            raise ValueError(f"{self.path}: unknown {kind} {path!r}; valid: {valid}")
+        return registry[name]
+
+    def get_control(self, path):
+        """Return control metadata by local or dotted path."""
+        return self._get_input(path, "_controls", "control")
+
+    def get_boundary(self, path):
+        """Return boundary metadata by local or dotted path."""
+        return self._get_input(path, "_boundaries", "boundary")
+
+    def set_inputs(self, mapping):
+        """Persist validated controls and boundaries addressed by relative dotted path."""
+        declarations = self.inputs(recurse=True)
+        pending = []
+        for path, value in mapping.items():
+            if path not in declarations:
+                suggestion = get_close_matches(path, declarations, n=1)
+                detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                valid = ", ".join(declarations) or "<none>"
+                raise ValueError(
+                    f"{self.path}: unknown control/boundary path {path!r}{detail}; valid: {valid}"
+                )
+            declaration = declarations[path]
+            pending.append((declaration.owner, declaration.name, declaration.validate(value)))
+        for owner, name, value in pending:
+            owner._input_values[name] = value
+        return self
+
     def missing_parameters(self):
         """Return dotted paths of all uninitialized parameters."""
         return [name for name, value in self.named_parameters() if not value.initialized]
@@ -407,17 +476,17 @@ class Module:
         return Fluid.model_validate(self._fluid.model_dump() | overrides)
 
     def _check_forward_signature(self):
-        expected = set(self._inlets) | set(self._controls) | set(self._boundaries)
+        expected = list(self._inlets)
         signature = inspect.signature(self.forward)
-        actual = {
+        actual = [
             name
             for name, parameter in signature.parameters.items()
             if parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
-        }
+        ]
         if actual != expected:
             raise TypeError(
                 f"{type(self).__name__}.forward signature mismatch: "
-                f"missing={sorted(expected - actual)}, extra={sorted(actual - expected)}"
+                f"expected={expected}, actual={actual}"
             )
         object.__setattr__(self, "_forward_checked", True)
 
@@ -425,46 +494,83 @@ class Module:
         """Compute outputs and return declared outlets; subclasses implement this."""
         raise NotImplementedError(f"{type(self).__name__} has no forward method")
 
+    def _split_call_args(self, args, kwargs):
+        inlet_names = list(self._inlets)
+        valid_names = inlet_names + list(self._controls) + list(self._boundaries)
+        if len(args) > len(inlet_names):
+            raise TypeError(
+                f"{self.path}: expected at most {len(inlet_names)} positional inlet arguments, "
+                f"got {len(args)}; valid: {', '.join(valid_names) or '<none>'}"
+            )
+        unknown = kwargs.keys() - set(valid_names)
+        if unknown:
+            raise TypeError(
+                f"{self.path}: unexpected keyword(s) {sorted(unknown)}; "
+                f"valid inlets, controls and boundaries: {', '.join(valid_names) or '<none>'}"
+            )
+        values = dict(zip(inlet_names, args))
+        duplicate = values.keys() & kwargs.keys()
+        if duplicate:
+            name = next(iter(duplicate))
+            raise TypeError(f"{self.path}: multiple values for inlet {name!r}")
+        values.update({name: kwargs[name] for name in inlet_names if name in kwargs})
+        missing = [name for name in inlet_names if name not in values]
+        if missing:
+            raise TypeError(f"{self.path}: missing required inlet(s): {', '.join(missing)}")
+        inlets = {name: self._inlets[name].validate(values[name]) for name in inlet_names}
+        inputs = {
+            name: kwargs[name] for name in self._controls | self._boundaries if name in kwargs
+        }
+        return inlets, inputs
+
+    @contextmanager
+    def _apply_inputs(self, supplied):
+        resolved = {}
+        for name, declaration in (self._controls | self._boundaries).items():
+            if name in supplied:
+                value = supplied[name]
+            elif name in self._input_values:
+                value = self._input_values[name]
+            elif declaration.default is not UNSET:
+                value = deepcopy(declaration.default)
+            else:
+                unit = declaration.unit or "-"
+                raise TypeError(
+                    f"{declaration.path}: missing required {declaration.section} "
+                    f"{name!r} [{unit}]"
+                )
+            resolved[name] = declaration.validate(value)
+        token = _input_call.set((self, resolved))
+        try:
+            yield resolved
+        finally:
+            _input_call.reset(token)
+
     def __call__(self, *args, **kwargs):
-        """Validate inputs, record outputs and validate returned outlet flows."""
+        """Apply controls and boundaries, run hooks/forward, and validate outlets."""
         missing = self.missing_parameters()
         if missing:
             raise RuntimeError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
         if not self._forward_checked:
             self._check_forward_signature()
-        declarations = self._inlets | self._controls | self._boundaries
-        signature = inspect.Signature(
-            [
-                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                for name in declarations
-            ]
-        )
-        try:
-            bound = signature.bind_partial(*args, **kwargs)
-        except TypeError as exc:
-            raise TypeError(f"{self.path}: {exc}") from exc
-        values = {}
-        for name, declaration in declarations.items():
-            if name in bound.arguments:
-                values[name] = declaration.validate(bound.arguments[name])
-            elif declaration.default is not UNSET:
-                values[name] = declaration.validate(deepcopy(declaration.default))
-            else:
-                raise TypeError(f"{self.path}: missing required argument {name!r}")
-        inlets = {name: values[name] for name in self._inlets}
-        inputs = {name: values[name] for name in self._controls | self._boundaries}
-        for fn in tuple(self._pre_hooks.values()):
-            fn(self, inputs, inlets)
-        children = {}
+        inlets, supplied = self._split_call_args(args, kwargs)
+        children, recorded = {}, {}
         parent = _evaluation.get()
-        evaluation_token = _evaluation.set((self, children))
-        recorded = {}
-        output_token = _output_call.set((self, recorded))
-        try:
-            returned = self.forward(**values)
-        finally:
-            _output_call.reset(output_token)
-            _evaluation.reset(evaluation_token)
+        with self._apply_inputs(supplied) as inputs:
+            for fn in tuple(self._pre_hooks.values()):
+                fn(self)
+            evaluation_token = _evaluation.set((self, children))
+            output_token = _output_call.set((self, recorded))
+            try:
+                returned = self.forward(**inlets)
+                for fn in tuple(self._hooks.values()):
+                    replacement = fn(self, returned)
+                    if replacement is not None:
+                        returned = replacement
+            finally:
+                _output_call.reset(output_token)
+                _evaluation.reset(evaluation_token)
+            inputs = dict(inputs)
         required = {name for name, output in self._outputs.items() if not output.optional}
         if required - recorded.keys():
             missing = sorted(required - recorded.keys())
@@ -495,8 +601,6 @@ class Module:
             collected[self._path.removeprefix(prefix) or self.name] = result
         object.__setattr__(self, "last_result", result)
         object.__setattr__(self, "last_results", result.leaves())
-        for fn in tuple(self._hooks.values()):
-            fn(self, inputs, inlets, result)
         return result
 
     def initial_state(self):
@@ -518,13 +622,13 @@ class Module:
         """Call ``fn`` before each forward evaluation."""
         key = object()
         self._pre_hooks[key] = fn
-        return HookHandle(self._pre_hooks, key)
+        return RemovableHandle(self._pre_hooks, key)
 
     def register_forward_hook(self, fn):
         """Call ``fn`` after each successful forward evaluation."""
         key = object()
         self._hooks[key] = fn
-        return HookHandle(self._hooks, key)
+        return RemovableHandle(self._hooks, key)
 
     def health(self, predicted, measured):
         """Return optional equipment health; absence means no diagnostic model."""
