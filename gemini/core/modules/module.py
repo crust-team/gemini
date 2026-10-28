@@ -1,18 +1,17 @@
 """Registration-driven, PyTorch-style equipment modules."""
 
-import ast
 import importlib
 import inspect
 import json
 import re
 from collections import OrderedDict
+from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from difflib import get_close_matches
 from functools import wraps
 from pathlib import Path
-from textwrap import dedent
 from typing import Literal
 
 from pydantic_core import to_jsonable_python
@@ -32,12 +31,12 @@ from gemini.core.types.declarations import (
     Parameter,
 )
 from gemini.core.types.fluid import Fluid
+from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult, Values
 
 _evaluation = ContextVar("module_evaluation", default=None)
 _output_call = ContextVar("module_output_call", default=None)
 _input_call = ContextVar("module_input_call", default=None)
-_inlet_call = ContextVar("module_inlet_call", default=None)
 _outputs_enabled = ContextVar("module_outputs_enabled", default=True)
 MODULE_REGISTRY = {}
 
@@ -59,52 +58,6 @@ def no_outputs():
 def outputs_enabled():
     """Return whether the current context records computed outputs."""
     return _outputs_enabled.get()
-
-
-def _declared_port_names(cls):
-    """Read conventional inlet/outlet assignments without constructing the class."""
-    names = set()
-    for base in reversed(cls.__mro__):
-        method = base.__dict__.get("__init__")
-        if method is None:
-            continue
-        try:
-            tree = ast.parse(dedent(inspect.getsource(method)))
-        except (OSError, TypeError, IndentationError, SyntaxError):
-            continue
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
-                continue
-            value = node.value
-            if not isinstance(value, ast.Call):
-                continue
-            called = value.func
-            called_name = (
-                called.id if isinstance(called, ast.Name) else getattr(called, "attr", None)
-            )
-            if called_name not in {"Inlet", "Outlet"}:
-                continue
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            for target in targets:
-                if (
-                    isinstance(target, ast.Attribute)
-                    and isinstance(target.value, ast.Name)
-                    and target.value.id == "self"
-                ):
-                    names.add(target.attr)
-    return names
-
-
-def _named_parameters(fn, *, skip=()):
-    signature = inspect.signature(fn)
-    names = []
-    for name, parameter in signature.parameters.items():
-        if name in skip:
-            continue
-        if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD):
-            raise TypeError(f"{fn.__qualname__}: variadic parameters are not supported")
-        names.append(name)
-    return tuple(names)
 
 
 class RemovableHandle:
@@ -129,19 +82,6 @@ class Module:
     def __init_subclass__(cls, **kwargs):
         """Derive metadata, register the class and wrap keyword-value construction."""
         super().__init_subclass__(**kwargs)
-        compute = cls.__dict__.get("_compute_outputs")
-        if compute is not None:
-            names = _named_parameters(compute, skip=("self",))
-            valid = _declared_port_names(cls)
-            bad = [name for name in names if name not in valid]
-            if valid and bad:
-                raise TypeError(
-                    f"{cls.__name__}._compute_outputs has unknown inlet/outlet {bad[0]!r}; "
-                    f"valid names: {', '.join(sorted(valid)) or '<none>'}"
-                )
-            cls._compute_output_args = names
-        elif not hasattr(cls, "_compute_output_args"):
-            cls._compute_output_args = ()
         if cls.__name__.startswith("_"):
             return
         doc = inspect.getdoc(cls)
@@ -184,13 +124,6 @@ class Module:
             if fluid is not None:
                 object.__setattr__(self, "_fluid", Fluid.model_validate(fluid))
                 object.__setattr__(self, "fluid", self._resolve_fluid())
-            valid = set(self._inlets) | set(self._outlets)
-            bad = [name for name in type(self)._compute_output_args if name not in valid]
-            if bad:
-                raise TypeError(
-                    f"{type(self).__name__}._compute_outputs has unknown inlet/outlet "
-                    f"{bad[0]!r}; valid names: {', '.join(sorted(valid)) or '<none>'}"
-                )
             self._finish_init(kwargs)
 
         cls.__init__ = initialise
@@ -232,7 +165,6 @@ class Module:
         object.__setattr__(self, "_active_from", None)
         object.__setattr__(self, "_active_params", {})
         object.__setattr__(self, "_param_overrides", {})
-        object.__setattr__(self, "_forward_checked", False)
 
     def _finish_init(self, values):
         for path, value in values.items():
@@ -567,56 +499,99 @@ class Module:
                 overrides[name] = parameters[name].value
         return Fluid.model_validate(self._fluid.model_dump() | overrides)
 
-    def _check_forward_signature(self):
-        expected = list(self._inlets)
-        signature = inspect.signature(self.forward)
-        actual = [
-            name
-            for name, parameter in signature.parameters.items()
-            if parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
-        ]
-        if actual != expected:
-            raise TypeError(
-                f"{type(self).__name__}.forward signature mismatch: "
-                f"expected={expected}, actual={actual}"
-            )
-        object.__setattr__(self, "_forward_checked", True)
-
-    def forward(self, **kwargs):
+    def forward(self, inlets):
         """Move inlet fluids to declared outlets; subclasses implement this."""
         raise NotImplementedError(f"{type(self).__name__} has no forward method")
 
-    def _compute_outputs(self):
+    def _compute_outputs(self, inlets, outlets):
         """Compute leaf outputs after ``forward``; overrides never call ``super()``."""
 
     def _split_call_args(self, args, kwargs):
         inlet_names = list(self._inlets)
         valid_names = inlet_names + list(self._controls) + list(self._boundaries)
-        if len(args) > len(inlet_names):
+        valid_inlets = ", ".join(inlet_names) or "<none>"
+        mapping = len(args) == 1 and isinstance(args[0], Mapping)
+        if mapping:
+            inlet_values = args[0]
+            mixed = [name for name in inlet_names if name in kwargs]
+            if mixed:
+                raise TypeError(
+                    f"{self.path}: cannot mix inlet mapping with inlet keyword {mixed[0]!r}; "
+                    f"valid names: {valid_inlets}"
+                )
+            unknown = [name for name in inlet_values if name not in self._inlets]
+            if unknown:
+                name = unknown[0]
+                suggestion = get_close_matches(str(name), inlet_names, n=1)
+                detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                raise TypeError(
+                    f"{self.path}: unknown inlet {name!r}{detail}; " f"valid names: {valid_inlets}"
+                )
+        elif len(args) > len(inlet_names):
             raise TypeError(
                 f"{self.path}: expected at most {len(inlet_names)} positional inlet arguments, "
-                f"got {len(args)}; valid: {', '.join(valid_names) or '<none>'}"
+                f"got {len(args)}; valid names: {valid_inlets}"
             )
-        unknown = kwargs.keys() - set(valid_names)
+        unknown = [name for name in kwargs if name not in valid_names]
         if unknown:
+            name = unknown[0]
+            suggestion = get_close_matches(str(name), valid_names, n=1)
+            detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
             raise TypeError(
-                f"{self.path}: unexpected keyword(s) {sorted(unknown)}; "
-                f"valid inlets, controls and boundaries: {', '.join(valid_names) or '<none>'}"
+                f"{self.path}: unexpected keyword {name!r}{detail}; "
+                f"valid names: {', '.join(valid_names) or '<none>'}"
             )
-        values = dict(zip(inlet_names, args))
-        duplicate = values.keys() & kwargs.keys()
-        if duplicate:
-            name = next(iter(duplicate))
-            raise TypeError(f"{self.path}: multiple values for inlet {name!r}")
-        values.update({name: kwargs[name] for name in inlet_names if name in kwargs})
-        missing = [name for name in inlet_names if name not in values]
+        if not mapping:
+            inlet_values = dict(zip(inlet_names, args))
+            duplicate = inlet_values.keys() & kwargs.keys()
+            if duplicate:
+                name = next(iter(duplicate))
+                raise TypeError(
+                    f"{self.path}: multiple values for inlet {name!r}; "
+                    f"valid names: {valid_inlets}"
+                )
+            inlet_values.update({name: kwargs[name] for name in inlet_names if name in kwargs})
+        missing = [name for name in inlet_names if name not in inlet_values]
         if missing:
-            raise TypeError(f"{self.path}: missing required inlet(s): {', '.join(missing)}")
-        inlets = {name: self._inlets[name].validate(values[name]) for name in inlet_names}
+            raise TypeError(
+                f"{self.path}: missing required inlet(s) {', '.join(missing)}; "
+                f"valid names: {valid_inlets}"
+            )
+        validated = []
+        for name in inlet_names:
+            try:
+                value = self._inlets[name].validate(inlet_values[name])
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    f"{self.path}: invalid inlet {name!r}; valid names: {valid_inlets}: {exc}"
+                ) from exc
+            validated.append((name, value))
+        inlets = Ports(validated, path=self.path)
         inputs = {
             name: kwargs[name] for name in self._controls | self._boundaries if name in kwargs
         }
         return inlets, inputs
+
+    def _check_outlets(self, returned):
+        if not isinstance(returned, dict):
+            raise TypeError(f"{self.path}: forward must return an outlet dict")
+        missing = self._outlets.keys() - returned.keys()
+        extra = returned.keys() - self._outlets.keys()
+        if missing or extra:
+            raise ValueError(
+                f"{self.path}: outlet names missing={sorted(missing)}, extra={sorted(extra)}"
+            )
+        valid = ", ".join(self._outlets) or "<none>"
+        validated = []
+        for name, declaration in self._outlets.items():
+            try:
+                value = declaration.validate(returned[name])
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    f"{self.path}: invalid outlet {name!r}; valid names: {valid}: {exc}"
+                ) from exc
+            validated.append((name, value))
+        return Ports(validated, path=self.path)
 
     @contextmanager
     def _apply_inputs(self, supplied):
@@ -640,18 +615,6 @@ class Module:
             yield resolved
         finally:
             _input_call.reset(token)
-
-    def _current_inlets(self):
-        active = _inlet_call.get()
-        return active[1] if active is not None and active[0] is self else {}
-
-    def _call_by_name(self, fn, inlets, outlets, *, names=None, **extra):
-        """Call a cached output callback with only the inlet/outlet names it requests."""
-        selected = type(self)._compute_output_args if names is None else names
-        available = dict(inlets) | dict(outlets) | extra
-        arguments = {name: available[name] for name in selected}
-        arguments.update(extra)
-        return fn(**arguments)
 
     def _formula_candidates(self):
         candidates = []
@@ -805,50 +768,31 @@ class Module:
         missing = self.missing_parameters()
         if missing:
             raise RuntimeError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
-        if not self._forward_checked:
-            self._check_forward_signature()
         self._resolve_formula_outputs()
         inlets, supplied = self._split_call_args(args, kwargs)
         children, call_records, recorded = {}, [], {}
         parent = _evaluation.get()
-        inlet_token = _inlet_call.set((self, inlets))
-        try:
-            with self._apply_inputs(supplied) as inputs:
-                for fn in tuple(self._pre_hooks.values()):
-                    fn(self)
-                evaluation_token = _evaluation.set((self, children, call_records))
-                output_token = _output_call.set((self, recorded)) if outputs_enabled() else None
-                try:
-                    returned = self.forward(**inlets)
-                    if returned is None and not self._outlets:
-                        returned = {}
-                    if not isinstance(returned, dict):
-                        raise TypeError(f"{self.path}: forward must return an outlet dict")
-                    missing_out = self._outlets.keys() - returned.keys()
-                    extra_out = returned.keys() - self._outlets.keys()
-                    if missing_out or extra_out:
-                        detail = f"missing={sorted(missing_out)}, extra={sorted(extra_out)}"
-                        raise ValueError(f"{self.path}: outlet names {detail}")
-                    outlets = {
-                        name: declaration.validate(returned[name])
-                        for name, declaration in self._outlets.items()
-                    }
-                    if outputs_enabled():
-                        self._call_by_name(self._compute_outputs, inlets, outlets)
-                        self._compute_formula_outputs(call_records)
-                        for fn, names in tuple(self._hooks.values()):
-                            self._call_by_name(fn, inlets, outlets, names=names, module=self)
-                        self._check_outputs(recorded)
-                finally:
-                    if output_token is not None:
-                        _output_call.reset(output_token)
-                    _evaluation.reset(evaluation_token)
-                inputs = dict(inputs)
-        finally:
-            _inlet_call.reset(inlet_token)
+        with self._apply_inputs(supplied) as inputs:
+            for fn in tuple(self._pre_hooks.values()):
+                fn(self, inlets)
+            evaluation_token = _evaluation.set((self, children, call_records))
+            output_token = _output_call.set((self, recorded)) if outputs_enabled() else None
+            try:
+                outlets = self._check_outlets(self.forward(inlets))
+                if outputs_enabled():
+                    self._compute_outputs(inlets, outlets)
+                    self._compute_formula_outputs(call_records)
+                    for fn in tuple(self._hooks.values()):
+                        fn(self, inlets, outlets)
+                    self._check_outputs(recorded)
+            finally:
+                if output_token is not None:
+                    _output_call.reset(output_token)
+                _evaluation.reset(evaluation_token)
+            inputs = dict(inputs)
         result = ModuleResult(
             outputs=Values(recorded, self._outputs),
-            outlets=Values(outlets, self._outlets),
+            outlets=outlets,
             inlets=inlets,
             inputs=inputs,
             children=children,
@@ -881,27 +825,33 @@ class Module:
         return state, self(**kwargs)
 
     def register_forward_pre_hook(self, fn):
-        """Call ``fn`` before each forward evaluation."""
+        """Call ``fn(module, inlets)`` before each forward evaluation."""
+        self._check_hook_signature(fn, ("module", "inlets"), "forward pre-hook")
         key = object()
         self._pre_hooks[key] = fn
         return RemovableHandle(self._pre_hooks, key)
 
     def register_forward_hook(self, fn):
-        """Call ``fn(module, named inlets/outlets...)`` after output computation."""
-        parameters = _named_parameters(fn)
-        if not parameters or parameters[0] != "module":
-            raise TypeError("forward hooks must name their first parameter 'module'")
-        names = parameters[1:]
-        valid = set(self._inlets) | set(self._outlets)
-        bad = [name for name in names if name not in valid]
-        if bad:
-            raise TypeError(
-                f"{self.path}: forward hook has unknown inlet/outlet {bad[0]!r}; "
-                f"valid names: {', '.join(sorted(valid)) or '<none>'}"
-            )
+        """Call ``fn(module, inlets, outlets)`` after output computation."""
+        self._check_hook_signature(fn, ("module", "inlets", "outlets"), "forward hook")
         key = object()
-        self._hooks[key] = (fn, names)
+        self._hooks[key] = fn
         return RemovableHandle(self._hooks, key)
+
+    def _check_hook_signature(self, fn, expected, kind):
+        parameters = inspect.signature(fn).parameters
+        actual = tuple(parameters)
+        invalid = actual != expected or any(
+            parameter.kind
+            not in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            or parameter.default is not inspect.Parameter.empty
+            for parameter in parameters.values()
+        )
+        if invalid:
+            raise TypeError(
+                f"{self.path}: {kind} signature must be ({', '.join(expected)}); "
+                f"got ({', '.join(actual)})"
+            )
 
     def health(self, predicted, measured):
         """Return optional equipment health; absence means no diagnostic model."""
