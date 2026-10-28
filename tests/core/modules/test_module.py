@@ -152,3 +152,35 @@ def test_recursive_parameters_state_and_hooks():
     assert visited == [second, first, plant]
     del plant.second
     assert list(plant.children()) == [first]
+
+
+def test_nested_stateful_stepping():
+    """A stateful leaf advances once through nested sequential and graph composites."""
+    from gemini.core.modules.module import Sequential
+    from gemini.core.modules.plant import GraphPlant
+
+    class Accumulator(PassThrough):
+        """State fixture accumulating elapsed seconds."""
+
+        stateful = True
+
+        def initial_state(self):
+            """Begin with no elapsed time."""
+            return 0
+
+        def step(self, state, inputs, streams_in, dt):
+            """Expose elapsed time through the scalar output."""
+            state += dt
+            return state, self({"multiplier": state}, streams_in)
+
+    seq = Sequential(Accumulator({"value": 2}))
+    graph = GraphPlant({"chain": seq}, [])
+    state = graph.initial_state()
+    streams = {"chain.inlet": Stream(m_dot=1, p=1e5, T=300)}
+    state, result = graph.step(state, {}, streams, 3)
+    assert state == {"chain": {"0": 3}}
+    assert result.outputs.root["chain"].root["0"].value == 6
+    state, result = graph.step(state, {}, streams, 2)
+    assert result.outputs.root["chain"].root["0"].value == 10
+    with pytest.raises(ValueError, match="dt"):
+        graph.step(state, {}, streams, 0)

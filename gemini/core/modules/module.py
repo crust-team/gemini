@@ -133,6 +133,8 @@ class Module(ABC):
 
     def __setattr__(self, name, value):
         """Register assigned modules and unregister replaced children."""
+        if name in {"inlets", "outlets"} and self.category != "plant":
+            raise AttributeError(f"{self.path}: equipment ports are declared on the class")
         if isinstance(value, Module):
             self.add_module(name, value)
         else:
@@ -417,14 +419,31 @@ class Sequential(Module):
             raise ValueError("Sequential requires at least one child")
         self.inlets, self.outlets = children[0].inlets, children[-1].outlets
 
-    def forward(self, inputs, streams_in):
-        """Pass each outgoing stream to the next child."""
+    def _chain(self, inputs, streams_in, state=None, dt=None):
         if inputs.root.keys() - self._children.keys():
             raise ValueError(f"{self.path}: unknown child inputs")
         stream = streams_in[self.inlets[0]]
-        outputs = {}
+        outputs, next_state = {}, {}
         for name, child in self.named_children():
-            result = child(inputs.root.get(name), {child.inlets[0]: stream})
+            inlet = {child.inlets[0]: stream}
+            if dt is not None and (child.stateful or child._children):
+                next_state[name], result = child.step(
+                    (state or {}).get(name), inputs.root.get(name), inlet, dt
+                )
+            else:
+                result = child(inputs.root.get(name), inlet)
             stream = result.streams[child.outlets[0]]
             outputs[name] = result.outputs
-        return ModuleResult(self.Outputs(outputs), {self.outlets[0]: stream})
+        return next_state or state, ModuleResult(self.Outputs(outputs), {self.outlets[0]: stream})
+
+    def forward(self, inputs, streams_in):
+        """Pass each outgoing stream to the next child."""
+        return self._chain(inputs, streams_in)[1]
+
+    def step(self, state, inputs, streams_in, dt):
+        """Advance each stateful child with its own state and validate external ports."""
+        if dt <= 0:
+            raise ValueError("dt must be positive [s]")
+        inputs = self._validate_inputs(inputs)
+        self._check_ports(streams_in, self.inlets, "inlet")
+        return self._chain(inputs, streams_in, state, dt)
