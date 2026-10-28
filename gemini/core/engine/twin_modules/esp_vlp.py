@@ -56,7 +56,7 @@ class ESPVLP(TwinModule):
             self.reservoir.params.pressure, self.reservoir.params.temperature
         ).rho_l
         mass = units.m3h_to_m3s(flow) * rho
-        _, streams = self.reservoir.compute({"m_dot": mass}, {})
+        _, streams = self.reservoir({"m_dot": mass}, {})
         intake = self.well.intake_conditions(streams["sandface"])
         result["esp_vlp_ipr_inlet_pressure"] = units.pa_to_bar(intake.p)
         p, T = (

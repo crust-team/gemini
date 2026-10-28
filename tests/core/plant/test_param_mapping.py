@@ -8,7 +8,7 @@ import pytest
 from gemini.core.engine import registry
 from gemini.core.plant import param_mapping as mapping
 
-DATA = Path(__file__).parents[3] / "datasets/geothermal_example"
+DATA = Path(__file__).parents[3] / "datasets/geothermal_doublet"
 
 
 @pytest.mark.parametrize("path", sorted(DATA.glob("*.param")), ids=lambda p: p.name)

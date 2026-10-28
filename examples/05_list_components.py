@@ -2,6 +2,6 @@
 
 import json
 
-from gemini.core.engine.registry import list_components
+from gemini.core.engine.registry import list_modules
 
-print(json.dumps(list_components(), indent=2))
+print(json.dumps(list_modules(), indent=2))

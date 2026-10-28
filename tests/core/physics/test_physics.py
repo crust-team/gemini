@@ -127,7 +127,7 @@ def test_wall_loss():
 
 def test_geometry_slice_and_fluid_overrides():
     """Measured-depth slicing conserves length and preserves property overrides."""
-    data = Path(__file__).parents[3] / "datasets/geothermal_example"
+    data = Path(__file__).parents[3] / "datasets/geothermal_doublet"
     path = geometry.build_path(geometry.load_trajectory_csv(data / "well_trajectory.csv"))
     assert path.total_length == 2800
     assert path.subpath(600, 2800).total_length + path.subpath(0, 600).total_length == 2800
