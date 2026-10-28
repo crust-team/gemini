@@ -24,5 +24,12 @@ class Blowdown(Module):
 
     def forward(self, inlet):
         """Preserve the inlet stream without implying a performance model."""
+
+        # Outputs
         self.modelled = False
-        return inlet
+
+        # Outlets
+        outlet = inlet
+
+        outlets = dict(outlet=outlet)
+        return outlets

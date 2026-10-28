@@ -99,6 +99,8 @@ class ESP(Module):
 
     def forward(self, suction, frequency):
         """Compute head and power and raise the suction-stream pressure."""
+
+        # Outputs
         self.flow = suction.volumetric_flow()
         if self.flow < 0:
             raise ValueError(f"{self.path}: reverse volume flow {self.flow} is unsupported")
@@ -106,14 +108,16 @@ class ESP(Module):
         self.power = self.power_function(self.flow, frequency)
         self.efficiency = self.efficiency_function(self.flow, self.head, self.power)
         scale = frequency / constants.ESP_REFERENCE_FREQUENCY
-        discharge = suction.with_(p=suction.p + self.head)
-        self.discharge_pressure = discharge.p
+        self.discharge_pressure = suction.p + self.head
         self.in_operating_window = self.min_flow * scale <= self.flow <= self.max_flow * scale
         self.bep_ratio = self.flow / (self.bep_flow * scale)
-        return {
-            "discharge": discharge,
-            "electricity": PowerFlow(P=self.power / self.motor_efficiency),
-        }
+
+        # Outlets
+        discharge = suction.with_(p=self.discharge_pressure)
+        electricity = PowerFlow(P=self.power / self.motor_efficiency)
+
+        outlets = dict(discharge=discharge, electricity=electricity)
+        return outlets
 
     def health(self, predicted, measured):
         """Score the worst available relative drift and the operating window."""

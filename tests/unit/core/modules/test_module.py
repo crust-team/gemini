@@ -32,8 +32,15 @@ class PassThrough(Module):
 
     def forward(self, inlet, multiplier):
         """Record the scalar product and return the stream."""
+
+        # Outputs
         self.result = self.value * multiplier
-        return inlet
+
+        # Outlets
+        outlet = inlet
+
+        outlets = dict(outlet=outlet)
+        return outlets
 
 
 def test_registration_construction_and_state():
@@ -76,7 +83,9 @@ def test_call_output_and_signature_guards():
 
         def forward(self, other):
             """Use the deliberately wrong name."""
-            return {}
+
+            outlets = dict()
+            return outlets
 
     with pytest.raises(TypeError, match="signature mismatch"):
         WrongSignature()(command=1)
@@ -111,9 +120,18 @@ def test_output_records_are_nested_and_thread_local():
 
         def forward(self, inlet):
             """Call the child and copy its recorded output."""
+
+            # Modules
             child = self.children_by_name.child(inlet=inlet)
+
+            # Outputs
             self.child_value = child.outputs.result
-            return child.outlets.outlet
+
+            # Outlets
+            outlet = child.outlets.outlet
+
+            outlets = dict(outlet=outlet)
+            return outlets
 
     result = Parent()(inlet=stream)
     assert result.outputs.child_value == 3

@@ -40,8 +40,15 @@ class Filter(Module):
 
     def forward(self, inlet):
         """Apply a quadratic clean-filter pressure loss."""
+
+        # Outputs
         self.pressure_drop = self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
-        return inlet.with_(p=inlet.p - self.pressure_drop)
+
+        # Outlets
+        outlet = inlet.with_(p=inlet.p - self.pressure_drop)
+
+        outlets = dict(outlet=outlet)
+        return outlets
 
     def health(self, predicted, measured):
         """Alarm when measured filter pressure loss exceeds the clogging limit."""

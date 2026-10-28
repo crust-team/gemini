@@ -63,7 +63,7 @@ class _Reservoir(Module):
         self.hydrostatic_dp = Output(PressureDifference)
         self.radial_bottomhole_pressure = Output(Pressure | None, optional=True)
 
-    def _record_outputs(self, flow, p_bh):
+    def _calculate_outputs(self, flow, p_bh):
         properties = self.fluid.properties(self.pressure, self.temperature)
         if self.drainage_radius == 0:
             flow_dp = skin_dp = radial = None
@@ -78,13 +78,15 @@ class _Reservoir(Module):
                 self.skin,
             )
             radial = self.pressure + flow_dp + skin_dp
-        self.bottomhole_pressure = p_bh
-        self.drawdown = self.pressure - p_bh if self.role == "production" else 0
-        self.overpressure = p_bh - self.pressure if self.role == "injection" else 0
-        self.flow_dp = flow_dp
-        self.skin_dp = skin_dp
-        self.hydrostatic_dp = hydraulics.hydrostatic_dp(properties.rho_l, self.top_depth)
-        self.radial_bottomhole_pressure = radial
+        return {
+            "bottomhole_pressure": p_bh,
+            "drawdown": self.pressure - p_bh if self.role == "production" else 0,
+            "overpressure": p_bh - self.pressure if self.role == "injection" else 0,
+            "flow_dp": flow_dp,
+            "skin_dp": skin_dp,
+            "hydrostatic_dp": hydraulics.hydrostatic_dp(properties.rho_l, self.top_depth),
+            "radial_bottomhole_pressure": radial,
+        }
 
     @staticmethod
     def estimate_pressure(flows, bottomhole_pressures) -> tuple[float, float]:
@@ -153,12 +155,26 @@ class ProductionReservoir(_Reservoir):
 
     def forward(self, m_dot):
         """Apply the linear production IPR and emit the sandface stream."""
+
+        # Outputs
         if self.productivity_index is None:
             raise ValueError(f"{self.path}: productivity_index is required")
         flow = m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
         p_bh = self.pressure - flow / self.productivity_index
-        self._record_outputs(flow, p_bh)
-        return Stream(m_dot=m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
+        calculated = self._calculate_outputs(flow, p_bh)
+        self.bottomhole_pressure = calculated["bottomhole_pressure"]
+        self.drawdown = calculated["drawdown"]
+        self.overpressure = calculated["overpressure"]
+        self.flow_dp = calculated["flow_dp"]
+        self.skin_dp = calculated["skin_dp"]
+        self.hydrostatic_dp = calculated["hydrostatic_dp"]
+        self.radial_bottomhole_pressure = calculated["radial_bottomhole_pressure"]
+
+        # Outlets
+        sandface = Stream(m_dot=m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
+
+        outlets = dict(sandface=sandface)
+        return outlets
 
 
 class InjectionReservoir(_Reservoir):
@@ -173,9 +189,20 @@ class InjectionReservoir(_Reservoir):
 
     def forward(self, sandface):
         """Calculate required bottomhole pressure from the sandface flow."""
+
+        # Outputs
         if self.injectivity_index is None:
             raise ValueError(f"{self.path}: injectivity_index is required")
         flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
         p_bh = self.pressure + flow / self.injectivity_index
-        self._record_outputs(flow, p_bh)
-        return {}
+        calculated = self._calculate_outputs(flow, p_bh)
+        self.bottomhole_pressure = calculated["bottomhole_pressure"]
+        self.drawdown = calculated["drawdown"]
+        self.overpressure = calculated["overpressure"]
+        self.flow_dp = calculated["flow_dp"]
+        self.skin_dp = calculated["skin_dp"]
+        self.hydrostatic_dp = calculated["hydrostatic_dp"]
+        self.radial_bottomhole_pressure = calculated["radial_bottomhole_pressure"]
+
+        outlets = dict()
+        return outlets

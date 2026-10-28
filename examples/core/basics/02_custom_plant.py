@@ -22,6 +22,17 @@ class TreatmentTrain(gm.modules.Module):
 
     def forward(self, inlet):
         """Apply each filter in diagram order."""
+
+        # Modules
+        filtered = self._apply_filters(inlet)
+
+        # Outlets
+        outlet = filtered
+
+        outlets = dict(outlet=outlet)
+        return outlets
+
+    def _apply_filters(self, inlet):
         stream = inlet
         for filter_ in self.filters:
             stream = filter_(inlet=stream).outlets.outlet
