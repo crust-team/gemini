@@ -54,7 +54,7 @@ class InjectionWellTwin(TwinModule):
         stream = Stream(
             m_dot=-units.m3h_to_m3s(flow) * rho, p=units.bar_to_pa(p), T=units.c_to_k(T)
         )
-        out, _ = self.well.compute({}, {"wellhead": stream})
+        out, _ = self.well({}, {"wellhead": stream})
         index = self.reservoir.injectivity_from_measurements(
             units.m3h_to_m3s(flow), out.bottomhole_pressure
         )

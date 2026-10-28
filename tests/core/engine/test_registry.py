@@ -1,4 +1,4 @@
-"""Component discovery, identity and metadata contracts."""
+"""Module discovery, identity and metadata contracts."""
 
 import inspect
 import json
@@ -11,20 +11,20 @@ from gemini.core.engine import registry
 
 def test_every_component_module_is_discovered():
     """Every equipment file contributes concrete components with unique serialisable schemas."""
-    schemas = registry.list_components()
+    schemas = registry.list_modules()
     names = [s["name"] for s in schemas]
     assert len(names) == len(set(names))
-    modules = {registry.get_component(name).__module__ for name in names}
-    root = Path(__file__).parents[3] / "gemini/components"
+    modules = {registry.get(name).__module__ for name in names}
+    root = Path(__file__).parents[3] / "gemini/core/modules"
     expected = {
-        "gemini.components." + ".".join(p.relative_to(root).with_suffix("").parts)
+        "gemini.core.modules." + ".".join(p.relative_to(root).with_suffix("").parts)
         for p in root.rglob("*.py")
-        if p.name != "__init__.py"
+        if p.name not in {"__init__.py", "module.py", "plant.py"}
     }
     assert modules == expected
     for schema in schemas:
         json.dumps(schema)
-        cls = registry.get_component(schema["name"])
+        cls = registry.get(schema["name"])
         assert not inspect.isabstract(cls)
         for model in (cls.Params, cls.Inputs, cls.Outputs):
             for field in model.model_fields.values():

@@ -1,0 +1,429 @@
+"""Composable, validated equipment modules and recursive parameter/state APIs."""
+
+import inspect
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import wraps
+from typing import Any, ClassVar, Literal, NamedTuple
+
+from pydantic import BaseModel, ConfigDict, RootModel
+
+from gemini.core.base.stream import Stream
+from gemini.core.physics import fluid
+
+
+class ModuleResult(NamedTuple):
+    """Validated outputs and outgoing SI streams from one evaluation."""
+
+    outputs: BaseModel
+    streams: dict[str, Stream]
+
+
+@dataclass(frozen=True)
+class ParamRef:
+    """A calibratable parameter's location, current value and numeric bounds."""
+
+    path: str
+    module_path: str
+    field: str
+    value: Any
+    bounds: tuple[float, float] | None
+
+
+class HookHandle:
+    """Removable registration; removal is idempotent."""
+
+    def __init__(self, hooks, key):
+        """Keep only the owning hook collection and registration key."""
+        self._hooks, self._key = hooks, key
+
+    def remove(self):
+        """Stop calling this hook."""
+        self._hooks.pop(self._key, None)
+
+
+class EmptyModel(BaseModel):
+    """Empty contract for composites and equipment without operating controls."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+
+class ChildInputs(RootModel[dict[str, Any]]):
+    """Operating controls keyed by immediate child name."""
+
+    root: dict[str, Any] = {}
+
+
+class ChildOutputs(RootModel[dict[str, BaseModel]]):
+    """Equipment outputs keyed by immediate child name."""
+
+
+class Module(ABC):
+    """Equipment contract with recursive composition, parameters, state and hooks."""
+
+    name: ClassVar[str]
+    category: ClassVar[str]
+    description: ClassVar[str] = "Composable equipment model."
+    Params = EmptyModel
+    Inputs = EmptyModel
+    Outputs = EmptyModel
+    inlets: ClassVar[tuple[str, ...]] = ()
+    outlets: ClassVar[tuple[str, ...]] = ()
+    soft_sensors: ClassVar[tuple[str, ...]] = ()
+    calibratable: ClassVar[tuple[str, ...]] = ()
+    stateful: ClassVar[bool] = False
+    fidelity: ClassVar[Literal["model", "simple", "passthrough"]] = "model"
+
+    def __init_subclass__(cls, **kwargs):
+        """Check metadata and retain validation for direct forward calls."""
+        super().__init_subclass__(**kwargs)
+        if inspect.isabstract(cls):
+            return
+        for key in ("name", "category", "description", "Params", "Inputs", "Outputs"):
+            if not hasattr(cls, key):
+                raise TypeError(f"{cls.__name__} must define {key}")
+        for key in ("Params", "Inputs", "Outputs"):
+            if not issubclass(getattr(cls, key), BaseModel):
+                raise TypeError(f"{cls.__name__}.{key} must be a Pydantic model")
+        if cls.fidelity not in {"model", "simple", "passthrough"}:
+            raise TypeError(f"{cls.name}: unknown fidelity {cls.fidelity}")
+        for names, model in ((cls.soft_sensors, cls.Outputs), (cls.calibratable, cls.Params)):
+            unknown = set(names) - model.model_fields.keys()
+            if unknown:
+                raise TypeError(f"{cls.name}: unknown schema fields {sorted(unknown)}")
+        method = cls.__dict__.get("forward")
+        if method is not None:
+
+            @wraps(method)
+            def checked(self, inputs, streams_in):
+                inputs = self._validate_inputs(inputs)
+                self._check_ports(streams_in, self.inlets, "inlet")
+                result = method(self, inputs, streams_in)
+                if not isinstance(result, ModuleResult) or not isinstance(
+                    result.outputs, self.Outputs
+                ):
+                    raise TypeError(
+                        f"{self.path}: forward must return ModuleResult "
+                        f"with {self.Outputs.__name__}"
+                    )
+                self._check_ports(result.streams, self.outlets, "outlet")
+                return result
+
+            cls.forward = checked
+
+    def __init__(self, params: dict | BaseModel | None = None, *, fluid: str = "brine"):
+        """Validate SI parameters and initialise independent child/hook collections."""
+        object.__setattr__(self, "_children", {})
+        object.__setattr__(self, "_pre_hooks", {})
+        object.__setattr__(self, "_hooks", {})
+        object.__setattr__(self, "_path", "")
+        self.params = self.Params.model_validate({} if params is None else params)
+        self.fluid_name = fluid
+        self.fluid = self._resolve_fluid()
+
+    @property
+    def path(self):
+        """Return the assigned tree path or standalone equipment name."""
+        return self._path or self.name
+
+    def _set_path(self, path):
+        object.__setattr__(self, "_path", path)
+        for name, child in self.named_children():
+            child._set_path(f"{path}.{name}" if path else name)
+
+    def __setattr__(self, name, value):
+        """Register assigned modules and unregister replaced children."""
+        if isinstance(value, Module):
+            self.add_module(name, value)
+        else:
+            if "_children" in self.__dict__:
+                self._children.pop(name, None)
+            object.__setattr__(self, name, value)
+
+    def __delattr__(self, name):
+        """Remove deleted child attributes from traversal."""
+        object.__delattr__(self, name)
+        self._children.pop(name, None)
+
+    def add_module(self, name, module):
+        """Register a child with an unambiguous local name, rejecting ownership cycles."""
+        if not isinstance(module, Module):
+            raise TypeError("child must be a Module")
+        if not name or "." in name or name.startswith("_"):
+            raise ValueError(f"Invalid child name {name!r}")
+        if not hasattr(self, "_children"):
+            raise RuntimeError("Call Module.__init__ before assigning children")
+        if name not in self._children and hasattr(self, name):
+            raise ValueError(f"Child name {name!r} conflicts with an existing attribute")
+        if any(item is self for item in module.modules()):
+            raise ValueError("Module ownership cannot contain a cycle")
+        self._children[name] = module
+        object.__setattr__(self, name, module)
+        module._set_path(f"{self._path}.{name}" if self._path else name)
+
+    def named_children(self):
+        """Iterate registered immediate children in insertion order."""
+        yield from self._children.items()
+
+    def children(self):
+        """Iterate immediate child modules."""
+        yield from self._children.values()
+
+    def named_modules(self, prefix=""):
+        """Walk self and descendants once, using dotted paths."""
+        seen = set()
+
+        def walk(module, path):
+            if id(module) in seen:
+                return
+            seen.add(id(module))
+            yield path, module
+            for name, child in module.named_children():
+                yield from walk(child, f"{path}.{name}" if path else name)
+
+        yield from walk(self, prefix)
+
+    def modules(self):
+        """Walk self and all unique descendants."""
+        for _, module in self.named_modules():
+            yield module
+
+    def get_submodule(self, path):
+        """Resolve a dotted descendant path; the empty path denotes self."""
+        module = self
+        for part in path.split(".") if path else ():
+            if part not in module._children:
+                raise ValueError(f"{self.path}: unknown module path {path!r}")
+            module = module._children[part]
+        return module
+
+    def apply(self, fn):
+        """Apply a visitor to every module, descendants before parents."""
+        for module in reversed(list(self.modules())):
+            fn(module)
+        return self
+
+    def _resolve_fluid(self):
+        overrides = {}
+        for field, key in (("liquid_density", "RHOL"), ("liquid_viscosity", "VISL")):
+            value = getattr(self.params, field, None)
+            if value is not None:
+                overrides[key] = value
+        return fluid.get_fluid(self.fluid_name, **overrides)
+
+    def update_params(self, **changes):
+        """Revalidate design changes before replacing the parameter snapshot."""
+        self.params = self.Params.model_validate(self.params.model_dump() | changes)
+        self.fluid = self._resolve_fluid()
+
+    def _validate_inputs(self, inputs):
+        try:
+            return self.Inputs.model_validate({} if inputs is None else inputs)
+        except ValueError as exc:
+            exc.add_note(f"Module path: {self.path}")
+            raise
+
+    def _check_ports(self, streams, expected, kind):
+        missing, extra = set(expected) - streams.keys(), streams.keys() - set(expected)
+        if missing or extra:
+            raise ValueError(
+                f"{self.path}: {kind} ports missing={sorted(missing)}, extra={sorted(extra)}"
+            )
+        if any(not isinstance(s, Stream) for s in streams.values()):
+            raise TypeError(f"{self.path}: {kind} ports must contain Stream objects")
+
+    @abstractmethod
+    def forward(self, inputs, streams_in) -> ModuleResult:
+        """Calculate SI outputs and outgoing streams."""
+
+    def __call__(self, inputs=None, streams_in=None, **streams):
+        """Validate a forward evaluation and notify observers in registration order."""
+        inputs = self._validate_inputs(inputs)
+        inlet = dict(streams_in or {})
+        overlap = inlet.keys() & streams.keys()
+        if overlap:
+            raise ValueError(f"{self.path}: duplicate streams {sorted(overlap)}")
+        inlet.update(streams)
+        self._check_ports(inlet, self.inlets, "inlet")
+        for fn in tuple(self._pre_hooks.values()):
+            fn(self, inputs, inlet)
+        result = self.forward(inputs, inlet)
+        for fn in tuple(self._hooks.values()):
+            fn(self, inputs, inlet, result)
+        return result
+
+    def named_params(self, recurse=True):
+        """Iterate parameter values with their owning module paths."""
+        for path, module in self.named_modules() if recurse else [("", self)]:
+            for field in type(module.params).model_fields:
+                yield f"{path}.{field}" if path else field, getattr(module.params, field)
+
+    def calibratable_params(self, recurse=True):
+        """Return fit parameters and Pydantic scalar bounds (inclusive numerical limits)."""
+        refs = []
+        for path, module in self.named_modules() if recurse else [("", self)]:
+            for field in module.calibratable:
+                low, high = float("-inf"), float("inf")
+                bounded = False
+                for constraint in module.Params.model_fields[field].metadata:
+                    for key in ("gt", "ge", "lt", "le"):
+                        value = getattr(constraint, key, None)
+                        if value is not None:
+                            bounded = True
+                            if key in ("gt", "ge"):
+                                low = max(low, value)
+                            else:
+                                high = min(high, value)
+                refs.append(
+                    ParamRef(
+                        f"{path}.{field}" if path else field,
+                        path,
+                        field,
+                        getattr(module.params, field),
+                        (low, high) if bounded else None,
+                    )
+                )
+        return refs
+
+    def _param_owner(self, path):
+        module_path, _, field = path.rpartition(".")
+        module = self.get_submodule(module_path)
+        if field not in module.Params.model_fields:
+            raise ValueError(f"{self.path}: unknown parameter {path!r}")
+        return module, field
+
+    def get_param(self, path):
+        """Read a parameter using a dotted path."""
+        module, field = self._param_owner(path)
+        return getattr(module.params, field)
+
+    def set_param(self, path, value):
+        """Replace a parameter only after its owning Params validates."""
+        module, field = self._param_owner(path)
+        module.update_params(**{field: value})
+
+    def state_dict(self):
+        """Return JSON-safe design snapshots, including the root module."""
+        return {
+            path: {"type": module.name, "params": module.params.model_dump(mode="json")}
+            for path, module in self.named_modules()
+        }
+
+    def load_state_dict(self, state, strict=True):
+        """Validate all matching snapshots before atomically applying parameter changes."""
+        modules = dict(self.named_modules())
+        if strict and state.keys() != modules.keys():
+            raise ValueError(
+                f"{self.path}: state paths differ; missing={modules.keys() - state.keys()}, "
+                f"unexpected={state.keys() - modules.keys()}"
+            )
+        pending = []
+        for path in state.keys() & modules.keys():
+            module, entry = modules[path], state[path]
+            if entry["type"] != module.name:
+                raise ValueError(f"{module.path}: state type {entry['type']!r} != {module.name!r}")
+            pending.append((module, module.Params.model_validate(entry["params"])))
+        for module, params in pending:
+            module.params = params
+            module.fluid = module._resolve_fluid()
+
+    def initial_state(self):
+        """Return independent states for stateful descendants, or None for a leaf."""
+        states = {
+            name: child.initial_state()
+            for name, child in self.named_children()
+            if child.stateful or child._children
+        }
+        return states or None
+
+    def step(self, state, inputs, streams_in, dt):
+        """Evaluate a stateless step; stateful equipment overrides this method."""
+        if dt <= 0:
+            raise ValueError("dt must be positive [s]")
+        return state, self(inputs, streams_in)
+
+    def register_forward_pre_hook(self, fn):
+        """Observe validated inputs before evaluation."""
+        key = object()
+        self._pre_hooks[key] = fn
+        return HookHandle(self._pre_hooks, key)
+
+    def register_forward_hook(self, fn):
+        """Observe validated results after evaluation."""
+        key = object()
+        self._hooks[key] = fn
+        return HookHandle(self._hooks, key)
+
+    def health(self, predicted, measured):
+        """Return optional equipment health; absence means no diagnostic model."""
+        return None
+
+    def health_report(self, results, measured):
+        """Collect available health diagnostics recursively by module path."""
+        report = {}
+        for path, module in self.named_modules():
+            if path in results:
+                health = module.health(results[path].outputs, measured.get(path, {}))
+                if health is not None:
+                    report[path] = health
+        return report
+
+    def capex(self):
+        """Return optional capital expenditure when a correlation is available."""
+        return None
+
+    @classmethod
+    def schema(cls):
+        """Describe identity, fidelity, ports and all validated contracts."""
+        return dict(
+            name=cls.name,
+            category=cls.category,
+            description=cls.description,
+            fidelity=cls.fidelity,
+            inlets=cls.inlets,
+            outlets=cls.outlets,
+            params=cls.Params.model_json_schema(),
+            inputs=cls.Inputs.model_json_schema(),
+            outputs=cls.Outputs.model_json_schema(),
+            soft_sensors=cls.soft_sensors,
+            calibratable=cls.calibratable,
+            stateful=cls.stateful,
+        )
+
+
+class Sequential(Module):
+    """Chain single-inlet/single-outlet modules with controls keyed by index or name."""
+
+    name = "sequential"
+    category = "plant"
+    Inputs = ChildInputs
+    Outputs = ChildOutputs
+
+    def __init__(self, *modules):
+        """Accept positional modules or a single ordered mapping of names to modules."""
+        super().__init__()
+        items = (
+            modules[0].items()
+            if len(modules) == 1 and isinstance(modules[0], dict)
+            else enumerate(modules)
+        )
+        for name, module in items:
+            if len(module.inlets) != 1 or len(module.outlets) != 1:
+                raise ValueError("Sequential children require exactly one inlet and outlet")
+            self.add_module(str(name), module)
+        children = list(self.children())
+        if not children:
+            raise ValueError("Sequential requires at least one child")
+        self.inlets, self.outlets = children[0].inlets, children[-1].outlets
+
+    def forward(self, inputs, streams_in):
+        """Pass each outgoing stream to the next child."""
+        if inputs.root.keys() - self._children.keys():
+            raise ValueError(f"{self.path}: unknown child inputs")
+        stream = streams_in[self.inlets[0]]
+        outputs = {}
+        for name, child in self.named_children():
+            result = child(inputs.root.get(name), {child.inlets[0]: stream})
+            stream = result.streams[child.outlets[0]]
+            outputs[name] = result.outputs
+        return ModuleResult(self.Outputs(outputs), {self.outlets[0]: stream})

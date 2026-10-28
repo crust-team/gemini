@@ -49,7 +49,7 @@ class ESPTheoretical(TwinModule):
                 T=300,
                 p=units.bar_to_pa(inlet) if inlet is not None else 0,
             )
-            out, _ = self.pump.compute({"frequency": frequency}, {"suction": suction})
+            out, _ = self.pump({"frequency": frequency}, {"suction": suction})
             # Preserve the float32 Pa-to-bar conversion performed before the old database write.
             head = float(units.pa_to_bar(np.float32(out.head)))
             power = out.power

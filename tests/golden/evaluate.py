@@ -3,14 +3,14 @@
 import json
 from pathlib import Path
 
-from gemini.components.pumps import ESP
-from gemini.components.subsurface import (
+from gemini.core.base.stream import Stream
+from gemini.core.modules.pumps import ESP
+from gemini.core.modules.subsurface import (
     InjectionReservoir,
     InjectionWell,
     ProductionReservoir,
     ProductionWell,
 )
-from gemini.core.base.stream import Stream
 from gemini.core.physics import (
     chemistry,
     corrosion,
@@ -30,7 +30,7 @@ def evaluate():
         p = case.get("parameters", {})
         u = case["inputs"]
         if name.startswith("esp_"):
-            output, _ = ESP(p).compute(
+            output, _ = ESP(p)(
                 {"frequency": u["pump_freq"]},
                 {"suction": Stream(m_dot=u["pump_flow"] * 1000, T=300, p=1e5)},
             )
@@ -55,10 +55,10 @@ def evaluate():
             )
             if name == "ipr_injection":
                 c = InjectionReservoir(params)
-                out, _ = c.compute({}, {"sandface": Stream(m_dot=u["flow"] * 1000, T=300, p=23e6)})
+                out, _ = c({}, {"sandface": Stream(m_dot=u["flow"] * 1000, T=300, p=23e6)})
                 result = dict(bottomhole_pressure=out.bottomhole_pressure)
             elif name == "ipr_production":
-                out, _ = ProductionReservoir(params).compute({"m_dot": u["flow"] * 1000}, {})
+                out, _ = ProductionReservoir(params)({"m_dot": u["flow"] * 1000}, {})
                 result = dict(bottomhole_pressure=out.bottomhole_pressure)
             elif name == "injectivity":
                 result = dict(
@@ -77,9 +77,7 @@ def evaluate():
                     liquid_viscosity=u["viscosity"],
                     skin=u["skin_factor"],
                 )
-                out, _ = ProductionReservoir(params).compute(
-                    {"m_dot": u["flow"] * u["density"]}, {}
-                )
+                out, _ = ProductionReservoir(params)({"m_dot": u["flow"] * u["density"]}, {})
                 result = dict(
                     Hydrostatic_dp=out.hydrostatic_dp,
                     skin_dp=out.skin_dp,
@@ -103,9 +101,9 @@ def evaluate():
                 if name == "well_production"
                 else (InjectionWell, "wellhead")
             )
-            output, streams = cls(
-                dict(path=path, soil_temperature=u["temperature_ambient"])
-            ).compute({}, {port: stream})
+            output, streams = cls(dict(path=path, soil_temperature=u["temperature_ambient"]))(
+                {}, {port: stream}
+            )
             stream = next(iter(streams.values()))
             result = dict(
                 pressure_output=stream.p,

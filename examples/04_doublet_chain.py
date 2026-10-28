@@ -3,19 +3,19 @@
 from functools import partial
 from pathlib import Path
 
-from gemini.components.heat import HeatExchanger
-from gemini.components.pumps import ESP
-from gemini.components.subsurface import (
+from gemini.core.base.stream import Stream
+from gemini.core.modules.heat import HeatExchanger
+from gemini.core.modules.pumps import ESP
+from gemini.core.modules.subsurface import (
     InjectionReservoir,
     InjectionWell,
     ProductionReservoir,
     ProductionWell,
 )
-from gemini.core.base.stream import Stream
 from gemini.core.physics import fluid, units
 from gemini.core.plant import param_mapping as mapping
 
-DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_example"
+DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
 
 
 def read(name):
@@ -58,12 +58,12 @@ receiving = InjectionReservoir(
     ),
     fluid="example_brine",
 )
-_, streams = production.compute({"m_dot": units.m3h_to_m3s(130) * rp["liquid_density"]}, {})
+_, streams = production({"m_dot": units.m3h_to_m3s(130) * rp["liquid_density"]}, {})
 stream = streams["sandface"]
 show("Reservoir sandface", stream)
 stream = well.intake_conditions(stream)
 show("ESP intake", stream)
-_, streams = pump.compute({"frequency": 60}, {"suction": stream})
+_, streams = pump({"frequency": 60}, {"suction": stream})
 stream = streams["discharge"]
 show("ESP discharge", stream)
 stream = well.wellhead_from_discharge(stream)
@@ -72,14 +72,14 @@ secondary = Stream(
     m_dot=units.m3h_to_m3s(160) * 1000, T=units.c_to_k(20), p=units.bar_to_pa(5), fluid="water"
 )
 show("Secondary inlet", secondary)
-_, streams = exchanger.compute({}, {"hot_in": stream, "cold_in": secondary})
+_, streams = exchanger({}, {"hot_in": stream, "cold_in": secondary})
 stream = streams["hot_out"]
 show("HEX primary outlet", stream)
 show("HEX secondary outlet", streams["cold_out"])
-_, streams = injection.compute({}, {"wellhead": stream})
+_, streams = injection({}, {"wellhead": stream})
 stream = streams["bottom"]
 show("Injection sandface", stream)
-out, _ = receiving.compute({}, {"sandface": stream})
+out, _ = receiving({}, {"sandface": stream})
 print(f"Required injection BHP: {units.pa_to_bar(out.bottomhole_pressure):.3f} bar")
 print(
     "This is an imposed-flow chain; a network solver would balance the injection pressure residual."

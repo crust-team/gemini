@@ -4,18 +4,19 @@ import importlib
 import inspect
 import pkgutil
 
-from gemini.core.base.component import Component
+from gemini.core.modules.module import Module
 
 
-def _discover() -> dict[str, type[Component]]:
-    package = importlib.import_module("gemini.components")
+def _discover() -> dict[str, type[Module]]:
+    package = importlib.import_module("gemini.core.modules")
     discovered = {}
     for info in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
         module = importlib.import_module(info.name)
         for _, cls in inspect.getmembers(module, inspect.isclass):
             if (
-                not issubclass(cls, Component)
+                not issubclass(cls, Module)
                 or inspect.isabstract(cls)
+                or cls.category == "plant"
                 or cls.__module__ != module.__name__
             ):
                 continue
@@ -25,22 +26,22 @@ def _discover() -> dict[str, type[Component]]:
     return discovered
 
 
-_COMPONENTS = _discover()
+_MODULES = _discover()
 
 
-def list_components() -> list[dict]:
+def list_modules() -> list[dict]:
     """Return deterministic JSON-serialisable equipment schemas."""
-    return [_COMPONENTS[name].schema() for name in sorted(_COMPONENTS)]
+    return [_MODULES[name].schema() for name in sorted(_MODULES)]
 
 
-def get_component(name: str) -> type[Component]:
+def get(name: str) -> type[Module]:
     """Resolve a component name or raise a clear configuration error."""
     try:
-        return _COMPONENTS[name]
+        return _MODULES[name]
     except KeyError as exc:
         raise ValueError(f"Unknown component {name!r}") from exc
 
 
-def create(name: str, params: dict, *, fluid: str = "brine") -> Component:
+def create(name: str, params: dict, *, fluid: str = "brine") -> Module:
     """Construct a validated component with SI parameters and a named fluid model."""
-    return get_component(name)(params, fluid=fluid)
+    return get(name)(params, fluid=fluid)
