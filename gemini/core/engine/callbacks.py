@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 
+from pydantic_core import to_jsonable_python
+
 
 class Callback:
     """Override any lifecycle hook; callbacks run in registration order between steps."""
@@ -54,16 +56,21 @@ class EventLog(Callback):
         for path, module in plant.named_modules():
             module_path = path or plant.path
 
-            def before(module, inputs, streams, path=module_path):
-                self._starts[path] = perf_counter()
+            def before(module, path=module_path):
+                inputs = dict(module._current_inlets()) | {
+                    name: getattr(module, name) for name in module.inputs()
+                }
+                self._starts[path] = perf_counter(), to_jsonable_python(inputs)
 
-            def after(module, inputs, streams, result, path=module_path):
-                start = self._starts.pop(path)
+            def after(module, outlets, path=module_path):
+                start, inputs = self._starts.pop(path)
                 self.log(
                     "forward",
                     module_path=path,
                     inputs=inputs,
-                    outputs=result.outputs.model_dump(mode="json"),
+                    outputs=to_jsonable_python(
+                        {name: getattr(module, name) for name in module.outputs()}
+                    ),
                     duration_ms=(perf_counter() - start) * 1000,
                 )
 
