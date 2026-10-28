@@ -1,7 +1,6 @@
 """Validated time series for exogenous operating inputs, in SI units."""
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -61,22 +60,20 @@ class Profile(BaseModel):
         return self
 
     @classmethod
-    def from_csv(cls, path: str | Path, column, unit, time_column="Timestamp", tz=None):
-        """Read comma/semicolon CSV, localise naive times and convert the selected column to SI."""
-        unit_in = unit
-        if unit_in not in _UNITS:
-            raise ValueError(f"Unsupported profile unit {unit_in!r}")
-        frame = pd.read_csv(path, sep=None, engine="python")
-        index = pd.DatetimeIndex(pd.to_datetime(frame[time_column]))
+    def from_series(cls, series, unit, tz="UTC"):
+        """Convert an in-memory pandas Series in a supported raw unit to an SI profile."""
+        if unit not in _UNITS:
+            raise ValueError(f"Unsupported profile unit {unit!r}")
+        index = pd.DatetimeIndex(pd.to_datetime(series.index))
         if index.tz is None:
-            index = index.tz_localize(tz or "UTC", ambiguous="raise", nonexistent="raise")
-        quantity, unit = _UNITS[unit_in]
+            index = index.tz_localize(tz, ambiguous="raise", nonexistent="raise")
+        quantity, si_unit = _UNITS[unit]
         return cls(
-            name=column,
+            name=series.name or "profile",
             quantity=quantity,
-            unit=unit,
-            index=index.to_pydatetime().tolist(),
-            values=[to_si(v, unit_in) for v in frame[column]],
+            unit=si_unit,
+            index=index.tz_convert("UTC").to_pydatetime().tolist(),
+            values=[to_si(value, unit) for value in series.to_numpy()],
         )
 
     @classmethod

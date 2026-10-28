@@ -1,33 +1,6 @@
-"""Observe actual stream identities and compare explicit plant wiring with GEMINI diagrams."""
+"""Observe actual stream identities through a handwritten module tree."""
 
-import json
-from pathlib import Path
-
-from gemini.core.modules.plants.geothermal_example import GeothermalExamplePlant
 from gemini.core.types import Stream
-
-GEMINI_PORTS = {
-    "production_reservoir": {"out": "sandface"},
-    "injection_reservoir": {"in": "sandface"},
-    "productionwell": {"in": "bottom", "out": "wellhead"},
-    "injectionwell": {"in": "wellhead", "out": "bottom"},
-    "esp": {"in": "suction", "out": "discharge"},
-    "injectionpump": {"in": "suction", "out": "discharge"},
-    "filter": {"in": "inlet", "out": "outlet"},
-    "degasser": {"in": "inlet", "out1": "liquid", "out2": "gas"},
-    "heatexchanger": {
-        "PrimIn": "hot_in",
-        "PrimOut": "hot_out",
-        "SecIn": "cold_in",
-        "SecOut": "cold_out",
-    },
-}
-TYPES = {
-    "production_well": "productionwell",
-    "injection_well": "injectionwell",
-    "heat_exchanger": "heatexchanger",
-    "injection_pump": "injectionpump",
-}
 
 
 def trace_wiring(plant, inputs, streams_in=None):
@@ -63,51 +36,3 @@ def trace_wiring(plant, inputs, streams_in=None):
         for handle in handles:
             handle.remove()
     return edges
-
-
-def check_against_diagram(traced, diagram_json, node_map):
-    """Return missing/extra links, expanding the example's explicitly declared buried riser.
-
-    Diagram nodes must have `properties.name` and `properties.type`. Node maps use
-    .param stems. No diagram edge constructs or changes the evaluated plant.
-    """
-    if isinstance(diagram_json, (str, Path)):
-        diagram_json = json.loads(Path(diagram_json).read_text())
-    nodes = {
-        cell["id"]: cell["properties"]
-        for cell in diagram_json["cells"]
-        if cell["type"] == "devs.Model"
-    }
-    links = [cell for cell in diagram_json["cells"] if cell["type"] == "devs.Link"]
-    incoming = {link["target"]["id"] for link in links}
-    expected, errors = set(), []
-    expansions = (
-        GeothermalExamplePlant.DIAGRAM_EXPANSIONS
-        if node_map == GeothermalExamplePlant.GEMINI_NODES
-        else {}
-    )
-    for link in links:
-        try:
-            endpoints = []
-            for side in ("source", "target"):
-                endpoint = link[side]
-                node = nodes[endpoint["id"]]
-                kind = TYPES.get(node["type"], node["type"])
-                if kind == "reservoir":
-                    kind = (
-                        "injection_reservoir"
-                        if endpoint["id"] in incoming
-                        else "production_reservoir"
-                    )
-                endpoints.append((node_map[node["name"]], GEMINI_PORTS[kind][endpoint["port"]]))
-            source, target = endpoints
-            if source in expansions:
-                path, inlet, outlet = expansions[source]
-                expected.add((*source, path, inlet))
-                source = (path, outlet)
-            expected.add((*source, *target))
-        except KeyError as exc:
-            errors.append(f"Unmapped diagram endpoint: {exc}")
-    errors.extend(f"Missing connection: {edge}" for edge in sorted(expected - traced))
-    errors.extend(f"Unexpected connection: {edge}" for edge in sorted(traced - expected))
-    return errors

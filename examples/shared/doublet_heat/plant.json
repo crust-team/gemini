@@ -1,0 +1,1208 @@
+{
+  "version": 1,
+  "plant_type": "examples.shared.doublet_heat.plant:DoubletHeatPlant",
+  "modules": {
+    "": {
+      "class": "examples.shared.doublet_heat.plant:DoubletHeatPlant",
+      "type": "doublet_heat",
+      "params": {},
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": null,
+          "params": {}
+        }
+      ],
+      "param_overrides": {},
+      "active_from": null,
+      "bindings": {
+        "degasser": {
+          "inputs": {},
+          "streams": {
+            "inlet": {
+              "m_dot": {
+                "column": "degasser.inlet.m_dot",
+                "unit": "m3/s"
+              },
+              "p": {
+                "column": "degasser.inlet.p",
+                "unit": "Pa"
+              },
+              "T": {
+                "column": "degasser.inlet.T",
+                "unit": "K"
+              }
+            }
+          },
+          "measured": {},
+          "state": {}
+        },
+        "doublet.esp": {
+          "inputs": {
+            "frequency": {
+              "column": "doublet.esp.frequency",
+              "unit": "Hz"
+            }
+          },
+          "streams": {
+            "suction": {
+              "m_dot": {
+                "column": "doublet.esp.suction.m_dot",
+                "unit": "m3/s"
+              },
+              "p": {
+                "column": "doublet.esp.suction.p",
+                "unit": "Pa"
+              },
+              "T": {
+                "column": "doublet.esp.suction.T",
+                "unit": "K"
+              }
+            }
+          },
+          "measured": {
+            "head": {
+              "column": "doublet.esp.head",
+              "unit": "Pa"
+            },
+            "discharge_pressure": {
+              "column": "doublet.esp.discharge_pressure",
+              "unit": "Pa"
+            },
+            "power": {
+              "column": "doublet.esp.power",
+              "unit": "W"
+            }
+          },
+          "state": {}
+        },
+        "filter_return": {
+          "inputs": {},
+          "streams": {
+            "inlet": {
+              "m_dot": {
+                "column": "filter_return.inlet.m_dot",
+                "unit": "m3/s"
+              },
+              "p": {
+                "column": "filter_return.inlet.p",
+                "unit": "Pa"
+              },
+              "T": {
+                "column": "filter_return.inlet.T",
+                "unit": "K"
+              }
+            }
+          },
+          "measured": {
+            "pressure_drop": {
+              "column": "filter_return.pressure_drop",
+              "unit": "Pa"
+            }
+          },
+          "state": {}
+        },
+        "filter_hot": {
+          "inputs": {},
+          "streams": {
+            "inlet": {
+              "m_dot": {
+                "column": "filter_hot.inlet.m_dot",
+                "unit": "m3/s"
+              },
+              "p": {
+                "column": "filter_hot.inlet.p",
+                "unit": "Pa"
+              },
+              "T": {
+                "column": "filter_hot.inlet.T",
+                "unit": "K"
+              }
+            }
+          },
+          "measured": {
+            "pressure_drop": {
+              "column": "filter_hot.pressure_drop",
+              "unit": "Pa"
+            }
+          },
+          "state": {}
+        },
+        "heat_exchanger": {
+          "inputs": {},
+          "streams": {
+            "hot_in": {
+              "m_dot": {
+                "column": "heat_exchanger.hot_in.m_dot",
+                "unit": "m3/s"
+              },
+              "p": {
+                "column": "heat_exchanger.hot_in.p",
+                "unit": "Pa"
+              },
+              "T": {
+                "column": "heat_exchanger.hot_in.T",
+                "unit": "K"
+              }
+            },
+            "cold_in": {
+              "m_dot": {
+                "column": "heat_exchanger.cold_in.m_dot",
+                "unit": "m3/s"
+              },
+              "T": {
+                "column": "heat_exchanger.cold_in.T",
+                "unit": "K"
+              }
+            }
+          },
+          "measured": {
+            "hot_out_T": {
+              "column": "heat_exchanger.hot_out_T",
+              "unit": "K"
+            },
+            "cold_out_T": {
+              "column": "heat_exchanger.cold_out_T",
+              "unit": "K"
+            },
+            "duty": {
+              "column": "heat_exchanger.duty",
+              "unit": "W"
+            },
+            "dp_hot": {
+              "column": "heat_exchanger.dp_hot",
+              "unit": "Pa"
+            }
+          },
+          "state": {}
+        },
+        "injection_pump": {
+          "inputs": {
+            "discharge_pressure": {
+              "column": "injection_pump.discharge_pressure",
+              "unit": "Pa"
+            }
+          },
+          "streams": {
+            "suction": {
+              "m_dot": {
+                "column": "injection_pump.suction.m_dot",
+                "unit": "m3/s"
+              },
+              "p": {
+                "column": "injection_pump.suction.p",
+                "unit": "Pa"
+              },
+              "T": {
+                "column": "injection_pump.suction.T",
+                "unit": "K"
+              }
+            }
+          },
+          "measured": {
+            "power": {
+              "column": "injection_pump.power",
+              "unit": "W"
+            }
+          },
+          "state": {}
+        },
+        "doublet.injector": {
+          "inputs": {},
+          "streams": {
+            "wellhead": {
+              "m_dot": {
+                "column": "doublet.injector.wellhead.m_dot",
+                "unit": "m3/s"
+              },
+              "p": {
+                "column": "doublet.injector.wellhead.p",
+                "unit": "Pa"
+              },
+              "T": {
+                "column": "doublet.injector.wellhead.T",
+                "unit": "K"
+              }
+            }
+          },
+          "measured": {},
+          "state": {}
+        },
+        "doublet.reservoir": {
+          "inputs": {
+            "m_dot": {
+              "column": "doublet.reservoir.m_dot",
+              "unit": "m3/s"
+            }
+          },
+          "streams": {},
+          "measured": {},
+          "state": {}
+        },
+        "": {
+          "inputs": {
+            "m_dot": {
+              "column": "production_rate",
+              "unit": "m3/s"
+            },
+            "esp_frequency": {
+              "column": "esp_frequency",
+              "unit": "Hz"
+            },
+            "injection_pressure": {
+              "column": "injection_pressure",
+              "unit": "Pa"
+            },
+            "secondary.m_dot": {
+              "column": "secondary_rate",
+              "unit": "m3/s"
+            },
+            "secondary.T": {
+              "column": "secondary_temperature",
+              "unit": "K"
+            }
+          },
+          "streams": {},
+          "measured": {},
+          "state": {}
+        }
+      },
+      "boundary": {
+        "stream_defaults": {
+          "heat_exchanger": {
+            "cold_in": {
+              "p": 500000.0
+            }
+          }
+        },
+        "inputs": {
+          "injection_pump": {
+            "discharge_pressure": 5150000.0
+          }
+        },
+        "streams": {},
+        "assumptions": [
+          "Example bulk heat capacity 4.410 MJ/m3/K inferred from its heat balance.",
+          "Unmeasured secondary inlet pressure assumed 5 bar absolute.",
+          "Injection-pump scenario setpoint 51.5 bar; twin uses measured setpoint.",
+          "Profiles lacking secondary measurements assume 40 kg/s at 20 C and 5 bar."
+        ],
+        "root_inputs": {
+          "injection_pressure": 5150000.0,
+          "secondary": {
+            "m_dot": 40,
+            "T": 293.15,
+            "p": 500000.0,
+            "fluid": {
+              "kind": "brine",
+              "salinity": 0.0,
+              "co2_mass_fraction": 0.0,
+              "gas_mass_fraction": 0.0,
+              "glycol_fraction": 0.0,
+              "property_model": "constant_stp",
+              "liquid_density": 1068.0,
+              "liquid_viscosity": 0.00065,
+              "specific_heat": 4129.213483146067,
+              "thermal_conductivity": null
+            }
+          }
+        }
+      }
+    },
+    "doublet": {
+      "class": "gemini.core.modules.plants.doublet:Doublet",
+      "type": "doublet",
+      "params": {},
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": null,
+        "liquid_viscosity": null,
+        "specific_heat": null,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": null,
+          "params": {}
+        }
+      ],
+      "param_overrides": {},
+      "active_from": null,
+      "bindings": {},
+      "boundary": {}
+    },
+    "doublet.reservoir": {
+      "class": "gemini.core.modules.subsurface.reservoir:ProductionReservoir",
+      "type": "production_reservoir",
+      "params": {
+        "role": "production",
+        "pressure": 22000000.0,
+        "temperature": 353.15,
+        "permeability": 9.869233e-12,
+        "thickness": 45.0,
+        "drainage_radius": 1000.0,
+        "top_depth": 1800.0,
+        "productivity_index": 5.833333333333333e-08,
+        "injectivity_index": null,
+        "skin": 0.0,
+        "wellbore_radius": 0.0765,
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "decline_threshold": 0.15
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "role": "production",
+            "pressure": 22000000.0,
+            "temperature": 353.15,
+            "permeability": 9.869233e-12,
+            "thickness": 45.0,
+            "drainage_radius": 1000.0,
+            "top_depth": 1800.0,
+            "productivity_index": 5.833333333333333e-08,
+            "injectivity_index": null,
+            "skin": 0.0,
+            "wellbore_radius": 0.0765,
+            "liquid_density": 1068.0,
+            "liquid_viscosity": 0.00065,
+            "decline_threshold": 0.15
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "doublet.well": {
+      "class": "gemini.core.modules.subsurface.productionwell:ProductionWell",
+      "type": "productionwell",
+      "params": {
+        "path": {
+          "sections": [
+            {
+              "length": 400.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 150.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 150.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 362.0,
+              "inclination": 1.312662130424935,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 188.0,
+              "inclination": 0.9238027730805987,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 100.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 250.0,
+              "inclination": 0.9272934315845873,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 550.0,
+              "inclination": 0.814370628980554,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 250.0,
+              "inclination": 0.9272934315845873,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 100.0,
+              "inclination": 0.5235987755982988,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 300.0,
+              "inclination": 0.5235987755982988,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            }
+          ]
+        },
+        "friction_correlation": "darcy_weisbach",
+        "friction_correlation_2p": "BeggsBrill",
+        "correction_factors": [
+          1.0,
+          0.0
+        ],
+        "soil_temperature": 288.15,
+        "u_value": 10.0,
+        "segment": "below_esp",
+        "esp_depth": 600.0
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "path": {
+              "sections": [
+                {
+                  "length": 400.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 362.0,
+                  "inclination": 1.312662130424935,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 188.0,
+                  "inclination": 0.9238027730805987,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 550.0,
+                  "inclination": 0.814370628980554,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 300.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                }
+              ]
+            },
+            "friction_correlation": "darcy_weisbach",
+            "friction_correlation_2p": "BeggsBrill",
+            "correction_factors": [
+              1.0,
+              0.0
+            ],
+            "soil_temperature": 288.15,
+            "u_value": 10.0,
+            "segment": "below_esp",
+            "esp_depth": 600.0
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "doublet.esp": {
+      "class": "gemini.core.modules.pumps.esp:ESP",
+      "type": "esp",
+      "params": {
+        "coefficient_precision": "float64",
+        "motor_efficiency": 1.0,
+        "no_stages": 15,
+        "head_coeff": [
+          125.518426,
+          -0.0020852856,
+          2.28955651e-07,
+          -1.45640214e-11,
+          2.37859645e-16,
+          -1.18258356e-21
+        ],
+        "power_coeff": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "pump_type": "DEFAULT-PUMP",
+        "setting_depth": 600.0,
+        "min_flow": 0.02277777777777778,
+        "max_flow": 0.049444444444444444,
+        "bep_flow": 0.03610555555555555,
+        "correction_factor": [
+          1.0,
+          0.0
+        ],
+        "tubing": 0.1778,
+        "drift_threshold": 0.1
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "coefficient_precision": "float64",
+            "motor_efficiency": 1.0,
+            "no_stages": 15,
+            "head_coeff": [
+              125.518426,
+              -0.0020852856,
+              2.28955651e-07,
+              -1.45640214e-11,
+              2.37859645e-16,
+              -1.18258356e-21
+            ],
+            "power_coeff": [
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "pump_type": "DEFAULT-PUMP",
+            "setting_depth": 600.0,
+            "min_flow": 0.02277777777777778,
+            "max_flow": 0.049444444444444444,
+            "bep_flow": 0.03610555555555555,
+            "correction_factor": [
+              1.0,
+              0.0
+            ],
+            "tubing": 0.1778,
+            "drift_threshold": 0.1
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "doublet.riser": {
+      "class": "gemini.core.modules.subsurface.productionwell:ProductionWell",
+      "type": "productionwell",
+      "params": {
+        "path": {
+          "sections": [
+            {
+              "length": 400.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 150.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 150.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 362.0,
+              "inclination": 1.312662130424935,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 188.0,
+              "inclination": 0.9238027730805987,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 100.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 250.0,
+              "inclination": 0.9272934315845873,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 550.0,
+              "inclination": 0.814370628980554,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 250.0,
+              "inclination": 0.9272934315845873,
+              "inner_diameter": 0.273,
+              "roughness": 2e-05
+            },
+            {
+              "length": 100.0,
+              "inclination": 0.5235987755982988,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 300.0,
+              "inclination": 0.5235987755982988,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            }
+          ]
+        },
+        "friction_correlation": "darcy_weisbach",
+        "friction_correlation_2p": "BeggsBrill",
+        "correction_factors": [
+          1.0,
+          0.0
+        ],
+        "soil_temperature": 288.15,
+        "u_value": 10.0,
+        "segment": "above_esp",
+        "esp_depth": 600.0
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "path": {
+              "sections": [
+                {
+                  "length": 400.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 150.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 362.0,
+                  "inclination": 1.312662130424935,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 188.0,
+                  "inclination": 0.9238027730805987,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 550.0,
+                  "inclination": 0.814370628980554,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 250.0,
+                  "inclination": 0.9272934315845873,
+                  "inner_diameter": 0.273,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 100.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 300.0,
+                  "inclination": 0.5235987755982988,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                }
+              ]
+            },
+            "friction_correlation": "darcy_weisbach",
+            "friction_correlation_2p": "BeggsBrill",
+            "correction_factors": [
+              1.0,
+              0.0
+            ],
+            "soil_temperature": 288.15,
+            "u_value": 10.0,
+            "segment": "above_esp",
+            "esp_depth": 600.0
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "doublet.injector": {
+      "class": "gemini.core.modules.subsurface.injectionwell:InjectionWell",
+      "type": "injectionwell",
+      "params": {
+        "path": {
+          "sections": [
+            {
+              "length": 500.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 500.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            },
+            {
+              "length": 1000.0,
+              "inclination": 1.5707963267948966,
+              "inner_diameter": 0.1778,
+              "roughness": 2e-05
+            }
+          ]
+        },
+        "friction_correlation": "darcy_weisbach",
+        "friction_correlation_2p": "BeggsBrill",
+        "correction_factors": [
+          1.0,
+          0.0
+        ],
+        "soil_temperature": 288.15,
+        "u_value": 10.0
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "path": {
+              "sections": [
+                {
+                  "length": 500.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 500.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                },
+                {
+                  "length": 1000.0,
+                  "inclination": 1.5707963267948966,
+                  "inner_diameter": 0.1778,
+                  "roughness": 2e-05
+                }
+              ]
+            },
+            "friction_correlation": "darcy_weisbach",
+            "friction_correlation_2p": "BeggsBrill",
+            "correction_factors": [
+              1.0,
+              0.0
+            ],
+            "soil_temperature": 288.15,
+            "u_value": 10.0
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "doublet.sink": {
+      "class": "gemini.core.modules.subsurface.reservoir:InjectionReservoir",
+      "type": "injection_reservoir",
+      "params": {
+        "role": "injection",
+        "pressure": 22000000.0,
+        "temperature": 353.15,
+        "permeability": 9.869233e-12,
+        "thickness": 45.0,
+        "drainage_radius": 0.0,
+        "top_depth": 0.0,
+        "productivity_index": null,
+        "injectivity_index": 5.5555555555555555e-08,
+        "skin": 0.0,
+        "wellbore_radius": 0.0765,
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "decline_threshold": 0.15
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "role": "injection",
+            "pressure": 22000000.0,
+            "temperature": 353.15,
+            "permeability": 9.869233e-12,
+            "thickness": 45.0,
+            "drainage_radius": 0.0,
+            "top_depth": 0.0,
+            "productivity_index": null,
+            "injectivity_index": 5.5555555555555555e-08,
+            "skin": 0.0,
+            "wellbore_radius": 0.0765,
+            "liquid_density": 1068.0,
+            "liquid_viscosity": 0.00065,
+            "decline_threshold": 0.15
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "degasser": {
+      "class": "gemini.core.modules.treatment.degasser:Degasser",
+      "type": "degasser",
+      "params": {
+        "p_out": null,
+        "dp": 14900.0,
+        "heat_transfer_coeff": 100000.0
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "p_out": null,
+            "dp": 14900.0,
+            "heat_transfer_coeff": 100000.0
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "filter_hot": {
+      "class": "gemini.core.modules.treatment.filter:Filter",
+      "type": "filter",
+      "params": {
+        "dp_nominal": 1600.0,
+        "m_dot_nominal": 44.20333333333333,
+        "clogging_dp": 50000.0
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "dp_nominal": 1600.0,
+            "m_dot_nominal": 44.20333333333333,
+            "clogging_dp": 50000.0
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "heat_exchanger": {
+      "class": "gemini.core.modules.heat.heatexchanger:HeatExchanger",
+      "type": "heatexchanger",
+      "params": {
+        "ua": 100000.0,
+        "arrangement": "counterflow",
+        "dp_hot_nominal": 0.0,
+        "dp_cold_nominal": 0.0,
+        "m_dot_hot_nominal": 1.0,
+        "m_dot_cold_nominal": 1.0,
+        "fouling_threshold": 0.15
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "ua": 100000.0,
+            "arrangement": "counterflow",
+            "dp_hot_nominal": 0.0,
+            "dp_cold_nominal": 0.0,
+            "m_dot_hot_nominal": 1.0,
+            "m_dot_cold_nominal": 1.0,
+            "fouling_threshold": 0.15
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "filter_return": {
+      "class": "gemini.core.modules.treatment.filter:Filter",
+      "type": "filter",
+      "params": {
+        "dp_nominal": 1600.0,
+        "m_dot_nominal": 44.20333333333333,
+        "clogging_dp": 50000.0
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "dp_nominal": 1600.0,
+            "m_dot_nominal": 44.20333333333333,
+            "clogging_dp": 50000.0
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    },
+    "injection_pump": {
+      "class": "gemini.core.modules.pumps.injectionpump:InjectionPump",
+      "type": "injectionpump",
+      "params": {
+        "no_stages": 10,
+        "pump_type": "DEFAULT-PUMP",
+        "efficiency": 0.8,
+        "head_coeff": null,
+        "power_coeff": null
+      },
+      "fluid": {
+        "kind": "brine",
+        "salinity": 0.0,
+        "co2_mass_fraction": 0.0,
+        "gas_mass_fraction": 0.0,
+        "glycol_fraction": 0.0,
+        "property_model": "constant_stp",
+        "liquid_density": 1068.0,
+        "liquid_viscosity": 0.00065,
+        "specific_heat": 4129.213483146067,
+        "thermal_conductivity": null
+      },
+      "param_history": [
+        {
+          "valid_from": "2020-01-01T00:00:00Z",
+          "params": {
+            "no_stages": 10,
+            "pump_type": "DEFAULT-PUMP",
+            "efficiency": 0.8,
+            "head_coeff": null,
+            "power_coeff": null
+          }
+        }
+      ],
+      "param_overrides": {},
+      "active_from": "2020-01-01T00:00:00+00:00",
+      "bindings": {},
+      "boundary": {}
+    }
+  }
+}

@@ -1,8 +1,7 @@
 """GEMINI: load a plant, choose a dataset, and simulate, replay or run live."""
 
-from gemini import optim
+from gemini import legacy, optim
 from gemini.core import modules
-from gemini.core.config.io import load_plant
 from gemini.core.data.dataset import Dataset
 from gemini.core.engine.clock import Clock
 from gemini.core.engine.engine import Engine
@@ -19,9 +18,9 @@ __all__ = [
     "Fluid",
     "BRINE",
     "WATER",
-    "load_plant",
     "modules",
     "plants",
+    "legacy",
     "optim",
     "__version__",
 ]

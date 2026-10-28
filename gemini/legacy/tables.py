@@ -1,9 +1,58 @@
 """Convert GEMINI property snapshots to component parameters at the configuration edge."""
 
+import csv
 import json
 from pathlib import Path
 
 from gemini.core.physics import geometry, units
+
+# All old-format names are intentionally confined to the legacy package.
+TYPES = {
+    "production_well": "productionwell",
+    "injection_well": "injectionwell",
+    "heat_exchanger": "heatexchanger",
+    "injection_pump": "injectionpump",
+}
+PORTS = {
+    "production_reservoir": {"out": "sandface"},
+    "injection_reservoir": {"in": "sandface"},
+    "productionwell": {"in": "bottom", "out": "wellhead"},
+    "injectionwell": {"in": "wellhead", "out": "bottom"},
+    "esp": {"in": "suction", "out": "discharge"},
+    "injectionpump": {"in": "suction", "out": "discharge"},
+    "filter": {"in": "inlet", "out": "outlet"},
+    "degasser": {"in": "inlet", "out1": "liquid", "out2": "gas"},
+    "heatexchanger": {
+        "PrimIn": "hot_in",
+        "PrimOut": "hot_out",
+        "SecIn": "cold_in",
+        "SecOut": "cold_out",
+    },
+}
+NODE_PATHS = {
+    "reservoir_c1b5": "doublet.reservoir",
+    "production_well_c774": "doublet.well",
+    "esp_1ee3": "doublet.esp",
+    "degasser_e846": "degasser",
+    "filter_b2e6": "filter_hot",
+    "heat_exchanger_3410": "heat_exchanger",
+    "filter_b1ed": "filter_return",
+    "injection_pump_3808": "injection_pump",
+    "injection_well_a06b": "doublet.injector",
+    "reservoir_28fc": "doublet.sink",
+}
+
+
+def _load_trajectory_csv(path):
+    """Read the old semicolon trajectory schema at the legacy boundary."""
+    with Path(path).open(newline="") as handle:
+        return [
+            {
+                key: float(value) if key in {"MD", "TVD", "ID", "roughness"} else value
+                for key, value in row.items()
+            }
+            for row in csv.DictReader(handle, delimiter=";")
+        ]
 
 
 def snapshot(properties: dict, index: int = 0) -> dict:
@@ -92,7 +141,7 @@ def _well_params(properties, prefix, base_path):
         filename = p.get(f"{prefix}_trajectory_file")
         if not filename:
             raise ValueError(f"{prefix}: provide a trajectory table or trajectory file")
-        table = geometry.load_trajectory_csv(Path(base_path) / filename)
+        table = _load_trajectory_csv(Path(base_path) / filename)
     tally = []
     for row in p.get(f"{prefix}_tally_table", []):
         # WIMS tally ID is inches; trajectory ID and roughness are already metres.

@@ -24,12 +24,11 @@ __all__ = [
 ]
 
 from .balance import collect_flows, energy_balance, mass_balance
-from .wiring import check_against_diagram, trace_wiring
+from .wiring import trace_wiring
 
 __all__ += [
     "collect_flows",
     "energy_balance",
     "mass_balance",
-    "check_against_diagram",
     "trace_wiring",
 ]

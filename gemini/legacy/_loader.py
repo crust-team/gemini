@@ -3,19 +3,65 @@
 import csv
 import json
 import warnings
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-from gemini.core.config import param_mapping as mapping
-from gemini.core.config.schema import (
+from pydantic import Field, field_validator
+
+from gemini.core.types.bindings import (
     Binding,
+    ConfigModel,
     DatedParams,
     ModuleBindings,
-    ModuleConfig,
-    PlantConfig,
+    utc,
 )
-from gemini.core.modules.plants.geothermal_example import GeothermalExamplePlant
-from gemini.core.modules.wiring import TYPES
-from gemini.core.types.fluid import Fluid
+from gemini.core.types.fluid import BRINE, Fluid
+from gemini.legacy import tables as mapping
+from gemini.legacy.tables import NODE_PATHS, TYPES
+
+
+class ModuleDesign(ConfigModel):
+    """Internal converted equipment design used only by the legacy bridge."""
+
+    type: str
+    params: list[DatedParams] = Field(min_length=1)
+    fluid: Fluid = BRINE
+
+    @field_validator("params")
+    @classmethod
+    def sort_snapshots(cls, values):
+        """Order snapshots and reject duplicate effective dates."""
+        dates = [item.valid_from for item in values]
+        if len(set(dates)) != len(dates):
+            raise ValueError("Duplicate parameter effective dates")
+        return sorted(
+            values, key=lambda item: item.valid_from or datetime.min.replace(tzinfo=timezone.utc)
+        )
+
+    def at(self, at=None):
+        """Return the latest applicable snapshot."""
+        eligible = [
+            item
+            for item in self.params
+            if at is None or item.valid_from is None or item.valid_from <= utc(at)
+        ]
+        if not eligible:
+            raise ValueError(f"{self.type}: no parameters valid at {at}")
+        return eligible[-1]
+
+
+class LegacyDesign(ConfigModel):
+    """Internal interpretation of old files before applying them to a new plant."""
+
+    name: str
+    modules: dict[str, ModuleDesign]
+    bindings: dict[str, ModuleBindings] = Field(default_factory=dict)
+    boundary: dict[str, Any] = Field(default_factory=dict)
+    timestep: float = Field(900, gt=0)
+    ignored: dict[str, str] = Field(default_factory=dict)
+    unmapped: list[str] = Field(default_factory=list)
+
 
 PROPERTIES = {
     "esp": set(
@@ -125,12 +171,13 @@ def _bind(bindings, target, column, unit):
         getattr(bindings, section)[parts[0]] = binding
 
 
-def load_gemini(folder: str | Path) -> PlantConfig:
+def load_legacy_design(folder: str | Path) -> LegacyDesign:
     """Convert all project snapshots and report unknown fields without silently discarding them."""
     folder = Path(folder)
-    csv_path = folder / "geothermal_example_dataset.csv"
+    data_files = [path for path in folder.glob("*.csv") if "trajectory" not in path.name]
+    csv_path = data_files[0] if len(data_files) == 1 else None
     columns = set()
-    if csv_path.exists():
+    if csv_path is not None:
         with csv_path.open() as handle:
             columns = set(next(csv.reader(handle, delimiter=";")))
     diagram = json.loads((folder / "diagram.json").read_text())["cells"]
@@ -194,7 +241,7 @@ def load_gemini(folder: str | Path) -> PlantConfig:
 
             params = get(kind).Params.model_validate(params).model_dump(mode="json")
             snapshots.append(DatedParams(valid_from=timestamp, params=params))
-        modules[name] = ModuleConfig(type=kind, params=snapshots)
+        modules[name] = ModuleDesign(type=kind, params=snapshots)
         bound = ModuleBindings()
         for section, tags in item["tagnames"].items():
             if section == "timestamps":
@@ -293,9 +340,9 @@ def load_gemini(folder: str | Path) -> PlantConfig:
     for item in modules.values():
         item.fluid = brine
     boundary.pop("fluids", None)
-    node_map = GeothermalExamplePlant.GEMINI_NODES | {"production_well_c774_riser": "doublet.riser"}
+    node_map = NODE_PATHS | {"production_well_c774_riser": "doublet.riser"}
     if set(modules) != set(node_map):
-        raise ValueError("Project nodes do not match GeothermalExamplePlant.GEMINI_NODES")
+        raise ValueError("Project nodes do not match the legacy bridge node table")
     modules = {node_map[k]: v for k, v in modules.items()}
     bindings = {node_map[k]: v for k, v in bindings.items()}
     for key in ("stream_defaults", "inputs"):
@@ -322,10 +369,9 @@ def load_gemini(folder: str | Path) -> PlantConfig:
     conf = json.loads((folder / "plant.conf").read_text())
     for key in unmapped:
         warnings.warn(f"Unmapped GEMINI field: {key}", stacklevel=2)
-    return PlantConfig(
+    return LegacyDesign(
         name=folder.name,
         modules=modules,
-        plant_type=GeothermalExamplePlant.name,
         bindings=bindings,
         boundary=boundary,
         timestep=conf["database"]["calculated"]["interval"],
