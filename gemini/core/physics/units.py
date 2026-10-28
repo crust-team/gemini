@@ -236,6 +236,10 @@ def to_si(value: float, unit: str) -> float:
         "W": (1, 0),
         "kW": (1000, 0),
         "MW": (1e6, 0),
+        "J": (1, 0),
+        "kWh": (3.6e6, 0),
+        "currency/J": (1, 0),
+        "currency/kWh": (1 / 3.6e6, 0),
         "Pa": (1, 0),
         "-": (1, 0),
     }
