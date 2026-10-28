@@ -66,7 +66,10 @@ class InjectionWell(Module):
         stream = stream.with_(m_dot=-abs(stream.m_dot))
         result = self.traverse(stream, 0, self.params.path.total_length, "down")
         a, b = self.params.correction_factors
-        output = stream.with_(p=a * result.p_out + b, T=result.T_out)
+        # NOTE(refactor): negative flow is internal to DPDT; ports preserve incoming mass sign.
+        output = stream.with_(
+            p=a * result.p_out + b, T=result.T_out, m_dot=streams_in["wellhead"].m_dot
+        )
         return ModuleResult(
             self.Outputs(
                 bottomhole_pressure=output.p,

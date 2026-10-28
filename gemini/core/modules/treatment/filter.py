@@ -7,13 +7,15 @@ equipment model.
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.base.health import Health
-from gemini.core.modules.module import Module
+from gemini.core.modules.module import Module, ModuleResult
 from gemini.core.physics import units
 
 
 class Filter(Module):
     """Removes suspended solids before reinjection into the aquifer."""
 
+    fidelity = "simple"
+    soft_sensors = ("pressure_drop",)
     name = "filter"
     category = "treatment"
     description = "Removes suspended solids before reinjection into the aquifer."
@@ -24,6 +26,11 @@ class Filter(Module):
         """Available design parameters; no performance model is assumed."""
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+        # NOTE(refactor): nominal clean loss from the example (0.016 bar at 149 m3/h).
+        dp_nominal: float = Field(1600, ge=0, description="Clean nominal pressure loss [Pa]")
+        m_dot_nominal: float = Field(
+            149 / 3600 * 1068, gt=0, description="Nominal brine mass flow [kg/s]"
+        )
         clogging_dp: float = Field(
             units.bar_to_pa(0.5), gt=0, description="Clogging alarm pressure differential [Pa]"
         )
@@ -39,8 +46,12 @@ class Filter(Module):
         pressure_drop: float = Field(..., description="Pressure loss [Pa]")
 
     def forward(self, inputs, streams_in):
-        """Report that the original equipment model is not implemented."""
-        raise NotImplementedError(f"{self.name} is not modelled yet")
+        """Apply a quadratic clean-filter pressure loss, conserving mass and temperature."""
+        stream = streams_in["inlet"]
+        dp = self.params.dp_nominal * (stream.m_dot / self.params.m_dot_nominal) ** 2
+        return ModuleResult(
+            self.Outputs(pressure_drop=dp), {"outlet": stream.with_(p=stream.p - dp)}
+        )
 
     def health(self, predicted, measured):
         """Alarm when measured filter pressure loss exceeds the clogging limit."""

@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gemini.core.base.health import Health
 from gemini.core.modules.module import Module, ModuleResult
-from gemini.core.physics import constants, units
+from gemini.core.physics import constants, pumps, units
 
 
 class ESP(Module):
@@ -96,17 +96,15 @@ class ESP(Module):
 
     def head_function(self, flow: float, frequency: float) -> float:
         """Return TNO R11363 pump head [Pa] for flow [m3/s] and frequency [Hz]."""
-        q = units.m3s_to_bbl_per_day(flow)
-        value = self.params.no_stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 2
-        value *= sum(c * q**i for i, c in enumerate(self._coefficients(self.params.head_coeff)))
-        return units.ft_head_to_pa(value)
+        return pumps.head(
+            flow, frequency, self.params.no_stages, self._coefficients(self.params.head_coeff)
+        )
 
     def power_function(self, flow: float, frequency: float) -> float:
         """Return TNO R11363 shaft power [W] for flow [m3/s] and frequency [Hz]."""
-        q = units.m3s_to_bbl_per_day(flow)
-        value = self.params.no_stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 3
-        value *= sum(c * q**i for i, c in enumerate(self._coefficients(self.params.power_coeff)))
-        return units.bhp_to_w(value)
+        return pumps.power(
+            flow, frequency, self.params.no_stages, self._coefficients(self.params.power_coeff)
+        )
 
     def efficiency_function(self, flow: float, head: float, power: float) -> float:
         """Return the original efficiency as a fraction from flow [m3/s], head [Pa], power [W]."""

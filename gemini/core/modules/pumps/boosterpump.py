@@ -6,7 +6,7 @@ equipment model.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.core.modules.module import Module
+from gemini.core.modules.module import Module, ModuleResult
 
 
 class BoosterPump(Module):
@@ -28,12 +28,13 @@ class BoosterPump(Module):
 
         model_config = ConfigDict(extra="forbid")
 
-    class Outputs(BaseModel):
-        """Declared future performance results."""
+    fidelity = "passthrough"
 
-        head: float = Field(..., description="Pressure rise [Pa]")
-        power: float = Field(..., description="Shaft power [W]")
+    class Outputs(BaseModel):
+        """Explicit statement that no equipment physics is modelled."""
+
+        modelled: bool = Field(False, description="Equipment physics available [-]")
 
     def forward(self, inputs, streams_in):
-        """Report that the original equipment model is not implemented."""
-        raise NotImplementedError(f"{self.name} is not modelled yet")
+        """Preserve the inlet stream without implying a performance model."""
+        return ModuleResult(self.Outputs(), {"discharge": streams_in["suction"]})
