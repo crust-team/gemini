@@ -1,4 +1,4 @@
-GeothermalExamplePlant(
+DoubletHeatPlant(
   (doublet): Doublet(
     (reservoir): ProductionReservoir(role=production, pressure=220 bar, temperature=80 °C, permeability=9.8692e-12 m2)
     (well): ProductionWell(segment=below_esp, esp_depth=600 m, soil_temperature=15 °C, u_value=10 W/m2/K)

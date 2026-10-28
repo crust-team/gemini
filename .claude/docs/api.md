@@ -1,50 +1,30 @@
 # Public API
 
-Use `import gemini as gm`. Interactive completion exposes exactly `Engine`, `Clock`, `Dataset`,
-`Profile`, `Stream`, `Fluid`, `BRINE`, `WATER`, `load_plant`, `modules`, `plants`, `optim`, and
-`__version__`. New top-level exports require a concrete common user workflow and a documented
-reason. Equipment classes, `Module`, `Sequential`, balance helpers and wiring observers are
-available through `gm.modules`; handwritten plants through `gm.plants`.
+Use `import gemini as gm`. The curated top level is `Engine`, `Clock`, `Dataset`, `Profile`,
+`Stream`, `Fluid`, `BRINE`, `WATER`, `modules`, `plants`, `legacy`, `optim`, and `__version__`.
+Common workflows need no `core.*` imports. New top-level names require a concrete common user
+workflow, documentation, and a public-API test.
 
-Load a GEMINI project directory or saved JSON with `gm.load_plant(path)`. The returned plant
-owns `bindings`, recursive `param_history`, `params_at(t)`, `apply_params_at(t)`, and
-`column_units()`. `plant.save(path)` preserves the current design, all histories, explicit
-parameter overrides, fluids, bindings and import diagnostics. `PlantConfig` is a serialization
-schema, never a separate argument to an engine or optimizer call. Custom plant reconstruction
-requires a discoverable plant class implementing `from_config`; checkpoints do not pickle code.
+Plants own their complete design. A plant class defined in `examples/` or user code uses
+`plant.to_dict()`, `PlantClass.from_dict()`, `plant.save(path)`, and `PlantClass.load(path)`.
+The file records the importable root/child classes, current parameters, dated histories,
+explicit overrides, fluids, bindings, and boundary defaults. Loading through the wrong class
+fails with both stored and requested types in the message.
 
 ```python
+import pandas as pd
 import gemini as gm
-plant = gm.load_plant("datasets/geothermal_doublet")
-data = gm.Dataset.from_csv("datasets/geothermal_doublet/geothermal_example_dataset.csv")
-engine = gm.Engine()
-results = engine.replay(plant, data)
+from examples.shared.doublet_heat.plant import DoubletHeatPlant
+
+plant = DoubletHeatPlant.load("examples/shared/doublet_heat/plant.json")
+frame = pd.read_csv("examples/shared/doublet_heat/doublet_2024_15min.csv",
+                    parse_dates=["time"])
+data = gm.Dataset.from_frame(frame, time_column="time")
+results = gm.Engine().replay(plant, data)
 print(results["doublet.esp"].power)
 print(results.summary())
-engine.save_checkpoint("runs/replay.ckpt")
-restored = gm.Engine.load_checkpoint("runs/replay.ckpt")
-results = restored.resume()
-fit = gm.optim.calibrate(plant, data, "heat_exchanger", fields=["ua"],
-                         end="2024-06-13T23:45:00Z")
-plant.save("runs/my_plant.json")
 ```
 
-The complete acceptance script is [00_quickstart.py](../../examples/00_quickstart.py), also
-included verbatim in the README and executed by `tests/test_quickstart.py`. The workspace's
-actual folder is `geothermal_doublet`; its HX is `heat_exchanger`, and root profile columns are
-`Qp` and `ESP_freq`. Minimal profiles inherit explicitly saved secondary-loop and injection
-setpoint assumptions; supplying those bound columns overrides the assumptions.
-
-`gm.optim.calibrate` accepts `fields`, `start`, `end`, an optional `engine`, and `apply=True`.
-Successful application replaces current values and stores explicit overrides; it adds no dated
-snapshot. Use `apply=False` to leave the original untouched. Fits use only public engine replay
-predictions, bounded/scaled optimizer coordinates, and normalized measured-output residuals.
-Fit and holdout windows must remain separate. The quickstart intentionally fits the whole file
-as an API demonstration; the reconciliation test fits only the first seven days.
-
-`Results[path].field` is a pandas Series. `to_frame()` returns MultiIndex columns. `summary()`
-reports evaluated/operating hours, output peaks, per-port energy J/MWh and peak W, alarms,
-errors and missing-data counts/reasons. `Results.save/load` preserve exact values using
-Parquet when available or CSV plus JSON metadata. `save_csv/save_parquet` produce conventional
-analysis files. `Results` and callback classes remain advanced APIs under `core.engine`;
-ordinary load/run/save/resume/calibrate workflows need no `core.*` imports.
+`gm.optim.calibrate` fits only through public `Engine.replay`. With `apply=True`, a successful
+fit replaces the current parameter as an explicit override; it does not add a dated snapshot.
+`Results[path].field` is a pandas Series and `Results.to_frame()` uses MultiIndex columns.

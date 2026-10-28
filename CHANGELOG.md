@@ -42,7 +42,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [1.0.3] - 2026-10-13
 ## added
-- parameters and tagnames of geothermal_example using csv data
+- parameters and tag names of the original doublet example using CSV data
 ### Fixed
 - fix influxsb writing data float
 
