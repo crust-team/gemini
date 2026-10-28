@@ -1,7 +1,7 @@
 # Public API
 
 Use `import gemini as gm`. The curated top level includes `Engine`, `Clock`, `Dataset`, `Profile`,
-`Stream`, `Fluid`, `Quantity`, `units`, `runtime`, `modules`, `legacy` and `optim`.
+`Stream`, `Fluid`, `Quantity`, `no_outputs`, `units`, `runtime`, `modules`, `legacy` and `optim`.
 Common workflows need no `core.*` imports. New top-level names require a concrete common user
 workflow, documentation, and a public-API test.
 
@@ -34,3 +34,6 @@ the API.
 Direct module calls return `ModuleResult`, whose `outputs` and `outlets` support mapping and
 attribute access. Use `get(name, unit="bar")` on direct or time-series results for display-unit
 conversion.
+
+Use `with gm.no_outputs():` (or `@gm.no_outputs()`) for fluid-only evaluation. These calls retain
+validated outlets but skip computed outputs, output formulas and forward hooks.

@@ -28,7 +28,7 @@ c = esp(suction=s)
 handle.remove()
 assert esp.frequency == 50.0
 assert c.outputs.head < b.outputs.head
-print(a.outputs.head, a.outlets.discharge.p, a.outlets.electricity.P)
+print(a.outputs.head, a.outlets.discharge.p, a.outputs.electricity)
 print(a.outputs.get("head", unit="bar"))
 print(list(esp.inlets()), list(esp.controls()), list(esp.boundaries()))
 print(esp.get_control("frequency").unit)

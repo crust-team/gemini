@@ -126,7 +126,7 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   the limbs in the parent forward pass. Every equipment call still triggers hooks and capture;
   the grouping object's forward hook runs only when Doublet itself is called.
 - ModuleResult now retains the actual inlet/control/child tree while preserving two-value
-  unpacking. Aggregation counts leaf energy ports once; composite reporting ports do not duplicate
+  unpacking. Aggregation counts leaf energy outputs once; composite formulas do not duplicate
   energy. Internal fluid transfers cancel in plant boundary totals. Reservoir withdrawal and
   deposition are explicit open-system source/sink boundaries.
 - `NOTE(refactor)`: **strict energy closure is not achieved**. Legacy pumps change pressure but

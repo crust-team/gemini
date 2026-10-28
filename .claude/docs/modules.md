@@ -1,193 +1,167 @@
 # Writing modules
 
-GEMINI modules follow the same ownership model as `torch.nn.Module`: declarations and child
-modules are assigned once in `__init__`; `Module` registers them; `forward` receives only plain
-inlet values; controls and boundaries are read from `self`; computed outputs are assigned; and
-only flows are returned.
+GEMINI modules follow a fluid-first call contract. Child modules and declarations are assigned
+once in `__init__`. `forward` receives exactly the declared fluid inlets and returns exactly the
+declared fluid outlets. Controls and boundaries are applied by the base class and read from
+`self`. Outputs are computed only after the fluid step succeeds.
+
+## Leaf modules
+
+Leaves declare ordinary `Output(kind)` values and implement `_compute_outputs`. The callback
+requests any inlet or outlet it needs by parameter name; its signature is inspected and cached
+when the class is defined. It never needs `super()._compute_outputs()`.
 
 ```python
-import gemini as gm
+from gemini.core.modules import Module
+from gemini.core.physics import pumps
 from gemini.core.types import (
-    Control, Inlet, Outlet, Output, Parameter,
-    PowerFlow, Pressure, PressureDifference, Stream,
+    Control, Frequency, Inlet, Outlet, Output, Power, PressureDifference, Stream, VolumeFlow,
 )
 
-class Pump(gm.modules.Module):
-    """Raise a stream's pressure by a controllable amount."""
+
+class Pump(Module):
+    """Example fluid pump."""
 
     def __init__(self):
         super().__init__()
-
-        # Parameters
-        self.efficiency = Parameter(float, default=0.8, gt=0, le=1)
 
         # Inlets
         self.suction = Inlet(Stream)
 
         # Controls
-        self.pressure_setpoint = Control(PressureDifference)
+        self.frequency = Control(Frequency)
 
         # Outputs
-        self.discharge_pressure = Output(Pressure, soft_sensor=True)
+        self.flow = Output(VolumeFlow)
+        self.head = Output(PressureDifference)
+        self.power = Output(Power)
+        self.electricity = Output(Power)
 
         # Outlets
         self.discharge = Outlet(Stream)
-        self.electricity = Outlet(PowerFlow)
 
     def forward(self, suction):
-        """Raise suction pressure and report the discharge."""
-
-        # Outputs
-        self.discharge_pressure = suction.p + self.pressure_setpoint
+        """Raise the suction pressure."""
 
         # Outlets
-        discharge = suction.with_(p=self.discharge_pressure)
-        electricity = PowerFlow(P=0)
+        flow = suction.volumetric_flow()
+        head = pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
+        discharge = suction.with_(p=suction.p + head)
 
-        outlets = dict(discharge=discharge, electricity=electricity)
+        outlets = dict(discharge=discharge)
+        return outlets
+
+    def _compute_outputs(self, suction, discharge):
+        self.flow = suction.volumetric_flow()
+        self.head = discharge.p - suction.p
+        self.power = pumps.power(
+            self.flow, self.frequency, self.no_stages, self.power_coeff
+        )
+        self.electricity = self.power
+```
+
+Derive pressure rise, duty, temperature change and similar outputs from inlet/outlet states when
+that preserves the model's numerical contract. If both phases need an expensive intermediate,
+put the calculation in a small private helper used by both; do not cache call data on `self`.
+Every declared output, including an optional output whose value is `None`, must be assigned on
+every output-enabled call.
+
+## Composite modules
+
+Composites never override `_compute_outputs`. They declare formula outputs in declaration order:
+
+- `Output.of("child.path.output")` copies one descendant output from this call. Outlet fields,
+  such as `Output.of("degasser.gas.m_dot")`, are also supported. The descendant must be called
+  exactly once.
+- `Output.total("electricity")` sums that additive output over all descendant leaf calls. A leaf
+  called twice contributes twice. All declarations must have the same unit.
+- `Output.ratio("thermal_power", "electricity_use")` divides earlier outputs on the same module
+  and records `None` when the denominator is zero.
+
+```python
+class HeatPlant(Module):
+    """Example composite plant."""
+
+    def __init__(self):
+        super().__init__()
+
+        # Modules
+        self.heat_exchanger = HeatExchanger()
+        self.pump = Pump()
+
+        # Inlets
+        self.secondary = Inlet(Stream)
+
+        # Outputs
+        self.thermal_power = Output.of("heat_exchanger.duty")
+        self.electricity_use = Output.total("electricity")
+        self.cop = Output.ratio("thermal_power", "electricity_use")
+
+        # Outlets
+        self.secondary_out = Outlet(Stream)
+
+    def forward(self, secondary):
+        """Evaluate children in physical flow order."""
+
+        # Modules
+        pumped = self.pump(suction=secondary)
+        exchanged = self.heat_exchanger(cold_in=pumped.outlets.discharge)
+
+        # Outlets
+        secondary_out = exchanged.outlets.cold_out
+
+        outlets = dict(secondary_out=secondary_out)
         return outlets
 ```
 
-Instantiate values as keywords: `Pump(efficiency=0.9)`. Numbers are SI; unit strings and
-`gm.Quantity` are converted at the public boundary. A required parameter without a default is
-uninitialized until supplied, assigned or loaded. Read its metadata with `get_parameter`.
+Formula paths are checked once the tree is complete and typo errors include a close-match
+suggestion. `module.is_leaf` is true exactly when the module has no registered children.
 
-Controls and boundaries resolve for each call in this order: a call keyword, a persistent value
-set by assignment or `set_inputs`, then the declaration default. Missing required values fail
-before `forward`, with their full path, kind, and unit. All three public forms convert unit
-strings and quantities and enforce declaration bounds:
+## Call order and hooks
 
-```python
-out = pump(suction=stream, pressure_setpoint="20 bar")  # this call only
-pump.pressure_setpoint = 2e6                            # persistent
-plant.set_inputs({"train.pump.pressure_setpoint": 2e6})
-out = pump(suction=stream)
-```
+One call performs these steps:
 
-Use `get_control(path)` and `get_boundary(path)` for declaration metadata. Persistent inputs are
-run data, not `state_dict` or checkpoint state.
+1. validate inlets and apply controls/boundaries;
+2. run forward pre-hooks;
+3. run `forward` and validate its fluid outlet dictionary;
+4. run leaf `_compute_outputs`;
+5. evaluate composite formula outputs in declaration order;
+6. run forward hooks;
+7. verify every output was assigned and build `ModuleResult`.
 
-## Authoring rules
-
-1. Declare everything in `__init__` with `Parameter`, `Inlet`, `Control`, `Boundary`, `Output`
-   or `Outlet`. Assign child modules there too. Never repeat derived metadata or port lists.
-2. Use section comments in this order: `# Modules`, `# Parameters`, `# Inlets`, `# Controls`,
-   `# Boundaries`, `# Outputs`, `# Outlets`. Omit empty sections and separate sections by one
-   blank line.
-3. A `Control` is a command that an optimiser or agent may change. A `Boundary` is imposed by
-   the world. `inputs()` returns controls plus boundaries.
-4. `forward` arguments must exactly match declared inlets in declaration order. Read controls
-   and boundaries as attributes; the base class applies them before `forward`.
-5. Assign every required output during `forward`; return every outlet in an explicit dictionary,
-   including modules with zero or one outlet. Results expose only `out.outputs` and
-   `out.outlets`; they are not tuple-unpackable.
-6. Value-bearing `__init__` arguments are forbidden. Only structural arguments that change the
-   module tree are allowed. Values come from keyword construction, assignment, state loading or
-   the legacy bridge; defaults live in declarations.
-7. `Module` derives `name`, `description`, `category`, ports, input contracts, soft sensors and
-   calibratable parameters. Do not declare any of those twice.
-
-## Fixed forward structure
-
-Every `forward` uses plain section comments in this order, omitting empty sections:
-
-1. `# Modules` contains only child-module calls and result unpacking. Only composites use it.
-2. `# Outputs` performs every `self.<output> = ...` assignment. Shared calculations are done
-   once here and reused by outlets.
-3. `# Outlets` creates one local per declared outlet, named exactly like the declaration.
-4. The final statements are `outlets = dict(...)` in declaration order and `return outlets`.
-
-Leaf template:
+Pre-hooks remain `hook(module)`. Register a forward hook with explicit names, for example:
 
 ```python
-def forward(self, suction):
-    """Compute pump head and raise the suction pressure."""
+def observe(module, suction, discharge):
+    print(module.head, suction.p, discharge.p)
 
-    # Outputs
-    self.flow = suction.volumetric_flow()
-    self.head = pumps.head(self.flow, self.frequency, self.no_stages, self.head_coeff)
-    self.discharge_pressure = suction.p + self.head
 
-    # Outlets
-    discharge = suction.with_(p=self.discharge_pressure)
-    electricity = PowerFlow(P=self.power)
-
-    outlets = dict(discharge=discharge, electricity=electricity)
-    return outlets
+handle = pump.register_forward_hook(observe)
 ```
 
-Composite template:
+Hook return values are ignored. Invalid hook parameter names fail at registration. Remove a hook
+with `handle.remove()`.
+
+## Skipping outputs
+
+`gm.no_outputs()` is a nestable, context-local context manager and decorator. It skips
+`_compute_outputs`, formulas, forward hooks and output completeness checks. Fluid forwarding,
+pre-hooks and outlet validation still run; the result has an empty `outputs` mapping.
 
 ```python
-def forward(self, secondary):
-    """Connect the doublet limbs through the surface equipment."""
+with gm.no_outputs():
+    fast = plant(secondary=stream)
 
-    # Modules
-    supply, esp_power, production_heat = self.doublet.produce()
-    degassed = self.degasser(inlet=supply)
-    exchanged = self.heat_exchanger(
-        hot_in=degassed.outlets.liquid,
-        cold_in=secondary,
-    )
-    pumped = self.injection_pump(suction=exchanged.outlets.hot_out)
-
-    # Outputs
-    self.thermal_power = exchanged.outputs.duty
-    self.electricity_use = esp_power.P
-    self.cop = self.thermal_power / self.electricity_use if self.electricity_use else None
-
-    # Outlets
-    secondary_out = exchanged.outlets.cold_out
-    gas = degassed.outlets.gas
-    electricity = PowerFlow(P=self.electricity_use)
-    heat_loss = production_heat
-
-    outlets = dict(
-        secondary_out=secondary_out,
-        gas=gas,
-        electricity=electricity,
-        heat_loss=heat_loss,
-    )
-    return outlets
+assert dict(fast.outputs) == {}
 ```
 
-Private helpers may shorten calculations, but declared outputs remain visibly assigned in the
-`# Outputs` section. Stateful `step` overrides use the same section vocabulary while retaining
-the engine's `(state, result)` return contract.
+## Structure
 
-## Forward hooks
+Constructor sections are ordered `Modules`, `Parameters`, `Inlets`, `Controls`, `Boundaries`,
+`States`, `Outputs`, `Outlets`, with empty sections omitted. `forward` uses only `# Modules` on
+composites and `# Outlets` when outlets exist. It contains no `self.<name> = ...` assignments and
+ends with `outlets = dict(...)` followed by `return outlets`. Method order is `__init__`,
+`forward`, `_compute_outputs`, then private helpers.
 
-Pre-hooks run after inputs are applied and may inspect or change a control for the current call.
-Forward hooks receive the returned outlet dictionary and may return a replacement. Both run in
-registration order and return a removable handle:
-
-```python
-def clamp(module):
-    module.frequency = min(module.frequency, 45.0)
-
-handle = esp.register_forward_pre_hook(clamp)
-limited = esp(suction=stream)
-handle.remove()
-```
-
-The assignment inside the hook is context-local; a persistent `esp.frequency` value is restored
-after the call. `register_forward_hook(hook)` calls `hook(module, outlets)` and uses a non-`None`
-return value as the new outlet dictionary. Hooks are not serialized or restored by state loads.
-
-## Plants and containers
-
-Plants build their children themselves. `ModuleList` registers numeric child paths,
-`ModuleDict` registers caller-provided keys, and `Sequential` chains children with one fluid
-inlet and outlet. `DoubletHeatPlant` therefore owns `filters.hot` and `filters.cold`; callers
-load values into this fixed tree rather than injecting children.
-
-`named_modules`, parameters, state dictionaries, save/load, hooks, bindings and engine paths all
-traverse registered containers. Composites do not redeclare controls merely to pass them to a
-child; callers and the engine address the one owning leaf by dotted path. Dated parameter
-snapshots remain available through
-`params_at`, `apply_params_at` and `param_history`; each `Parameter` also owns validated history
-metadata.
-
-Energy use is reported with `PowerFlow`, `FuelFlow` and `HeatFlow` outlets. Fluid energy remains
-on `Stream`. Health models consume recorded output values; missing diagnostic evidence remains
-explicitly unassessed.
+Inlets and outlets accept `Stream` types only. Electricity, fuel use and environmental heat loss
+are `Power` outputs. Results keep the same dotted `<module path>.<name>` addressing scheme.
