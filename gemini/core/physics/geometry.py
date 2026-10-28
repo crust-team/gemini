@@ -1,10 +1,8 @@
-"""Pipe geometry and explicit configuration loaders salvaged from GEMINI WIMS."""
+"""Pure in-memory pipe geometry calculations."""
 
 from __future__ import annotations
 
-import csv
 import math
-from pathlib import Path
 from typing import Sequence
 
 import numpy as np
@@ -271,31 +269,6 @@ def esp_section_index(path: PipePath, esp_depth: float) -> int:
     Reference: Measured-depth interval intersection; see PipePath.index_at_measured_depth.
     """
     return path.index_at_measured_depth(esp_depth)
-
-
-def load_trajectory_csv(path: str | Path) -> list[dict]:
-    """Read a semicolon-delimited trajectory at the file boundary.
-
-    Parameters
-    ----------
-    path : str or pathlib.Path
-        Trajectory CSV filename [-].
-
-    Returns
-    -------
-    list of dict
-        MD, TVD, ID and roughness as floats [m], with other columns preserved.
-
-    Notes
-    -----
-    Reference: GEMINI example well_trajectory.csv schema. This loader is the explicit
-    I/O boundary; geometry calculations only accept the returned plain data.
-    """
-    with Path(path).open(newline="") as handle:
-        return [
-            {k: float(v) if k in {"MD", "TVD", "ID", "roughness"} else v for k, v in row.items()}
-            for row in csv.DictReader(handle, delimiter=";")
-        ]
 
 
 def annulus_id_m(outer_id_m: float, inner_od_m: float) -> float:

@@ -38,21 +38,6 @@ class Doublet(Module):
         self.injector = injector
         self.sink = sink
 
-    @classmethod
-    def from_config(cls, config, at=None):
-        """Build named equipment from a Doublet configuration without reading any wiring."""
-        from gemini.core.modules.catalogue import create
-
-        expected = {"reservoir", "well", "esp", "riser", "injector", "sink"}
-        if set(config.modules) != expected:
-            raise ValueError(f"Doublet requires exactly {sorted(expected)}")
-        return cls(
-            **{
-                name: create(item.type, item.at(at).params, fluid=item.fluid)
-                for name, item in config.modules.items()
-            }
-        )
-
     def produce(self, inputs):
         """Traverse reservoir, lower well, ESP and riser, returning supply and energy reports."""
         inputs = self.Inputs.model_validate(inputs)

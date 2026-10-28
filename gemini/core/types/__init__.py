@@ -1,5 +1,6 @@
 """Public data types for GEMINI modules."""
 
+from .bindings import Binding, ColumnInfo, DatedParams, ModuleBindings
 from .cost import Cost
 from .flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
 from .fluid import BRINE, GLYCOL_30, WATER, Fluid
@@ -74,6 +75,10 @@ __all__ = [
     "Count",
     "quantity",
 ] + [
+    "Binding",
+    "ColumnInfo",
+    "DatedParams",
+    "ModuleBindings",
     "Cost",
     "Flow",
     "FuelFlow",

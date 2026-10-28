@@ -4,14 +4,12 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
-from gemini.core.config.build import build_plant, plant_to_config
-from gemini.core.config.schema import PlantConfig
-from gemini.core.data.dataset import Dataset
 from gemini.core.data.loader import Loader
 from gemini.core.engine import checkpoint as storage
 from gemini.core.engine.clock import Clock, LiveClock
 from gemini.core.engine.results import Results
 from gemini.core.engine.step import BindingPlan, chained_step, twin_step
+from gemini.core.modules.module import Module
 from gemini.core.types.bindings import utc
 
 
@@ -26,6 +24,7 @@ class Engine:
         self.plant = self.results = self.dataset = self.clock = None
         self.run_kind = self.position = self.only = None
         self.module_states = {}
+        self._dataset_fingerprint = None
         self._in_step = False
 
     def simulate(self, plant, dataset, clock):
@@ -97,6 +96,8 @@ class Engine:
         if not continuing:
             self.results, self.module_states, self.position = Results(), {}, None
         self.run_kind, self.plant, self.dataset, self.clock = kind, plant, dataset, clock
+        if not continuing or kind == "live" or self._dataset_fingerprint is None:
+            self._dataset_fingerprint = dataset.fingerprint()
         self.only = list(only) if only is not None else None
         remaining = clock.after(self.position) if self.position is not None else clock
         loader = Loader(dataset, remaining, columns=sorted(plan.columns))
@@ -137,27 +138,35 @@ class Engine:
             raise RuntimeError("Checkpoints are only valid between completed steps")
         checkpoint = storage.Checkpoint(
             run_kind=self.run_kind,
-            plant=plant_to_config(self.plant).model_dump(mode="json"),
+            plant_class=Module._class_name(type(self.plant)),
+            plant=self.plant.to_dict(),
             module_states=self.module_states,
             clock=self.clock.describe() if self.clock is not None else None,
             position=self.position,
-            dataset=self.dataset.describe() if self.dataset is not None else None,
+            dataset_fingerprint=self._dataset_fingerprint,
             only=self.only,
             on_error=self.on_error,
         )
-        storage.save(path, checkpoint, self.results)
+        remaining = None
+        if self.run_kind in {"simulate", "replay"} and self.dataset is not None:
+            remaining = self.dataset.after(self.position)
+        storage.save(path, checkpoint, self.results, remaining)
 
     @classmethod
     def load_checkpoint(cls, path, callbacks=None):
         """Restore a plant, dataset handle, finite schedule, states and completed results."""
         checkpoint = storage.load(path)
         engine = cls(callbacks, checkpoint.on_error)
-        engine.plant = build_plant(PlantConfig.model_validate(checkpoint.plant))
+        plant_class = Module._import_class(checkpoint.plant_class)
+        engine.plant = plant_class.from_dict(checkpoint.plant)
         engine.run_kind, engine.position = checkpoint.run_kind, checkpoint.position
         engine.module_states, engine.only = checkpoint.module_states, checkpoint.only
         engine.clock = Clock.reopen(checkpoint.clock) if checkpoint.clock is not None else None
+        engine._dataset_fingerprint = checkpoint.dataset_fingerprint
         engine.dataset = (
-            Dataset.reopen(checkpoint.dataset) if checkpoint.dataset is not None else None
+            storage.read_dataset(Path(path).parent / checkpoint.remaining_data_file)
+            if checkpoint.remaining_data_file
+            else None
         )
         engine.results = (
             Results.load(Path(path).parent / checkpoint.results_file)
@@ -170,10 +179,14 @@ class Engine:
         """Continue strictly after the saved position, or return stored results when finished."""
         if self.run_kind is None:
             return self.results if self.results is not None else Results()
-        if self.clock is None or self.dataset is None:
+        if self.clock is None:
             raise ValueError("Checkpoint does not contain a resumable run")
+        if not len(self.clock):
+            return self.results
         if self.position is not None and not len(self.clock.after(self.position)):
             return self.results
+        if self.dataset is None:
+            raise ValueError("Checkpoint has unfinished ticks but no remaining in-memory data")
         step_fn = chained_step if self.run_kind == "simulate" else twin_step
         return self._run(
             self.run_kind,

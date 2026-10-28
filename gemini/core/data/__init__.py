@@ -1,5 +1,6 @@
-"""Database integrations for Gemini Framework.
+"""In-memory datasets and finite clock sampling."""
 
-Includes connectors for internal InfluxDB and external sources (AVEVA, OSIsoft PI),
-plus reader utilities to sync data into the internal store.
-"""
+from .dataset import Dataset
+from .loader import Loader, Sample
+
+__all__ = ["Dataset", "Loader", "Sample"]

@@ -28,9 +28,7 @@ python = "^3.11, <3.13"
 pandas = "2.3.3"
 scipy = "1.13.1"
 numpy = "2.2.6"
-influxdb-client = "1.49.0"
 pytz = "2024.2"
-adh-sample-library-preview = "0.10.19rc0"
 pydantic = "^2"
 pyarrow = { version = ">=15", optional = true }
 
@@ -65,7 +63,7 @@ line_length = 100
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
-markers = ["slow: full-dataset integration and reconciliation (runs by default)"]
+markers = ["e2e: full public workflows on committed example data"]
 
 [build-system]
 requires = ["poetry-core"]

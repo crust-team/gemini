@@ -1,16 +1,20 @@
 """Composable, validated equipment modules and recursive parameter/state APIs."""
 
+import importlib
 import inspect
+import json
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import replace
 from functools import wraps
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
+from pydantic_core import to_jsonable_python
 
 from gemini.core.physics import units
-from gemini.core.types.bindings import ColumnInfo, DatedParams, utc
+from gemini.core.types.bindings import ColumnInfo, DatedParams, ModuleBindings, utc
 from gemini.core.types.cost import Cost
 from gemini.core.types.flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
 from gemini.core.types.fluid import BRINE, Fluid
@@ -61,7 +65,6 @@ class Module(ABC):
     soft_sensors: ClassVar[tuple[str, ...]] = ()
     calibratable: ClassVar[tuple[str, ...]] = ()
     stateful: ClassVar[bool] = False
-    _save_handler: ClassVar = None
     fidelity: ClassVar[Literal["model", "simple", "passthrough"]] = "model"
 
     def __init_subclass__(cls, **kwargs):
@@ -172,10 +175,124 @@ class Module(ABC):
         return columns
 
     def save(self, path):
-        """Save portable design, histories, explicit overrides and sensor bindings."""
-        if self._save_handler is None:
-            raise RuntimeError("Plant serialization has not been initialized")
-        self._save_handler(self, path)
+        """Save the complete portable module tree as JSON."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
+
+    @staticmethod
+    def _class_name(cls):
+        """Return an importable class identity used by plants and checkpoints."""
+        return f"{cls.__module__}:{cls.__qualname__}"
+
+    @staticmethod
+    def _import_class(name):
+        """Import a class identity and report the exact unavailable type."""
+        try:
+            module_name, qualname = name.split(":", 1)
+            value = importlib.import_module(module_name)
+            for part in qualname.split("."):
+                value = getattr(value, part)
+        except (ImportError, AttributeError, ValueError) as exc:
+            raise ImportError(f"Cannot import plant/module class {name!r}") from exc
+        if not isinstance(value, type) or not issubclass(value, Module):
+            raise TypeError(f"Serialized class {name!r} is not a Module")
+        return value
+
+    def to_dict(self):
+        """Return a JSON-serialisable design, histories, bindings and boundary defaults."""
+        modules = {}
+        for path, module in self.named_modules():
+            modules[path] = {
+                "class": self._class_name(type(module)),
+                "type": module.name,
+                "params": module.params.model_dump(mode="json"),
+                "fluid": module._fluid.model_dump(mode="json"),
+                "param_history": [
+                    snapshot.model_dump(mode="json") for snapshot in module.param_history
+                ],
+                "param_overrides": to_jsonable_python(module._param_overrides),
+                "active_from": (
+                    module._active_from.isoformat() if module._active_from is not None else None
+                ),
+                "bindings": {
+                    key: value.model_dump(mode="json") for key, value in module.bindings.items()
+                },
+                "boundary": to_jsonable_python(module.boundary),
+            }
+        return {
+            "version": 1,
+            "plant_type": self._class_name(type(self)),
+            "modules": modules,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Rebuild a saved tree and require its root type to match this class."""
+        if data.get("version") != 1:
+            raise ValueError(f"Unsupported plant format version {data.get('version')!r}")
+        expected = cls._class_name(cls)
+        stored = data.get("plant_type")
+        if stored != expected:
+            raise ValueError(f"Stored plant type {stored!r} does not match {expected!r}")
+        entries = data.get("modules")
+        if not isinstance(entries, dict) or "" not in entries:
+            raise ValueError("Plant file must contain a root module entry")
+
+        built = {}
+        for path in sorted(entries, key=lambda value: value.count(".")):
+            entry = entries[path]
+            module_cls = cls if path == "" else cls._import_class(entry["class"])
+            if entry.get("type") != module_cls.name:
+                raise ValueError(
+                    f"{path or '<root>'}: stored module type {entry.get('type')!r} "
+                    f"does not match {module_cls.name!r}"
+                )
+            module = module_cls.__new__(module_cls)
+            Module.__init__(
+                module,
+                entry.get("params", {}),
+                fluid=Fluid.model_validate(entry.get("fluid", {})),
+            )
+            built[path] = module
+            if path:
+                parent_path, _, name = path.rpartition(".")
+                if parent_path not in built:
+                    raise ValueError(f"{path}: parent {parent_path!r} is missing")
+                built[parent_path].add_module(name, module)
+
+        for path, module in built.items():
+            entry = entries[path]
+            module.param_history = [
+                DatedParams.model_validate(item) for item in entry.get("param_history", [])
+            ] or [DatedParams(params=module.params.model_dump(mode="json"))]
+            dates = [item.valid_from for item in module.param_history]
+            if len(set(dates)) != len(dates):
+                raise ValueError(f"{path or '<root>'}: duplicate parameter effective dates")
+            module.param_history.sort(key=lambda item: item.valid_from or utc("0001-01-01"))
+            module._param_overrides = dict(entry.get("param_overrides", {}))
+            module._active_from = (
+                utc(entry["active_from"]) if entry.get("active_from") is not None else None
+            )
+            active = module.params_at(module._active_from)
+            module.params = module.Params.model_validate(entry.get("params", active.model_dump()))
+            module._active_params = module.params.model_dump(mode="json")
+            module.fluid = module._resolve_fluid()
+            module.bindings = {
+                key: ModuleBindings.model_validate(value)
+                for key, value in entry.get("bindings", {}).items()
+            }
+            module.boundary = dict(entry.get("boundary", {}))
+        return built[""]
+
+    @classmethod
+    def load(cls, path):
+        """Load a JSON plant file and rebuild an instance of this exact class."""
+        try:
+            data = json.loads(Path(path).read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Could not read plant file {str(path)!r}: {exc}") from exc
+        return cls.from_dict(data)
 
     def extra_repr(self):
         """Display up to four scalar design parameters in familiar human units."""
