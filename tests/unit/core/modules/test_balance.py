@@ -39,4 +39,4 @@ def test_esp_motor_efficiency_does_not_change_shaft_power():
     pump.motor_efficiency = 0.5
     second = pump(frequency=60, suction=inlet)
     assert second.outputs.power == first.outputs.power
-    assert second.outlets.electricity.P == 2 * first.outputs.power
+    assert second.outputs.electricity == 2 * first.outputs.power

@@ -41,11 +41,11 @@ class Accumulator(gm.modules.Module):
     def forward(self):
         """Expose a stateless rate observation."""
 
-        # Outputs
-        self.value = self.rate
-
         outlets = dict()
         return outlets
+
+    def _compute_outputs(self):
+        self.value = self.rate
 
     def step(self, state, dt):
         """Integrate with explicit state."""
@@ -92,9 +92,7 @@ def test_reference_replay_and_simulate(setup):
     assert len(result) == 24
     for path, field in result._energy:
         total = (actual[path, field] * 3600).sum()
-        assert result.summary().loc[
-            (path, field.removeprefix("energy_port_")), "energy_J"
-        ] == pytest.approx(total)
+        assert result.summary().loc[(path, field), "energy_J"] == pytest.approx(total)
 
 
 class Interrupted(BaseException):

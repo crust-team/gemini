@@ -1,12 +1,10 @@
 """Immutable fluid streams exchanged by equipment ports."""
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.physics import units
 from gemini.core.types.fluid import BRINE, Fluid
-from gemini.core.types.quantities import MassFlow, Power, Pressure, Temperature
+from gemini.core.types.quantities import MassFlow, Pressure, Temperature
 
 
 class Stream(BaseModel):
@@ -52,29 +50,3 @@ class Stream(BaseModel):
         """Return a validated copy with updated SI stream fields."""
         # model_copy alone bypasses validation, including physical pressure/temperature limits.
         return type(self).model_validate(self.model_dump() | changes)
-
-
-class PowerFlow(BaseModel):
-    """Electrical power drawn by a module; positive means consumption [W]."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-    P: Power
-
-
-class FuelFlow(BaseModel):
-    """Chemical energy consumed, measured on a lower-heating-value basis [W]."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-    P: Power
-    fuel: Literal["natural_gas", "hydrogen", "biogas"] = "natural_gas"
-
-
-class HeatFlow(BaseModel):
-    """Heat released to the environment, positive outward [W]."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-    Q: Power
-    T: Temperature | None = None
-
-
-Flow = Stream | PowerFlow | FuelFlow | HeatFlow

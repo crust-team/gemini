@@ -156,25 +156,21 @@ class ProductionReservoir(_Reservoir):
     def forward(self):
         """Apply the linear production IPR and emit the sandface stream."""
 
-        # Outputs
         if self.productivity_index is None:
             raise ValueError(f"{self.path}: productivity_index is required")
         flow = self.m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
         p_bh = self.pressure - flow / self.productivity_index
-        calculated = self._calculate_outputs(flow, p_bh)
-        self.bottomhole_pressure = calculated["bottomhole_pressure"]
-        self.drawdown = calculated["drawdown"]
-        self.overpressure = calculated["overpressure"]
-        self.flow_dp = calculated["flow_dp"]
-        self.skin_dp = calculated["skin_dp"]
-        self.hydrostatic_dp = calculated["hydrostatic_dp"]
-        self.radial_bottomhole_pressure = calculated["radial_bottomhole_pressure"]
 
         # Outlets
         sandface = Stream(m_dot=self.m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
 
         outlets = dict(sandface=sandface)
         return outlets
+
+    def _compute_outputs(self, sandface):
+        flow = sandface.volumetric_flow()
+        for name, value in self._calculate_outputs(flow, sandface.p).items():
+            setattr(self, name, value)
 
 
 class InjectionReservoir(_Reservoir):
@@ -190,19 +186,13 @@ class InjectionReservoir(_Reservoir):
     def forward(self, sandface):
         """Calculate required bottomhole pressure from the sandface flow."""
 
-        # Outputs
+        outlets = dict()
+        return outlets
+
+    def _compute_outputs(self, sandface):
         if self.injectivity_index is None:
             raise ValueError(f"{self.path}: injectivity_index is required")
         flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
         p_bh = self.pressure + flow / self.injectivity_index
-        calculated = self._calculate_outputs(flow, p_bh)
-        self.bottomhole_pressure = calculated["bottomhole_pressure"]
-        self.drawdown = calculated["drawdown"]
-        self.overpressure = calculated["overpressure"]
-        self.flow_dp = calculated["flow_dp"]
-        self.skin_dp = calculated["skin_dp"]
-        self.hydrostatic_dp = calculated["hydrostatic_dp"]
-        self.radial_bottomhole_pressure = calculated["radial_bottomhole_pressure"]
-
-        outlets = dict()
-        return outlets
+        for name, value in self._calculate_outputs(flow, p_bh).items():
+            setattr(self, name, value)

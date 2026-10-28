@@ -12,7 +12,7 @@ from .declarations import (
     Parameter,
     Quantity,
 )
-from .flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
+from .flows import Stream
 from .fluid import BRINE, GLYCOL_30, WATER, Fluid
 from .profile import Profile
 from .quantities import (
@@ -98,10 +98,6 @@ __all__ = [
     "Output",
     "Outlet",
     "Quantity",
-    "Flow",
-    "FuelFlow",
-    "HeatFlow",
-    "PowerFlow",
     "Stream",
     "BRINE",
     "GLYCOL_30",
