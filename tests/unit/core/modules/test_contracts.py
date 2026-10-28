@@ -1,19 +1,6 @@
-"""Declaration and forward conventions across every registered built-in module."""
-
-import inspect
+"""Declaration metadata across every registered built-in module."""
 
 from gemini.core.modules.module import MODULE_REGISTRY
-
-
-def test_every_forward_matches_its_declarations():
-    """Every non-container built-in has exactly its declared forward arguments."""
-    for cls in MODULE_REGISTRY.values():
-        if cls.category in {"container", "user"}:
-            continue
-        module = cls()
-        expected = list(module.inlets())
-        actual = list(inspect.signature(module.forward).parameters)
-        assert actual == expected, cls
 
 
 def test_metadata_is_derived():

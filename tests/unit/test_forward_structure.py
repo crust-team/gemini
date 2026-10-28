@@ -79,6 +79,70 @@ def _assert_return_block(cls, tree, outlet_names):
     assert keys == outlet_names, f"{cls.__name__}: outlet order {keys} != {outlet_names}"
 
 
+def _assert_fixed_signature(cls, name, expected):
+    method = getattr(cls, name)
+    signature = inspect.signature(method)
+    parameters = list(signature.parameters.values())
+    actual = [parameter.name for parameter in parameters]
+    assert actual == expected, (
+        f"{cls.__name__}.{name}: signature must be "
+        f"({', '.join(expected)}), got ({', '.join(actual)})"
+    )
+    for parameter in parameters:
+        assert parameter.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        ), f"{cls.__name__}.{name}: {parameter.name!r} cannot be variadic or keyword-only"
+        assert (
+            parameter.default is inspect.Parameter.empty
+        ), f"{cls.__name__}.{name}: {parameter.name!r} cannot have a default"
+
+
+def _port_accesses(tree, variable):
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == variable
+        ):
+            yield node.attr
+        elif (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == variable
+            and isinstance(node.slice, ast.Constant)
+            and isinstance(node.slice.value, str)
+        ):
+            yield node.slice.value
+
+
+def _assert_declared_accesses(cls, method_name, variable, declared):
+    _, tree = _source_tree(getattr(cls, method_name))
+    for name in _port_accesses(tree, variable):
+        assert name in declared, (
+            f"{cls.__name__}.{method_name}: unknown {variable[:-1]} {name!r}; "
+            f"declared names: {', '.join(declared) or '<none>'}"
+        )
+
+
+def test_fixed_signatures_and_declared_port_accesses():
+    """Every module lifecycle method receives fixed Ports and reads only declared names."""
+    for cls in MODULE_REGISTRY.values():
+        if not cls.__module__.startswith(("gemini.", "examples.")):
+            continue
+        _assert_fixed_signature(cls, "forward", ["self", "inlets"])
+        _assert_fixed_signature(cls, "_compute_outputs", ["self", "inlets", "outlets"])
+        try:
+            module = cls()
+        except (TypeError, ValueError):
+            continue
+        inlet_names = list(module.inlets())
+        outlet_names = list(module.outlets())
+        _assert_declared_accesses(cls, "forward", "inlets", inlet_names)
+        _assert_declared_accesses(cls, "_compute_outputs", "inlets", inlet_names)
+        _assert_declared_accesses(cls, "_compute_outputs", "outlets", outlet_names)
+
+
 def test_registered_forward_structure():
     """Forwards accept inlets, move only fluids and never assign module attributes."""
     for cls in MODULE_REGISTRY.values():
@@ -96,8 +160,6 @@ def test_registered_forward_structure():
         assert ("# Outlets" in comments) == bool(module.outlets())
         assert not _self_assignments(tree), f"{cls.__name__}: forward assigns to self"
 
-        arguments = [argument.arg for argument in tree.args.args if argument.arg != "self"]
-        assert arguments == list(module.inlets())
         declarations = list(module.inlets().values()) + list(module.outlets().values())
         assert all(
             isinstance(declaration.kind, type) and issubclass(declaration.kind, Stream)
