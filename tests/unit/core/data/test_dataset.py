@@ -1,0 +1,58 @@
+"""In-memory Dataset constructor and UTC tests."""
+
+from datetime import timedelta
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+import gemini as gm
+
+
+def test_constructors_fingerprint_bounds_and_types():
+    """Every constructor normalises the same values to one stable representation."""
+    time = pd.date_range("2024-01-01", periods=4, freq="15min", tz="UTC")
+    values = np.array([[1, "ok"], [2, "ok"], [3, "warn"], [4, "ok"]], dtype=object)
+    frame = pd.DataFrame(values, columns=["value", "status"])
+    frame.insert(0, "time", time)
+    datasets = [
+        gm.Dataset.from_frame(frame, time_column="time", units={"value": "W"}),
+        gm.Dataset.from_dict(
+            {"value": [1, 2, 3, 4], "status": ["ok", "ok", "warn", "ok"]},
+            time,
+            units={"value": "W"},
+        ),
+        gm.Dataset.from_records(frame.to_dict("records"), "time", units={"value": "W"}),
+        gm.Dataset.from_numpy(time, values, ["value", "status"], units={"value": "W"}),
+    ]
+    assert len({dataset.fingerprint() for dataset in datasets}) == 1
+    data = datasets[0]
+    assert data.native_step == timedelta(minutes=15)
+    assert len(data.read(time[1], time[2])) == 2
+    assert len(data.window(time[1], time[2])) == 2
+    assert len(data.after(time[1])) == 2
+    assert data.to_frame().status.iloc[2] == "warn"
+
+
+def test_timezones_duplicates_profiles_and_validation():
+    """Naive times use the requested zone and duplicate timestamps fail clearly."""
+    frame = pd.DataFrame({"time": ["2024-01-01 00:00", "2024-01-01 01:00"], "x": [1, 2]})
+    data = gm.Dataset.from_frame(frame, "time", tz="Europe/Oslo")
+    assert data.start.hour == 23 and data.start.day == 31
+    with pytest.raises(ValueError, match="unique"):
+        gm.Dataset.from_dict({"x": [1, 2]}, [data.start, data.start])
+    clock = gm.Clock.days(2027, 1, 1)
+    profiles = gm.Dataset.from_profiles(
+        {"flow": gm.Profile.constant(150, unit="m3/h", clock=clock)}
+    )
+    assert profiles.columns["flow"].unit == "m3/s"
+    assert profiles.to_frame().flow.iloc[0] == pytest.approx(150 / 3600)
+
+
+def test_core_data_has_no_file_or_network_readers():
+    """The runtime data package stays an in-memory boundary."""
+    root = Path(gm.__file__).parent / "core/data"
+    source = "\n".join(path.read_text() for path in root.glob("*.py"))
+    for forbidden in ("read_csv", "requests", "influx", "aveva", "sqlalchemy"):
+        assert forbidden not in source.lower()
