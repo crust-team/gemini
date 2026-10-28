@@ -172,6 +172,7 @@ class RequiredInputs(Module):
     """Fixture with required unit-bearing control and boundary values."""
 
     def __init__(self):
+        """Declare one inlet, required control, required boundary and result."""
         super().__init__()
 
         # Inlets
@@ -276,6 +277,7 @@ def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
         """Own one child solely to test relative input paths."""
 
         def __init__(self):
+            """Register the child input fixture."""
             super().__init__()
 
             # Modules

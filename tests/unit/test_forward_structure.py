@@ -125,7 +125,7 @@ def _child_for_call(module, function):
 def test_registered_forward_structure():
     """Concrete forwards use fixed sections, assignments and outlet return blocks."""
     for cls in MODULE_REGISTRY.values():
-        if "forward" not in cls.__dict__ or cls.__module__.startswith("tests."):
+        if "forward" not in cls.__dict__ or not cls.__module__.startswith(("gemini.", "examples.")):
             continue
         module = cls()
         source, tree = _source_tree(cls.forward)
