@@ -15,6 +15,7 @@ from gemini.core.types import (
     Outlet,
     Output,
     Parameter,
+    Ports,
     Power,
     Stream,
 )
@@ -42,16 +43,17 @@ class PassThrough(Module):
         # Outlets
         self.outlet = Outlet(Stream)
 
-    def forward(self, inlet):
+    def forward(self, inlets):
         """Record the scalar product and return the stream."""
 
         # Outlets
+        inlet = inlets.inlet
         outlet = inlet
 
         outlets = dict(outlet=outlet)
         return outlets
 
-    def _compute_outputs(self, inlet, outlet):
+    def _compute_outputs(self, inlets, outlets):
         self.result = self.value * self.multiplier
 
 
@@ -72,48 +74,54 @@ def test_registration_construction_and_state():
 
 
 def test_call_output_and_signature_guards():
-    """Calls validate arguments, required outputs and outlet names."""
+    """All supported inlet call forms resolve to the same fixed Ports shape."""
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = PassThrough(value=2)
-    result = module(inlet=stream, multiplier=4)
-    assert result.outputs.result == 8
-    assert result.outlets.outlet is stream
+    results = [
+        module(inlet=stream, multiplier=4),
+        module({"inlet": stream}, multiplier=4),
+        module(Ports({"inlet": stream}), multiplier=4),
+        module(stream, multiplier=4),
+    ]
+    assert [result.outputs.result for result in results] == [8, 8, 8, 8]
+    assert all(result.outlets.outlet is stream for result in results)
+    assert all(isinstance(result.inlets, Ports) for result in results)
+    assert all(isinstance(result.outlets, Ports) for result in results)
     assert module.result.soft_sensor
-    with pytest.raises(TypeError, match="missing required inlet"):
+
+    with pytest.raises(TypeError, match="pass_through.*missing.*inlet.*valid names: inlet"):
         module()
-    with pytest.raises(TypeError):
-        module(inlet=stream, unexpected=1)
+    with pytest.raises(TypeError, match="pass_through.*inlett.*did you mean 'inlet'.*valid names"):
+        module(inlett=stream)
+    with pytest.raises(TypeError, match="pass_through.*cannot mix.*inlet.*valid names: inlet"):
+        module({"inlet": stream}, inlet=stream)
+    with pytest.raises(TypeError, match="pass_through.*invalid inlet 'inlet'.*valid names: inlet"):
+        module(inlet=1)
+    with pytest.raises(TypeError, match="pass_through.*multiple values.*inlet.*valid names"):
+        module(stream, inlet=stream)
 
 
-def test_single_outlet_scalar_return_is_rejected(monkeypatch):
-    """A one-outlet module must return the same explicit dictionary shape as every module."""
+def test_outlet_dict_names_and_flow_types_are_checked(monkeypatch):
+    """Forward returns exactly one declared, correctly typed outlet dictionary."""
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = PassThrough(value=2)
 
-    def scalar_forward(inlet):
-        return inlet
+    def scalar_forward(inlets):
+        return inlets.inlet
 
     monkeypatch.setattr(module, "forward", scalar_forward)
     with pytest.raises(TypeError, match="outlet dict"):
         module(inlet=stream)
 
-    class WrongSignature(Module):
-        """Fixture with a declaration/signature mismatch."""
-
-        def __init__(self):
-            super().__init__()
-
-            # Controls
-            self.command = Control(float)
-
-        def forward(self, other):
-            """Use the deliberately wrong name."""
-
-            outlets = dict()
-            return outlets
-
-    with pytest.raises(TypeError, match="signature mismatch"):
-        WrongSignature()(command=1)
+    monkeypatch.setattr(module, "forward", lambda inlets: {})
+    with pytest.raises(ValueError, match=r"pass_through.*missing=\['outlet'\]"):
+        module(inlet=stream)
+    monkeypatch.setattr(module, "forward", lambda inlets: {"outlet": stream, "extra": stream})
+    with pytest.raises(ValueError, match=r"pass_through.*extra=\['extra'\]"):
+        module(inlet=stream)
+    monkeypatch.setattr(module, "forward", lambda inlets: {"outlet": 1})
+    with pytest.raises(TypeError, match="pass_through.*invalid outlet 'outlet'.*valid names"):
+        module(inlet=stream)
 
 
 def test_output_records_are_nested_and_thread_local():
@@ -143,10 +151,11 @@ def test_output_records_are_nested_and_thread_local():
             # Outlets
             self.outlet = Outlet(Stream)
 
-        def forward(self, inlet):
+        def forward(self, inlets):
             """Call the child and copy its recorded output."""
 
             # Modules
+            inlet = inlets.inlet
             child = self.children_by_name.child(inlet=inlet, multiplier=2)
 
             # Outlets
@@ -169,8 +178,8 @@ def test_uninitialized_and_hooks():
         module(inlet=Stream(m_dot=1, T=300, p=1e5))
     module.value = 2
     calls = []
-    before = module.register_forward_pre_hook(lambda *args: calls.append("before"))
-    after = module.register_forward_hook(lambda module: calls.append("after"))
+    before = module.register_forward_pre_hook(lambda module, inlets: calls.append("before"))
+    after = module.register_forward_hook(lambda module, inlets, outlets: calls.append("after"))
     module(inlet=Stream(m_dot=1, T=300, p=1e5))
     assert calls == ["before", "after"]
     before.remove()
@@ -199,16 +208,17 @@ class RequiredInputs(Module):
         # Outlets
         self.outlet = Outlet(Stream)
 
-    def forward(self, inlet):
+    def forward(self, inlets):
         """Read applied values through ordinary attributes."""
 
         # Outlets
+        inlet = inlets.inlet
         outlet = inlet
 
         outlets = dict(outlet=outlet)
         return outlets
 
-    def _compute_outputs(self, inlet, outlet):
+    def _compute_outputs(self, inlets, outlets):
         self.total = self.frequency + self.grid_frequency
 
 
@@ -236,7 +246,7 @@ def test_missing_input_and_unknown_keyword_errors_are_complete():
     module.frequency = 50
     with pytest.raises(TypeError, match="required_inputs.grid_frequency.*boundary.*Hz"):
         module(inlet=stream)
-    with pytest.raises(TypeError, match="valid inlets, controls and boundaries"):
+    with pytest.raises(TypeError, match="valid names"):
         module(inlet=stream, typo=1)
 
 
@@ -247,7 +257,8 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
     module.set_inputs({"frequency": 50, "grid_frequency": 50})
     seen = []
 
-    def clamp(current):
+    def clamp(module, inlets):
+        current = module
         seen.append(current.frequency)
         current.frequency = min(current.frequency, 45)
 
@@ -261,16 +272,17 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
     class AssignInForward(RequiredInputs):
         """Fixture changing a control from inside its active forward context."""
 
-        def forward(self, inlet):
+        def forward(self, inlets):
             """Override frequency for only the current call."""
 
             # Outlets
+            inlet = inlets.inlet
             outlet = inlet
 
             outlets = dict(outlet=outlet)
             return outlets
 
-        def _compute_outputs(self, inlet, outlet):
+        def _compute_outputs(self, inlets, outlets):
             self.frequency = 10
             self.total = self.frequency + self.grid_frequency
 
@@ -286,10 +298,17 @@ def test_hooks_are_ordered_removable_and_observe_named_ports():
     replacement = stream.with_(p=2e5)
     module = PassThrough(value=2)
     calls = []
-    first = module.register_forward_pre_hook(lambda current: calls.append(("first", current)))
-    second = module.register_forward_pre_hook(lambda current: calls.append(("second", current)))
 
-    def observe(module, inlet, outlet):
+    def first_hook(module, inlets):
+        calls.append(("first", module))
+
+    def second_hook(module, inlets):
+        calls.append(("second", module))
+
+    first = module.register_forward_pre_hook(first_hook)
+    second = module.register_forward_pre_hook(second_hook)
+
+    def observe(module, inlets, outlets):
         calls.append(("post", module))
         return {"outlet": replacement}
 
@@ -319,7 +338,7 @@ def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
             # Modules
             self.child = RequiredInputs()
 
-        def forward(self):
+        def forward(self, inlets):
             """Return no outlets for the structural fixture."""
 
             # Modules
@@ -337,25 +356,20 @@ def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
         parent.set_inputs({"child.frequncy": 40})
 
 
-def test_compute_output_signature_is_checked_at_class_definition():
-    """Output callbacks can request only declared inlet and outlet names."""
-    with pytest.raises(TypeError, match="BadOutputName.*typo.*inlet.*outlet"):
+def test_hooks_require_the_fixed_signatures():
+    """Hook registration rejects old by-name, variadic and defaulted signatures."""
+    module = PassThrough(value=1)
 
-        class BadOutputName(Module):
-            """Deliberately invalid output callback fixture."""
+    with pytest.raises(TypeError, match="forward hook.*module, inlets, outlets"):
+        module.register_forward_hook(lambda module, inlet, outlet: None)
+    with pytest.raises(TypeError, match="forward pre-hook.*module, inlets"):
+        module.register_forward_pre_hook(lambda module: None)
 
-            def __init__(self):
-                super().__init__()
-                self.inlet = Inlet(Stream)
-                self.value = Output(float)
-                self.outlet = Outlet(Stream)
+    def defaulted(module, inlets, outlets=None):
+        pass
 
-            def forward(self, inlet):
-                outlets = dict(outlet=inlet)
-                return outlets
-
-            def _compute_outputs(self, typo):
-                self.value = 1
+    with pytest.raises(TypeError, match="forward hook.*module, inlets, outlets"):
+        module.register_forward_hook(defaulted)
 
 
 def test_missing_output_and_named_hook_ordering():
@@ -370,11 +384,11 @@ def test_missing_output_and_named_hook_ordering():
             self.value = Output(float)
             self.outlet = Outlet(Stream)
 
-        def forward(self, inlet):
-            outlets = dict(outlet=inlet)
+        def forward(self, inlets):
+            outlets = dict(outlet=inlets.inlet)
             return outlets
 
-        def _compute_outputs(self, inlet, outlet):
+        def _compute_outputs(self, inlets, outlets):
             pass
 
     stream = Stream(m_dot=1, T=300, p=1e5)
@@ -385,14 +399,12 @@ def test_missing_output_and_named_hook_ordering():
     good = PassThrough(value=3)
     seen = []
 
-    def observe(module, inlet, outlet):
-        seen.append((module.result, inlet, outlet))
+    def observe(module, inlets, outlets):
+        seen.append((module.result, inlets.inlet, outlets.outlet))
 
     good.register_forward_hook(observe)
     good(inlet=stream, multiplier=2)
     assert seen == [(6, stream, stream)]
-    with pytest.raises(TypeError, match="unknown inlet/outlet 'typo'"):
-        good.register_forward_hook(lambda module, typo: None)
 
 
 def test_no_outputs_is_nested_thread_local_context_and_decorator():
@@ -401,7 +413,7 @@ def test_no_outputs_is_nested_thread_local_context_and_decorator():
     module = PassThrough(value=2)
     calls = []
 
-    def observe(module):
+    def observe(module, inlets, outlets):
         calls.append(module)
 
     module.register_forward_hook(observe)
@@ -433,11 +445,11 @@ def test_formula_outputs_count_calls_sum_leaves_and_read_outlet_fields():
             self.electricity = Output(Power)
             self.outlet = Outlet(Stream)
 
-        def forward(self, inlet):
-            outlets = dict(outlet=inlet)
+        def forward(self, inlets):
+            outlets = dict(outlet=inlets.inlet)
             return outlets
 
-        def _compute_outputs(self, inlet, outlet):
+        def _compute_outputs(self, inlets, outlets):
             self.electricity = 2
 
     class FormulaParent(Module):
@@ -453,7 +465,8 @@ def test_formula_outputs_count_calls_sum_leaves_and_read_outlet_fields():
             self.mass = Output.of("child.outlet.m_dot")
             self.outlet = Outlet(Stream)
 
-        def forward(self, inlet):
+        def forward(self, inlets):
+            inlet = inlets.inlet
             child = self.child(inlet=inlet)
             outlet = child.outlets.outlet
             outlets = dict(outlet=outlet)
@@ -472,7 +485,8 @@ def test_formula_outputs_count_calls_sum_leaves_and_read_outlet_fields():
             self.total = Output.total("electricity")
             self.outlet = Outlet(Stream)
 
-        def forward(self, inlet):
+        def forward(self, inlets):
+            inlet = inlets.inlet
             self.child(inlet=inlet)
             child = self.child(inlet=inlet)
             outlet = child.outlets.outlet
@@ -491,7 +505,8 @@ def test_formula_outputs_count_calls_sum_leaves_and_read_outlet_fields():
             self.copied = Output.of("child.electricity")
             self.outlet = Outlet(Stream)
 
-        def forward(self, inlet):
+        def forward(self, inlets):
+            inlet = inlets.inlet
             self.child(inlet=inlet)
             child = self.child(inlet=inlet)
             outlet = child.outlets.outlet
@@ -512,11 +527,11 @@ def test_formula_validation_units_zero_ratio_and_typo_suggestion():
             super().__init__()
             self.use = Output(Power)
 
-        def forward(self):
+        def forward(self, inlets):
             outlets = dict()
             return outlets
 
-        def _compute_outputs(self):
+        def _compute_outputs(self, inlets, outlets):
             self.use = 0
 
     class MassUse(Module):
@@ -526,11 +541,11 @@ def test_formula_validation_units_zero_ratio_and_typo_suggestion():
             super().__init__()
             self.use = Output(MassFlow)
 
-        def forward(self):
+        def forward(self, inlets):
             outlets = dict()
             return outlets
 
-        def _compute_outputs(self):
+        def _compute_outputs(self, inlets, outlets):
             self.use = 1
 
     class BadTotal(Module):
@@ -542,7 +557,7 @@ def test_formula_validation_units_zero_ratio_and_typo_suggestion():
             self.mass = MassUse()
             self.use = Output.total("use")
 
-        def forward(self):
+        def forward(self, inlets):
             self.power()
             self.mass()
             outlets = dict()
@@ -560,7 +575,7 @@ def test_formula_validation_units_zero_ratio_and_typo_suggestion():
             self.value = Output.of("child.use")
             self.ratio = Output.ratio("value", "value")
 
-        def forward(self):
+        def forward(self, inlets):
             self.child()
             outlets = dict()
             return outlets
@@ -575,7 +590,7 @@ def test_formula_validation_units_zero_ratio_and_typo_suggestion():
             self.child = PowerUse()
             self.value = Output.of("child.ues")
 
-        def forward(self):
+        def forward(self, inlets):
             self.child()
             outlets = dict()
             return outlets
