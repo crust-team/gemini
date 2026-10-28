@@ -5,8 +5,6 @@ from copy import deepcopy
 import pandas as pd
 
 from gemini.core.data.dataset import Dataset
-from gemini.core.modules import catalogue
-from gemini.core.modules.plants.doublet import Doublet
 from gemini.core.modules.wiring import trace_wiring
 from gemini.core.physics import units
 from gemini.core.types import Binding, ModuleBindings
@@ -42,10 +40,10 @@ def _require_folder(project):
 
 
 def _new_name(path, section, field, port=None):
-    if path == "" and section == "inputs":
+    if path == "" and section == "controls":
         return _ROOT_COLUMNS.get(field, field)
     prefix = f"{path}." if path else ""
-    if section == "streams":
+    if section == "inlets":
         return f"{prefix}{port}.{field}"
     return f"{prefix}{field}"
 
@@ -54,15 +52,19 @@ def _converted_bindings(design):
     converted, sources = {}, {}
     for path, old in design.bindings.items():
         bound = ModuleBindings()
-        for field, binding in old.inputs.items():
-            name = _new_name(path, "inputs", field)
-            bound.inputs[field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
+        for field, binding in old.controls.items():
+            name = _new_name(path, "controls", field)
+            bound.controls[field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
             sources[name] = binding
-        for port, fields in old.streams.items():
-            bound.streams[port] = {}
+        for field, binding in old.boundaries.items():
+            name = _new_name(path, "boundaries", field)
+            bound.boundaries[field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
+            sources[name] = binding
+        for port, fields in old.inlets.items():
+            bound.inlets[port] = {}
             for field, binding in fields.items():
-                name = _new_name(path, "streams", field, port)
-                bound.streams[port][field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
+                name = _new_name(path, "inlets", field, port)
+                bound.inlets[port][field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
                 sources[name] = binding
         for field, binding in old.measured.items():
             name = _new_name(path, "measured", field)
@@ -85,24 +87,18 @@ def to_plant(project, plant, nodes=None):
             raise ValueError(
                 f"Explicit legacy node map differs: {set(nodes.items()) ^ set(expected.items())}"
             )
-    leaves = {
-        path: catalogue.create(item.type, item.at().params, fluid=item.fluid)
-        for path, item in design.modules.items()
-    }
-    doublet_names = {"reservoir", "well", "esp", "riser", "injector", "sink"}
-    doublet = Doublet(**{name: leaves[f"doublet.{name}"] for name in doublet_names})
-    for name in list(plant._children):
-        delattr(plant, name)
-    plant.doublet = doublet
-    for name in ("degasser", "filter_hot", "heat_exchanger", "filter_return", "injection_pump"):
-        setattr(plant, name, leaves[name])
     for path, item in design.modules.items():
         module = plant.get_submodule(path)
+        if module.name != item.type:
+            raise ValueError(f"{path}: expected {module.name!r}, legacy maps to {item.type!r}")
         module.param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
-        module.params = module.params_at(None)
+        for name, value in module.params_at(None).items():
+            module.get_parameter(name).set(value, explicit=False)
         module._active_from = item.at().valid_from
         module._active_params = item.at().params.copy()
         module._param_overrides = {}
+        module._fluid = item.fluid
+        module.fluid = module._resolve_fluid()
     plant.bindings, _ = _converted_bindings(design)
     plant.boundary = deepcopy(design.boundary)
     plant._fluid = next(iter(design.modules.values())).fluid
@@ -218,7 +214,7 @@ def _legacy_property(name, params, original):
         "esp_no_stage": "no_stages",
         "esp_tubing": "tubing",
         "esp_type": "pump_type",
-        "heat_transfer_coeff": ("ua" if hasattr(params, "ua") else "heat_transfer_coeff"),
+        "heat_transfer_coeff": ("ua" if "ua" in params else "heat_transfer_coeff"),
         "injectionpump_no_stage": "no_stages",
         "injectionpump_type": "pump_type",
         "reservoir_thickness": "thickness",
@@ -230,36 +226,36 @@ def _legacy_property(name, params, original):
         "wellbore_radius": "wellbore_radius",
     }
     if name in direct:
-        value = getattr(params, direct[name])
+        value = params[direct[name]]
     elif name == "esp_head_coeff":
-        return _coefficient_value(params.head_coeff, original)
+        return _coefficient_value(params["head_coeff"], original)
     elif name == "esp_power_coeff":
-        return _coefficient_value(params.power_coeff, original)
+        return _coefficient_value(params["power_coeff"], original)
     elif name == "esp_correction_factor":
         return _coefficient_value(
-            [params.correction_factor[0], units.pa_to_bar(params.correction_factor[1])],
+            [params["correction_factor"][0], units.pa_to_bar(params["correction_factor"][1])],
             original,
         )
     elif name in {"esp_bep_flow", "esp_min_flow", "esp_max_flow"}:
-        value = units.m3s_to_m3h(getattr(params, name.removeprefix("esp_")))
+        value = units.m3s_to_m3h(params[name.removeprefix("esp_")])
     elif name == "reservoir_pressure":
-        value = units.pa_to_bar(params.pressure)
+        value = units.pa_to_bar(params["pressure"])
     elif name == "reservoir_temperature":
-        value = units.k_to_c(params.temperature)
+        value = units.k_to_c(params["temperature"])
     elif name == "reservoir_permeability":
-        value = units.m2_to_md(params.permeability)
+        value = units.m2_to_md(params["permeability"])
     elif name.endswith("_soil_temperature"):
-        value = units.k_to_c(params.soil_temperature)
+        value = units.k_to_c(params["soil_temperature"])
     elif name.endswith("_friction_correlation"):
-        value = params.friction_correlation
+        value = params["friction_correlation"]
     elif name.endswith("_friction_correlation_2p"):
-        value = params.friction_correlation_2p
+        value = params["friction_correlation_2p"]
     elif name.endswith("_friction_correction_factors"):
-        value = list(params.correction_factors)
+        value = list(params["correction_factors"])
     elif name.endswith("_productivity_index"):
-        value = units.index_from_si(params.productivity_index)
+        value = units.index_from_si(params["productivity_index"])
     elif name.endswith("_injectivity_index"):
-        value = units.index_from_si(params.injectivity_index)
+        value = units.index_from_si(params["injectivity_index"])
     else:
         return original
     return original if value == original else value
@@ -299,7 +295,7 @@ def check_wiring(plant, project, nodes=None):
     node_map = nodes or {node_id: NODE_PATHS[node.name] for node_id, node in project.nodes.items()}
     try:
         inputs = (
-            plant.last_result.inputs.model_dump()
+            dict(plant.last_result.inputs) | dict(plant.last_result.inlets)
             if getattr(plant, "last_result", None) is not None
             else deepcopy(plant.boundary["root_inputs"])
         )

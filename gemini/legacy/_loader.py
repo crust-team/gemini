@@ -78,7 +78,7 @@ PROPERTIES = {
             "salinity co2_mass_fraction gas_mass_fraction"
         ).split()
     ),
-    "heatexchanger": set(
+    "heat_exchanger": set(
         (
             "heat_transfer_coeff ua arrangement dp_hot_nominal dp_cold_nominal "
             "m_dot_hot_nominal m_dot_cold_nominal"
@@ -86,10 +86,10 @@ PROPERTIES = {
     ),
     "degasser": {"heat_transfer_coeff"},
     "filter": {"clogging_dp"},
-    "injectionpump": {"injectionpump_no_stage", "injectionpump_type"},
+    "injection_pump": {"injectionpump_no_stage", "injectionpump_type"},
 }
-for _prefix in ("productionwell", "injectionwell"):
-    PROPERTIES[_prefix] = {
+for _kind, _prefix in (("production_well", "productionwell"), ("injection_well", "injectionwell")):
+    PROPERTIES[_kind] = {
         f"{_prefix}_{key}"
         for key in (
             "friction_correction_factors",
@@ -102,52 +102,52 @@ for _prefix in ("productionwell", "injectionwell"):
             "productivity_index" if _prefix == "productionwell" else "injectivity_index",
         )
     }
-    PROPERTIES[_prefix].add("wellbore_radius")
+    PROPERTIES[_kind].add("wellbore_radius")
 
 # Each target is inputs.field, streams.port.field, or measured.output.
 TAGS = {
     "esp": {
-        "esp_frequency": ("inputs.frequency", "Hz"),
-        "esp_flow": ("streams.suction.m_dot", "m3/h"),
-        "esp_inlet_pressure": ("streams.suction.p", "bar"),
-        "esp_inlet_temperature": ("streams.suction.T", "degC"),
+        "esp_frequency": ("controls.frequency", "Hz"),
+        "esp_flow": ("inlets.suction.m_dot", "m3/h"),
+        "esp_inlet_pressure": ("inlets.suction.p", "bar"),
+        "esp_inlet_temperature": ("inlets.suction.T", "degC"),
         "esp_head": ("measured.head", "bar"),
         "esp_outlet_pressure": ("measured.discharge_pressure", "bar"),
         "esp_power_consumption": ("measured.power", "W"),
     },
     "filter": {
-        "filter_flow": ("streams.inlet.m_dot", "m3/h"),
-        "filter_inlet_pressure": ("streams.inlet.p", "bar"),
-        "filter_inlet_temperature": ("streams.inlet.T", "degC"),
+        "filter_flow": ("inlets.inlet.m_dot", "m3/h"),
+        "filter_inlet_pressure": ("inlets.inlet.p", "bar"),
+        "filter_inlet_temperature": ("inlets.inlet.T", "degC"),
     },
     "degasser": {
-        "degasser_inlet_flow": ("streams.inlet.m_dot", "m3/h"),
-        "degasser_pressure": ("streams.inlet.p", "bar"),
+        "degasser_inlet_flow": ("inlets.inlet.m_dot", "m3/h"),
+        "degasser_pressure": ("inlets.inlet.p", "bar"),
     },
-    "injectionpump": {
-        "injectionpump_flow": ("streams.suction.m_dot", "m3/h"),
-        "injectionpump_inlet_pressure": ("streams.suction.p", "bar"),
-        "injectionpump_inlet_temperature": ("streams.suction.T", "degC"),
-        "injectionpump_outlet_pressure": ("inputs.discharge_pressure", "bar"),
+    "injection_pump": {
+        "injectionpump_flow": ("inlets.suction.m_dot", "m3/h"),
+        "injectionpump_inlet_pressure": ("inlets.suction.p", "bar"),
+        "injectionpump_inlet_temperature": ("inlets.suction.T", "degC"),
+        "injectionpump_outlet_pressure": ("controls.pressure_setpoint", "bar"),
         "injectionpump_power_consumption": ("measured.power", "W"),
-        "injectionpump_frequency": ("inputs.frequency", "Hz"),
+        "injectionpump_frequency": ("controls.frequency", "Hz"),
         "injectionpump_head": ("measured.head", "bar"),
     },
-    "injectionwell": {
-        "injectionwell_flow": ("streams.wellhead.m_dot", "m3/h"),
-        "injectionwell_wellhead_pressure": ("streams.wellhead.p", "bar"),
-        "injectionwell_wellhead_temperature": ("streams.wellhead.T", "degC"),
+    "injection_well": {
+        "injectionwell_flow": ("inlets.wellhead.m_dot", "m3/h"),
+        "injectionwell_wellhead_pressure": ("inlets.wellhead.p", "bar"),
+        "injectionwell_wellhead_temperature": ("inlets.wellhead.T", "degC"),
         "injectionwell_bottomhole_pressure": ("measured.bottomhole_pressure", "bar"),
         "injectionwell_bottomhole_temperature": ("measured.bottomhole_temperature", "degC"),
     },
-    "heatexchanger": {
-        "hex_primary_flow": ("streams.hot_in.m_dot", "m3/h"),
-        "hex_primary_inlet_pressure": ("streams.hot_in.p", "bar"),
-        "hex_primary_inlet_temperature": ("streams.hot_in.T", "degC"),
+    "heat_exchanger": {
+        "hex_primary_flow": ("inlets.hot_in.m_dot", "m3/h"),
+        "hex_primary_inlet_pressure": ("inlets.hot_in.p", "bar"),
+        "hex_primary_inlet_temperature": ("inlets.hot_in.T", "degC"),
         "hex_primary_outlet_temperature": ("measured.hot_out_T", "degC"),
-        "hex_secondary_flow": ("streams.cold_in.m_dot", "m3/h"),
-        "hex_secondary_inlet_pressure": ("streams.cold_in.p", "bar"),
-        "hex_secondary_inlet_temperature": ("streams.cold_in.T", "degC"),
+        "hex_secondary_flow": ("inlets.cold_in.m_dot", "m3/h"),
+        "hex_secondary_inlet_pressure": ("inlets.cold_in.p", "bar"),
+        "hex_secondary_inlet_temperature": ("inlets.cold_in.T", "degC"),
         "hex_secondary_outlet_temperature": ("measured.cold_out_T", "degC"),
     },
 }
@@ -165,8 +165,8 @@ IGNORED_TAGS = {
 def _bind(bindings, target, column, unit):
     section, *parts = target.split(".")
     binding = Binding(column=column, unit=unit)
-    if section == "streams":
-        bindings.streams.setdefault(parts[0], {})[parts[1]] = binding
+    if section == "inlets":
+        bindings.inlets.setdefault(parts[0], {})[parts[1]] = binding
     else:
         getattr(bindings, section)[parts[0]] = binding
 
@@ -220,18 +220,18 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
                 params = mapping.reservoir_params_from_gemini(
                     props, neighbour_at(well, timestamp), kind.split("_")[0]
                 )
-            elif kind == "productionwell":
+            elif kind == "production_well":
                 esp = outgoing.get(name)
                 params = mapping.productionwell_params_from_gemini(
                     props,
                     base_path=folder,
                     esp_property=neighbour_at(esp, timestamp) if types.get(esp) == "esp" else None,
                 )
-            elif kind == "injectionwell":
+            elif kind == "injection_well":
                 params = mapping.injectionwell_params_from_gemini(props, base_path=folder)
             else:
                 params = getattr(mapping, f"{kind}_params_from_gemini")(props)
-            if kind == "injectionpump" and "InjectorPump_PowerDraw" in columns:
+            if kind == "injection_pump" and "InjectorPump_PowerDraw" in columns:
                 # NOTE(refactor): example Q*deltaP/PowerDraw is 0.80000 (within rounding).
                 # No curves exist, so use the pressure-setpoint variant with efficiency 0.8;
                 # the standalone equipment default stays 0.7.
@@ -239,7 +239,7 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
             # Geometry models become plain JSON values at the portable config boundary.
             from gemini.core.modules.catalogue import get
 
-            params = get(kind).Params.model_validate(params).model_dump(mode="json")
+            params = get(kind)(**params).state_dict()[""]["params"]
             snapshots.append(DatedParams(valid_from=timestamp, params=params))
         modules[name] = ModuleDesign(type=kind, params=snapshots)
         bound = ModuleBindings()
@@ -257,7 +257,7 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
                 elif tag in TAGS.get(kind, {}):
                     target, unit = TAGS[kind][tag]
                     _bind(bound, target, values[0], unit)
-                elif kind == "productionwell" and tag in {
+                elif kind == "production_well" and tag in {
                     "productionwell_flow",
                     "productionwell_wellhead_pressure",
                     "productionwell_wellhead_temperature",
@@ -273,15 +273,15 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
         # NOTE(refactor): project tags omit these CSV channels and secondary absolute pressure.
         # Supplements are explicit, dataset-specific, and applied only when the columns exist.
         supplements = []
-        if kind == "filter" and "p" in bound.streams.get("inlet", {}):
-            column = bound.streams["inlet"]["p"].column.replace("_Pin", "_PDrop")
+        if kind == "filter" and "p" in bound.inlets.get("inlet", {}):
+            column = bound.inlets["inlet"]["p"].column.replace("_Pin", "_PDrop")
             supplements.append(("measured.pressure_drop", column, "bar"))
         elif kind == "degasser":
-            supplements.append(("streams.inlet.T", "T_p_in", "degC"))
+            supplements.append(("inlets.inlet.T", "T_p_in", "degC"))
             ignored[f"{name}.parameters.heat_transfer_coeff"] = (
                 "Preserved as metadata; liquid-only passthrough has no gas/thermal model."
             )
-        elif kind == "heatexchanger":
+        elif kind == "heat_exchanger":
             supplements.extend(
                 [
                     ("measured.duty", "Thermal_PowerGen", "W"),
@@ -291,21 +291,21 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
             if columns:
                 boundary["stream_defaults"][name] = {"cold_in": {"p": 5e5}}
         elif kind == "production_reservoir":
-            supplements.append(("inputs.m_dot", "Qp", "m3/h"))
+            supplements.append(("controls.m_dot", "Qp", "m3/h"))
         for target, column, unit in supplements:
             if column in columns:
                 _bind(bound, target, column, unit)
-        if bound.inputs or bound.streams:
+        if bound.controls or bound.inlets:
             bindings[name] = bound
-        if kind == "injectionpump":
+        if kind == "injection_pump":
             # NOTE(refactor): no injection curves are supplied; use measured discharge setpoint.
             # The example efficiency is explicit in the snapshot; no curve is fabricated.
-            boundary["inputs"][name] = {"discharge_pressure": 5.15e6}
+            boundary["inputs"][name] = {"pressure_setpoint": 5.15e6}
     # NOTE(refactor): expand the buried pump into two physical well segments. The riser
     # is an explicit handwritten child, preserving the previous physical segmentation.
     for name, item in list(modules.items()):
         esp = outgoing.get(name)
-        if item.type != "productionwell" or types.get(esp) != "esp":
+        if item.type != "production_well" or types.get(esp) != "esp":
             continue
         riser = name + "_riser"
         if riser in modules:
@@ -349,13 +349,17 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
         boundary[key] = {node_map[k]: v for k, v in boundary[key].items()}
     boundary.pop("well_risers", None)
     bindings[""] = ModuleBindings(
-        inputs={
+        controls={
             "m_dot": Binding(column="Qp", unit="m3/h"),
             "esp_frequency": Binding(column="ESP_freq", unit="Hz"),
             "injection_pressure": Binding(column="InjectorPump_Pout", unit="bar"),
-            "secondary.m_dot": Binding(column="Qs", unit="m3/h"),
-            "secondary.T": Binding(column="T_s_in", unit="degC"),
-        }
+        },
+        inlets={
+            "secondary": {
+                "m_dot": Binding(column="Qs", unit="m3/h"),
+                "T": Binding(column="T_s_in", unit="degC"),
+            }
+        },
     )
     # NOTE(refactor): two-control simulations need an assumed secondary boundary.
     # Store 40 kg/s, 20 C and 5 bar explicitly; measured replay never uses these defaults.

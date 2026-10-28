@@ -1,94 +1,79 @@
-"""Example doublet heat plant with every equipment connection written explicitly."""
+"""Example doublet heat plant with every connection written explicitly."""
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from gemini.core.modules.module import Module
-from gemini.core.types import HeatFlow, ModuleResult, PowerFlow, Stream
-from gemini.core.types.quantities import Frequency, MassFlow, Power, Pressure, Ratio
+from gemini.core.modules import Module, ModuleDict
+from gemini.core.modules.heat import HeatExchanger
+from gemini.core.modules.plants import Doublet
+from gemini.core.modules.pumps import InjectionPump
+from gemini.core.modules.treatment import Degasser, Filter
+from gemini.core.types import (
+    Control,
+    Frequency,
+    HeatFlow,
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Power,
+    PowerFlow,
+    Pressure,
+    Ratio,
+    Stream,
+)
 
 
 class DoubletHeatPlant(Module):
     """Doublet, degasser, filters, heat exchanger and injection pump in diagram order."""
 
-    name = "doublet_heat"
-    category = "plant"
-    description = "Handwritten doublet, surface heat extraction and reinjection plant."
-    inlets = {}
-    outlets = {
-        "secondary_out": Stream,
-        "gas": Stream,
-        "electricity": PowerFlow,
-        "heat_loss": HeatFlow,
-    }
-
-    class Inputs(BaseModel):
-        """Imposed flow, drive controls and secondary-loop boundary conditions."""
-
-        model_config = ConfigDict(extra="forbid")
-        m_dot: MassFlow = Field(ge=0, description="Production rate [kg/s]")
-        esp_frequency: Frequency = Field(description="ESP drive frequency [Hz]")
-        injection_pressure: Pressure = Field(description="Injection pump discharge setpoint [Pa]")
-        injection_frequency: Frequency = Field(60, description="Injection drive frequency [Hz]")
-        secondary: Stream = Field(description="Secondary-loop inlet stream [-]")
-
-    class Outputs(BaseModel):
-        """Delivered heat and total predicted electrical consumption."""
-
-        thermal_power: Power = Field(description="Secondary heat delivered [W]")
-        electricity: Power = Field(description="Predicted total grid consumption [W]")
-        cop: Ratio | None = Field(description="Heat/electricity; absent at zero consumption [-]")
-
-    def __init__(
-        self,
-        doublet=None,
-        degasser=None,
-        filter_hot=None,
-        heat_exchanger=None,
-        filter_return=None,
-        injection_pump=None,
-    ):
-        """Register supplied children; an empty instance can be filled by the legacy bridge."""
+    def __init__(self):
+        """Declare the complete plant tree, ports, controls and outputs."""
         super().__init__()
-        for name, module in (
-            ("doublet", doublet),
-            ("degasser", degasser),
-            ("filter_hot", filter_hot),
-            ("heat_exchanger", heat_exchanger),
-            ("filter_return", filter_return),
-            ("injection_pump", injection_pump),
-        ):
-            if module is not None:
-                setattr(self, name, module)
 
-    def forward(self, inputs, streams_in):
-        """Connect the two doublet limbs through the explicitly modeled surface equipment."""
-        supply, esp_power, production_heat = self.doublet.produce(
-            {"m_dot": inputs.m_dot, "esp_frequency": inputs.esp_frequency}
-        )
+        # Modules
+        self.doublet = Doublet()
+        self.degasser = Degasser()
+        self.filters = ModuleDict({"hot": Filter(), "cold": Filter()})
+        self.heat_exchanger = HeatExchanger()
+        self.injection_pump = InjectionPump()
+
+        # Inlets
+        self.secondary = Inlet(Stream)
+
+        # Controls
+        self.m_dot = Control(MassFlow)
+        self.esp_frequency = Control(Frequency)
+        self.injection_pressure = Control(Pressure)
+        self.injection_frequency = Control(Frequency, default=60)
+
+        # Outputs
+        self.thermal_power = Output(Power)
+        self.electricity_use = Output(Power)
+        self.cop = Output(Ratio | None, optional=True)
+
+        # Outlets
+        self.secondary_out = Outlet(Stream)
+        self.gas = Outlet(Stream)
+        self.electricity = Outlet(PowerFlow)
+        self.heat_loss = Outlet(HeatFlow)
+
+    def forward(self, secondary, m_dot, esp_frequency, injection_pressure, injection_frequency):
+        """Connect the doublet limbs through the modeled surface equipment."""
+        supply, esp_power, production_heat = self.doublet.produce(m_dot, esp_frequency)
         degassed = self.degasser(inlet=supply)
-        filtered = self.filter_hot(inlet=degassed.streams["liquid"])
-        exchanged = self.heat_exchanger(hot_in=filtered.streams["outlet"], cold_in=inputs.secondary)
-        returned = self.filter_return(inlet=exchanged.streams["hot_out"])
+        filtered = self.filters.hot(inlet=degassed.outlets.liquid)
+        exchanged = self.heat_exchanger(hot_in=filtered.outlets.outlet, cold_in=secondary)
+        returned = self.filters.cold(inlet=exchanged.outlets.hot_out)
         pumped = self.injection_pump(
-            {
-                "discharge_pressure": inputs.injection_pressure,
-                "frequency": inputs.injection_frequency,
-            },
-            suction=returned.streams["outlet"],
+            suction=returned.outlets.outlet,
+            pressure_setpoint=injection_pressure,
+            frequency=injection_frequency,
         )
-        injection_heat = self.doublet.inject(pumped.streams["discharge"])
-        electricity = esp_power.P + pumped.streams["electricity"].P
-        heat = exchanged.outputs.duty
-        return ModuleResult(
-            self.Outputs(
-                thermal_power=heat,
-                electricity=electricity,
-                cop=heat / electricity if electricity else None,
-            ),
-            {
-                "secondary_out": exchanged.streams["cold_out"],
-                "gas": degassed.streams["gas"],
-                "electricity": PowerFlow(P=electricity),
-                "heat_loss": HeatFlow(Q=production_heat.Q + injection_heat.Q),
-            },
-        )
+        injection_heat = self.doublet.inject(pumped.outlets.discharge)
+        self.electricity_use = esp_power.P + pumped.outlets.electricity.P
+        self.thermal_power = exchanged.outputs.duty
+        self.cop = self.thermal_power / self.electricity_use if self.electricity_use else None
+        return {
+            "secondary_out": exchanged.outlets.cold_out,
+            "gas": degassed.outlets.gas,
+            "electricity": PowerFlow(P=self.electricity_use),
+            "heat_loss": HeatFlow(Q=production_heat.Q + injection_heat.Q),
+        }

@@ -8,21 +8,21 @@ from gemini.core.physics import geometry, units
 
 # All old-format names are intentionally confined to the legacy package.
 TYPES = {
-    "production_well": "productionwell",
-    "injection_well": "injectionwell",
-    "heat_exchanger": "heatexchanger",
-    "injection_pump": "injectionpump",
+    "production_well": "production_well",
+    "injection_well": "injection_well",
+    "heat_exchanger": "heat_exchanger",
+    "injection_pump": "injection_pump",
 }
 PORTS = {
     "production_reservoir": {"out": "sandface"},
     "injection_reservoir": {"in": "sandface"},
-    "productionwell": {"in": "bottom", "out": "wellhead"},
-    "injectionwell": {"in": "wellhead", "out": "bottom"},
+    "production_well": {"in": "bottom", "out": "wellhead"},
+    "injection_well": {"in": "wellhead", "out": "bottom"},
     "esp": {"in": "suction", "out": "discharge"},
-    "injectionpump": {"in": "suction", "out": "discharge"},
+    "injection_pump": {"in": "suction", "out": "discharge"},
     "filter": {"in": "inlet", "out": "outlet"},
     "degasser": {"in": "inlet", "out1": "liquid", "out2": "gas"},
-    "heatexchanger": {
+    "heat_exchanger": {
         "PrimIn": "hot_in",
         "PrimOut": "hot_out",
         "SecIn": "cold_in",
@@ -34,9 +34,9 @@ NODE_PATHS = {
     "production_well_c774": "doublet.well",
     "esp_1ee3": "doublet.esp",
     "degasser_e846": "degasser",
-    "filter_b2e6": "filter_hot",
+    "filter_b2e6": "filters.hot",
     "heat_exchanger_3410": "heat_exchanger",
-    "filter_b1ed": "filter_return",
+    "filter_b1ed": "filters.cold",
     "injection_pump_3808": "injection_pump",
     "injection_well_a06b": "doublet.injector",
     "reservoir_28fc": "doublet.sink",
@@ -147,7 +147,7 @@ def _well_params(properties, prefix, base_path):
         # WIMS tally ID is inches; trajectory ID and roughness are already metres.
         tally.append(dict(row, ID=units.inch_to_m(float(row["ID"]))))
     return dict(
-        path=geometry.build_path(table, tally),
+        pipe_path=geometry.build_path(table, tally),
         friction_correlation=p.get(f"{prefix}_friction_correlation", "darcy_weisbach"),
         friction_correlation_2p=p.get(f"{prefix}_friction_correlation_2p", "BeggsBrill"),
         correction_factors=tuple(p.get(f"{prefix}_friction_correction_factors", (1, 0))),
@@ -200,7 +200,13 @@ def blowdown_params_from_gemini(property: dict) -> dict:
 def boiler_params_from_gemini(property: dict) -> dict:
     """Map explicit boiler capacity [W], efficiency [-], and fuel [-]."""
     p = _values(property)
-    return dict(fuel=p["fuel"], capacity=p["capacity"], efficiency=p["efficiency"])
+    return dict(fuel_type=p["fuel"], capacity=p["capacity"], efficiency=p["efficiency"])
+
+
+# New derived class names retain the old file-schema spelling inside these converters.
+production_well_params_from_gemini = productionwell_params_from_gemini
+injection_well_params_from_gemini = injectionwell_params_from_gemini
+injection_pump_params_from_gemini = injectionpump_params_from_gemini
 
 
 def heatexchanger_params_from_gemini(property: dict) -> dict:
@@ -216,3 +222,6 @@ def heatexchanger_params_from_gemini(property: dict) -> dict:
         m_dot_hot_nominal=p.get("m_dot_hot_nominal", 1),
         m_dot_cold_nominal=p.get("m_dot_cold_nominal", 1),
     )
+
+
+heat_exchanger_params_from_gemini = heatexchanger_params_from_gemini

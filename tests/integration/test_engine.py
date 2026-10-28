@@ -6,13 +6,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from pydantic import BaseModel
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.engine.callbacks import AutoCheckpoint, Callback, EventLog
 from gemini.core.engine.results import Results
-from gemini.core.types import ModuleResult
+from gemini.core.types import Control, Output
 from gemini.core.types.bindings import Binding, DatedParams, ModuleBindings
 
 ROOT = Path(__file__).parents[2]
@@ -23,30 +22,31 @@ REFERENCE = ROOT / "tests/fixtures/engine_reference"
 class Accumulator(gm.modules.Module):
     """Simple importable test integrator with a JSON state."""
 
-    name, category, stateful = "engine_accumulator", "test", True
+    stateful = True
 
-    class Inputs(BaseModel):
-        """Rate of accumulation."""
+    def __init__(self):
+        """Declare the accumulator's test state and ports."""
+        super().__init__()
 
-        rate: float
+        # Controls
+        self.rate = Control(float)
 
-    class Outputs(BaseModel):
-        """Integrated quantity."""
-
-        value: float
+        # Outputs
+        self.value = Output(float)
 
     def initial_state(self):
         """Start at zero."""
         return {"value": 0.0}
 
-    def forward(self, inputs, streams_in):
+    def forward(self, rate):
         """Expose a stateless rate observation."""
-        return ModuleResult(self.Outputs(value=inputs.rate), {})
+        self.value = rate
+        return {}
 
-    def step(self, state, inputs, streams_in, dt):
+    def step(self, state, dt, rate):
         """Integrate with explicit state."""
-        state = {"value": state["value"] + inputs["rate"] * dt}
-        return state, ModuleResult(self.Outputs(value=state["value"]), {})
+        state = {"value": state["value"] + rate * dt}
+        return state, self(rate=state["value"])
 
 
 @pytest.fixture
@@ -62,6 +62,7 @@ def test_reference_replay_and_simulate(setup):
     """Preserve every pre-refactor output, including health fields and scenario diagnostics."""
     plant, data = setup
     old = pd.read_pickle(REFERENCE / "replay.pkl")
+    old = old.rename(columns={"filter_hot": "filters.hot", "filter_return": "filters.cold"})
     actual = gm.Engine(on_error="raise").replay(plant, data).to_frame()
     pd.testing.assert_frame_equal(actual[old.columns], old, check_names=False)
     clock = gm.Clock.days(2024, 6, 7)
@@ -69,6 +70,7 @@ def test_reference_replay_and_simulate(setup):
     assumed = pd.DataFrame([raw.iloc[0].to_dict()] * 24, index=list(clock))
     result = gm.Engine(on_error="raise").simulate(plant, gm.Dataset.from_frame(assumed), clock)
     old = pd.read_pickle(REFERENCE / "simulate.pkl")
+    old = old.rename(columns={"filter_hot": "filters.hot", "filter_return": "filters.cold"})
     actual = result.to_frame()
     # NOTE(refactor): pandas' ordinary decimal parser changes a few chained scenario
     # values at ~1e-15 relative to the old raw-unit CSV conversion path.
@@ -151,18 +153,16 @@ def test_missing_data_dates_events_and_export(setup, tmp_path):
     plant, data = setup
     frame = data.read(data.start, data.end).iloc[:12]
     frame.loc[frame.index[0], "doublet.esp.suction.p"] = np.nan
-    module = plant.filter_hot
+    module = plant.filters.hot
     module.param_history.append(
-        DatedParams(
-            valid_from=frame.index[1], params=module.params.model_dump() | {"dp_nominal": 3200}
-        )
+        DatedParams(valid_from=frame.index[1], params=module.params_at(None) | {"dp_nominal": 3200})
     )
     events = EventLog(tmp_path / "events.jsonl")
     result = gm.Engine([events], on_error="raise").replay(plant, gm.Dataset.from_frame(frame))
     assert result["doublet.esp"].head.notna().sum() == 11
     assert (
-        result["filter_hot"].pressure_drop.iloc[1]
-        > 1.99 * result["filter_hot"].pressure_drop.iloc[0]
+        result["filters.hot"].pressure_drop.iloc[1]
+        > 1.99 * result["filters.hot"].pressure_drop.iloc[0]
     )
     assert result.skip_counts == {"doublet.esp": {"doublet.esp.suction.p": 1}}
     assert not any(m._hooks for m in plant.modules())
@@ -217,7 +217,7 @@ def test_error_policies_and_missing_columns(setup):
     frame.loc[frame.index[0], "doublet.esp.suction.p"] = -100
     result = gm.Engine().replay(plant, gm.Dataset.from_frame(frame))
     assert result.errors[0]["module"] == "doublet.esp"
-    assert result["filter_hot"].pressure_drop.notna().all()
+    assert result["filters.hot"].pressure_drop.notna().all()
     with pytest.raises(ValueError):
         gm.Engine(on_error="raise").replay(plant, gm.Dataset.from_frame(frame))
     with pytest.raises(ValueError, match="doublet.esp.suction.p.*doublet.reservoir.m_dot"):
@@ -246,7 +246,7 @@ def test_plant_only_checkpoint(setup, tmp_path):
 def test_stateful_measured_and_integrated(tmp_path):
     """Measured state resets each tick; unbound state integrates and survives checkpoints."""
     plant = Accumulator()
-    plant.bindings = {"": ModuleBindings(inputs={"rate": Binding(column="rate", unit="-")})}
+    plant.bindings = {"": ModuleBindings(controls={"rate": Binding(column="rate", unit="-")})}
     frame = pd.DataFrame(
         {"rate": [1, 1, 1], "observed": [10, 20, 30]},
         index=pd.date_range("2024-01-01", periods=3, freq="1s", tz="UTC"),

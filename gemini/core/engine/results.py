@@ -46,6 +46,25 @@ class ModuleSeries:
             raise AttributeError(f"Unknown result field {field!r}; available: {list(self._frame)}")
         return self._frame[field]
 
+    def get(self, field, unit=None):
+        """Return a series, optionally converted from its stored SI unit."""
+        series = getattr(self, field)
+        if unit is None:
+            return series
+        from gemini.core.physics import units
+
+        source = {
+            "head": "Pa",
+            "pressure_drop": "Pa",
+            "discharge_pressure": "Pa",
+            "power": "W",
+            "duty": "W",
+            "thermal_power": "W",
+        }.get(field)
+        if source is None:
+            raise ValueError(f"No stored unit metadata for result field {field!r}")
+        return series.map(lambda value: units.convert(value, source, unit))
+
 
 class Results:
     """Collect finite timestep outputs, energy ports, health, errors and explicit skips."""
@@ -65,11 +84,11 @@ class Results:
             row.update({(path, key): value for key, value in result.outputs.model_dump().items()})
             streams = [
                 flow
-                for flow in (result.inlets | result.streams).values()
+                for flow in (result.inlets | dict(result.outlets)).values()
                 if isinstance(flow, Stream)
             ]
             row[path, "operating"] = any(flow.m_dot != 0 for flow in streams) if streams else True
-            for port, flow in result.streams.items():
+            for port, flow in result.outlets.items():
                 if isinstance(flow, (PowerFlow, FuelFlow, HeatFlow)):
                     key = (path, "energy_port_" + port)
                     row[key] = flow.Q if isinstance(flow, HeatFlow) else flow.P

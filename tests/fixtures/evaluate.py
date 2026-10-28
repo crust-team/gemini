@@ -30,10 +30,10 @@ def evaluate():
         p = case.get("parameters", {})
         u = case["inputs"]
         if name.startswith("esp_"):
-            output, _ = ESP(p)(
-                {"frequency": u["pump_freq"]},
-                {"suction": Stream(m_dot=u["pump_flow"] * 1000, T=300, p=1e5)},
-            )
+            output = ESP(**p)(
+                frequency=u["pump_freq"],
+                suction=Stream(m_dot=u["pump_flow"] * 1000, T=300, p=1e5),
+            ).outputs
             result = dict(
                 pump_head=output.head, pump_power=output.power, pump_eff=output.efficiency * 100
             )
@@ -54,15 +54,15 @@ def evaluate():
                 injectivity_index=units.index_to_si(20),
             )
             if name == "ipr_injection":
-                c = InjectionReservoir(params)
-                out, _ = c({}, {"sandface": Stream(m_dot=u["flow"] * 1000, T=300, p=23e6)})
+                c = InjectionReservoir(**params)
+                out = c(sandface=Stream(m_dot=u["flow"] * 1000, T=300, p=23e6)).outputs
                 result = dict(bottomhole_pressure=out.bottomhole_pressure)
             elif name == "ipr_production":
-                out, _ = ProductionReservoir(params)({"m_dot": u["flow"] * 1000}, {})
+                out = ProductionReservoir(**params)(m_dot=u["flow"] * 1000).outputs
                 result = dict(bottomhole_pressure=out.bottomhole_pressure)
             elif name == "injectivity":
                 result = dict(
-                    injectivity_index=InjectionReservoir(params).injectivity_from_measurements(
+                    injectivity_index=InjectionReservoir(**params).injectivity_from_measurements(
                         u["flow"], u["bottomhole_pressure"]
                     )
                 )
@@ -77,7 +77,7 @@ def evaluate():
                     liquid_viscosity=u["viscosity"],
                     skin=u["skin_factor"],
                 )
-                out, _ = ProductionReservoir(params)({"m_dot": u["flow"] * u["density"]}, {})
+                out = ProductionReservoir(**params)(m_dot=u["flow"] * u["density"]).outputs
                 result = dict(
                     Hydrostatic_dp=out.hydrostatic_dp,
                     skin_dp=out.skin_dp,
@@ -101,10 +101,13 @@ def evaluate():
                 if name == "well_production"
                 else (InjectionWell, "wellhead")
             )
-            output, streams = cls(dict(path=path, soil_temperature=u["temperature_ambient"]))(
-                {}, {port: stream}
+            evaluated = cls(pipe_path=path, soil_temperature=u["temperature_ambient"])(
+                **{port: stream}
             )
-            stream = next(iter(streams.values()))
+            output = evaluated.outputs
+            stream = next(
+                value for value in evaluated.outlets.values() if isinstance(value, Stream)
+            )
             result = dict(
                 pressure_output=stream.p,
                 temperature_output=stream.T,

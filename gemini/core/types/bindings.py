@@ -46,8 +46,9 @@ class Binding(ConfigModel):
 class ModuleBindings(ConfigModel):
     """Operating controls, inlet conditions and measured outputs for one module."""
 
-    inputs: dict[str, Binding] = Field(default_factory=dict)
-    streams: dict[str, dict[str, Binding]] = Field(default_factory=dict)
+    controls: dict[str, Binding] = Field(default_factory=dict)
+    boundaries: dict[str, Binding] = Field(default_factory=dict)
+    inlets: dict[str, dict[str, Binding]] = Field(default_factory=dict)
     measured: dict[str, Binding] = Field(default_factory=dict)
     state: dict[str, Binding] = Field(default_factory=dict)
 
