@@ -151,15 +151,118 @@ def to_dataset(project, frame_old):
 
 
 def from_plant(plant, template, nodes=None):
-    """Return an old-project copy suitable for writing through the faithful raw writer.
+    """Convert current parameters and dated histories into an old-project copy.
 
-    The bridge preserves every original raw property. Current parameter conversion is
-    deliberately limited to values originating from that template; unsupported new fields
-    remain represented only in the new plant JSON.
+    Properties without a faithful inverse (notably trajectory tables) retain the template's
+    raw value. New-format-only fields remain in the plant JSON and are not invented in GEMINI.
     """
-    if nodes is not None and nodes != plant.legacy_info.get("nodes", nodes):
-        raise ValueError("The supplied node map differs from the plant's legacy conversion map")
-    return template.model_copy(deep=True)
+    node_map = nodes or getattr(plant, "legacy_info", {}).get("nodes")
+    if node_map is None:
+        raise ValueError("from_plant requires nodes or a plant created by legacy.to_plant")
+    unknown = sorted(set(template.nodes) - set(node_map))
+    if unknown:
+        raise ValueError(f"Legacy node map is missing node ids: {unknown}")
+    converted = template.model_copy(deep=True)
+    for node_id, properties in converted.params.items():
+        path = node_map[node_id]
+        owner = plant.get_submodule(path)
+        dates = [snapshot.valid_from for snapshot in owner.param_history]
+        for name, legacy_param in properties.items():
+            source = owner
+            if name == "productionwell_productivity_index":
+                source = plant.get_submodule("doublet.reservoir")
+            elif name == "injectionwell_injectivity_index":
+                source = plant.get_submodule("doublet.sink")
+            elif name == "wellbore_radius" and path.endswith(".well"):
+                source = plant.get_submodule("doublet.reservoir")
+            elif name == "wellbore_radius" and path.endswith(".injector"):
+                source = plant.get_submodule("doublet.sink")
+            export_dates = dates or legacy_param.timestamps
+            if len(export_dates) == len(legacy_param.timestamps) and all(
+                _same_time(new, old) for new, old in zip(export_dates, legacy_param.timestamps)
+            ):
+                export_dates = legacy_param.timestamps
+            values = []
+            for index, timestamp in enumerate(export_dates):
+                params = source.params_at(timestamp)
+                original = legacy_param.values[min(index, len(legacy_param.values) - 1)]
+                values.append(_legacy_property(name, params, original))
+            legacy_param.timestamps = list(export_dates)
+            legacy_param.values = values
+    return converted
+
+
+def _same_time(left, right):
+    if left is None or right is None:
+        return left is right
+    return pd.Timestamp(left).tz_localize(None) == pd.Timestamp(right).tz_localize(None)
+
+
+def _coefficients(value):
+    return list(map(float, value.split(";"))) if isinstance(value, str) else list(value)
+
+
+def _coefficient_value(values, original):
+    values = list(values)
+    if _coefficients(original) == values:
+        return original
+    if isinstance(original, str):
+        return ";".join(format(value, ".17g") for value in values)
+    return values
+
+
+def _legacy_property(name, params, original):
+    """Return one old-format property while preserving unchanged raw representations."""
+    direct = {
+        "esp_depth": "setting_depth",
+        "esp_no_stage": "no_stages",
+        "esp_tubing": "tubing",
+        "esp_type": "pump_type",
+        "heat_transfer_coeff": ("ua" if hasattr(params, "ua") else "heat_transfer_coeff"),
+        "injectionpump_no_stage": "no_stages",
+        "injectionpump_type": "pump_type",
+        "reservoir_thickness": "thickness",
+        "reservoir_radius": "drainage_radius",
+        "reservoir_top": "top_depth",
+        "liquid_density": "liquid_density",
+        "liquid_viscosity": "liquid_viscosity",
+        "skin": "skin",
+        "wellbore_radius": "wellbore_radius",
+    }
+    if name in direct:
+        value = getattr(params, direct[name])
+    elif name == "esp_head_coeff":
+        return _coefficient_value(params.head_coeff, original)
+    elif name == "esp_power_coeff":
+        return _coefficient_value(params.power_coeff, original)
+    elif name == "esp_correction_factor":
+        return _coefficient_value(
+            [params.correction_factor[0], units.pa_to_bar(params.correction_factor[1])],
+            original,
+        )
+    elif name in {"esp_bep_flow", "esp_min_flow", "esp_max_flow"}:
+        value = units.m3s_to_m3h(getattr(params, name.removeprefix("esp_")))
+    elif name == "reservoir_pressure":
+        value = units.pa_to_bar(params.pressure)
+    elif name == "reservoir_temperature":
+        value = units.k_to_c(params.temperature)
+    elif name == "reservoir_permeability":
+        value = units.m2_to_md(params.permeability)
+    elif name.endswith("_soil_temperature"):
+        value = units.k_to_c(params.soil_temperature)
+    elif name.endswith("_friction_correlation"):
+        value = params.friction_correlation
+    elif name.endswith("_friction_correlation_2p"):
+        value = params.friction_correlation_2p
+    elif name.endswith("_friction_correction_factors"):
+        value = list(params.correction_factors)
+    elif name.endswith("_productivity_index"):
+        value = units.index_from_si(params.productivity_index)
+    elif name.endswith("_injectivity_index"):
+        value = units.index_from_si(params.injectivity_index)
+    else:
+        return original
+    return original if value == original else value
 
 
 def _from_si(value, unit):
