@@ -1,4 +1,4 @@
-"""Print all discovered component schemas as JSON."""
+"""Print all discovered module schemas as JSON."""
 
 import json
 

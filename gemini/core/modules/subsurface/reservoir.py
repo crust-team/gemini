@@ -1,4 +1,4 @@
-"""Production and injection reservoir components for a geothermal doublet.
+"""Production and injection reservoir modules for a geothermal doublet.
 
 References: Tarek Ahmed, Reservoir Engineering Handbook (2019), chapter 7;
 Akin (2019), geothermal re-injection surveillance and pressure estimation.

@@ -1,4 +1,4 @@
-"""Boiler component supplying auxiliary heat to the geothermal loop.
+"""Boiler module supplying auxiliary heat to the geothermal loop.
 
 Gas and electric boilers share a steady first-law heat balance with a capacity cap.
 """

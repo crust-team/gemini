@@ -1,16 +1,14 @@
-# Core Physics Rules
+# Core physics rules
 
-`gemini/core/physics` holds physics that more than one component can use.
+`gemini/core/physics` contains reusable correlations: conversions, constants, fluids, geometry,
+hydraulics, heat transfer, pumps, chemistry, corrosion and erosion.
 
-- One module per topic: `units`, `constants`, `fluid`, `geometry`, `hydraulics`,
-  `heat_transfer`, `chemistry`, `corrosion`, `erosion` (add `thermodynamics` when needed).
-- Plain typed functions, SI in and out. Use small Pydantic models or frozen dataclasses only for
-  structured results (`PathResult`, `FluidProperties`, `PipeSection`).
-- Every function docstring lists parameters and returns with units and gives the reference
-  (author, year, title or standard, page/equation).
-- Correlations that need non-SI units internally (Beggs–Brill, ESP curves, erosion) convert at the
-  function boundary with `units`.
-- Selecting between correlations uses a `Literal[...]` argument and raises `ValueError` on an
-  unknown name.
-- No state, no I/O, no logging inside physics functions.
-- Do not add standalone `utils.py` or `helpers.py`; a function belongs to a topic module.
+- Use plain typed functions and SI inputs/outputs; small structured return models are allowed.
+- State dimensions, reference formulas and assumptions in docstrings.
+- Keep correlation-specific US or laboratory bases explicit at the formula boundary.
+- Do not perform database I/O, logging or mutate global state during calculations.
+- Register named fluid factories while building configurations, before evaluation.
+- Do not hide undefined diagnostics as valid numbers. The receiving aquifer's unconfigured
+  drainage radius leaves radial estimates unavailable while its pressure-flow model works.
+- Preserve original numerical cases in `tests/golden`. Intentional changes require a
+  `NOTE(refactor)` and measured or physical evidence; see `refactor-notes.md`.

@@ -1,8 +1,4 @@
-"""BoosterPump component.
-
-Maintains circulation pressure through the surface geothermal loop. The original GEMINI unit had no
-equipment model.
-"""
+"""Booster-pump passthrough with an explicit unmodelled-performance flag."""
 
 from pydantic import BaseModel, ConfigDict, Field
 

@@ -1,114 +1,95 @@
 # GEMINI Geothermal Suite
 
-An installable Python package for geothermal equipment physics and time-series monitoring,
-developed by TNO and partners in the Nieuwe Warmte Nu programme. Python **3.11** and
-**Pydantic v2** are used for the component API. Package inputs and outputs use SI units.
+Composable geothermal physics and digital twins, developed by TNO and partners in the Nieuwe
+Warmte Nu programme. Python 3.11 and Pydantic v2. Equipment and plants share a `Module` API;
+streams use SI, measured twins use independent boundaries, and scenarios chain predictions.
 
-## Install and run
+## Quickstart
 
-From this directory:
+From this checkout (the existing dataset directory is `geothermal_doublet`):
 
 ```bash
 pip install poetry
-poetry install
-poetry run python examples/01_esp_operating_point.py
-poetry run python examples/04_doublet_chain.py
-poetry run python examples/05_list_components.py
+poetry install --extras parquet
+poetry run python - <<'PY'
+from pathlib import Path
+from gemini.core.config.gemini_loader import load_gemini
+from gemini.core.config.build import build_plant
+from gemini.core.data.timeseries import CSVTimeSeries
+from gemini.core.modes.history import replay, calibrate
+folder = Path("datasets/geothermal_doublet")
+config = load_gemini(folder)
+plant = build_plant(config)
+data = CSVTimeSeries(folder / "geothermal_example_dataset.csv").frame
+print(replay(plant, config, data.iloc[:672]).to_frame().head())
+print(calibrate(plant, config, data.iloc[:672], "heat_exchanger_3410", ["ua"], apply=True))
+PY
 ```
 
-For library use, `pip install .` installs the `gemini` import package. Examples and sample
-plant files live in the source checkout under `examples/` and `datasets/geothermal_example/`.
-No external services are needed for the components, examples or CSV engine integration test.
+## Module API
 
 ```python
+from gemini.core.modules import Boiler, Sequential
 from gemini.core.base.stream import Stream
-from gemini.core.engine.registry import create
 
-boiler = create("boiler", {"fuel": "electric", "capacity": 100000, "efficiency": 0.95})
-result, streams = boiler.compute(
-    {"setpoint_T": 350},
-    {"inlet": Stream(m_dot=10, T=300, p=1000000)},
-)
-print(result.duty, streams["outlet"].T)
+plant = Sequential(Boiler({"fuel": "electric", "capacity": 100000, "efficiency": 0.95}))
+result = plant({"0": {"setpoint_T": 350}}, inlet=Stream(m_dot=10, T=300, p=1e6))
+print(result.outputs.root["0"].duty)
+print(dict(plant.named_params()))
+snapshot = plant.state_dict()
+plant.load_state_dict(snapshot)
 ```
 
-## Package structure
+`Module` supports named children, recursive parameters, bounded calibration references,
+validated state loading, hooks, optional health and stateful stepping. `GraphPlant` exposes
+unconnected ports, routes links and solves feedback through stream tearing. Imported buried
+ESPs use below-pump and riser well segments. `Sequential` chains single-inlet equipment.
 
-- `gemini/core/base`: validated streams, component contracts, health, runtime unit interfaces.
-- `gemini/core/physics`: units, fluid properties, geometry, hydraulics, heat transfer,
-  chemistry, corrosion and erosion.
-- `gemini/core/plant`: configuration mappers, connected units and plant loading.
-- `gemini/core/data`: CSV, InfluxDB and AVEVA drivers; an offline CSV reader with in-memory outputs.
-- `gemini/core/engine`: time loops, registry and component-based monitoring modules.
-- `gemini/components`: subsurface, pumps, treatment and heat equipment, one file per equipment type.
-- `gemini/design`, `gemini/optim`, `gemini/agentic`, `gemini/core/modes`: reserved namespaces.
+Equipment declares `fidelity`: established correlations use `model`, filters and injection
+pumps use `simple`, and liquid-only degassing/booster/blowdown use `passthrough`. Gas separation
+is not modelled. Bindings and sensor names belong to configuration, not equipment.
 
-Implemented equipment includes ESPs, production/injection reservoirs and wells, boilers, and
-counterflow/parallel heat exchangers. Injection/booster pumps, degassers, filters and blowdown
-have explicit unmodelled compute methods. Filter clogging monitoring is available independently.
+## Execution and persistence
 
-## Conventions and numerical compatibility
+- `history.replay`: independent measured-boundary twins, with dated parameters and counted skips.
+- `history.calibrate`: bounded least squares on an explicit window; `apply=False` by default.
+- `live.run_latest`: the same twin evaluator over a driver's `latest(window)` result or loaded CSV.
+- `scenario.run`: chained assumptions, optionally advancing process state.
+- `Results.to_frame`: `(module_path, field)` columns; CSV and optional Parquet exports.
+- `EventLog(path).attach(plant)`: JSON-lines forward traces; `EventLog()` retains them in memory.
+- `build_plant`, `plant_to_config`, `save_config`, `load_config`: portable JSON design round trips.
 
-Read [AGENTS.md](AGENTS.md) and the linked [.claude/docs](.claude/docs/conventions.md) before
-changing code. Component ports carry immutable `Stream` objects. Parameters, operating inputs,
-returned output types and port names are validated on direct `compute()` calls.
+The original CSV, InfluxDB and AVEVA drivers remain available. A live source adapter must expose
+`latest(window)` as a timestamp-indexed DataFrame; external services are not needed for examples.
 
-GEMINI `.param` files retain their historical units and timestamped structure. Convert them
-through `gemini.core.plant.param_mapping`. Corrosion and erosion rates retain the documented
-`mm/year` output convention. ESP polynomial coefficients retain their historical US basis;
-efficiency is now a fraction. The example pump has zero power coefficients.
+## Examples and validation
 
-`tests/golden/golden_values.json` contains the original physics baseline. Do not regenerate it
-from the new API. `tests/golden/capture_golden.py` is a historical script intended to be run at
-the phase-0 commit, where the original imports still exist. `runtime_values.json` additionally
-records all eight legacy monitoring outputs from the first CSV interval, captured using the
-phase-1 implementation (`193c9a8`) before rewriting the engine adapters.
-
-Public components use physically consistent SI mappings. Compatibility adapters retain old
-dashboard conventions, including the legacy IPR unit mismatch, ESP interval selection and
-float32 polynomial evaluation. Search for `NOTE(refactor)` for their precise locations.
-The injection example has an unconfigured zero drainage radius; radial diagnostics are `None`.
-
-The doublet example registers a named constant brine model during configuration so reservoir,
-well and pump streams use the same example density. The default `water`/`brine` properties remain
-unchanged. It imposes flow and prints the injection pressure residual; no network solver is implied.
-
-## Offline and service-backed monitoring
-
-```python
-from gemini.core.data.csv_memory import CSVMemoryReader
-from gemini.core.engine.mainmodule import MainModule
-from gemini.core.plant.loader import setup
-
-reader = CSVMemoryReader(
-    "datasets/geothermal_example/geothermal_example_dataset.csv",
-    end_time="2024-06-07T00:15:00Z",
-)
-plant = setup("datasets", "geothermal_example", database=reader)
-MainModule(plant).step()
-print(reader.outputs)
-```
-
-Calling `setup` without a supplied reader uses the retained InfluxDB/AVEVA configuration path.
-Supply the existing `INFLUXDB_URL`, `INFLUXDB_ORG`, `INFLUXDB_USERNAME`, `INFLUXDB_PASSWORD`, and
-`INFLUXDB_BUCKET` environment variables when using that path. The runner does not load `.env`
-files or start services at import time. External-service tests are skipped without credentials.
-
-## Validation and API documentation
+`examples/01`–`05` demonstrate individual equipment, a manual chain and discovery;
+`06` imports/exports a graph, `07` replays a week, `08` calibrates HX conductance and `09` runs a day.
+All nine run in the test suite.
 
 ```bash
-poetry run black --check gemini tests
-poetry run isort --check-only gemini tests
-poetry run flake8 gemini tests
+poetry run black --check gemini tests examples
+poetry run isort --check-only gemini tests examples
+poetry run flake8 gemini tests examples
 poetry run pytest tests
-poetry run sphinx-build -W -b html docs docs/_build/html
 ```
 
-The workflows inline these commands. Documentation consists of the Python API reference;
-GitHub Pages deployment runs only for `main`. See [CHANGELOG.md](CHANGELOG.md) and
-[VERSIONING.md](VERSIONING.md) for release policy. This migration is unreleased.
+The full 17,280-row e2e test runs by default. AVEVA requires credentials; Parquet requires the
+`parquet` extra. The 25 original physics cases and eight captured monitoring outputs are immutable.
 
-## License and acknowledgments
+## Accuracy and limits
 
-[Apache 2.0](LICENSE). Supported by NWM innovatie: Datagedreven optimalisatie
-aardwarmtesystemen, with TNO, Gaia Energy, HVC, Well Engineering Partners and Helin.
+The example has **zero unmapped properties/tags** and 100% coverage for its eight bound twins.
+The three remaining graph nodes lack measured inlet boundaries and run in scenarios. Health
+with `assessed=False` means the model or measurements cannot support a diagnostic.
+
+The supplied ESP power curve is all zeros, and its head curve disagrees with the CSV by 63.2%
+median. These produce alarms even though all source status labels say Normal. Calibrated HX
+holdout duty error is 0.63% median; the hot temperature maximum is 0.566 K. Full-chain pressure
+and duty errors remain 57.6% and 12.4%. The e2e tests document these exceptions explicitly;
+green tests do not establish the original accuracy targets. The graph imposes flow and does
+not solve hydraulic operating-point balance.
+
+Read [AGENTS.md](AGENTS.md), [numerical decisions](.claude/docs/refactor-notes.md), and the
+[implementation report](docs/module-refactor-report.md) before changing the models.

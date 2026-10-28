@@ -1,4 +1,4 @@
-"""Discover equipment components without a manual component catalogue."""
+"""Discover equipment modules without a manual module catalogue."""
 
 import importlib
 import inspect
@@ -21,7 +21,7 @@ def _discover() -> dict[str, type[Module]]:
             ):
                 continue
             if cls.name in discovered:
-                raise ValueError(f"Duplicate component name {cls.name!r}")
+                raise ValueError(f"Duplicate module name {cls.name!r}")
             discovered[cls.name] = cls
     return discovered
 
@@ -35,13 +35,13 @@ def list_modules() -> list[dict]:
 
 
 def get(name: str) -> type[Module]:
-    """Resolve a component name or raise a clear configuration error."""
+    """Resolve a module name or raise a clear configuration error."""
     try:
         return _MODULES[name]
     except KeyError as exc:
-        raise ValueError(f"Unknown component {name!r}") from exc
+        raise ValueError(f"Unknown module {name!r}") from exc
 
 
 def create(name: str, params: dict, *, fluid: str = "brine") -> Module:
-    """Construct a validated component with SI parameters and a named fluid model."""
+    """Construct a validated module with SI parameters and a named fluid model."""
     return get(name)(params, fluid=fluid)

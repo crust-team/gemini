@@ -1,4 +1,4 @@
-"""GEMINI treatment equipment components."""
+"""GEMINI treatment equipment modules."""
 
 from .blowdown import Blowdown
 from .degasser import Degasser

@@ -1,25 +1,29 @@
 # Testing
 
-- Tests mirror the package: `tests/core/physics/test_hydraulics.py`,
-  `tests/components/pumps/test_esp.py`.
-- Test behaviour, physical limits and failure handling. Do not add tests that only repeat the
-  implementation.
-- Every component has tests for: parameter validation (valid example, missing field, wrong type,
-  out-of-range value), port contract, `schema()` serialisation, reference numbers, and `health`
-  thresholds when implemented.
-- Reference numbers come from a documented source: golden values captured from the original
-  GEMINI models (`tests/golden/golden_values.json`), a textbook example, or measured data in
-  `datasets/`. Write the source next to the expected value.
-- Physics functions get at least one energy- or mass-balance or limiting-case check (zero flow,
-  equal temperatures, infinite UA).
-- Tests that need external services (InfluxDB, AVEVA) are skipped when credentials are missing.
-- Examples in `examples/` are run by `tests/test_examples.py`.
+Mirror implementation paths under `tests/core`. Test behaviour, physical limits and failure
+handling. Equipment tests cover validated parameters, port contracts, fidelity, mass/energy
+balance, reference numbers and health thresholds. Base tests cover child paths, recursive
+parameters, atomic JSON state loading, hook order/removal and stateful composition. Graph tests
+cover feedback convergence, failure residuals and the buried ESP split.
 
-Validation commands:
+`tests/golden/golden_values.json` and `runtime_values.json` are immutable. The historical
+capture script is archival; do not regenerate expected values from the replacement API.
+Monitoring parity is reconstructed in golden tests using public physics, never production
+compatibility adapters.
+
+`tests/e2e/test_geothermal_example.py` runs by default despite its `slow` marker. It loads the
+project and saved JSON, replays all 17,280 rows, checks coverage and finite soft sensors, fits
+HX conductance on the first 672 observations and evaluates the remaining 16,608 observations.
+It also runs a chained graph for every row. Explicit `NOTE(refactor)` comments explain
+source-model inconsistencies and changed accuracy limits. These are reported limitations,
+not evidence that the original accuracy targets were achieved.
+
+All nine examples are executed by `tests/test_examples.py`. External AVEVA tests skip only
+without credentials. Install the optional `parquet` extra to exercise that export check.
 
 ```bash
-poetry run black --check gemini tests
-poetry run isort --check-only gemini tests
-poetry run flake8 gemini tests
+poetry run black --check gemini tests examples
+poetry run isort --check-only gemini tests examples
+poetry run flake8 gemini tests examples
 poetry run pytest tests
 ```

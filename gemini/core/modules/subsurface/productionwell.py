@@ -1,4 +1,4 @@
-"""ProductionWell component.
+"""ProductionWell module.
 
 Traverses a geothermal well using the original GEMINI DPDT equations,
 Swamee–Jain (1976) friction, Beggs–Brill two-phase flow and explicit heat loss.

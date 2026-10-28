@@ -9,8 +9,8 @@ import pytest
 from gemini.core.engine import registry
 
 
-def test_every_component_module_is_discovered():
-    """Every equipment file contributes concrete components with unique serialisable schemas."""
+def test_every_module_module_is_discovered():
+    """Every equipment file contributes concrete modules with unique serialisable schemas."""
     schemas = registry.list_modules()
     names = [s["name"] for s in schemas]
     assert len(names) == len(set(names))
@@ -29,12 +29,12 @@ def test_every_component_module_is_discovered():
         for model in (cls.Params, cls.Inputs, cls.Outputs):
             for field in model.model_fields.values():
                 assert field.description and "[" in field.description and "]" in field.description
-    with pytest.raises(ValueError, match="Unknown component"):
+    with pytest.raises(ValueError, match="Unknown module"):
         registry.create("missing", {})
 
 
 def test_duplicate_names_are_rejected(monkeypatch):
-    """Discovery catches two distinct classes claiming the same public component name."""
+    """Discovery catches two distinct classes claiming the same public module name."""
     real = registry.inspect.getmembers
 
     def members(module, predicate):
@@ -47,5 +47,5 @@ def test_duplicate_names_are_rejected(monkeypatch):
         return result + concrete
 
     monkeypatch.setattr(registry.inspect, "getmembers", members)
-    with pytest.raises(ValueError, match="Duplicate component name"):
+    with pytest.raises(ValueError, match="Duplicate module name"):
         registry._discover()

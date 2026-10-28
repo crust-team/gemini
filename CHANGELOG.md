@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] — composable modules
+
+- Replace equipment contracts with recursive Module, Sequential and GraphPlant APIs.
+- Move equipment into core/modules; remove the former runtime wrappers and execution loop.
+- Add dated configuration, explicit GEMINI binding audits and portable plant JSON.
+- Implement filters, liquid-only degassing and simple injection-pump physics.
+- Add independent twin/history/live modes, bounded calibration, scenarios, event logs and exports.
+- Validate all 17,280 observations; preserve golden values and document source-data accuracy limits.
+- Preserve the workspace dataset name geothermal_doublet and provide nine runnable examples.
+
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
@@ -16,7 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 - Consolidate the suite into the installable `gemini` Python package.
 - Rewrite monitoring modules to use components while preserving the existing eight output tags.
-- Move example plant data to `datasets/geothermal_example` and API documentation to `docs`.
+- Move example plant data to `datasets/geothermal_doublet` and API documentation to `docs`.
 - Return ESP efficiency as a fraction; report undefined radial diagnostics as unavailable.
 
 ### Removed

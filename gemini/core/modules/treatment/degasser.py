@@ -1,7 +1,6 @@
-"""Degasser component.
+"""Liquid-only degasser with an explicit pressure loss and zero gas flow.
 
-Separates released gas from the produced geothermal brine. The original GEMINI unit had no equipment
-model.
+Gas separation is not modelled.
 """
 
 from pydantic import BaseModel, ConfigDict, Field
