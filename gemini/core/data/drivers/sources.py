@@ -25,14 +25,18 @@ class InfluxSource:
         from influxdb_client import InfluxDBClient
 
         self.driver.parameters = self.options
-        self.driver.conn = InfluxDBClient(**{k: v for k, v in self.options.items() if k != "bucket"},
-                                         token=os.environ[self.token_env])
+        self.driver.conn = InfluxDBClient(
+            **{k: v for k, v in self.options.items() if k != "bucket"},
+            token=os.environ[self.token_env]
+        )
         self.names = self.driver.get_tagnames(self.tags["plant_name"])[0]
 
     def _bound(self, method, pick):
         times = []
         for name in self.names:
-            _, values = getattr(self.driver, method)(self.tags["plant_name"], self.tags["asset_name"], name)
+            _, values = getattr(self.driver, method)(
+                self.tags["plant_name"], self.tags["asset_name"], name
+            )
             times.extend(utc(t) for t in values)
         return pick(times) if times else None
 
@@ -55,10 +59,15 @@ class InfluxSource:
         """Read selected fields independently, then align on their union of UTC timestamps."""
         series = {}
         for name in self.names if columns is None else columns:
-            values, times = self.driver.read_data(self.tags["plant_name"], self.tags["asset_name"],
-                                                  name, utc(start).isoformat(), utc(end).isoformat())
+            values, times = self.driver.read_data(
+                self.tags["plant_name"],
+                self.tags["asset_name"],
+                name,
+                utc(start).isoformat(),
+                utc(end).isoformat(),
+            )
             series[name] = pd.Series(values, index=pd.to_datetime(times, utc=True))
-        return pd.DataFrame(series).sort_index().loc[utc(start):utc(end)]
+        return pd.DataFrame(series).sort_index().loc[utc(start) : utc(end)]
 
 
 class AvevaSource:
@@ -78,14 +87,20 @@ class AvevaSource:
 
     def connect(self):
         """Connect using an environment-provided client secret."""
-        self.driver.update_parameters(self.parameters | {"client_secret": os.environ[self.secret_env]})
+        self.driver.update_parameters(
+            self.parameters | {"client_secret": os.environ[self.secret_env]}
+        )
         self.driver.connect()
 
     def read(self, start, end, columns=None):
         """Read each named stream using the existing connector's bounded pagination."""
         series = {}
         for name in self.names if columns is None else columns:
-            values, times = self.driver.read_data(self.streams[name], utc(start).isoformat(),
-                                                  utc(end).isoformat(), self.native_step.total_seconds())
+            values, times = self.driver.read_data(
+                self.streams[name],
+                utc(start).isoformat(),
+                utc(end).isoformat(),
+                self.native_step.total_seconds(),
+            )
             series[name] = pd.Series(values, index=pd.to_datetime(times, utc=True))
-        return pd.DataFrame(series).sort_index().loc[utc(start):utc(end)]
+        return pd.DataFrame(series).sort_index().loc[utc(start) : utc(end)]

@@ -41,7 +41,7 @@ class Doublet(Module):
     @classmethod
     def from_config(cls, config, at=None):
         """Build named equipment from a Doublet configuration without reading any wiring."""
-        from gemini.core.engine.registry import create
+        from gemini.core.modules.catalogue import create
 
         expected = {"reservoir", "well", "esp", "riser", "injector", "sink"}
         if set(config.modules) != expected:

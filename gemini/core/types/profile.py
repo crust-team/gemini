@@ -93,8 +93,13 @@ class Profile(BaseModel):
                 raise ValueError(f"Unsupported profile unit {unit!r}")
             quantity, si_unit = _UNITS[unit]
             ticks = list(clock)
-            return cls(name="constant", quantity=quantity, unit=si_unit, index=ticks,
-                       values=[to_si(args[0], unit)] * len(ticks))
+            return cls(
+                name="constant",
+                quantity=quantity,
+                unit=si_unit,
+                index=ticks,
+                values=[to_si(args[0], unit)] * len(ticks),
+            )
         names = ("name", "quantity", "unit", "value", "start", "periods", "step")
         values = dict(zip(names, args)) | kwargs
         if unit is not None:
@@ -102,8 +107,13 @@ class Profile(BaseModel):
         if values["periods"] <= 0 or values["step"].total_seconds() <= 0:
             raise ValueError("Profile periods and step must be positive")
         index = pd.date_range(values["start"], periods=values["periods"], freq=values["step"])
-        return cls(name=values["name"], quantity=values["quantity"], unit=values["unit"],
-                   index=index.to_pydatetime().tolist(), values=[values["value"]] * len(index))
+        return cls(
+            name=values["name"],
+            quantity=values["quantity"],
+            unit=values["unit"],
+            index=index.to_pydatetime().tolist(),
+            values=[values["value"]] * len(index),
+        )
 
     def at(self, t: datetime) -> float:
         """Return the previous sample, raising before the profile starts."""

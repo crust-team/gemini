@@ -22,3 +22,14 @@ __all__ = [
     "Degasser",
     "Filter",
 ]
+
+from .balance import collect_flows, energy_balance, mass_balance
+from .wiring import check_against_diagram, trace_wiring
+
+__all__ += [
+    "collect_flows",
+    "energy_balance",
+    "mass_balance",
+    "check_against_diagram",
+    "trace_wiring",
+]

@@ -3,15 +3,22 @@
 from pathlib import Path
 
 from gemini.core.config.schema import ModuleConfig, PlantConfig
-from gemini.core.engine import registry
+from gemini.core.modules import catalogue as registry
 
 
 def build_plant(config: PlantConfig, at=None):
     """Instantiate equipment with the parameter snapshot active at the requested instant."""
     cls = registry.get(config.plant_type)
-    if cls.category != "plant" or not hasattr(cls, "from_config"):
+    if hasattr(cls, "from_config"):
+        plant = cls.from_config(config, at=at)
+    elif not cls.category == "plant" and "" in config.modules:
+        item = config.modules[""]
+        plant = cls(item.at(at).params, fluid=item.fluid)
+    else:
         raise ValueError(f"{config.plant_type!r} is not a configurable plant")
-    plant = cls.from_config(config, at=at)
+    if config.modules and not config.state:
+        plant._fluid = next(iter(config.modules.values())).fluid
+        plant.fluid = plant._resolve_fluid()
     plant.config = config.model_copy(deep=True)
     plant.bindings = config.model_copy(deep=True).bindings
     plant.boundary = config.model_copy(deep=True).boundary
@@ -39,12 +46,14 @@ def plant_to_config(plant) -> PlantConfig:
     config.boundary = plant.boundary
     config.state = plant.state_dict()
     for name, module in plant.named_modules():
-        if not name or module._children:
+        if module._children:
             continue
         config.modules[name] = ModuleConfig(
-            type=module.name, fluid=module._fluid,
+            type=module.name,
+            fluid=module._fluid,
             params=module.param_history,
-            overrides=module._param_overrides, active_from=module._active_from,
+            overrides=module._param_overrides,
+            active_from=module._active_from,
         )
     return PlantConfig.model_validate(config.model_dump())
 

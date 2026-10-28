@@ -1,1 +1,6 @@
-"""Handwritten geothermal plant modules; wiring lives in each forward method."""
+"""Handwritten reusable geothermal plant classes."""
+
+from .doublet import Doublet
+from .geothermal_example import GeothermalExamplePlant
+
+__all__ = ["Doublet", "GeothermalExamplePlant"]

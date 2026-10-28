@@ -2,7 +2,9 @@
 
 from datetime import datetime, timezone
 from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 
 def utc(value):
     """Normalise naive project timestamps and aware timestamps to UTC."""
@@ -48,7 +50,6 @@ class ModuleBindings(ConfigModel):
     streams: dict[str, dict[str, Binding]] = Field(default_factory=dict)
     measured: dict[str, Binding] = Field(default_factory=dict)
     state: dict[str, Binding] = Field(default_factory=dict)
-
 
 
 class ColumnInfo(ConfigModel):
