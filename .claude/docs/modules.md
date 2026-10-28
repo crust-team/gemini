@@ -90,6 +90,7 @@ class HeatPlant(Module):
         self.pump = Pump()
 
         # Inlets
+        self.primary = Inlet(Stream)
         self.secondary = Inlet(Stream)
 
         # Outputs
@@ -100,12 +101,14 @@ class HeatPlant(Module):
         # Outlets
         self.secondary_out = Outlet(Stream)
 
-    def forward(self, secondary):
+    def forward(self, primary, secondary):
         """Evaluate children in physical flow order."""
 
         # Modules
-        pumped = self.pump(suction=secondary)
-        exchanged = self.heat_exchanger(cold_in=pumped.outlets.discharge)
+        pumped = self.pump(suction=primary)
+        exchanged = self.heat_exchanger(
+            hot_in=pumped.outlets.discharge, cold_in=secondary
+        )
 
         # Outlets
         secondary_out = exchanged.outlets.cold_out
