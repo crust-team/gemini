@@ -42,8 +42,9 @@ def test_quickstart(tmp_path, monkeypatch):
 
     clock = gm.Clock.days(2027, 1, 1, days=1)
     profiles = {
-        "production_rate": gm.Profile.constant(150, unit="m3/h", clock=clock),
-        "esp_frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
+        "doublet.reservoir.m_dot": gm.Profile.constant(150, unit="m3/h", clock=clock),
+        "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
+        "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
     sim = engine.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     print(sim.summary())

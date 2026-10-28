@@ -259,20 +259,7 @@
           "state": {}
         },
         "": {
-          "controls": {
-            "m_dot": {
-              "column": "production_rate",
-              "unit": "m3/s"
-            },
-            "esp_frequency": {
-              "column": "esp_frequency",
-              "unit": "Hz"
-            },
-            "injection_pressure": {
-              "column": "injection_pressure",
-              "unit": "Pa"
-            }
-          },
+          "controls": {},
           "boundaries": {},
           "inlets": {
             "secondary": {
@@ -311,7 +298,6 @@
           "Profiles lacking secondary measurements assume 40 kg/s at 20 C and 5 bar."
         ],
         "root_inputs": {
-          "injection_pressure": 5150000.0,
           "secondary": {
             "m_dot": 40,
             "T": 293.15,
