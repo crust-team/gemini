@@ -16,3 +16,5 @@ dist/
 docs/codedocumentation/
 
 docs/_build/
+
+*.pyc
