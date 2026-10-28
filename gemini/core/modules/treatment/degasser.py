@@ -1,55 +1,48 @@
-"""Liquid-only degasser with an explicit pressure loss and zero gas flow.
-
-Gas separation is not modelled.
-"""
-
-from pydantic import BaseModel, ConfigDict, Field
+"""Liquid-only degasser with an explicit pressure loss and zero gas flow."""
 
 from gemini.core.modules.module import Module
-from gemini.core.types.flows import Stream
-from gemini.core.types.quantities import MassFlow, Pressure, PressureDifference
-from gemini.core.types.results import ModuleResult
+from gemini.core.types import (
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Parameter,
+    Pressure,
+    PressureDifference,
+    Stream,
+)
 
 
 class Degasser(Module):
     """Separates released gas from the produced geothermal brine."""
 
     fidelity = "passthrough"
-    soft_sensors = ("pressure_drop", "gas_mass_flow")
-    name = "degasser"
-    category = "treatment"
-    description = "Separates released gas from the produced geothermal brine."
-    inlets = {"inlet": Stream}
-    outlets = {"liquid": Stream, "gas": Stream}
 
-    class Params(BaseModel):
-        """Available design parameters; no performance model is assumed."""
+    def __init__(self):
+        """Declare degasser design data, inlet and split outlets."""
+        super().__init__()
 
-        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        p_out: Pressure | None = Field(None, ge=0, description="Separator outlet pressure [Pa]")
-        dp: PressureDifference = Field(14900, ge=0, description="Separator pressure loss [Pa]")
-        heat_transfer_coeff: float = Field(
-            0, ge=0, description="Legacy coefficient with unknown physical meaning [unknown]"
-        )
+        # Parameters
+        self.p_out = Parameter(Pressure | None, default=None)
+        self.dp = Parameter(PressureDifference, default=14900, ge=0)
+        self.heat_transfer_coeff = Parameter(float, default=0, ge=0)
 
-    class Inputs(BaseModel):
-        """No operating inputs are modelled yet."""
+        # Inlets
+        self.inlet = Inlet(Stream)
 
-        model_config = ConfigDict(extra="forbid")
+        # Outputs
+        self.gas_mass_flow = Output(MassFlow, soft_sensor=True)
+        self.pressure_drop = Output(PressureDifference, soft_sensor=True)
 
-    class Outputs(BaseModel):
-        """Declared future performance results."""
+        # Outlets
+        self.liquid = Outlet(Stream)
+        self.gas = Outlet(Stream)
 
-        gas_mass_flow: MassFlow = Field(..., description="Separated gas flow [kg/s]")
-        pressure_drop: PressureDifference = Field(..., description="Pressure loss [Pa]")
-
-    def forward(self, inputs, streams_in):
+    def forward(self, inlet):
         """Pass liquid through; gas separation is not modelled and gas flow is zero."""
         # NOTE(refactor): 0.149 bar default loss comes from Sep_Pin/Sep_Pout in the example.
-        stream = streams_in["inlet"]
-        pressure = self.params.p_out if self.params.p_out is not None else stream.p - self.params.dp
-        liquid = stream.with_(p=pressure)
-        return ModuleResult(
-            self.Outputs(gas_mass_flow=0, pressure_drop=stream.p - pressure),
-            {"liquid": liquid, "gas": liquid.with_(m_dot=0)},
-        )
+        pressure = self.p_out if self.p_out is not None else inlet.p - self.dp
+        liquid = inlet.with_(p=pressure)
+        self.gas_mass_flow = 0
+        self.pressure_drop = inlet.p - pressure
+        return {"liquid": liquid, "gas": liquid.with_(m_dot=0)}

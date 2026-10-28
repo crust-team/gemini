@@ -1,129 +1,95 @@
-"""Production and injection reservoir modules for a geothermal doublet.
-
-References: Tarek Ahmed, Reservoir Engineering Handbook (2019), chapter 7;
-Akin (2019), geothermal re-injection surveillance and pressure estimation.
-"""
+"""Production and injection reservoir modules for a geothermal doublet."""
 
 from typing import Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import hydraulics
-from gemini.core.types.flows import Stream
-from gemini.core.types.quantities import (
+from gemini.core.types import (
+    Control,
     Density,
     Dimensionless,
     Fraction,
+    Inlet,
     Length,
     MassFlow,
+    Outlet,
+    Output,
+    Parameter,
     Permeability,
     Pressure,
     PressureDifference,
     ProductivityIndex,
+    Stream,
     Temperature,
     Viscosity,
 )
-from gemini.core.types.results import Health, ModuleResult
+from gemini.core.types.results import Health
 
 
 class _Reservoir(Module):
-    """Common reservoir parameters and measurement helpers; ports remain static in subclasses."""
+    """Common reservoir parameters and measurement helpers."""
 
-    category = "subsurface"
-    soft_sensors = ("bottomhole_pressure",)
-    calibratable = ("productivity_index", "injectivity_index", "pressure", "skin")
+    def __init__(self, role):
+        super().__init__()
 
-    class Params(BaseModel):
-        """Reservoir and near-well formation properties in SI units."""
+        # Parameters
+        self.role = Parameter(Literal["production", "injection"], default=role)
+        self.pressure = Parameter(Pressure, calibratable=True)
+        self.temperature = Parameter(Temperature)
+        self.permeability = Parameter(Permeability)
+        self.thickness = Parameter(Length, gt=0)
+        self.drainage_radius = Parameter(Length)
+        self.top_depth = Parameter(Length)
+        self.productivity_index = Parameter(
+            ProductivityIndex | None, default=None, calibratable=True
+        )
+        self.injectivity_index = Parameter(
+            ProductivityIndex | None, default=None, calibratable=True
+        )
+        self.skin = Parameter(Dimensionless, default=0, calibratable=True)
+        self.wellbore_radius = Parameter(Length, gt=0)
+        self.liquid_density = Parameter(Density | None, default=None)
+        self.liquid_viscosity = Parameter(Viscosity | None, default=None)
+        self.decline_threshold = Parameter(Fraction, default=0.15, gt=0, le=1)
 
-        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        role: Literal["production", "injection"] = Field(..., description="Side of the doublet [-]")
-        pressure: Pressure = Field(..., ge=0, description="Static reservoir pressure [Pa]")
-        temperature: Temperature = Field(..., gt=0, description="Reservoir temperature [K]")
-        permeability: Permeability = Field(..., gt=0, description="Absolute permeability [m2]")
-        thickness: Length = Field(..., gt=0, description="Reservoir thickness [m]")
-        drainage_radius: Length = Field(
-            ..., ge=0, description="Drainage radius; zero means unconfigured [m]"
-        )
-        top_depth: Length = Field(..., ge=0, description="Top reservoir vertical depth [m]")
-        productivity_index: ProductivityIndex | None = Field(
-            None, gt=0, description="Productivity index [m3/s/Pa]"
-        )
-        injectivity_index: ProductivityIndex | None = Field(
-            None, gt=0, description="Injectivity index [m3/s/Pa]"
-        )
-        skin: Dimensionless = Field(0, description="Dimensionless skin factor [-]")
-        wellbore_radius: Length = Field(..., gt=0, description="Effective wellbore radius [m]")
-        liquid_density: Density | None = Field(
-            None, gt=0, description="Liquid density override [kg/m3]"
-        )
-        liquid_viscosity: Viscosity | None = Field(
-            None, gt=0, description="Liquid viscosity override [Pa s]"
-        )
-        decline_threshold: Fraction = Field(
-            0.15, gt=0, le=1, description="PI or II decline alarm fraction [-]"
-        )
+        # Outputs
+        self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
+        self.drawdown = Output(PressureDifference)
+        self.overpressure = Output(PressureDifference)
+        self.flow_dp = Output(PressureDifference | None, optional=True)
+        self.skin_dp = Output(PressureDifference | None, optional=True)
+        self.hydrostatic_dp = Output(PressureDifference)
+        self.radial_bottomhole_pressure = Output(Pressure | None, optional=True)
 
-        @model_validator(mode="after")
-        def required_index(self):
-            """Require the well index used by this reservoir's role."""
-            key = "productivity_index" if self.role == "production" else "injectivity_index"
-            if getattr(self, key) is None:
-                raise ValueError(f"{self.role}_reservoir requires {key}")
-            return self
-
-    class Outputs(BaseModel):
-        """IPR and radial-flow pressures for one well."""
-
-        bottomhole_pressure: Pressure = Field(..., description="Required sandface pressure [Pa]")
-        drawdown: PressureDifference = Field(..., description="Production pressure drawdown [Pa]")
-        overpressure: PressureDifference = Field(..., description="Injection pressure excess [Pa]")
-        flow_dp: PressureDifference | None = Field(
-            ..., description="Radial Darcy pressure drop [Pa]"
-        )
-        skin_dp: PressureDifference | None = Field(..., description="Skin pressure drop [Pa]")
-        hydrostatic_dp: PressureDifference = Field(
-            ..., description="Hydrostatic pressure contribution [Pa]"
-        )
-        radial_bottomhole_pressure: Pressure | None = Field(
-            ..., description="Legacy radial reservoir pressure [Pa]"
-        )
-
-    def _outputs(self, flow, p_bh):
-        p = self.params
-        f = self.fluid.properties(p.pressure, p.temperature)
-        if p.drainage_radius == 0:
-            # NOTE(refactor): injection example radius=0 made log(radius/rw)=-inf; expose
-            # unavailable radial diagnostics as None.
+    def _record_outputs(self, flow, p_bh):
+        properties = self.fluid.properties(self.pressure, self.temperature)
+        if self.drainage_radius == 0:
             flow_dp = skin_dp = radial = None
         else:
             flow_dp, skin_dp = hydraulics.radial_pressure_drops(
                 flow,
-                f.mu_l,
-                p.permeability,
-                p.thickness,
-                p.drainage_radius,
-                p.wellbore_radius,
-                p.skin,
+                properties.mu_l,
+                self.permeability,
+                self.thickness,
+                self.drainage_radius,
+                self.wellbore_radius,
+                self.skin,
             )
-            # Preserve the original radial model's plus sign for both reservoir roles.
-            radial = p.pressure + flow_dp + skin_dp
-        return self.Outputs(
-            bottomhole_pressure=p_bh,
-            drawdown=p.pressure - p_bh if p.role == "production" else 0,
-            overpressure=p_bh - p.pressure if p.role == "injection" else 0,
-            flow_dp=flow_dp,
-            skin_dp=skin_dp,
-            hydrostatic_dp=hydraulics.hydrostatic_dp(f.rho_l, p.top_depth),
-            radial_bottomhole_pressure=radial,
-        )
+            radial = self.pressure + flow_dp + skin_dp
+        self.bottomhole_pressure = p_bh
+        self.drawdown = self.pressure - p_bh if self.role == "production" else 0
+        self.overpressure = p_bh - self.pressure if self.role == "injection" else 0
+        self.flow_dp = flow_dp
+        self.skin_dp = skin_dp
+        self.hydrostatic_dp = hydraulics.hydrostatic_dp(properties.rho_l, self.top_depth)
+        self.radial_bottomhole_pressure = radial
 
     @staticmethod
     def estimate_pressure(flows, bottomhole_pressures) -> tuple[float, float]:
-        """Fit pressure [Pa] and R-squared [-] from flows [m3/s] and BHP [Pa] (Akin 2019)."""
-        q, p = map(lambda v: np.asarray(v, dtype=float), (flows, bottomhole_pressures))
+        """Fit reservoir pressure [Pa] and R-squared from flow observations."""
+        q, p = map(lambda value: np.asarray(value, dtype=float), (flows, bottomhole_pressures))
         if (
             q.shape != p.shape
             or q.ndim != 1
@@ -131,45 +97,42 @@ class _Reservoir(Module):
             or np.any(q == 0)
             or not np.isfinite([q, p]).all()
         ):
-            raise ValueError(
-                "Reservoir pressure estimation needs matching finite, nonzero flow samples"
-            )
+            raise ValueError("Reservoir pressure estimation needs matching finite samples")
         x, y = 1 / q, p / q
         if np.ptp(x) == 0 or np.ptp(y) == 0:
-            raise ValueError("Reservoir pressure regression requires variation in 1/Q and p/Q")
+            raise ValueError("Reservoir pressure regression requires variation")
         coefficients = np.polyfit(x, y, 1)
         residual = y - np.poly1d(coefficients)(x)
         r_squared = 1 - np.sum(residual**2) / np.sum((y - np.mean(y)) ** 2)
         return float(coefficients[0]), float(r_squared)
 
-    def injectivity_from_measurements(self, flow: float, p_bh: float) -> float:
-        """Return II [m3/s/Pa] from volume flow [m3/s] and sandface pressure [Pa]."""
-        if p_bh == self.params.pressure:
+    def injectivity_from_measurements(self, flow, p_bh):
+        """Return injectivity [m3/s/Pa] from one measurement."""
+        if p_bh == self.pressure:
             raise ValueError("Injection reservoir: zero pressure differential")
-        return flow / (p_bh - self.params.pressure)
+        return flow / (p_bh - self.pressure)
 
-    def productivity_from_measurements(self, flow: float, p_bh: float) -> float:
-        """Return PI [m3/s/Pa] from volume flow [m3/s] and sandface pressure [Pa]."""
-        if p_bh == self.params.pressure:
+    def productivity_from_measurements(self, flow, p_bh):
+        """Return productivity [m3/s/Pa] from one measurement."""
+        if p_bh == self.pressure:
             raise ValueError("Production reservoir: zero pressure differential")
-        return flow / (self.params.pressure - p_bh)
+        return flow / (self.pressure - p_bh)
 
     def health(self, predicted, measured):
-        """Alarm on declining measured PI or II relative to the design index."""
+        """Alarm on declining measured PI or II relative to design."""
         if not {"flow", "bottomhole_pressure"} <= measured.keys():
             return None
-        production = self.params.role == "production"
-        helper = (
+        production = self.role == "production"
+        actual = (
             self.productivity_from_measurements
             if production
             else self.injectivity_from_measurements
-        )
-        actual = helper(measured["flow"], measured["bottomhole_pressure"])
-        nominal = self.params.productivity_index if production else self.params.injectivity_index
+        )(measured["flow"], measured["bottomhole_pressure"])
+        nominal = self.productivity_index if production else self.injectivity_index
         ratio = actual / nominal
         return Health(
             score=min(1, max(0, ratio)),
-            alarm=ratio < 1 - self.params.decline_threshold,
+            alarm=ratio < 1 - self.decline_threshold,
             message=("Productivity" if production else "Injectivity") + " index comparison",
             metrics={"index": actual, "ratio": ratio},
         )
@@ -178,50 +141,41 @@ class _Reservoir(Module):
 class ProductionReservoir(_Reservoir):
     """Aquifer supplying a production-well sandface stream."""
 
-    name = "production_reservoir"
-    description = "Production aquifer with productivity and radial-flow diagnostics."
-    outlets = {"sandface": Stream}
+    def __init__(self):
+        """Declare a production reservoir."""
+        super().__init__("production")
 
-    class Params(_Reservoir.Params):
-        """Production-side reservoir design data."""
+        # Controls
+        self.m_dot = Control(MassFlow, ge=0)
 
-        role: Literal["production"] = Field("production", description="Side of the doublet [-]")
+        # Outlets
+        self.sandface = Outlet(Stream)
 
-    class Inputs(BaseModel):
-        """Mass withdrawal imposed by the caller."""
-
-        model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        m_dot: MassFlow = Field(..., ge=0, description="Produced mass flow [kg/s]")
-
-    def forward(self, inputs, streams_in):
+    def forward(self, m_dot):
         """Apply the linear production IPR and emit the sandface stream."""
-        p = self.params
-        flow = inputs.m_dot / self.fluid.properties(p.pressure, p.temperature).rho_l
-        p_bh = p.pressure - flow / p.productivity_index
-        stream = Stream(m_dot=inputs.m_dot, T=p.temperature, p=p_bh, fluid=self.fluid)
-        return ModuleResult(self._outputs(flow, p_bh), {"sandface": stream})
+        if self.productivity_index is None:
+            raise ValueError(f"{self.path}: productivity_index is required")
+        flow = m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
+        p_bh = self.pressure - flow / self.productivity_index
+        self._record_outputs(flow, p_bh)
+        return Stream(m_dot=m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
 
 
 class InjectionReservoir(_Reservoir):
     """Aquifer receiving the injection-well sandface stream."""
 
-    name = "injection_reservoir"
-    description = "Injection aquifer with injectivity and radial-flow diagnostics."
-    inlets = {"sandface": Stream}
+    def __init__(self):
+        """Declare an injection reservoir."""
+        super().__init__("injection")
 
-    class Params(_Reservoir.Params):
-        """Injection-side reservoir design data."""
+        # Inlets
+        self.sandface = Inlet(Stream)
 
-        role: Literal["injection"] = Field("injection", description="Side of the doublet [-]")
-
-    class Inputs(BaseModel):
-        """The inlet stream supplies all operating conditions."""
-
-        model_config = ConfigDict(extra="forbid")
-
-    def forward(self, inputs, streams_in):
-        """Calculate required injection bottomhole pressure from the sandface flow."""
-        stream = streams_in["sandface"]
-        flow = abs(stream.m_dot) / self.fluid.properties(stream.p, stream.T).rho_l
-        p_bh = self.params.pressure + flow / self.params.injectivity_index
-        return ModuleResult(self._outputs(flow, p_bh), {})
+    def forward(self, sandface):
+        """Calculate required bottomhole pressure from the sandface flow."""
+        if self.injectivity_index is None:
+            raise ValueError(f"{self.path}: injectivity_index is required")
+        flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
+        p_bh = self.pressure + flow / self.injectivity_index
+        self._record_outputs(flow, p_bh)
+        return {}

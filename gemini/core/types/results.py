@@ -1,10 +1,11 @@
-"""Equipment monitoring health."""
+"""Health and immutable per-call module results."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterator, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from gemini.core.physics import units
 from gemini.core.types.flows import Flow
 from gemini.core.types.quantities import Fraction
 
@@ -17,29 +18,70 @@ class Health(BaseModel):
     score: Fraction = Field(..., ge=0, le=1, description="Condition score, one is nominal [-]")
     alarm: bool = Field(..., description="Whether a monitoring limit is exceeded [-]")
     message: str = Field(..., description="Explanation of the condition [-]")
-    metrics: dict[str, float] = Field(
-        default_factory=dict, description="Named diagnostic metrics [-]"
-    )
+    metrics: dict[str, float] = Field(default_factory=dict)
+
+
+class Values(Mapping[str, Any]):
+    """Read-only attribute and mapping access to named call values."""
+
+    def __init__(self, values=None, declarations=None):
+        """Store immutable-by-interface values and declaration metadata."""
+        self._values = dict(values or {})
+        self._declarations = dict(declarations or {})
+
+    def __getitem__(self, name):
+        """Return a value by mapping key."""
+        return self._values[name]
+
+    def __getattr__(self, name):
+        """Return a value by attribute name."""
+        values = self.__dict__.get("_values")
+        if values is None:
+            raise AttributeError(name)
+        try:
+            return values[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate value names."""
+        return iter(self._values)
+
+    def __len__(self):
+        """Return the number of recorded values."""
+        return len(self._values)
+
+    def model_dump(self, **kwargs):
+        """Return a copy for engine storage and health calculations."""
+        del kwargs
+        return self._values.copy()
+
+    def get(self, name, default=None, *, unit=None):
+        """Return one value, optionally converted from its declared SI unit."""
+        if name not in self._values:
+            return default
+        value = self._values[name]
+        if unit is None:
+            return value
+        declaration = self._declarations.get(name)
+        if declaration is None or declaration.unit is None:
+            raise ValueError(f"{name}: no physical unit is declared")
+        return units.convert(value, declaration.unit, unit)
+
+    def __repr__(self):
+        """Represent the contained values as a plain mapping."""
+        return repr(self._values)
 
 
 @dataclass(frozen=True)
 class ModuleResult:
-    """Outputs, typed flows and an evaluation tree captured by Module.__call__.
+    """Computed outputs, outgoing flows and immutable evaluation audit data."""
 
-    Iteration yields outputs and streams. Inputs and children are audit metadata,
-    retained with this result so later evaluations cannot alter its balances.
-    """
-
-    outputs: BaseModel
-    streams: dict[str, Flow]
+    outputs: Values
+    outlets: Values
     inlets: dict[str, Flow] = field(default_factory=dict)
-    inputs: BaseModel | None = None
+    inputs: dict[str, Any] = field(default_factory=dict)
     children: dict[str, "ModuleResult"] = field(default_factory=dict)
-
-    def __iter__(self):
-        """Unpack the two public calculation values."""
-        yield self.outputs
-        yield self.streams
 
     def leaves(self, prefix=""):
         """Flatten only descendant leaf results, with relative module paths."""
@@ -49,17 +91,3 @@ class ModuleResult:
         for name, child in self.children.items():
             result.update(child.leaves(f"{prefix}.{name}" if prefix else name))
         return result
-
-
-@dataclass(frozen=True)
-class ParamRef:
-    """A calibratable parameter's location, current value and numeric bounds."""
-
-    path: str
-    module_path: str
-    field: str
-    value: Any
-    # Bounds use the owning Params field unit; they are not dimensionless physical values.
-    bounds: tuple[float, float] | None
-    quantity: str | list[str | None] | None = None
-    unit: str | list[str | None] | None = None

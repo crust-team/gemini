@@ -1,139 +1,95 @@
-"""Electrical submersible pump module.
-
-Predicts stage head, shaft power and efficiency using the original polynomial
-basis. Reference: TNO 2022 R11363, Model-based monitoring of geothermal assets.
-"""
-
-from typing import Literal
+"""Electrical submersible pump using the retained TNO polynomial basis."""
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from gemini.core import runtime
 from gemini.core.modules.module import Module
 from gemini.core.physics import constants, pumps, units
-from gemini.core.types.flows import PowerFlow, Stream
-from gemini.core.types.quantities import (
+from gemini.core.types import (
+    Control,
     Count,
     Dimensionless,
     Efficiency,
     Fraction,
     Frequency,
+    Inlet,
     Length,
+    Outlet,
+    Output,
+    Parameter,
     Power,
+    PowerFlow,
     Pressure,
     PressureDifference,
     Ratio,
+    Stream,
     VolumeFlow,
 )
-from gemini.core.types.results import Health, ModuleResult
+from gemini.core.types.results import Health
 
 
 class ESP(Module):
     """Electrical submersible pump installed inside a production well."""
 
-    name = "esp"
-    category = "pumps"
-    description = "Submersible pump head, power, efficiency and operating-window monitoring."
-    inlets = {"suction": Stream}
-    outlets = {"discharge": Stream, "electricity": PowerFlow}
-    soft_sensors = ("head", "power", "efficiency", "discharge_pressure")
-    calibratable = ("head_coeff", "power_coeff")
-
     repr_fields = ("no_stages", "setting_depth", "motor_efficiency", "bep_flow")
 
-    class Params(BaseModel):
-        """Design data with legacy US-basis polynomial coefficients."""
+    def __init__(self):
+        """Declare ESP design data, ports and computed performance."""
+        super().__init__()
 
-        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        coefficient_precision: Literal["float64", "float32"] = Field(
-            "float64", description="Polynomial arithmetic precision for legacy runtime parity [-]"
-        )
-        # NOTE(refactor): report shaft power / motor efficiency; default preserves power.
-        motor_efficiency: Efficiency = Field(1, description="Motor efficiency [-]")
-        no_stages: Count = Field(..., gt=0, description="Number of pump stages [-]")
-        head_coeff: list[float] = Field(
-            ...,
-            min_length=6,
-            max_length=6,
-            description="Ascending polynomial coefficients, ft/stage versus bbl/day [US basis]",
-        )
-        power_coeff: list[float] = Field(
-            ...,
-            min_length=6,
-            max_length=6,
-            description="Ascending polynomial coefficients, bhp/stage versus bbl/day [US basis]",
-        )
-        pump_type: str | None = Field(None, description="Pump model identifier [-]")
-        setting_depth: Length = Field(0, ge=0, description="Measured installation depth [m]")
-        min_flow: VolumeFlow = Field(
-            0, ge=0, description="Minimum flow at reference frequency [m3/s]"
-        )
-        max_flow: VolumeFlow = Field(
-            1, gt=0, description="Maximum flow at reference frequency [m3/s]"
-        )
-        bep_flow: VolumeFlow = Field(
-            0.04, gt=0, description="Best-efficiency flow at reference frequency [m3/s]"
-        )
-        correction_factor: tuple[Dimensionless, PressureDifference] = Field(
-            (1, 0), description="VLP discharge correction (slope [-], offset [Pa])"
-        )
-        tubing: Length | None = Field(None, gt=0, description="Tubing internal diameter [m]")
-        drift_threshold: Fraction = Field(
-            0.10, gt=0, le=1, description="Relative drift alarm threshold [-]"
-        )
+        # Parameters
+        self.no_stages = Parameter(Count)
+        self.head_coeff = Parameter(list[float], shape=(6,), calibratable=True)
+        self.power_coeff = Parameter(list[float], shape=(6,), calibratable=True)
+        self.pump_type = Parameter(str | None, default=None)
+        self.setting_depth = Parameter(Length, default=0)
+        self.motor_efficiency = Parameter(Efficiency, default=1)
+        self.min_flow = Parameter(VolumeFlow, default=0, ge=0)
+        self.max_flow = Parameter(VolumeFlow, default=1, gt=0)
+        self.bep_flow = Parameter(VolumeFlow, default=0.04, gt=0)
+        self.correction_factor = Parameter(tuple[Dimensionless, PressureDifference], default=(1, 0))
+        self.tubing = Parameter(Length | None, default=None, gt=0)
+        self.drift_threshold = Parameter(Fraction, default=0.10, gt=0, le=1)
 
-        @model_validator(mode="after")
-        def operating_window(self):
-            """Require an ordered operating window."""
-            if self.max_flow < self.min_flow:
-                raise ValueError("esp: max_flow must be >= min_flow")
-            return self
+        # Inlets
+        self.suction = Inlet(Stream)
 
-    class Inputs(BaseModel):
-        """Per-step electrical drive frequency."""
+        # Controls
+        self.frequency = Control(Frequency)
 
-        model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        frequency: Frequency = Field(..., gt=0, description="Drive frequency [Hz]")
+        # Outputs
+        self.head = Output(PressureDifference, soft_sensor=True)
+        self.power = Output(Power, soft_sensor=True)
+        self.efficiency = Output(Dimensionless, soft_sensor=True)
+        self.discharge_pressure = Output(Pressure, soft_sensor=True)
+        self.flow = Output(VolumeFlow)
+        self.in_operating_window = Output(bool)
+        self.bep_ratio = Output(Ratio)
 
-    class Outputs(BaseModel):
-        """Pump performance and monitoring metrics in SI units."""
+        # Outlets
+        self.discharge = Outlet(Stream)
+        self.electricity = Outlet(PowerFlow)
 
-        head: PressureDifference = Field(..., description="Pump pressure rise [Pa]")
-        power: Power = Field(..., description="Pump shaft power [W]")
-        efficiency: Dimensionless = Field(..., description="Hydraulic efficiency as a fraction [-]")
-        discharge_pressure: Pressure = Field(..., description="Discharge pressure [Pa]")
-        flow: VolumeFlow = Field(..., description="Pump volume flow [m3/s]")
-        in_operating_window: bool = Field(
-            ..., description="Flow within frequency-scaled bounds [-]"
-        )
-        bep_ratio: Ratio = Field(..., description="Flow divided by frequency-scaled BEP flow [-]")
-
-    def _coefficients(self, values):
-        # NOTE(refactor): old monitoring modules evaluate NumPy float32 coefficients and arithmetic.
+    @staticmethod
+    def _coefficients(values):
+        # NOTE(refactor): old monitoring uses NumPy float32 arithmetic when selected globally.
         return (
-            np.asarray(values, dtype=np.float32)
-            if self.params.coefficient_precision == "float32"
-            else values
+            np.asarray(values, dtype=np.float32) if runtime.get_precision() == "float32" else values
         )
 
     def head_function(self, flow: float, frequency: float) -> float:
-        """Return TNO R11363 pump head [Pa] for flow [m3/s] and frequency [Hz]."""
-        return pumps.head(
-            flow, frequency, self.params.no_stages, self._coefficients(self.params.head_coeff)
-        )
+        """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""
+        return pumps.head(flow, frequency, self.no_stages, self._coefficients(self.head_coeff))
 
     def power_function(self, flow: float, frequency: float) -> float:
-        """Return TNO R11363 shaft power [W] for flow [m3/s] and frequency [Hz]."""
-        return pumps.power(
-            flow, frequency, self.params.no_stages, self._coefficients(self.params.power_coeff)
-        )
+        """Return shaft power [W] for flow [m3/s] and frequency [Hz]."""
+        return pumps.power(flow, frequency, self.no_stages, self._coefficients(self.power_coeff))
 
-    def efficiency_function(self, flow: float, head: float, power: float) -> float:
-        """Return the original efficiency as a fraction from flow [m3/s], head [Pa], power [W]."""
+    @staticmethod
+    def efficiency_function(flow: float, head: float, power: float) -> float:
+        """Return retained hydraulic efficiency as a fraction."""
         if power < 0.1:
             return 0.0
-        # NOTE(refactor): original efficiency was percent; this API divides by 100, without
-        # clipping.
         return (
             units.m3s_to_bbl_per_day(flow)
             / constants.ESP_EFFICIENCY_FLOW_FACTOR
@@ -141,35 +97,23 @@ class ESP(Module):
             * (units.bhp_to_w(1) / units.ft_head_to_pa(1))
         )
 
-    def forward(self, inputs, streams_in):
+    def forward(self, suction, frequency):
         """Compute head and power and raise the suction-stream pressure."""
-        suction = streams_in["suction"]
-        flow = suction.volumetric_flow()
-        if flow < 0:
-            raise ValueError(f"esp: reverse volume flow {flow} is unsupported")
-        head = self.head_function(flow, inputs.frequency)
-        power = self.power_function(flow, inputs.frequency)
-        scale = inputs.frequency / constants.ESP_REFERENCE_FREQUENCY
-        discharge = suction.with_(p=suction.p + head)
-        # NOTE(refactor): correction_factor belongs to inferred VLP discharge, not theoretical head.
-        result = self.Outputs(
-            head=head,
-            power=power,
-            efficiency=self.efficiency_function(flow, head, power),
-            discharge_pressure=discharge.p,
-            flow=flow,
-            in_operating_window=self.params.min_flow * scale
-            <= flow
-            <= self.params.max_flow * scale,
-            bep_ratio=flow / (self.params.bep_flow * scale),
-        )
-        return ModuleResult(
-            result,
-            {
-                "discharge": discharge,
-                "electricity": PowerFlow(P=power / self.params.motor_efficiency),
-            },
-        )
+        self.flow = suction.volumetric_flow()
+        if self.flow < 0:
+            raise ValueError(f"{self.path}: reverse volume flow {self.flow} is unsupported")
+        self.head = self.head_function(self.flow, frequency)
+        self.power = self.power_function(self.flow, frequency)
+        self.efficiency = self.efficiency_function(self.flow, self.head, self.power)
+        scale = frequency / constants.ESP_REFERENCE_FREQUENCY
+        discharge = suction.with_(p=suction.p + self.head)
+        self.discharge_pressure = discharge.p
+        self.in_operating_window = self.min_flow * scale <= self.flow <= self.max_flow * scale
+        self.bep_ratio = self.flow / (self.bep_flow * scale)
+        return {
+            "discharge": discharge,
+            "electricity": PowerFlow(P=self.power / self.motor_efficiency),
+        }
 
     def health(self, predicted, measured):
         """Score the worst available relative drift and the operating window."""
@@ -186,51 +130,40 @@ class ESP(Module):
             message += "; outside operating window"
         return Health(
             score=max(0, 1 - drift),
-            alarm=drift > self.params.drift_threshold or not predicted.in_operating_window,
+            alarm=drift > self.drift_threshold or not predicted.in_operating_window,
             message=message,
             metrics=drifts,
         )
 
     @classmethod
     def fit_head_coefficients(cls, flows, frequencies, heads, no_stages: int) -> list[float]:
-        """Fit ascending US-basis head coefficients from flows [m3/s], Hz and heads [Pa].
-
-        Fits the compute model's polynomial with frequency-squared scaling. At least
-        six distinct flow values are required to determine all six coefficients.
-        """
-        q, f, h = map(lambda v: np.asarray(v, dtype=float), (flows, frequencies, heads))
+        """Fit six ascending US-basis head coefficients from SI observations."""
+        q, f, h = map(lambda value: np.asarray(value, dtype=float), (flows, frequencies, heads))
         if q.shape != f.shape or q.shape != h.shape or q.ndim != 1 or len(q) < 6:
-            raise ValueError(
-                "esp: at least six matching flow, frequency and head observations required"
-            )
+            raise ValueError("esp: at least six matching observations required")
         if no_stages <= 0 or np.any(f <= 0) or np.any(q < 0) or not np.isfinite([q, f, h]).all():
-            raise ValueError(
-                "esp: fitting requires finite observations, positive stages and frequencies"
-            )
+            raise ValueError("esp: fitting requires finite positive stages and frequencies")
         x = units.m3s_to_bbl_per_day(q)
         y = units.pa_to_ft_head(h) / (no_stages * (f / constants.ESP_REFERENCE_FREQUENCY) ** 2)
         if len(np.unique(x)) < 6:
             raise ValueError("esp: six distinct flow values are required")
-        # NOTE(refactor): old calibration fitted affine VLP correction, not polynomial coefficients.
-        # Preserve that algorithm separately; this method fits the requested six coefficients.
         return np.polynomial.Polynomial.fit(x, y, 5).convert().coef.tolist()
 
     @classmethod
     def fit_head_correction(cls, measured, theoretical) -> tuple[float, float]:
-        """Port the old affine fit: theoretical [Pa] = a * measured [Pa] + b [Pa]."""
-        x, y = map(lambda v: np.asarray(v, dtype=float), (measured, theoretical))
+        """Fit the retained affine VLP correction in Pa."""
+        x, y = map(lambda value: np.asarray(value, dtype=float), (measured, theoretical))
         if x.shape != y.shape or len(x) < 2 or not np.isfinite([x, y]).all() or np.var(x) == 0:
             raise ValueError("esp: two or more finite, distinct measurements required")
         slope = np.sum((x - x.mean()) * (y - y.mean())) / np.sum((x - x.mean()) ** 2)
         return float(slope), float(y.mean() - slope * x.mean())
 
     def head_curve(self, frequency: float, n_points: int = 50) -> list[tuple[float, float]]:
-        """Return the legacy plotting curve as (flow [m3/s], head [Pa]) pairs at frequency [Hz]."""
+        """Return plotting points as (flow [m3/s], head [Pa])."""
         if frequency <= 0 or n_points < 2:
             raise ValueError("esp: positive frequency and at least two curve points required")
         scale = frequency / constants.ESP_REFERENCE_FREQUENCY
-        # NOTE(refactor): old plotting normalises flow by f/60; old calculate_output does not.
         return [
-            (float(q), self.head_function(q / scale, frequency))
-            for q in np.linspace(0, 2 * self.params.max_flow * scale, n_points)
+            (float(flow), self.head_function(flow / scale, frequency))
+            for flow in np.linspace(0, 2 * self.max_flow * scale, n_points)
         ]

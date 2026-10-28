@@ -1,33 +1,48 @@
-"""Composable, validated equipment modules and recursive parameter/state APIs."""
+"""Registration-driven, PyTorch-style equipment modules."""
 
 import importlib
 import inspect
 import json
-from abc import ABC, abstractmethod
+import re
 from contextvars import ContextVar
-from dataclasses import replace
+from copy import deepcopy
 from functools import wraps
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 from pydantic_core import to_jsonable_python
 
+from gemini.core import runtime
 from gemini.core.physics import units
 from gemini.core.types.bindings import ColumnInfo, DatedParams, ModuleBindings, utc
 from gemini.core.types.cost import Cost
-from gemini.core.types.flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
-from gemini.core.types.fluid import BRINE, Fluid
-from gemini.core.types.results import ModuleResult, ParamRef
+from gemini.core.types.declarations import (
+    UNSET,
+    Boundary,
+    Control,
+    Declaration,
+    Inlet,
+    Outlet,
+    Output,
+    Parameter,
+)
+from gemini.core.types.fluid import Fluid
+from gemini.core.types.results import ModuleResult, Values
 
 _evaluation = ContextVar("module_evaluation", default=None)
+_output_call = ContextVar("module_output_call", default=None)
+MODULE_REGISTRY = {}
+
+
+def _snake_case(name):
+    return re.sub(r"(?<!^)(?=[A-Z][a-z])|(?<=[a-z0-9])(?=[A-Z])", "_", name).lower()
 
 
 class HookHandle:
     """Removable registration; removal is idempotent."""
 
     def __init__(self, hooks, key):
-        """Keep only the owning hook collection and registration key."""
+        """Retain the hook mapping and opaque registration key."""
         self._hooks, self._key = hooks, key
 
     def remove(self):
@@ -35,335 +50,207 @@ class HookHandle:
         self._hooks.pop(self._key, None)
 
 
-class EmptyModel(BaseModel):
-    """Empty contract for composites and equipment without operating controls."""
+class Module:
+    """Base class discovering declarations and child modules assigned in ``__init__``."""
 
-    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-
-
-class ChildInputs(RootModel[dict[str, Any]]):
-    """Operating controls keyed by immediate child name."""
-
-    root: dict[str, Any] = {}
-
-
-class ChildOutputs(RootModel[dict[str, SerializeAsAny[BaseModel]]]):
-    """Equipment outputs keyed by immediate child name."""
-
-
-class Module(ABC):
-    """Equipment contract with recursive composition, parameters, state and hooks."""
-
-    name: ClassVar[str]
-    category: ClassVar[str]
-    description: ClassVar[str] = "Composable equipment model."
-    Params = EmptyModel
-    Inputs = EmptyModel
-    Outputs = EmptyModel
-    inlets: ClassVar[dict[str, type[Flow]]] = {}
-    outlets: ClassVar[dict[str, type[Flow]]] = {}
-    soft_sensors: ClassVar[tuple[str, ...]] = ()
-    calibratable: ClassVar[tuple[str, ...]] = ()
-    stateful: ClassVar[bool] = False
-    fidelity: ClassVar[Literal["model", "simple", "passthrough"]] = "model"
+    stateful = False
+    fidelity: Literal["model", "simple", "passthrough"] = "model"
+    repr_fields = ()
 
     def __init_subclass__(cls, **kwargs):
-        """Check metadata and retain validation for direct forward calls."""
+        """Derive metadata, register the class and wrap keyword-value construction."""
         super().__init_subclass__(**kwargs)
-        if inspect.isabstract(cls):
+        if cls.__name__.startswith("_"):
             return
-        for key in ("name", "category", "description", "Params", "Inputs", "Outputs"):
-            if not hasattr(cls, key):
-                raise TypeError(f"{cls.__name__} must define {key}")
-        for key in ("inlets", "outlets"):
-            ports = getattr(cls, key)
-            if not isinstance(ports, dict) or any(
-                t not in (Stream, PowerFlow, FuelFlow, HeatFlow) for t in ports.values()
-            ):
-                raise TypeError(f"{cls.name}: {key} must map port names to Flow types")
-        for key in ("Params", "Inputs", "Outputs"):
-            if not issubclass(getattr(cls, key), BaseModel):
-                raise TypeError(f"{cls.__name__}.{key} must be a Pydantic model")
-        if cls.fidelity not in {"model", "simple", "passthrough"}:
-            raise TypeError(f"{cls.name}: unknown fidelity {cls.fidelity}")
-        for names, model in ((cls.soft_sensors, cls.Outputs), (cls.calibratable, cls.Params)):
-            unknown = set(names) - model.model_fields.keys()
-            if unknown:
-                raise TypeError(f"{cls.name}: unknown schema fields {sorted(unknown)}")
-        method = cls.__dict__.get("forward")
-        if method is not None:
-
-            @wraps(method)
-            def checked(self, inputs, streams_in):
-                inputs = self._validate_inputs(inputs)
-                self._check_ports(streams_in, self.inlets, "inlet")
-                result = method(self, inputs, streams_in)
-                if not isinstance(result, ModuleResult) or not isinstance(
-                    result.outputs, self.Outputs
-                ):
-                    raise TypeError(
-                        f"{self.path}: forward must return ModuleResult "
-                        f"with {self.Outputs.__name__}"
-                    )
-                self._check_ports(result.streams, self.outlets, "outlet")
-                return result
-
-            cls.forward = checked
-
-    def __init__(self, params: dict | BaseModel | None = None, *, fluid: Fluid = BRINE):
-        """Validate SI parameters and initialise independent child/hook collections."""
-        object.__setattr__(self, "_children", {})
-        object.__setattr__(self, "_pre_hooks", {})
-        object.__setattr__(self, "_hooks", {})
-        object.__setattr__(self, "_path", "")
-        self.params = self.Params.model_validate({} if params is None else params)
-        self._fluid = Fluid.model_validate(fluid)
-        self.fluid = self._resolve_fluid()
-        self.bindings = {}
-        self.boundary = {}
-        self.param_history = [DatedParams(params=self.params.model_dump(mode="json"))]
-        self._active_from = None
-        self._active_params = self.param_history[0].params.copy()
-        self._param_overrides = {}
-
-    def params_at(self, t):
-        """Return validated dated parameters with explicit user overrides applied."""
-        eligible = [
-            p
-            for p in self.param_history
-            if t is None or p.valid_from is None or p.valid_from <= utc(t)
-        ]
-        if not eligible:
-            raise ValueError(f"{self.path}: no parameters valid at {t}")
-        snapshot = max(eligible, key=lambda p: p.valid_from or utc("0001-01-01"))
-        return self.Params.model_validate(snapshot.params | self._param_overrides)
-
-    def apply_params_at(self, t):
-        """Select dated snapshots recursively, retaining deliberate parameter overrides."""
-        for module in self.modules():
-            eligible = [
-                p
-                for p in module.param_history
-                if t is None or p.valid_from is None or p.valid_from <= utc(t)
-            ]
-            if not eligible:
-                raise ValueError(f"{module.path}: no parameters valid at {t}")
-            snapshot = max(eligible, key=lambda p: p.valid_from or utc("0001-01-01"))
-            if (
-                snapshot.valid_from != module._active_from
-                or snapshot.params != module._active_params
-            ):
-                module.params = module.params_at(t)
-                module.fluid = module._resolve_fluid()
-                module._active_from = snapshot.valid_from
-                module._active_params = snapshot.params.copy()
-
-    def column_units(self):
-        """Collect raw column metadata and reject conflicting unit declarations."""
-        columns = {}
-        for path, bound in self.bindings.items():
-            groups = [bound.inputs, bound.measured, bound.state, *bound.streams.values()]
-            for group in groups:
-                for field, binding in group.items():
-                    info = ColumnInfo(unit=binding.unit)
-                    if binding.column in columns and columns[binding.column] != info:
-                        raise ValueError(
-                            f"{path}.{field}: conflicting unit {binding.unit!r} "
-                            f"for column {binding.column!r}"
-                        )
-                    columns[binding.column] = info
-        return columns
-
-    def save(self, path):
-        """Save the complete portable module tree as JSON."""
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
-
-    @staticmethod
-    def _class_name(cls):
-        """Return an importable class identity used by plants and checkpoints."""
-        return f"{cls.__module__}:{cls.__qualname__}"
-
-    @staticmethod
-    def _import_class(name):
-        """Import a class identity and report the exact unavailable type."""
-        try:
-            module_name, qualname = name.split(":", 1)
-            value = importlib.import_module(module_name)
-            for part in qualname.split("."):
-                value = getattr(value, part)
-        except (ImportError, AttributeError, ValueError) as exc:
-            raise ImportError(f"Cannot import plant/module class {name!r}") from exc
-        if not isinstance(value, type) or not issubclass(value, Module):
-            raise TypeError(f"Serialized class {name!r} is not a Module")
-        return value
-
-    def to_dict(self):
-        """Return a JSON-serialisable design, histories, bindings and boundary defaults."""
-        modules = {}
-        for path, module in self.named_modules():
-            modules[path] = {
-                "class": self._class_name(type(module)),
-                "type": module.name,
-                "params": module.params.model_dump(mode="json"),
-                "fluid": module._fluid.model_dump(mode="json"),
-                "param_history": [
-                    snapshot.model_dump(mode="json") for snapshot in module.param_history
-                ],
-                "param_overrides": to_jsonable_python(module._param_overrides),
-                "active_from": (
-                    module._active_from.isoformat() if module._active_from is not None else None
-                ),
-                "bindings": {
-                    key: value.model_dump(mode="json") for key, value in module.bindings.items()
-                },
-                "boundary": to_jsonable_python(module.boundary),
-            }
-        return {
-            "version": 1,
-            "plant_type": self._class_name(type(self)),
-            "modules": modules,
+        doc = inspect.getdoc(cls)
+        if not doc:
+            raise TypeError(f"{cls.__name__} must have a class docstring")
+        cls.name = _snake_case(cls.__name__)
+        cls.description = doc.split("\n\n", 1)[0].replace("\n", " ")
+        parts = cls.__module__.split(".")
+        cls.category = (
+            parts[parts.index("modules") + 1]
+            if "modules" in parts and len(parts) > parts.index("modules") + 1
+            else "user"
+        )
+        previous = MODULE_REGISTRY.get(cls.name)
+        if previous is not None and previous is not cls:
+            raise TypeError(
+                f"Module registry name {cls.name!r} collides between "
+                f"{previous.__module__}.{previous.__qualname__} and "
+                f"{cls.__module__}.{cls.__qualname__}"
+            )
+        MODULE_REGISTRY[cls.name] = cls
+        original = cls.__dict__.get("__init__")
+        if original is None:
+            return
+        signature = inspect.signature(original)
+        structural = {
+            name
+            for name, value in signature.parameters.items()
+            if name != "self"
+            and value.kind not in (inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL)
         }
 
-    @classmethod
-    def from_dict(cls, data):
-        """Rebuild a saved tree and require its root type to match this class."""
-        if data.get("version") != 1:
-            raise ValueError(f"Unsupported plant format version {data.get('version')!r}")
-        expected = cls._class_name(cls)
-        stored = data.get("plant_type")
-        if stored != expected:
-            raise ValueError(f"Stored plant type {stored!r} does not match {expected!r}")
-        entries = data.get("modules")
-        if not isinstance(entries, dict) or "" not in entries:
-            raise ValueError("Plant file must contain a root module entry")
+        @wraps(original)
+        def initialise(self, *args, **kwargs):
+            fluid = kwargs.pop("fluid", None)
+            structural_values = {k: kwargs.pop(k) for k in tuple(kwargs) if k in structural}
+            original(self, *args, **structural_values)
+            if not hasattr(self, "_parameters"):
+                raise RuntimeError(f"{cls.__name__}.__init__ must call super().__init__()")
+            if fluid is not None:
+                object.__setattr__(self, "_fluid", Fluid.model_validate(fluid))
+                object.__setattr__(self, "fluid", self._resolve_fluid())
+            self._finish_init(kwargs)
 
-        built = {}
-        for path in sorted(entries, key=lambda value: value.count(".")):
-            entry = entries[path]
-            module_cls = cls if path == "" else cls._import_class(entry["class"])
-            if entry.get("type") != module_cls.name:
-                raise ValueError(
-                    f"{path or '<root>'}: stored module type {entry.get('type')!r} "
-                    f"does not match {module_cls.name!r}"
-                )
-            module = module_cls.__new__(module_cls)
-            Module.__init__(
-                module,
-                entry.get("params", {}),
-                fluid=Fluid.model_validate(entry.get("fluid", {})),
-            )
-            built[path] = module
-            if path:
-                parent_path, _, name = path.rpartition(".")
-                if parent_path not in built:
-                    raise ValueError(f"{path}: parent {parent_path!r} is missing")
-                built[parent_path].add_module(name, module)
+        cls.__init__ = initialise
+        cls.__signature__ = signature.replace(
+            parameters=[
+                value
+                for name, value in signature.parameters.items()
+                if name == "self" or name in structural
+            ]
+            + [inspect.Parameter("values", inspect.Parameter.VAR_KEYWORD)]
+        )
 
-        for path, module in built.items():
-            entry = entries[path]
-            module.param_history = [
-                DatedParams.model_validate(item) for item in entry.get("param_history", [])
-            ] or [DatedParams(params=module.params.model_dump(mode="json"))]
-            dates = [item.valid_from for item in module.param_history]
-            if len(set(dates)) != len(dates):
-                raise ValueError(f"{path or '<root>'}: duplicate parameter effective dates")
-            module.param_history.sort(key=lambda item: item.valid_from or utc("0001-01-01"))
-            module._param_overrides = dict(entry.get("param_overrides", {}))
-            module._active_from = (
-                utc(entry["active_from"]) if entry.get("active_from") is not None else None
-            )
-            active = module.params_at(module._active_from)
-            module.params = module.Params.model_validate(entry.get("params", active.model_dump()))
-            module._active_params = module.params.model_dump(mode="json")
-            module.fluid = module._resolve_fluid()
-            module.bindings = {
-                key: ModuleBindings.model_validate(value)
-                for key, value in entry.get("bindings", {}).items()
+    def __init__(self):
+        """Create independent ordered registries and run-owned metadata."""
+        for name in (
+            "_parameters",
+            "_inlets",
+            "_controls",
+            "_boundaries",
+            "_outputs",
+            "_outlets",
+            "_children",
+            "_pre_hooks",
+            "_hooks",
+        ):
+            object.__setattr__(self, name, {})
+        object.__setattr__(self, "_path", "")
+        object.__setattr__(self, "_initialising", True)
+        object.__setattr__(self, "_fluid", runtime.get_default_fluid())
+        object.__setattr__(self, "fluid", self._resolve_fluid())
+        object.__setattr__(self, "bindings", {})
+        object.__setattr__(self, "boundary", {})
+        object.__setattr__(self, "param_history", [])
+        object.__setattr__(self, "_active_from", None)
+        object.__setattr__(self, "_active_params", {})
+        object.__setattr__(self, "_param_overrides", {})
+        object.__setattr__(self, "_forward_checked", False)
+
+    def _finish_init(self, values):
+        for path, value in values.items():
+            parameter = self.get_parameter(path)
+            parameter.set(value)
+        object.__setattr__(self, "fluid", self._resolve_fluid())
+        object.__setattr__(self, "_initialising", False)
+        if not self.param_history:
+            snapshot = {
+                name: deepcopy(parameter.value)
+                for name, parameter in self._parameters.items()
+                if parameter.initialized
             }
-            module.boundary = dict(entry.get("boundary", {}))
-        return built[""]
-
-    @classmethod
-    def load(cls, path):
-        """Load a JSON plant file and rebuild an instance of this exact class."""
-        try:
-            data = json.loads(Path(path).read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError(f"Could not read plant file {str(path)!r}: {exc}") from exc
-        return cls.from_dict(data)
-
-    def extra_repr(self):
-        """Display up to four scalar design parameters in familiar human units."""
-        fields = self._field_schema(self.Params).get("properties", {})
-        parts = []
-        values = self.params.model_dump()
-        for name in getattr(self, "repr_fields", values):
-            value = values[name]
-            if value is None or isinstance(value, (dict, list, tuple)):
-                continue
-            unit = fields.get(name, {}).get("unit") or ""
-            if not isinstance(unit, str):
-                unit = ""
-            if unit == "Pa" and isinstance(value, (float, int)):
-                value, unit = units.pa_to_bar(value), "bar"
-            elif unit == "K" and isinstance(value, (float, int)):
-                value, unit = units.k_to_c(value), "°C"
-            elif unit == "m3/s":
-                value, unit = units.m3s_to_m3h(value), "m3/h"
-            shown = f"{value:.5g}" if isinstance(value, float) else str(value)
-            parts.append(f"{name}={shown}{(' ' + unit) if unit and unit != '-' else ''}")
-            if len(parts) == 4:
-                break
-        return ", ".join(parts)
-
-    def __repr__(self):
-        """Render the registered module tree with compact design summaries."""
-        extra = self.extra_repr()
-        if not self._children:
-            return f"{type(self).__name__}({extra})"
-        rows = [f"{type(self).__name__}({extra}"]
-        for name, child in self.named_children():
-            rows.append("  (" + name + "): " + repr(child).replace("\n", "\n  "))
-        return "\n".join(rows + [")"])
+            self.param_history = [DatedParams(params=to_jsonable_python(snapshot))]
+            self._active_params = snapshot
 
     @property
     def path(self):
-        """Return the assigned tree path or standalone equipment name."""
+        """Return the assigned tree path or standalone derived name."""
         return self._path or self.name
 
     def _set_path(self, path):
         object.__setattr__(self, "_path", path)
+        for declaration in self._declarations().values():
+            declaration.bind(self, declaration.name)
         for name, child in self.named_children():
             child._set_path(f"{path}.{name}" if path else name)
 
+    def _declarations(self):
+        result = {}
+        for registry in (
+            self._parameters,
+            self._inlets,
+            self._controls,
+            self._boundaries,
+            self._outputs,
+            self._outlets,
+        ):
+            result.update(registry)
+        return result
+
+    def __getattr__(self, name):
+        """Resolve parameter values and registered declaration metadata."""
+        parameters = self.__dict__.get("_parameters", {})
+        if name in parameters:
+            parameter = parameters[name]
+            if not parameter.initialized:
+                raise RuntimeError(f"{parameter.path}: parameter is uninitialized")
+            return parameter.value
+        for key in ("_inlets", "_controls", "_boundaries", "_outlets"):
+            registry = self.__dict__.get(key, {})
+            if name in registry:
+                return registry[name]
+        outputs = self.__dict__.get("_outputs", {})
+        if name in outputs:
+            active = _output_call.get()
+            if active is not None and active[0] is self and name in active[1]:
+                return active[1][name]
+            return outputs[name]
+        raise AttributeError(name)
+
     def __setattr__(self, name, value):
-        """Register assigned modules and unregister replaced children."""
-        if name in {"inlets", "outlets"} and self.category != "plant":
-            raise AttributeError(f"{self.path}: equipment ports are declared on the class")
+        """Register declarations and children or assign declared call values."""
+        if name.startswith("_") or "_parameters" not in self.__dict__:
+            object.__setattr__(self, name, value)
+            return
+        if name in self._parameters and not isinstance(value, Declaration):
+            self._parameters[name].set(value)
+            object.__setattr__(self, "fluid", self._resolve_fluid())
+            return
+        if name in self._outputs and not isinstance(value, Declaration):
+            active = _output_call.get()
+            if active is None or active[0] is not self:
+                raise RuntimeError(f"{self.path}.{name}: outputs may only be assigned in forward")
+            active[1][name] = self._outputs[name].validate(value)
+            return
+        if isinstance(value, Declaration):
+            if not self._initialising:
+                raise RuntimeError(f"{self.path}: declarations may only be assigned in __init__")
+            registries = {
+                Parameter: self._parameters,
+                Inlet: self._inlets,
+                Control: self._controls,
+                Boundary: self._boundaries,
+                Output: self._outputs,
+                Outlet: self._outlets,
+            }
+            existing = self._declarations().get(name)
+            target = next(
+                registry for kind, registry in registries.items() if isinstance(value, kind)
+            )
+            if existing is not None and existing is not value:
+                raise TypeError(f"{self.path}.{name}: declaration is already registered")
+            target[name] = value.bind(self, name)
+            return
         if isinstance(value, Module):
             self.add_module(name, value)
-        else:
-            if "_children" in self.__dict__:
-                self._children.pop(name, None)
-            object.__setattr__(self, name, value)
-
-    def __delattr__(self, name):
-        """Remove deleted child attributes from traversal."""
-        object.__delattr__(self, name)
-        self._children.pop(name, None)
+            return
+        if name in self._declarations():
+            raise TypeError(f"{self.path}.{name}: cannot replace a declaration")
+        if name in self._children:
+            self._children.pop(name)
+        object.__setattr__(self, name, value)
 
     def add_module(self, name, module):
-        """Register a child with an unambiguous local name, rejecting ownership cycles."""
+        """Register an immediate child and reject ambiguous names or ownership cycles."""
         if not isinstance(module, Module):
             raise TypeError("child must be a Module")
         if not name or "." in name or name.startswith("_"):
             raise ValueError(f"Invalid child name {name!r}")
-        if not hasattr(self, "_children"):
-            raise RuntimeError("Call Module.__init__ before assigning children")
-        if name not in self._children and hasattr(self, name):
-            raise ValueError(f"Child name {name!r} conflicts with an existing attribute")
+        if name in self._declarations():
+            raise ValueError(f"Child name {name!r} conflicts with a declaration")
         if any(item is self for item in module.modules()):
             raise ValueError("Module ownership cannot contain a cycle")
         self._children[name] = module
@@ -371,7 +258,7 @@ class Module(ABC):
         module._set_path(f"{self._path}.{name}" if self._path else name)
 
     def named_children(self):
-        """Iterate registered immediate children in insertion order."""
+        """Iterate immediate children in insertion order."""
         yield from self._children.items()
 
     def children(self):
@@ -379,7 +266,7 @@ class Module(ABC):
         yield from self._children.values()
 
     def named_modules(self, prefix=""):
-        """Walk self and descendants once, using dotted paths."""
+        """Walk self and descendants once using dotted paths."""
         seen = set()
 
         def walk(module, path):
@@ -412,166 +299,207 @@ class Module(ABC):
             fn(module)
         return self
 
-    def _resolve_fluid(self):
-        overrides = {}
-        for field, key in (
-            ("liquid_density", "liquid_density"),
-            ("liquid_viscosity", "liquid_viscosity"),
-        ):
-            value = getattr(self.params, field, None)
-            if value is not None:
-                overrides[key] = value
-        return Fluid.model_validate(self._fluid.model_dump() | overrides)
+    def _named(self, registry_name, recurse=False):
+        for path, module in self.named_modules() if recurse else [("", self)]:
+            for name, declaration in getattr(module, registry_name).items():
+                yield f"{path}.{name}" if path else name, declaration
+
+    def parameters(self, recurse=True):
+        """Iterate parameter declarations."""
+        for _, parameter in self._named("_parameters", recurse):
+            yield parameter
+
+    def named_parameters(self, recurse=True):
+        """Iterate dotted names and parameter declarations."""
+        yield from self._named("_parameters", recurse)
+
+    def calibratable_parameters(self, recurse=True):
+        """Return only parameters explicitly marked calibratable."""
+        return [p for p in self.parameters(recurse) if p.calibratable]
+
+    def _section(self, name, recurse=False):
+        return dict(self._named(name, recurse))
+
+    def inlets(self, recurse=False):
+        """Return inlet declarations by local or dotted name."""
+        return self._section("_inlets", recurse)
+
+    def controls(self, recurse=False):
+        """Return controllable input declarations."""
+        return self._section("_controls", recurse)
+
+    def boundaries(self, recurse=False):
+        """Return external boundary declarations."""
+        return self._section("_boundaries", recurse)
+
+    def inputs(self, recurse=False):
+        """Return controls followed by boundaries."""
+        return self.controls(recurse) | self.boundaries(recurse)
+
+    def outputs(self, recurse=False):
+        """Return computed output declarations."""
+        return self._section("_outputs", recurse)
+
+    def outlets(self, recurse=False):
+        """Return outgoing flow declarations."""
+        return self._section("_outlets", recurse)
+
+    def soft_sensors(self, recurse=False):
+        """Return outputs marked as inferred measurements."""
+        return {name: value for name, value in self.outputs(recurse).items() if value.soft_sensor}
+
+    def get_parameter(self, path):
+        """Return parameter metadata by local or dotted path."""
+        module_path, _, name = path.rpartition(".")
+        module = self.get_submodule(module_path)
+        if name not in module._parameters:
+            valid = ", ".join(module._parameters) or "<none>"
+            raise ValueError(f"{self.path}: unknown parameter {path!r}; valid: {valid}")
+        return module._parameters[name]
+
+    def missing_parameters(self):
+        """Return dotted paths of all uninitialized parameters."""
+        return [name for name, value in self.named_parameters() if not value.initialized]
+
+    @property
+    def is_initialized(self):
+        """Whether every parameter in this module tree has a value."""
+        return not self.missing_parameters()
 
     def update_params(self, **changes):
-        """Revalidate design changes before replacing the parameter snapshot."""
-        self.params = self.Params.model_validate(self.params.model_dump() | changes)
-        self._param_overrides.update(changes)
-        self.fluid = self._resolve_fluid()
+        """Set validated local parameters as explicit overrides."""
+        for name, value in changes.items():
+            self.get_parameter(name).set(value)
+        object.__setattr__(self, "fluid", self._resolve_fluid())
 
-    def _validate_inputs(self, inputs):
-        try:
-            return self.Inputs.model_validate({} if inputs is None else inputs)
-        except ValidationError as exc:
-            raise ValidationError.from_exception_data(
-                self.path, exc.errors(include_url=False)
-            ) from exc
+    def params_at(self, at):
+        """Return the complete validated parameter mapping active at an instant."""
+        eligible = [
+            item
+            for item in self.param_history
+            if at is None or item.valid_from is None or item.valid_from <= utc(at)
+        ]
+        if not eligible:
+            raise ValueError(f"{self.path}: no parameters valid at {at}")
+        selected = max(eligible, key=lambda item: item.valid_from or utc("0001-01-01"))
+        values = selected.params | self._param_overrides
+        return {name: self._parameters[name].validate(value) for name, value in values.items()}
 
-    def _check_ports(self, streams, expected, kind):
-        missing, extra = set(expected) - streams.keys(), streams.keys() - set(expected)
-        if missing or extra:
-            raise ValueError(
-                f"{self.path}: {kind} ports missing={sorted(missing)}, extra={sorted(extra)}"
+    def apply_params_at(self, at):
+        """Apply dated parameter snapshots recursively while retaining explicit overrides."""
+        for module in self.modules():
+            values = module.params_at(at)
+            for name, value in values.items():
+                module._parameters[name].set(value, explicit=False)
+            module._active_params = deepcopy(values)
+            object.__setattr__(module, "fluid", module._resolve_fluid())
+
+    def _resolve_fluid(self):
+        overrides = {}
+        parameters = self.__dict__.get("_parameters", {})
+        for name in ("liquid_density", "liquid_viscosity"):
+            if (
+                name in parameters
+                and parameters[name].initialized
+                and parameters[name].value is not None
+            ):
+                overrides[name] = parameters[name].value
+        return Fluid.model_validate(self._fluid.model_dump() | overrides)
+
+    def _check_forward_signature(self):
+        expected = set(self._inlets) | set(self._controls) | set(self._boundaries)
+        signature = inspect.signature(self.forward)
+        actual = {
+            name
+            for name, parameter in signature.parameters.items()
+            if parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
+        }
+        if actual != expected:
+            raise TypeError(
+                f"{type(self).__name__}.forward signature mismatch: "
+                f"missing={sorted(expected - actual)}, extra={sorted(actual - expected)}"
             )
-        for name, value in streams.items():
-            if not isinstance(value, expected[name]):
-                raise TypeError(f"{self.path}: {kind} {name} requires {expected[name].__name__}")
+        object.__setattr__(self, "_forward_checked", True)
 
-    @abstractmethod
-    def forward(self, inputs, streams_in) -> ModuleResult:
-        """Calculate SI outputs and outgoing streams."""
+    def forward(self, **kwargs):
+        """Compute outputs and return declared outlets; subclasses implement this."""
+        raise NotImplementedError(f"{type(self).__name__} has no forward method")
 
-    def __call__(self, inputs=None, streams_in=None, **streams):
-        """Validate a forward evaluation and notify observers in registration order."""
-        inputs = self._validate_inputs(inputs)
-        inlet = dict(streams_in or {})
-        overlap = inlet.keys() & streams.keys()
-        if overlap:
-            raise ValueError(f"{self.path}: duplicate streams {sorted(overlap)}")
-        inlet.update(streams)
-        self._check_ports(inlet, self.inlets, "inlet")
-        return self._observe(inputs, inlet, lambda: self.forward(inputs, inlet))
-
-    def _observe(self, inputs, inlet, evaluate):
-        """Capture one forward/step result and its children with the same hook semantics."""
+    def __call__(self, *args, **kwargs):
+        """Validate inputs, record outputs and validate returned outlet flows."""
+        missing = self.missing_parameters()
+        if missing:
+            raise RuntimeError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
+        if not self._forward_checked:
+            self._check_forward_signature()
+        declarations = self._inlets | self._controls | self._boundaries
+        signature = inspect.Signature(
+            [
+                inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                for name in declarations
+            ]
+        )
+        try:
+            bound = signature.bind_partial(*args, **kwargs)
+        except TypeError as exc:
+            raise TypeError(f"{self.path}: {exc}") from exc
+        values = {}
+        for name, declaration in declarations.items():
+            if name in bound.arguments:
+                values[name] = declaration.validate(bound.arguments[name])
+            elif declaration.default is not UNSET:
+                values[name] = declaration.validate(deepcopy(declaration.default))
+            else:
+                raise TypeError(f"{self.path}: missing required argument {name!r}")
+        inlets = {name: values[name] for name in self._inlets}
+        inputs = {name: values[name] for name in self._controls | self._boundaries}
         for fn in tuple(self._pre_hooks.values()):
-            fn(self, inputs, inlet)
+            fn(self, inputs, inlets)
         children = {}
         parent = _evaluation.get()
-        token = _evaluation.set((self, children))
+        evaluation_token = _evaluation.set((self, children))
+        recorded = {}
+        output_token = _output_call.set((self, recorded))
         try:
-            result = evaluate()
+            returned = self.forward(**values)
         finally:
-            _evaluation.reset(token)
-        result = replace(result, inlets=inlet, inputs=inputs, children=children)
+            _output_call.reset(output_token)
+            _evaluation.reset(evaluation_token)
+        required = {name for name, output in self._outputs.items() if not output.optional}
+        if required - recorded.keys():
+            missing = sorted(required - recorded.keys())
+            raise RuntimeError(f"{self.path}: required outputs left unassigned: {missing}")
+        if len(self._outlets) == 1 and not isinstance(returned, dict):
+            returned = {next(iter(self._outlets)): returned}
+        if returned is None and not self._outlets:
+            returned = {}
+        if not isinstance(returned, dict):
+            raise TypeError(f"{self.path}: forward must return an outlet dict")
+        missing_out = self._outlets.keys() - returned.keys()
+        extra_out = returned.keys() - self._outlets.keys()
+        if missing_out or extra_out:
+            detail = f"missing={sorted(missing_out)}, extra={sorted(extra_out)}"
+            raise ValueError(f"{self.path}: outlet names {detail}")
+        outlets = {
+            name: declaration.validate(returned[name])
+            for name, declaration in self._outlets.items()
+        }
+        result = ModuleResult(
+            outputs=Values(recorded, self._outputs),
+            outlets=Values(outlets, self._outlets),
+            inlets=inlets,
+            inputs=inputs,
+            children=children,
+        )
         if parent is not None:
             owner, collected = parent
             prefix = owner._path + "." if owner._path else ""
             collected[self._path.removeprefix(prefix) or self.name] = result
-        self.last_result = result
-        self.last_results = result.leaves()
+        object.__setattr__(self, "last_result", result)
+        object.__setattr__(self, "last_results", result.leaves())
         for fn in tuple(self._hooks.values()):
-            fn(self, inputs, inlet, result)
+            fn(self, inputs, inlets, result)
         return result
-
-    def named_params(self, recurse=True):
-        """Iterate parameter values with their owning module paths."""
-        for path, module in self.named_modules() if recurse else [("", self)]:
-            for field in type(module.params).model_fields:
-                yield f"{path}.{field}" if path else field, getattr(module.params, field)
-
-    def calibratable_params(self, recurse=True):
-        """Return fit parameters and Pydantic scalar bounds (inclusive numerical limits)."""
-        refs = []
-        for path, module in self.named_modules() if recurse else [("", self)]:
-            for field in module.calibratable:
-                low, high = float("-inf"), float("inf")
-                bounded = False
-                for constraint in module.Params.model_fields[field].metadata:
-                    for key in ("gt", "ge", "lt", "le"):
-                        value = getattr(constraint, key, None)
-                        if value is not None:
-                            bounded = True
-                            if key in ("gt", "ge"):
-                                low = max(low, value)
-                            else:
-                                high = min(high, value)
-                metadata = self._field_schema(module.Params)["properties"][field]
-                refs.append(
-                    ParamRef(
-                        f"{path}.{field}" if path else field,
-                        path,
-                        field,
-                        getattr(module.params, field),
-                        (low, high) if bounded else None,
-                        metadata["quantity"],
-                        metadata["unit"],
-                    )
-                )
-        return refs
-
-    def _param_owner(self, path):
-        module_path, _, field = path.rpartition(".")
-        module = self.get_submodule(module_path)
-        if field not in module.Params.model_fields:
-            raise ValueError(f"{self.path}: unknown parameter {path!r}")
-        return module, field
-
-    def get_param(self, path):
-        """Read a parameter using a dotted path."""
-        module, field = self._param_owner(path)
-        return getattr(module.params, field)
-
-    def set_param(self, path, value):
-        """Replace a parameter only after its owning Params validates."""
-        module, field = self._param_owner(path)
-        module.update_params(**{field: value})
-
-    def state_dict(self):
-        """Return JSON-safe design snapshots, including the root module."""
-        return {
-            path: {
-                "type": module.name,
-                "params": module.params.model_dump(mode="json"),
-                "fluid": module._fluid.model_dump(mode="json"),
-            }
-            for path, module in self.named_modules()
-        }
-
-    def load_state_dict(self, state, strict=True):
-        """Validate all matching snapshots before atomically applying parameter changes."""
-        modules = dict(self.named_modules())
-        if strict and state.keys() != modules.keys():
-            raise ValueError(
-                f"{self.path}: state paths differ; missing={modules.keys() - state.keys()}, "
-                f"unexpected={state.keys() - modules.keys()}"
-            )
-        pending = []
-        for path in state.keys() & modules.keys():
-            module, entry = modules[path], state[path]
-            if entry["type"] != module.name:
-                raise ValueError(f"{module.path}: state type {entry['type']!r} != {module.name!r}")
-            pending.append(
-                (
-                    module,
-                    module.Params.model_validate(entry["params"]),
-                    Fluid.model_validate(entry["fluid"]),
-                )
-            )
-        for module, params, dtype in pending:
-            module.params = params
-            module._fluid = dtype
-            module.fluid = module._resolve_fluid()
 
     def initial_state(self):
         """Return independent states for stateful descendants, or None for a leaf."""
@@ -582,20 +510,20 @@ class Module(ABC):
         }
         return states or None
 
-    def step(self, state, inputs, streams_in, dt):
-        """Evaluate a stateless step; stateful equipment overrides this method."""
+    def step(self, state, dt, **kwargs):
+        """Evaluate a stateless step; stateful equipment may override this method."""
         if dt <= 0:
             raise ValueError("dt must be positive [s]")
-        return state, self(inputs, streams_in)
+        return state, self(**kwargs)
 
     def register_forward_pre_hook(self, fn):
-        """Observe validated inputs before evaluation."""
+        """Call ``fn`` before each forward evaluation."""
         key = object()
         self._pre_hooks[key] = fn
         return HookHandle(self._pre_hooks, key)
 
     def register_forward_hook(self, fn):
-        """Observe validated results after evaluation."""
+        """Call ``fn`` after each successful forward evaluation."""
         key = object()
         self._hooks[key] = fn
         return HookHandle(self._hooks, key)
@@ -604,23 +532,224 @@ class Module(ABC):
         """Return optional equipment health; absence means no diagnostic model."""
         return None
 
-    def health_report(self, results, measured):
-        """Collect available health diagnostics recursively by module path."""
-        report = {}
+    def state_dict(self):
+        """Return JSON-safe parameter and fluid snapshots for the complete tree."""
+        return {
+            path: {
+                "type": module.name,
+                "params": {
+                    name: to_jsonable_python(parameter.value)
+                    for name, parameter in module._parameters.items()
+                    if parameter.initialized
+                },
+                "fluid": module._fluid.model_dump(mode="json"),
+            }
+            for path, module in self.named_modules()
+        }
+
+    def load_state_dict(self, state, strict=True):
+        """Validate every matching snapshot before atomically applying it."""
+        modules = dict(self.named_modules())
+        if strict and state.keys() != modules.keys():
+            raise ValueError(
+                f"{self.path}: state paths differ; missing={modules.keys() - state.keys()}, "
+                f"unexpected={state.keys() - modules.keys()}"
+            )
+        pending = []
+        for path in state.keys() & modules.keys():
+            module, entry = modules[path], state[path]
+            valid = {
+                name: module.get_parameter(name).validate(value)
+                for name, value in entry["params"].items()
+            }
+            unknown = entry["params"].keys() - module._parameters.keys()
+            if unknown:
+                raise ValueError(f"{module.path}: unknown state parameters {sorted(unknown)}")
+            pending.append((module, valid, Fluid.model_validate(entry["fluid"])))
+        for module, values, fluid in pending:
+            for name, value in values.items():
+                module._parameters[name].set(value, explicit=False)
+            object.__setattr__(module, "_fluid", fluid)
+            object.__setattr__(module, "fluid", module._resolve_fluid())
+        return self
+
+    @staticmethod
+    def _class_name(cls):
+        return f"{cls.__module__}:{cls.__qualname__}"
+
+    @staticmethod
+    def _import_class(name):
+        module_name, qualname = name.split(":", 1)
+        value = importlib.import_module(module_name)
+        for part in qualname.split("."):
+            value = getattr(value, part)
+        if not isinstance(value, type) or not issubclass(value, Module):
+            raise TypeError(f"Serialized class {name!r} is not a Module")
+        return value
+
+    def to_dict(self):
+        """Return portable design, histories, bindings and boundary defaults."""
+        modules = {}
         for path, module in self.named_modules():
-            if path in results:
-                health = module.health(results[path].outputs, measured.get(path, {}))
-                if health is not None:
-                    report[path] = health
-        return report
+            modules[path] = {
+                "class": self._class_name(type(module)),
+                "type": module.name,
+                "params": self.state_dict()[path]["params"],
+                "fluid": module._fluid.model_dump(mode="json"),
+                "param_history": [item.model_dump(mode="json") for item in module.param_history],
+                "param_overrides": to_jsonable_python(module._param_overrides),
+                "active_from": (
+                    module._active_from.isoformat() if module._active_from is not None else None
+                ),
+                "bindings": {
+                    key: value.model_dump(mode="json") for key, value in module.bindings.items()
+                },
+                "boundary": to_jsonable_python(module.boundary),
+            }
+        return {"version": 1, "plant_type": self._class_name(type(self)), "modules": modules}
+
+    @classmethod
+    def from_dict(cls, data):
+        """Construct the self-building tree, then fill its state and run metadata."""
+        if data.get("version") != 1:
+            raise ValueError(f"Unsupported plant format version {data.get('version')!r}")
+        expected = cls._class_name(cls)
+        if data.get("plant_type") != expected:
+            raise ValueError(
+                f"Stored plant type {data.get('plant_type')!r} does not match {expected!r}"
+            )
+        root = cls()
+        entries = data.get("modules", {})
+        modules = dict(root.named_modules())
+        if entries.keys() != modules.keys():
+            raise ValueError(
+                f"Stored module paths differ; missing={modules.keys() - entries.keys()}, "
+                f"unexpected={entries.keys() - modules.keys()}"
+            )
+        state = {}
+        for path, module in modules.items():
+            entry = entries[path]
+            state[path] = {
+                "type": module.name,
+                "params": entry.get("params", {}),
+                "fluid": entry.get("fluid", {}),
+            }
+        root.load_state_dict(state)
+        for path, module in modules.items():
+            entry = entries[path]
+            module.param_history = [
+                DatedParams.model_validate(item) for item in entry.get("param_history", [])
+            ] or [DatedParams(params=entry.get("params", {}))]
+            module._param_overrides = dict(entry.get("param_overrides", {}))
+            module._active_from = (
+                utc(entry["active_from"]) if entry.get("active_from") is not None else None
+            )
+            module._active_params = entry.get("params", {}).copy()
+            module.bindings = {
+                key: ModuleBindings.model_validate(value)
+                for key, value in entry.get("bindings", {}).items()
+            }
+            module.boundary = dict(entry.get("boundary", {}))
+        return root
+
+    def save(self, path):
+        """Save the complete portable module tree as JSON."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
+
+    @classmethod
+    def load(cls, path):
+        """Load a JSON plant file as this exact self-building class."""
+        return cls.from_dict(json.loads(Path(path).read_text()))
+
+    def column_units(self):
+        """Collect raw binding units and reject conflicts."""
+        columns = {}
+        for path, bound in self.bindings.items():
+            groups = [
+                bound.controls,
+                bound.boundaries,
+                bound.measured,
+                bound.state,
+                *bound.inlets.values(),
+            ]
+            for group in groups:
+                for field, binding in group.items():
+                    info = ColumnInfo(unit=binding.unit)
+                    if binding.column in columns and columns[binding.column] != info:
+                        raise ValueError(f"{path}.{field}: conflicting binding unit")
+                    columns[binding.column] = info
+        return columns
+
+    def extra_repr(self):
+        """Display up to four initialized scalar parameters."""
+        names = self.repr_fields or tuple(self._parameters)
+        parts = []
+        for name in names:
+            parameter = self._parameters.get(name)
+            if parameter is None or not parameter.initialized:
+                continue
+            value, unit = parameter.value, parameter.unit or ""
+            if isinstance(value, (dict, list, tuple)) or value is None:
+                continue
+            if runtime.get_display_units() == "field":
+                target = {"Pa": "bar", "K": "°C", "m3/s": "m3/h", "W": "kW"}.get(unit)
+                if target:
+                    value, unit = units.convert(value, unit, target), target
+            shown = f"{value:.5g}" if isinstance(value, float) else str(value)
+            parts.append(f"{name}={shown}{(' ' + unit) if unit and unit != '-' else ''}")
+            if len(parts) == 4:
+                break
+        return ", ".join(parts)
+
+    def __repr__(self):
+        """Render a compact recursive module tree."""
+        extra = self.extra_repr()
+        if not self._children:
+            return f"{type(self).__name__}({extra})"
+        rows = [f"{type(self).__name__}({extra}"]
+        for name, child in self.named_children():
+            rows.append("  (" + name + "): " + repr(child).replace("\n", "\n  "))
+        return "\n".join(rows + [")"])
+
+    @classmethod
+    def help(cls):
+        """Return a declaration-oriented summary for interactive use."""
+        try:
+            module = cls()
+        except TypeError:
+            return f"{cls.description}\nCategory: {cls.category}"
+        lines = [cls.description, f"Category: {cls.category}"]
+        for title, values in (
+            ("Parameters", module._parameters),
+            ("Inlets", module._inlets),
+            ("Controls", module._controls),
+            ("Boundaries", module._boundaries),
+            ("Outputs", module._outputs),
+            ("Outlets", module._outlets),
+        ):
+            if not values:
+                continue
+            lines.append(f"\n{title}:")
+            for name, value in values.items():
+                details = [value.unit] if value.unit else []
+                if isinstance(value, Parameter) and value.default is not UNSET:
+                    details.append(f"default={value.default!r}")
+                if isinstance(value, Parameter) and value.calibratable:
+                    details.append("calibratable")
+                if isinstance(value, Output) and value.soft_sensor:
+                    details.append("soft sensor")
+                lines.append(f"  {name}: {', '.join(details)}")
+        return "\n".join(lines)
 
     def capex(self) -> Cost | None:
-        """Return optional capital expenditure when a correlation is available."""
+        """Return this module's capital cost when a subclass supplies one."""
         return None
 
     def cost(self) -> Cost | None:
-        """Sum independently sourced costs; never combine currencies or price years."""
-        costs = [cost for module in self.modules() if (cost := module.capex()) is not None]
+        """Aggregate compatible descendant capital and operating costs."""
+        costs = [value for module in self.modules() if (value := module.capex()) is not None]
         if not costs:
             return None
         first = costs[0]
@@ -634,119 +763,3 @@ class Module(ABC):
             price_year=first.price_year,
             source="; ".join(dict.fromkeys(c.source for c in costs)),
         )
-
-    @staticmethod
-    def _field_schema(model):
-        """Retain JSON schema, adding explicit names, bounds and nullable defaults."""
-        schema = model.model_json_schema()
-
-        def annotate(properties):
-            for name, field in properties.items():
-                variants = field.get("anyOf", [field])
-                value = next((v for v in variants if v.get("type") != "null"), field)
-                scalar = value.get("items", value)
-                field["name"] = name
-                field["quantity"] = scalar.get("quantity", field.get("quantity"))
-                field["unit"] = scalar.get("unit", field.get("unit"))
-                field["bounds"] = {
-                    k: scalar[k]
-                    for k in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum")
-                    if k in scalar
-                }
-                if "prefixItems" in value:
-                    field["quantity"] = [v.get("quantity") for v in value["prefixItems"]]
-                    field["unit"] = [v.get("unit") for v in value["prefixItems"]]
-                field.setdefault("description", "")
-                field.setdefault("default", None)
-
-        annotate(schema.get("properties", {}))
-        for definition in schema.get("$defs", {}).values():
-            annotate(definition.get("properties", {}))
-        return schema
-
-    @classmethod
-    def schema(cls):
-        """Describe identity, fidelity, ports and all validated contracts."""
-        return dict(
-            name=cls.name,
-            category=cls.category,
-            description=cls.description,
-            fidelity=cls.fidelity,
-            inlets={k: v.__name__ for k, v in cls.inlets.items()},
-            outlets={k: v.__name__ for k, v in cls.outlets.items()},
-            params=cls._field_schema(cls.Params),
-            inputs=cls._field_schema(cls.Inputs),
-            outputs=cls._field_schema(cls.Outputs),
-            soft_sensors=cls.soft_sensors,
-            calibratable=cls.calibratable,
-            stateful=cls.stateful,
-        )
-
-
-class Sequential(Module):
-    """Chain single-inlet/single-outlet modules with controls keyed by index or name."""
-
-    name = "sequential"
-    category = "plant"
-    Inputs = ChildInputs
-    Outputs = ChildOutputs
-
-    def __init__(self, *modules):
-        """Accept positional modules or a single ordered mapping of names to modules."""
-        super().__init__()
-        items = (
-            modules[0].items()
-            if len(modules) == 1 and isinstance(modules[0], dict)
-            else enumerate(modules)
-        )
-        for name, module in items:
-            if (
-                list(module.inlets.values()) != [Stream]
-                or len([t for t in module.outlets.values() if t is Stream]) != 1
-            ):
-                raise ValueError("Sequential children require exactly one inlet and outlet")
-            self.add_module(str(name), module)
-        children = list(self.children())
-        if not children:
-            raise ValueError("Sequential requires at least one child")
-        self.inlets = children[0].inlets
-        self.outlets = {k: t for k, t in children[-1].outlets.items() if t is Stream}
-
-    def _chain(self, inputs, streams_in, state=None, dt=None):
-        if inputs.root.keys() - self._children.keys():
-            raise ValueError(f"{self.path}: unknown child inputs")
-        stream = streams_in[next(iter(self.inlets))]
-        outputs, next_state = {}, {}
-        for name, child in self.named_children():
-            inlet = {next(iter(child.inlets)): stream}
-            if dt is not None and (child.stateful or child._children):
-                next_state[name], result = child.step(
-                    (state or {}).get(name), inputs.root.get(name), inlet, dt
-                )
-            else:
-                result = child(inputs.root.get(name), inlet)
-            stream = result.streams[next(k for k, t in child.outlets.items() if t is Stream)]
-            outputs[name] = result.outputs
-        return next_state or state, ModuleResult(
-            self.Outputs(outputs), {next(iter(self.outlets)): stream}
-        )
-
-    def forward(self, inputs, streams_in):
-        """Pass each outgoing stream to the next child."""
-        return self._chain(inputs, streams_in)[1]
-
-    def step(self, state, inputs, streams_in, dt):
-        """Advance each stateful child with its own state and validate external ports."""
-        if dt <= 0:
-            raise ValueError("dt must be positive [s]")
-        inputs = self._validate_inputs(inputs)
-        self._check_ports(streams_in, self.inlets, "inlet")
-        next_state = state
-
-        def advance():
-            nonlocal next_state
-            next_state, result = self._chain(inputs, streams_in, state, dt)
-            return result
-
-        result = self._observe(inputs, streams_in, advance)
-        return next_state, result

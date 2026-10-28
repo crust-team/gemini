@@ -8,13 +8,14 @@ from gemini.core.types.flows import Stream
 
 def test_capacity_balance_and_no_cooling():
     """Capacity caps heat, energy input accounts for efficiency, and the boiler never cools."""
-    c = Boiler(dict(fuel="gas", capacity=100000, efficiency=0.8))
+    c = Boiler(fuel_type="gas", capacity=100000, efficiency=0.8)
     s = Stream(m_dot=10, T=300, p=1e6)
-    out, streams = c({"setpoint_T": 360}, {"inlet": s})
+    result = c(setpoint_T=360, inlet=s)
+    out, streams = result.outputs, result.outlets
     assert out.capped and out.duty == 100000 and out.fuel_or_power == 125000
     assert (streams["outlet"].T - s.T) * s.m_dot * 4217.4 == pytest.approx(out.duty)
     assert streams["outlet"].m_dot == s.m_dot and streams["outlet"].p == s.p
-    out, _ = c({"setpoint_T": 290}, {"inlet": s})
+    out = c(setpoint_T=290, inlet=s).outputs
     assert out.duty == 0 and out.outlet_T == 300
-    out, _ = c({"setpoint_T": 360}, {"inlet": s.with_(m_dot=0)})
+    out = c(setpoint_T=360, inlet=s.with_(m_dot=0)).outputs
     assert out.duty == 0 and out.outlet_T == 300

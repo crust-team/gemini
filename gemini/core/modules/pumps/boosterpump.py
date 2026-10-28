@@ -1,38 +1,28 @@
 """Booster-pump passthrough with an explicit unmodelled-performance flag."""
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from gemini.core.modules.module import Module
-from gemini.core.types.flows import Stream
-from gemini.core.types.results import ModuleResult
+from gemini.core.types import Inlet, Outlet, Output, Stream
 
 
 class BoosterPump(Module):
     """Maintains circulation pressure through the surface geothermal loop."""
 
-    name = "boosterpump"
-    category = "pumps"
-    description = "Maintains circulation pressure through the surface geothermal loop."
-    inlets = {"suction": Stream}
-    outlets = {"discharge": Stream}
-
-    class Params(BaseModel):
-        """Available design parameters; no performance model is assumed."""
-
-        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-
-    class Inputs(BaseModel):
-        """No operating inputs are modelled yet."""
-
-        model_config = ConfigDict(extra="forbid")
-
     fidelity = "passthrough"
 
-    class Outputs(BaseModel):
-        """Explicit statement that no equipment physics is modelled."""
+    def __init__(self):
+        """Declare booster pump design data, ports and computed performance."""
+        super().__init__()
 
-        modelled: bool = Field(False, description="Equipment physics available [-]")
+        # Inlets
+        self.suction = Inlet(Stream)
 
-    def forward(self, inputs, streams_in):
+        # Outputs
+        self.modelled = Output(bool)
+
+        # Outlets
+        self.discharge = Outlet(Stream)
+
+    def forward(self, suction):
         """Preserve the inlet stream without implying a performance model."""
-        return ModuleResult(self.Outputs(), {"discharge": streams_in["suction"]})
+        self.modelled = False
+        return suction
