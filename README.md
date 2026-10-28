@@ -24,6 +24,10 @@ out = esp(
 )
 print(out.outputs.get("head", unit="bar"), out.outlets.discharge)
 
+with gm.no_outputs():
+    fluid_only = esp(suction=out.outlets.discharge, frequency="50 Hz")
+assert dict(fluid_only.outputs) == {}
+
 # Persist controls by assignment, or set any leaf input by path.
 esp.frequency = 50.0
 plant.set_inputs({"doublet.esp.frequency": "50 Hz"})

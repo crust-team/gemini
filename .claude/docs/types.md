@@ -15,7 +15,8 @@ Import public types from `gemini.core.types`; quantity aliases are also defined 
 ## Quantities and schemas
 
 Use `Parameter`, `Inlet`, `Control`, `Boundary`, `Output` and `Outlet` in module constructors.
-Their `kind` may be a quantity alias, Python type or flow type. Pydantic `TypeAdapter` performs
+Output kinds may be quantity aliases or Python types; inlet and outlet kinds must be `Stream`
+types. Pydantic `TypeAdapter` performs
 validation after declarations convert unit-bearing public values to SI. `UNSET` denotes an
 uninitialized parameter; `shape=` checks fixed vectors; bounds can tighten quantity defaults.
 
@@ -69,18 +70,13 @@ include salting-out. Explicit measured gas chemistry remains supported and takes
 Zero dissolved CO2 with no supplied gas chemistry returns zero CO2-corrosion rates; it does not
 claim absence of other corrosion mechanisms.
 
-## Energy flows and balances
+## Energy outputs and balances
 
-All energy ports are reporting **outlets**, calculated by the equipment:
-
-- `PowerFlow(P)`: positive electricity consumed from the grid.
-- `FuelFlow(P, fuel)`: positive chemical energy consumption on an LHV basis.
-- `HeatFlow(Q, T=None)`: positive heat released to the environment; negative means heat gained.
-
-Fluid heat transferred between equipment remains in Streams. Energy ports are never required
-caller inputs for the built-in equipment. `collect_flows(result)` sums leaf reporting ports once,
-ignoring duplicate composite aggregates. `ModuleResult` captures incoming streams, controls and
-children at evaluation time; later evaluations do not replace these audit inputs.
+Electricity, fuel use and environmental heat loss are `Power` outputs named `electricity`,
+`fuel` and `heat_loss`; they are not flow ports. Fluid heat transferred between equipment remains
+in `Stream` states. `collect_flows(result)` sums these leaf outputs once, ignoring composite
+aggregates. `ModuleResult` captures incoming streams, controls and children at evaluation time;
+later evaluations do not replace these audit inputs.
 
 `mass_balance` includes aquifer withdrawal/deposition boundaries. `energy_balance` audits
 sensible enthalpy (`m_dot * cp_l * T`), electricity, fuel and reported environmental heat.
