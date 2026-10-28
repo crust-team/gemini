@@ -109,7 +109,7 @@
           "params": {
             "no_stages": 10,
             "pump_type": "DEFAULT-PUMP",
-            "efficiency": 0.7,
+            "efficiency": 0.8,
             "head_coeff": null,
             "power_coeff": null
           }
@@ -681,7 +681,8 @@
     "fluids": {
       "geothermal_doublet_brine": {
         "RHOL": 1068.0,
-        "VISL": 0.00065
+        "VISL": 0.00065,
+        "CPL": 4129.213483146067
       }
     },
     "inputs": {
@@ -692,7 +693,12 @@
     "streams": {},
     "well_risers": {
       "production_well_c774": "production_well_c774_riser"
-    }
+    },
+    "assumptions": [
+      "Example bulk heat capacity 4.410 MJ/m3/K inferred from its heat balance.",
+      "Unmeasured secondary inlet pressure assumed 5 bar absolute.",
+      "Injection-pump default scenario setpoint 51.5 bar; twin uses the measured setpoint."
+    ]
   },
   "timestep": 900.0,
   "ignored": {
@@ -704,6 +710,7 @@
     "degasser_e846.tagnames.measured.degasser_level": "Empty tag: no data column is bound.",
     "degasser_e846.tagnames.measured.degasser_outlet_gas_flow": "Empty tag: no data column is bound.",
     "degasser_e846.tagnames.measured.degasser_outlet_liquid_flow": "Duplicates Qp; the liquid-only model conserves inlet mass.",
+    "degasser_e846.parameters.heat_transfer_coeff": "Preserved as metadata; liquid-only passthrough has no gas/thermal model.",
     "esp_1ee3.tagnames.calculated.esp_efficiency": "Empty tag: no data column is bound.",
     "esp_1ee3.tagnames.calculated.esp_theoretical_head": "Empty tag: no data column is bound.",
     "esp_1ee3.tagnames.calculated.esp_theoretical_outlet_pressure": "Empty tag: no data column is bound.",

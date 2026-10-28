@@ -33,11 +33,23 @@ class CSVMemoryReader:
         """Release the CSV driver connection."""
         self.driver.disconnect()
 
-    def register_tags(self, units):
-        """Map configured internal measured tags to CSV column names."""
-        for unit in units:
-            for tag, external in unit.tags["measured"].items():
-                self.tags[(unit.name, tag + ".measured")] = external[-1]
+    def register_tags(self, config):
+        """Map configured measured fields to CSV columns."""
+        self.tags = {}
+        for name, bound in config.bindings.items():
+            fields = dict(bound.inputs) | dict(bound.measured)
+            for port, bindings in bound.streams.items():
+                fields.update({f"{port}.{key}": value for key, value in bindings.items()})
+            for key, binding in fields.items():
+                self.tags[(name, key + ".measured")] = binding.column
+
+    def latest(self, window):
+        """Read the latest window ending at this offline reader's configured timestamp."""
+        frame = self.driver.df.loc[: self.end_time].copy()
+        frame.index = pd.to_datetime(frame.index, utc=True)
+        if isinstance(window, int):
+            return frame.tail(window)
+        return frame.loc[frame.index[-1] - pd.Timedelta(window) :]
 
     def import_raw_data(self):
         """Use the CSV already loaded at construction, without external writes."""

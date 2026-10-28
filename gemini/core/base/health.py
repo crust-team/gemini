@@ -7,6 +7,7 @@ class Health(BaseModel):
     """Comparison of predicted equipment performance with measurements."""
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    assessed: bool = Field(True, description="Diagnostic model was evaluated [-]")
     score: float = Field(..., ge=0, le=1, description="Condition score, one is nominal [-]")
     alarm: bool = Field(..., description="Whether a monitoring limit is exceeded [-]")
     message: str = Field(..., description="Explanation of the condition [-]")
