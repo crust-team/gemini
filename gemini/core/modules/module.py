@@ -469,8 +469,6 @@ class Module:
         if required - recorded.keys():
             missing = sorted(required - recorded.keys())
             raise RuntimeError(f"{self.path}: required outputs left unassigned: {missing}")
-        if len(self._outlets) == 1 and not isinstance(returned, dict):
-            returned = {next(iter(self._outlets)): returned}
         if returned is None and not self._outlets:
             returned = {}
         if not isinstance(returned, dict):

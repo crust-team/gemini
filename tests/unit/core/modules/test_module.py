@@ -72,6 +72,20 @@ def test_call_output_and_signature_guards():
     with pytest.raises(TypeError):
         module(inlet=stream, unexpected=1)
 
+
+def test_single_outlet_scalar_return_is_rejected(monkeypatch):
+    """A one-outlet module must return the same explicit dictionary shape as every module."""
+    stream = Stream(m_dot=1, T=300, p=1e5)
+    module = PassThrough(value=2)
+
+    def scalar_forward(inlet, multiplier):
+        module.result = module.value * multiplier
+        return inlet
+
+    monkeypatch.setattr(module, "forward", scalar_forward)
+    with pytest.raises(TypeError, match="outlet dict"):
+        module(inlet=stream)
+
     class WrongSignature(Module):
         """Fixture with a declaration/signature mismatch."""
 
