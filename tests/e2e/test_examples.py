@@ -10,7 +10,9 @@ ROOT = Path(__file__).parents[2]
 pytestmark = pytest.mark.e2e
 
 
-@pytest.mark.parametrize("path", sorted((ROOT / "examples").glob("**/run.py")), ids=str)
+@pytest.mark.parametrize(
+    "path", sorted((ROOT / "examples").glob("**/[0-9][0-9]_*.py")), ids=str
+)
 def test_example(path):
     """Examples load the checked-in dataset, execute cleanly and produce useful output."""
     completed = subprocess.run(

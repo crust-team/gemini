@@ -1,6 +1,6 @@
 """Convert old files in both directions.
 
-Run: python examples/legacy/gemini_project_bridge/run.py.
+Run: python examples/legacy/00_gemini_project_bridge.py.
 """
 
 import argparse

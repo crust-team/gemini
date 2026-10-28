@@ -1,4 +1,4 @@
-"""Inspect a saved plant. Run: python examples/basics/inspect_plant/run.py."""
+"""Inspect a saved plant. Run: python examples/core/basics/00_inspect_plant.py."""
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant

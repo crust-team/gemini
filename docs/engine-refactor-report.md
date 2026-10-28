@@ -13,7 +13,7 @@ isolated under `gemini.legacy`.
 - Moved the example plant to `examples/shared/doublet_heat/plant.py` as `DoubletHeatPlant`.
 - Moved old project files to `examples/legacy/gemini_project_bridge/old_project/` and generated
   the committed SI `plant.json` and `doublet_2024_15min.csv` in the shared example.
-- Replaced numbered scripts with category/name/run.py examples.
+- Organized numbered scripts as package/category/NN_name.py examples.
 - Reorganized tests into unit, integration, e2e, and fixtures.
 
 ## Checkpoints

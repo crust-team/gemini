@@ -17,7 +17,7 @@ gemini/
 ├── optim/            # calibration through Engine.replay
 ├── design/
 └── agentic/
-examples/             # category/name/run.py; shared plant/data outside package
+examples/             # package/category/NN_name.py; shared plant/data outside package
 tests/                # unit mirror, integration, e2e and immutable fixtures
 ```
 
