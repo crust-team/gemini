@@ -1,4 +1,4 @@
-"""Process two daily live updates once. Run: python examples/live/daily_update/run.py."""
+"""Process two daily live updates once. Run: python examples/core/live/00_daily_update.py."""
 
 from tempfile import TemporaryDirectory
 

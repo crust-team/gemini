@@ -1,4 +1,4 @@
-"""Compare one-day ESP frequencies. Run: python examples/simulate/esp_frequency_sweep/run.py."""
+"""Compare one-day ESP frequencies. Run: python examples/core/simulate/00_esp_frequency_sweep.py."""
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
