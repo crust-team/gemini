@@ -10,3 +10,7 @@ poetry.lock
 codedocumentation
 build
 .env
+.venv311/
+.pytest_cache/
+dist/
+docs/codedocumentation/

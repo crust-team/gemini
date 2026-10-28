@@ -18,8 +18,9 @@ jobs:
         python-version: "3.11"
     - name: Install dependencies
       run: |
-        ./ci/linux/run_installation.sh
+        pip install poetry
+        poetry install
 
     - name: Test with pytest
       run: |
-        ./ci/linux/run_test.sh
+        poetry run pytest tests

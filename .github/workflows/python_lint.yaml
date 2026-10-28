@@ -18,7 +18,10 @@ jobs:
         python-version: "3.11"
     - name: Install dependencies
       run: |
-        ./ci/linux/run_installation.sh
+        pip install poetry
+        poetry install
     - name: Lint with flake8 black isort
       run: |
-        ./ci/linux/run_linter.sh
+        poetry run flake8 gemini tests
+        poetry run black --check gemini tests
+        poetry run isort --check-only gemini tests

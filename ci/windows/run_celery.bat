@@ -1,1 +1,0 @@
-celery --app src.gemini_interface.blueprint.celerytasks.celery worker --loglevel=info --pool=solo
