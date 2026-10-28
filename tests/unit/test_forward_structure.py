@@ -107,10 +107,25 @@ def _assert_return_block(cls, tree, outlet_names):
     assert valid_return, f"{cls.__name__}: final statement must be return outlets"
 
 
+def _child_for_call(module, function):
+    parts = []
+    while isinstance(function, ast.Attribute):
+        parts.append(function.attr)
+        function = function.value
+    if not isinstance(function, ast.Name) or function.id != "self":
+        return None
+    current = module
+    for part in reversed(parts):
+        if part not in current._children:
+            return None
+        current = current._children[part]
+    return current
+
+
 def test_registered_forward_structure():
     """Concrete forwards use fixed sections, assignments and outlet return blocks."""
     for cls in MODULE_REGISTRY.values():
-        if "forward" not in cls.__dict__:
+        if "forward" not in cls.__dict__ or cls.__module__.startswith("tests."):
             continue
         module = cls()
         source, tree = _source_tree(cls.forward)
@@ -118,6 +133,13 @@ def test_registered_forward_structure():
         output_names = list(module.outputs())
         outlet_names = list(module.outlets())
         composite = bool(list(module.children()))
+
+        expected_arguments = list(module.inlets())
+        actual_arguments = [argument.arg for argument in tree.args.args if argument.arg != "self"]
+        assert actual_arguments == expected_arguments, (
+            f"{cls.__name__}: forward arguments {actual_arguments} "
+            f"!= declared inlets {expected_arguments}"
+        )
 
         assert (
             "# Modules" in comments
@@ -150,6 +172,17 @@ def test_registered_forward_structure():
                     locals_.count(name) == 1
                 ), f"{cls.__name__}: outlet {name!r} needs exactly one local in # Outlets"
         _assert_return_block(cls, tree, outlet_names)
+
+        for call in (node for node in ast.walk(tree) if isinstance(node, ast.Call)):
+            child = _child_for_call(module, call.func)
+            if child is None:
+                continue
+            keywords = {keyword.arg for keyword in call.keywords if keyword.arg is not None}
+            unexpected = keywords - child.inlets().keys()
+            assert not unexpected, (
+                f"{cls.__name__}: child {child.path} receives non-inlet keywords "
+                f"{sorted(unexpected)}"
+            )
 
 
 def test_stateful_step_sections_are_ordered():

@@ -11,8 +11,8 @@ def test_every_forward_matches_its_declarations():
         if cls.category in {"container", "user"}:
             continue
         module = cls()
-        expected = set(module.inlets()) | set(module.controls()) | set(module.boundaries())
-        actual = set(inspect.signature(module.forward).parameters)
+        expected = list(module.inlets())
+        actual = list(inspect.signature(module.forward).parameters)
         assert actual == expected, cls
 
 
