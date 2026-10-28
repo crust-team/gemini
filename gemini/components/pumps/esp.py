@@ -4,6 +4,8 @@ Predicts stage head, shaft power and efficiency using the original polynomial
 basis. Reference: TNO 2022 R11363, Model-based monitoring of geothermal assets.
 """
 
+from typing import Literal
+
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -26,6 +28,9 @@ class ESP(Component):
         """Design data with legacy US-basis polynomial coefficients."""
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+        coefficient_precision: Literal["float64", "float32"] = Field(
+            "float64", description="Polynomial arithmetic precision for legacy runtime parity [-]"
+        )
         no_stages: int = Field(..., gt=0, description="Number of pump stages [-]")
         head_coeff: list[float] = Field(
             ...,
@@ -80,18 +85,26 @@ class ESP(Component):
         )
         bep_ratio: float = Field(..., description="Flow divided by frequency-scaled BEP flow [-]")
 
+    def _coefficients(self, values):
+        # NOTE(refactor): old monitoring modules evaluate NumPy float32 coefficients and arithmetic.
+        return (
+            np.asarray(values, dtype=np.float32)
+            if self.params.coefficient_precision == "float32"
+            else values
+        )
+
     def head_function(self, flow: float, frequency: float) -> float:
         """Return TNO R11363 pump head [Pa] for flow [m3/s] and frequency [Hz]."""
         q = units.m3s_to_bbl_per_day(flow)
         value = self.params.no_stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 2
-        value *= sum(c * q**i for i, c in enumerate(self.params.head_coeff))
+        value *= sum(c * q**i for i, c in enumerate(self._coefficients(self.params.head_coeff)))
         return units.ft_head_to_pa(value)
 
     def power_function(self, flow: float, frequency: float) -> float:
         """Return TNO R11363 shaft power [W] for flow [m3/s] and frequency [Hz]."""
         q = units.m3s_to_bbl_per_day(flow)
         value = self.params.no_stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 3
-        value *= sum(c * q**i for i, c in enumerate(self.params.power_coeff))
+        value *= sum(c * q**i for i, c in enumerate(self._coefficients(self.params.power_coeff)))
         return units.bhp_to_w(value)
 
     def efficiency_function(self, flow: float, head: float, power: float) -> float:

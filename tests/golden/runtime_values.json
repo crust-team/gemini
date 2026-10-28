@@ -1,0 +1,26 @@
+{
+  "injection_well_a06b:injectionwell_bottomhole_pressure.calculated": [
+    258.5796439146258
+  ],
+  "injection_well_a06b:injectionwell_injectivity_index.calculated": [
+    3.867091161601951
+  ],
+  "esp_1ee3:esp_theoretical_head.calculated": [
+    37.05164337158203
+  ],
+  "esp_1ee3:esp_theoretical_power.calculated": [
+    0.0
+  ],
+  "esp_1ee3:esp_theoretical_outlet_pressure.calculated": [
+    96.54264337158203
+  ],
+  "esp_1ee3:esp_vlp_ipr_inlet_pressure.calculated": [
+    51.621190017149914
+  ],
+  "esp_1ee3:esp_vlp_outlet_pressure.calculated": [
+    73.59806682561225
+  ],
+  "esp_1ee3:esp_vlp_head.calculated": [
+    14.10706682561225
+  ]
+}

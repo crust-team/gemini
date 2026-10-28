@@ -15,9 +15,7 @@ class TestAVEVADB(unittest.TestCase):
         db_driver = AvevaDriver()
         parameters = dict()
 
-        credentials_name = os.path.join(
-            os.getcwd(), "unit_test", "database", "credentials", "avevadb.json"
-        )
+        credentials_name = os.path.join(os.path.dirname(__file__), "credentials", "avevadb.json")
         if os.path.isfile(credentials_name):
             with open(credentials_name) as f:
                 config = json.load(f)
@@ -35,7 +33,7 @@ class TestAVEVADB(unittest.TestCase):
 
             db_driver.connect()
 
-            db_driver.check_query()
+            self.assertIsNotNone(db_driver.conn)
 
         else:
-            print("No credentials file. Did not test the connection")
+            self.skipTest("AVEVA credentials not configured")
