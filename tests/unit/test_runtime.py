@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import gemini as gm
 from gemini.core.engine import registry
 from gemini.core.physics import geometry, units
 from gemini.core.types.flows import Stream
@@ -25,15 +26,16 @@ def test_captured_monitoring_values():
         return mapping.read_property(DATA / (name + ".param"))
 
     w, e, r = read("production_well_c774"), read("esp_1ee3"), read("reservoir_c1b5")
-    pump = registry.create(
-        "esp", mapping.esp_params_from_gemini(e) | {"coefficient_precision": "float32"}
-    )
-    result = pump(
-        {"frequency": row.ESP_freq},
-        suction=Stream(
-            m_dot=units.m3h_to_m3s(row.Qp) * 1000, T=300, p=units.bar_to_pa(row.ESP_Pin)
-        ),
-    ).outputs
+    pump = registry.create("esp", mapping.esp_params_from_gemini(e))
+    with gm.runtime.settings(precision="float32"):
+        result = pump(
+            frequency=row.ESP_freq,
+            suction=Stream(
+                m_dot=units.m3h_to_m3s(row.Qp) * 1000,
+                T=300,
+                p=units.bar_to_pa(row.ESP_Pin),
+            ),
+        ).outputs
     head = float(units.pa_to_bar(np.float32(result.head)))
     actual = {
         "esp_1ee3:esp_theoretical_head.calculated": [head],
@@ -56,14 +58,14 @@ def test_captured_monitoring_values():
         inner_diameter=e["esp_tubing"],
         roughness=table[1]["roughness"],
     )
-    wp["path"] = geometry.PipePath(sections=[top, *below])
-    well = registry.create("productionwell", wp)
+    wp["pipe_path"] = geometry.PipePath(sections=[top, *below])
+    well = registry.create("production_well", wp)
     well.fluid = reservoir.fluid
     mass = (
         units.m3h_to_m3s(row.Qp)
         * reservoir.fluid.properties(params["pressure"], params["temperature"]).rho_l
     )
-    sandface = reservoir({"m_dot": mass}).streams["sandface"]
+    sandface = reservoir(m_dot=mass).outlets["sandface"]
     intake = well.intake_conditions(sandface)
     discharge = well.discharge_from_wellhead(
         Stream(
@@ -86,7 +88,7 @@ def test_captured_monitoring_values():
     reservoir = registry.create(
         "injection_reservoir", mapping.injection_reservoir_params_from_gemini(r, w)
     )
-    well = registry.create("injectionwell", mapping.injectionwell_params_from_gemini(w))
+    well = registry.create("injection_well", mapping.injectionwell_params_from_gemini(w))
     well.fluid = reservoir.fluid
     p, T = units.bar_to_pa(row.InjectorPump_Pout), units.c_to_k(row.T_p_out)
     stream = Stream(
