@@ -18,11 +18,12 @@ plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
 esp = gm.modules.ESP(
     **{name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
 )
-out = esp(
-    suction=gm.Stream(flow="150 m3/h", T="80 C", p="20 bar"),
-    frequency="50 Hz",
-)
+stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
+out = esp(suction=stream, frequency="50 Hz")
+assert out.outputs.head == esp({"suction": stream}, frequency="50 Hz").outputs.head
+assert out.outputs.head == esp(stream, frequency="50 Hz").outputs.head
 print(out.outputs.get("head", unit="bar"), out.outlets.discharge)
+assert out.outlets.discharge is out.outlets["discharge"]
 
 with gm.no_outputs():
     fluid_only = esp(suction=out.outlets.discharge, frequency="50 Hz")

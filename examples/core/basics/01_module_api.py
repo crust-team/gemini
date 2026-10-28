@@ -13,14 +13,17 @@ values = {name: p.value for name, p in plant.doublet.esp.named_parameters()}
 esp = gm.modules.ESP(**values | {"setting_depth": "1200 m"})
 s = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
 a = esp(suction=s, frequency="50 Hz")
+b = esp({"suction": s}, frequency="50 Hz")
+c = esp(s, frequency="50 Hz")
+assert a.outputs.head == b.outputs.head == c.outputs.head
 esp.frequency = 50.0
-b = esp(suction=s)
-assert a.outputs.head == b.outputs.head
+persistent = esp(suction=s)
+assert a.outputs.head == persistent.outputs.head
 
 with gm.no_outputs():
     fluid_only = esp(suction=s)
 assert dict(fluid_only.outputs) == {}
-assert fluid_only.outlets.discharge == b.outlets.discharge
+assert fluid_only.outlets.discharge == persistent.outlets.discharge
 
 
 def clamp(module, inlets):
@@ -32,7 +35,7 @@ handle = esp.register_forward_pre_hook(clamp)
 c = esp(suction=s)
 handle.remove()
 assert esp.frequency == 50.0
-assert c.outputs.head < b.outputs.head
+assert c.outputs.head < persistent.outputs.head
 print(a.outputs.head, a.outlets.discharge.p, a.outputs.electricity)
 print(a.outputs.get("head", unit="bar"))
 print(list(esp.inlets()), list(esp.controls()), list(esp.boundaries()))

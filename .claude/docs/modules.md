@@ -1,15 +1,15 @@
 # Writing modules
 
 GEMINI modules follow a fluid-first call contract. Child modules and declarations are assigned
-once in `__init__`. `forward` receives exactly the declared fluid inlets and returns exactly the
-declared fluid outlets. Controls and boundaries are applied by the base class and read from
-`self`. Outputs are computed only after the fluid step succeeds.
+once in `__init__`. Every `forward` receives the same read-only `Ports` mapping and returns a
+dictionary containing exactly the declared fluid outlets. Controls and boundaries are applied by
+the base class and read from `self`. Outputs are computed only after the fluid step succeeds.
 
 ## Leaf modules
 
-Leaves declare ordinary `Output(kind)` values and implement `_compute_outputs`. The callback
-requests any inlet or outlet it needs by parameter name; its signature is inspected and cached
-when the class is defined. It never needs `super()._compute_outputs()`.
+Leaves declare ordinary `Output(kind)` values and implement
+`_compute_outputs(self, inlets, outlets)`. It never needs
+`super()._compute_outputs()`.
 
 ```python
 from gemini.core.modules import Module
@@ -46,10 +46,11 @@ class Pump(Module):
         # Outlets
         self.discharge = Outlet(Stream)
 
-    def forward(self, suction):
+    def forward(self, inlets):
         """Raise the suction pressure."""
 
         # Outlets
+        suction = inlets.suction
         flow = suction.volumetric_flow()
         head = pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
         discharge = suction.with_(p=suction.p + head)
@@ -57,7 +58,9 @@ class Pump(Module):
         outlets = dict(discharge=discharge)
         return outlets
 
-    def _compute_outputs(self, suction, discharge):
+    def _compute_outputs(self, inlets, outlets):
+        suction = inlets.suction
+        discharge = outlets.discharge
         self.flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
         self.power = pumps.power(
@@ -107,10 +110,12 @@ class HeatPlant(Module):
         # Outlets
         self.secondary_out = Outlet(Stream)
 
-    def forward(self, primary, secondary):
+    def forward(self, inlets):
         """Evaluate children in physical flow order."""
 
         # Modules
+        primary = inlets.primary
+        secondary = inlets.secondary
         pumped = self.pump(suction=primary)
         exchanged = self.heat_exchanger(
             hot_in=pumped.outlets.discharge, cold_in=secondary
@@ -126,6 +131,23 @@ class HeatPlant(Module):
 Formula paths are checked once the tree is complete and typo errors include a close-match
 suggestion. `module.is_leaf` is true exactly when the module has no registered children.
 
+## Calling modules and `Ports`
+
+Keyword, mapping and positional inlet calls are equivalent. Positional streams follow inlet
+declaration order; controls and boundaries remain optional call keywords. Do not combine an inlet
+mapping with inlet keywords.
+
+```python
+a = pump(suction=stream, frequency="50 Hz")
+b = pump({"suction": stream}, frequency="50 Hz")
+c = pump(stream, frequency="50 Hz")
+assert a.outputs.head == b.outputs.head == c.outputs.head
+```
+
+`inlets`, `_compute_outputs` outlets, and `result.outlets` are immutable `Ports`. They preserve
+declaration order and support both `ports.suction` and `ports["suction"]`. Unknown names report
+the module path, valid names and a close-match suggestion.
+
 ## Call order and hooks
 
 One call performs these steps:
@@ -138,17 +160,23 @@ One call performs these steps:
 6. run forward hooks;
 7. verify every output was assigned and build `ModuleResult`.
 
-Pre-hooks remain `hook(module)`. Register a forward hook with explicit names, for example:
+Pre-hooks always receive `(module, inlets)` and forward hooks always receive
+`(module, inlets, outlets)`:
 
 ```python
-def observe(module, suction, discharge):
-    print(module.head, suction.p, discharge.p)
+def clamp(module, inlets):
+    module.frequency = min(module.frequency, 45)
 
 
+def observe(module, inlets, outlets):
+    print(module.head, inlets.suction.p, outlets.discharge.p)
+
+
+pre_handle = pump.register_forward_pre_hook(clamp)
 handle = pump.register_forward_hook(observe)
 ```
 
-Hook return values are ignored. Invalid hook parameter names fail at registration. Remove a hook
+Hook return values are ignored. Any non-fixed hook signature fails at registration. Remove a hook
 with `handle.remove()`.
 
 ## Skipping outputs
@@ -170,7 +198,9 @@ Constructor sections are ordered `Modules`, `Parameters`, `Inlets`, `Controls`, 
 `States`, `Outputs`, `Outlets`, with empty sections omitted. `forward` uses only `# Modules` on
 composites and `# Outlets` when outlets exist. It contains no `self.<name> = ...` assignments and
 ends with `outlets = dict(...)` followed by `return outlets`. Method order is `__init__`,
-`forward`, `_compute_outputs`, then private helpers.
+`forward`, `_compute_outputs`, then private helpers. Signatures are always
+`forward(self, inlets)` and `_compute_outputs(self, inlets, outlets)`, including modules with no
+ports; parameters have no defaults or variadic forms.
 
 Inlets and outlets accept `Stream` types only. Electricity, fuel use and environmental heat loss
 are `Power` outputs. Results keep the same dotted `<module path>.<name>` addressing scheme.
