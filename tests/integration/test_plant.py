@@ -59,7 +59,9 @@ def test_trace_hooks_are_removed_after_failure():
     """Failed evaluation does not leak observers into subsequent calls."""
     plant, inputs = example()
     before = [(len(m._hooks), len(m._pre_hooks)) for m in plant.modules()]
+    plant.injection_pump.pressure_setpoint = 0
     with pytest.raises(ValueError):
-        trace_wiring(plant, inputs | {"injection_pressure": 0})
+        trace_wiring(plant, inputs)
     assert before == [(len(m._hooks), len(m._pre_hooks)) for m in plant.modules()]
+    plant.injection_pump.pressure_setpoint = 5.15e6
     plant(**inputs)

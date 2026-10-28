@@ -349,11 +349,6 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
         boundary[key] = {node_map[k]: v for k, v in boundary[key].items()}
     boundary.pop("well_risers", None)
     bindings[""] = ModuleBindings(
-        controls={
-            "m_dot": Binding(column="Qp", unit="m3/h"),
-            "esp_frequency": Binding(column="ESP_freq", unit="Hz"),
-            "injection_pressure": Binding(column="InjectorPump_Pout", unit="bar"),
-        },
         inlets={
             "secondary": {
                 "m_dot": Binding(column="Qs", unit="m3/h"),
@@ -364,7 +359,6 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
     # NOTE(refactor): two-control simulations need an assumed secondary boundary.
     # Store 40 kg/s, 20 C and 5 bar explicitly; measured replay never uses these defaults.
     boundary["root_inputs"] = {
-        "injection_pressure": 5.15e6,
         "secondary": {"m_dot": 40, "T": 293.15, "p": 5e5, "fluid": brine.model_dump(mode="json")},
     }
     boundary.setdefault("assumptions", []).append(

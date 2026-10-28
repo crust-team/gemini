@@ -25,9 +25,6 @@ _SI_UNITS = {
     "-": "-",
 }
 _ROOT_COLUMNS = {
-    "m_dot": "production_rate",
-    "esp_frequency": "esp_frequency",
-    "injection_pressure": "injection_pressure",
     "secondary.m_dot": "secondary_rate",
     "secondary.T": "secondary_temperature",
 }
@@ -295,12 +292,18 @@ def check_wiring(plant, project, nodes=None):
     node_map = nodes or {node_id: NODE_PATHS[node.name] for node_id, node in project.nodes.items()}
     try:
         inputs = (
-            dict(plant.last_result.inputs) | dict(plant.last_result.inlets)
+            dict(plant.last_result.inlets)
             if getattr(plant, "last_result", None) is not None
             else deepcopy(plant.boundary["root_inputs"])
         )
-        inputs.setdefault("m_dot", 40.0)
-        inputs.setdefault("esp_frequency", 60.0)
+        if getattr(plant, "last_result", None) is None:
+            plant.set_inputs(
+                {
+                    "doublet.reservoir.m_dot": 40.0,
+                    "doublet.esp.frequency": 60.0,
+                    "injection_pump.pressure_setpoint": 5.15e6,
+                }
+            )
         traced = trace_wiring(plant, inputs)
     except Exception as exc:
         return [f"Could not trace plant wiring: {exc}"]

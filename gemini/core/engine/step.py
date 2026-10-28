@@ -6,6 +6,7 @@ from copy import deepcopy
 
 from gemini.core.physics import units
 from gemini.core.types import Fluid, Health, Stream
+from gemini.core.types.declarations import UNSET
 
 
 class MissingMeasurement(ValueError):
@@ -86,7 +87,7 @@ class BindingPlan:
         """Compile declarations and dataset bindings for repeated evaluations."""
         from gemini.core.types.bindings import Binding, ModuleBindings
 
-        self.entries, self.columns = [], set()
+        self.entries, self.columns, self.chained_inputs = [], set(), []
         self._started, self._next_change = False, None
         self._dates = sorted(
             {
@@ -106,18 +107,35 @@ class BindingPlan:
                     raise ValueError(f"{path}: no measured boundary bindings")
         bindings = plant.bindings
         if kind == "simulate":
-            bindings = {
-                "": bindings.get(
-                    "",
-                    ModuleBindings(
-                        controls={
-                            name: Binding(column=name, unit=declaration.unit or "-")
-                            for name, declaration in plant.controls().items()
-                            if name in dataset.columns
-                        }
-                    ),
+            root = bindings.get("", ModuleBindings()).model_copy(deep=True)
+            root.controls, root.boundaries = {}, {}
+            root.measured, root.state = {}, {}
+            bindings = {"": root}
+            missing_inputs = []
+            for input_path, declaration in plant.inputs(recurse=True).items():
+                module_path, _, name = input_path.rpartition(".")
+                module = plant.get_submodule(module_path)
+                original = plant.bindings.get(module_path, ModuleBindings())
+                group = original.controls if name in module.controls() else original.boundaries
+                binding = group.get(name)
+                if binding is None and input_path in dataset.names:
+                    binding = Binding(column=input_path, unit=declaration.unit or "-")
+                if binding is not None and binding.column in dataset.names:
+                    binding = binding.model_copy(deep=True)
+                    if binding.column in dataset.columns:
+                        binding.unit = dataset.columns[binding.column].unit
+                    bound = ModuleBindings()
+                    target = bound.controls if name in module.controls() else bound.boundaries
+                    target[name] = binding
+                    self.chained_inputs.append((module_path, module, bound))
+                    self.columns.add(binding.column)
+                elif declaration.default is UNSET and name not in module._input_values:
+                    missing_inputs.append(input_path)
+            if missing_inputs:
+                raise ValueError(
+                    "Simulation inputs have no data column or default: "
+                    + ", ".join(sorted(missing_inputs))
                 )
-            }
         for path, original in bindings.items():
             if kind != "simulate" and (not path or only is not None and path not in only):
                 if path or plant._children or only is not None and path not in only:
@@ -177,6 +195,8 @@ def twin_step(plant, sample, states, plan):
     for path, module, bound, defaults in plan.entries:
         try:
             kwargs, measured = prepare(module, bound, sample.row, defaults)
+            applied = {name: kwargs.pop(name) for name in module.inputs() if name in kwargs}
+            module.set_inputs(applied)
             if module.stateful:
                 state = (
                     {key: _value(sample.row, binding) for key, binding in bound.state.items()}
@@ -203,9 +223,20 @@ def chained_step(plant, sample, states, plan):
     plan.apply_parameters(plant, sample.t)
     plan.skips, plan.errors = {}, []
     _, _, bound, defaults = plan.entries[0]
-    kwargs = deepcopy(plant.boundary.get("root_inputs", {}))
+    kwargs = {
+        name: value
+        for name, value in deepcopy(plant.boundary.get("root_inputs", {})).items()
+        if name in plant.inlets()
+    }
     measured_kwargs, _ = prepare(plant, bound, sample.row, defaults)
     kwargs.update(measured_kwargs)
+    input_values = {}
+    for path, module, input_bindings in plan.chained_inputs:
+        values, _ = prepare(module, input_bindings, sample.row)
+        input_values.update(
+            {f"{path}.{name}" if path else name: value for name, value in values.items()}
+        )
+    plant.set_inputs(input_values)
     if plan.stateful:
         states[""], result = plant.step(states.get("", plant.initial_state()), sample.dt, **kwargs)
     else:
