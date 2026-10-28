@@ -2,6 +2,16 @@
 
 from .bindings import Binding, ColumnInfo, DatedParams, ModuleBindings
 from .cost import Cost
+from .declarations import (
+    UNSET,
+    Boundary,
+    Control,
+    Inlet,
+    Outlet,
+    Output,
+    Parameter,
+    Quantity,
+)
 from .flows import Flow, FuelFlow, HeatFlow, PowerFlow, Stream
 from .fluid import BRINE, GLYCOL_30, WATER, Fluid
 from .profile import Profile
@@ -39,7 +49,7 @@ from .quantities import (
     VolumeFlow,
     quantity,
 )
-from .results import Health, ModuleResult, ParamRef
+from .results import Health, ModuleResult, Values
 
 __all__ = [
     "Pressure",
@@ -80,6 +90,14 @@ __all__ = [
     "DatedParams",
     "ModuleBindings",
     "Cost",
+    "UNSET",
+    "Parameter",
+    "Inlet",
+    "Control",
+    "Boundary",
+    "Output",
+    "Outlet",
+    "Quantity",
     "Flow",
     "FuelFlow",
     "HeatFlow",
@@ -92,5 +110,5 @@ __all__ = [
     "Profile",
     "Health",
     "ModuleResult",
-    "ParamRef",
+    "Values",
 ]
