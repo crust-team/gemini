@@ -19,8 +19,8 @@ class Relaxation(Module):
 
     name = "relaxation"
     category = "test"
-    inlets = ("inlet",)
-    outlets = ("outlet",)
+    inlets = {"inlet": Stream}
+    outlets = {"outlet": Stream}
 
     class Params(EmptyModel):
         """Temperature relaxation factor and target."""

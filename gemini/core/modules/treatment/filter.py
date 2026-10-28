@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import units
+from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import MassFlow, PressureDifference
 from gemini.core.types.results import Health, ModuleResult
 
@@ -16,8 +17,8 @@ class Filter(Module):
     name = "filter"
     category = "treatment"
     description = "Removes suspended solids before reinjection into the aquifer."
-    inlets = ("inlet",)
-    outlets = ("outlet",)
+    inlets = {"inlet": Stream}
+    outlets = {"outlet": Stream}
 
     class Params(BaseModel):
         """Available design parameters; no performance model is assumed."""

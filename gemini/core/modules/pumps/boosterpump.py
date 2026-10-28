@@ -3,6 +3,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
+from gemini.core.types.flows import Stream
 from gemini.core.types.results import ModuleResult
 
 
@@ -12,8 +13,8 @@ class BoosterPump(Module):
     name = "boosterpump"
     category = "pumps"
     description = "Maintains circulation pressure through the surface geothermal loop."
-    inlets = ("suction",)
-    outlets = ("discharge",)
+    inlets = {"suction": Stream}
+    outlets = {"discharge": Stream}
 
     class Params(BaseModel):
         """Available design parameters; no performance model is assumed."""

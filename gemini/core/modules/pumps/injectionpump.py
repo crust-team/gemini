@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import pumps
+from gemini.core.types.flows import PowerFlow, Stream
 from gemini.core.types.quantities import (
     Count,
     Efficiency,
@@ -22,8 +23,8 @@ class InjectionPump(Module):
     category = "pumps"
     description = "Injection pump using curves or a pressure setpoint and efficiency."
     fidelity = "simple"
-    inlets = ("suction",)
-    outlets = ("discharge",)
+    inlets = {"suction": Stream}
+    outlets = {"discharge": Stream, "electricity": PowerFlow}
     soft_sensors = ("head", "power", "discharge_pressure")
     calibratable = ("efficiency",)
 
@@ -85,5 +86,6 @@ class InjectionPump(Module):
             )
         outlet = stream.with_(p=stream.p + head)
         return ModuleResult(
-            self.Outputs(head=head, power=power, discharge_pressure=outlet.p), {"discharge": outlet}
+            self.Outputs(head=head, power=power, discharge_pressure=outlet.p),
+            {"discharge": outlet, "electricity": PowerFlow(P=power)},
         )

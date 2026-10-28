@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import heat_transfer
+from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import (
     Fraction,
     MassFlow,
@@ -29,8 +30,8 @@ class HeatExchanger(Module):
     name = "heatexchanger"
     category = "heat"
     description = "Plate heat exchanger with effectiveness–NTU performance and UA monitoring."
-    inlets = ("hot_in", "cold_in")
-    outlets = ("hot_out", "cold_out")
+    inlets = {"hot_in": Stream, "cold_in": Stream}
+    outlets = {"hot_out": Stream, "cold_out": Stream}
     soft_sensors = ("duty", "effectiveness")
     calibratable = ("ua",)
 

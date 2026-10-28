@@ -2,14 +2,19 @@
 
 import inspect
 from abc import ABC, abstractmethod
+from contextvars import ContextVar
+from dataclasses import replace
 from functools import wraps
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 
-from gemini.core.types.flows import Stream
+from gemini.core.types.cost import Cost
+from gemini.core.types.flows import Flow, Stream
 from gemini.core.types.fluid import BRINE, Fluid
 from gemini.core.types.results import ModuleResult, ParamRef
+
+_evaluation = ContextVar("module_evaluation", default=None)
 
 
 class HookHandle:
@@ -49,8 +54,8 @@ class Module(ABC):
     Params = EmptyModel
     Inputs = EmptyModel
     Outputs = EmptyModel
-    inlets: ClassVar[tuple[str, ...]] = ()
-    outlets: ClassVar[tuple[str, ...]] = ()
+    inlets: ClassVar[dict[str, type[Flow]]] = {}
+    outlets: ClassVar[dict[str, type[Flow]]] = {}
     soft_sensors: ClassVar[tuple[str, ...]] = ()
     calibratable: ClassVar[tuple[str, ...]] = ()
     stateful: ClassVar[bool] = False
@@ -217,8 +222,9 @@ class Module(ABC):
             raise ValueError(
                 f"{self.path}: {kind} ports missing={sorted(missing)}, extra={sorted(extra)}"
             )
-        if any(not isinstance(s, Stream) for s in streams.values()):
-            raise TypeError(f"{self.path}: {kind} ports must contain Stream objects")
+        for name, value in streams.items():
+            if not isinstance(value, expected[name]):
+                raise TypeError(f"{self.path}: {kind} {name} requires {expected[name].__name__}")
 
     @abstractmethod
     def forward(self, inputs, streams_in) -> ModuleResult:
@@ -235,7 +241,20 @@ class Module(ABC):
         self._check_ports(inlet, self.inlets, "inlet")
         for fn in tuple(self._pre_hooks.values()):
             fn(self, inputs, inlet)
-        result = self.forward(inputs, inlet)
+        children = {}
+        parent = _evaluation.get()
+        token = _evaluation.set((self, children))
+        try:
+            result = self.forward(inputs, inlet)
+        finally:
+            _evaluation.reset(token)
+        result = replace(result, inlets=inlet, inputs=inputs, children=children)
+        if parent is not None:
+            owner, collected = parent
+            prefix = owner._path + "." if owner._path else ""
+            collected[self._path.removeprefix(prefix) or self.name] = result
+        self.last_result = result
+        self.last_results = result.leaves()
         for fn in tuple(self._hooks.values()):
             fn(self, inputs, inlet, result)
         return result
@@ -293,7 +312,11 @@ class Module(ABC):
     def state_dict(self):
         """Return JSON-safe design snapshots, including the root module."""
         return {
-            path: {"type": module.name, "params": module.params.model_dump(mode="json")}
+            path: {
+                "type": module.name,
+                "params": module.params.model_dump(mode="json"),
+                "fluid": module._fluid.model_dump(mode="json"),
+            }
             for path, module in self.named_modules()
         }
 
@@ -310,9 +333,16 @@ class Module(ABC):
             module, entry = modules[path], state[path]
             if entry["type"] != module.name:
                 raise ValueError(f"{module.path}: state type {entry['type']!r} != {module.name!r}")
-            pending.append((module, module.Params.model_validate(entry["params"])))
-        for module, params in pending:
+            pending.append(
+                (
+                    module,
+                    module.Params.model_validate(entry["params"]),
+                    Fluid.model_validate(entry["fluid"]),
+                )
+            )
+        for module, params, dtype in pending:
             module.params = params
+            module._fluid = dtype
             module.fluid = module._resolve_fluid()
 
     def initial_state(self):
@@ -356,9 +386,26 @@ class Module(ABC):
                     report[path] = health
         return report
 
-    def capex(self):
+    def capex(self) -> Cost | None:
         """Return optional capital expenditure when a correlation is available."""
         return None
+
+    def cost(self) -> Cost | None:
+        """Sum independently sourced costs; never combine currencies or price years."""
+        costs = [cost for module in self.modules() if (cost := module.capex()) is not None]
+        if not costs:
+            return None
+        first = costs[0]
+        if any((c.currency, c.price_year) != (first.currency, first.price_year) for c in costs):
+            raise ValueError("Costs require the same currency and price year")
+        return Cost(
+            capex=sum(c.capex for c in costs),
+            opex_fixed=sum(c.opex_fixed for c in costs),
+            opex_variable=sum(c.opex_variable for c in costs),
+            currency=first.currency,
+            price_year=first.price_year,
+            source="; ".join(dict.fromkeys(c.source for c in costs)),
+        )
 
     @staticmethod
     def _field_schema(model):
@@ -387,8 +434,8 @@ class Module(ABC):
             category=cls.category,
             description=cls.description,
             fidelity=cls.fidelity,
-            inlets=cls.inlets,
-            outlets=cls.outlets,
+            inlets={k: v.__name__ for k, v in cls.inlets.items()},
+            outlets={k: v.__name__ for k, v in cls.outlets.items()},
             params=cls._field_schema(cls.Params),
             inputs=cls._field_schema(cls.Inputs),
             outputs=cls._field_schema(cls.Outputs),
@@ -415,30 +462,36 @@ class Sequential(Module):
             else enumerate(modules)
         )
         for name, module in items:
-            if len(module.inlets) != 1 or len(module.outlets) != 1:
+            if (
+                len(module.inlets) != 1
+                or len([t for t in module.outlets.values() if t is Stream]) != 1
+            ):
                 raise ValueError("Sequential children require exactly one inlet and outlet")
             self.add_module(str(name), module)
         children = list(self.children())
         if not children:
             raise ValueError("Sequential requires at least one child")
-        self.inlets, self.outlets = children[0].inlets, children[-1].outlets
+        self.inlets = children[0].inlets
+        self.outlets = {k: t for k, t in children[-1].outlets.items() if t is Stream}
 
     def _chain(self, inputs, streams_in, state=None, dt=None):
         if inputs.root.keys() - self._children.keys():
             raise ValueError(f"{self.path}: unknown child inputs")
-        stream = streams_in[self.inlets[0]]
+        stream = streams_in[next(iter(self.inlets))]
         outputs, next_state = {}, {}
         for name, child in self.named_children():
-            inlet = {child.inlets[0]: stream}
+            inlet = {next(iter(child.inlets)): stream}
             if dt is not None and (child.stateful or child._children):
                 next_state[name], result = child.step(
                     (state or {}).get(name), inputs.root.get(name), inlet, dt
                 )
             else:
                 result = child(inputs.root.get(name), inlet)
-            stream = result.streams[child.outlets[0]]
+            stream = result.streams[next(k for k, t in child.outlets.items() if t is Stream)]
             outputs[name] = result.outputs
-        return next_state or state, ModuleResult(self.Outputs(outputs), {self.outlets[0]: stream})
+        return next_state or state, ModuleResult(
+            self.Outputs(outputs), {next(iter(self.outlets)): stream}
+        )
 
     def forward(self, inputs, streams_in):
         """Pass each outgoing stream to the next child."""

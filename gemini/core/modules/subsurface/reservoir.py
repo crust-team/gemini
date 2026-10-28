@@ -180,7 +180,7 @@ class ProductionReservoir(_Reservoir):
 
     name = "production_reservoir"
     description = "Production aquifer with productivity and radial-flow diagnostics."
-    outlets = ("sandface",)
+    outlets = {"sandface": Stream}
 
     class Params(_Reservoir.Params):
         """Production-side reservoir design data."""
@@ -207,7 +207,7 @@ class InjectionReservoir(_Reservoir):
 
     name = "injection_reservoir"
     description = "Injection aquifer with injectivity and radial-flow diagnostics."
-    inlets = ("sandface",)
+    inlets = {"sandface": Stream}
 
     class Params(_Reservoir.Params):
         """Injection-side reservoir design data."""
