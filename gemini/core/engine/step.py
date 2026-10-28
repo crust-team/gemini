@@ -82,6 +82,16 @@ class BindingPlan:
         from gemini.core.types.bindings import Binding, ModuleBindings
 
         self.entries, self.columns = [], set()
+        self._started, self._next_change = False, None
+        self._dates = sorted(
+            {
+                snapshot.valid_from
+                for module in plant.modules()
+                for snapshot in module.param_history
+                if snapshot.valid_from is not None
+            }
+        )
+        self.stateful = any(module.stateful for module in plant.modules())
         self.on_error = on_error
         self.skips, self.errors = {}, []
         if only is not None:
@@ -128,6 +138,13 @@ class BindingPlan:
         if missing:
             raise ValueError("Dataset is missing bound columns: " + ", ".join(missing))
 
+    def apply_parameters(self, plant, t):
+        """Apply precomputed design transitions once, retaining direct parameter overrides."""
+        if not self._started or self._next_change is not None and t >= self._next_change:
+            plant.apply_params_at(t)
+            self._started = True
+            self._next_change = next((date for date in self._dates if date > t), None)
+
 
 def _nested_get(mapping, path):
     for part in path.split("."):
@@ -146,7 +163,7 @@ def _nested_set(mapping, path, value):
 
 def twin_step(plant, sample, states, plan):
     """Evaluate measured boundaries, taking measured state or advancing retained state."""
-    plant.apply_params_at(sample.t)
+    plan.apply_parameters(plant, sample.t)
     results = {}
     plan.skips, plan.errors = {}, []
     for path, module, bound, defaults in plan.entries:
@@ -185,7 +202,7 @@ def twin_step(plant, sample, states, plan):
 
 def chained_step(plant, sample, states, plan):
     """Apply root bindings to a single plant call, preserving the handwritten wiring."""
-    plant.apply_params_at(sample.t)
+    plan.apply_parameters(plant, sample.t)
     plan.skips, plan.errors = {}, []
     _, _, bound, defaults = plan.entries[0]
     inputs = deepcopy(plant.boundary.get("root_inputs", {}))
@@ -201,7 +218,7 @@ def chained_step(plant, sample, states, plan):
             _nested_set(
                 inputs, field, stream.m_dot * stream.fluid.properties(stream.p, stream.T).density
             )
-    if any(module.stateful for module in plant.modules()):
+    if plan.stateful:
         states[""], result = plant.step(
             states.get("", plant.initial_state()), inputs, streams, sample.dt
         )

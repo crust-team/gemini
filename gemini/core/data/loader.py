@@ -59,6 +59,22 @@ class Loader:
             times = frame.index.asi8
             values = frame.to_numpy()
             numeric = [pd.api.types.is_numeric_dtype(frame[c]) for c in self.columns]
+            invalid = frame.isna().to_numpy()
+            for column, is_numeric in enumerate(numeric):
+                if is_numeric:
+                    invalid[:, column] |= ~np.isfinite(
+                        frame.iloc[:, column].to_numpy(dtype=float, na_value=np.nan)
+                    )
+                else:
+                    invalid[:, column] |= (
+                        frame.iloc[:, column]
+                        .map(
+                            lambda value: isinstance(value, (int, float, np.number))
+                            and not np.isfinite(value)
+                        )
+                        .to_numpy(dtype=bool)
+                    )
+            column_names = np.asarray(self.columns, dtype=object)
             positions = np.searchsorted(times, selected.asi8, side="right") - 1
             for local, (t, previous) in enumerate(zip(selected, positions)):
                 dt = float(seconds[offset + local])
@@ -82,13 +98,16 @@ class Loader:
                 else:
                     raw = values[previous]
                 row = dict(zip(self.columns, raw))
-                missing = tuple(
-                    k
-                    for k, value in row.items()
-                    if value is None
-                    or (np.isscalar(value) and pd.isna(value))
-                    or isinstance(value, (int, float, np.number))
-                    and not np.isfinite(value)
-                )
+                if self.align != "mean":
+                    missing = self.columns if gap else tuple(column_names[invalid[previous]])
+                else:
+                    missing = tuple(
+                        k
+                        for k, value in row.items()
+                        if value is None
+                        or pd.isna(value)
+                        or isinstance(value, (int, float, np.number))
+                        and not np.isfinite(value)
+                    )
                 yield Sample(t.to_pydatetime(), dt, row, missing, bool(gap))
             offset = stop
