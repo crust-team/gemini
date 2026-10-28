@@ -35,8 +35,9 @@ tests/                # unit mirror, integration, e2e and immutable fixtures
 - [Numerical decisions](.claude/docs/refactor-notes.md)
 - [Runtime settings](.claude/docs/runtime.md)
 
-Work locally; do not push or open a PR. Modules declare parameters and ports in `__init__`, use
-plain `forward` arguments, assign outputs and return outlets. `core.config`, data drivers, and run
+Work locally; do not push or open a PR. Modules declare parameters and ports in `__init__`;
+`forward` receives only inlets while controls and boundaries are pre-applied and read from
+`self`. Modules assign outputs and return outlets. `core.config`, data drivers, and run
 modes are removed. Plants own persistence, bindings, and dated design. Core data is in-memory
 only. No engine loop sleeps or schedules itself. Keep the public API small and examples outside
 the package.

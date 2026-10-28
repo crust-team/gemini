@@ -24,6 +24,10 @@ out = esp(
 )
 print(out.outputs.get("head", unit="bar"), out.outlets.discharge)
 
+# Persist controls by assignment, or set any leaf input by path.
+esp.frequency = 50.0
+plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
+
 df = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(df, time_column="time")
 
