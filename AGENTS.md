@@ -9,10 +9,10 @@ state snapshots and observer hooks. Preserve the captured numerical baseline.
 ```text
 gemini/
 ├── core/
-│   ├── base/       # Stream and Health
+│   ├── types/      # quantities, Fluid, flows, Profile, results and Cost
 │   ├── physics/    # SI correlations, conversions and fluid properties
-│   ├── modules/    # Module, Sequential, GraphPlant and equipment categories
-│   ├── config/     # dated schemas, GEMINI import and graph construction
+│   ├── modules/    # Module, Sequential, handwritten plants and equipment
+│   ├── config/     # dated design schemas, GEMINI import and wiring verification
 │   ├── data/       # database drivers and CSV time series
 │   ├── engine/     # discovery, Results and EventLog
 │   └── modes/      # twin, history, live and scenario
@@ -20,17 +20,18 @@ gemini/
 ├── optim/
 └── agentic/
 tests/              # mirrors core; immutable golden cases and full-dataset e2e
-examples/           # nine executable examples
+examples/           # ten executable examples
 datasets/geothermal_doublet/  # original project and converted plant.json
 ```
 
 ## Read before coding
 
 - [Conventions](.claude/docs/conventions.md)
+- [Core types](.claude/docs/types.md)
 - [Writing modules](.claude/docs/modules.md)
 - [Physics](.claude/docs/physics.md)
 - [Testing](.claude/docs/testing.md)
 - [Numerical decisions](.claude/docs/refactor-notes.md)
 
 The example folder was renamed to `geothermal_doublet` in the workspace; retain that name.
-Work locally on `refactor/modules`, commit completed phases, and do not push or open a PR.
+Work locally on `refactor/types`, commit completed phases, and do not push or open a PR.

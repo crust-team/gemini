@@ -1,5 +1,11 @@
 # Changelog
 
+## Types and handwritten plants
+
+- Add quantity schemas, immutable Fluid dtypes, reporting energy flows, Profiles and Costs.
+- Replace GraphPlant and serialized links with explicit Doublet/GeothermalExamplePlant wiring.
+- Preserve golden values and expose unresolved pump work and electricity reconciliation limits.
+
 ## [Unreleased] — composable modules
 
 - Replace equipment contracts with recursive Module, Sequential and GraphPlant APIs.
