@@ -107,7 +107,7 @@ class ProductionWell(Module):
         return hydraulics.pipe_path_profile(
             p.path.subpath(from_md, to_md),
             stream,
-            self.fluid,
+            stream.fluid,
             direction,
             p.u_value,
             p.soil_temperature,
@@ -120,7 +120,7 @@ class ProductionWell(Module):
         return hydraulics.corrosion_profile(
             self.params.path,
             stream,
-            self.fluid,
+            stream.fluid,
             "up",
             self.params.u_value,
             self.params.soil_temperature,
@@ -130,7 +130,7 @@ class ProductionWell(Module):
 
     def erosion_check(self, stream) -> dict:
         """Compare section velocities [m/s] with the API erosional velocity limit."""
-        return hydraulics.erosion_check(self.params.path, stream, self.fluid)
+        return hydraulics.erosion_check(self.params.path, stream, stream.fluid)
 
     def _esp_depth(self):
         depth = self.params.esp_depth

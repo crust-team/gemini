@@ -9,6 +9,7 @@ from gemini.core.config import param_mapping as mapping
 from gemini.core.modules.heat import HeatExchanger
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
+from gemini.core.types.fluid import WATER
 
 
 def test_measured_heat_exchanger_performance():
@@ -41,7 +42,7 @@ def test_measured_heat_exchanger_performance():
         c = HeatExchanger(params)
         streams = {
             "hot_in": Stream(m_dot=mh, T=measured["hot_in_T"], p=units.bar_to_pa(r.HEX_Pin)),
-            "cold_in": Stream(m_dot=mc, T=measured["cold_in_T"], p=1e6, fluid="water"),
+            "cold_in": Stream(m_dot=mc, T=measured["cold_in_T"], p=1e6, fluid=WATER),
         }
         out, _ = c({}, streams)
         assert out.hot_out_T == pytest.approx(measured["hot_out_T"], abs=0.5)

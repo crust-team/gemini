@@ -3,7 +3,7 @@
 import math
 from collections import Counter
 
-from gemini.core.physics import fluid, units
+from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.results import Health
 
@@ -48,15 +48,13 @@ def prepare(module, bindings, row, defaults=None):
     for port, fields in bindings.streams.items():
         values = dict((defaults or {}).get(port, {}))
         values.update({name: _value(row, binding) for name, binding in fields.items()})
-        values.setdefault("fluid", module.fluid_name)
+        values.setdefault("fluid", module.fluid)
         if "m_dot" in fields and fields["m_dot"].unit in ("m3/h", "m3/s"):
             if not {"p", "T"} <= values.keys():
                 raise MissingMeasurement(
                     f"{port}: pressure and temperature required for volume flow"
                 )
-            values["m_dot"] *= (
-                fluid.get_fluid(values["fluid"]).properties(values["p"], values["T"]).density
-            )
+            values["m_dot"] *= values["fluid"].properties(values["p"], values["T"]).density
         streams[port] = Stream.model_validate(values)
     measured = {name: _value(row, binding) for name, binding in bindings.measured.items()}
     if module.name == "heatexchanger" and {"hot_out_T", "cold_out_T"} <= measured.keys():
@@ -66,8 +64,8 @@ def prepare(module, bindings, row, defaults=None):
             cold_in_T=cold.T,
             m_dot_hot=hot.m_dot,
             m_dot_cold=cold.m_dot,
-            cp_hot=fluid.get_fluid(hot.fluid).properties(hot.p, hot.T).cp_l,
-            cp_cold=fluid.get_fluid(cold.fluid).properties(cold.p, cold.T).cp_l,
+            cp_hot=hot.fluid.properties(hot.p, hot.T).cp_l,
+            cp_cold=cold.fluid.properties(cold.p, cold.T).cp_l,
         )
     return inputs, streams, measured
 

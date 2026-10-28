@@ -102,7 +102,7 @@ class InjectionWell(Module):
         return hydraulics.pipe_path_profile(
             p.path.subpath(from_md, to_md),
             stream,
-            self.fluid,
+            stream.fluid,
             direction,
             p.u_value,
             p.soil_temperature,
@@ -115,7 +115,7 @@ class InjectionWell(Module):
         return hydraulics.corrosion_profile(
             self.params.path,
             stream.with_(m_dot=-abs(stream.m_dot)),
-            self.fluid,
+            stream.fluid,
             "down",
             self.params.u_value,
             self.params.soil_temperature,
@@ -125,4 +125,4 @@ class InjectionWell(Module):
 
     def erosion_check(self, stream) -> dict:
         """Compare section velocities [m/s] with the API erosional velocity limit."""
-        return hydraulics.erosion_check(self.params.path, stream, self.fluid)
+        return hydraulics.erosion_check(self.params.path, stream, stream.fluid)

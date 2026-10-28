@@ -14,6 +14,7 @@ from gemini.core.config.schema import (
     ModuleConfig,
     PlantConfig,
 )
+from gemini.core.types.fluid import Fluid
 
 GEMINI_PORTS = {
     "production_reservoir": {"out": "sandface"},
@@ -330,7 +331,13 @@ def load_gemini(folder: str | Path) -> PlantConfig:
                 ),
             ]
         for module in modules.values():
-            module.fluid = fluid_name
+            values = boundary["fluids"][fluid_name]
+            module.fluid = Fluid(
+                liquid_density=values["RHOL"],
+                liquid_viscosity=values["VISL"],
+                specific_heat=values.get("CPL"),
+            )
+        del boundary["fluids"]
     conf = json.loads((folder / "plant.conf").read_text())
     for key in unmapped:
         warnings.warn(f"Unmapped GEMINI field: {key}", stacklevel=2)

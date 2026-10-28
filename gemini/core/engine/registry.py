@@ -5,6 +5,7 @@ import inspect
 import pkgutil
 
 from gemini.core.modules.module import Module
+from gemini.core.types.fluid import BRINE, Fluid
 
 
 def _discover() -> dict[str, type[Module]]:
@@ -42,6 +43,6 @@ def get(name: str) -> type[Module]:
         raise ValueError(f"Unknown module {name!r}") from exc
 
 
-def create(name: str, params: dict, *, fluid: str = "brine") -> Module:
+def create(name: str, params: dict, *, fluid: Fluid = BRINE) -> Module:
     """Construct a validated module with SI parameters and a named fluid model."""
     return get(name)(params, fluid=fluid)

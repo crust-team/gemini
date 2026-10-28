@@ -48,7 +48,7 @@ class Boiler(Module):
         stream = streams_in["inlet"]
         if stream.m_dot < 0:
             raise ValueError(f"boiler: negative mass flow {stream.m_dot}")
-        cp = self.fluid.properties(stream.p, stream.T).cp_l
+        cp = stream.fluid.properties(stream.p, stream.T).cp_l
         requested = stream.m_dot * cp * max(0, inputs.setpoint_T - stream.T)
         duty = min(requested, self.params.capacity)
         T = stream.T + duty / (stream.m_dot * cp) if stream.m_dot else stream.T

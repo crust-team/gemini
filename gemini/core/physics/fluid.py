@@ -1,7 +1,5 @@
 """Constant fluid properties inherited from GEMINI's PVTConstantSTP model."""
 
-from typing import Callable
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -64,61 +62,3 @@ class ConstantWater:
     def properties(self, p: float, T: float) -> FluidProperties:
         """Return constant properties for pressure [Pa] and temperature [K]."""
         return self._properties
-
-
-_FLUIDS = {"brine": ConstantWater, "water": ConstantWater}
-
-
-def get_fluid(name: str = "brine", **overrides: float) -> ConstantWater:
-    """Resolve a configured fluid name to a property model.
-
-    Parameters
-    ----------
-    name : str
-        Registered fluid name [-]; water and brine default to ConstantWater.
-    **overrides : float
-        Original uppercase PVT property keys in SI units, e.g. RHOL [kg/m3].
-
-    Returns
-    -------
-    ConstantWater
-        Property model exposing properties(p [Pa], T [K]).
-
-    Notes
-    -----
-    Reference: GEMINI PVTConstantSTP defaults; factory selection happens during
-    configuration and does not modify properties during a calculation.
-    """
-    try:
-        factory = _FLUIDS[name]
-    except KeyError as exc:
-        raise ValueError(f"Unknown fluid {name!r}; available: {sorted(_FLUIDS)}") from exc
-    return factory(**overrides)
-
-
-def register_fluid(name: str, factory: Callable[..., ConstantWater]) -> None:
-    """Configure a named fluid factory before constructing a plant.
-
-    Parameters
-    ----------
-    name : str
-        New fluid model identifier [-]; default water and brine cannot be replaced.
-    factory : callable
-        Factory accepting SI property overrides and returning a ConstantWater model.
-
-    Returns
-    -------
-    None
-        The model is available to get_fluid and Stream.volumetric_flow.
-
-    Notes
-    -----
-    Reference: Configuration-only registration for consistent density across component ports.
-    Physics calculations do not register or mutate models.
-    """
-    if name in {"water", "brine"}:
-        raise ValueError(f"Cannot replace default fluid {name!r}")
-    model = factory()
-    if not isinstance(model.properties(100000, 300), FluidProperties):
-        raise TypeError("A fluid factory must return a model producing FluidProperties")
-    _FLUIDS[name] = factory

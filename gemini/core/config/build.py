@@ -1,18 +1,14 @@
 """Construct plant graphs and round-trip their portable design configurations."""
 
-from functools import partial
 from pathlib import Path
 
 from gemini.core.config.schema import DatedParams, Link, ModuleConfig, PlantConfig
 from gemini.core.engine import registry
 from gemini.core.modules.plant import GraphPlant
-from gemini.core.physics import fluid
 
 
 def build_plant(config: PlantConfig, at=None) -> GraphPlant:
     """Instantiate equipment with the parameter snapshot active at the requested instant."""
-    for name, properties in config.boundary.get("fluids", {}).items():
-        fluid.register_fluid(name, partial(fluid.ConstantWater, **properties))
     modules = {
         name: registry.create(item.type, item.at(at).params, fluid=item.fluid)
         for name, item in config.modules.items()
@@ -49,7 +45,7 @@ def plant_to_config(plant) -> PlantConfig:
         else:
             config.modules[name] = ModuleConfig(
                 type=module.name,
-                fluid=module.fluid_name,
+                fluid=module.fluid,
                 params=[DatedParams(params=state[name]["params"])],
             )
     config.links = [Link.model_validate(link) for link in plant.links]
