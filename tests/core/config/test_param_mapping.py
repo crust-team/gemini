@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from gemini.core.config import param_mapping as mapping
 from gemini.core.engine import registry
-from gemini.core.plant import param_mapping as mapping
 
 DATA = Path(__file__).parents[3] / "datasets/geothermal_doublet"
 

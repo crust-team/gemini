@@ -5,7 +5,7 @@ from pathlib import Path
 from gemini.core.base.stream import Stream
 from gemini.core.modules.pumps import ESP
 from gemini.core.physics import units
-from gemini.core.plant import param_mapping as mapping
+from gemini.core.config import param_mapping as mapping
 
 DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
 pump = ESP(mapping.esp_params_from_gemini(mapping.read_property(DATA / "esp_1ee3.param")))

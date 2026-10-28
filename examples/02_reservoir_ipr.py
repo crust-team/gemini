@@ -4,7 +4,7 @@ from pathlib import Path
 
 from gemini.core.modules.subsurface import ProductionReservoir
 from gemini.core.physics import units
-from gemini.core.plant import param_mapping as mapping
+from gemini.core.config import param_mapping as mapping
 
 DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
 params = mapping.production_reservoir_params_from_gemini(

@@ -4,9 +4,9 @@ import numpy as np
 
 from gemini.core.base.stream import Stream
 from gemini.core.base.unit_module import TwinModule
+from gemini.core.config import param_mapping as mapping
 from gemini.core.engine import registry
 from gemini.core.physics import units
-from gemini.core.plant import param_mapping as mapping
 
 
 class ESPTheoretical(TwinModule):

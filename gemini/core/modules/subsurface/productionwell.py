@@ -41,6 +41,9 @@ class ProductionWell(Module):
         u_value: float = Field(
             10, ge=0, description="Overall pipe heat transfer coefficient [W/m2/K]"
         )
+        segment: Literal["full", "below_esp", "above_esp"] = Field(
+            "full", description="Physical interval represented by this graph node [-]"
+        )
         esp_depth: float | None = Field(None, ge=0, description="Optional ESP measured depth [m]")
 
     class Inputs(BaseModel):
@@ -63,7 +66,12 @@ class ProductionWell(Module):
     def forward(self, inputs, streams_in):
         """Traverse the passive full path; an internal ESP is handled with the split helpers."""
         stream = streams_in["bottom"]
-        result = self.traverse(stream, self.params.path.total_length, 0, "up")
+        start, end = self.params.path.total_length, 0
+        if self.params.segment == "below_esp":
+            end = self._esp_depth()
+        elif self.params.segment == "above_esp":
+            start = self._esp_depth()
+        result = self.traverse(stream, start, end, "up")
         a, b = self.params.correction_factors
         output = stream.with_(p=a * result.p_out + b, T=result.T_out)
         return ModuleResult(
