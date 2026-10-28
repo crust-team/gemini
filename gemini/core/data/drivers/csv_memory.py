@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from gemini.core.data.connector.csv_driver import CSVDriver
+from gemini.core.data.drivers.csv_driver import CSVDriver
 
 
 class CSVMemoryReader:

@@ -61,8 +61,9 @@ class Profile(BaseModel):
         return self
 
     @classmethod
-    def from_csv(cls, path: str | Path, column, unit_in, time_column="Timestamp", tz=None):
+    def from_csv(cls, path: str | Path, column, unit, time_column="Timestamp", tz=None):
         """Read comma/semicolon CSV, localise naive times and convert the selected column to SI."""
+        unit_in = unit
         if unit_in not in _UNITS:
             raise ValueError(f"Unsupported profile unit {unit_in!r}")
         frame = pd.read_csv(path, sep=None, engine="python")
@@ -79,18 +80,30 @@ class Profile(BaseModel):
         )
 
     @classmethod
-    def constant(cls, name, quantity, unit, value, start, periods, step: timedelta):
-        """Construct a constant profile; value is already expressed in its declared SI unit."""
-        if periods <= 0 or step.total_seconds() <= 0:
+    def constant(cls, *args, unit=None, clock=None, **kwargs):
+        """Build a raw-unit constant on a clock, or an explicitly named SI time series.
+
+        Common form: Profile.constant(150, unit="m3/h", clock=clock).
+        The existing explicit name/quantity/unit/value/start/periods/step form remains valid.
+        """
+        if clock is not None:
+            if len(args) != 1 or kwargs:
+                raise TypeError("Use constant(value, unit=..., clock=...)")
+            if unit not in _UNITS:
+                raise ValueError(f"Unsupported profile unit {unit!r}")
+            quantity, si_unit = _UNITS[unit]
+            ticks = list(clock)
+            return cls(name="constant", quantity=quantity, unit=si_unit, index=ticks,
+                       values=[to_si(args[0], unit)] * len(ticks))
+        names = ("name", "quantity", "unit", "value", "start", "periods", "step")
+        values = dict(zip(names, args)) | kwargs
+        if unit is not None:
+            values["unit"] = unit
+        if values["periods"] <= 0 or values["step"].total_seconds() <= 0:
             raise ValueError("Profile periods and step must be positive")
-        index = pd.date_range(start, periods=periods, freq=step)
-        return cls(
-            name=name,
-            quantity=quantity,
-            unit=unit,
-            index=index.to_pydatetime().tolist(),
-            values=[value] * periods,
-        )
+        index = pd.date_range(values["start"], periods=values["periods"], freq=values["step"])
+        return cls(name=values["name"], quantity=values["quantity"], unit=values["unit"],
+                   index=index.to_pydatetime().tolist(), values=[values["value"]] * len(index))
 
     def at(self, t: datetime) -> float:
         """Return the previous sample, raising before the profile starts."""

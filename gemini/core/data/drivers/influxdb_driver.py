@@ -5,7 +5,7 @@ from datetime import datetime
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 
-from gemini.core.data.database_driver_abstract import DatabaseDriverAbstract
+from gemini.core.data.drivers.database_driver_abstract import DatabaseDriverAbstract
 
 
 class InfluxdbDriver(DatabaseDriverAbstract):

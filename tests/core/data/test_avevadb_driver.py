@@ -4,7 +4,7 @@ import json
 import os
 import unittest
 
-from gemini.core.data.connector.avevadb_driver import AvevaDriver
+from gemini.core.data.drivers.avevadb_driver import AvevaDriver
 
 
 class TestAVEVADB(unittest.TestCase):

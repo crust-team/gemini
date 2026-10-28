@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from gemini.core.data.database_driver_abstract import DatabaseDriverAbstract
+from gemini.core.data.drivers.database_driver_abstract import DatabaseDriverAbstract
 
 
 class CSVDriver(DatabaseDriverAbstract):

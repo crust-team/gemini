@@ -1,7 +1,7 @@
 """Reader to import data from CSV into the internal InfluxDB store."""
 
-from gemini.core.data.connector.csv_driver import CSVDriver
-from gemini.core.data.database_reader_abstract import DatabaseReaderAbstract
+from gemini.core.data.drivers.csv_driver import CSVDriver
+from gemini.core.data.drivers.database_reader_abstract import DatabaseReaderAbstract
 
 
 class InfluxdbCSVReaderDB(DatabaseReaderAbstract):

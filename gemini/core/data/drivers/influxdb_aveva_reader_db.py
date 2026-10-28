@@ -1,7 +1,7 @@
 """Reader to import data from AVEVA into the internal InfluxDB store."""
 
-from gemini.core.data.connector.avevadb_driver import AvevaDriver
-from gemini.core.data.database_reader_abstract import DatabaseReaderAbstract
+from gemini.core.data.drivers.avevadb_driver import AvevaDriver
+from gemini.core.data.drivers.database_reader_abstract import DatabaseReaderAbstract
 
 
 class InfluxdbAvevaReaderDB(DatabaseReaderAbstract):
