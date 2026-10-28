@@ -32,6 +32,10 @@ influxdb-client = "1.49.0"
 pytz = "2024.2"
 adh-sample-library-preview = "0.10.19rc0"
 pydantic = "^2"
+pyarrow = { version = ">=15", optional = true }
+
+[tool.poetry.extras]
+parquet = ["pyarrow"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "8.4.2"
@@ -61,6 +65,7 @@ line_length = 100
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
+markers = ["slow: full-dataset integration and reconciliation (runs by default)"]
 
 [build-system]
 requires = ["poetry-core"]

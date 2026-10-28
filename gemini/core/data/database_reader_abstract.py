@@ -73,18 +73,22 @@ class DatabaseReaderAbstract(ABC):
         self.internal_db_driver.disconnect()
         self.external_db_driver.disconnect()
 
-    def register_tags(self, units):
-        """Register tags for units."""
-        for unit in units:
-            for key, value in unit.tags[self.category].items():
-                tag = {
-                    "plant_name": unit.plant.name,
-                    "asset_name": unit.name,
-                    "internal_tagname": key + "." + self.category,
-                    "external_tagname": value[-1],
-                }
-
-                self.tags.append(tag)
+    def register_tags(self, config):
+        """Register configured measured columns for each equipment module."""
+        self.tags = []
+        for name, bound in config.bindings.items():
+            fields = dict(bound.inputs) | dict(bound.measured)
+            for port, bindings in bound.streams.items():
+                fields.update({f"{port}.{key}": value for key, value in bindings.items()})
+            for key, binding in fields.items():
+                self.tags.append(
+                    {
+                        "plant_name": config.name,
+                        "asset_name": name,
+                        "internal_tagname": key + ".measured",
+                        "external_tagname": binding.column,
+                    }
+                )
 
     def get_current_time_str(self):
         """Get current time as string."""

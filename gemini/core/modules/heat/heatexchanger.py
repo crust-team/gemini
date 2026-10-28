@@ -173,7 +173,10 @@ class HeatExchanger(Module):
         if not set(keys) <= measured.keys():
             return None
         ua = self.ua_from_measurements(
-            **{key: measured[key] for key in keys}, arrangement=self.params.arrangement
+            **{key: measured[key] for key in keys},
+            cp_hot=measured.get("cp_hot", 4217.4),
+            cp_cold=measured.get("cp_cold", 4217.4),
+            arrangement=self.params.arrangement,
         )
         ratio = ua / self.params.ua if self.params.ua else 1.0
         return Health(

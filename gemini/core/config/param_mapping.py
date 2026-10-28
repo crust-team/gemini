@@ -167,27 +167,3 @@ def heatexchanger_params_from_gemini(property: dict) -> dict:
         m_dot_hot_nominal=p.get("m_dot_hot_nominal", 1),
         m_dot_cold_nominal=p.get("m_dot_cold_nominal", 1),
     )
-
-
-def legacy_esp_well_params(well_property: dict, esp_property: dict) -> dict:
-    """Retain the old twin's tubing and ESP-depth section selection.
-
-    The public well mapper keeps the complete physical trajectory.
-    """
-    import math
-
-    w, e = _values(well_property), _values(esp_property)
-    params = productionwell_params_from_gemini(w, esp_property=e)
-    table = w["productionwell_trajectory_table"]
-    full = geometry.build_path(table)
-    # NOTE(refactor): old ESP intake omitted an entire interval crossing esp_depth (550–700 m).
-    below = [s for row, s in zip(table, full.sections) if row["MD"] >= e["esp_depth"]]
-    # NOTE(refactor): old inferred discharge uses one vertical tubing section above the ESP.
-    top = geometry.PipeSection(
-        length=e["esp_depth"],
-        inclination=math.pi / 2,
-        inner_diameter=e["esp_tubing"],
-        roughness=table[1]["roughness"],
-    )
-    params["path"] = geometry.PipePath(sections=[top, *below])
-    return params

@@ -141,7 +141,8 @@ class GraphPlant(Module):
                 )
             guesses = updated
         raise RuntimeError(
-            f"{self.path}: tear streams failed to converge after 50 iterations; residuals={residuals}"
+            f"{self.path}: tear streams failed to converge after 50 iterations; "
+            f"residuals={residuals}"
         )
 
     def forward(self, inputs, streams_in):

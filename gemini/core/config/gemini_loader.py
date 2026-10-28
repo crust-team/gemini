@@ -1,5 +1,6 @@
 """Import GEMINI projects with explicit parameter, port and sensor-tag accounting."""
 
+import csv
 import json
 import warnings
 from pathlib import Path
@@ -38,13 +39,23 @@ TYPES = {
 }
 PROPERTIES = {
     "esp": set(
-        "esp_bep_flow esp_correction_factor esp_depth esp_head_coeff esp_max_flow esp_min_flow esp_no_stage esp_power_coeff esp_tubing esp_type".split()
+        (
+            "esp_bep_flow esp_correction_factor esp_depth esp_head_coeff esp_max_flow "
+            "esp_min_flow esp_no_stage esp_power_coeff esp_tubing esp_type"
+        ).split()
     ),
     "reservoir": set(
-        "liquid_density liquid_viscosity reservoir_permeability reservoir_pressure reservoir_radius reservoir_temperature reservoir_thickness reservoir_top skin wellbore_radius productivity_index injectivity_index".split()
+        (
+            "liquid_density liquid_viscosity reservoir_permeability reservoir_pressure "
+            "reservoir_radius reservoir_temperature reservoir_thickness reservoir_top skin"
+            " wellbore_radius productivity_index injectivity_index"
+        ).split()
     ),
     "heatexchanger": set(
-        "heat_transfer_coeff ua arrangement dp_hot_nominal dp_cold_nominal m_dot_hot_nominal m_dot_cold_nominal".split()
+        (
+            "heat_transfer_coeff ua arrangement dp_hot_nominal dp_cold_nominal "
+            "m_dot_hot_nominal m_dot_cold_nominal"
+        ).split()
     ),
     "degasser": {"heat_transfer_coeff"},
     "filter": {"clogging_dp"},
@@ -136,6 +147,11 @@ def _bind(bindings, target, column, unit):
 def load_gemini(folder: str | Path) -> PlantConfig:
     """Convert all project snapshots and report unknown fields without silently discarding them."""
     folder = Path(folder)
+    csv_path = folder / "geothermal_example_dataset.csv"
+    columns = set()
+    if csv_path.exists():
+        with csv_path.open() as handle:
+            columns = set(next(csv.reader(handle, delimiter=";")))
     diagram = json.loads((folder / "diagram.json").read_text())["cells"]
     raw = {p.stem: json.loads(p.read_text()) for p in sorted(folder.glob("*.param"))}
     ids = {value["id"]: key for key, value in raw.items()}
@@ -187,6 +203,11 @@ def load_gemini(folder: str | Path) -> PlantConfig:
                 params = mapping.injectionwell_params_from_gemini(props, base_path=folder)
             else:
                 params = getattr(mapping, f"{kind}_params_from_gemini")(props)
+            if kind == "injectionpump" and "InjectorPump_PowerDraw" in columns:
+                # NOTE(refactor): example Q*deltaP/PowerDraw is 0.80000 (within rounding).
+                # No curves exist, so use the pressure-setpoint variant with efficiency 0.8;
+                # the standalone equipment default stays 0.7.
+                params["efficiency"] = 0.8
             # Geometry models become plain JSON values at the portable config boundary.
             from gemini.core.engine.registry import get
 
@@ -208,9 +229,14 @@ def load_gemini(folder: str | Path) -> PlantConfig:
                 elif tag in TAGS.get(kind, {}):
                     target, unit = TAGS[kind][tag]
                     _bind(bound, target, values[0], unit)
-                elif kind == "productionwell":
+                elif kind == "productionwell" and tag in {
+                    "productionwell_flow",
+                    "productionwell_wellhead_pressure",
+                    "productionwell_wellhead_temperature",
+                }:
                     ignored[key] = (
-                        "No measured sandface boundary: this well is evaluated in the chained scenario only."
+                        "No measured sandface boundary: this well is evaluated in the "
+                        "chained scenario only."
                     )
                 elif tag in IGNORED_TAGS:
                     ignored[key] = IGNORED_TAGS[tag]
@@ -218,22 +244,34 @@ def load_gemini(folder: str | Path) -> PlantConfig:
                     unmapped.append(key)
         # NOTE(refactor): project tags omit these CSV channels and secondary absolute pressure.
         # Supplements are explicit, dataset-specific, and applied only when the columns exist.
-        if kind == "filter":
+        supplements = []
+        if kind == "filter" and "p" in bound.streams.get("inlet", {}):
             column = bound.streams["inlet"]["p"].column.replace("_Pin", "_PDrop")
-            _bind(bound, "measured.pressure_drop", column, "bar")
+            supplements.append(("measured.pressure_drop", column, "bar"))
         elif kind == "degasser":
-            _bind(bound, "streams.inlet.T", "T_p_in", "degC")
+            supplements.append(("streams.inlet.T", "T_p_in", "degC"))
+            ignored[f"{name}.parameters.heat_transfer_coeff"] = (
+                "Preserved as metadata; liquid-only passthrough has no gas/thermal model."
+            )
         elif kind == "heatexchanger":
-            _bind(bound, "measured.duty", "Thermal_PowerGen", "W")
-            _bind(bound, "measured.dp_hot", "HEX_PDrop", "bar")
-            boundary["stream_defaults"][name] = {"cold_in": {"p": 5e5}}
+            supplements.extend(
+                [
+                    ("measured.duty", "Thermal_PowerGen", "W"),
+                    ("measured.dp_hot", "HEX_PDrop", "bar"),
+                ]
+            )
+            if columns:
+                boundary["stream_defaults"][name] = {"cold_in": {"p": 5e5}}
         elif kind == "production_reservoir":
-            _bind(bound, "inputs.m_dot", "Qp", "m3/h")
+            supplements.append(("inputs.m_dot", "Qp", "m3/h"))
+        for target, column, unit in supplements:
+            if column in columns:
+                _bind(bound, target, column, unit)
         if bound.inputs or bound.streams:
             bindings[name] = bound
         if kind == "injectionpump":
             # NOTE(refactor): no injection curves are supplied; use measured discharge setpoint.
-            # The default 0.7 efficiency remains an assumption, not a fitted power curve.
+            # The example efficiency is explicit in the snapshot; no curve is fabricated.
             boundary["inputs"][name] = {"discharge_pressure": 5.15e6}
     links = []
     for edge in edges:
@@ -278,6 +316,19 @@ def load_gemini(folder: str | Path) -> PlantConfig:
             "RHOL": p.get("liquid_density") or 1000,
             "VISL": p.get("liquid_viscosity") or 0.001,
         }
+        if {"Thermal_PowerGen", "Qp", "T_p_in", "T_p_out"} <= columns:
+            # NOTE(refactor): example duty/(Q * deltaT) implies 4.410 MJ/m3/K.
+            # Use that explicit bulk heat capacity with the supplied 1068 kg/m3 density;
+            # this assumption is dataset-specific and does not alter default/golden fluids.
+            boundary["fluids"][fluid_name]["CPL"] = 4.410e6 / boundary["fluids"][fluid_name]["RHOL"]
+            boundary["assumptions"] = [
+                "Example bulk heat capacity 4.410 MJ/m3/K inferred from its heat balance.",
+                "Unmeasured secondary inlet pressure assumed 5 bar absolute.",
+                (
+                    "Injection-pump default scenario setpoint 51.5 bar; twin uses the "
+                    "measured setpoint."
+                ),
+            ]
         for module in modules.values():
             module.fluid = fluid_name
     conf = json.loads((folder / "plant.conf").read_text())
