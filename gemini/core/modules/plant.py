@@ -105,7 +105,10 @@ class GraphPlant(Module):
                         if i in guesses
                         else results[link["source"]].streams[link["source_port"]]
                     )
-                controls = self.boundary.get("inputs", {}).get(name, {}) | inputs.root.get(name, {})
+                controls = inputs.root.get(name, {})
+                if hasattr(controls, "model_dump"):
+                    controls = controls.model_dump()
+                controls = self.boundary.get("inputs", {}).get(name, {}) | controls
                 if dt is not None and (child.stateful or child._children):
                     next_state[name], results[name] = child.step(
                         (state or {}).get(name), controls, inlet, dt
