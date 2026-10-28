@@ -1,0 +1,110 @@
+"""InjectionWell component.
+
+Traverses a geothermal well using the original GEMINI DPDT equations,
+Swamee–Jain (1976) friction, Beggs–Brill two-phase flow and explicit heat loss.
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from gemini.core.base.component import Component
+from gemini.core.physics import geometry, hydraulics
+
+
+class InjectionWell(Component):
+    """Passive injectionwell pressure and temperature profile with integrity hooks."""
+
+    name = "injectionwell"
+    category = "subsurface"
+    description = "InjectionWell pressure, temperature, corrosion and erosion diagnostics."
+    inlets = ("wellhead",)
+    outlets = ("bottom",)
+    soft_sensors = ("bottomhole_pressure",)
+    calibratable = ("correction_factors", "u_value")
+
+    class Params(BaseModel):
+        """Pipe path and heat-loss design parameters."""
+
+        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+        path: geometry.PipePath = Field(..., description="Ordered pipe sections [-]")
+        friction_correlation: Literal["darcy_weisbach"] = Field(
+            "darcy_weisbach", description="Single-phase correlation [-]"
+        )
+        friction_correlation_2p: Literal["BeggsBrill"] = Field(
+            "BeggsBrill", description="Two-phase correlation [-]"
+        )
+        correction_factors: tuple[float, float] = Field(
+            (1, 0), description="Pressure correction slope [-], offset [Pa]"
+        )
+        soil_temperature: float = Field(..., gt=0, description="Ambient soil temperature [K]")
+        u_value: float = Field(
+            10, ge=0, description="Overall pipe heat transfer coefficient [W/m2/K]"
+        )
+
+    class Inputs(BaseModel):
+        """All operating conditions arrive through the inlet stream."""
+
+        model_config = ConfigDict(extra="forbid")
+
+    class Outputs(BaseModel):
+        """Outlet conditions and traversed section profiles."""
+
+        bottomhole_pressure: float = Field(..., description="Outlet pressure [Pa]")
+        bottomhole_temperature: float = Field(..., description="Outlet temperature [K]")
+        dp_friction: float = Field(..., description="Signed friction pressure drop [Pa]")
+        dp_gravity: float = Field(..., description="Gravity pressure drop [Pa]")
+        section_pressure: list[float] = Field(..., description="Traversed section pressures [Pa]")
+        section_temperature: list[float] = Field(
+            ..., description="Traversed section temperatures [K]"
+        )
+
+    def compute(self, inputs, streams_in):
+        """Traverse the passive full path; an internal ESP is handled with the split helpers."""
+        stream = streams_in["wellhead"]
+        # NOTE(refactor): legacy injection DPDT uses negative flow; retain that sign convention.
+        stream = stream.with_(m_dot=-abs(stream.m_dot))
+        result = self.traverse(stream, 0, self.params.path.total_length, "down")
+        a, b = self.params.correction_factors
+        output = stream.with_(p=a * result.p_out + b, T=result.T_out)
+        return self.Outputs(
+            bottomhole_pressure=output.p,
+            bottomhole_temperature=output.T,
+            dp_friction=result.dp_fric,
+            dp_gravity=result.dp_grav,
+            section_pressure=result.section_p,
+            section_temperature=result.section_T,
+        ), {"bottom": output}
+
+    def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):
+        """Traverse an arbitrary depth interval [m], returning uncorrected SI conditions."""
+        p = self.params
+        if (direction == "up" and to_md > from_md) or (direction == "down" and to_md < from_md):
+            raise ValueError(f"{self.name}: depth interval conflicts with direction {direction}")
+        return hydraulics.pipe_path_profile(
+            p.path.subpath(from_md, to_md),
+            stream,
+            self.fluid,
+            direction,
+            p.u_value,
+            p.soil_temperature,
+            p.friction_correlation,
+            p.friction_correlation_2p,
+        )
+
+    def corrosion_profile(self, stream, chemistry: dict, model: str = "NORSOK") -> list[float]:
+        """Return per-section CO2 corrosion [mm/year] using SI chemistry inputs."""
+        return hydraulics.corrosion_profile(
+            self.params.path,
+            stream,
+            self.fluid,
+            "down",
+            self.params.u_value,
+            self.params.soil_temperature,
+            chemistry,
+            model,
+        )
+
+    def erosion_check(self, stream) -> dict:
+        """Compare section velocities [m/s] with the API erosional velocity limit."""
+        return hydraulics.erosion_check(self.params.path, stream, self.fluid)
