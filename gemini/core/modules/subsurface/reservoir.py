@@ -153,13 +153,13 @@ class ProductionReservoir(_Reservoir):
         # Outlets
         self.sandface = Outlet(Stream)
 
-    def forward(self, m_dot):
+    def forward(self):
         """Apply the linear production IPR and emit the sandface stream."""
 
         # Outputs
         if self.productivity_index is None:
             raise ValueError(f"{self.path}: productivity_index is required")
-        flow = m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
+        flow = self.m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
         p_bh = self.pressure - flow / self.productivity_index
         calculated = self._calculate_outputs(flow, p_bh)
         self.bottomhole_pressure = calculated["bottomhole_pressure"]
@@ -171,7 +171,7 @@ class ProductionReservoir(_Reservoir):
         self.radial_bottomhole_pressure = calculated["radial_bottomhole_pressure"]
 
         # Outlets
-        sandface = Stream(m_dot=m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
+        sandface = Stream(m_dot=self.m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
 
         outlets = dict(sandface=sandface)
         return outlets

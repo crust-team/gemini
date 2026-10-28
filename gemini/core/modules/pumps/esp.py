@@ -97,17 +97,17 @@ class ESP(Module):
             * (units.bhp_to_w(1) / units.ft_head_to_pa(1))
         )
 
-    def forward(self, suction, frequency):
+    def forward(self, suction):
         """Compute head and power and raise the suction-stream pressure."""
 
         # Outputs
         self.flow = suction.volumetric_flow()
         if self.flow < 0:
             raise ValueError(f"{self.path}: reverse volume flow {self.flow} is unsupported")
-        self.head = self.head_function(self.flow, frequency)
-        self.power = self.power_function(self.flow, frequency)
+        self.head = self.head_function(self.flow, self.frequency)
+        self.power = self.power_function(self.flow, self.frequency)
         self.efficiency = self.efficiency_function(self.flow, self.head, self.power)
-        scale = frequency / constants.ESP_REFERENCE_FREQUENCY
+        scale = self.frequency / constants.ESP_REFERENCE_FREQUENCY
         self.discharge_pressure = suction.p + self.head
         self.in_operating_window = self.min_flow * scale <= self.flow <= self.max_flow * scale
         self.bep_ratio = self.flow / (self.bep_flow * scale)
