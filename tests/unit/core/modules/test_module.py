@@ -1,185 +1,136 @@
-"""Contract tests independent of equipment calculations."""
+"""Registration, calls, state and output-recording contracts."""
 
-import json
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from pydantic import BaseModel, Field, ValidationError
 
-from gemini.core.modules.module import Module
-from gemini.core.types.flows import Stream
-from gemini.core.types.results import Health, ModuleResult
+from gemini.core.modules import Module, ModuleDict
+from gemini.core.types import Control, Inlet, Outlet, Output, Parameter, Stream
 
 
 class PassThrough(Module):
     """Contract fixture passing an inlet stream through unchanged."""
 
-    name = "test_passthrough"
-    category = "test"
-    description = "Contract fixture."
-    inlets = {"inlet": Stream}
-    outlets = {"outlet": Stream}
+    def __init__(self):
+        """Declare a minimal module used across registration tests."""
+        super().__init__()
 
-    class Params(BaseModel):
-        """Positive test parameter."""
+        # Parameters
+        self.value = Parameter(float, gt=0, calibratable=True)
 
-        value: float = Field(..., gt=0, description="Fixture value [-]")
+        # Inlets
+        self.inlet = Inlet(Stream)
 
-    class Inputs(BaseModel):
-        """Validated operating input."""
+        # Controls
+        self.multiplier = Control(float, default=1, gt=0)
 
-        multiplier: float = Field(1, gt=0, description="Multiplier [-]")
+        # Outputs
+        self.result = Output(float, soft_sensor=True)
 
-    class Outputs(BaseModel):
-        """Predicted scalar."""
+        # Outlets
+        self.outlet = Outlet(Stream)
 
-        value: float = Field(..., description="Fixture result [-]")
-
-    def forward(self, inputs, streams_in):
-        """Return the scalar product and unchanged stream."""
-        return ModuleResult(
-            self.Outputs(value=self.params.value * inputs.multiplier),
-            {"outlet": streams_in["inlet"]},
-        )
+    def forward(self, inlet, multiplier):
+        """Record the scalar product and return the stream."""
+        self.result = self.value * multiplier
+        return inlet
 
 
-def test_stream_validation_and_copy():
-    """Streams reject nonphysical updates and preserve originals."""
-    s = Stream(m_dot=10, T=300, p=100000)
-    assert s.volumetric_flow() == 0.01
-    assert s.with_(p=200000).p == 200000
-    assert s.p == 100000
-    with pytest.raises(ValidationError):
-        s.with_(p=-1)
-    with pytest.raises(ValidationError):
-        s.T = 0
+def test_registration_construction_and_state():
+    """Keyword values fill registered declarations and state reload is atomic."""
+    module = PassThrough(value=2)
+    assert module.value == 2
+    assert dict(module.named_parameters()) == {"value": module.get_parameter("value")}
+    assert module.calibratable_parameters() == [module.get_parameter("value")]
+    module.value = 3
+    assert module.value == 3
+    state = module.state_dict()
+    module.value = 4
+    module.load_state_dict(state)
+    assert module.value == 3
+    with pytest.raises(TypeError):
+        module.value = -1
 
 
-def test_contract_and_state():
-    """Direct compute calls enforce ports, inputs and stateless stepping."""
-    c = PassThrough({"value": 2})
-    s = Stream(m_dot=1, T=300, p=100000)
-    with pytest.raises(ValueError, match="test_passthrough.*missing.*inlet"):
-        c({}, {})
-    with pytest.raises(ValueError, match="extra"):
-        c({}, {"inlet": s, "other": s})
-    with pytest.raises(ValidationError):
-        c({"multiplier": 0}, {"inlet": s})
-    with pytest.raises(ValidationError):
-        c.update_params(value=-1)
-    assert c.params.value == 2
-    state, (out, streams) = c.step("state", {}, {"inlet": s}, 1)
-    assert state == "state" and out.value == 2 and streams["outlet"] == s
-    assert c.initial_state() is None and c.capex() is None and c.health(out, {}) is None
-    json.dumps(c.schema())
-
-
-def test_invalid_declaration_and_return():
-    """Invalid sensor names and output contracts fail with clear errors."""
-    with pytest.raises(TypeError, match="unknown schema"):
-
-        class Invalid(PassThrough):
-            """Malformed metadata fixture."""
-
-            soft_sensors = ("absent",)
-
-    class WrongOutput(PassThrough):
-        """Malformed return fixture."""
-
-        def forward(self, inputs, streams_in):
-            """Return an invalid output to exercise the base guard."""
-            return ModuleResult({}, {})
-
-    with pytest.raises(TypeError, match="forward must return"):
-        WrongOutput({"value": 1})({}, {"inlet": Stream(m_dot=1, T=300, p=1)})
-    a = Health(score=1, alarm=False, message="ok")
-    b = Health(score=1, alarm=False, message="ok")
-    a.metrics["x"] = 1
-    assert b.metrics == {}
-
-
-def test_recursive_parameters_state_and_hooks():
-    """Nested trees preserve validated state and hook order across JSON round trips."""
-    from gemini.core.modules.module import Sequential
-
-    class FitPass(PassThrough):
-        """Calibratable fixture."""
-
-        calibratable = ("value",)
-
-    first, second = FitPass({"value": 2}), FitPass({"value": 3})
-    plant = Sequential({"first": first, "second": second})
-    plant._set_path("plant")
-    assert list(plant.named_modules()) == [("", plant), ("first", first), ("second", second)]
-    assert plant.get_submodule("first") is first
-    assert dict(plant.named_params()) == {"first.value": 2, "second.value": 3}
-    ref = plant.calibratable_params()[0]
-    assert ref.path == "first.value" and ref.bounds == (0, float("inf"))
-    with pytest.raises(ValidationError):
-        plant.set_param("first.value", -2)
-    assert plant.get_param("first.value") == 2
-    state = json.loads(json.dumps(plant.state_dict()))
-    plant.set_param("first.value", 7)
-    plant.load_state_dict(state)
-    assert first.params.value == 2
-    with pytest.raises(ValueError, match="state paths"):
-        plant.load_state_dict({"first": state["first"]})
-    plant.load_state_dict({"first": state["first"], "unknown": {}}, strict=False)
-    bad = json.loads(json.dumps(state))
-    bad["second"]["params"]["value"] = -1
-    bad["first"]["params"]["value"] = 10
-    with pytest.raises(ValidationError):
-        plant.load_state_dict(bad)
-    assert first.params.value == 2
-    calls = []
-    a = first.register_forward_pre_hook(lambda *args: calls.append("pre"))
-    b = first.register_forward_hook(lambda *args: calls.append("post"))
+def test_call_output_and_signature_guards():
+    """Calls validate arguments, required outputs and outlet names."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    result = plant({"first": {"multiplier": 4}}, inlet=stream)
-    assert result.outputs.root["first"].value == 8
-    assert result.streams["outlet"] == stream
-    assert calls == ["pre", "post"]
-    a.remove()
-    a.remove()
-    b.remove()
-    plant(inlet=stream)
-    assert calls == ["pre", "post"]
-    with pytest.raises(ValueError, match="plant.first.*missing"):
-        first()
-    with pytest.raises(ValueError, match="cycle"):
-        first.add_module("parent", plant)
-    visited = []
-    assert plant.apply(visited.append) is plant
-    assert visited == [second, first, plant]
-    del plant.second
-    assert list(plant.children()) == [first]
+    module = PassThrough(value=2)
+    result = module(inlet=stream, multiplier=4)
+    assert result.outputs.result == 8
+    assert result.outlets.outlet is stream
+    assert module.result.soft_sensor
+    with pytest.raises(TypeError, match="missing required argument"):
+        module()
+    with pytest.raises(TypeError):
+        module(inlet=stream, unexpected=1)
+
+    class WrongSignature(Module):
+        """Fixture with a declaration/signature mismatch."""
+
+        def __init__(self):
+            super().__init__()
+
+            # Controls
+            self.command = Control(float)
+
+        def forward(self, other):
+            """Use the deliberately wrong name."""
+            return {}
+
+    with pytest.raises(TypeError, match="signature mismatch"):
+        WrongSignature()(command=1)
 
 
-def test_nested_stateful_stepping():
-    """A stateful leaf advances once through nested sequential and graph composites."""
-    from gemini.core.modules.module import Sequential
+def test_output_records_are_nested_and_thread_local():
+    """Concurrent and nested evaluations never share output records."""
+    stream = Stream(m_dot=1, T=300, p=1e5)
+    module = PassThrough(value=2)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        values = list(pool.map(lambda value: module(inlet=stream, multiplier=value), range(1, 9)))
+    assert [result.outputs.result for result in values] == [2 * value for value in range(1, 9)]
+    assert module.result.soft_sensor
 
-    class Accumulator(PassThrough):
-        """State fixture accumulating elapsed seconds."""
+    class Parent(Module):
+        """Nested-call fixture."""
 
-        stateful = True
+        def __init__(self):
+            super().__init__()
 
-        def initial_state(self):
-            """Begin with no elapsed time."""
-            return 0
+            # Modules
+            self.children_by_name = ModuleDict({"child": PassThrough(value=3)})
 
-        def step(self, state, inputs, streams_in, dt):
-            """Expose elapsed time through the scalar output."""
-            state += dt
-            return state, self({"multiplier": state}, streams_in)
+            # Inlets
+            self.inlet = Inlet(Stream)
 
-    seq = Sequential(Accumulator({"value": 2}))
-    graph = Sequential({"chain": seq})
-    state = graph.initial_state()
-    streams = {"inlet": Stream(m_dot=1, p=1e5, T=300)}
-    state, result = graph.step(state, {}, streams, 3)
-    assert state == {"chain": {"0": 3}}
-    assert result.outputs.root["chain"].root["0"].value == 6
-    state, result = graph.step(state, {}, streams, 2)
-    assert result.outputs.root["chain"].root["0"].value == 10
-    with pytest.raises(ValueError, match="dt"):
-        graph.step(state, {}, streams, 0)
+            # Outputs
+            self.child_value = Output(float)
+
+            # Outlets
+            self.outlet = Outlet(Stream)
+
+        def forward(self, inlet):
+            """Call the child and copy its recorded output."""
+            child = self.children_by_name.child(inlet=inlet)
+            self.child_value = child.outputs.result
+            return child.outlets.outlet
+
+    result = Parent()(inlet=stream)
+    assert result.outputs.child_value == 3
+    assert result.children["children_by_name.child"].outputs.result == 3
+
+
+def test_uninitialized_and_hooks():
+    """Uninitialized parameters and hook ordering have clear behavior."""
+    module = PassThrough()
+    assert module.missing_parameters() == ["value"]
+    with pytest.raises(RuntimeError, match="uninitialized"):
+        module(inlet=Stream(m_dot=1, T=300, p=1e5))
+    module.value = 2
+    calls = []
+    before = module.register_forward_pre_hook(lambda *args: calls.append("before"))
+    after = module.register_forward_hook(lambda *args: calls.append("after"))
+    module(inlet=Stream(m_dot=1, T=300, p=1e5))
+    assert calls == ["before", "after"]
+    before.remove()
+    after.remove()

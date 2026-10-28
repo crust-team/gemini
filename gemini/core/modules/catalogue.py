@@ -1,48 +1,30 @@
-"""Discover equipment modules without a manual module catalogue."""
+"""Class-creation registry for built-in and user modules."""
 
-import importlib
-import inspect
-import pkgutil
-
-from gemini.core.modules.module import Module
-from gemini.core.types.fluid import BRINE, Fluid
+from gemini.core.modules.module import MODULE_REGISTRY, Module
+from gemini.core.types.fluid import Fluid
 
 
-def _discover() -> dict[str, type[Module]]:
-    package = importlib.import_module("gemini.core.modules")
-    discovered = {}
-    for info in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
-        module = importlib.import_module(info.name)
-        for _, cls in inspect.getmembers(module, inspect.isclass):
-            if (
-                not issubclass(cls, Module)
-                or inspect.isabstract(cls)
-                or cls.name == "sequential"
-                or cls.__module__ != module.__name__
-            ):
-                continue
-            if cls.name in discovered:
-                raise ValueError(f"Duplicate module name {cls.name!r}")
-            discovered[cls.name] = cls
-    return discovered
-
-
-_MODULES = _discover()
-
-
-def list_modules() -> list[dict]:
-    """Return deterministic JSON-serialisable equipment schemas."""
-    return [_MODULES[name].schema() for name in sorted(_MODULES)]
+def list_modules():
+    """Return registered names grouped by derived category."""
+    grouped = {}
+    for name, cls in sorted(MODULE_REGISTRY.items()):
+        if cls.category == "user":
+            continue
+        grouped.setdefault(cls.category, []).append(name)
+    return grouped
 
 
 def get(name: str) -> type[Module]:
-    """Resolve a module name or raise a clear configuration error."""
+    """Resolve a derived module name."""
     try:
-        return _MODULES[name]
+        return MODULE_REGISTRY[name]
     except KeyError as exc:
         raise ValueError(f"Unknown module {name!r}") from exc
 
 
-def create(name: str, params: dict, *, fluid: Fluid = BRINE) -> Module:
-    """Construct a validated module with SI parameters and a named fluid model."""
-    return get(name)(params, fluid=fluid)
+def create(name: str, params=None, *, fluid: Fluid | None = None) -> Module:
+    """Construct a module and fill keyword parameter values."""
+    values = dict(params or {})
+    if fluid is not None:
+        values["fluid"] = fluid
+    return get(name)(**values)

@@ -1,39 +1,41 @@
-"""Every numeric equipment contract needs units or an explicit justified exception."""
+"""Declaration metadata and source conventions."""
 
-from gemini.core.engine.registry import list_modules
+import inspect
 
-ALLOWLIST = {
-    ("esp", "params", "head_coeff"): "Mixed-order polynomial in ft/stage vs bbl/day.",
-    ("esp", "params", "power_coeff"): "Mixed-order polynomial in bhp/stage vs bbl/day.",
-    ("injectionpump", "params", "head_coeff"): "Mixed-order US-basis polynomial.",
-    ("injectionpump", "params", "power_coeff"): "Mixed-order US-basis polynomial.",
-    ("degasser", "params", "heat_transfer_coeff"): "Unused legacy metadata; dimension unknown.",
-}
+from gemini.core.modules.module import MODULE_REGISTRY
 
-
-def numeric_without_unit(schema):
-    """Inspect unions and containers without mistaking literal strings for numbers."""
-    if schema.get("type") in ("number", "integer"):
-        return not (schema.get("unit") and schema.get("quantity"))
-    children = schema.get("anyOf", []) + schema.get("prefixItems", [])
-    if "items" in schema:
-        children.append(schema["items"])
-    return any(numeric_without_unit(child) for child in children)
+SECTIONS = [
+    "# Modules",
+    "# Parameters",
+    "# Inlets",
+    "# Controls",
+    "# Boundaries",
+    "# Outputs",
+    "# Outlets",
+]
 
 
-def test_registered_fields():
-    """Scan every registered contract and fail on newly introduced untyped numbers."""
-    for module in list_modules():
-        for contract in ("params", "inputs", "outputs"):
-            for name, field in module[contract].get("properties", {}).items():
-                if (module["name"], contract, name) not in ALLOWLIST:
-                    assert not numeric_without_unit(field), (module["name"], contract, name)
+def test_quantity_declarations_expose_units():
+    """Annotated numeric declarations retain machine-readable units."""
+    for cls in MODULE_REGISTRY.values():
+        if cls.category in {"container", "user"}:
+            continue
+        module = cls()
+        for declaration in module._declarations().values():
+            schema = declaration.schema
+            numeric = schema.get("type") in {"number", "integer"} or any(
+                item.get("type") in {"number", "integer"} for item in schema.get("anyOf", [])
+            )
+            if numeric and declaration.kind not in {float, int}:
+                assert declaration.unit is not None, (cls, declaration.name)
 
 
-def test_nested_numeric_schemas():
-    """Validate nested Stream, Fluid and pipe geometry schemas as well as direct fields."""
-    for module in list_modules():
-        for contract in ("params", "inputs", "outputs"):
-            for name, schema in module[contract].get("$defs", {}).items():
-                for field, value in schema.get("properties", {}).items():
-                    assert not numeric_without_unit(value), (module["name"], name, field)
+def test_init_section_comments_are_ordered():
+    """Module declarations use fixed plain-text section comments in order."""
+    for cls in MODULE_REGISTRY.values():
+        if cls.category in {"container", "user"}:
+            continue
+        source = inspect.getsource(cls.__init__)
+        positions = [source.find(section) for section in SECTIONS if section in source]
+        assert positions == sorted(positions), cls
+        assert not any(section + " -" in source for section in SECTIONS)

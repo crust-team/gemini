@@ -1,74 +1,67 @@
-"""Boiler module supplying auxiliary heat to the geothermal loop.
-
-Gas and electric boilers share a steady first-law heat balance with a capacity cap.
-"""
+"""Auxiliary gas or electric boiler with a steady first-law heat balance."""
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from gemini.core.modules.module import Module
-from gemini.core.types.flows import FuelFlow, HeatFlow, PowerFlow, Stream
-from gemini.core.types.quantities import Efficiency, Power, Temperature
-from gemini.core.types.results import ModuleResult
+from gemini.core.types import (
+    Control,
+    Efficiency,
+    FuelFlow,
+    HeatFlow,
+    Inlet,
+    Outlet,
+    Output,
+    Parameter,
+    Power,
+    PowerFlow,
+    Stream,
+    Temperature,
+)
 
 
 class Boiler(Module):
     """Auxiliary gas or electric boiler with a thermal capacity limit."""
 
-    name = "boiler"
-    category = "heat"
-    description = "Auxiliary heat source with efficiency and capacity limits."
-    inlets = {"inlet": Stream}
-    outlets = {"outlet": Stream, "electricity": PowerFlow, "fuel": FuelFlow, "heat_loss": HeatFlow}
+    def __init__(self):
+        """Declare boiler design data, ports and computed performance."""
+        super().__init__()
 
-    class Params(BaseModel):
-        """Nominal boiler design data."""
+        # Parameters
+        self.fuel_type = Parameter(Literal["gas", "electric"])
+        self.capacity = Parameter(Power, gt=0)
+        self.efficiency = Parameter(Efficiency)
 
-        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        fuel: Literal["gas", "electric"] = Field(..., description="Energy source [-]")
-        capacity: Power = Field(..., gt=0, description="Maximum thermal duty [W]")
-        efficiency: Efficiency = Field(..., gt=0, le=1, description="Thermal efficiency [-]")
+        # Inlets
+        self.inlet = Inlet(Stream)
 
-    class Inputs(BaseModel):
-        """Outlet temperature target."""
+        # Controls
+        self.setpoint_T = Control(Temperature)
 
-        model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        setpoint_T: Temperature = Field(..., gt=0, description="Outlet temperature setpoint [K]")
+        # Outputs
+        self.duty = Output(Power)
+        self.fuel_or_power = Output(Power)
+        self.outlet_T = Output(Temperature)
+        self.capped = Output(bool)
 
-    class Outputs(BaseModel):
-        """Delivered heat and energy input."""
+        # Outlets
+        self.outlet = Outlet(Stream)
+        self.electricity = Outlet(PowerFlow)
+        self.fuel = Outlet(FuelFlow)
+        self.heat_loss = Outlet(HeatFlow)
 
-        duty: Power = Field(..., description="Delivered thermal power [W]")
-        fuel_or_power: Power = Field(..., description="Fuel energy or electric power [W]")
-        outlet_T: Temperature = Field(..., description="Outlet temperature [K]")
-        capped: bool = Field(..., description="Requested heat exceeds capacity [-]")
-
-    def forward(self, inputs, streams_in):
+    def forward(self, inlet, setpoint_T):
         """Heat a forward stream up to its setpoint, conserving energy."""
-        stream = streams_in["inlet"]
-        if stream.m_dot < 0:
-            raise ValueError(f"boiler: negative mass flow {stream.m_dot}")
-        cp = stream.fluid.properties(stream.p, stream.T).cp_l
-        requested = stream.m_dot * cp * max(0, inputs.setpoint_T - stream.T)
-        duty = min(requested, self.params.capacity)
-        T = stream.T + duty / (stream.m_dot * cp) if stream.m_dot else stream.T
-        return ModuleResult(
-            self.Outputs(
-                duty=duty,
-                fuel_or_power=duty / self.params.efficiency,
-                outlet_T=T,
-                capped=requested > self.params.capacity,
-            ),
-            {
-                "outlet": stream.with_(T=T),
-                # NOTE(refactor): both energy supply ports are static; the unused one is zero.
-                "electricity": PowerFlow(
-                    P=duty / self.params.efficiency if self.params.fuel == "electric" else 0
-                ),
-                "fuel": FuelFlow(
-                    P=duty / self.params.efficiency if self.params.fuel == "gas" else 0
-                ),
-                "heat_loss": HeatFlow(Q=duty / self.params.efficiency - duty),
-            },
-        )
+        if inlet.m_dot < 0:
+            raise ValueError(f"{self.path}: negative mass flow {inlet.m_dot}")
+        cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
+        requested = inlet.m_dot * cp * max(0, setpoint_T - inlet.T)
+        self.duty = min(requested, self.capacity)
+        self.fuel_or_power = self.duty / self.efficiency
+        self.outlet_T = inlet.T + self.duty / (inlet.m_dot * cp) if inlet.m_dot else inlet.T
+        self.capped = requested > self.capacity
+        return {
+            "outlet": inlet.with_(T=self.outlet_T),
+            "electricity": PowerFlow(P=self.fuel_or_power if self.fuel_type == "electric" else 0),
+            "fuel": FuelFlow(P=self.fuel_or_power if self.fuel_type == "gas" else 0),
+            "heat_loss": HeatFlow(Q=self.fuel_or_power - self.duty),
+        }

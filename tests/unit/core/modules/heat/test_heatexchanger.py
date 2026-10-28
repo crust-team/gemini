@@ -39,19 +39,19 @@ def test_measured_heat_exchanger_performance():
             m_dot_hot_nominal=mh,
             m_dot_cold_nominal=mc,
         )
-        c = HeatExchanger(params)
+        c = HeatExchanger(**params)
         streams = {
             "hot_in": Stream(m_dot=mh, T=measured["hot_in_T"], p=units.bar_to_pa(r.HEX_Pin)),
             "cold_in": Stream(m_dot=mc, T=measured["cold_in_T"], p=1e6, fluid=WATER),
         }
-        out, _ = c({}, streams)
+        out = c(**streams).outputs
         assert out.hot_out_T == pytest.approx(measured["hot_out_T"], abs=0.5)
         assert out.cold_out_T == pytest.approx(measured["cold_out_T"], abs=0.5)
         assert out.duty == pytest.approx(r.Thermal_PowerGen, rel=0.02)
         assert 10000 < out.dp_hot < 20000
         assert not c.health(out, measured).alarm
-        fouled = HeatExchanger(params | {"ua": ua * 0.8})
-        reduced, _ = fouled({}, streams)
+        fouled = HeatExchanger(**(params | {"ua": ua * 0.8}))
+        reduced = fouled(**streams).outputs
         degraded = measured | dict(hot_out_T=reduced.hot_out_T, cold_out_T=reduced.cold_out_T)
         assert c.health(out, degraded).alarm
 
@@ -67,19 +67,20 @@ def test_first_law_equal_capacity_and_limits(arrangement):
         m_dot_hot_nominal=10,
         m_dot_cold_nominal=10,
     )
-    c = HeatExchanger(p)
+    c = HeatExchanger(**p)
     hot, cold = Stream(m_dot=10, T=350, p=1e6), Stream(m_dot=10, T=300, p=1e6)
-    out, streams = c({}, dict(hot_in=hot, cold_in=cold))
+    result = c(hot_in=hot, cold_in=cold)
+    out, streams = result.outputs, result.outlets
     assert (hot.T - out.hot_out_T) * 10 * 4217.4 == pytest.approx(out.duty)
     assert (out.cold_out_T - cold.T) * 10 * 4217.4 == pytest.approx(out.duty)
     assert streams["hot_out"].m_dot == hot.m_dot and streams["cold_out"].m_dot == cold.m_dot
     assert streams["hot_out"].p == hot.p - 1000
-    out, _ = c({}, dict(hot_in=hot.with_(m_dot=0), cold_in=cold))
+    out = c(hot_in=hot.with_(m_dot=0), cold_in=cold).outputs
     assert out.duty == 0
     c.update_params(ua=0)
-    out, _ = c({}, dict(hot_in=hot, cold_in=cold))
+    out = c(hot_in=hot, cold_in=cold).outputs
     assert out.duty == 0 and out.hot_out_T == hot.T
-    out, _ = c({}, dict(hot_in=hot, cold_in=cold.with_(T=350)))
+    out = c(hot_in=hot, cold_in=cold.with_(T=350)).outputs
     assert out.duty == 0 and out.lmtd == 0
 
 

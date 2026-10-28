@@ -1,93 +1,75 @@
 """Injection pump using supplied curves or a discharge-pressure setpoint."""
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 from gemini.core.modules.module import Module
 from gemini.core.physics import pumps
-from gemini.core.types.flows import PowerFlow, Stream
-from gemini.core.types.quantities import (
+from gemini.core.types import (
+    Control,
     Count,
     Efficiency,
     Frequency,
+    Inlet,
+    Outlet,
+    Output,
+    Parameter,
     Power,
+    PowerFlow,
     Pressure,
     PressureDifference,
+    Stream,
 )
-from gemini.core.types.results import ModuleResult
 
 
 class InjectionPump(Module):
     """Raise brine pressure with a simple hydraulic-power estimate."""
 
-    name = "injectionpump"
-    category = "pumps"
-    description = "Injection pump using curves or a pressure setpoint and efficiency."
     fidelity = "simple"
-    inlets = {"suction": Stream}
-    outlets = {"discharge": Stream, "electricity": PowerFlow}
-    soft_sensors = ("head", "power", "discharge_pressure")
-    calibratable = ("efficiency",)
-
     repr_fields = ("no_stages", "efficiency", "pump_type")
 
-    class Params(BaseModel):
-        """Optional pump curves and fallback hydraulic efficiency."""
+    def __init__(self):
+        """Declare injection pump design data, ports and controls."""
+        super().__init__()
 
-        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        no_stages: Count | None = Field(None, gt=0, description="Number of stages [-]")
-        pump_type: str = Field("unspecified", description="Pump type [-]")
-        efficiency: Efficiency = Field(0.7, gt=0, le=1, description="Hydraulic efficiency [-]")
-        head_coeff: list[float] | None = Field(
-            None, min_length=6, max_length=6, description="US head polynomial [US basis]"
-        )
-        power_coeff: list[float] | None = Field(
-            None, min_length=6, max_length=6, description="US power polynomial [US basis]"
-        )
+        # Parameters
+        self.no_stages = Parameter(Count | None, default=None)
+        self.pump_type = Parameter(str, default="unspecified")
+        self.efficiency = Parameter(Efficiency, default=0.7, calibratable=True)
+        self.head_coeff = Parameter(list[float] | None, default=None, shape=(6,))
+        self.power_coeff = Parameter(list[float] | None, default=None, shape=(6,))
 
-        @model_validator(mode="after")
-        def curve_stages(self):
-            """Require stage count when a head curve is supplied."""
-            if self.head_coeff is not None and self.no_stages is None:
-                raise ValueError("injectionpump: curves require no_stages")
-            return self
+        # Inlets
+        self.suction = Inlet(Stream)
 
-    class Inputs(BaseModel):
-        """Discharge target or drive frequency for supplied curves."""
+        # Controls
+        self.pressure_setpoint = Control(Pressure | None, default=None)
+        self.frequency = Control(Frequency, default=60)
 
-        model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        discharge_pressure: Pressure | None = Field(
-            None, ge=0, description="Discharge setpoint [Pa]"
-        )
-        frequency: Frequency = Field(60, gt=0, description="Drive frequency [Hz]")
+        # Outputs
+        self.head = Output(PressureDifference, soft_sensor=True)
+        self.power = Output(Power, soft_sensor=True)
+        self.discharge_pressure = Output(Pressure, soft_sensor=True)
 
-    class Outputs(BaseModel):
-        """Hydraulic rise and predicted power consumption."""
+        # Outlets
+        self.discharge = Outlet(Stream)
+        self.electricity = Outlet(PowerFlow)
 
-        head: PressureDifference = Field(..., ge=0, description="Pressure rise [Pa]")
-        power: Power = Field(..., ge=0, description="Power draw [W]")
-        discharge_pressure: Pressure = Field(..., ge=0, description="Discharge pressure [Pa]")
-
-    def forward(self, inputs, streams_in):
+    def forward(self, suction, pressure_setpoint, frequency):
         """Evaluate supplied curves or Q times pressure rise divided by efficiency."""
-        stream = streams_in["suction"]
-        flow = stream.volumetric_flow()
+        flow = suction.volumetric_flow()
         if flow < 0:
             raise ValueError(f"{self.path}: reverse flow is unsupported")
-        if self.params.head_coeff is not None:
-            head = pumps.head(flow, inputs.frequency, self.params.no_stages, self.params.head_coeff)
-        elif inputs.discharge_pressure is not None:
-            head = inputs.discharge_pressure - stream.p
+        if self.head_coeff is not None:
+            if self.no_stages is None:
+                raise ValueError(f"{self.path}: curves require no_stages")
+            self.head = pumps.head(flow, frequency, self.no_stages, self.head_coeff)
+        elif pressure_setpoint is not None:
+            self.head = pressure_setpoint - suction.p
         else:
             raise ValueError(f"{self.path}: supply discharge_pressure or pump curves")
-        if head < 0:
+        if self.head < 0:
             raise ValueError(f"{self.path}: discharge pressure is below suction pressure")
-        power = flow * head / self.params.efficiency
-        if self.params.head_coeff is not None and self.params.power_coeff is not None:
-            power = pumps.power(
-                flow, inputs.frequency, self.params.no_stages, self.params.power_coeff
-            )
-        outlet = stream.with_(p=stream.p + head)
-        return ModuleResult(
-            self.Outputs(head=head, power=power, discharge_pressure=outlet.p),
-            {"discharge": outlet, "electricity": PowerFlow(P=power)},
-        )
+        self.power = flow * self.head / self.efficiency
+        if self.head_coeff is not None and self.power_coeff is not None:
+            self.power = pumps.power(flow, frequency, self.no_stages, self.power_coeff)
+        discharge = suction.with_(p=suction.p + self.head)
+        self.discharge_pressure = discharge.p
+        return {"discharge": discharge, "electricity": PowerFlow(P=self.power)}

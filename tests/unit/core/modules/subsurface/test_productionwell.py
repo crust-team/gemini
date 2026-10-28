@@ -13,7 +13,7 @@ def test_split_esp_traversal():
     """Split at 600 m inside a section; pumping raises the resulting wellhead pressure."""
     data = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
     c = ProductionWell(
-        mapping.productionwell_params_from_gemini(
+        **mapping.productionwell_params_from_gemini(
             mapping.read_property(data / "production_well_c774.param"),
             esp_property=mapping.read_property(data / "esp_1ee3.param"),
         )
@@ -25,6 +25,6 @@ def test_split_esp_traversal():
     assert out.p - passive.p == pytest.approx(3e6)
     assert out.m_dot == stream.m_dot
     assert len(c.corrosion_profile(stream, {"co2_fraction": 0.1}, model="DLM")) == len(
-        c.params.path.sections
+        c.pipe_path.sections
     )
-    assert len(c.erosion_check(stream)["velocity"]) == len(c.params.path.sections)
+    assert len(c.erosion_check(stream)["velocity"]) == len(c.pipe_path.sections)

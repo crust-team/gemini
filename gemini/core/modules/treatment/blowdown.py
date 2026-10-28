@@ -1,41 +1,28 @@
-"""Blowdown placeholder that conserves the incoming stream.
-
-No withdrawal physics is modelled; outputs explicitly report modelled=False.
-"""
-
-from pydantic import BaseModel, ConfigDict, Field
+"""Blowdown placeholder that conserves the incoming stream."""
 
 from gemini.core.modules.module import Module
-from gemini.core.types.flows import Stream
-from gemini.core.types.results import ModuleResult
+from gemini.core.types import Inlet, Outlet, Output, Stream
 
 
 class Blowdown(Module):
     """Removes a controlled fraction of circulating brine."""
 
-    name = "blowdown"
-    category = "treatment"
-    description = "Removes a controlled fraction of circulating brine."
-    inlets = {"inlet": Stream}
-    outlets = {"outlet": Stream}
-
-    class Params(BaseModel):
-        """Available design parameters; no performance model is assumed."""
-
-        model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-
-    class Inputs(BaseModel):
-        """No operating inputs are modelled yet."""
-
-        model_config = ConfigDict(extra="forbid")
-
     fidelity = "passthrough"
 
-    class Outputs(BaseModel):
-        """Explicit statement that no equipment physics is modelled."""
+    def __init__(self):
+        """Declare blowdown fraction, inlet and split outlets."""
+        super().__init__()
 
-        modelled: bool = Field(False, description="Equipment physics available [-]")
+        # Inlets
+        self.inlet = Inlet(Stream)
 
-    def forward(self, inputs, streams_in):
+        # Outputs
+        self.modelled = Output(bool)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlet):
         """Preserve the inlet stream without implying a performance model."""
-        return ModuleResult(self.Outputs(), {"outlet": streams_in["inlet"]})
+        self.modelled = False
+        return inlet
