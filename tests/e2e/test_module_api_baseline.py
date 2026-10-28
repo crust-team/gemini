@@ -9,11 +9,9 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 pytestmark = pytest.mark.e2e
 ROOT = Path(__file__).parents[2]
-SHARED = ROOT / "examples/shared/doublet_heat"
 BASELINE = ROOT / "tests/fixtures/module_api_baseline"
 FAST_BASELINE = ROOT / "tests/fixtures/module_api_fast"
 PATH_RENAMES = {"filter_hot": "filters.hot", "filter_return": "filters.cold"}
@@ -64,9 +62,9 @@ def _assert_values_identical(actual, expected):
             )
 
 
-def test_state_and_full_results_match_phase_zero(dataset_name, dataset_path):
+def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset, fresh_plant):
     """State, replay and simulation remain numerically identical after documented renames."""
-    plant = DoubletHeatPlant.load(SHARED / "plant.json")
+    plant = fresh_plant
     old_state = json.loads((BASELINE / "state_dict.json").read_text())
     new_state = plant.state_dict()
     for old_path, old in old_state.items():
@@ -79,10 +77,8 @@ def test_state_and_full_results_match_phase_zero(dataset_name, dataset_path):
         assert old_params == new["params"]
         assert old["fluid"] == new["fluid"]
 
-    frame = pd.read_csv(dataset_path, parse_dates=["time"])
-    data = gm.Dataset.from_frame(frame, time_column="time")
     started = perf_counter()
-    replay = gm.Engine().replay(plant, data).to_frame()
+    replay = gm.Engine().replay(plant, selected_dataset).to_frame()
     elapsed = perf_counter() - started
     assert elapsed < 60
     baseline = BASELINE if dataset_name == "slow" else FAST_BASELINE

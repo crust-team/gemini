@@ -2,33 +2,28 @@
 
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.modules.balance import collect_flows, energy_balance, mass_balance
 from gemini.core.modules.wiring import trace_wiring
 
 ROOT = Path(__file__).parents[2]
-SHARED = ROOT / "examples/shared/doublet_heat"
 OLD = ROOT / "examples/legacy/gemini_project_bridge/old_project"
 
 
-def example():
+@pytest.fixture
+def example(fresh_plant, fast_dataset):
     """Prepare one real operating point."""
-    plant = DoubletHeatPlant.load(SHARED / "plant.json")
-    frame = pd.read_csv(SHARED / "doublet_2024_15min.csv", parse_dates=["time"])
-    data = gm.Dataset.from_frame(frame.iloc[:1], time_column="time")
-    data = data.window(end=data.start)
-    gm.Engine(on_error="raise").simulate(plant, data, gm.Clock.from_data(data))
-    inputs = dict(plant.last_result.inputs) | dict(plant.last_result.inlets)
-    return plant, inputs
+    data = fast_dataset.window(end=fast_dataset.start)
+    gm.Engine(on_error="raise").simulate(fresh_plant, data, gm.Clock.from_data(data))
+    inputs = dict(fresh_plant.last_result.inputs) | dict(fresh_plant.last_result.inlets)
+    return fresh_plant, inputs
 
 
-def test_handwritten_wiring_and_split_helpers():
+def test_handwritten_wiring_and_split_helpers(example):
     """Every diagram link matches actual identities, including both sides of the buried ESP."""
-    plant, inputs = example()
+    plant, inputs = example
     result = plant(**inputs)
     assert set(plant.last_results) == {
         path for path, module in plant.named_modules() if path and not module._children
@@ -55,9 +50,9 @@ def test_handwritten_wiring_and_split_helpers():
     assert balance["residual"] == pytest.approx(result.outputs.electricity_use)
 
 
-def test_trace_hooks_are_removed_after_failure():
+def test_trace_hooks_are_removed_after_failure(example):
     """Failed evaluation does not leak observers into subsequent calls."""
-    plant, inputs = example()
+    plant, inputs = example
     before = [(len(m._hooks), len(m._pre_hooks)) for m in plant.modules()]
     plant.injection_pump.pressure_setpoint = 0
     with pytest.raises(ValueError):

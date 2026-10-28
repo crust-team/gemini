@@ -1,7 +1,6 @@
 """Full geothermal replay and measured reconciliation, including documented source-model limits."""
 
 import json
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -9,23 +8,18 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.engine.callbacks import Callback
 
 ROOT = Path(__file__).parents[2]
-DATA = ROOT / "examples/shared/doublet_heat"
 OLD = ROOT / "examples/legacy/gemini_project_bridge/old_project"
 pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture(scope="module")
-def verification(tmp_path_factory, dataset_path):
+def verification(tmp_path_factory, selected_dataset, module_plant):
     """Run full replay, held-out calibration and chained audit through the public API."""
-    with warnings.catch_warnings(record=True) as warnings_seen:
-        plant = DoubletHeatPlant.load(DATA / "plant.json")
-    assert not warnings_seen
-    raw = pd.read_csv(dataset_path, parse_dates=["time"])
-    dataset = gm.Dataset.from_frame(raw, time_column="time")
+    plant = module_plant
+    dataset = selected_dataset
     data = dataset.to_frame()
     assert len(data) in {2976, 17280}
     engine = gm.Engine(on_error="raise")
