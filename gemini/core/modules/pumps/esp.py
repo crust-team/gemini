@@ -90,14 +90,14 @@ class ESP(Module):
         )
 
     def forward(self, suction):
-        """Compute head and power and raise the suction-stream pressure."""
+        """Raise the suction-stream pressure by the pump-curve head."""
 
+        # Outlets
         flow = suction.volumetric_flow()
         if flow < 0:
             raise ValueError(f"{self.path}: reverse volume flow {flow} is unsupported")
         head = self.head_function(flow, self.frequency)
 
-        # Outlets
         discharge = suction.with_(p=suction.p + head)
 
         outlets = dict(discharge=discharge)

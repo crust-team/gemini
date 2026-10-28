@@ -63,6 +63,7 @@ class ProductionWell(Module):
     def forward(self, bottom):
         """Traverse the passive full path; an internal ESP is handled with the split helpers."""
 
+        # Outlets
         stream = bottom
         start, end = self.pipe_path.total_length, 0
         if self.segment == "below_esp":
@@ -72,7 +73,6 @@ class ProductionWell(Module):
         result = self.traverse(stream, start, end, "up")
         a, b = self.correction_factors
 
-        # Outlets
         wellhead = stream.with_(p=a * result.p_out + b, T=result.T_out)
 
         outlets = dict(wellhead=wellhead)

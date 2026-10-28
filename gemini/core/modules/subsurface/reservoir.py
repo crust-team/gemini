@@ -156,12 +156,12 @@ class ProductionReservoir(_Reservoir):
     def forward(self):
         """Apply the linear production IPR and emit the sandface stream."""
 
+        # Outlets
         if self.productivity_index is None:
             raise ValueError(f"{self.path}: productivity_index is required")
         flow = self.m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
         p_bh = self.pressure - flow / self.productivity_index
 
-        # Outlets
         sandface = Stream(m_dot=self.m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
 
         outlets = dict(sandface=sandface)
