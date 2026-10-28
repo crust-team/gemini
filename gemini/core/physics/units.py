@@ -1,6 +1,7 @@
 """Unit conversions at package and correlation boundaries; historical factors retained."""
 
 import math
+import re
 
 SECONDS_PER_DAY = 24 * 3600
 SECONDS_PER_YEAR = 365.25 * SECONDS_PER_DAY
@@ -228,10 +229,14 @@ def to_si(value: float, unit: str) -> float:
         "bar": (1e5, 0),
         "barg": (1e5, 101325),
         "degC": (1, 273.15),
+        "C": (1, 273.15),
+        "°C": (1, 273.15),
         "K": (1, 0),
         "m3/h": (1 / 3600, 0),
         "m3/s": (1, 0),
+        "l/s": (1e-3, 0),
         "kg/s": (1, 0),
+        "t/h": (1000 / 3600, 0),
         "Hz": (1, 0),
         "W": (1, 0),
         "kW": (1000, 0),
@@ -241,9 +246,89 @@ def to_si(value: float, unit: str) -> float:
         "currency/J": (1, 0),
         "currency/kWh": (1 / 3.6e6, 0),
         "Pa": (1, 0),
+        "m": (1, 0),
+        "ft": (0.3048, 0),
+        "s": (1, 0),
+        "m2": (1, 0),
+        "m3": (1, 0),
+        "rad": (1, 0),
+        "kg/m3": (1, 0),
+        "Pa.s": (1, 0),
+        "J/kg/K": (1, 0),
+        "W/m/K": (1, 0),
+        "W/m2/K": (1, 0),
+        "W/K": (1, 0),
+        "m2": (1, 0),
+        "m3/s/Pa": (1, 0),
         "-": (1, 0),
     }
     if unit not in conversions:
         raise ValueError(f"Unknown data unit {unit!r}")
     scale, offset = conversions[unit]
     return float(value) * scale + offset
+
+
+_DIMENSIONS = {
+    "Pa": {"Pa", "bar", "barg"},
+    "K": {"K", "degC", "C", "°C"},
+    "m3/s": {"m3/s", "m3/h", "l/s"},
+    "kg/s": {"kg/s", "t/h"},
+    "W": {"W", "kW", "MW"},
+    "J": {"J", "kWh"},
+    "m": {"m", "ft"},
+    "-": {"-"},
+}
+
+
+def value_in_si(value, expected_unit=None, path="value"):
+    """Convert a unit string or Quantity-like object to a declaration's SI unit."""
+    supplied = None
+    if hasattr(value, "value") and hasattr(value, "unit"):
+        value, supplied = value.value, value.unit
+    elif isinstance(value, str):
+        match = re.fullmatch(
+            r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+(.+?)\s*", value
+        )
+        if match is None:
+            return value
+        value, supplied = float(match.group(1)), match.group(2)
+    if supplied is None:
+        return value
+    allowed = _DIMENSIONS.get(expected_unit, {expected_unit})
+    if expected_unit is not None and supplied not in allowed:
+        raise ValueError(
+            f"{path}: unit {supplied!r} is incompatible with expected {expected_unit!r}"
+        )
+    return to_si(value, supplied)
+
+
+def convert(value, from_unit, to_unit):
+    """Convert a scalar between supported units of the same dimension."""
+    dimensions = [values for values in _DIMENSIONS.values() if from_unit in values]
+    if not dimensions or to_unit not in dimensions[0]:
+        raise ValueError(f"Cannot convert {from_unit!r} to {to_unit!r}")
+    si = to_si(value, from_unit)
+    targets = {
+        "Pa": (1, 0),
+        "bar": (1e5, 0),
+        "barg": (1e5, 101325),
+        "K": (1, 0),
+        "degC": (1, 273.15),
+        "C": (1, 273.15),
+        "°C": (1, 273.15),
+        "m3/s": (1, 0),
+        "m3/h": (1 / 3600, 0),
+        "l/s": (1e-3, 0),
+        "kg/s": (1, 0),
+        "t/h": (1000 / 3600, 0),
+        "W": (1, 0),
+        "kW": (1000, 0),
+        "MW": (1e6, 0),
+        "J": (1, 0),
+        "kWh": (3.6e6, 0),
+        "m": (1, 0),
+        "ft": (0.3048, 0),
+        "-": (1, 0),
+    }
+    scale, offset = targets[to_unit]
+    return (si - offset) / scale

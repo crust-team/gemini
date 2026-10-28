@@ -14,6 +14,9 @@ def test_public_names_and_docs():
         "Fluid",
         "BRINE",
         "WATER",
+        "Quantity",
+        "runtime",
+        "units",
         "legacy",
         "modules",
         "plants",
@@ -35,6 +38,7 @@ def test_readable_tree():
     plant = DoubletHeatPlant.load(
         Path(__file__).parents[2] / "examples/shared/doublet_heat/plant.json"
     )
-    rendered = repr(plant)
+    with gm.runtime.settings(display_units="field"):
+        rendered = repr(plant)
     assert "DoubletHeatPlant(" in rendered and "(doublet): Doublet(" in rendered
     assert "ESP(" in rendered and "bar" in rendered and "°C" in rendered
