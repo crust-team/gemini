@@ -1,5 +1,6 @@
 """Registration-driven, PyTorch-style equipment modules."""
 
+import ast
 import importlib
 import inspect
 import json
@@ -11,6 +12,7 @@ from copy import deepcopy
 from difflib import get_close_matches
 from functools import wraps
 from pathlib import Path
+from textwrap import dedent
 from typing import Literal
 
 from pydantic_core import to_jsonable_python
@@ -36,11 +38,73 @@ _evaluation = ContextVar("module_evaluation", default=None)
 _output_call = ContextVar("module_output_call", default=None)
 _input_call = ContextVar("module_input_call", default=None)
 _inlet_call = ContextVar("module_inlet_call", default=None)
+_outputs_enabled = ContextVar("module_outputs_enabled", default=True)
 MODULE_REGISTRY = {}
 
 
 def _snake_case(name):
     return re.sub(r"(?<!^)(?=[A-Z][a-z])|(?<=[a-z0-9])(?=[A-Z])", "_", name).lower()
+
+
+@contextmanager
+def no_outputs():
+    """Skip output computation and hooks within a nestable context or decorator."""
+    token = _outputs_enabled.set(False)
+    try:
+        yield
+    finally:
+        _outputs_enabled.reset(token)
+
+
+def outputs_enabled():
+    """Return whether the current context records computed outputs."""
+    return _outputs_enabled.get()
+
+
+def _declared_port_names(cls):
+    """Read conventional inlet/outlet assignments without constructing the class."""
+    names = set()
+    for base in reversed(cls.__mro__):
+        method = base.__dict__.get("__init__")
+        if method is None:
+            continue
+        try:
+            tree = ast.parse(dedent(inspect.getsource(method)))
+        except (OSError, TypeError, IndentationError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            value = node.value
+            if not isinstance(value, ast.Call):
+                continue
+            called = value.func
+            called_name = (
+                called.id if isinstance(called, ast.Name) else getattr(called, "attr", None)
+            )
+            if called_name not in {"Inlet", "Outlet"}:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if (
+                    isinstance(target, ast.Attribute)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "self"
+                ):
+                    names.add(target.attr)
+    return names
+
+
+def _named_parameters(fn, *, skip=()):
+    signature = inspect.signature(fn)
+    names = []
+    for name, parameter in signature.parameters.items():
+        if name in skip:
+            continue
+        if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD):
+            raise TypeError(f"{fn.__qualname__}: variadic parameters are not supported")
+        names.append(name)
+    return tuple(names)
 
 
 class RemovableHandle:
@@ -65,6 +129,19 @@ class Module:
     def __init_subclass__(cls, **kwargs):
         """Derive metadata, register the class and wrap keyword-value construction."""
         super().__init_subclass__(**kwargs)
+        compute = cls.__dict__.get("_compute_outputs")
+        if compute is not None:
+            names = _named_parameters(compute, skip=("self",))
+            valid = _declared_port_names(cls)
+            bad = [name for name in names if name not in valid]
+            if valid and bad:
+                raise TypeError(
+                    f"{cls.__name__}._compute_outputs has unknown inlet/outlet {bad[0]!r}; "
+                    f"valid names: {', '.join(sorted(valid)) or '<none>'}"
+                )
+            cls._compute_output_args = names
+        elif not hasattr(cls, "_compute_output_args"):
+            cls._compute_output_args = ()
         if cls.__name__.startswith("_"):
             return
         doc = inspect.getdoc(cls)
@@ -107,6 +184,13 @@ class Module:
             if fluid is not None:
                 object.__setattr__(self, "_fluid", Fluid.model_validate(fluid))
                 object.__setattr__(self, "fluid", self._resolve_fluid())
+            valid = set(self._inlets) | set(self._outlets)
+            bad = [name for name in type(self)._compute_output_args if name not in valid]
+            if bad:
+                raise TypeError(
+                    f"{type(self).__name__}._compute_outputs has unknown inlet/outlet "
+                    f"{bad[0]!r}; valid names: {', '.join(sorted(valid)) or '<none>'}"
+                )
             self._finish_init(kwargs)
 
         cls.__init__ = initialise
@@ -247,7 +331,9 @@ class Module:
         if name in self._outputs and not isinstance(value, Declaration):
             active = _output_call.get()
             if active is None or active[0] is not self:
-                raise RuntimeError(f"{self.path}.{name}: outputs may only be assigned in forward")
+                raise RuntimeError(
+                    f"{self.path}.{name}: outputs may only be assigned while computing outputs"
+                )
             active[1][name] = self._outputs[name].validate(value)
             return
         if isinstance(value, Declaration):
@@ -436,6 +522,11 @@ class Module:
         """Whether every parameter in this module tree has a value."""
         return not self.missing_parameters()
 
+    @property
+    def is_leaf(self):
+        """Whether this module owns no child modules."""
+        return not self._children
+
     def update_params(self, **changes):
         """Set validated local parameters as explicit overrides."""
         for name, value in changes.items():
@@ -492,8 +583,11 @@ class Module:
         object.__setattr__(self, "_forward_checked", True)
 
     def forward(self, **kwargs):
-        """Compute outputs and return declared outlets; subclasses implement this."""
+        """Move inlet fluids to declared outlets; subclasses implement this."""
         raise NotImplementedError(f"{type(self).__name__} has no forward method")
+
+    def _compute_outputs(self):
+        """Compute leaf outputs after ``forward``; overrides never call ``super()``."""
 
     def _split_call_args(self, args, kwargs):
         inlet_names = list(self._inlets)
@@ -551,6 +645,161 @@ class Module:
         active = _inlet_call.get()
         return active[1] if active is not None and active[0] is self else {}
 
+    def _call_by_name(self, fn, inlets, outlets, *, names=None, **extra):
+        """Call a cached output callback with only the inlet/outlet names it requests."""
+        selected = type(self)._compute_output_args if names is None else names
+        available = dict(inlets) | dict(outlets) | extra
+        arguments = {name: available[name] for name in selected}
+        arguments.update(extra)
+        return fn(**arguments)
+
+    def _formula_candidates(self):
+        candidates = []
+        for path, module in self.named_modules():
+            if not path:
+                continue
+            candidates.extend(f"{path}.{name}" for name in module._outputs)
+            for name, outlet in module._outlets.items():
+                fields = getattr(outlet.kind, "model_fields", {})
+                candidates.extend(f"{path}.{name}.{field}" for field in fields)
+        return candidates
+
+    def _resolve_of(self, target):
+        parts = target.split(".")
+        module = None
+        module_path = ""
+        remainder = []
+        for size in range(len(parts) - 1, 0, -1):
+            try:
+                candidate = self.get_submodule(".".join(parts[:size]))
+            except ValueError:
+                continue
+            module, module_path, remainder = candidate, ".".join(parts[:size]), parts[size:]
+            break
+        declaration = None
+        access = None
+        if module is not None and len(remainder) == 1 and remainder[0] in module._outputs:
+            declaration = module._outputs[remainder[0]]
+            access = ("output", remainder[0], None)
+        elif module is not None and len(remainder) == 2 and remainder[0] in module._outlets:
+            outlet = module._outlets[remainder[0]]
+            field = getattr(outlet.kind, "model_fields", {}).get(remainder[1])
+            if field is not None:
+                declaration = Output(field.annotation)
+                access = ("outlet", remainder[0], remainder[1])
+        if declaration is None:
+            candidates = self._formula_candidates()
+            suggestion = get_close_matches(target, candidates, n=1)
+            detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+            raise ValueError(f"{self.path}: unknown output formula path {target!r}{detail}")
+        return module_path, access, declaration
+
+    def _resolve_formula_outputs(self):
+        seen = set()
+        for name, output in self._outputs.items():
+            if output.formula is None:
+                seen.add(name)
+                continue
+            if output._resolved_formula is not None:
+                seen.add(name)
+                continue
+            kind, *arguments = output.formula
+            if kind == "of":
+                module_path, access, declaration = self._resolve_of(arguments[0])
+                output.infer_kind(declaration)
+                output._resolved_formula = (kind, module_path, access)
+            elif kind == "total":
+                target = arguments[0]
+                declarations = [
+                    module._outputs[target]
+                    for path, module in self.named_modules()
+                    if path and module.is_leaf and target in module._outputs
+                ]
+                if not declarations:
+                    names = sorted(
+                        {
+                            field
+                            for path, module in self.named_modules()
+                            if path and module.is_leaf
+                            for field in module._outputs
+                        }
+                    )
+                    suggestion = get_close_matches(target, names, n=1)
+                    detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                    raise ValueError(
+                        f"{self.path}: no descendant leaf declares output {target!r}{detail}"
+                    )
+                units = {declaration.unit for declaration in declarations}
+                if len(units) != 1:
+                    raise TypeError(
+                        f"{self.path}.{name}: Output.total({target!r}) has differing units "
+                        f"{sorted(str(unit) for unit in units)}"
+                    )
+                if any(
+                    declaration.quantity not in {"power", "mass_flow"}
+                    for declaration in declarations
+                ):
+                    raise TypeError(
+                        f"{self.path}.{name}: Output.total({target!r}) requires an additive "
+                        "power, heat-flow or mass-flow quantity"
+                    )
+                output.infer_kind(declarations[0])
+                output._resolved_formula = (kind, target)
+            else:
+                numerator, denominator = arguments
+                for reference in (numerator, denominator):
+                    if reference not in seen:
+                        suggestion = get_close_matches(reference, seen, n=1)
+                        detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                        raise ValueError(
+                            f"{self.path}.{name}: ratio references unavailable earlier output "
+                            f"{reference!r}{detail}"
+                        )
+                output._resolved_formula = (kind, numerator, denominator)
+            seen.add(name)
+
+    @staticmethod
+    def _recorded_calls(call_records, prefix=""):
+        for path, result in call_records:
+            full_path = f"{prefix}.{path}" if prefix else path
+            yield full_path, result
+            yield from Module._recorded_calls(result.call_records, full_path)
+
+    def _compute_formula_outputs(self, call_records):
+        calls = list(self._recorded_calls(call_records))
+        for name, output in self._outputs.items():
+            if output.formula is None:
+                continue
+            kind, *arguments = output._resolved_formula
+            if kind == "of":
+                module_path, (section, port, field) = arguments
+                matches = [result for path, result in calls if path == module_path]
+                if len(matches) != 1:
+                    raise RuntimeError(
+                        f"{self.path}.{name}: descendant {module_path!r} was called "
+                        f"{len(matches)} times; expected exactly once"
+                    )
+                values = matches[0].outputs if section == "output" else matches[0].outlets
+                value = values[port]
+                setattr(self, name, getattr(value, field) if field is not None else value)
+            elif kind == "total":
+                target = arguments[0]
+                value = sum(
+                    result.outputs[target]
+                    for _, result in calls
+                    if result.is_leaf and target in result.outputs
+                )
+                setattr(self, name, value)
+            else:
+                numerator, denominator = arguments
+                divisor = getattr(self, denominator)
+                setattr(self, name, None if divisor == 0 else getattr(self, numerator) / divisor)
+
+    def _check_outputs(self, recorded):
+        missing = sorted(self._outputs.keys() - recorded.keys())
+        if missing:
+            raise RuntimeError(f"{self.path}: outputs left unassigned: {missing}")
+
     def __call__(self, *args, **kwargs):
         """Apply controls and boundaries, run hooks/forward, and validate outlets."""
         missing = self.missing_parameters()
@@ -558,56 +807,60 @@ class Module:
             raise RuntimeError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
         if not self._forward_checked:
             self._check_forward_signature()
+        self._resolve_formula_outputs()
         inlets, supplied = self._split_call_args(args, kwargs)
-        children, recorded = {}, {}
+        children, call_records, recorded = {}, [], {}
         parent = _evaluation.get()
         inlet_token = _inlet_call.set((self, inlets))
         try:
             with self._apply_inputs(supplied) as inputs:
                 for fn in tuple(self._pre_hooks.values()):
                     fn(self)
-                evaluation_token = _evaluation.set((self, children))
-                output_token = _output_call.set((self, recorded))
+                evaluation_token = _evaluation.set((self, children, call_records))
+                output_token = _output_call.set((self, recorded)) if outputs_enabled() else None
                 try:
                     returned = self.forward(**inlets)
-                    for fn in tuple(self._hooks.values()):
-                        replacement = fn(self, returned)
-                        if replacement is not None:
-                            returned = replacement
+                    if returned is None and not self._outlets:
+                        returned = {}
+                    if not isinstance(returned, dict):
+                        raise TypeError(f"{self.path}: forward must return an outlet dict")
+                    missing_out = self._outlets.keys() - returned.keys()
+                    extra_out = returned.keys() - self._outlets.keys()
+                    if missing_out or extra_out:
+                        detail = f"missing={sorted(missing_out)}, extra={sorted(extra_out)}"
+                        raise ValueError(f"{self.path}: outlet names {detail}")
+                    outlets = {
+                        name: declaration.validate(returned[name])
+                        for name, declaration in self._outlets.items()
+                    }
+                    if outputs_enabled():
+                        self._call_by_name(self._compute_outputs, inlets, outlets)
+                        self._compute_formula_outputs(call_records)
+                        for fn, names in tuple(self._hooks.values()):
+                            self._call_by_name(fn, inlets, outlets, names=names, module=self)
+                        self._check_outputs(recorded)
                 finally:
-                    _output_call.reset(output_token)
+                    if output_token is not None:
+                        _output_call.reset(output_token)
                     _evaluation.reset(evaluation_token)
                 inputs = dict(inputs)
         finally:
             _inlet_call.reset(inlet_token)
-        required = {name for name, output in self._outputs.items() if not output.optional}
-        if required - recorded.keys():
-            missing = sorted(required - recorded.keys())
-            raise RuntimeError(f"{self.path}: required outputs left unassigned: {missing}")
-        if returned is None and not self._outlets:
-            returned = {}
-        if not isinstance(returned, dict):
-            raise TypeError(f"{self.path}: forward must return an outlet dict")
-        missing_out = self._outlets.keys() - returned.keys()
-        extra_out = returned.keys() - self._outlets.keys()
-        if missing_out or extra_out:
-            detail = f"missing={sorted(missing_out)}, extra={sorted(extra_out)}"
-            raise ValueError(f"{self.path}: outlet names {detail}")
-        outlets = {
-            name: declaration.validate(returned[name])
-            for name, declaration in self._outlets.items()
-        }
         result = ModuleResult(
             outputs=Values(recorded, self._outputs),
             outlets=Values(outlets, self._outlets),
             inlets=inlets,
             inputs=inputs,
             children=children,
+            call_records=tuple(call_records),
+            is_leaf=self.is_leaf,
         )
         if parent is not None:
-            owner, collected = parent
+            owner, collected, calls = parent
             prefix = owner._path + "." if owner._path else ""
-            collected[self._path.removeprefix(prefix) or self.name] = result
+            relative = self._path.removeprefix(prefix) or self.name
+            collected[relative] = result
+            calls.append((relative, result))
         object.__setattr__(self, "last_result", result)
         object.__setattr__(self, "last_results", result.leaves())
         return result
@@ -634,9 +887,20 @@ class Module:
         return RemovableHandle(self._pre_hooks, key)
 
     def register_forward_hook(self, fn):
-        """Call ``fn`` after each successful forward evaluation."""
+        """Call ``fn(module, named inlets/outlets...)`` after output computation."""
+        parameters = _named_parameters(fn)
+        if not parameters or parameters[0] != "module":
+            raise TypeError("forward hooks must name their first parameter 'module'")
+        names = parameters[1:]
+        valid = set(self._inlets) | set(self._outlets)
+        bad = [name for name in names if name not in valid]
+        if bad:
+            raise TypeError(
+                f"{self.path}: forward hook has unknown inlet/outlet {bad[0]!r}; "
+                f"valid names: {', '.join(sorted(valid)) or '<none>'}"
+            )
         key = object()
-        self._hooks[key] = fn
+        self._hooks[key] = (fn, names)
         return RemovableHandle(self._hooks, key)
 
     def health(self, predicted, measured):

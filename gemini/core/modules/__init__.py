@@ -2,13 +2,14 @@
 
 from .container import ModuleDict, ModuleList, Sequential
 from .heat import Boiler, HeatExchanger
-from .module import Module
+from .module import Module, no_outputs
 from .pumps import ESP, BoosterPump, InjectionPump
 from .subsurface import InjectionReservoir, InjectionWell, ProductionReservoir, ProductionWell
 from .treatment import Blowdown, Degasser, Filter
 
 __all__ = [
     "Module",
+    "no_outputs",
     "Sequential",
     "ModuleList",
     "ModuleDict",

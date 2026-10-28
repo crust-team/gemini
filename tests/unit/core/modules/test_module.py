@@ -4,8 +4,20 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+import gemini as gm
 from gemini.core.modules import Module, ModuleDict
-from gemini.core.types import Boundary, Control, Frequency, Inlet, Outlet, Output, Parameter, Stream
+from gemini.core.types import (
+    Boundary,
+    Control,
+    Frequency,
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Parameter,
+    Power,
+    Stream,
+)
 
 
 class PassThrough(Module):
@@ -33,14 +45,14 @@ class PassThrough(Module):
     def forward(self, inlet):
         """Record the scalar product and return the stream."""
 
-        # Outputs
-        self.result = self.value * self.multiplier
-
         # Outlets
         outlet = inlet
 
         outlets = dict(outlet=outlet)
         return outlets
+
+    def _compute_outputs(self, inlet, outlet):
+        self.result = self.value * self.multiplier
 
 
 def test_registration_construction_and_state():
@@ -79,7 +91,6 @@ def test_single_outlet_scalar_return_is_rejected(monkeypatch):
     module = PassThrough(value=2)
 
     def scalar_forward(inlet):
-        module.result = module.value * module.multiplier
         return inlet
 
     monkeypatch.setattr(module, "forward", scalar_forward)
@@ -127,7 +138,7 @@ def test_output_records_are_nested_and_thread_local():
             self.inlet = Inlet(Stream)
 
             # Outputs
-            self.child_value = Output(float)
+            self.child_value = Output.of("children_by_name.child.result")
 
             # Outlets
             self.outlet = Outlet(Stream)
@@ -137,9 +148,6 @@ def test_output_records_are_nested_and_thread_local():
 
             # Modules
             child = self.children_by_name.child(inlet=inlet, multiplier=2)
-
-            # Outputs
-            self.child_value = child.outputs.result
 
             # Outlets
             outlet = child.outlets.outlet
@@ -162,7 +170,7 @@ def test_uninitialized_and_hooks():
     module.value = 2
     calls = []
     before = module.register_forward_pre_hook(lambda *args: calls.append("before"))
-    after = module.register_forward_hook(lambda *args: calls.append("after"))
+    after = module.register_forward_hook(lambda module: calls.append("after"))
     module(inlet=Stream(m_dot=1, T=300, p=1e5))
     assert calls == ["before", "after"]
     before.remove()
@@ -194,14 +202,14 @@ class RequiredInputs(Module):
     def forward(self, inlet):
         """Read applied values through ordinary attributes."""
 
-        # Outputs
-        self.total = self.frequency + self.grid_frequency
-
         # Outlets
         outlet = inlet
 
         outlets = dict(outlet=outlet)
         return outlets
+
+    def _compute_outputs(self, inlet, outlet):
+        self.total = self.frequency + self.grid_frequency
 
 
 def test_input_resolution_units_bounds_and_metadata():
@@ -255,10 +263,6 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
 
         def forward(self, inlet):
             """Override frequency for only the current call."""
-            self.frequency = 10
-
-            # Outputs
-            self.total = self.frequency + self.grid_frequency
 
             # Outlets
             outlet = inlet
@@ -266,26 +270,33 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
             outlets = dict(outlet=outlet)
             return outlets
 
+        def _compute_outputs(self, inlet, outlet):
+            self.frequency = 10
+            self.total = self.frequency + self.grid_frequency
+
     assigned = AssignInForward()
     assigned.set_inputs({"frequency": 50, "grid_frequency": 50})
     assert assigned(inlet=stream).outputs.total == 60
     assert assigned.frequency == 50
 
 
-def test_hooks_are_ordered_removable_and_can_replace_outlets():
-    """Hooks use PyTorch-style arguments and a post-hook may replace the outlet mapping."""
+def test_hooks_are_ordered_removable_and_observe_named_ports():
+    """Hooks use named ports, preserve outlets and ignore their return value."""
     stream = Stream(m_dot=1, T=300, p=1e5)
     replacement = stream.with_(p=2e5)
     module = PassThrough(value=2)
     calls = []
     first = module.register_forward_pre_hook(lambda current: calls.append(("first", current)))
     second = module.register_forward_pre_hook(lambda current: calls.append(("second", current)))
-    post = module.register_forward_hook(
-        lambda current, outlets: calls.append(("post", current)) or {"outlet": replacement}
-    )
+
+    def observe(module, inlet, outlet):
+        calls.append(("post", module))
+        return {"outlet": replacement}
+
+    post = module.register_forward_hook(observe)
     result = module(inlet=stream)
     assert [name for name, _ in calls] == ["first", "second", "post"]
-    assert result.outlets.outlet is replacement
+    assert result.outlets.outlet is stream
     second.remove()
     post.remove()
     first.remove()
@@ -324,3 +335,250 @@ def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
     assert parent().children["child"].outputs.total == 100
     with pytest.raises(ValueError, match="did you mean 'child.frequency'"):
         parent.set_inputs({"child.frequncy": 40})
+
+
+def test_compute_output_signature_is_checked_at_class_definition():
+    """Output callbacks can request only declared inlet and outlet names."""
+    with pytest.raises(TypeError, match="BadOutputName.*typo.*inlet.*outlet"):
+
+        class BadOutputName(Module):
+            """Deliberately invalid output callback fixture."""
+
+            def __init__(self):
+                super().__init__()
+                self.inlet = Inlet(Stream)
+                self.value = Output(float)
+                self.outlet = Outlet(Stream)
+
+            def forward(self, inlet):
+                outlets = dict(outlet=inlet)
+                return outlets
+
+            def _compute_outputs(self, typo):
+                self.value = 1
+
+
+def test_missing_output_and_named_hook_ordering():
+    """Checks run after output computation and named hooks observe completed values."""
+
+    class MissingOutput(Module):
+        """Leave one declared output unset."""
+
+        def __init__(self):
+            super().__init__()
+            self.inlet = Inlet(Stream)
+            self.value = Output(float)
+            self.outlet = Outlet(Stream)
+
+        def forward(self, inlet):
+            outlets = dict(outlet=inlet)
+            return outlets
+
+        def _compute_outputs(self, inlet, outlet):
+            pass
+
+    stream = Stream(m_dot=1, T=300, p=1e5)
+    module = MissingOutput()
+    with pytest.raises(RuntimeError, match="missing_output.*value"):
+        module(inlet=stream)
+
+    good = PassThrough(value=3)
+    seen = []
+
+    def observe(module, inlet, outlet):
+        seen.append((module.result, inlet, outlet))
+
+    good.register_forward_hook(observe)
+    good(inlet=stream, multiplier=2)
+    assert seen == [(6, stream, stream)]
+    with pytest.raises(TypeError, match="unknown inlet/outlet 'typo'"):
+        good.register_forward_hook(lambda module, typo: None)
+
+
+def test_no_outputs_is_nested_thread_local_context_and_decorator():
+    """The fast path skips output callbacks, formulas, hooks and output checks."""
+    stream = Stream(m_dot=1, T=300, p=1e5)
+    module = PassThrough(value=2)
+    calls = []
+
+    def observe(module):
+        calls.append(module)
+
+    module.register_forward_hook(observe)
+    with gm.no_outputs():
+        assert not module(inlet=stream).outputs
+        with gm.no_outputs():
+            assert not module(inlet=stream).outputs
+        assert not module(inlet=stream).outputs
+    assert module(inlet=stream).outputs.result == 2
+    assert calls == [module]
+
+    @gm.no_outputs()
+    def fast_call():
+        return module(inlet=stream)
+
+    assert not fast_call().outputs
+
+
+def test_formula_outputs_count_calls_sum_leaves_and_read_outlet_fields():
+    """Formula outputs use this call's exact descendant records in declaration order."""
+    stream = Stream(m_dot=1, T=300, p=1e5)
+
+    class EnergyLeaf(Module):
+        """Emit a fixed electrical output while preserving a stream."""
+
+        def __init__(self):
+            super().__init__()
+            self.inlet = Inlet(Stream)
+            self.electricity = Output(Power)
+            self.outlet = Outlet(Stream)
+
+        def forward(self, inlet):
+            outlets = dict(outlet=inlet)
+            return outlets
+
+        def _compute_outputs(self, inlet, outlet):
+            self.electricity = 2
+
+    class FormulaParent(Module):
+        """Exercise copy, total, ratio and outlet-field formulas."""
+
+        def __init__(self):
+            super().__init__()
+            self.child = EnergyLeaf()
+            self.inlet = Inlet(Stream)
+            self.copied = Output.of("child.electricity")
+            self.total = Output.total("electricity")
+            self.ratio = Output.ratio("copied", "total")
+            self.mass = Output.of("child.outlet.m_dot")
+            self.outlet = Outlet(Stream)
+
+        def forward(self, inlet):
+            child = self.child(inlet=inlet)
+            outlet = child.outlets.outlet
+            outlets = dict(outlet=outlet)
+            return outlets
+
+    result = FormulaParent()(inlet=stream)
+    assert dict(result.outputs) == {"copied": 2, "total": 2, "ratio": 1, "mass": 1}
+
+    class RepeatedParent(Module):
+        """Call one leaf twice so totals include both evaluations."""
+
+        def __init__(self):
+            super().__init__()
+            self.child = EnergyLeaf()
+            self.inlet = Inlet(Stream)
+            self.total = Output.total("electricity")
+            self.outlet = Outlet(Stream)
+
+        def forward(self, inlet):
+            self.child(inlet=inlet)
+            child = self.child(inlet=inlet)
+            outlet = child.outlets.outlet
+            outlets = dict(outlet=outlet)
+            return outlets
+
+    assert RepeatedParent()(inlet=stream).outputs.total == 4
+
+    class ExactlyOnceParent(Module):
+        """Copy an output from a child that is deliberately called twice."""
+
+        def __init__(self):
+            Module.__init__(self)
+            self.child = EnergyLeaf()
+            self.inlet = Inlet(Stream)
+            self.copied = Output.of("child.electricity")
+            self.outlet = Outlet(Stream)
+
+        def forward(self, inlet):
+            self.child(inlet=inlet)
+            child = self.child(inlet=inlet)
+            outlet = child.outlets.outlet
+            outlets = dict(outlet=outlet)
+            return outlets
+
+    with pytest.raises(RuntimeError, match="child.*called 2 times"):
+        ExactlyOnceParent()(inlet=stream)
+
+
+def test_formula_validation_units_zero_ratio_and_typo_suggestion():
+    """Totals require matching additive units and formula mistakes are actionable."""
+
+    class PowerUse(Module):
+        """Power-valued additive leaf."""
+
+        def __init__(self):
+            super().__init__()
+            self.use = Output(Power)
+
+        def forward(self):
+            outlets = dict()
+            return outlets
+
+        def _compute_outputs(self):
+            self.use = 0
+
+    class MassUse(Module):
+        """Mass-valued additive leaf."""
+
+        def __init__(self):
+            super().__init__()
+            self.use = Output(MassFlow)
+
+        def forward(self):
+            outlets = dict()
+            return outlets
+
+        def _compute_outputs(self):
+            self.use = 1
+
+    class BadTotal(Module):
+        """Combine incompatible additive units."""
+
+        def __init__(self):
+            super().__init__()
+            self.power = PowerUse()
+            self.mass = MassUse()
+            self.use = Output.total("use")
+
+        def forward(self):
+            self.power()
+            self.mass()
+            outlets = dict()
+            return outlets
+
+    with pytest.raises(TypeError, match="differing units"):
+        BadTotal()()
+
+    class ZeroRatio(Module):
+        """Produce a zero-denominator ratio."""
+
+        def __init__(self):
+            super().__init__()
+            self.child = PowerUse()
+            self.value = Output.of("child.use")
+            self.ratio = Output.ratio("value", "value")
+
+        def forward(self):
+            self.child()
+            outlets = dict()
+            return outlets
+
+    assert ZeroRatio()().outputs.ratio is None
+
+    class TypoFormula(Module):
+        """Misspell a known descendant output."""
+
+        def __init__(self):
+            super().__init__()
+            self.child = PowerUse()
+            self.value = Output.of("child.ues")
+
+        def forward(self):
+            self.child()
+            outlets = dict()
+            return outlets
+
+    with pytest.raises(ValueError, match="did you mean 'child.use'"):
+        TypoFormula()()

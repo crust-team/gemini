@@ -62,20 +62,26 @@ class EventLog(Callback):
                 }
                 self._starts[path] = perf_counter(), to_jsonable_python(inputs)
 
-            def after(module, outlets, path=module_path):
-                start, inputs = self._starts.pop(path)
-                self.log(
-                    "forward",
-                    module_path=path,
-                    inputs=inputs,
-                    outputs=to_jsonable_python(
-                        {name: getattr(module, name) for name in module.outputs()}
-                    ),
-                    duration_ms=(perf_counter() - start) * 1000,
-                )
+            def make_after(path):
+                def after(module):
+                    start, inputs = self._starts.pop(path)
+                    self.log(
+                        "forward",
+                        module_path=path,
+                        inputs=inputs,
+                        outputs=to_jsonable_python(
+                            {name: getattr(module, name) for name in module.outputs()}
+                        ),
+                        duration_ms=(perf_counter() - start) * 1000,
+                    )
+
+                return after
 
             self._handles.extend(
-                [module.register_forward_pre_hook(before), module.register_forward_hook(after)]
+                [
+                    module.register_forward_pre_hook(before),
+                    module.register_forward_hook(make_after(module_path)),
+                ]
             )
         return self
 

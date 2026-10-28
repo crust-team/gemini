@@ -6,6 +6,7 @@ from gemini.core.data.dataset import Dataset
 from gemini.core.engine.clock import Clock
 from gemini.core.engine.engine import Engine
 from gemini.core.modules import plants
+from gemini.core.modules.module import no_outputs
 from gemini.core.physics import units
 from gemini.core.types import BRINE, WATER, Fluid, Profile, Quantity, Stream
 
@@ -26,6 +27,7 @@ __all__ = [
     "plants",
     "legacy",
     "optim",
+    "no_outputs",
     "__version__",
 ]
 

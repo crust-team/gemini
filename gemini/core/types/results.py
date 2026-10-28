@@ -6,7 +6,7 @@ from typing import Any, Iterator, Mapping
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.physics import units
-from gemini.core.types.flows import Flow
+from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import Fraction
 
 
@@ -79,9 +79,11 @@ class ModuleResult:
 
     outputs: Values
     outlets: Values
-    inlets: dict[str, Flow] = field(default_factory=dict)
+    inlets: dict[str, Stream] = field(default_factory=dict)
     inputs: dict[str, Any] = field(default_factory=dict)
     children: dict[str, "ModuleResult"] = field(default_factory=dict)
+    call_records: tuple[tuple[str, "ModuleResult"], ...] = field(default_factory=tuple, repr=False)
+    is_leaf: bool = True
 
     def leaves(self, prefix=""):
         """Flatten only descendant leaf results, with relative module paths."""

@@ -9,6 +9,7 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
+from gemini.core.types.quantities import Ratio
 
 
 class _Unset:
@@ -135,6 +136,8 @@ class Inlet(Declaration):
 
     def __init__(self, kind=Stream, *, description=None):
         """Declare an incoming flow of the requested kind."""
+        if not isinstance(kind, type) or not issubclass(kind, Stream):
+            raise TypeError("Inlet kinds must be fluid Stream types")
         super().__init__(kind, description=description)
 
 
@@ -160,15 +163,64 @@ class Output(Declaration):
         super().__init__(kind, description=description)
         self.soft_sensor = soft_sensor
         self.optional = optional
+        self.formula = None
+        self._formula_kind_given = True
+        self._resolved_formula = None
+
+    @classmethod
+    def _from_formula(cls, formula, kind, **kwargs):
+        output = cls(kind or Any, **kwargs)
+        output.formula = formula
+        output._formula_kind_given = kind is not None
+        return output
+
+    @classmethod
+    def of(cls, path, kind=None, **kwargs):
+        """Declare an output copied from one exactly-once descendant call."""
+        return cls._from_formula(("of", path), kind, **kwargs)
+
+    @classmethod
+    def total(cls, name, kind=None, **kwargs):
+        """Declare the sum of one additive output over descendant leaf calls."""
+        output = cls._from_formula(("total", name), kind, **kwargs)
+        if kind is not None and output.quantity not in {"power", "mass_flow"}:
+            raise TypeError(
+                f"Output.total requires an additive power, heat-flow or mass-flow quantity; "
+                f"got {output.quantity or kind!r}"
+            )
+        return output
+
+    @classmethod
+    def ratio(cls, numerator, denominator, kind=None, **kwargs):
+        """Declare the ratio of two earlier outputs on the same module."""
+        kwargs.setdefault("optional", True)
+        return cls._from_formula(("ratio", numerator, denominator), kind or Ratio | None, **kwargs)
+
+    def infer_kind(self, declaration):
+        """Adopt an inferred formula target kind while preserving output metadata."""
+        if self._formula_kind_given:
+            return
+        self.kind = declaration.kind
+        self._adapter = _adapter(self.kind, {})
+        self.schema = self._adapter.json_schema()
+        variants = self.schema.get("anyOf", [self.schema])
+        value_schema = next(
+            (value for value in variants if value.get("type") != "null"), self.schema
+        )
+        value_schema = value_schema.get("items", value_schema)
+        self.quantity = value_schema.get("quantity")
+        self.unit = value_schema.get("unit")
 
 
 class Outlet(Declaration):
-    """Outgoing fluid or energy flow port."""
+    """Outgoing fluid stream port."""
 
     section = "outlet"
 
     def __init__(self, kind=Stream, *, description=None):
         """Declare an outgoing flow of the requested kind."""
+        if not isinstance(kind, type) or not issubclass(kind, Stream):
+            raise TypeError("Outlet kinds must be fluid Stream types")
         super().__init__(kind, description=description)
 
 

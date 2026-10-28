@@ -47,14 +47,14 @@ class Declared(Module):
     def forward(self, inlet):
         """Return the inlet after recording a value."""
 
-        # Outputs
-        self.value = self.command + self.weather
-
         # Outlets
         outlet = inlet
 
         outlets = dict(outlet=outlet)
         return outlets
+
+    def _compute_outputs(self, inlet, outlet):
+        self.value = self.command + self.weather
 
 
 def test_parameter_units_shape_and_metadata():
@@ -87,3 +87,11 @@ def test_all_sections_list_own_declarations():
     assert list(module.inputs()) == ["command", "weather"]
     assert list(module.outputs()) == ["value"]
     assert list(module.outlets()) == ["outlet"]
+
+
+def test_inlets_and_outlets_accept_fluid_stream_types_only():
+    """Scalar and energy values belong in inputs or outputs, never flow ports."""
+    with pytest.raises(TypeError, match="fluid Stream"):
+        Inlet(float)
+    with pytest.raises(TypeError, match="fluid Stream"):
+        Outlet(float)
