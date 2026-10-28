@@ -9,10 +9,9 @@ from gemini.core.modules.subsurface import (
     ProductionWell,
 )
 from gemini.core.types import (
-    HeatFlow,
     Inlet,
     Outlet,
-    PowerFlow,
+    Output,
     Stream,
 )
 
@@ -35,10 +34,12 @@ class Doublet(Module):
         # Inlets
         self.return_stream = Inlet(Stream)
 
+        # Outputs
+        self.electricity = Output.total("electricity")
+        self.heat_loss = Output.total("heat_loss")
+
         # Outlets
         self.supply = Outlet(Stream)
-        self.electricity = Outlet(PowerFlow)
-        self.heat_loss = Outlet(HeatFlow)
 
     def produce(self):
         """Traverse reservoir, lower well, ESP and riser."""
@@ -46,29 +47,22 @@ class Doublet(Module):
         lower = self.well(bottom=source.outlets.sandface)
         pump = self.esp(suction=lower.outlets.wellhead)
         upper = self.riser(bottom=pump.outlets.discharge)
-        return (
-            upper.outlets.wellhead,
-            pump.outlets.electricity,
-            HeatFlow(Q=lower.outlets.heat_loss.Q + upper.outlets.heat_loss.Q),
-        )
+        return upper.outlets.wellhead
 
     def inject(self, stream):
         """Traverse the injection well and receiving aquifer."""
         injection = self.injector(wellhead=stream)
         self.sink(sandface=injection.outlets.bottom)
-        return injection.outlets.heat_loss
 
     def forward(self, return_stream):
         """Evaluate both limbs for an independently specified return boundary."""
 
         # Modules
-        produced_supply, produced_electricity, produced_heat = self.produce()
-        injection_heat = self.inject(return_stream)
+        produced_supply = self.produce()
+        self.inject(return_stream)
 
         # Outlets
         supply = produced_supply
-        electricity = produced_electricity
-        heat_loss = HeatFlow(Q=produced_heat.Q + injection_heat.Q)
 
-        outlets = dict(supply=supply, electricity=electricity, heat_loss=heat_loss)
+        outlets = dict(supply=supply)
         return outlets
