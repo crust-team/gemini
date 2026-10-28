@@ -20,18 +20,21 @@ do not construct runtime wiring.
 2. Section order is `Modules`, `Parameters`, `Inlets`, `Controls`, `Boundaries`, `States`,
    `Outputs`, `Outlets`, using plain `# Section` comments without decorative dashes.
 3. Controls are settable commands; boundaries are uncontrollable external conditions.
-4. `forward` has exactly the declared inlet names, in declaration order. Controls and boundaries
-   are applied before the call and read as plain attributes such as `self.frequency`.
+4. `forward` is exactly `forward(self, inlets)` and reads declared streams through the immutable
+   `Ports` mapping, such as `inlets.suction`. Controls and boundaries are applied before the call
+   and read as plain attributes such as `self.frequency`.
 5. `forward` sections are `# Modules` and `# Outlets`, in that order with empty sections omitted.
    Only composites use `# Modules`; `forward` never assigns an attribute on `self`.
-6. Leaves assign every plain output in `_compute_outputs`. Composites use only `Output.of`,
-   `Output.total` and `Output.ratio` declarations and never override `_compute_outputs`.
+6. Leaves assign every plain output in `_compute_outputs(self, inlets, outlets)`. Composites use
+   only `Output.of`, `Output.total` and `Output.ratio` declarations and never override it.
 7. End every `forward` with `outlets = dict(...)` in declaration order, then `return outlets`.
    Zero- and one-outlet modules use the same dictionary shape.
 8. Do not construct `ModuleResult` in module code; `Module.__call__` creates it.
 9. Keep value arguments out of `__init__`; structural tree-shape arguments are the exception.
 10. Never declare metadata or lists that `Module` derives.
 11. Inlets and outlets carry `Stream` types only. Electricity, fuel and heat loss are outputs.
+12. Pre-hooks are exactly `(module, inlets)` and forward hooks are exactly
+    `(module, inlets, outlets)`.
 
 Use dotted module paths consistently. Binding groups are `controls`, `boundaries`, `inlets`,
 `measured` and `state`. Reject unknown ports and parameters. Missing observations skip only

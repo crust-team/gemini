@@ -1,7 +1,8 @@
 # Public API
 
 Use `import gemini as gm`. The curated top level includes `Engine`, `Clock`, `Dataset`, `Profile`,
-`Stream`, `Fluid`, `Quantity`, `no_outputs`, `units`, `runtime`, `modules`, `legacy` and `optim`.
+`Stream`, `Ports`, `Fluid`, `Quantity`, `no_outputs`, `units`, `runtime`, `modules`, `legacy` and
+`optim`.
 Common workflows need no `core.*` imports. New top-level names require a concrete common user
 workflow, documentation, and a public-API test.
 
@@ -31,9 +32,9 @@ Pass parameter objects, for example
 `params=[plant.get_parameter("heat_exchanger.ua")]`; string paths and `ParamRef` are not part of
 the API.
 `Results[path].field` is a pandas Series and `Results.to_frame()` uses MultiIndex columns.
-Direct module calls return `ModuleResult`, whose `outputs` and `outlets` support mapping and
-attribute access. Use `get(name, unit="bar")` on direct or time-series results for display-unit
-conversion.
+Direct module calls return `ModuleResult`. Its `outlets` is an immutable `Ports` mapping with
+mapping and attribute access; `outputs` provides the same two access forms plus unit conversion.
+Use `get(name, unit="bar")` on direct or time-series outputs for display-unit conversion.
 
 Use `with gm.no_outputs():` (or `@gm.no_outputs()`) for fluid-only evaluation. These calls retain
 validated outlets but skip computed outputs, output formulas and forward hooks.

@@ -7,6 +7,7 @@ Import public types from `gemini.core.types`; quantity aliases are also defined 
 | PyTorch analogy | GEMINI | Purpose |
 | --- | --- | --- |
 | Tensor | `Stream` | Immutable mass flow, absolute temperature and pressure |
+| Tensor mapping | `Ports` | Immutable, ordered module inlet or outlet streams |
 | dtype | `Fluid` | Immutable composition and constant-property overrides |
 | Parameter | `Parameter` declaration | Design value with physical unit and validation bounds |
 | Forward result | `ModuleResult` | Recorded outputs, outlets and retained evaluation tree |
