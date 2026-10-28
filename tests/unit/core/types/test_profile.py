@@ -1,0 +1,66 @@
+"""Profile time semantics, physical-unit conversion and aggregation."""
+
+from datetime import datetime, timedelta, timezone
+
+import pandas as pd
+import pytest
+
+from gemini.core.types.profile import Profile
+
+
+def test_series_previous_and_resample():
+    """Convert raw temperatures, hold prior samples and aggregate without filling gaps."""
+    source = pd.Series(
+        [10, 20],
+        name="ambient",
+        index=pd.to_datetime(["2024-01-01 00:00", "2024-01-01 01:00"]),
+    )
+    profile = Profile.from_series(source, "degC", tz="Europe/Oslo")
+    assert profile.unit == "K" and profile.quantity == "temperature"
+    assert profile.values == [283.15, 293.15]
+    assert profile.index[0].hour == 23
+    assert profile.at(profile.index[0] + timedelta(minutes=30)) == 283.15
+    assert profile.at(profile.index[-1] + timedelta(days=1)) == 293.15
+    with pytest.raises(ValueError, match="precedes"):
+        profile.at(profile.index[0] - timedelta(seconds=1))
+    series = profile.to_series()
+    series.iloc[0] = 0
+    assert profile.values[0] == 283.15
+    constant = Profile.constant(
+        "load", "power", "W", 10, datetime(2024, 1, 1), 4, timedelta(hours=1)
+    )
+    assert len(constant.resample(timedelta(hours=2), "mean")) == 2
+    assert constant.resample(timedelta(hours=2), "sum").values == [20, 20]
+    assert constant.resample(timedelta(hours=2), "first").values == [10, 10]
+    for index, values in (
+        (profile.index[::-1], profile.values),
+        ([profile.index[0]] * 2, [1, 2]),
+        (profile.index, [1]),
+    ):
+        with pytest.raises(ValueError):
+            Profile(name="bad", quantity="power", unit="W", index=index, values=values)
+
+
+def test_profiles_drive_scenario():
+    """Dotted profile inputs drive an ordinary handwritten module without configuration."""
+    import gemini as gm
+    from gemini.core.modules.heat.boiler import Boiler
+    from gemini.core.types.bindings import Binding, ModuleBindings
+
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    target = Profile.constant("target", "temperature", "K", 320, start, 3, timedelta(hours=1))
+    inlet = dict(m_dot=1, T=300, p=1e5)
+    boiler = Boiler(dict(fuel="electric", capacity=1e6, efficiency=0.9))
+    boiler.bindings = {
+        "": ModuleBindings(
+            inputs={"setpoint_T": Binding(column="setpoint_T", unit="K")}, streams={"inlet": {}}
+        )
+    }
+    boiler.boundary = {"stream_defaults": {"": {"inlet": inlet}}}
+    result = gm.Engine(on_error="raise").simulate(
+        boiler,
+        gm.Dataset.from_profiles({"setpoint_T": target}),
+        gm.Clock.from_data(gm.Dataset.from_profiles({"setpoint_T": target})),
+    )
+    assert len(result) == 3
+    assert result.to_frame()["", "outlet_T"].tolist() == [320] * 3
