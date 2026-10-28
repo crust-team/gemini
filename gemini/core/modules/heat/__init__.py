@@ -1,4 +1,4 @@
-"""GEMINI heat equipment components."""
+"""GEMINI heat equipment modules."""
 
 from .boiler import Boiler
 from .heatexchanger import HeatExchanger

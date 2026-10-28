@@ -1,6 +1,6 @@
-"""Blowdown component.
+"""Blowdown placeholder that conserves the incoming stream.
 
-Removes a controlled fraction of circulating brine. The original GEMINI unit had no equipment model.
+No withdrawal physics is modelled; outputs explicitly report modelled=False.
 """
 
 from pydantic import BaseModel, ConfigDict, Field

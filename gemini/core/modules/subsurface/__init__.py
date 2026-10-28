@@ -1,4 +1,4 @@
-"""GEMINI subsurface equipment components."""
+"""GEMINI subsurface equipment modules."""
 
 from .injectionwell import InjectionWell
 from .productionwell import ProductionWell

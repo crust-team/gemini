@@ -1,4 +1,4 @@
-"""Electrical submersible pump component.
+"""Electrical submersible pump module.
 
 Predicts stage head, shaft power and efficiency using the original polynomial
 basis. Reference: TNO 2022 R11363, Model-based monitoring of geothermal assets.

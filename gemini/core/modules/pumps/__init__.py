@@ -1,4 +1,4 @@
-"""GEMINI pumps equipment components."""
+"""GEMINI pumps equipment modules."""
 
 from .boosterpump import BoosterPump
 from .esp import ESP

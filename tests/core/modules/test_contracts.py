@@ -1,4 +1,4 @@
-"""Parameter, port and schema contracts for every declared equipment component."""
+"""Parameter, port and schema contracts for every declared equipment module."""
 
 import json
 from pathlib import Path
@@ -21,7 +21,7 @@ from gemini.core.modules.treatment import Blowdown, Degasser, Filter
 DATA = Path(__file__).parents[3] / "datasets/geothermal_doublet"
 
 
-def example_components():
+def example_modules():
     """Build equipment from the checked-in example property blocks."""
 
     def read(name):
@@ -55,10 +55,10 @@ def example_components():
     ]
 
 
-@pytest.mark.parametrize("component", example_components(), ids=lambda c: c.name)
-def test_schema_and_ports(component):
-    """All components expose serialisable schemas and reject extra or missing stream ports."""
-    schema = component.schema()
+@pytest.mark.parametrize("module", example_modules(), ids=lambda c: c.name)
+def test_schema_and_ports(module):
+    """All modules expose serialisable schemas and reject extra or missing stream ports."""
+    schema = module.schema()
     assert set(schema) == {
         "name",
         "category",
@@ -74,43 +74,43 @@ def test_schema_and_ports(component):
         "fidelity",
     }
     json.dumps(schema)
-    for model in (component.Params, component.Inputs, component.Outputs):
+    for model in (module.Params, module.Inputs, module.Outputs):
         for field in model.model_fields.values():
             assert field.description and "[" in field.description and "]" in field.description
     inputs = (
         {"frequency": 60}
-        if component.name == "esp"
+        if module.name == "esp"
         else (
             {"m_dot": 40}
-            if component.name == "production_reservoir"
-            else {"setpoint_T": 360} if component.name == "boiler" else {}
+            if module.name == "production_reservoir"
+            else {"setpoint_T": 360} if module.name == "boiler" else {}
         )
     )
-    with pytest.raises(ValueError, match=component.name + ": inlet ports"):
-        component(inputs, {"unexpected": Stream(m_dot=1, T=300, p=1e5)})
-    if component.inlets:
+    with pytest.raises(ValueError, match=module.name + ": inlet ports"):
+        module(inputs, {"unexpected": Stream(m_dot=1, T=300, p=1e5)})
+    if module.inlets:
         with pytest.raises(ValueError, match="missing"):
-            component(inputs, {})
+            module(inputs, {})
 
 
-@pytest.mark.parametrize("component", example_components(), ids=lambda c: c.name)
-def test_parameter_failures(component):
+@pytest.mark.parametrize("module", example_modules(), ids=lambda c: c.name)
+def test_parameter_failures(module):
     """Reject unknown fields, wrong types, missing required data and nonphysical values."""
-    p = component.params.model_dump()
+    p = module.params.model_dump()
     with pytest.raises(ValidationError):
-        component.Params.model_validate(p | {"unexpected": 1})
-    for name, field in component.Params.model_fields.items():
+        module.Params.model_validate(p | {"unexpected": 1})
+    for name, field in module.Params.model_fields.items():
         if field.is_required():
             missing = p.copy()
             missing.pop(name)
             with pytest.raises(ValidationError):
-                component.Params.model_validate(missing)
+                module.Params.model_validate(missing)
         if isinstance(p.get(name), (float, int)):
             with pytest.raises(ValidationError):
-                component.Params.model_validate(p | {name: "invalid"})
+                module.Params.model_validate(p | {name: "invalid"})
             if any(
                 getattr(c, "gt", None) is not None or getattr(c, "ge", None) is not None
                 for c in field.metadata
             ):
                 with pytest.raises(ValidationError):
-                    component.Params.model_validate(p | {name: -1})
+                    module.Params.model_validate(p | {name: -1})

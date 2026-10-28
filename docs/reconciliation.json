@@ -1,0 +1,77 @@
+{
+  "rows": 17280,
+  "normal_rows": 17280,
+  "coverage": {
+    "degasser_e846": 1.0,
+    "esp_1ee3": 1.0,
+    "filter_b1ed": 1.0,
+    "filter_b2e6": 1.0,
+    "heat_exchanger_3410": 1.0,
+    "injection_pump_3808": 1.0,
+    "injection_well_a06b": 1.0,
+    "reservoir_c1b5": 1.0
+  },
+  "unmapped": [],
+  "ignored_count": 119,
+  "median_relative_errors": {
+    "esp_1ee3.power": 1.0,
+    "esp_1ee3.head": 0.6316775866204323,
+    "filter_b2e6.pressure_drop": 0.016961021530562004,
+    "filter_b1ed.pressure_drop": 0.016961021530562004,
+    "injection_pump_3808.power": 1.2319590001030889e-05
+  },
+  "alarm_rates": {
+    "degasser_e846": 0.0,
+    "esp_1ee3": 1.0,
+    "filter_b1ed": 0.0,
+    "filter_b2e6": 0.0,
+    "heat_exchanger_3410": 0.0,
+    "injection_pump_3808": 0.0,
+    "injection_well_a06b": 0.0,
+    "reservoir_c1b5": 0.0
+  },
+  "health_assessed": {
+    "degasser_e846": false,
+    "esp_1ee3": true,
+    "filter_b1ed": true,
+    "filter_b2e6": true,
+    "heat_exchanger_3410": true,
+    "injection_pump_3808": false,
+    "injection_well_a06b": false,
+    "reservoir_c1b5": false
+  },
+  "calibration": {
+    "fitted": {
+      "ua": 7138598.616760451
+    },
+    "rms_before": 0.3804315779089568,
+    "rms_after": 0.0002941831887789225,
+    "observations": 672,
+    "success": true,
+    "message": "`gtol` termination condition is satisfied.",
+    "applied": true
+  },
+  "holdout_and_chain": {
+    "hx_hot_K": {
+      "median": 0.33878964662312683,
+      "max": 0.5660824219172014
+    },
+    "hx_cold_K": {
+      "median": 0.30371220357892525,
+      "max": 0.4888875373163728
+    },
+    "hx_duty": {
+      "median": 0.006292951472255615,
+      "max": 0.009523290513201
+    },
+    "chain_wellhead": {
+      "median": 0.5759048187207421,
+      "max": 0.5805620677373236
+    },
+    "chain_hx_duty": {
+      "median": 0.12437011060257164,
+      "max": 0.14376821449153354
+    }
+  },
+  "calibrated_hx_holdout_alarm_rate": 0.8324301541425819
+}

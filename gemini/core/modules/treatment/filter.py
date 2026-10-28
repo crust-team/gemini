@@ -1,8 +1,4 @@
-"""Filter component.
-
-Removes suspended solids before reinjection into the aquifer. The original GEMINI unit had no
-equipment model.
-"""
+"""Clean-filter quadratic hydraulic loss and clogging diagnostics."""
 
 from pydantic import BaseModel, ConfigDict, Field
 
