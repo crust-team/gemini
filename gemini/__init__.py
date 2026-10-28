@@ -1,7 +1,7 @@
 """GEMINI: load a plant, choose a dataset, and simulate, replay or run live."""
 
-from gemini import legacy, optim
-from gemini.core import modules, runtime
+from gemini import optim
+from gemini.core import legacy, modules, runtime
 from gemini.core.data.dataset import Dataset
 from gemini.core.engine.clock import Clock
 from gemini.core.engine.engine import Engine

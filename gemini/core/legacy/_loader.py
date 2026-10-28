@@ -17,8 +17,9 @@ from gemini.core.types.bindings import (
     utc,
 )
 from gemini.core.types.fluid import BRINE, Fluid
-from gemini.legacy import tables as mapping
-from gemini.legacy.tables import NODE_PATHS, TYPES
+
+from . import tables as mapping
+from .tables import NODE_PATHS, TYPES
 
 
 class ModuleDesign(ConfigModel):

@@ -9,9 +9,9 @@ import pandas as pd
 
 import gemini as gm
 from gemini.core.engine import registry
+from gemini.core.legacy import tables as mapping
 from gemini.core.physics import geometry, units
 from gemini.core.types.flows import Stream
-from gemini.legacy import tables as mapping
 from tests.unit.test_golden import assert_values
 
 ROOT = Path(__file__).parents[2]

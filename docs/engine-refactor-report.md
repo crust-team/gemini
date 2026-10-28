@@ -3,7 +3,7 @@
 The runtime now has one finite `Engine` for simulate, replay, and live calls. Plants own their
 bindings, dated parameters, fluids, serialization, and module tree. Core data is one in-memory
 pandas-backed `Dataset`; all file/database acquisition is caller code. Old project conversion is
-isolated under `gemini.legacy`.
+isolated under `gemini.core.legacy` and re-exported publicly as `gm.legacy`.
 
 ## Main moves and removals
 

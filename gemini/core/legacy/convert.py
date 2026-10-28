@@ -8,8 +8,9 @@ from gemini.core.data.dataset import Dataset
 from gemini.core.modules.wiring import trace_wiring
 from gemini.core.physics import units
 from gemini.core.types import Binding, ModuleBindings
-from gemini.legacy._loader import load_legacy_design
-from gemini.legacy.tables import NODE_PATHS, PORTS, TYPES
+
+from ._loader import load_legacy_design
+from .tables import NODE_PATHS, PORTS, TYPES
 
 _SI_UNITS = {
     "bar": "Pa",

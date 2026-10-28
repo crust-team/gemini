@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from gemini.core.legacy import tables as mapping
 from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.core.types.flows import Stream
-from gemini.legacy import tables as mapping
 
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
 
