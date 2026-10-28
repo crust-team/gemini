@@ -19,15 +19,15 @@ pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture(scope="module")
-def verification(tmp_path_factory):
+def verification(tmp_path_factory, dataset_path):
     """Run full replay, held-out calibration and chained audit through the public API."""
     with warnings.catch_warnings(record=True) as warnings_seen:
         plant = DoubletHeatPlant.load(DATA / "plant.json")
     assert not warnings_seen
-    raw = pd.read_csv(DATA / "doublet_2024_15min.csv", parse_dates=["time"])
+    raw = pd.read_csv(dataset_path, parse_dates=["time"])
     dataset = gm.Dataset.from_frame(raw, time_column="time")
     data = dataset.to_frame()
-    assert len(data) == 17280
+    assert len(data) in {2976, 17280}
     engine = gm.Engine(on_error="raise")
     replay = engine.replay(plant, dataset)
     frame = replay.to_frame()
@@ -153,7 +153,7 @@ def verification(tmp_path_factory):
 def test_complete_history_and_source_accounting(verification):
     """Every measured twin covers the full CSV without unmapped fields or missing outputs."""
     report, results = verification
-    assert len(results) == 17280 and not results.skip_counts
+    assert len(results) in {2976, 17280} and not results.skip_counts
     assert all(coverage >= 0.99 for coverage in report["coverage"].values())
     assert not report["unmapped"]
 
@@ -188,7 +188,7 @@ def test_measured_reconciliation(verification):
     assert report["calibration"]["rms_after"] < report["calibration"]["rms_before"] / 100
 
 
-def test_health_does_not_hide_model_mismatch(verification):
+def test_health_does_not_hide_model_mismatch(verification, dataset_name):
     """Unassessed health is explicit and the inconsistent ESP raises alarms on Normal rows."""
     report, _ = verification
     for name, rate in report["alarm_rates"].items():
@@ -204,7 +204,12 @@ def test_health_does_not_hide_model_mismatch(verification):
     # NOTE(refactor): calibrated reference UA is 7.139 MW/K; held-out apparent UA declines
     # despite all labels Normal, giving 83.24% HX alarms. Preserve the diagnostic instead of
     # weakening its 15% fouling limit to meet the requested <5% alarm rate.
-    assert 0.80 < report["calibrated_hx_holdout_alarm_rate"] < 0.85
+    alarm_rate = report["calibrated_hx_holdout_alarm_rate"]
+    if dataset_name == "slow":
+        assert 0.80 < alarm_rate < 0.85
+    else:
+        # July's fitted/held-out month predates the full year's declining-UA alarm period.
+        assert alarm_rate == 0
 
 
 def test_balances_and_electricity_limitations(verification):

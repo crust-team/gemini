@@ -3,6 +3,8 @@
 Run: python examples/core/replay/00_doublet_soft_sensors.py.
 """
 
+import os
+
 import pandas as pd
 
 import gemini as gm
@@ -10,7 +12,8 @@ from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 shared = "examples/shared/doublet_heat"
 plant = DoubletHeatPlant.load(f"{shared}/plant.json")
-frame = pd.read_csv(f"{shared}/doublet_2024_15min.csv", parse_dates=["time"])
+dataset_path = os.environ.get("GEMINI_EXAMPLE_DATASET", f"{shared}/doublet_2024_15min.csv")
+frame = pd.read_csv(dataset_path, parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
 results = gm.Engine().replay(plant, data)
 print(results["doublet.esp"].head.head())
