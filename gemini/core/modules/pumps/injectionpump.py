@@ -54,6 +54,8 @@ class InjectionPump(Module):
 
     def forward(self, suction, pressure_setpoint, frequency):
         """Evaluate supplied curves or Q times pressure rise divided by efficiency."""
+
+        # Outputs
         flow = suction.volumetric_flow()
         if flow < 0:
             raise ValueError(f"{self.path}: reverse flow is unsupported")
@@ -70,6 +72,11 @@ class InjectionPump(Module):
         self.power = flow * self.head / self.efficiency
         if self.head_coeff is not None and self.power_coeff is not None:
             self.power = pumps.power(flow, frequency, self.no_stages, self.power_coeff)
-        discharge = suction.with_(p=suction.p + self.head)
-        self.discharge_pressure = discharge.p
-        return {"discharge": discharge, "electricity": PowerFlow(P=self.power)}
+        self.discharge_pressure = suction.p + self.head
+
+        # Outlets
+        discharge = suction.with_(p=self.discharge_pressure)
+        electricity = PowerFlow(P=self.power)
+
+        outlets = dict(discharge=discharge, electricity=electricity)
+        return outlets

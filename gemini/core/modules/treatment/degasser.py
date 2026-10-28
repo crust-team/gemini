@@ -40,9 +40,16 @@ class Degasser(Module):
 
     def forward(self, inlet):
         """Pass liquid through; gas separation is not modelled and gas flow is zero."""
+
+        # Outputs
         # NOTE(refactor): 0.149 bar default loss comes from Sep_Pin/Sep_Pout in the example.
         pressure = self.p_out if self.p_out is not None else inlet.p - self.dp
-        liquid = inlet.with_(p=pressure)
         self.gas_mass_flow = 0
         self.pressure_drop = inlet.p - pressure
-        return {"liquid": liquid, "gas": liquid.with_(m_dot=0)}
+
+        # Outlets
+        liquid = inlet.with_(p=pressure)
+        gas = liquid.with_(m_dot=0)
+
+        outlets = dict(liquid=liquid, gas=gas)
+        return outlets

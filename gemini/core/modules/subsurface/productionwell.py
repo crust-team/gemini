@@ -62,6 +62,8 @@ class ProductionWell(Module):
 
     def forward(self, bottom):
         """Traverse the passive full path; an internal ESP is handled with the split helpers."""
+
+        # Outputs
         stream = bottom
         start, end = self.pipe_path.total_length, 0
         if self.segment == "below_esp":
@@ -70,22 +72,24 @@ class ProductionWell(Module):
             start = self._esp_depth()
         result = self.traverse(stream, start, end, "up")
         a, b = self.correction_factors
-        output = stream.with_(p=a * result.p_out + b, T=result.T_out)
-        self.wellhead_pressure = output.p
-        self.wellhead_temperature = output.T
+        self.wellhead_pressure = a * result.p_out + b
+        self.wellhead_temperature = result.T_out
         self.dp_friction = result.dp_fric
         self.dp_gravity = result.dp_grav
         self.section_pressure = result.section_p
         self.section_temperature = result.section_T
-        return {
-            "wellhead": output,
-            "heat_loss": HeatFlow(
-                Q=output.m_dot
-                * stream.fluid.properties(stream.p, stream.T).cp_l
-                * (stream.T - output.T),
-                T=self.soil_temperature,
-            ),
-        }
+
+        # Outlets
+        wellhead = stream.with_(p=self.wellhead_pressure, T=self.wellhead_temperature)
+        heat_loss = HeatFlow(
+            Q=wellhead.m_dot
+            * stream.fluid.properties(stream.p, stream.T).cp_l
+            * (stream.T - wellhead.T),
+            T=self.soil_temperature,
+        )
+
+        outlets = dict(wellhead=wellhead, heat_loss=heat_loss)
+        return outlets
 
     def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):
         """Traverse an arbitrary depth interval [m], returning uncorrected SI conditions."""

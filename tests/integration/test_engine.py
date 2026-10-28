@@ -40,13 +40,21 @@ class Accumulator(gm.modules.Module):
 
     def forward(self, rate):
         """Expose a stateless rate observation."""
+
+        # Outputs
         self.value = rate
-        return {}
+
+        outlets = dict()
+        return outlets
 
     def step(self, state, dt, rate):
         """Integrate with explicit state."""
+
+        # Outputs
         state = {"value": state["value"] + rate * dt}
-        return state, self(rate=state["value"])
+        result = self(rate=state["value"])
+
+        return state, result
 
 
 @pytest.fixture

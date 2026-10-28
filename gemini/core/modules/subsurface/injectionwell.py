@@ -57,28 +57,36 @@ class InjectionWell(Module):
 
     def forward(self, wellhead):
         """Traverse the injection path with the legacy negative flow convention."""
+
+        # Outputs
         stream = wellhead
         # NOTE(refactor): legacy injection DPDT uses negative flow; retain that sign convention.
         stream = stream.with_(m_dot=-abs(stream.m_dot))
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
         a, b = self.correction_factors
         # NOTE(refactor): negative flow is internal to DPDT; ports preserve incoming mass sign.
-        output = stream.with_(p=a * result.p_out + b, T=result.T_out, m_dot=wellhead.m_dot)
-        self.bottomhole_pressure = output.p
-        self.bottomhole_temperature = output.T
+        self.bottomhole_pressure = a * result.p_out + b
+        self.bottomhole_temperature = result.T_out
         self.dp_friction = result.dp_fric
         self.dp_gravity = result.dp_grav
         self.section_pressure = result.section_p
         self.section_temperature = result.section_T
-        return {
-            "bottom": output,
-            "heat_loss": HeatFlow(
-                Q=output.m_dot
-                * stream.fluid.properties(stream.p, stream.T).cp_l
-                * (stream.T - output.T),
-                T=self.soil_temperature,
-            ),
-        }
+
+        # Outlets
+        bottom = stream.with_(
+            p=self.bottomhole_pressure,
+            T=self.bottomhole_temperature,
+            m_dot=wellhead.m_dot,
+        )
+        heat_loss = HeatFlow(
+            Q=bottom.m_dot
+            * stream.fluid.properties(stream.p, stream.T).cp_l
+            * (stream.T - bottom.T),
+            T=self.soil_temperature,
+        )
+
+        outlets = dict(bottom=bottom, heat_loss=heat_loss)
+        return outlets
 
     def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):
         """Traverse an arbitrary depth interval [m], returning uncorrected SI conditions."""

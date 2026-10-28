@@ -51,6 +51,8 @@ class Boiler(Module):
 
     def forward(self, inlet, setpoint_T):
         """Heat a forward stream up to its setpoint, conserving energy."""
+
+        # Outputs
         if inlet.m_dot < 0:
             raise ValueError(f"{self.path}: negative mass flow {inlet.m_dot}")
         cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
@@ -59,9 +61,17 @@ class Boiler(Module):
         self.fuel_or_power = self.duty / self.efficiency
         self.outlet_T = inlet.T + self.duty / (inlet.m_dot * cp) if inlet.m_dot else inlet.T
         self.capped = requested > self.capacity
-        return {
-            "outlet": inlet.with_(T=self.outlet_T),
-            "electricity": PowerFlow(P=self.fuel_or_power if self.fuel_type == "electric" else 0),
-            "fuel": FuelFlow(P=self.fuel_or_power if self.fuel_type == "gas" else 0),
-            "heat_loss": HeatFlow(Q=self.fuel_or_power - self.duty),
-        }
+
+        # Outlets
+        outlet = inlet.with_(T=self.outlet_T)
+        electricity = PowerFlow(P=self.fuel_or_power if self.fuel_type == "electric" else 0)
+        fuel = FuelFlow(P=self.fuel_or_power if self.fuel_type == "gas" else 0)
+        heat_loss = HeatFlow(Q=self.fuel_or_power - self.duty)
+
+        outlets = dict(
+            outlet=outlet,
+            electricity=electricity,
+            fuel=fuel,
+            heat_loss=heat_loss,
+        )
+        return outlets

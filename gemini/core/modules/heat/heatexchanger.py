@@ -61,6 +61,8 @@ class HeatExchanger(Module):
 
     def forward(self, hot_in, cold_in):
         """Solve the heat balance and retain both streams' mass flows."""
+
+        # Outputs
         if hot_in.m_dot < 0 or cold_in.m_dot < 0:
             raise ValueError(f"{self.path}: negative mass flow")
         if hot_in.T < cold_in.T:
@@ -93,10 +95,13 @@ class HeatExchanger(Module):
         self.hot_out_T = hot_T
         self.cold_out_T = cold_T
         self.approach_T = min(dt1, dt2)
-        return {
-            "hot_out": hot_in.with_(T=hot_T, p=hot_in.p - self.dp_hot),
-            "cold_out": cold_in.with_(T=cold_T, p=cold_in.p - self.dp_cold),
-        }
+
+        # Outlets
+        hot_out = hot_in.with_(T=self.hot_out_T, p=hot_in.p - self.dp_hot)
+        cold_out = cold_in.with_(T=self.cold_out_T, p=cold_in.p - self.dp_cold)
+
+        outlets = dict(hot_out=hot_out, cold_out=cold_out)
+        return outlets
 
     @classmethod
     def ua_from_measurements(

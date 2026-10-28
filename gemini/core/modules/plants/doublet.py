@@ -67,10 +67,15 @@ class Doublet(Module):
 
     def forward(self, return_stream, m_dot, esp_frequency):
         """Evaluate both limbs for an independently specified return boundary."""
-        supply, electricity, heat = self.produce(m_dot, esp_frequency)
-        rejected = self.inject(return_stream)
-        return {
-            "supply": supply,
-            "electricity": electricity,
-            "heat_loss": HeatFlow(Q=heat.Q + rejected.Q),
-        }
+
+        # Modules
+        produced_supply, produced_electricity, produced_heat = self.produce(m_dot, esp_frequency)
+        injection_heat = self.inject(return_stream)
+
+        # Outlets
+        supply = produced_supply
+        electricity = produced_electricity
+        heat_loss = HeatFlow(Q=produced_heat.Q + injection_heat.Q)
+
+        outlets = dict(supply=supply, electricity=electricity, heat_loss=heat_loss)
+        return outlets

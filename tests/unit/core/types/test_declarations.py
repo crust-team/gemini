@@ -46,8 +46,15 @@ class Declared(Module):
 
     def forward(self, inlet, command, weather):
         """Return the inlet after recording a value."""
+
+        # Outputs
         self.value = command + weather
-        return inlet
+
+        # Outlets
+        outlet = inlet
+
+        outlets = dict(outlet=outlet)
+        return outlets
 
 
 def test_parameter_units_shape_and_metadata():
