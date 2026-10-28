@@ -71,7 +71,7 @@ def prepare(module, bindings, row, defaults=None):
 
 def health_or_unavailable(module, result, measured):
     """Keep lack of diagnostics distinct from assessed nominal health."""
-    health = module.health(result.outputs, measured)
+    health = module.health(result.outputs, measured) if result.outputs else None
     return health or Health(
         score=1,
         alarm=False,

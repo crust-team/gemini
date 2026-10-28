@@ -16,6 +16,11 @@ ROOT = Path(__file__).parents[2]
 SHARED = ROOT / "examples/shared/doublet_heat"
 BASELINE = ROOT / "tests/fixtures/module_api_baseline"
 PATH_RENAMES = {"filter_hot": "filters.hot", "filter_return": "filters.cold"}
+FIELD_RENAMES = {
+    "energy_port_electricity": "electricity",
+    "energy_port_fuel": "fuel",
+    "energy_port_heat_loss": "heat_loss",
+}
 TYPE_RENAMES = {
     "doublet_heat": "doublet_heat_plant",
     "heatexchanger": "heat_exchanger",
@@ -26,12 +31,16 @@ TYPE_RENAMES = {
 
 
 def _baseline_frame(name):
-    return pd.read_csv(
-        BASELINE / name,
-        header=[0, 1],
-        index_col=0,
-        parse_dates=True,
-    ).rename(columns=PATH_RENAMES, level=0)
+    return (
+        pd.read_csv(
+            BASELINE / name,
+            header=[0, 1],
+            index_col=0,
+            parse_dates=True,
+        )
+        .rename(columns=PATH_RENAMES, level=0)
+        .rename(columns=FIELD_RENAMES, level=1)
+    )
 
 
 def _assert_values_identical(actual, expected):

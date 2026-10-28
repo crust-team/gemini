@@ -95,6 +95,18 @@ def test_reference_replay_and_simulate(setup):
         assert result.summary().loc[(path, field), "energy_J"] == pytest.approx(total)
 
 
+def test_replay_can_skip_outputs(setup):
+    """A no-output replay retains fluid execution without running diagnostics on empty values."""
+    plant, data = setup
+    first = data.window(end=data.start)
+    with gm.no_outputs():
+        result = gm.Engine(on_error="raise").replay(plant, first)
+    assert len(result) == 1
+    fields = set(result.to_frame().columns.get_level_values("field"))
+    assert "operating" in fields
+    assert "power" not in fields
+
+
 class Interrupted(BaseException):
     """Model a scheduler cancellation without ordinary-error recovery."""
 
