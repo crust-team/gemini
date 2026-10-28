@@ -1,1 +1,0 @@
-"""Tag browser generation application."""

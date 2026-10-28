@@ -1,1 +1,0 @@
-"""Production well application."""
