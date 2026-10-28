@@ -37,9 +37,7 @@ def main():
         "production_rate": gm.Profile.constant(150, unit="m3/h", clock=clock),
         "esp_frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
     }
-    simulation = gm.Engine().simulate(
-        plant, gm.Dataset.from_profiles(profiles), clock=clock
-    )
+    simulation = gm.Engine().simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     simulation.to_frame().to_csv(OUTPUT / "simulate.csv.gz", compression="gzip")
 
     (OUTPUT / "state_dict.json").write_text(
