@@ -66,7 +66,12 @@ def test_captured_monitoring_values():
     sandface = reservoir({"m_dot": mass}).streams["sandface"]
     intake = well.intake_conditions(sandface)
     discharge = well.discharge_from_wellhead(
-        Stream(m_dot=mass, p=units.bar_to_pa(row.Pwh_prod), T=units.c_to_k(row.T_p_in))
+        Stream(
+            m_dot=mass,
+            p=units.bar_to_pa(row.Pwh_prod),
+            T=units.c_to_k(row.T_p_in),
+            fluid=well.fluid,
+        )
     )
     a, b = mapping.esp_params_from_gemini(e)["correction_factor"]
     dp = units.pa_to_bar(a * discharge.p + b)
@@ -84,7 +89,12 @@ def test_captured_monitoring_values():
     well = registry.create("injectionwell", mapping.injectionwell_params_from_gemini(w))
     well.fluid = reservoir.fluid
     p, T = units.bar_to_pa(row.InjectorPump_Pout), units.c_to_k(row.T_p_out)
-    stream = Stream(m_dot=-units.m3h_to_m3s(row.Qp) * well.fluid.properties(p, T).rho_l, p=p, T=T)
+    stream = Stream(
+        m_dot=-units.m3h_to_m3s(row.Qp) * well.fluid.properties(p, T).rho_l,
+        p=p,
+        T=T,
+        fluid=well.fluid,
+    )
     out = well(wellhead=stream).outputs
     ii = reservoir.injectivity_from_measurements(units.m3h_to_m3s(row.Qp), out.bottomhole_pressure)
     actual.update(

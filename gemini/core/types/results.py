@@ -1,11 +1,11 @@
 """Equipment monitoring health."""
 
-from dataclasses import dataclass
-from typing import Any, NamedTuple
+from dataclasses import dataclass, field
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.core.types.flows import Stream
+from gemini.core.types.flows import Flow
 from gemini.core.types.quantities import Dimensionless, Fraction
 
 
@@ -22,11 +22,33 @@ class Health(BaseModel):
     )
 
 
-class ModuleResult(NamedTuple):
-    """Validated outputs and outgoing SI streams from one evaluation."""
+@dataclass(frozen=True)
+class ModuleResult:
+    """Outputs, typed flows and an evaluation tree captured by Module.__call__.
+
+    Iteration yields outputs and streams. Inputs and children are audit metadata,
+    retained with this result so later evaluations cannot alter its balances.
+    """
 
     outputs: BaseModel
-    streams: dict[str, Stream]
+    streams: dict[str, Flow]
+    inlets: dict[str, Flow] = field(default_factory=dict)
+    inputs: BaseModel | None = None
+    children: dict[str, "ModuleResult"] = field(default_factory=dict)
+
+    def __iter__(self):
+        """Unpack the two public calculation values."""
+        yield self.outputs
+        yield self.streams
+
+    def leaves(self, prefix=""):
+        """Flatten only descendant leaf results, with relative module paths."""
+        if not self.children:
+            return {prefix: self}
+        result = {}
+        for name, child in self.children.items():
+            result.update(child.leaves(f"{prefix}.{name}" if prefix else name))
+        return result
 
 
 @dataclass(frozen=True)

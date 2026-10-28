@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
+from gemini.core.types.flows import FuelFlow, HeatFlow, PowerFlow, Stream
 from gemini.core.types.quantities import Efficiency, Power, Temperature
 from gemini.core.types.results import ModuleResult
 
@@ -18,8 +19,8 @@ class Boiler(Module):
     name = "boiler"
     category = "heat"
     description = "Auxiliary heat source with efficiency and capacity limits."
-    inlets = ("inlet",)
-    outlets = ("outlet",)
+    inlets = {"inlet": Stream}
+    outlets = {"outlet": Stream, "electricity": PowerFlow, "fuel": FuelFlow, "heat_loss": HeatFlow}
 
     class Params(BaseModel):
         """Nominal boiler design data."""
@@ -59,5 +60,15 @@ class Boiler(Module):
                 outlet_T=T,
                 capped=requested > self.params.capacity,
             ),
-            {"outlet": stream.with_(T=T)},
+            {
+                "outlet": stream.with_(T=T),
+                # NOTE(refactor): both energy supply ports are static; the unused one is zero.
+                "electricity": PowerFlow(
+                    P=duty / self.params.efficiency if self.params.fuel == "electric" else 0
+                ),
+                "fuel": FuelFlow(
+                    P=duty / self.params.efficiency if self.params.fuel == "gas" else 0
+                ),
+                "heat_loss": HeatFlow(Q=duty / self.params.efficiency - duty),
+            },
         )

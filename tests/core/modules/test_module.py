@@ -16,8 +16,8 @@ class PassThrough(Module):
     name = "test_passthrough"
     category = "test"
     description = "Contract fixture."
-    inlets = ("inlet",)
-    outlets = ("outlet",)
+    inlets = {"inlet": Stream}
+    outlets = {"outlet": Stream}
 
     class Params(BaseModel):
         """Positive test parameter."""

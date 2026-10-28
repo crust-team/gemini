@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import geometry, hydraulics
+from gemini.core.types.flows import HeatFlow, Stream
 from gemini.core.types.quantities import (
     Dimensionless,
     HeatTransferCoefficient,
@@ -27,8 +28,8 @@ class ProductionWell(Module):
     name = "productionwell"
     category = "subsurface"
     description = "ProductionWell pressure, temperature, corrosion and erosion diagnostics."
-    inlets = ("bottom",)
-    outlets = ("wellhead",)
+    inlets = {"bottom": Stream}
+    outlets = {"wellhead": Stream, "heat_loss": HeatFlow}
     soft_sensors = ("wellhead_pressure", "wellhead_temperature")
     calibratable = ("correction_factors", "u_value")
 
@@ -96,7 +97,15 @@ class ProductionWell(Module):
                 section_pressure=result.section_p,
                 section_temperature=result.section_T,
             ),
-            {"wellhead": output},
+            {
+                "wellhead": output,
+                "heat_loss": HeatFlow(
+                    Q=output.m_dot
+                    * stream.fluid.properties(stream.p, stream.T).cp_l
+                    * (stream.T - output.T),
+                    T=self.params.soil_temperature,
+                ),
+            },
         )
 
     def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):

@@ -11,9 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import constants, pumps, units
+from gemini.core.types.flows import PowerFlow, Stream
 from gemini.core.types.quantities import (
     Count,
     Dimensionless,
+    Efficiency,
     Fraction,
     Frequency,
     Length,
@@ -32,8 +34,8 @@ class ESP(Module):
     name = "esp"
     category = "pumps"
     description = "Submersible pump head, power, efficiency and operating-window monitoring."
-    inlets = ("suction",)
-    outlets = ("discharge",)
+    inlets = {"suction": Stream}
+    outlets = {"discharge": Stream, "electricity": PowerFlow}
     soft_sensors = ("head", "power", "efficiency", "discharge_pressure")
     calibratable = ("head_coeff", "power_coeff")
 
@@ -44,6 +46,8 @@ class ESP(Module):
         coefficient_precision: Literal["float64", "float32"] = Field(
             "float64", description="Polynomial arithmetic precision for legacy runtime parity [-]"
         )
+        # NOTE(refactor): report shaft power / motor efficiency; default preserves power.
+        motor_efficiency: Efficiency = Field(1, description="Motor efficiency [-]")
         no_stages: Count = Field(..., gt=0, description="Number of pump stages [-]")
         head_coeff: list[float] = Field(
             ...,
@@ -157,7 +161,13 @@ class ESP(Module):
             <= self.params.max_flow * scale,
             bep_ratio=flow / (self.params.bep_flow * scale),
         )
-        return ModuleResult(result, {"discharge": discharge})
+        return ModuleResult(
+            result,
+            {
+                "discharge": discharge,
+                "electricity": PowerFlow(P=power / self.params.motor_efficiency),
+            },
+        )
 
     def health(self, predicted, measured):
         """Score the worst available relative drift and the operating window."""

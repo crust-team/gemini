@@ -6,6 +6,7 @@ Gas separation is not modelled.
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
+from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import MassFlow, Pressure, PressureDifference
 from gemini.core.types.results import ModuleResult
 
@@ -18,8 +19,8 @@ class Degasser(Module):
     name = "degasser"
     category = "treatment"
     description = "Separates released gas from the produced geothermal brine."
-    inlets = ("inlet",)
-    outlets = ("liquid", "gas")
+    inlets = {"inlet": Stream}
+    outlets = {"liquid": Stream, "gas": Stream}
 
     class Params(BaseModel):
         """Available design parameters; no performance model is assumed."""

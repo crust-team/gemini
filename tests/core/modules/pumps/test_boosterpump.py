@@ -9,7 +9,7 @@ def test_equipment_forward():
     c = BoosterPump({})
     streams = {p: Stream(m_dot=1, T=300, p=1e6) for p in ["suction"]}
     result = c({}, streams)
-    assert sum(s.m_dot for s in result.streams.values()) == 1
+    assert sum(s.m_dot for s in result.streams.values() if isinstance(s, Stream)) == 1
     assert result.streams["discharge"].T == 300
     assert result.streams["discharge"].p >= 0
     assert c.schema()["fidelity"] in {"simple", "passthrough"}
