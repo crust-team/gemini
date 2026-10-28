@@ -7,12 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gemini.core.config.build import build_plant, load_config
-from gemini.core.config.gemini_loader import load_gemini
-from gemini.core.config.wiring import check_against_diagram, trace_wiring
-from gemini.core.data.timeseries import CSVTimeSeries
-from gemini.core.modes import history, twin
-from gemini.core.modules.balance import energy_balance, mass_balance
+import gemini as gm
 
 DATA = Path(__file__).parents[2] / "datasets/geothermal_doublet"
 pytestmark = pytest.mark.slow
@@ -20,32 +15,31 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture(scope="module")
 def verification(tmp_path_factory):
-    """Replay all observations and evaluate held-out HX and full chained scenarios once."""
+    """Run full replay, held-out calibration and chained audit through the public API."""
     with warnings.catch_warnings(record=True) as warnings_seen:
-        config = load_gemini(DATA)
-    assert not warnings_seen and not config.unmapped
-    plant = build_plant(config)
-    assert plant.state_dict() == build_plant(load_config(DATA / "plant.json")).state_dict()
-    data = CSVTimeSeries(DATA / "geothermal_example_dataset.csv").frame
+        plant = gm.load_plant(DATA)
+    assert not warnings_seen and not plant.config.unmapped
+    assert plant.state_dict() == gm.load_plant(DATA / "plant.json").state_dict()
+    dataset = gm.Dataset.from_csv(DATA / "geothermal_example_dataset.csv")
+    data = dataset.read(dataset.start, dataset.end)
     assert len(data) == 17280
-    controls, streams = twin.scenario_inputs(plant, data.iloc[0])
-    plant(controls, streams)
-    traced = trace_wiring(plant, controls)
-    assert check_against_diagram(traced, DATA / "diagram.json", plant.GEMINI_NODES) == []
-    replay = history.replay(plant, config, data)
+    engine = gm.Engine(on_error="raise")
+    replay = engine.replay(plant, dataset)
     frame = replay.to_frame()
     normal = (data.filter(like="_status") == "Normal").all(axis=1)
     report = {
         "rows": len(data),
         "normal_rows": int(normal.sum()),
         "coverage": {},
-        "unmapped": config.unmapped,
-        "ignored_count": len(config.ignored),
+        "unmapped": plant.config.unmapped,
+        "ignored_count": len(plant.config.ignored),
         "median_relative_errors": {},
         "alarm_rates": {},
         "health_assessed": {},
     }
-    for name in config.bindings:
+    for name in plant.bindings:
+        if not name:
+            continue
         module = plant.get_submodule(name)
         report["coverage"][name] = float(frame[name].health_alarm.notna().mean())
         report["alarm_rates"][name] = float(frame.loc[normal, (name, "health_alarm")].mean())
@@ -64,48 +58,35 @@ def verification(tmp_path_factory):
         report["median_relative_errors"][module + "." + field] = float(
             np.median(abs(predicted / measured - 1))
         )
-    fit = history.calibrate(
-        plant, config, data.iloc[: 7 * 96], "heat_exchanger", ["ua"], apply=True
-    )
+    fit = gm.optim.calibrate(plant, dataset, "heat_exchanger", ["ua"], end=data.index[7 * 96 - 1])
     report["calibration"] = fit.__dict__
+    holdout = engine.replay(
+        plant, dataset, start=data.index[7 * 96], only=["heat_exchanger"]
+    ).to_frame()
+    observed = data.loc[holdout.index]
     errors = {
-        key: [] for key in ("hx_hot_K", "hx_cold_K", "hx_duty", "chain_wellhead", "chain_hx_duty")
+        "hx_hot_K": abs(holdout["heat_exchanger", "hot_out_T"] - (observed.T_p_out + 273.15)),
+        "hx_cold_K": abs(holdout["heat_exchanger", "cold_out_T"] - (observed.T_s_out + 273.15)),
+        "hx_duty": abs(holdout["heat_exchanger", "duty"] / observed.Thermal_PowerGen - 1),
     }
-    calibrated_alarms = []
-    balances = []
-    electricity_errors = []
-    sampled = set(np.linspace(0, len(data) - 1, 100, dtype=int))
+    report["calibrated_hx_holdout_alarm_rate"] = float(
+        holdout["heat_exchanger", "health_alarm"].mean()
+    )
     measured_electricity = data.ESP_PowerDraw + data.InjectorPump_PowerDraw
     twin_electricity = frame["doublet.esp", "power"] + frame["injection_pump", "power"]
     report["electricity_twin_median_relative_error"] = float(
         np.median(abs(twin_electricity / measured_electricity - 1))
     )
-    report["wiring"] = {"edges": len(traced), "mismatches": []}
-    hx = plant.heat_exchanger
-    for index, row in enumerate(data.to_dict("records")):
-        if index >= 7 * 96:
-            controls, streams, measured = twin.prepare(
-                hx,
-                config.bindings["heat_exchanger"],
-                row,
-                config.boundary["stream_defaults"]["heat_exchanger"],
-            )
-            prediction = hx(controls, streams)
-            errors["hx_hot_K"].append(abs(prediction.outputs.hot_out_T - measured["hot_out_T"]))
-            errors["hx_cold_K"].append(abs(prediction.outputs.cold_out_T - measured["cold_out_T"]))
-            errors["hx_duty"].append(abs(prediction.outputs.duty / measured["duty"] - 1))
-            calibrated_alarms.append(hx.health(prediction.outputs, measured).alarm)
-        controls, streams = twin.scenario_inputs(plant, row)
-        result = plant(controls, streams)
-        electricity_errors.append(
-            abs(
-                result.outputs.electricity / (row["ESP_PowerDraw"] + row["InjectorPump_PowerDraw"])
-                - 1
-            )
-        )
-        if index in sampled:
-            mass = mass_balance(plant, result)
-            energy = energy_balance(plant, result)
+    sampled = set(np.linspace(0, len(data) - 1, 100, dtype=int))
+    balances, electricity = [], []
+    count = 0
+
+    def audit(module, inputs, streams, result):
+        nonlocal count
+        electricity.append(result.outputs.electricity)
+        if count in sampled:
+            mass = gm.modules.mass_balance(module, result)
+            energy = gm.modules.energy_balance(module, result)
             assert all(abs(v["residual"]) < 1e-6 for v in mass["modules"].values())
             assert all(v["relative_thermal_residual"] < 1e-6 for v in energy["modules"].values())
             balances.append(
@@ -117,20 +98,27 @@ def verification(tmp_path_factory):
                     "residual_W": energy["residual"],
                 }
             )
-        if normal.iloc[index]:
-            errors["chain_wellhead"].append(
-                abs(
-                    plant.last_results["doublet.riser"].outputs.wellhead_pressure
-                    / (row["Pwh_prod"] * 1e5)
-                    - 1
-                )
-            )
-            errors["chain_hx_duty"].append(
-                abs(plant.last_results["heat_exchanger"].outputs.duty / row["Thermal_PowerGen"] - 1)
-            )
+        count += 1
+
+    handle = plant.register_forward_hook(audit)
+    try:
+        chain = engine.simulate(plant, dataset, gm.Clock.from_data(dataset)).to_frame()
+    finally:
+        handle.remove()
+    controls = plant.last_result.inputs
+    traced = gm.modules.trace_wiring(plant, controls)
+    assert gm.modules.check_against_diagram(traced, DATA / "diagram.json", plant.GEMINI_NODES) == []
+    report["wiring"] = {"edges": len(traced), "mismatches": []}
+    report["electricity_chain_median_relative_error"] = float(
+        np.median(abs(np.array(electricity) / measured_electricity - 1))
+    )
+    errors["chain_wellhead"] = abs(
+        chain["doublet.riser", "wellhead_pressure"] / (data.Pwh_prod * 1e5) - 1
+    )
+    errors["chain_hx_duty"] = abs(chain["heat_exchanger", "duty"] / data.Thermal_PowerGen - 1)
     report["holdout_and_chain"] = {
-        key: {"median": float(np.median(values)), "max": float(np.max(values))}
-        for key, values in errors.items()
+        key: {"median": float(np.median(value)), "max": float(np.max(value))}
+        for key, value in errors.items()
     }
     report["balances"] = {
         key: {
@@ -140,8 +128,6 @@ def verification(tmp_path_factory):
         for key in balances[0]
     }
     report["balance_samples"] = len(balances)
-    report["electricity_chain_median_relative_error"] = float(np.median(electricity_errors))
-    report["calibrated_hx_holdout_alarm_rate"] = float(np.mean(calibrated_alarms))
     path = tmp_path_factory.mktemp("reconciliation") / "metrics.json"
     path.write_text(json.dumps(report, indent=2) + "\n")
     return report, replay

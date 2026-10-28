@@ -33,6 +33,8 @@ class ProductionWell(Module):
     soft_sensors = ("wellhead_pressure", "wellhead_temperature")
     calibratable = ("correction_factors", "u_value")
 
+    repr_fields = ("segment", "esp_depth", "soil_temperature", "u_value")
+
     class Params(BaseModel):
         """Pipe path and heat-loss design parameters."""
 

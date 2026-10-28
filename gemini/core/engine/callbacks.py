@@ -91,7 +91,8 @@ class EventLog(Callback):
     def on_error(self, engine, error):
         """Record errors and detach after interruptions."""
         self.log("error", message=str(error), error_type=type(error).__name__)
-        self.detach()
+        if not isinstance(error, Exception) or engine.on_error == "raise":
+            self.detach()
 
     def on_run_end(self, engine):
         """Record completion and remove owned observers."""

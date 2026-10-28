@@ -47,6 +47,7 @@ class PlantConfig(ConfigModel):
 
     name: str
     modules: dict[str, ModuleConfig]
+    composites: dict[str, ModuleConfig] = Field(default_factory=dict)
     plant_type: str
     bindings: dict[str, ModuleBindings] = Field(default_factory=dict)
     boundary: dict[str, Any] = Field(default_factory=dict)

@@ -35,6 +35,8 @@ class HeatExchanger(Module):
     soft_sensors = ("duty", "effectiveness")
     calibratable = ("ua",)
 
+    repr_fields = ("ua", "arrangement", "dp_hot_nominal", "dp_cold_nominal")
+
     class Params(BaseModel):
         """Thermal conductance and nominal hydraulic operating point."""
 

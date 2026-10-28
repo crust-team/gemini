@@ -39,6 +39,8 @@ class ESP(Module):
     soft_sensors = ("head", "power", "efficiency", "discharge_pressure")
     calibratable = ("head_coeff", "power_coeff")
 
+    repr_fields = ("no_stages", "setting_depth", "motor_efficiency", "bep_flow")
+
     class Params(BaseModel):
         """Design data with legacy US-basis polynomial coefficients."""
 

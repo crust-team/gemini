@@ -69,7 +69,8 @@ class Clock(ABC):
         """Cover one calendar year in the chosen timezone, excluding the next year's start."""
         start = pd.Timestamp(year=year, month=1, day=1, tz=tz)
         end = pd.Timestamp(year=year + 1, month=1, day=1, tz=tz)
-        return Clock(pd.date_range(start, end, freq=duration(step), inclusive="left"), step)
+        ticks = pd.date_range(start, end, freq=duration(step), inclusive="left")
+        return FixedClock(ticks[0], ticks[-1], step)
 
     @staticmethod
     def days(year, month, day, days=1, step="1h", tz="UTC"):

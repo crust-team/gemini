@@ -18,3 +18,5 @@ docs/codedocumentation/
 docs/_build/
 
 *.pyc
+
+runs/

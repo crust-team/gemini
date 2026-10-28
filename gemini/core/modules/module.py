@@ -61,6 +61,7 @@ class Module(ABC):
     soft_sensors: ClassVar[tuple[str, ...]] = ()
     calibratable: ClassVar[tuple[str, ...]] = ()
     stateful: ClassVar[bool] = False
+    _save_handler: ClassVar = None
     fidelity: ClassVar[Literal["model", "simple", "passthrough"]] = "model"
 
     def __init_subclass__(cls, **kwargs):
@@ -119,6 +120,7 @@ class Module(ABC):
         self.boundary = {}
         self.param_history = [DatedParams(params=self.params.model_dump(mode="json"))]
         self._active_from = None
+        self._active_params = self.param_history[0].params.copy()
         self._param_overrides = {}
 
     def params_at(self, t):
@@ -144,10 +146,14 @@ class Module(ABC):
             if not eligible:
                 raise ValueError(f"{module.path}: no parameters valid at {t}")
             snapshot = max(eligible, key=lambda p: p.valid_from or utc("0001-01-01"))
-            if snapshot.valid_from != module._active_from:
+            if (
+                snapshot.valid_from != module._active_from
+                or snapshot.params != module._active_params
+            ):
                 module.params = module.params_at(t)
                 module.fluid = module._resolve_fluid()
                 module._active_from = snapshot.valid_from
+                module._active_params = snapshot.params.copy()
 
     def column_units(self):
         """Collect raw column metadata and reject conflicting unit declarations."""
@@ -167,24 +173,30 @@ class Module(ABC):
 
     def save(self, path):
         """Save portable design, histories, explicit overrides and sensor bindings."""
-        from gemini.core.config.build import plant_to_config, save_config
-
-        save_config(plant_to_config(self), path)
+        if self._save_handler is None:
+            raise RuntimeError("Plant serialization has not been initialized")
+        self._save_handler(self, path)
 
     def extra_repr(self):
         """Display up to four scalar design parameters in familiar human units."""
         fields = self._field_schema(self.Params).get("properties", {})
         parts = []
-        for name, value in self.params.model_dump().items():
-            if value is None or isinstance(value, (dict, list)):
+        values = self.params.model_dump()
+        for name in getattr(self, "repr_fields", values):
+            value = values[name]
+            if value is None or isinstance(value, (dict, list, tuple)):
                 continue
             unit = fields.get(name, {}).get("unit") or ""
+            if not isinstance(unit, str):
+                unit = ""
             if unit == "Pa" and isinstance(value, (float, int)):
                 value, unit = units.pa_to_bar(value), "bar"
             elif unit == "K" and isinstance(value, (float, int)):
                 value, unit = units.k_to_c(value), "°C"
+            elif unit == "m3/s":
+                value, unit = units.m3s_to_m3h(value), "m3/h"
             shown = f"{value:.5g}" if isinstance(value, float) else str(value)
-            parts.append(f"{name}={shown}{(' ' + unit) if unit != '-' else ''}")
+            parts.append(f"{name}={shown}{(' ' + unit) if unit and unit != '-' else ''}")
             if len(parts) == 4:
                 break
         return ", ".join(parts)

@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from gemini.core.config import param_mapping as mapping
-from gemini.core.data.timeseries import CSVTimeSeries
+from gemini.core.data.dataset import Dataset
 from gemini.core.engine import registry
 from gemini.core.physics import geometry, units
 from gemini.core.types.flows import Stream
@@ -19,7 +19,7 @@ DATA = ROOT / "datasets/geothermal_doublet"
 
 def test_captured_monitoring_values():
     """Reproduce all eight immutable historical outputs, including documented arithmetic quirks."""
-    row = CSVTimeSeries(DATA / "geothermal_example_dataset.csv").frame.iloc[1]
+    row = Dataset.from_csv(DATA / "geothermal_example_dataset.csv").frame.iloc[1]
 
     def read(name):
         return mapping.read_property(DATA / (name + ".param"))

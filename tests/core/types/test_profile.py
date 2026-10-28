@@ -39,13 +39,24 @@ def test_csv_previous_and_resample(tmp_path):
 
 def test_profiles_drive_scenario():
     """Dotted profile inputs drive an ordinary handwritten module without configuration."""
-    from gemini.core.modes.scenario import run
+    import gemini as gm
     from gemini.core.modules.heat.boiler import Boiler
+    from gemini.core.types.bindings import Binding, ModuleBindings
 
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
     target = Profile.constant("target", "temperature", "K", 320, start, 3, timedelta(hours=1))
     inlet = dict(m_dot=1, T=300, p=1e5)
     boiler = Boiler(dict(fuel="electric", capacity=1e6, efficiency=0.9))
-    result = run(boiler, {"setpoint_T": target}, 3600, base_inputs={"streams_in": {"inlet": inlet}})
+    boiler.bindings = {
+        "": ModuleBindings(
+            inputs={"setpoint_T": Binding(column="setpoint_T", unit="K")}, streams={"inlet": {}}
+        )
+    }
+    boiler.boundary = {"stream_defaults": {"": {"inlet": inlet}}}
+    result = gm.Engine(on_error="raise").simulate(
+        boiler,
+        gm.Dataset.from_profiles({"setpoint_T": target}),
+        gm.Clock.from_data(gm.Dataset.from_profiles({"setpoint_T": target})),
+    )
     assert len(result) == 3
     assert result.to_frame()["", "outlet_T"].tolist() == [320] * 3

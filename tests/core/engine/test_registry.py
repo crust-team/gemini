@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from gemini.core.engine import registry
+from gemini.core.modules import catalogue as registry
 
 
 def test_every_module_module_is_discovered():
@@ -19,7 +19,7 @@ def test_every_module_module_is_discovered():
     expected = {
         "gemini.core.modules." + ".".join(p.relative_to(root).with_suffix("").parts)
         for p in root.rglob("*.py")
-        if p.name not in {"__init__.py", "module.py", "balance.py"}
+        if p.name not in {"__init__.py", "module.py", "balance.py", "catalogue.py", "wiring.py"}
     }
     assert modules == expected
     for schema in schemas:

@@ -14,30 +14,9 @@ from gemini.core.config.schema import (
     PlantConfig,
 )
 from gemini.core.modules.plants.geothermal_example import GeothermalExamplePlant
+from gemini.core.modules.wiring import TYPES
 from gemini.core.types.fluid import Fluid
 
-GEMINI_PORTS = {
-    "production_reservoir": {"out": "sandface"},
-    "injection_reservoir": {"in": "sandface"},
-    "productionwell": {"in": "bottom", "out": "wellhead"},
-    "injectionwell": {"in": "wellhead", "out": "bottom"},
-    "esp": {"in": "suction", "out": "discharge"},
-    "injectionpump": {"in": "suction", "out": "discharge"},
-    "filter": {"in": "inlet", "out": "outlet"},
-    "degasser": {"in": "inlet", "out1": "liquid", "out2": "gas"},
-    "heatexchanger": {
-        "PrimIn": "hot_in",
-        "PrimOut": "hot_out",
-        "SecIn": "cold_in",
-        "SecOut": "cold_out",
-    },
-}
-TYPES = {
-    "production_well": "productionwell",
-    "injection_well": "injectionwell",
-    "heat_exchanger": "heatexchanger",
-    "injection_pump": "injectionpump",
-}
 PROPERTIES = {
     "esp": set(
         (
@@ -331,6 +310,8 @@ def load_gemini(folder: str | Path) -> PlantConfig:
             "secondary.T": Binding(column="T_s_in", unit="degC"),
         }
     )
+    # NOTE(refactor): two-control simulations need an assumed secondary boundary.
+    # Store 40 kg/s, 20 C and 5 bar explicitly; measured replay never uses these defaults.
     boundary["root_inputs"] = {
         "injection_pressure": 5.15e6,
         "secondary": {"m_dot": 40, "T": 293.15, "p": 5e5, "fluid": brine.model_dump(mode="json")},

@@ -6,7 +6,30 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from gemini.core.types.flows import FuelFlow, HeatFlow, PowerFlow
+from gemini.core.types.flows import FuelFlow, HeatFlow, PowerFlow, Stream
+
+
+class Summary(pd.DataFrame):
+    """Detailed summary table with a compact printed energy/alarm view."""
+
+    def __repr__(self):
+        """Display the principal metrics without pandas hiding energy or alarm columns."""
+        if self.empty:
+            return "No completed observations"
+        columns = [
+            "energy_MWh",
+            "peak_W",
+            "operating_hours",
+            "alarms",
+            "alarm_rate",
+            "skipped",
+            "errors",
+        ]
+        return self[columns].to_string(float_format=lambda value: f"{value:.6g}")
+
+    def __str__(self):
+        """Use the same concise view for print and interactive display."""
+        return self.__repr__()
 
 
 class ModuleSeries:
@@ -31,6 +54,7 @@ class Results:
         self._rows, self._times, self._dt = [], [], []
         self.skip_counts, self.errors = {}, []
         self._energy = set()
+        self._skips = []
         self._frame = None
 
     def append(self, at, results, dt=0, skips=None, errors=None):
@@ -38,6 +62,12 @@ class Results:
         row = {}
         for path, (result, health) in results.items():
             row.update({(path, key): value for key, value in result.outputs.model_dump().items()})
+            streams = [
+                flow
+                for flow in (result.inlets | result.streams).values()
+                if isinstance(flow, Stream)
+            ]
+            row[path, "operating"] = any(flow.m_dot != 0 for flow in streams) if streams else True
             for port, flow in result.streams.items():
                 if isinstance(flow, (PowerFlow, FuelFlow, HeatFlow)):
                     key = (path, "energy_port_" + port)
@@ -53,6 +83,7 @@ class Results:
         self._times.append(at)
         self._dt.append(dt)
         self._rows.append(row)
+        self._skips.append(skips or {})
         for path, reasons in (skips or {}).items():
             target = self.skip_counts.setdefault(path, {})
             for reason, count in reasons.items():
@@ -83,7 +114,11 @@ class Results:
         """Report energy per port (J/MWh), peaks, evaluated hours, alarms and skip reasons."""
         frame = self.to_frame()
         rows = []
-        paths = sorted(set(frame.columns.get_level_values(0)) | self.skip_counts.keys())
+        paths = sorted(
+            set(frame.columns.get_level_values(0))
+            | self.skip_counts.keys()
+            | {error["module"] for error in self.errors}
+        )
         dt = pd.Series(self._dt, index=frame.index, dtype=float)
         for path in paths:
             fields = (
@@ -92,14 +127,19 @@ class Results:
                 else pd.DataFrame(index=frame.index)
             )
             active = fields.notna().any(axis=1)
-            alarms = (
-                fields.get("health_alarm", pd.Series(False, index=frame.index))
-                .fillna(False)
-                .astype(bool)
-            )
+            alarms = fields.get("health_alarm", pd.Series(False, index=frame.index)).eq(True)
             info = dict(
                 module=path,
                 hours=float(dt[active].sum() / 3600),
+                operating_hours=float(dt[fields.get("operating", active).eq(True)].sum() / 3600),
+                errors=sum(error["module"] == path for error in self.errors),
+                peaks={
+                    field: float(fields[field].max())
+                    for field in fields
+                    if not field.startswith(("health_", "energy_port_"))
+                    and field != "operating"
+                    and pd.api.types.is_numeric_dtype(fields[field])
+                },
                 alarms=int(alarms.sum()),
                 alarm_rate=float(alarms[active].mean()) if active.any() else 0,
                 skipped=sum(self.skip_counts.get(path, {}).values()),
@@ -119,12 +159,16 @@ class Results:
                     )
                 )
             if not ports:
-                rows.append(info | dict(port="", energy_J=0.0, energy_MWh=0.0, peak_W=np.nan))
-        return pd.DataFrame(rows).set_index(["module", "port"]) if rows else pd.DataFrame()
+                power_fields = [
+                    name for name in ("duty", "power", "thermal_power") if name in fields
+                ]
+                peak = float(fields[power_fields].max().max()) if power_fields else np.nan
+                rows.append(info | dict(port="", energy_J=0.0, energy_MWh=0.0, peak_W=peak))
+        return Summary(pd.DataFrame(rows).set_index(["module", "port"])) if rows else Summary()
 
     def __repr__(self):
         """Print a compact human-readable summary."""
-        return self.summary().to_string()
+        return str(self.summary())
 
     def save_csv(self, path):
         """Export a conventional analysis CSV with two header rows."""
@@ -165,6 +209,7 @@ class Results:
             dt=self._dt,
             skip_counts=self.skip_counts,
             errors=self.errors,
+            skips=self._skips,
             energy=sorted(self._energy),
         )
         Path(str(path) + ".json").write_text(json.dumps(metadata, indent=2))
@@ -190,12 +235,15 @@ class Results:
             else pd.read_csv(path, index_col=0, dtype=str, keep_default_na=False)
         )
         frame = frame.map(json.loads)
-        frame.columns = pd.MultiIndex.from_tuples(metadata["columns"])
+        frame.columns = pd.MultiIndex.from_tuples(
+            metadata["columns"], names=["module_path", "field"]
+        )
         result = cls()
         result._times = pd.to_datetime(frame.index, utc=True).to_pydatetime().tolist()
         result._rows = frame.to_dict("records")
         result._dt, result.skip_counts = metadata["dt"], metadata["skip_counts"]
         result.errors = metadata["errors"]
+        result._skips = metadata["skips"]
         result._energy = {tuple(key) for key in metadata["energy"]}
         return result
 
@@ -208,6 +256,12 @@ class Results:
             self._dt[start:],
         )
         result._energy = self._energy.copy()
+        result._skips = self._skips[start:]
+        for skipped in result._skips:
+            for path, reasons in skipped.items():
+                target = result.skip_counts.setdefault(path, {})
+                for reason, count in reasons.items():
+                    target[reason] = target.get(reason, 0) + count
         times = {t.isoformat() for t in result._times}
         result.errors = [error for error in self.errors if error["timestamp"] in times]
         return result

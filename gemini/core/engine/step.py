@@ -2,6 +2,7 @@
 
 import math
 from collections import Counter
+from copy import deepcopy
 
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
@@ -70,32 +71,6 @@ def health_or_unavailable(module, result, measured):
             assessed=False,
             message="No diagnostic model or sufficient measurements",
         )
-    )
-
-
-def scenario_inputs(plant, row):
-    """Translate bound observations into this handwritten plant's public operating controls."""
-    controls, streams = {}, {}
-    defaults = plant.boundary.get("stream_defaults", {})
-    for path, bindings in plant.bindings.items():
-        if not path:
-            continue
-        module = plant.get_submodule(path)
-        values, inlet, _ = prepare(
-            module, bindings.model_copy(update={"measured": {}}), row, defaults.get(path)
-        )
-        controls[path], streams[path] = values, inlet
-    if plant.name != "geothermal_example":
-        raise ValueError("scenario_inputs needs an explicit adapter for this plant type")
-    return (
-        dict(
-            m_dot=controls["doublet.reservoir"]["m_dot"],
-            esp_frequency=controls["doublet.esp"]["frequency"],
-            injection_pressure=controls["injection_pump"]["discharge_pressure"],
-            injection_frequency=controls["injection_pump"].get("frequency", 60),
-            secondary=streams["heat_exchanger"]["cold_in"],
-        ),
-        {},
     )
 
 
@@ -181,26 +156,35 @@ def twin_step(plant, sample, states, plan):
                 state = (
                     {key: _value(sample.row, binding) for key, binding in bound.state.items()}
                     if bound.state
-                    else states.get(path, module.initial_state())
+                    else deepcopy(states[path]) if path in states else module.initial_state()
                 )
                 next_state, prediction = module.step(state, inputs, streams, sample.dt)
-                states[path] = state if bound.state else next_state
             else:
                 prediction = module(inputs, streams)
             results[path] = prediction, health_or_unavailable(module, prediction, measured)
+            if module.stateful:
+                states[path] = state if bound.state else next_state
         except MissingMeasurement as exc:
             plan.skips.setdefault(path, Counter())[str(exc)] += 1
         except Exception as exc:
+            groups = {
+                "inputs": bound.inputs,
+                **{f"streams.{port}": fields for port, fields in bound.streams.items()},
+            }
+            boundary = ", ".join(
+                f"{section}.{field}={sample.row.get(binding.column)!r} {binding.unit}"
+                for section, fields in groups.items()
+                for field, binding in fields.items()
+            )
+            message = f"{module.path}: {exc}; boundary: {boundary}"
             if plan.on_error == "raise":
-                raise
-            plan.errors.append(dict(module=path, message=str(exc), type=type(exc).__name__))
+                raise ValueError(message) from exc
+            plan.errors.append(dict(module=path, message=message, type=type(exc).__name__))
     return results
 
 
 def chained_step(plant, sample, states, plan):
     """Apply root bindings to a single plant call, preserving the handwritten wiring."""
-    from copy import deepcopy
-
     plant.apply_params_at(sample.t)
     plan.skips, plan.errors = {}, []
     _, _, bound, defaults = plan.entries[0]

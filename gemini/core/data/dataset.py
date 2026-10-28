@@ -95,7 +95,7 @@ class Dataset(ABC):
 
     @staticmethod
     def from_aveva(parameters, streams, start, end, step="15min", secret_env="AVEVA_CLIENT_SECRET"):
-        """Read named AVEVA streams over an explicit range; resolve the secret from the environment."""
+        """Read named AVEVA streams over a bounded range with an environment-provided secret."""
         from gemini.core.data.drivers.sources import AvevaSource
 
         if any(k in parameters for k in ("client_secret", "password", "token")):
@@ -223,12 +223,19 @@ class DriverDataset(Dataset):
         """Connect lazily through driver metadata; credentials remain outside descriptions."""
         self.driver, self._source = driver, source
         self.columns = {}
-        driver.connect()
+        self._file_version = None
+        if not hasattr(driver, "df"):
+            driver.connect()
         self._refresh()
 
     def _refresh(self):
         if hasattr(self.driver, "df"):
+            stat = Path(self.driver.parameters["url"]).stat()
+            version = (stat.st_mtime_ns, stat.st_size)
+            if version == self._file_version:
+                return
             self.driver.connect()
+            self._file_version = version
             self._frame = FrameDataset(self.driver.df)
             self.names = self._frame.names
         else:

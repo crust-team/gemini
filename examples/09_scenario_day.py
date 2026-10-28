@@ -1,22 +1,17 @@
-"""Run 24 hourly chained steps using constant measured operating controls and inlet conditions."""
+"""Run one day of assumed flow and ESP frequency on a finite hourly clock."""
 
 from pathlib import Path
 
-from gemini.core.config.build import build_plant
-from gemini.core.config.gemini_loader import load_gemini
-from gemini.core.data.timeseries import CSVTimeSeries
-from gemini.core.modes import history, scenario, twin
+import gemini as gm
 
 DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
-config = load_gemini(DATA)
-plant = build_plant(config)
-data = CSVTimeSeries(DATA / "geothermal_example_dataset.csv").frame
-history.calibrate(plant, config, data.iloc[: 7 * 96], "heat_exchanger", ["ua"], apply=True)
-inputs, streams = twin.scenario_inputs(plant, data.iloc[0])
-results = scenario.run(plant, [inputs | {"streams_in": streams}] * 24, dt=3600)
-print(
-    results.to_frame().loc[:, [("doublet.riser", "wellhead_pressure"), ("heat_exchanger", "duty")]]
-)
-print(
-    "Imposed flow; the supplied pressure and temperature design data do not match all measurements."
-)
+plant = gm.load_plant(DATA)
+
+clock = gm.Clock.days(2027, 1, 1)
+profiles = {
+    "Qp": gm.Profile.constant(150, unit="m3/h", clock=clock),
+    "ESP_freq": gm.Profile.constant(55, unit="Hz", clock=clock),
+}
+result = gm.Engine().simulate(plant, gm.Dataset.from_profiles(profiles), clock)
+print(result.summary())
+print("Secondary boundary defaults are explicit assumptions stored with this plant.")

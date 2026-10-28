@@ -1,20 +1,16 @@
-"""Print pump performance at three frequencies using the example pump parameters."""
+"""Print pump performance at three frequencies."""
 
 from pathlib import Path
 
-from gemini.core.config import param_mapping as mapping
-from gemini.core.modules.pumps import ESP
-from gemini.core.physics import units
-from gemini.core.types.flows import Stream
+import gemini as gm
 
 DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
-pump = ESP(mapping.esp_params_from_gemini(mapping.read_property(DATA / "esp_1ee3.param")))
-suction = Stream(m_dot=units.m3h_to_m3s(130) * 1000, T=units.c_to_k(80), p=units.bar_to_pa(60))
+plant = gm.load_plant(DATA)
+
+pump = plant.doublet.esp
+suction = gm.Stream(m_dot=130 / 3600 * 1000, T=353.15, p=6e6)
 print("Frequency [Hz]  Head [bar]  Power [W]  Efficiency [-]")
 for frequency in (40, 50, 60):
-    out, _ = pump({"frequency": frequency}, {"suction": suction})
-    print(
-        f"{frequency:14.0f}  {units.pa_to_bar(out.head):10.3f}"
-        f"  {out.power:9.2f}  {out.efficiency:.4f}"
-    )
+    out, _ = pump({"frequency": frequency}, suction=suction)
+    print(f"{frequency:14.0f}  {out.head / 1e5:10.3f}  {out.power:9.2f}  {out.efficiency:.4f}")
 print("The example has zero power coefficients, so power and efficiency are zero.")

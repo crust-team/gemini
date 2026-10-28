@@ -1,14 +1,17 @@
-"""Load the example graph, inspect its tree and save the portable configuration."""
+"""Load, inspect and round-trip a portable plant."""
 
 from pathlib import Path
 
-from gemini.core.config.build import build_plant, plant_to_config, save_config
-from gemini.core.config.gemini_loader import load_gemini
+import gemini as gm
 
 DATA = Path(__file__).resolve().parents[1] / "datasets/geothermal_doublet"
-config = load_gemini(DATA)
-plant = build_plant(config)
-for path, module in plant.named_modules():
-    print(f"{path or plant.path}: {module.name} ({module.fidelity})")
-save_config(plant_to_config(plant), DATA / "plant.json")
-print(f"Saved {DATA / 'plant.json'}; ignored {len(config.ignored)} documented fields.")
+plant = gm.load_plant(DATA)
+
+from tempfile import TemporaryDirectory
+
+print(plant)
+with TemporaryDirectory() as directory:
+    path = Path(directory) / "plant.json"
+    plant.save(path)
+    assert gm.load_plant(path).state_dict() == plant.state_dict()
+print(f"Round-trip complete; {len(plant.config.ignored)} documented import diagnostics.")
