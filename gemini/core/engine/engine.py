@@ -116,10 +116,11 @@ class Engine:
                     plan.skips = {}
                     plan.errors = [dict(module="", message=str(exc), type=type(exc).__name__)]
                     output = {}
-                    self._notify("on_error", exc)
                 self.results.append(sample.t, output, sample.dt, plan.skips, plan.errors)
                 self.position = sample.t
                 self._in_step = False
+                for error in plan.errors:
+                    self._notify("on_error", RuntimeError(f"{error['module']}: {error['message']}"))
                 self._notify("on_step_end", sample)
             self._notify("on_run_end")
         except BaseException as exc:
@@ -129,7 +130,7 @@ class Engine:
         return self.results
 
     def save_checkpoint(self, path):
-        """Save before/after runs or between steps; assign engine.plant for a plant-only snapshot."""
+        """Save at a step boundary; assign engine.plant to save before the first run."""
         if self.plant is None:
             raise ValueError("Set engine.plant or start a run before saving a checkpoint")
         if self._in_step:

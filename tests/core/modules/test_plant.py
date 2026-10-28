@@ -7,8 +7,9 @@ import pytest
 from gemini.core.config.build import build_plant
 from gemini.core.config.gemini_loader import load_gemini
 from gemini.core.config.wiring import check_against_diagram, trace_wiring
-from gemini.core.data.timeseries import CSVTimeSeries
-from gemini.core.modes.twin import scenario_inputs
+from gemini.core.data.dataset import Dataset
+from gemini.core.engine.clock import Clock
+from gemini.core.engine.engine import Engine
 from gemini.core.modules.balance import collect_flows, energy_balance, mass_balance
 
 DATA = Path(__file__).parents[3] / "datasets/geothermal_doublet"
@@ -18,8 +19,10 @@ def example():
     """Prepare one real operating point."""
     config = load_gemini(DATA)
     plant = build_plant(config)
-    row = CSVTimeSeries(DATA / "geothermal_example_dataset.csv").frame.iloc[0]
-    inputs, streams = scenario_inputs(plant, row)
+    data = Dataset.from_csv(DATA / "geothermal_example_dataset.csv")
+    data = data.window(end=data.start)
+    Engine(on_error="raise").simulate(plant, data, Clock.from_data(data))
+    inputs, streams = plant.last_result.inputs.model_dump(), plant.last_result.inlets
     return plant, inputs, streams
 
 

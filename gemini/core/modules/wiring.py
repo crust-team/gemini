@@ -3,9 +3,31 @@
 import json
 from pathlib import Path
 
-from gemini.core.config.gemini_loader import GEMINI_PORTS, TYPES
 from gemini.core.modules.plants.geothermal_example import GeothermalExamplePlant
 from gemini.core.types import Stream
+
+GEMINI_PORTS = {
+    "production_reservoir": {"out": "sandface"},
+    "injection_reservoir": {"in": "sandface"},
+    "productionwell": {"in": "bottom", "out": "wellhead"},
+    "injectionwell": {"in": "wellhead", "out": "bottom"},
+    "esp": {"in": "suction", "out": "discharge"},
+    "injectionpump": {"in": "suction", "out": "discharge"},
+    "filter": {"in": "inlet", "out": "outlet"},
+    "degasser": {"in": "inlet", "out1": "liquid", "out2": "gas"},
+    "heatexchanger": {
+        "PrimIn": "hot_in",
+        "PrimOut": "hot_out",
+        "SecIn": "cold_in",
+        "SecOut": "cold_out",
+    },
+}
+TYPES = {
+    "production_well": "productionwell",
+    "injection_well": "injectionwell",
+    "heat_exchanger": "heatexchanger",
+    "injection_pump": "injectionpump",
+}
 
 
 def trace_wiring(plant, inputs, streams_in=None):

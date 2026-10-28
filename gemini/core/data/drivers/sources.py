@@ -58,7 +58,8 @@ class InfluxSource:
     def read(self, start, end, columns=None):
         """Read selected fields independently, then align on their union of UTC timestamps."""
         series = {}
-        for name in self.names if columns is None else columns:
+        timestamp_only = columns is not None and len(columns) == 0
+        for name in self.names if columns is None or timestamp_only else columns:
             values, times = self.driver.read_data(
                 self.tags["plant_name"],
                 self.tags["asset_name"],
@@ -67,7 +68,8 @@ class InfluxSource:
                 utc(end).isoformat(),
             )
             series[name] = pd.Series(values, index=pd.to_datetime(times, utc=True))
-        return pd.DataFrame(series).sort_index().loc[utc(start) : utc(end)]
+        frame = pd.DataFrame(series).sort_index().loc[utc(start) : utc(end)]
+        return frame.iloc[:, :0] if timestamp_only else frame
 
 
 class AvevaSource:
@@ -95,7 +97,8 @@ class AvevaSource:
     def read(self, start, end, columns=None):
         """Read each named stream using the existing connector's bounded pagination."""
         series = {}
-        for name in self.names if columns is None else columns:
+        timestamp_only = columns is not None and len(columns) == 0
+        for name in self.names if columns is None or timestamp_only else columns:
             values, times = self.driver.read_data(
                 self.streams[name],
                 utc(start).isoformat(),
@@ -103,4 +106,5 @@ class AvevaSource:
                 self.native_step.total_seconds(),
             )
             series[name] = pd.Series(values, index=pd.to_datetime(times, utc=True))
-        return pd.DataFrame(series).sort_index().loc[utc(start) : utc(end)]
+        frame = pd.DataFrame(series).sort_index().loc[utc(start) : utc(end)]
+        return frame.iloc[:, :0] if timestamp_only else frame

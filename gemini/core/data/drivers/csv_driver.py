@@ -28,6 +28,7 @@ class CSVDriver(DatabaseDriverAbstract):
         self.df["Timestamp"] = (
             pd.to_datetime(self.df["Timestamp"], utc=True, format="mixed")
             .round("min")
+            .dt.tz_localize(None)
             .dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         )
         self.df = self.df.set_index("Timestamp")

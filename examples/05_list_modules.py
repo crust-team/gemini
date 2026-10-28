@@ -1,7 +1,19 @@
-"""Print all discovered module schemas as JSON."""
+"""Print the public equipment and plant contracts as JSON."""
 
 import json
 
-from gemini.core.engine.registry import list_modules
+import gemini as gm
 
-print(json.dumps(list_modules(), indent=2))
+classes = [getattr(gm.modules, name) for name in gm.modules.__all__]
+print(
+    json.dumps(
+        [
+            cls.schema()
+            for cls in classes
+            if isinstance(cls, type)
+            and issubclass(cls, gm.modules.Module)
+            and cls not in (gm.modules.Module, gm.modules.Sequential)
+        ],
+        indent=2,
+    )
+)

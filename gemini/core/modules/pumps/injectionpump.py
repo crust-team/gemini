@@ -28,6 +28,8 @@ class InjectionPump(Module):
     soft_sensors = ("head", "power", "discharge_pressure")
     calibratable = ("efficiency",)
 
+    repr_fields = ("no_stages", "efficiency", "pump_type")
+
     class Params(BaseModel):
         """Optional pump curves and fallback hydraulic efficiency."""
 

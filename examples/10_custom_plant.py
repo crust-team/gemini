@@ -4,33 +4,28 @@ from pathlib import Path
 
 from pydantic import Field
 
-from gemini.core.config.build import build_plant
-from gemini.core.config.gemini_loader import load_gemini
-from gemini.core.modules.balance import collect_flows
-from gemini.core.modules.heat.boiler import Boiler
-from gemini.core.modules.module import Module
-from gemini.core.modules.plants.doublet import Doublet
-from gemini.core.types import WATER, ModuleResult, Stream
+import gemini as gm
+from gemini.core.types import ModuleResult
 from gemini.core.types.quantities import Temperature
 
 
-class HeatingPlant(Module):
+class HeatingPlant(gm.modules.Module):
     """A user-defined plant: child assignment registers it, forward defines its wiring."""
 
     name, category = "custom_heating", "plant"
-    outlets = {"supply": Stream}
+    outlets = {"supply": gm.Stream}
 
-    class Inputs(Doublet.Inputs):
+    class Inputs(gm.plants.Doublet.Inputs):
         """Production controls, secondary inlet and heating target."""
 
-        secondary: Stream = Field(description="Heating return [-]")
+        secondary: gm.Stream = Field(description="Heating return [-]")
         target: Temperature = Field(description="Heating supply temperature [K]")
 
     def __init__(self, doublet, exchanger):
         """Compose reusable equipment with a local auxiliary heat source."""
         super().__init__()
         self.doublet, self.exchanger = doublet, exchanger
-        self.boiler = Boiler(dict(fuel="electric", capacity=1e6, efficiency=0.98))
+        self.boiler = gm.modules.Boiler(dict(fuel="electric", capacity=1e6, efficiency=0.98))
 
     def forward(self, inputs, streams_in):
         """Connect geothermal production, heat transfer, reinjection and auxiliary heating."""
@@ -43,15 +38,15 @@ class HeatingPlant(Module):
         return ModuleResult(self.Outputs(), {"supply": heated.streams["outlet"]})
 
 
-base = build_plant(load_gemini(Path(__file__).parents[1] / "datasets/geothermal_doublet"))
+base = gm.load_plant(Path(__file__).parents[1] / "datasets/geothermal_doublet")
 plant = HeatingPlant(base.doublet, base.heat_exchanger)
 result = plant(
     dict(
         m_dot=40,
         esp_frequency=60,
         target=340,
-        secondary=Stream(m_dot=40, T=300, p=5e5, fluid=WATER),
+        secondary=gm.Stream(m_dot=40, T=300, p=5e5, fluid=gm.WATER),
     )
 )
 print(result.streams["supply"])
-print(collect_flows(result))
+print(gm.modules.collect_flows(result))
