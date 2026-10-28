@@ -27,7 +27,7 @@ the committed position as an idempotent watermark.
 ## Verification
 
 - Full 17,280-row replay: 16.89 seconds, zero recorded errors.
-- Full suite: 148 passed in 261.11 seconds.
+- Full suite: 148 passed in 268.71 seconds.
 - Full reconciliation: 4 passed in 55.67 seconds; captured physical metrics remain within their
   documented thresholds.
 - Literal quickstart passed, including full-data calibration, save/load, checkpoint resume,
