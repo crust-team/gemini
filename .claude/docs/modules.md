@@ -83,3 +83,11 @@ Stateless `step` calls forward. Stateful equipment implements `initial_state` an
 `step(state, inputs, streams_in, dt)` with state passed explicitly. Sequential advances nested
 stateful children and captures the same hooks/result tree as ordinary calls. Custom stateful
 plants must implement their own explicit stepping schedule.
+
+## Plant-owned run configuration
+
+Modules own sensor bindings, parameter histories and explicit overrides. Root bindings use the
+empty path. `params_at(t)` validates dated selections; `apply_params_at(t)` recursively applies
+changed snapshots without erasing explicit fits. Scalar display uses quantity metadata through
+`extra_repr()`; classes may override it. Save preserves composite and leaf histories as well as
+current state. Use `gm.load_plant`, `plant.save`, and the engine methods described in [API](api.md).

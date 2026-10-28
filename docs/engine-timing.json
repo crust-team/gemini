@@ -1,0 +1,8 @@
+{
+  "rows": 17280,
+  "replay_seconds": 21.43589879499632,
+  "environment": "macOS environment, Python 3.11, .venv311; hardware model not queried",
+  "includes": "Engine.replay only; CSV parsed before timer",
+  "errors": 0,
+  "skips": {}
+}

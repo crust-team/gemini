@@ -1,0 +1,39 @@
+GeothermalExamplePlant(
+  (doublet): Doublet(
+    (reservoir): ProductionReservoir(role=production, pressure=220 bar, temperature=80 °C, permeability=9.8692e-12 m2)
+    (well): ProductionWell(segment=below_esp, esp_depth=600 m, soil_temperature=15 °C, u_value=10 W/m2/K)
+    (esp): ESP(no_stages=15, setting_depth=600 m, motor_efficiency=1, bep_flow=129.98 m3/h)
+    (riser): ProductionWell(segment=above_esp, esp_depth=600 m, soil_temperature=15 °C, u_value=10 W/m2/K)
+    (injector): InjectionWell(friction_correlation=darcy_weisbach, friction_correlation_2p=BeggsBrill, soil_temperature=15 °C, u_value=10 W/m2/K)
+    (sink): InjectionReservoir(role=injection, pressure=220 bar, temperature=80 °C, permeability=9.8692e-12 m2)
+  )
+  (degasser): Degasser(dp=0.149 bar, heat_transfer_coeff=1e+05)
+  (filter_hot): Filter(dp_nominal=0.016 bar, m_dot_nominal=44.203 kg/s, clogging_dp=0.5 bar)
+  (heat_exchanger): HeatExchanger(ua=1e+05 W/K, arrangement=counterflow, dp_hot_nominal=0 bar, dp_cold_nominal=0 bar)
+  (filter_return): Filter(dp_nominal=0.016 bar, m_dot_nominal=44.203 kg/s, clogging_dp=0.5 bar)
+  (injection_pump): InjectionPump(no_stages=10, efficiency=0.8, pump_type=DEFAULT-PUMP)
+)
+                                 energy_J  energy_MWh      peak_W  operating_hours  alarms  alarm_rate  skipped  errors
+module            port
+degasser                                0           0         NaN             4320       0           0        0       0
+doublet.esp       electricity           0           0           0             4320   17280           1        0       0
+doublet.injector  heat_loss   1.56973e+12     436.036      169242             4320       0           0        0       0
+doublet.reservoir                       0           0         NaN             4320       0           0        0       0
+filter_hot                              0           0         NaN             4320       0           0        0       0
+filter_return                           0           0         NaN             4320       0           0        0       0
+heat_exchanger                          0           0 3.93602e+06             4320       0           0        0       0
+injection_pump    electricity 3.05408e+12     848.355      220543             4320       0           0        0       0
+CalibrationResult(ua: 100000.0 -> 5317564.26321053; RMS 0.369074 -> 0.00307464; evaluations=16, success=True, applied=True)
+                                 energy_J  energy_MWh      peak_W  operating_hours  alarms  alarm_rate  skipped  errors
+module            port
+degasser                                0           0         NaN               24       0           0        0       0
+doublet.esp       electricity           0           0           0               24       0           0        0       0
+doublet.injector  heat_loss   9.98057e+09     2.77238      115516               24       0           0        0       0
+doublet.reservoir                       0           0         NaN               24       0           0        0       0
+doublet.riser     heat_loss   1.77574e+10     4.93262      205526               24       0           0        0       0
+doublet.sink                            0           0         NaN               24       0           0        0       0
+doublet.well      heat_loss   9.53016e+10     26.4727 1.10303e+06               24       0           0        0       0
+filter_hot                              0           0         NaN               24       0           0        0       0
+filter_return                           0           0         NaN               24       0           0        0       0
+heat_exchanger                          0           0 8.69861e+06               24       0           0        0       0
+injection_pump    electricity 2.26485e+10     6.29125      262136               24       0           0        0       0
