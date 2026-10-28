@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.golden.capture_golden import capture
+from tests.golden.evaluate import evaluate
 
 
 def assert_values(actual, expected):
@@ -27,7 +27,7 @@ def assert_values(actual, expected):
 def test_golden():
     """Compare every captured physics family against the immutable baseline."""
     expected = json.loads(Path(__file__).with_name("golden_values.json").read_text())
-    actual = capture()
+    actual = evaluate()
     assert actual.keys() == expected.keys()
     for key in expected:
         assert_values(actual[key]["expected"], expected[key]["expected"])
