@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from gemini.core.types.fluid import BRINE, Fluid
+
 
 def utc(value):
     """Normalise naive project timestamps and aware timestamps to UTC."""
@@ -41,7 +43,7 @@ class ModuleConfig(ConfigModel):
 
     type: str
     params: list[DatedParams] = Field(min_length=1)
-    fluid: str = "brine"
+    fluid: Fluid = BRINE
 
     @field_validator("params")
     @classmethod

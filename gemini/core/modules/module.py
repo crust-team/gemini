@@ -7,8 +7,8 @@ from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 
-from gemini.core.physics import fluid
 from gemini.core.types.flows import Stream
+from gemini.core.types.fluid import BRINE, Fluid
 from gemini.core.types.results import ModuleResult, ParamRef
 
 
@@ -93,14 +93,14 @@ class Module(ABC):
 
             cls.forward = checked
 
-    def __init__(self, params: dict | BaseModel | None = None, *, fluid: str = "brine"):
+    def __init__(self, params: dict | BaseModel | None = None, *, fluid: Fluid = BRINE):
         """Validate SI parameters and initialise independent child/hook collections."""
         object.__setattr__(self, "_children", {})
         object.__setattr__(self, "_pre_hooks", {})
         object.__setattr__(self, "_hooks", {})
         object.__setattr__(self, "_path", "")
         self.params = self.Params.model_validate({} if params is None else params)
-        self.fluid_name = fluid
+        self._fluid = Fluid.model_validate(fluid)
         self.fluid = self._resolve_fluid()
 
     @property
@@ -189,11 +189,14 @@ class Module(ABC):
 
     def _resolve_fluid(self):
         overrides = {}
-        for field, key in (("liquid_density", "RHOL"), ("liquid_viscosity", "VISL")):
+        for field, key in (
+            ("liquid_density", "liquid_density"),
+            ("liquid_viscosity", "liquid_viscosity"),
+        ):
             value = getattr(self.params, field, None)
             if value is not None:
                 overrides[key] = value
-        return fluid.get_fluid(self.fluid_name, **overrides)
+        return Fluid.model_validate(self._fluid.model_dump() | overrides)
 
     def update_params(self, **changes):
         """Revalidate design changes before replacing the parameter snapshot."""

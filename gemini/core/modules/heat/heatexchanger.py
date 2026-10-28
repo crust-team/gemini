@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
-from gemini.core.physics import fluid, heat_transfer
+from gemini.core.physics import heat_transfer
 from gemini.core.types.quantities import (
     Fraction,
     MassFlow,
@@ -89,8 +89,8 @@ class HeatExchanger(Module):
             raise ValueError(f"heatexchanger: negative mass flows {hot.m_dot}, {cold.m_dot}")
         if hot.T < cold.T:
             raise ValueError(f"heatexchanger: hot inlet {hot.T} K is below cold inlet {cold.T} K")
-        cp_h = fluid.get_fluid(hot.fluid).properties(hot.p, hot.T).cp_l
-        cp_c = fluid.get_fluid(cold.fluid).properties(cold.p, cold.T).cp_l
+        cp_h = hot.fluid.properties(hot.p, hot.T).cp_l
+        cp_c = cold.fluid.properties(cold.p, cold.T).cp_l
         c_hot, c_cold = hot.m_dot * cp_h, cold.m_dot * cp_c
         c_min, c_max = min(c_hot, c_cold), max(c_hot, c_cold)
         if c_min == 0:

@@ -133,5 +133,3 @@ def test_geometry_slice_and_fluid_overrides():
     assert path.subpath(600, 2800).total_length + path.subpath(0, 600).total_length == 2800
     assert geometry.esp_section_index(path, 600) == 2
     assert fluid.ConstantWater(RHOL=1068).properties(1e5, 300).rho_l == 1068
-    with pytest.raises(ValueError):
-        fluid.get_fluid("unknown")

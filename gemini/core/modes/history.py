@@ -80,7 +80,7 @@ def calibrate(
     baseline = config.modules[module_path].at(
         data.index[0]
     ).params | plant._parameter_overrides.get(module_path, {})
-    trial = type(original)(baseline, fluid=original.fluid_name)
+    trial = type(original)(baseline, fluid=original.fluid)
     targets = set(original.Outputs.model_fields) & set.intersection(*(set(s[2]) for s in samples))
     if original.name == "heatexchanger" and fields == ["ua"]:
         targets &= {"duty", "hot_out_T", "cold_out_T"}

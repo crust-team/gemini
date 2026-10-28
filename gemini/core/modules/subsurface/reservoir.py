@@ -198,7 +198,7 @@ class ProductionReservoir(_Reservoir):
         p = self.params
         flow = inputs.m_dot / self.fluid.properties(p.pressure, p.temperature).rho_l
         p_bh = p.pressure - flow / p.productivity_index
-        stream = Stream(m_dot=inputs.m_dot, T=p.temperature, p=p_bh, fluid=self.fluid_name)
+        stream = Stream(m_dot=inputs.m_dot, T=p.temperature, p=p_bh, fluid=self.fluid)
         return ModuleResult(self._outputs(flow, p_bh), {"sandface": stream})
 
 
