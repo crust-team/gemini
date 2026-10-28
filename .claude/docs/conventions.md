@@ -6,12 +6,20 @@ with docstrings. Preserve golden numbers. Intentional numerical decisions requir
 
 Dependencies flow:
 
-`core.physics` ← `core.types` ← `core.modules` ← `core.config` / `core.modes` / `core.engine`
-← `design` / `optim` ← `agentic`.
+`core.physics` ← `core.types` ← `core.modules` ← `core.config` ← `core.data`
+← `core.engine` ← `optim` / `design` ← `agentic` ← `gemini/__init__`.
+
+Runtime calculations follow that direction. Binding/date metadata lives in types so modules
+never import configuration schemas. Discovery and wiring observers live in modules; engine
+registry and config wiring expose these capabilities without making modules import the engine.
+The config layer registers the serializer used by `Module.save`; the module layer does not
+import config or perform serialization during physics evaluation. Plant factories use the
+module-owned catalogue.
+Data sampling imports no clock/engine code. Calibration predicts only through Engine.replay.
 
 Physics owns correlations and conversions. Types owns quantities, Fluid, flows, Profile, results
 and Cost; it never imports modules. Equipment contains no configuration/data access. Plant
-`from_config` factories may import the registry locally solely for child construction. Physical
+`from_config` factories use the module catalogue solely for child construction. Physical
 geometry models retain direct quantity metadata without importing types upward.
 
 Every numeric module contract field uses a quantity alias or the documented, tested allow-list.

@@ -1,110 +1,88 @@
-# GEMINI Geothermal Suite
+# GEMINI geothermal suite
 
-Composable geothermal physics and digital twins, developed by TNO and partners in the Nieuwe
-Warmte Nu programme. Python 3.11 and Pydantic v2. Equipment and plants share a `Module` API;
-streams use SI, measured twins use independent boundaries, and scenarios chain predictions.
+Composable equipment and handwritten geothermal plants with a small Python API. Load a plant,
+choose a dataset, then simulate assumed inputs, replay history or process a finite live window.
+Plants carry their sensor bindings, dated parameters and fluids; checkpoints restore the entire
+run. The engine never schedules itself or sleeps.
+
+## Setup
+
+Use Python 3.11 and install this package in your environment (`pip install -e .`). The optional
+`parquet` extra enables Parquet result files; CSV plus JSON metadata works without it. From the
+repository root, run `python examples/00_quickstart.py`.
 
 ## Quickstart
 
-From this checkout (the existing dataset directory is `geothermal_doublet`):
-
-```bash
-pip install poetry
-poetry install --extras parquet
-poetry run python - <<'PY'
-from pathlib import Path
-from gemini.core.config.gemini_loader import load_gemini
-from gemini.core.config.build import build_plant
-from gemini.core.data.timeseries import CSVTimeSeries
-from gemini.core.modes.history import replay, calibrate
-folder = Path("datasets/geothermal_doublet")
-config = load_gemini(folder)
-plant = build_plant(config)
-data = CSVTimeSeries(folder / "geothermal_example_dataset.csv").frame
-print(replay(plant, config, data.iloc[:672]).to_frame().head())
-print(calibrate(plant, config, data.iloc[:672], "heat_exchanger", ["ua"], apply=True))
-PY
-```
-
-## Module API
+The checked-in project folder is named `geothermal_doublet`. Its actual HX path is
+`heat_exchanger`; profiles use the source column names `Qp` and `ESP_freq`.
 
 ```python
-from gemini.core.modules import Boiler, Sequential
-from gemini.core.types import Stream, WATER
-from gemini.core.modules.balance import collect_flows
+import gemini as gm
 
-plant = Sequential(Boiler({"fuel": "electric", "capacity": 100000, "efficiency": 0.95}))
-result = plant({"0": {"setpoint_T": 350}}, inlet=Stream(m_dot=10, T=300, p=1e6, fluid=WATER))
-print(result.outputs.root["0"].duty)
-print(collect_flows(result))
-print(dict(plant.named_params()))
-snapshot = plant.state_dict()
-plant.load_state_dict(snapshot)
+# Load a GEMINI project folder or our own plant.json.
+plant = gm.load_plant("datasets/geothermal_doublet")
+print(plant)
+
+data = gm.Dataset.from_csv("datasets/geothermal_doublet/geothermal_example_dataset.csv")
+engine = gm.Engine()
+res = engine.replay(plant, data)
+print(res.summary())
+esp_power = res["doublet.esp"].power
+
+engine.save_checkpoint("runs/replay.ckpt")
+engine2 = gm.Engine.load_checkpoint("runs/replay.ckpt")
+res2 = engine2.resume()
+
+fit = gm.optim.calibrate(plant, data, "heat_exchanger", fields=["ua"])
+print(fit)
+plant.save("runs/my_plant.json")
+assert gm.load_plant("runs/my_plant.json").state_dict() == plant.state_dict()
+
+profiles = {
+    "Qp": gm.Profile.constant(150, unit="m3/h", clock=gm.Clock.days(2027, 1, 1, days=1)),
+    "ESP_freq": gm.Profile.constant(55, unit="Hz", clock=gm.Clock.days(2027, 1, 1, days=1)),
+}
+sim = engine.simulate(
+    plant, gm.Dataset.from_profiles(profiles), clock=gm.Clock.days(2027, 1, 1, days=1)
+)
+print(sim.summary())
+
+live_data = gm.Dataset.from_csv_driver("datasets/geothermal_doublet")
+out = engine.live(plant, live_data, checkpoint="runs/live.ckpt", now="2024-06-08T00:00:00Z")
 ```
 
-`Module` supports named children, recursive parameters, bounded calibration references,
-validated state loading, hooks, optional health and stateful stepping. Plants are handwritten
-Module subclasses: `__init__` registers children and `forward` connects typed streams.
-`GeothermalExamplePlant` groups wells and ESP under `doublet`, with named surface equipment.
-Configuration selects its type and dated parameters; the diagram only verifies wiring.
-`Sequential` chains modules with one fluid inlet/outlet and retains child energy reports.
-
-`core.types` supplies physical quantity aliases, immutable `Fluid`/`Stream`, electricity/fuel/heat
-reporting flows, UTC `Profile` inputs and sourced `Cost` estimates. See the
-[types guide](.claude/docs/types.md) and [small composition example](examples/10_custom_plant.py).
-
-Equipment declares `fidelity`: established correlations use `model`, filters and injection
-pumps use `simple`, and liquid-only degassing/booster/blowdown use `passthrough`. Gas separation
-is not modelled. Bindings and sensor names belong to configuration, not equipment.
+The quickstart's two assumed controls inherit the plant's explicit secondary-loop defaults:
+40 kg/s at 20 °C and 5 bar, and a 51.5-bar injection setpoint. Supply the corresponding root-bound
+columns to replace those assumptions. The whole-file calibration demonstrates the API; validation
+fits only the first week and evaluates the remaining observations separately.
 
 ## Execution and persistence
 
-- `history.replay`: independent measured-boundary twins, with dated parameters and counted skips.
-- `history.calibrate`: bounded least squares on an explicit window; `apply=False` by default.
-- `live.run_latest`: the same twin evaluator over a driver's `latest(window)` result or loaded CSV.
-- `scenario.run`: chained assumptions, optionally advancing process state.
-- `Results.to_frame`: `(module_path, field)` columns; CSV and optional Parquet exports.
-- `EventLog(path).attach(plant)`: JSON-lines forward traces; `EventLog()` retains them in memory.
-- `build_plant`, `plant_to_config`, `save_config`, `load_config`: portable JSON design round trips.
+`replay` predicts each equipment module on measured boundaries. `simulate` runs the handwritten
+plant's real wiring. `live` processes only new available ticks up to `now`, saves its checkpoint,
+and returns this call's new rows. An external scheduler calls it again. `engine.results` retains
+cumulative results; timestamp-keyed sinks should be idempotent.
 
-The original CSV, InfluxDB and AVEVA drivers remain available. A live source adapter must expose
-`latest(window)` as a timestamp-indexed DataFrame; external services are not needed for examples.
+A checkpoint stores plant design, states, finite clock, completed position, dataset descriptor
+and a sibling result generation. File/remote inputs must remain stable for exact resume. CSV
+and in-memory inputs work offline. Influx/AVEVA adapters reference credentials by environment
+variable names; real service access requires local configuration.
 
-## Examples and validation
+The supplied project's known physical limitations remain visible: zero ESP power coefficients,
+a mismatched ESP head curve, and a changing apparent HX conductance. Passing regression tests
+does not establish the original pump-accuracy or alarm-rate targets. See the numerical notes
+and engine report for measured values.
 
-`examples/01`–`05` demonstrate individual equipment, a manual chain and discovery;
-`06` imports/exports a handwritten plant, `07` replays a week, `08` calibrates HX conductance and `09` runs a day.
-`10` defines a custom doublet/HX/boiler plant. All ten run in the test suite.
+## Documentation and development
 
-```bash
-poetry run black --check gemini tests examples
-poetry run isort --check-only gemini tests examples
-poetry run flake8 gemini tests examples
-poetry run pytest tests
-```
+- [Public API](.claude/docs/api.md)
+- [Engine, clocks, callbacks and checkpoints](.claude/docs/engine.md)
+- [Datasets, units and alignment](.claude/docs/data.md)
+- [Module authoring](.claude/docs/modules.md)
+- [Numerical decisions and known limitations](.claude/docs/refactor-notes.md)
+- [Engine refactor report](docs/engine-refactor-report.md)
 
-The full 17,280-row e2e test runs by default. AVEVA requires credentials; Parquet requires the
-`parquet` extra. The 25 original physics cases and eight captured monitoring outputs are immutable.
-
-## Accuracy and limits
-
-The example has **zero unmapped properties/tags** and 100% coverage for its eight bound twins.
-The three remaining equipment nodes lack measured inlet boundaries and run in scenarios. Health
-with `assessed=False` means the model or measurements cannot support a diagnostic.
-
-The supplied ESP power curve is all zeros, and its head curve disagrees with the CSV by 63.2%
-median. These produce alarms even though all source status labels say Normal. Calibrated HX
-holdout duty error is 0.63% median; the hot temperature maximum is 0.566 K. Full-chain pressure
-and duty errors remain 57.6% and 12.4%. The e2e tests document these exceptions explicitly;
-green tests do not establish the original accuracy targets. The plant imposes flow and does
-not solve hydraulic operating-point balance.
-
-Read [AGENTS.md](AGENTS.md), [numerical decisions](.claude/docs/refactor-notes.md), and the
-[implementation report](docs/module-refactor-report.md) before changing the models.
-
-The types refactor preserves all prior numerical reconciliation results. On 100 sampled rows,
-mass and modeled thermal transfers close. **Strict energy closure does not**: isothermal pumps
-leave about 212 kW median electrical power unallocated. Total electricity median error is
-38.73% on measured boundaries and 29.80% in the full chain; the supplied ESP power curve remains
-zero. `energy_balance` exposes both residual and unresolved power; no heat loss is invented.
-See the [types refactor report](docs/types-refactor-report.md) for the complete before/after audit.
+Run `black --check gemini tests examples`, `isort --check-only gemini tests examples`,
+`flake8 gemini tests examples`, and `pytest tests`. Golden fixtures must not change. The full
+17,280-row reconciliation and every example run in the default suite; external AVEVA integration
+is skipped when credentials are absent.

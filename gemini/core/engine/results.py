@@ -17,6 +17,7 @@ class Summary(pd.DataFrame):
         if self.empty:
             return "No completed observations"
         columns = [
+            "energy_J",
             "energy_MWh",
             "peak_W",
             "operating_hours",

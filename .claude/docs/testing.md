@@ -19,7 +19,7 @@ It also runs a handwritten plant for every row. Explicit `NOTE(refactor)` commen
 source-model inconsistencies and changed accuracy limits. These are reported limitations,
 not evidence that the original accuracy targets were achieved.
 
-All ten examples are executed by `tests/test_examples.py`. External AVEVA tests skip only
+All thirteen examples are executed by `tests/test_examples.py`. External AVEVA tests skip only
 without credentials. Install the optional `parquet` extra to exercise that export check.
 
 ```bash
@@ -28,3 +28,9 @@ poetry run isort --check-only gemini tests examples
 poetry run flake8 gemini tests examples
 poetry run pytest tests
 ```
+
+Engine regression fixtures were captured before deleting modes: first-day measured replay and
+24-step chained simulation. Tests compare every prior output exactly. New tests cover interrupted
+replay/simulate, stateful integration/measurement selection, atomic checkpoint publication failure,
+CSV fallback, empty live windows, callback order and live idempotency. Dataset tests cover UTC,
+constructors, source reopening, hand-calculated means, gaps and chunk boundaries.
