@@ -12,6 +12,19 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from gemini.core.modules.module import Module
 from gemini.core.physics import hydraulics
 from gemini.core.types.flows import Stream
+from gemini.core.types.quantities import (
+    Density,
+    Dimensionless,
+    Fraction,
+    Length,
+    MassFlow,
+    Permeability,
+    Pressure,
+    PressureDifference,
+    ProductivityIndex,
+    Temperature,
+    Viscosity,
+)
 from gemini.core.types.results import Health, ModuleResult
 
 
@@ -27,29 +40,29 @@ class _Reservoir(Module):
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
         role: Literal["production", "injection"] = Field(..., description="Side of the doublet [-]")
-        pressure: float = Field(..., ge=0, description="Static reservoir pressure [Pa]")
-        temperature: float = Field(..., gt=0, description="Reservoir temperature [K]")
-        permeability: float = Field(..., gt=0, description="Absolute permeability [m2]")
-        thickness: float = Field(..., gt=0, description="Reservoir thickness [m]")
-        drainage_radius: float = Field(
+        pressure: Pressure = Field(..., ge=0, description="Static reservoir pressure [Pa]")
+        temperature: Temperature = Field(..., gt=0, description="Reservoir temperature [K]")
+        permeability: Permeability = Field(..., gt=0, description="Absolute permeability [m2]")
+        thickness: Length = Field(..., gt=0, description="Reservoir thickness [m]")
+        drainage_radius: Length = Field(
             ..., ge=0, description="Drainage radius; zero means unconfigured [m]"
         )
-        top_depth: float = Field(..., ge=0, description="Top reservoir vertical depth [m]")
-        productivity_index: float | None = Field(
+        top_depth: Length = Field(..., ge=0, description="Top reservoir vertical depth [m]")
+        productivity_index: ProductivityIndex | None = Field(
             None, gt=0, description="Productivity index [m3/s/Pa]"
         )
-        injectivity_index: float | None = Field(
+        injectivity_index: ProductivityIndex | None = Field(
             None, gt=0, description="Injectivity index [m3/s/Pa]"
         )
-        skin: float = Field(0, description="Dimensionless skin factor [-]")
-        wellbore_radius: float = Field(..., gt=0, description="Effective wellbore radius [m]")
-        liquid_density: float | None = Field(
+        skin: Dimensionless = Field(0, description="Dimensionless skin factor [-]")
+        wellbore_radius: Length = Field(..., gt=0, description="Effective wellbore radius [m]")
+        liquid_density: Density | None = Field(
             None, gt=0, description="Liquid density override [kg/m3]"
         )
-        liquid_viscosity: float | None = Field(
+        liquid_viscosity: Viscosity | None = Field(
             None, gt=0, description="Liquid viscosity override [Pa s]"
         )
-        decline_threshold: float = Field(
+        decline_threshold: Fraction = Field(
             0.15, gt=0, le=1, description="PI or II decline alarm fraction [-]"
         )
 
@@ -64,13 +77,17 @@ class _Reservoir(Module):
     class Outputs(BaseModel):
         """IPR and radial-flow pressures for one well."""
 
-        bottomhole_pressure: float = Field(..., description="Required sandface pressure [Pa]")
-        drawdown: float = Field(..., description="Production pressure drawdown [Pa]")
-        overpressure: float = Field(..., description="Injection pressure excess [Pa]")
-        flow_dp: float | None = Field(..., description="Radial Darcy pressure drop [Pa]")
-        skin_dp: float | None = Field(..., description="Skin pressure drop [Pa]")
-        hydrostatic_dp: float = Field(..., description="Hydrostatic pressure contribution [Pa]")
-        radial_bottomhole_pressure: float | None = Field(
+        bottomhole_pressure: Pressure = Field(..., description="Required sandface pressure [Pa]")
+        drawdown: PressureDifference = Field(..., description="Production pressure drawdown [Pa]")
+        overpressure: PressureDifference = Field(..., description="Injection pressure excess [Pa]")
+        flow_dp: PressureDifference | None = Field(
+            ..., description="Radial Darcy pressure drop [Pa]"
+        )
+        skin_dp: PressureDifference | None = Field(..., description="Skin pressure drop [Pa]")
+        hydrostatic_dp: PressureDifference = Field(
+            ..., description="Hydrostatic pressure contribution [Pa]"
+        )
+        radial_bottomhole_pressure: Pressure | None = Field(
             ..., description="Legacy radial reservoir pressure [Pa]"
         )
 
@@ -174,7 +191,7 @@ class ProductionReservoir(_Reservoir):
         """Mass withdrawal imposed by the caller."""
 
         model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        m_dot: float = Field(..., ge=0, description="Produced mass flow [kg/s]")
+        m_dot: MassFlow = Field(..., ge=0, description="Produced mass flow [kg/s]")
 
     def forward(self, inputs, streams_in):
         """Apply the linear production IPR and emit the sandface stream."""

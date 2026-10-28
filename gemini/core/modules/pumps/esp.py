@@ -11,6 +11,18 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import constants, pumps, units
+from gemini.core.types.quantities import (
+    Count,
+    Dimensionless,
+    Fraction,
+    Frequency,
+    Length,
+    Power,
+    Pressure,
+    PressureDifference,
+    Ratio,
+    VolumeFlow,
+)
 from gemini.core.types.results import Health, ModuleResult
 
 
@@ -32,7 +44,7 @@ class ESP(Module):
         coefficient_precision: Literal["float64", "float32"] = Field(
             "float64", description="Polynomial arithmetic precision for legacy runtime parity [-]"
         )
-        no_stages: int = Field(..., gt=0, description="Number of pump stages [-]")
+        no_stages: Count = Field(..., gt=0, description="Number of pump stages [-]")
         head_coeff: list[float] = Field(
             ...,
             min_length=6,
@@ -46,17 +58,21 @@ class ESP(Module):
             description="Ascending polynomial coefficients, bhp/stage versus bbl/day [US basis]",
         )
         pump_type: str | None = Field(None, description="Pump model identifier [-]")
-        setting_depth: float = Field(0, ge=0, description="Measured installation depth [m]")
-        min_flow: float = Field(0, ge=0, description="Minimum flow at reference frequency [m3/s]")
-        max_flow: float = Field(1, gt=0, description="Maximum flow at reference frequency [m3/s]")
-        bep_flow: float = Field(
+        setting_depth: Length = Field(0, ge=0, description="Measured installation depth [m]")
+        min_flow: VolumeFlow = Field(
+            0, ge=0, description="Minimum flow at reference frequency [m3/s]"
+        )
+        max_flow: VolumeFlow = Field(
+            1, gt=0, description="Maximum flow at reference frequency [m3/s]"
+        )
+        bep_flow: VolumeFlow = Field(
             0.04, gt=0, description="Best-efficiency flow at reference frequency [m3/s]"
         )
-        correction_factor: tuple[float, float] = Field(
+        correction_factor: tuple[Dimensionless, PressureDifference] = Field(
             (1, 0), description="VLP discharge correction (slope [-], offset [Pa])"
         )
-        tubing: float | None = Field(None, gt=0, description="Tubing internal diameter [m]")
-        drift_threshold: float = Field(
+        tubing: Length | None = Field(None, gt=0, description="Tubing internal diameter [m]")
+        drift_threshold: Fraction = Field(
             0.10, gt=0, le=1, description="Relative drift alarm threshold [-]"
         )
 
@@ -71,20 +87,20 @@ class ESP(Module):
         """Per-step electrical drive frequency."""
 
         model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        frequency: float = Field(..., gt=0, description="Drive frequency [Hz]")
+        frequency: Frequency = Field(..., gt=0, description="Drive frequency [Hz]")
 
     class Outputs(BaseModel):
         """Pump performance and monitoring metrics in SI units."""
 
-        head: float = Field(..., description="Pump pressure rise [Pa]")
-        power: float = Field(..., description="Pump shaft power [W]")
-        efficiency: float = Field(..., description="Hydraulic efficiency as a fraction [-]")
-        discharge_pressure: float = Field(..., description="Discharge pressure [Pa]")
-        flow: float = Field(..., description="Pump volume flow [m3/s]")
+        head: PressureDifference = Field(..., description="Pump pressure rise [Pa]")
+        power: Power = Field(..., description="Pump shaft power [W]")
+        efficiency: Dimensionless = Field(..., description="Hydraulic efficiency as a fraction [-]")
+        discharge_pressure: Pressure = Field(..., description="Discharge pressure [Pa]")
+        flow: VolumeFlow = Field(..., description="Pump volume flow [m3/s]")
         in_operating_window: bool = Field(
             ..., description="Flow within frequency-scaled bounds [-]"
         )
-        bep_ratio: float = Field(..., description="Flow divided by frequency-scaled BEP flow [-]")
+        bep_ratio: Ratio = Field(..., description="Flow divided by frequency-scaled BEP flow [-]")
 
     def _coefficients(self, values):
         # NOTE(refactor): old monitoring modules evaluate NumPy float32 coefficients and arithmetic.

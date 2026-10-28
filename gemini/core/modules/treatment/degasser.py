@@ -6,6 +6,7 @@ Gas separation is not modelled.
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
+from gemini.core.types.quantities import MassFlow, Pressure, PressureDifference
 from gemini.core.types.results import ModuleResult
 
 
@@ -24,8 +25,8 @@ class Degasser(Module):
         """Available design parameters; no performance model is assumed."""
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        p_out: float | None = Field(None, ge=0, description="Separator outlet pressure [Pa]")
-        dp: float = Field(14900, ge=0, description="Separator pressure loss [Pa]")
+        p_out: Pressure | None = Field(None, ge=0, description="Separator outlet pressure [Pa]")
+        dp: PressureDifference = Field(14900, ge=0, description="Separator pressure loss [Pa]")
         heat_transfer_coeff: float = Field(
             0, ge=0, description="Legacy coefficient with unknown physical meaning [unknown]"
         )
@@ -38,8 +39,8 @@ class Degasser(Module):
     class Outputs(BaseModel):
         """Declared future performance results."""
 
-        gas_mass_flow: float = Field(..., description="Separated gas flow [kg/s]")
-        pressure_drop: float = Field(..., description="Pressure loss [Pa]")
+        gas_mass_flow: MassFlow = Field(..., description="Separated gas flow [kg/s]")
+        pressure_drop: PressureDifference = Field(..., description="Pressure loss [Pa]")
 
     def forward(self, inputs, streams_in):
         """Pass liquid through; gas separation is not modelled and gas flow is zero."""

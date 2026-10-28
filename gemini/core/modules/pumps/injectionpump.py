@@ -4,6 +4,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import pumps
+from gemini.core.types.quantities import (
+    Count,
+    Efficiency,
+    Frequency,
+    Power,
+    Pressure,
+    PressureDifference,
+)
 from gemini.core.types.results import ModuleResult
 
 
@@ -23,9 +31,9 @@ class InjectionPump(Module):
         """Optional pump curves and fallback hydraulic efficiency."""
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        no_stages: int | None = Field(None, gt=0, description="Number of stages [-]")
+        no_stages: Count | None = Field(None, gt=0, description="Number of stages [-]")
         pump_type: str = Field("unspecified", description="Pump type [-]")
-        efficiency: float = Field(0.7, gt=0, le=1, description="Hydraulic efficiency [-]")
+        efficiency: Efficiency = Field(0.7, gt=0, le=1, description="Hydraulic efficiency [-]")
         head_coeff: list[float] | None = Field(
             None, min_length=6, max_length=6, description="US head polynomial [US basis]"
         )
@@ -44,15 +52,17 @@ class InjectionPump(Module):
         """Discharge target or drive frequency for supplied curves."""
 
         model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        discharge_pressure: float | None = Field(None, ge=0, description="Discharge setpoint [Pa]")
-        frequency: float = Field(60, gt=0, description="Drive frequency [Hz]")
+        discharge_pressure: Pressure | None = Field(
+            None, ge=0, description="Discharge setpoint [Pa]"
+        )
+        frequency: Frequency = Field(60, gt=0, description="Drive frequency [Hz]")
 
     class Outputs(BaseModel):
         """Hydraulic rise and predicted power consumption."""
 
-        head: float = Field(..., ge=0, description="Pressure rise [Pa]")
-        power: float = Field(..., ge=0, description="Power draw [W]")
-        discharge_pressure: float = Field(..., ge=0, description="Discharge pressure [Pa]")
+        head: PressureDifference = Field(..., ge=0, description="Pressure rise [Pa]")
+        power: Power = Field(..., ge=0, description="Power draw [W]")
+        discharge_pressure: Pressure = Field(..., ge=0, description="Discharge pressure [Pa]")
 
     def forward(self, inputs, streams_in):
         """Evaluate supplied curves or Q times pressure rise divided by efficiency."""

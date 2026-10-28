@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
+from gemini.core.types.quantities import Efficiency, Power, Temperature
 from gemini.core.types.results import ModuleResult
 
 
@@ -25,21 +26,21 @@ class Boiler(Module):
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
         fuel: Literal["gas", "electric"] = Field(..., description="Energy source [-]")
-        capacity: float = Field(..., gt=0, description="Maximum thermal duty [W]")
-        efficiency: float = Field(..., gt=0, le=1, description="Thermal efficiency [-]")
+        capacity: Power = Field(..., gt=0, description="Maximum thermal duty [W]")
+        efficiency: Efficiency = Field(..., gt=0, le=1, description="Thermal efficiency [-]")
 
     class Inputs(BaseModel):
         """Outlet temperature target."""
 
         model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-        setpoint_T: float = Field(..., gt=0, description="Outlet temperature setpoint [K]")
+        setpoint_T: Temperature = Field(..., gt=0, description="Outlet temperature setpoint [K]")
 
     class Outputs(BaseModel):
         """Delivered heat and energy input."""
 
-        duty: float = Field(..., description="Delivered thermal power [W]")
-        fuel_or_power: float = Field(..., description="Fuel energy or electric power [W]")
-        outlet_T: float = Field(..., description="Outlet temperature [K]")
+        duty: Power = Field(..., description="Delivered thermal power [W]")
+        fuel_or_power: Power = Field(..., description="Fuel energy or electric power [W]")
+        outlet_T: Temperature = Field(..., description="Outlet temperature [K]")
         capped: bool = Field(..., description="Requested heat exceeds capacity [-]")
 
     def forward(self, inputs, streams_in):

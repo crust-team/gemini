@@ -10,6 +10,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.modules.module import Module
 from gemini.core.physics import fluid, heat_transfer
+from gemini.core.types.quantities import (
+    Fraction,
+    MassFlow,
+    Power,
+    PressureDifference,
+    Ratio,
+    Temperature,
+    TemperatureDifference,
+    ThermalConductance,
+)
 from gemini.core.types.results import Health, ModuleResult
 
 
@@ -28,19 +38,23 @@ class HeatExchanger(Module):
         """Thermal conductance and nominal hydraulic operating point."""
 
         model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
-        ua: float = Field(..., ge=0, description="Overall heat conductance [W/K]")
+        ua: ThermalConductance = Field(..., ge=0, description="Overall heat conductance [W/K]")
         arrangement: Literal["counterflow", "parallel"] = Field(
             "counterflow", description="Flow arrangement [-]"
         )
-        dp_hot_nominal: float = Field(..., ge=0, description="Hot-side nominal pressure loss [Pa]")
-        dp_cold_nominal: float = Field(
+        dp_hot_nominal: PressureDifference = Field(
+            ..., ge=0, description="Hot-side nominal pressure loss [Pa]"
+        )
+        dp_cold_nominal: PressureDifference = Field(
             ..., ge=0, description="Cold-side nominal pressure loss [Pa]"
         )
-        m_dot_hot_nominal: float = Field(..., gt=0, description="Hot-side nominal mass flow [kg/s]")
-        m_dot_cold_nominal: float = Field(
+        m_dot_hot_nominal: MassFlow = Field(
+            ..., gt=0, description="Hot-side nominal mass flow [kg/s]"
+        )
+        m_dot_cold_nominal: MassFlow = Field(
             ..., gt=0, description="Cold-side nominal mass flow [kg/s]"
         )
-        fouling_threshold: float = Field(
+        fouling_threshold: Fraction = Field(
             0.15, gt=0, le=1, description="Fractional UA decline triggering alarm [-]"
         )
 
@@ -52,17 +66,21 @@ class HeatExchanger(Module):
     class Outputs(BaseModel):
         """Thermal transfer, outlet temperatures and pressure losses."""
 
-        duty: float = Field(..., description="Transferred thermal power [W]")
-        effectiveness: float = Field(
+        duty: Power = Field(..., description="Transferred thermal power [W]")
+        effectiveness: Fraction = Field(
             ..., description="Fraction of maximum possible heat transfer [-]"
         )
-        ntu: float = Field(..., description="Number of transfer units [-]")
-        lmtd: float = Field(..., description="Logarithmic mean temperature difference [K]")
-        hot_out_T: float = Field(..., description="Hot-side outlet temperature [K]")
-        cold_out_T: float = Field(..., description="Cold-side outlet temperature [K]")
-        dp_hot: float = Field(..., description="Hot-side pressure loss [Pa]")
-        dp_cold: float = Field(..., description="Cold-side pressure loss [Pa]")
-        approach_T: float = Field(..., description="Minimum terminal temperature approach [K]")
+        ntu: Ratio = Field(..., description="Number of transfer units [-]")
+        lmtd: TemperatureDifference = Field(
+            ..., description="Logarithmic mean temperature difference [K]"
+        )
+        hot_out_T: Temperature = Field(..., description="Hot-side outlet temperature [K]")
+        cold_out_T: Temperature = Field(..., description="Cold-side outlet temperature [K]")
+        dp_hot: PressureDifference = Field(..., description="Hot-side pressure loss [Pa]")
+        dp_cold: PressureDifference = Field(..., description="Cold-side pressure loss [Pa]")
+        approach_T: TemperatureDifference = Field(
+            ..., description="Minimum terminal temperature approach [K]"
+        )
 
     def forward(self, inputs, streams_in):
         """Solve the heat balance and retain both streams' mass flows."""
