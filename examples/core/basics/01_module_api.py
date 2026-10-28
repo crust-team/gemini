@@ -17,6 +17,11 @@ esp.frequency = 50.0
 b = esp(suction=s)
 assert a.outputs.head == b.outputs.head
 
+with gm.no_outputs():
+    fluid_only = esp(suction=s)
+assert dict(fluid_only.outputs) == {}
+assert fluid_only.outlets.discharge == b.outlets.discharge
+
 
 def clamp(module):
     """Clamp one call without changing the persistent command."""
