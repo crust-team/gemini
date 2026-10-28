@@ -8,6 +8,7 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from gemini.core.engine.engine import Engine
+from gemini.core.physics import heat_transfer
 from gemini.core.physics.units import to_si
 
 
@@ -38,21 +39,27 @@ class CalibrationResult:
         )
 
 
-def calibrate(
-    plant, dataset, module_path, fields=None, start=None, end=None, engine=None, apply=True
-):
+def calibrate(plant, dataset, params, start=None, end=None, engine=None, apply=True):
     """Fit measured outputs with bounded least squares through the public replay API.
 
     With apply=True, successful fits replace current parameters and persist as explicit
     overrides. No dated history entry is added. apply=False leaves the plant unchanged.
     Windows must lie in one design snapshot; holdout observations never enter the objective.
     """
+    if not params:
+        raise ValueError("params must contain at least one Parameter")
+    if any(not parameter.calibratable for parameter in params):
+        raise ValueError("All calibration parameters must declare calibratable=True")
+    owners = {parameter.owner for parameter in params}
+    if len(owners) != 1:
+        raise ValueError("Calibrate parameters belonging to one module at a time")
+    original = owners.pop()
+    module_path = original._path
+    fields = [parameter.name for parameter in params]
     dataset = dataset.window(start, end)
     data = dataset.read(dataset.start, dataset.end)
-    original = plant.get_submodule(module_path)
-    fields = list(original.calibratable if fields is None else fields)
-    if not fields or set(fields) - set(original.calibratable):
-        raise ValueError(f"{module_path}: fields must be nonempty and calibratable")
+    if plant.get_submodule(module_path) is not original:
+        raise ValueError("Calibration parameters must belong to the supplied plant")
     if not len(data):
         raise ValueError(f"{module_path}: no complete calibration observations")
     snapshots = {
@@ -66,10 +73,10 @@ def calibrate(
         raise ValueError("Calibrate one dated design snapshot at a time")
     trial = deepcopy(plant)
     target = trial.get_submodule(module_path)
-    target.params = original.params_at(data.index[0])
+    target.update_params(**original.params_at(data.index[0]))
     bindings = plant.bindings[module_path]
-    targets = set(original.Outputs.model_fields) & bindings.measured.keys()
-    if original.name == "heatexchanger" and fields == ["ua"]:
+    targets = set(original.outputs()) & bindings.measured.keys()
+    if original.name == "heat_exchanger" and fields == ["ua"]:
         targets &= {"duty", "hot_out_T", "cold_out_T"}
     if original.name == "esp":
         targets &= (
@@ -91,11 +98,11 @@ def calibrate(
     )
     scales = np.maximum(np.nanmedian(abs(measured), axis=0), 1e-12)
     runner = engine if engine is not None else Engine(on_error="raise")
-    initial_values = {field: getattr(target.params, field) for field in fields}
-    refs = {ref.field: ref for ref in target.calibratable_params(False)}
+    initial_values = {field: getattr(target, field) for field in fields}
+    refs = {parameter.name: parameter for parameter in target.calibratable_parameters(False)}
     sizes, scale_x, initial, lower, upper = {}, [], [], [], []
     for field in fields:
-        value = getattr(target.params, field)
+        value = getattr(target, field)
         if value is None or isinstance(value, bool):
             raise ValueError(f"{module_path}.{field}: requires a numeric initial value")
         values = np.atleast_1d(np.asarray(value, dtype=float))
@@ -104,12 +111,13 @@ def calibrate(
         scale[values == 0] = 1
         scale_x.extend(scale)
         initial.extend(values / scale)
-        low, high = refs[field].bounds or (-np.inf, np.inf)
-        for constraint in target.Params.model_fields[field].metadata:
-            if getattr(constraint, "gt", None) is not None:
-                low = np.nextafter(low, np.inf)
-            if getattr(constraint, "lt", None) is not None:
-                high = np.nextafter(high, -np.inf)
+        bounds = refs[field].bounds
+        low = bounds.get("ge", bounds.get("gt", -np.inf))
+        high = bounds.get("le", bounds.get("lt", np.inf))
+        if "gt" in bounds:
+            low = np.nextafter(low, np.inf)
+        if "lt" in bounds:
+            high = np.nextafter(high, -np.inf)
         lower.extend(np.full(len(values), low) / scale)
         upper.extend(np.full(len(values), high) / scale)
     scale_x = np.asarray(scale_x)
@@ -140,6 +148,32 @@ def calibrate(
     initial = np.asarray(initial)
     before_values = residual(initial).reshape(-1, len(targets))
     guess = initial.copy()
+    if original.name == "heat_exchanger" and fields == ["ua"]:
+
+        def raw_values(binding):
+            unit = (
+                dataset.columns[binding.column].unit
+                if binding.column in dataset.columns
+                else binding.unit
+            )
+            return np.array([to_si(value, unit) for value in data[binding.column]])
+
+        hot_in = raw_values(bindings.inlets["hot_in"]["T"])
+        cold_in = raw_values(bindings.inlets["cold_in"]["T"])
+        hot_out = measured[:, targets.index("hot_out_T")]
+        cold_out = measured[:, targets.index("cold_out_T")]
+        duty = measured[:, targets.index("duty")]
+        if original.arrangement == "counterflow":
+            differences = zip(hot_in - cold_out, hot_out - cold_in)
+        else:
+            differences = zip(hot_in - cold_in, hot_out - cold_out)
+        apparent = [
+            q / delta
+            for q, pair in zip(duty, differences)
+            if (delta := heat_transfer.lmtd(max(0, pair[0]), max(0, pair[1]))) > 0
+        ]
+        if apparent:
+            guess = np.asarray([np.median(apparent)]) / scale_x
     if original.name == "esp" and fields == ["head_coeff"] and "head" in targets:
 
         def raw(binding):
@@ -150,7 +184,7 @@ def calibrate(
             )
             return np.array([to_si(v, unit) for v in data[binding.column]])
 
-        flow_binding = bindings.streams["suction"]["m_dot"]
+        flow_binding = bindings.inlets["suction"]["m_dot"]
         flows = raw(flow_binding)
         flow_unit = (
             dataset.columns[flow_binding.column].unit
@@ -158,16 +192,16 @@ def calibrate(
             else flow_binding.unit
         )
         if flow_unit == "kg/s":
-            pressures = raw(bindings.streams["suction"]["p"])
-            temperatures = raw(bindings.streams["suction"]["T"])
+            pressures = raw(bindings.inlets["suction"]["p"])
+            temperatures = raw(bindings.inlets["suction"]["T"])
             flows /= np.array(
                 [target.fluid.properties(p, t).density for p, t in zip(pressures, temperatures)]
             )
         coefficients = original.fit_head_coefficients(
             flows[valid],
-            raw(bindings.inputs["frequency"])[valid],
+            raw(bindings.controls["frequency"])[valid],
             measured[valid, targets.index("head")],
-            target.params.no_stages,
+            target.no_stages,
         )
         guess = np.asarray(coefficients) / scale_x
     fitted = least_squares(
