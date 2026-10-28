@@ -82,7 +82,7 @@ energy residual must remain visible. A small thermal residual is not full first-
 
 ## Profiles and costs
 
-`Profile.from_csv` converts supported units with `physics.units.to_si`, including Celsius,
+`Profile.from_series` converts supported in-memory units with `physics.units.to_si`, including Celsius,
 kW/MW, kWh and currency/kWh. Naive timestamps are interpreted in the supplied timezone or UTC;
 storage is UTC. Indices must be nonempty, unique and strictly increasing, with finite matching
 values. `at(t)` holds the latest sample at or before t; times before the first sample raise.

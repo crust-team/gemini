@@ -42,14 +42,10 @@ optional injection frequency, and a secondary inlet Stream. Outputs contain deli
 total electricity and COP (None for zero consumption). It follows the diagram's actual order:
 production -> degasser -> hot filter -> HX -> return filter -> injection pump -> injection.
 
-Each configurable plant implements `from_config(config, at=None)` and instantiates the named
-children using the registry and dated parameters. `PlantConfig.plant_type` selects the plant;
-`modules` and `bindings` use dotted child paths. Wiring is never deserialized from configuration.
-`GEMINI_NODES` belongs to the plant class and maps imported .param stems to those paths.
-`trace_wiring` observes real Stream identities through temporary hooks and cleans up on failure.
-`check_against_diagram` checks every link after explicit port translation. The example's buried
-riser expands its logical ESP-to-surface edge into two checked physical links. Tests require zero
-missing AND extra connections. Other topologies require another handwritten class and mapping.
+Plants serialize themselves with `to_dict`/`from_dict` and `save`/`load`; the file records
+importable classes, histories, bindings and fluids but never runtime wiring. `trace_wiring`
+observes real Stream identities through temporary hooks and cleans up on failure. Old diagram
+translation and wiring comparison live exclusively in `gemini.legacy`.
 
 ## Reporting energy and diagnostics
 

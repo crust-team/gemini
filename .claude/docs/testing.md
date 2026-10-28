@@ -1,36 +1,22 @@
 # Testing
 
-Mirror implementation paths under `tests/core`. Test behaviour, physical limits and failure
-handling. Equipment tests cover validated parameters, port contracts, fidelity, mass/energy
-balance, reference numbers and health thresholds. Module tests cover child paths, recursive
-parameters, atomic JSON state loading, hook order/removal and stateful composition. Handwritten-plant tests verify actual stream identity wiring, hook cleanup and the buried ESP split.
-Types tests cover quantity bounds, recursive numeric schemas, Fluid caching/composition, profiles
-and compatible cost aggregation. Balance tests distinguish thermal closure from unresolved work.
+Tests have four roles:
 
-`tests/golden/golden_values.json` and `runtime_values.json` are immutable. The historical
-capture script is archival; do not regenerate expected values from the replacement API.
-Monitoring parity is reconstructed in golden tests using public physics, never production
-compatibility adapters.
+- `tests/unit/` mirrors every source file with logic.
+- `tests/integration/` combines plants, data, engines, callbacks, checkpoints, and calibration.
+- `tests/e2e/` runs public workflows and committed real example data; tests use `@pytest.mark.e2e`.
+- `tests/fixtures/` contains immutable golden values and captured pre-refactor engine frames.
 
-`tests/e2e/test_geothermal_example.py` runs by default despite its `slow` marker. It loads the
-project and saved JSON, replays all 17,280 rows, checks coverage and finite soft sensors, fits
-HX conductance on the first 672 observations and evaluates the remaining 16,608 observations.
-It also runs a handwritten plant for every row. Explicit `NOTE(refactor)` comments explain
-source-model inconsistencies and changed accuracy limits. These are reported limitations,
-not evidence that the original accuracy targets were achieved.
-
-All thirteen examples are executed by `tests/test_examples.py`. External AVEVA tests skip only
-without credentials. Install the optional `parquet` extra to exercise that export check.
+`tests/unit/test_mirror.py` enforces the source mirror rule; `__init__.py` and pure re-export
+files are excluded. Only `tests/unit/legacy/` and `tests/e2e/test_legacy_bridge.py` read old
+formats. E2E tests cover the literal quickstart, 17,280-row reconciliation, calibration holdout,
+mass/thermal balance, electricity limitations, alarm rates, bridge round trips, example
+subprocesses, live idempotency, and exact interrupt/resume results.
 
 ```bash
-poetry run black --check gemini tests examples
-poetry run isort --check-only gemini tests examples
-poetry run flake8 gemini tests examples
-poetry run pytest tests
+python -m pytest -m "not e2e"
+python -m pytest
+black --check gemini tests examples
+isort --check-only gemini tests examples
+flake8 gemini tests examples
 ```
-
-Engine regression fixtures were captured before deleting modes: first-day measured replay and
-24-step chained simulation. Tests compare every prior output exactly. New tests cover interrupted
-replay/simulate, stateful integration/measurement selection, atomic checkpoint publication failure,
-CSV fallback, empty live windows, callback order and live idempotency. Dataset tests cover UTC,
-constructors, source reopening, hand-calculated means, gaps and chunk boundaries.

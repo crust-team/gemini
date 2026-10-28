@@ -51,7 +51,7 @@ and threshold exceptions are annotated `NOTE(refactor)` next to the implementati
   on the below-pump node this denotes its local upper endpoint (pump intake).
 - Port mapping is explicit, including HX primary/secondary ports and both degasser outlets.
   Every unknown property/tag is reported. Empty tags, redundant observations and absent
-  measured sandface conditions have individually recorded reasons in `PlantConfig.ignored`.
+  measured sandface conditions have individually recorded reasons in legacy bridge diagnostics.
 - Supplemental CSV bindings supply filter pressure differences, HX duty/loss, degasser inlet
   temperature and production rate. Unmeasured secondary pressure is assumed 5 bar absolute.
 - Immutable Fluid definitions and import diagnostics live in portable configuration. Each timestep selects
@@ -93,11 +93,8 @@ accuracy and alarm-rate targets are not all met by the supplied project. Correct
 reservoir pressure/temperature and an appropriate variable-UA reference are the next data work.
 
 
-## Types phase: new decisions and limits
+## Retained typed-model decisions and limits
 
-- The workspace dataset is still `geothermal_doublet`; no source CSV or golden JSON changed.
-  Work is local on `refactor/types`; no push/PR. `core/base` is removed, and `core/types` is
-  the public data-type package. GraphPlant, Link and serialized `links` are removed.
 - Every numeric equipment contract uses quantity metadata. Polynomial coefficients (ESP and
   injection-pump head/power) remain mixed-unit lists; the unused degasser coefficient remains
   unknown-unit metadata. PipeSection's physics-layer fields declare equivalent metadata
@@ -150,4 +147,5 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   values are held. Scenario profiles must share an index. Cost aggregation rejects mixed
   currency/year values and sums each module's own sourced contribution once.
 
-See [the types report](../../docs/types-refactor-report.md) for paths, metrics and verification.
+The engine-specific moves, verification, and checkpoint design are recorded in
+[`docs/engine-refactor-report.md`](../../docs/engine-refactor-report.md).
