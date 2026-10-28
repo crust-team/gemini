@@ -1,0 +1,26 @@
+{
+  "branch": "refactor-module-api",
+  "pytest": "132 passed in 531.46s",
+  "replay_rows": 17280,
+  "replay_seconds": 32.09904707601527,
+  "replay_sha256": "add9fe0bcb60cb661a0bc0e4aade026950cf570cbe1b0f640a6c3d6a662f1364",
+  "simulate_rows": 24,
+  "simulate_sha256": "0a14dc0f7a493e7e3b8ff15a5f16f8696c2bb37210efeb418dd2792b5a9cefc1",
+  "golden": {
+    "esp_head_first": 3705164.20243279,
+    "heat_exchanger_duty_first": 3924646.065419465
+  },
+  "metrics": {
+    "coverage_min": 1.0,
+    "filter_hot_median_relative_error": 0.016961021530565668,
+    "filter_cold_median_relative_error": 0.016961021530565668,
+    "injection_pump_power_median_relative_error": 1.231959000014271e-05,
+    "esp_head_median_relative_error": 0.631677586620434,
+    "calibration_rms_before": 0.3804315779089569,
+    "calibration_rms_after": 0.0002941831887788673,
+    "mass_balance_max": 0.0,
+    "thermal_balance_max": 2.6601853814079245e-16,
+    "wiring_edges": 10,
+    "wiring_mismatches": 0
+  }
+}
