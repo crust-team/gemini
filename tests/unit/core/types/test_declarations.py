@@ -1,5 +1,7 @@
 """Ready-made declaration validation."""
 
+from datetime import datetime, timezone
+
 import pytest
 
 from gemini.core.modules import Module
@@ -13,6 +15,7 @@ from gemini.core.types import (
     Parameter,
     Stream,
 )
+from gemini.core.types.bindings import DatedParams
 
 
 class Declared(Module):
@@ -56,6 +59,16 @@ def test_parameter_units_shape_and_metadata():
         Declared(length=1, coefficients=[1])
     with pytest.raises(TypeError, match="expected m"):
         Declared(length="12 bar", coefficients=[1, 2])
+
+
+def test_parameter_history_projects_module_snapshots():
+    """A parameter exposes its values from the module's canonical dated snapshots."""
+    module = Declared(length=1, coefficients=[1, 2])
+    changed = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    module.param_history.append(
+        DatedParams(valid_from=changed, params={"length": 2, "coefficients": [3, 4]})
+    )
+    assert module.get_parameter("length").history == [(None, 1.0), (changed, 2.0)]
 
 
 def test_all_sections_list_own_declarations():
