@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any, ClassVar, Literal, NamedTuple
 
-from pydantic import BaseModel, ConfigDict, RootModel
+from pydantic import BaseModel, ConfigDict, RootModel, SerializeAsAny, ValidationError
 
 from gemini.core.base.stream import Stream
 from gemini.core.physics import fluid
@@ -54,7 +54,7 @@ class ChildInputs(RootModel[dict[str, Any]]):
     root: dict[str, Any] = {}
 
 
-class ChildOutputs(RootModel[dict[str, BaseModel]]):
+class ChildOutputs(RootModel[dict[str, SerializeAsAny[BaseModel]]]):
     """Equipment outputs keyed by immediate child name."""
 
 
@@ -219,9 +219,10 @@ class Module(ABC):
     def _validate_inputs(self, inputs):
         try:
             return self.Inputs.model_validate({} if inputs is None else inputs)
-        except ValueError as exc:
-            exc.add_note(f"Module path: {self.path}")
-            raise
+        except ValidationError as exc:
+            raise ValidationError.from_exception_data(
+                self.path, exc.errors(include_url=False)
+            ) from exc
 
     def _check_ports(self, streams, expected, kind):
         missing, extra = set(expected) - streams.keys(), streams.keys() - set(expected)
