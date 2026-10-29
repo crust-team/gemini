@@ -64,12 +64,19 @@ def parse_duration(step):
 
 
 def median_step(index):
-    """Return the median spacing of a ``DatetimeIndex`` as ``pd.Timedelta``, or ``None``."""
+    """Return the median spacing of a ``DatetimeIndex`` as ``pd.Timedelta``, or ``None``.
+
+    The index may have any resolution; spacing is computed in nanoseconds.
+    """
     if len(index) < 2:
         return None
-    return pd.Timedelta(int(np.median(np.diff(index.asi8))), unit="ns")
+    return pd.Timedelta(int(np.median(np.diff(index.as_unit("ns").asi8))), unit="ns")
 
 
 def interval_seconds(index, final_step):
-    """Return seconds from each tick to the next, using ``final_step`` after the last tick."""
-    return np.append(np.diff(index.asi8) / 1e9, pd.Timedelta(final_step).total_seconds())
+    """Return seconds from each tick to the next, using ``final_step`` after the last tick.
+
+    The index may have any resolution; spacing is computed in nanoseconds.
+    """
+    spacing = np.diff(index.as_unit("ns").asi8) / 1e9
+    return np.append(spacing, pd.Timedelta(final_step).total_seconds())

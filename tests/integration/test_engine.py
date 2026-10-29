@@ -106,6 +106,24 @@ def test_replay_can_skip_outputs(setup):
     assert "power" not in fields
 
 
+@pytest.mark.parametrize("unit", ["s", "ms", "us", "ns"])
+def test_replay_of_example_data_skips_nothing_at_any_timestamp_resolution(
+    fresh_plant, fast_frame, unit
+):
+    """Every twin runs on every tick of one example day, whatever the parsed time resolution.
+
+    pandas 3 parses the example CSV times as microseconds; comparing them with nanosecond
+    ``Timestamp.value`` once made every tick a gap, so replay silently skipped every twin.
+    """
+    frame = fast_frame.iloc[:96].copy()
+    frame["time"] = frame["time"].dt.as_unit(unit)
+    data = gm.Dataset.from_frame(frame, time_column="time")
+    result = gm.Engine(on_error="raise").replay(fresh_plant, data)
+    assert len(result) == 96
+    assert result.skip_counts == {}
+    assert result["doublet.esp"].head.notna().all()
+
+
 class Interrupted(BaseException):
     """Model a scheduler cancellation without ordinary-error recovery."""
 

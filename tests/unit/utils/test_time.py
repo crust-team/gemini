@@ -55,6 +55,14 @@ def test_median_step_and_interval_seconds():
     assert interval_seconds(index[:0], pd.Timedelta(minutes=5)).tolist() == [300.0]
 
 
+@pytest.mark.parametrize("unit", ["s", "ms", "us", "ns"])
+def test_spacing_is_independent_of_the_timestamp_resolution(unit):
+    """Second, millisecond, microsecond and nanosecond indexes give the same spacing."""
+    index = pd.date_range("2024-01-01", periods=3, freq="15min", tz="UTC").as_unit(unit)
+    assert median_step(index) == pd.Timedelta(minutes=15)
+    np.testing.assert_array_equal(interval_seconds(index, DEFAULT_STEP), [900.0, 900.0, 3600.0])
+
+
 def test_to_utc_index_localises_naive_values_and_keeps_offsets():
     """Naive values are local to ``tz``; offsets may change between values at DST switches."""
     naive = to_utc_index(["2024-07-01 02:00", "2024-07-01 03:00"], "Europe/Oslo")

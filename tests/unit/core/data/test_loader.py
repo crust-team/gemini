@@ -49,6 +49,28 @@ def test_chunks_and_default_durations(source):
     assert whole[-1].dt == 900.0
 
 
+@pytest.mark.parametrize("unit", ["s", "ms", "us", "ns"])
+def test_alignment_is_independent_of_the_timestamp_resolution(source, unit):
+    """Indexes and ticks in any resolution sample alike; pandas 3 parses text as microseconds."""
+    frame = source.to_frame()
+    frame.index = frame.index.as_unit(unit)
+    data = gm.Dataset(frame)
+    assert data.native_step == timedelta(minutes=15)
+    for ticks in (frame.index, frame.index.as_unit("ns")):
+        for align in ("previous", "exact"):
+            rows = list(Loader(data, ticks, align=align))
+            assert [sample.row["v"] for sample in rows] == list(range(12))
+            assert [sample.dt for sample in rows] == [900.0] * 12
+    sparse = gm.Dataset(frame.drop(frame.index[1:8]))
+    rows = list(Loader(sparse, frame.index, max_gap=timedelta(minutes=30)))
+    assert [sample.row["v"] for sample in rows[:3]] == [0, 0, 0]
+    assert np.isnan(rows[3].row["v"]) and rows[8].row["v"] == 8
+    clock = gm.Clock.range(source.start, source.end, "1h")
+    hourly = clock.ticks.as_unit(unit)
+    means = list(Loader(data, hourly, align="mean", durations=clock.durations))
+    assert [sample.row["v"] for sample in means] == [1.5, 5.5, 9.5]
+
+
 def test_options_and_columns_are_validated(source):
     """Invalid options fail at construction; unknown columns fail on the first read."""
     with pytest.raises(ValueError, match="align = 'nearest'"):

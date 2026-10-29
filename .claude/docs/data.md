@@ -14,11 +14,13 @@ values to one of:
 
 The time axis may be any timestamp sequence: datetimes, ISO text or values with UTC offsets.
 Naive timestamps are local times in `tz` and fail when ambiguous or nonexistent at a DST switch;
-values with offsets keep their own offsets, which may change at DST switches. `units` maps column
-names to a unit string or a `{"unit": ..., "quantity": ...}` mapping. `from_profiles` takes a
-mapping of column names to profiles that share one index and records their SI units. Invalid
-input (no time column, repeated or missing timestamps, repeated or empty column names, unit
-metadata for unknown columns, a wrong array shape) raises `gm.errors.DatasetError`.
+values with offsets keep their own offsets, which may change at DST switches. The index may have
+any resolution (s, ms, us or ns; pandas 3 parses text as microseconds); spacing, gaps and sampling
+are computed in nanoseconds. `units` maps column names to a unit string or a
+`{"unit": ..., "quantity": ...}` mapping. `from_profiles` takes a mapping of column names to
+profiles that share one index and records their SI units. Invalid input (no time column, repeated
+or missing timestamps, repeated or empty column names, unit metadata for unknown columns, a wrong
+array shape) raises `gm.errors.DatasetError`.
 
 `read(start, end, columns=None)` and `window(start, end)` use inclusive bounds; `after(t)` is
 strict. `names` lists the columns, `start`/`end` the first and last timestamps, and

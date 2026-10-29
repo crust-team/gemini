@@ -61,7 +61,7 @@ class Loader:
         ticks = pd.DatetimeIndex(list(self.ticks))
         if not len(ticks):
             return
-        ticks = pd.to_datetime(ticks, utc=True)
+        ticks = pd.to_datetime(ticks, utc=True).as_unit("ns")
         seconds = self.durations
         if seconds is None:
             seconds = interval_seconds(ticks, self.dataset.native_step or DEFAULT_STEP)
@@ -81,8 +81,12 @@ class Loader:
             offset = stop
 
     def _previous(self, frame, ticks, seconds):
-        """Hold the latest row at or before each tick (``exact``: only a row at the tick)."""
-        times = frame.index.asi8
+        """Hold the latest row at or before each tick (``exact``: only a row at the tick).
+
+        Row times are compared as nanosecond integers, the unit of ``Timestamp.value``, whatever
+        the resolution of the dataset index (pandas 3 parses text as microseconds).
+        """
+        times = frame.index.as_unit("ns").asi8
         values = frame.to_numpy()
         positions = np.searchsorted(times, ticks.asi8, side="right") - 1
         for t, previous, dt in zip(ticks, positions, seconds):
@@ -95,7 +99,7 @@ class Loader:
 
     def _mean(self, frame, ticks, seconds):
         """Average each numeric column over ``[tick, tick + dt)``; text keeps its last value."""
-        times = frame.index.asi8
+        times = frame.index.as_unit("ns").asi8
         values = frame.to_numpy()
         numeric = [pd.api.types.is_numeric_dtype(frame[column]) for column in self.columns]
         for t, dt in zip(ticks, seconds):

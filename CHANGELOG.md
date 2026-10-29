@@ -105,6 +105,10 @@ finite engine, and then cleaned up. Old import paths are not retained.
   calibration tolerates a NaN duty row; the t/h ESP head guess is correct; `check_wiring` works
   on a copy; `barg` converts from SI correctly; an ambiguous data CSV and unknown runtime keys
   raise explicit errors; mixed timestamp spellings parse.
+- Data: replay, simulation and clocks work with timestamp indexes of any resolution (s, ms, us,
+  ns). Under pandas 3, which parses text times as microseconds, the loader compared them with
+  nanosecond tick values, so every tick looked like a gap and replay silently skipped every twin;
+  `native_step` and clock durations were also 1000 times too short.
 
 ## [1.0.3] - 2026-10-13
 ### Added
