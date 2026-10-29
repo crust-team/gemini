@@ -106,7 +106,7 @@ class Results:
         """Append one completed step; count leaf energy outputs once."""
         row = {}
         for path, (result, health) in results.items():
-            row.update({(path, key): value for key, value in result.outputs.model_dump().items()})
+            row.update({(path, key): value for key, value in result.outputs.items()})
             self._energy.update((path, key) for key in ENERGY_FIELDS if key in result.outputs)
             streams = [
                 flow

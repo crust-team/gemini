@@ -12,7 +12,6 @@ from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import WATER
 
-
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
 BRINE_DENSITY = 1050
 """Brine density [kg/m3] that, with the retained cp = 4217.4 J/kg/K, reproduces the CSV duty.

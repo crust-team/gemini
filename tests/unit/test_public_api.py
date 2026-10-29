@@ -1,5 +1,8 @@
 """Curated user API and plant ownership contracts."""
 
+import tomllib
+from pathlib import Path
+
 import gemini as gm
 
 
@@ -34,8 +37,6 @@ def test_public_names_and_docs():
 
 def test_readable_tree():
     """Printing a loaded plant displays nested equipment and scalar human-unit parameters."""
-    from pathlib import Path
-
     from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
     plant = DoubletHeatPlant.load(
@@ -45,3 +46,9 @@ def test_readable_tree():
         rendered = repr(plant)
     assert "DoubletHeatPlant(" in rendered and "(doublet): Doublet(" in rendered
     assert "ESP(" in rendered and "bar" in rendered and "°C" in rendered
+
+
+def test_version_matches_the_package_metadata():
+    """The version literal in ``gemini/__init__.py`` is the one in ``pyproject.toml``."""
+    project = tomllib.loads((Path(__file__).parents[2] / "pyproject.toml").read_text())
+    assert gm.__version__ == project["tool"]["poetry"]["version"]

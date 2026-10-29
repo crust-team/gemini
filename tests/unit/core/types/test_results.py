@@ -28,7 +28,6 @@ def test_values_mapping_and_unit_conversion(values):
     assert values.get("head", unit="barg") == 1
     assert values.get("rise", unit="degC") == 10
     assert values.get("missing", 5) == 5
-    assert values.model_dump() == dict(values)
     with pytest.raises(UnitError, match="label"):
         values.get("label", unit="m")
 

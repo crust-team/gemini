@@ -298,10 +298,10 @@ class PathResult:
 
     p_out: float
     T_out: float
-    dp_fric: float
-    dp_grav: float
-    section_p: list[float]
-    section_T: list[float]
+    dp_friction: float
+    dp_gravity: float
+    section_pressure: list[float]
+    section_temperature: list[float]
 
 
 def hydrostatic_dp(rho: float, height: float) -> float:
@@ -518,7 +518,7 @@ def corrosion_profile(
     result = pipe_path_profile(path, stream, fluid, direction, u_value, ambient_temperature)
     _, sections = _traversal(path, direction)
     rates = []
-    for section, p, T in zip(sections, result.section_p, result.section_T):
+    for section, p, T in zip(sections, result.section_pressure, result.section_temperature):
         f = fluid.properties(p, T)
         rates.append(
             corrosion.co2_corrosion_rate(

@@ -68,10 +68,10 @@ class ProductionWell(_Well):
         result = self.traverse(bottom, start, end, "up")
         self.wellhead_pressure = wellhead.p
         self.wellhead_temperature = wellhead.T
-        self.dp_friction = result.dp_fric
-        self.dp_gravity = result.dp_grav
-        self.section_pressure = result.section_p
-        self.section_temperature = result.section_T
+        self.dp_friction = result.dp_friction
+        self.dp_gravity = result.dp_gravity
+        self.section_pressure = result.section_pressure
+        self.section_temperature = result.section_temperature
         self.heat_loss = (
             wellhead.m_dot
             * bottom.fluid.properties(bottom.p, bottom.T).cp_l

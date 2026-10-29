@@ -50,10 +50,10 @@ def test_path_golden(role):
         dict(
             pressure_output=result.p_out,
             temperature_output=result.T_out,
-            pressuredrop_fric_output=result.dp_fric,
-            pressuredrop_grav_output=result.dp_grav,
-            section_pressure_output=result.section_p,
-            section_temperature_output=result.section_T,
+            pressuredrop_fric_output=result.dp_friction,
+            pressuredrop_grav_output=result.dp_gravity,
+            section_pressure_output=result.section_pressure,
+            section_temperature_output=result.section_temperature,
         ),
         case["expected"],
     )
@@ -139,8 +139,8 @@ def test_two_phase_reverse_flow_reverses_friction():
     reverse = Stream(m_dot=-40, T=350, p=20e5, fluid=GAS)
     ahead = hydraulics.pipe_path_profile(path, forward, GAS, "down", 0, 300)
     back = hydraulics.pipe_path_profile(path, reverse, GAS, "down", 0, 300)
-    assert back.dp_fric == pytest.approx(-ahead.dp_fric)
-    assert back.dp_grav == pytest.approx(ahead.dp_grav)
+    assert back.dp_friction == pytest.approx(-ahead.dp_friction)
+    assert back.dp_gravity == pytest.approx(ahead.dp_gravity)
 
 
 def test_zero_flow_unknown_correlation_and_direction():
@@ -149,7 +149,7 @@ def test_zero_flow_unknown_correlation_and_direction():
     stream = Stream(m_dot=0, p=1e6, T=350)
     result = hydraulics.pipe_path_profile(path, stream, BRINE, "up", 10, 290)
     assert result.p_out == stream.p and result.T_out == stream.T
-    assert result.dp_fric == result.dp_grav == 0
+    assert result.dp_friction == result.dp_gravity == 0
     assert hydraulics.pipe_path_profile(path, stream, BRINE, " Up ", 10, 290) == result
     with pytest.raises(UnknownCorrelationError, match="'unknown'"):
         hydraulics.pipe_path_profile(path, stream, BRINE, "up", 10, 290, correlation="unknown")

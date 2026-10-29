@@ -66,10 +66,10 @@ class InjectionWell(_Well):
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
         self.bottomhole_pressure = bottom.p
         self.bottomhole_temperature = bottom.T
-        self.dp_friction = result.dp_fric
-        self.dp_gravity = result.dp_grav
-        self.section_pressure = result.section_p
-        self.section_temperature = result.section_T
+        self.dp_friction = result.dp_friction
+        self.dp_gravity = result.dp_gravity
+        self.section_pressure = result.section_pressure
+        self.section_temperature = result.section_temperature
         self.heat_loss = (
             bottom.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l * (stream.T - bottom.T)
         )
