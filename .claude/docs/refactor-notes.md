@@ -212,6 +212,15 @@ ported into the refactored structure; only missing behaviour was added.
   charged the injection pump in full; here all consumption is netted against all generation.
   Its reference total (4083 kg CO2/day) depends on the upstream fuel-driven boiler and CHP
   formulas, which were not ported, so it is not reproduced.
+- Upstream `well_flow` traverses an injector with positive flow and `direction="down"`, the
+  convention for walking down a producer against its upward flow, so it adds friction to the
+  bottom pressure. The legacy GEMINI injection DPDT (negative flow) and this port subtract it,
+  as for brine flowing down. On the upstream `parallel_hex_plant` injector at 125.1 m3/h the
+  required wellhead pressure is therefore 54.86 bar here and 44.47 bar upstream: density
+  (1000 kg/m3), roughness (2e-5 m), aquifer (180 bar, 2.3 m3/h/bar, 234.39 bar required) and
+  friction magnitude (5.197 bar) agree; the gap is twice the friction (10.39 bar) less 0.0085
+  bar of gravity from the 0.01 degree inclination rounding of `build_path`. The upstream value
+  is the bug; the injectivity it fitted to a measured ~44 bar absorbs it.
 - The upstream Sphinx model pages became the correlation sections of
   [physics.md](physics.md), written from the code. Where they disagree the code is documented:
   SI boundaries instead of bar, degC, cP, m3/day or m3/h, degrees, GPa and mm; roughness in

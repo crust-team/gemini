@@ -164,3 +164,42 @@ def test_invalid_requests_raise(producer):
         nodal.solve_production_rate(reservoir, well, 3e5, (5, 10), esp=esp, riser=riser)
     with pytest.raises(PhysicsRangeError, match="rate = 1000 kg/s"):
         nodal.solve_production_rate(reservoir, well, 3e5, (5, 1000), esp=esp, riser=riser)
+
+
+UPSTREAM_INJECTION_PRESSURE = 44.4716458281338e5
+"""Upstream ``parallel_hex_plant`` injector wellhead pressure [Pa] at 125.1 m3/h."""
+
+UPSTREAM_GRAVITY = 184.7223e5
+"""Upstream DPDT gravity drop [Pa] of the same injector."""
+
+
+def test_injection_pressure_gap_to_upstream_is_the_friction_sign():
+    """Upstream walks the injector down with positive flow, adding friction to the bottom.
+
+    The injected brine flows downward, so friction lowers the bottom pressure; the legacy
+    GEMINI injection DPDT (negative flow) and this port subtract it. Density (1000 kg/m3),
+    roughness (2e-5 m), the aquifer (180 bar, 2.3 m3/h/bar) and the 5.197 bar friction
+    magnitude agree with upstream; the gravity drop differs by 0.0085 bar through the 0.01
+    degree inclination rounding of ``build_path``. The 10.39 bar gap (54.86 against 44.47 bar)
+    is twice the friction plus that difference.
+    """
+    stations = [
+        (0, 0, 0.1616964),
+        (148, 148, 0.1616964),
+        (1097, 1034, 0.25273),
+        (2109, 1742, 0.1616964),
+        (2327, 1883, 0.0995668),
+    ]
+    rows = [dict(MD=md, TVD=tvd, ID=bore, roughness=2e-5) for md, tvd, bore in stations]
+    well = InjectionWell().update_params(pipe_path=build_path(rows), soil_temperature=293.15)
+    sink = InjectionReservoir().update_params(
+        pressure=180e5, injectivity_index=2.3 / 3.6e8, top_depth=1883, **RESERVOIR
+    )
+    wellhead = Stream(flow="125.1 m3/h", T=343.15, p=1e5)
+    pressure = nodal.solve_injection_pressure(well, sink, wellhead, (1e5, 1e8))
+    out = well(wellhead=wellhead.with_(p=pressure)).outputs
+    assert out.dp_friction == pytest.approx(-5.197358519692272e5, rel=1e-9)
+    assert out.dp_gravity - UPSTREAM_GRAVITY == pytest.approx(0.0085e5, abs=10)
+    gap = -2 * out.dp_friction - (out.dp_gravity - UPSTREAM_GRAVITY)
+    assert pressure - UPSTREAM_INJECTION_PRESSURE == pytest.approx(gap, abs=1)
+    assert pressure / 1e5 == pytest.approx(54.86, abs=0.005)
