@@ -1,6 +1,18 @@
-"""Physical constants retained from the original GEMINI correlations."""
+"""Physical constants retained from the original GEMINI correlations.
 
-G = 9.81  # [m/s2]
-G_FT = 32.17405  # [ft/s2], historical Beggs-Brill basis
-ESP_REFERENCE_FREQUENCY = 60.0  # [Hz]
-ESP_EFFICIENCY_FLOW_FACTOR = 135773  # historical US correlation factor
+| Name | Value | Unit | Meaning |
+| --- | --- | --- | --- |
+| ``G`` | 9.81 | m/s2 | gravitational acceleration |
+| ``G_FT`` | 32.17405 | ft/s2 | gravitational acceleration, historical Beggs–Brill basis |
+| ``ESP_REFERENCE_FREQUENCY`` | 60.0 | Hz | frequency of the ESP catalogue curves |
+| ``ESP_EFFICIENCY_FLOW_FACTOR`` | 135773 | - | historical US ESP efficiency factor |
+| ``CO2_MOLAR_MASS`` | 0.04401 | kg/mol | molar mass of CO2 |
+| ``MIN_PATH_PRESSURE`` | 0.001 | Pa | floor of marched pipe-path pressures |
+"""
+
+G = 9.81
+G_FT = 32.17405
+ESP_REFERENCE_FREQUENCY = 60.0
+ESP_EFFICIENCY_FLOW_FACTOR = 135773
+CO2_MOLAR_MASS = 0.04401
+MIN_PATH_PRESSURE = 0.001

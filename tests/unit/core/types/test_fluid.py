@@ -3,21 +3,26 @@
 import pytest
 from pydantic import ValidationError
 
-from gemini.core.physics.fluid import ConstantWater
+from gemini.core.physics.fluid import FluidProperties
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import BRINE, GLYCOL_30, WATER, Fluid
 
 
 def test_fluid_properties_and_identity():
     """Defaults preserve all legacy numbers; overrides travel with streams and cache safely."""
-    assert BRINE.properties(1e5, 300) == ConstantWater().properties(1e5, 300)
+    assert BRINE.properties(1e5, 300) == FluidProperties()
     brine = Fluid(liquid_density=1068, liquid_viscosity=0.00065, co2_mass_fraction=0.01)
     stream = Stream(m_dot=106.8, p=1e5, T=300, fluid=brine)
     assert stream.volumetric_flow() == pytest.approx(0.1)
     assert stream.with_(T=310).fluid == brine
     assert brine.properties(1e5, 300) is brine.properties(2e5, 350)
     assert WATER != BRINE
-    assert GLYCOL_30.properties(1e5, 313.15).cp_l == 3841
+    assert GLYCOL_30.properties(1e5, 313.15) == FluidProperties(
+        rho_l=1029.85, cp_l=3841, k_l=0.4622, mu_l=0.0016295
+    )
+    assert Fluid(gas_mass_fraction=0.1, specific_heat=4000).properties(1e5, 300) == (
+        FluidProperties(gmf=0.1, cp_l=4000)
+    )
     assert Stream.model_validate_json(stream.model_dump_json()) == stream
     with pytest.raises(ValidationError):
         brine.salinity = 0.5

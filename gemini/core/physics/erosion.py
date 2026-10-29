@@ -1,362 +1,165 @@
-"""Erosion correlations: DNV RP O501, OKA, E/CRC Tulsa and API RP 14E."""
+"""Erosion correlations: DNV RP O501, OKA, E/CRC Tulsa and API RP 14E.
+
+The penetration-rate correlations work in their published basis: impact angle in degrees,
+flow in m3/h, Vickers hardness in GPa and OKA particle diameter in mm. ``erosion_rate`` is the
+SI boundary and returns mm/year, the explicit literature-unit exception of the package.
+"""
 
 import math
-from typing import Literal
 
-from . import units
+from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from gemini.utils.strings import did_you_mean, join_names
+
+from . import geometry, units
+
+_API_C_FACTOR = 125
+"""API RP 14E empirical constant C in the historical imperial basis."""
+
+_GPA_PER_HV = 0.009807
+"""GPa per Vickers hardness number, from http://www.iron-foundry.com/castings-hardness.html."""
+
+_DNV_MATERIALS = {
+    "steel": (2e-9, 2.6, 7800),
+    "grp/epoxy": (0.3e-9, 3.6, 1800),
+    "grp/vinyl ester": (0.6e-9, 3.6, 1800),
+}
+"""DNV RP O501 material constant K, velocity exponent n and pipe density [kg/m3].
+
+Names match case-insensitively. Titanium (K = 2e-9, n = 2.6, 4500 kg/m3) is listed by DNV
+but stays rejected: the original compared ``material.upper() == "titanium"``, which can never
+be true.
+"""
+
+_OKA_PARTICLES = {
+    "SIO2": (104, 326, -0.12, lambda hardness: 2.3 * hardness**0.038, 0.19, 65),
+    "SIC": (99, 326, -0.05, lambda hardness: 3 * hardness**0.085, 0.19, 45),
+    "GLASS": (100, 200, -0.16, lambda hardness: 2.1, 0.19, 27),
+}
+"""OKA particle constants: reference velocity [m/s], reference diameter, k1, k2(Hv), k3, K.
+
+Names match case-insensitively (SiO2 sand, SiC, glass beads).
+"""
+
+_MODELS = {
+    "DNV": "DNV",
+    "DNVGL": "DNV",
+    "OKA": "OKA",
+    "TULSA": "TULSA",
+    "E/CRC TULSA": "TULSA",
+    "ECRC": "TULSA",
+    "API": "API",
+}
+"""Accepted model spellings (upper-cased, stripped) and their correlation."""
 
 
-def _mass_flow_and_velocity(
-    flow_rate_m3h: float, rho_fluid_kgm3: float, diameter_m: float
-) -> tuple[float, float, float]:
-    """Particle mass flow, pipe area, and mixture velocity from volumetric flow.
+def _particle_flow(flow_rate_m3h, rho_fluid, diameter):
+    """Return particle mass flow [kg/s], impact velocity [m/s] and pipe area [m2].
 
-    Parameters
-    ----------
-    flow_rate_m3h: float
-        Fluid flow rate (m3/h).
-    rho_fluid_kgm3: float
-        Mixture density of fluid (kg/m3).
-    diameter_m: float
-        Inner diameter of the pipe (m).
-
-    Returns
-    -------
-    tuple
-        ``(mp_kgs, up_ms, a_pipe_m2)`` -- particle mass flow [kg/s],
-        mixture impact velocity [m/s], pipe cross-section area [m2].
+    NOTE(refactor): particle mass flow equals the total fluid mass flow; there is no solids
+    fraction.
     """
-    # -- mass flow of particles [kg/s] ----------------------------------
-    mp_kgs = units.kgh_to_kgs(flow_rate_m3h * rho_fluid_kgm3)
-
-    # -- pipe cross-section + mixture velocity --------------------------
-    a_pipe_m2 = 0.25 * math.pi * diameter_m**2
-    up_ms = mp_kgs / (rho_fluid_kgm3 * a_pipe_m2)
-
-    return mp_kgs, up_ms, a_pipe_m2
+    particle_mass_flow = units.kgh_to_kgs(flow_rate_m3h * rho_fluid)
+    area = geometry.circle_area(diameter)
+    velocity = particle_mass_flow / (rho_fluid * area)
+    return particle_mass_flow, velocity, area
 
 
-class _ErosionAPI:
-    """Class for API erosion model."""
+def _dnv_rate(alpha_deg, material, rho_fluid, diameter, flow_rate_m3h):
+    """Return the DNV RP O501 erosion rate [mm/year].
 
-    @staticmethod
-    def calculate_erosion_velocity(rho_fluid):
-        """Calculate maximum erosion flow velocity.
-
-        Parameters
-        ----------
-        rho_fluid: float
-            mixture density of fluid (kg/m3)
-
-        Returns
-        --------
-        U_erosion: float
-            maximum erosion flow velocity (m/s)
-        """
-        C = 125
-        C_unit = units.API_VELOCITY_FACTOR
-
-        U_erosion = C_unit * C / math.sqrt(rho_fluid)  # VELOCITY LIMIT FOR EROSION, m/s
-
-        return U_erosion
-
-
-class _ErosionDNV:
-    """Class for DNV erosion model.
-
-    source: https://wiki.pengtools.com/images/9/91/RP_O501_EROSIVE_WEAR_IN_PIPING_SYSTEMS.pdf
+    Source: https://wiki.pengtools.com/images/9/91/RP_O501_EROSIVE_WEAR_IN_PIPING_SYSTEMS.pdf
     """
-
-    @staticmethod
-    def calculate_erosion_rate(input):
-        """Calculate maximum erosion rate per year.
-
-        Parameters
-        ----------
-        alpha: float
-            particle impact angle (deg)
-        mater: string
-            material (steel, titanium, GRP, Vinyl Ester)
-        rho_fluid: float
-            mixture density of fluid (kg/m3)
-        diameter: float
-            inner diameter of the pipe (m)
-        flowRate: float
-            fluid flow rate (m3/h)
-
-        Returns
-        --------
-        EL: float
-            erosion rate (mm/y or mpy)
-        """
-        alpha = input["alpha"]
-        material = input["mater"]
-        if material.lower() == "steel":
-            K = 2e-9
-            n = 2.6
-            rho_pipe = 7800
-        elif material.upper() == "titanium":
-            K = 2e-9
-            n = 2.6
-            rho_pipe = 4500
-        elif material.lower() == "grp/epoxy":
-            K = 0.3e-9
-            n = 3.6
-            rho_pipe = 1800
-        elif material.lower() == "grp/vinyl ester":
-            K = 0.6e-9
-            n = 3.6
-            rho_pipe = 1800
-        else:
-            raise ValueError(f"Unknown mater '{material}' for DNV erosion.")
-
-        D = input["diameter"]
-        dens_liq = input["rho_fluid"]
-        # mp [kg/s], Up [m/s] (mixture velocity in multiphase), A_pipe [m2]
-        mp, Up, A_pipe = _mass_flow_and_velocity(input["flowRate"], dens_liq, D)
-
-        aa = units.deg_to_rad(alpha)
-        F = aa * (
-            9.37
-            + aa
+    if material.lower() not in _DNV_MATERIALS:
+        raise UnknownCorrelationError(
+            f"erosion_rate DNV: material = {material!r}; expected one of "
+            f"{join_names(_DNV_MATERIALS)}{did_you_mean(material.lower(), _DNV_MATERIALS)}"
+        )
+    constant, exponent, rho_pipe = _DNV_MATERIALS[material.lower()]
+    mass_flow, velocity, area = _particle_flow(flow_rate_m3h, rho_fluid, diameter)
+    angle = units.deg_to_rad(alpha_deg)
+    angle_function = angle * (
+        9.37
+        + angle
+        * (
+            -42.295
+            + angle
             * (
-                -42.295
-                + aa
+                110.864
+                + angle
                 * (
-                    110.864
-                    + aa * (-175.804 + aa * (170.137 + aa * (-98.398 + aa * (31.211 - 4.17 * aa))))
+                    -175.804
+                    + angle * (170.137 + angle * (-98.398 + angle * (31.211 - 4.17 * angle)))
                 )
             )
         )
+    )
+    impact_area = area / math.sin(angle)
+    return (
+        units.ms_to_mm_year(1)
+        * mass_flow
+        * constant
+        * velocity**exponent
+        * angle_function
+        / (rho_pipe * impact_area)
+    )
 
-        A_t = A_pipe / math.sin(aa)  # m2
-        C_unit = units.ms_to_mm_year(1)  # conversion m/s --> mm/yr
 
-        EL = C_unit * mp * K * Up**n * F / (rho_pipe * A_t)  # [mm/yr]
+def _oka_rate(
+    alpha_deg,
+    particle_material,
+    hardness_gpa,
+    particle_diameter_mm,
+    rho_fluid,
+    diameter,
+    flow_rate_m3h,
+):
+    """Return the OKA erosion rate [mm/year].
 
-        return EL
+    Source: https://www.sciencedirect.com/science/article/pii/S0043164805000979
 
-
-class _ErosionOKA:
-    """Class for OKA erosion model.
-
-    source: https://www.sciencedirect.com/science/article/pii/S0043164805000979
+    NOTE(refactor): OKA documents the particle diameter in mm; it is retained despite the
+    reference diameter 326.
     """
-
-    @staticmethod
-    def calculate_erosion_rate(input):
-        """Calculate maximum erosion rate per year.
-
-        Parameters
-        ----------
-        alpha: float
-            particle impact angle (deg)
-        material_particles: string
-            material of particle (SIO2, SIC, Glass)
-        diameter_particles: float
-            diamater of particle (mm)
-        Hv: float
-            vickers  hardness (GPa)
-        rho_fluid: float
-            mixture density of fluid (kg/m3)
-        diameter: float
-            inner diameter of the pipe (m)
-        flowRate: float
-            fluid flow rate (m3/h
-        Returns
-        --------
-        EL: float
-            erosion rate (mm/y or mpy)
-        """
-        alpha = input["alpha"]
-        D = input["diameter"]
-        dens_liq = input["rho_fluid"]
-        # mp [kg/s], Up [m/s] (mixture velocity in multiphase), A_pipe1 [m2]
-        mp, Up, A_pipe1 = _mass_flow_and_velocity(input["flowRate"], dens_liq, D)
-
-        Hv = input["Hv"]  # Vickers [GPa] NB:Hv[GPa] = 0.009807*Hv_
-        material_particles = input["mater_particle"]
-        dp = input["diameter_particle"]
-
-        if material_particles.upper() == "SIO2":
-            # SiO2 particles
-            Upref = 104
-            dpref = 326
-            k1 = -0.12
-            k2 = 2.3 * Hv**0.038
-            k3 = 0.19
-            K = 65
-        elif material_particles.upper() == "SIC":
-            # SiC particles
-            Upref = 99
-            dpref = 326
-            k1 = -0.05
-            k2 = 3 * Hv**0.085
-            k3 = 0.19
-            K = 45
-        elif material_particles.upper() == "GLASS":
-            # Glass beads
-            Upref = 100
-            dpref = 200
-            k1 = -0.16
-            k2 = 2.1
-            k3 = 0.19
-            K = 27
-        else:
-            raise ValueError(
-                f"Unknown mater_particle '{material_particles}'. " "Use SIO2, SIC, or GLASS."
-            )
-
-        a = 1
-        b = 1
-
-        aa = units.deg_to_rad(alpha)
-        A_pipe = units.m2_to_mm2(A_pipe1)  # [mm2]
-        A_t = A_pipe / math.sin(aa)  # [mm2]
-
-        E_alpha = K * (a * Hv) ** (k1 * b) * (Up / Upref) ** k2 * (dp / dpref) ** k3  # [mm3/kg]
-
-        EL = units.SECONDS_PER_YEAR * mp / A_t * E_alpha  # [mm/yr]
-
-        return EL
+    key = particle_material.upper()
+    if key not in _OKA_PARTICLES:
+        raise UnknownCorrelationError(
+            f"erosion_rate OKA: particle_material = {particle_material!r}; expected one of "
+            f"{join_names(_OKA_PARTICLES)}{did_you_mean(key, _OKA_PARTICLES)}"
+        )
+    reference_velocity, reference_diameter, k1, k2, k3, constant = _OKA_PARTICLES[key]
+    mass_flow, velocity, area = _particle_flow(flow_rate_m3h, rho_fluid, diameter)
+    angle = units.deg_to_rad(alpha_deg)
+    impact_area = units.m2_to_mm2(area) / math.sin(angle)
+    erosion_per_mass = (
+        constant
+        * hardness_gpa**k1
+        * (velocity / reference_velocity) ** k2(hardness_gpa)
+        * (particle_diameter_mm / reference_diameter) ** k3
+    )
+    return units.SECONDS_PER_YEAR * mass_flow / impact_area * erosion_per_mass
 
 
-class _ErosionTULSA:
-    """Class for Tulsa erosion model.
+def _tulsa_rate(
+    alpha_deg, hardness_gpa, shape_factor, rho_pipe, rho_fluid, diameter, flow_rate_m3h
+):
+    """Return the E/CRC Tulsa erosion rate [mm/year].
 
-    source: http://www.ecrc.utulsa.edu/
+    Source: http://www.ecrc.utulsa.edu/. Brinell hardness follows from Vickers hardness as
+    0.95057 Hv - 0.03743 (http://www.iron-foundry.com/castings-hardness.html).
     """
-
-    @staticmethod
-    def calculate_erosion_rate(input):
-        """Calculate maximum erosion rate per year.
-
-        Parameters
-        ----------
-        alpha: float
-            particle impact angle (deg)
-        material_particles: string
-            material of particle (SIO2, SIC, Glass)
-        diameter_particles: float
-            diamater of particle (m)
-        Hv: float
-            vickers  hardness (GPa)
-        fs: float
-            Particle shape factor (0.2-1) 0.2 fully rounded - 1 sharp edges
-        rho_fluid: float
-            mixture density of fluid (kg/m3)
-        diameter: float
-            inner diameter of the pipe (m)
-        flowRate: float
-            fluid flow rate (m3/h
-        Returns
-        --------
-        EL: float
-            erosion rate (mm/y or mpy)
-        """
-        alpha = input["alpha"]  # particle impact angle [deg]
-        rho_pipe = input["rho_pipe"]  # density of pipe material
-        D = input["diameter"]  # diameter of pipe [m]
-        dens_liq = input["rho_fluid"]  # kg/m3
-        # mp [kg/s], Up [m/s] (mixture velocity in multiphase), A_pipe [m2]
-        mp, Up, A_pipe = _mass_flow_and_velocity(input["flowRate"], dens_liq, D)
-
-        Hv = input["Hv"]  # Vickers [GPa] NB:Hv[GPa] = 0.009807*Hv_
-        # Particle shape factor: 1 sharp, 0.53 semi-rounded, 0.2 fully rounded
-        Fs = input["fs"]
-
-        aa = units.deg_to_rad(alpha)
-        F = 5.4 * aa - 10.11 * aa**2 + 10.93 * aa**3 - 6.33 * aa**4 + 1.42 * aa**5
-
-        A_t = A_pipe / math.sin(aa)  # [m2]
-
-        Hv_ = Hv / 0.009807  # unit-less, http://www.iron-foundry.com/castings-hardness.html
-        Hb_ = Hv_ * 0.95057 - 0.03743  # http://www.iron-foundry.com/castings-hardness.html
-        C = 2.17e-7
-        n = 2.41
-
-        C_unit = units.ms_to_mm_year(1)  # conversion m/s --> mm/yr
-
-        ER = C * Hb_ ** (-0.59) * Fs * Up**n * F  # [kg/kg]
-
-        #     EL = ER * mp; % [kg/s]
-        #     EL = ER * mp / rho_pipe; % [m3/s]
-        #     EL = ER * mp / rho_pipe / A_t; % [m/s]
-        EL = C_unit * ER * mp / (rho_pipe * A_t)  # [mm/yr]
-
-        return EL
-
-
-MODEL_DNVGL = "DNVGL"
-MODEL_OKA = "OKA"
-MODEL_API = "API"
-MODEL_TULSA = "E/CRC Tulsa"
-
-# Map user-facing spellings (upper-cased) to canonical names.
-_ALIASES = {
-    "DNVGL": MODEL_DNVGL,
-    "DNV": MODEL_DNVGL,
-    "OKA": MODEL_OKA,
-    "API": MODEL_API,
-    "E/CRC TULSA": MODEL_TULSA,
-    "TULSA": MODEL_TULSA,
-    "ECRC": MODEL_TULSA,
-}
-
-# Canonical name -> correlation class exposing calculate_erosion_rate().
-_RATE_CORRELATIONS = {
-    MODEL_DNVGL: _ErosionDNV,
-    MODEL_OKA: _ErosionOKA,
-    MODEL_TULSA: _ErosionTULSA,
-}
-
-
-def normalize_model_name(name: str) -> str:
-    """Resolve an erosion correlation alias.
-
-    Parameters
-    ----------
-    name : str
-        User-facing correlation name [-].
-
-    Returns
-    -------
-    str
-        Canonical DNV, OKA, TULSA or API name [-].
-
-    Notes
-    -----
-    Reference: GEMINI ErosionModel alias table; unknown names raise ValueError.
-    """
-    key = str(name).strip().upper()
-    canonical = _ALIASES.get(key)
-    if canonical is None:
-        raise ValueError(f"Unknown erosion_model '{name}'.")
-    return canonical
-
-
-def is_velocity_model(name: str) -> bool:
-    """Identify a velocity-limit correlation.
-
-    Parameters
-    ----------
-    name : str
-        Erosion correlation name or alias [-].
-
-    Returns
-    -------
-    bool
-        True for API; False for penetration-rate correlations [-].
-
-    Notes
-    -----
-    Reference: GEMINI ErosionModel output classification.
-    """
-    return normalize_model_name(name) == MODEL_API
+    mass_flow, velocity, area = _particle_flow(flow_rate_m3h, rho_fluid, diameter)
+    angle = units.deg_to_rad(alpha_deg)
+    angle_function = (
+        5.4 * angle - 10.11 * angle**2 + 10.93 * angle**3 - 6.33 * angle**4 + 1.42 * angle**5
+    )
+    impact_area = area / math.sin(angle)
+    brinell = hardness_gpa / _GPA_PER_HV * 0.95057 - 0.03743
+    erosion_per_mass = 2.17e-7 * brinell ** (-0.59) * shape_factor * velocity**2.41 * angle_function
+    return units.ms_to_mm_year(1) * erosion_per_mass * mass_flow / (rho_pipe * impact_area)
 
 
 def erosion_rate(
-    model: Literal["DNV", "OKA", "TULSA"],
+    model: str,
     *,
     flow_rate: float,
     rho_fluid: float,
@@ -374,11 +177,12 @@ def erosion_rate(
     Parameters
     ----------
     model : str
-        DNV, OKA or TULSA, including legacy aliases.
+        DNV, OKA or TULSA, case-insensitive, also as DNVGL, E/CRC Tulsa or ECRC.
     flow_rate, rho_fluid, diameter : float
-        Volume flow [m3/s], density [kg/m3], internal diameter [m].
+        Volume flow [m3/s], density [kg/m3], internal diameter [m]. A negative flow raises
+        wherever it makes a velocity power complex.
     alpha, material, hardness : float, str, float
-        Impact angle [rad], pipe material [-], Vickers hardness [Pa].
+        Nonzero impact angle [rad], pipe material [-], Vickers hardness [Pa].
     particle_material, particle_diameter : str, float
         Particle material [-] and diameter [m].
     rho_pipe, shape_factor : float
@@ -388,26 +192,49 @@ def erosion_rate(
     -------
     float
         Erosion rate [mm/year]. API is available separately as a velocity limit.
+
+    Notes
+    -----
+    The impact angle is converted to degrees at this boundary and back to radians inside the
+    correlations; the rad→deg→rad round trip changes the last bits and is retained.
     """
-    name = normalize_model_name(model)
-    if name == MODEL_API:
-        raise ValueError("API is a velocity limit; use api_erosional_velocity")
-    # NOTE(refactor): particle mass flow equals total fluid mass flow; no solids fraction.
-    # NOTE(refactor): OKA documents particle diameter as mm; retain it despite dpref=326.
-    # NOTE(refactor): DNV's uppercase comparison to 'titanium' remains unreachable, as before.
-    data = dict(
-        flowRate=units.m3s_to_m3h(flow_rate),
-        rho_fluid=rho_fluid,
-        diameter=diameter,
-        alpha=units.rad_to_deg(alpha),
-        mater=material,
-        Hv=units.pa_to_gpa(hardness),
-        mater_particle=particle_material,
-        diameter_particle=units.m_to_mm(particle_diameter),
-        rho_pipe=rho_pipe,
-        fs=shape_factor,
-    )
-    return float(_RATE_CORRELATIONS[name].calculate_erosion_rate(data))
+    name = _MODELS.get(str(model).strip().upper())
+    if name is None or name == "API":
+        raise UnknownCorrelationError(
+            f"erosion_rate: model = {model!r}; expected DNV, OKA or TULSA"
+            + ("; API is a velocity limit, use api_erosional_velocity" if name else "")
+        )
+    if alpha == 0:
+        raise PhysicsRangeError(f"erosion_rate: alpha = {alpha} rad; expected a nonzero angle")
+    flow_rate_m3h, alpha_deg = units.m3s_to_m3h(flow_rate), units.rad_to_deg(alpha)
+    if name == "DNV":
+        rate = _dnv_rate(alpha_deg, material, rho_fluid, diameter, flow_rate_m3h)
+    elif name == "OKA":
+        rate = _oka_rate(
+            alpha_deg,
+            particle_material,
+            units.pa_to_gpa(hardness),
+            units.m_to_mm(particle_diameter),
+            rho_fluid,
+            diameter,
+            flow_rate_m3h,
+        )
+    else:
+        rate = _tulsa_rate(
+            alpha_deg,
+            units.pa_to_gpa(hardness),
+            shape_factor,
+            rho_pipe,
+            rho_fluid,
+            diameter,
+            flow_rate_m3h,
+        )
+    if isinstance(rate, complex):
+        raise PhysicsRangeError(
+            f"erosion_rate {name}: flow_rate = {flow_rate} m3/s gives a complex rate; "
+            "expected a nonnegative flow"
+        )
+    return float(rate)
 
 
 def api_erosional_velocity(rho_fluid: float) -> float:
@@ -425,11 +252,13 @@ def api_erosional_velocity(rho_fluid: float) -> float:
 
     Notes
     -----
-    Reference: API RP 14E; GEMINI uses C=100 with historical imperial conversions.
+    Reference: API RP 14E; GEMINI uses C=125 with historical imperial conversions.
     """
     if rho_fluid <= 0:
-        raise ValueError(f"Density must be positive, got {rho_fluid}")
-    return _ErosionAPI.calculate_erosion_velocity(rho_fluid)
+        raise PhysicsRangeError(
+            f"api_erosional_velocity: rho_fluid = {rho_fluid} kg/m3; expected a positive density"
+        )
+    return units.API_VELOCITY_FACTOR * _API_C_FACTOR / math.sqrt(rho_fluid)
 
 
 def api_velocity_comparison(actual: float, limit: float) -> dict:
@@ -450,7 +279,9 @@ def api_velocity_comparison(actual: float, limit: float) -> dict:
     Reference: GEMINI WIMS API velocity comparison; margin = limit - actual.
     """
     if limit <= 0:
-        raise ValueError("Velocity limit must be positive")
+        raise PhysicsRangeError(
+            f"api_velocity_comparison: limit = {limit} m/s; expected a positive velocity limit"
+        )
     return {
         "velocity_ratio": actual / limit,
         "velocity_margin_ms": limit - actual,

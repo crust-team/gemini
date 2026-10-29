@@ -5,8 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from gemini.core.physics import constants
 from gemini.core.physics.chemistry import henry_constant
-from gemini.core.physics.fluid import ConstantWater, FluidProperties
+from gemini.core.physics.fluid import FluidProperties
 from gemini.core.types.quantities import (
     Density,
     Fraction,
@@ -51,42 +52,52 @@ class Fluid(BaseModel):
 
     def properties(self, p: Pressure, T: Temperature) -> FluidProperties:
         """Return cached constant SI properties; pressure and temperature are independent."""
-        return _property_model(self).properties(p, T)
+        return _properties(self)
 
     def corrosion_inputs(self, p: Pressure, T: Temperature) -> dict[str, float]:
         """Convert dissolved CO2 and salt mass fractions for the existing corrosion boundary.
 
         The Henry-law approximation is evaluated at the inlet temperature. Explicit
         measured gas mole fraction/partial pressure should override it when available.
+
+        NOTE(refactor): dissolved mass fraction is NOT a gas mole fraction. It converts from
+        kg/m3 to mol/m3 with the CO2 molar mass, then inverts the existing Henry law.
         """
         rho = self.properties(p, T).rho_l
-        # NOTE(refactor): dissolved mass fraction is NOT a gas mole fraction. Convert
-        # kg/m3 to mol/m3 (CO2 molar mass 0.04401 kg/mol), then invert existing Henry law.
+        dissolved_co2 = self.co2_mass_fraction * rho / constants.CO2_MOLAR_MASS
         return {
-            "co2_partial_pressure": self.co2_mass_fraction * rho / 0.04401 / henry_constant(T),
+            "co2_partial_pressure": dissolved_co2 / henry_constant(T),
             "ionic_strength": self.salinity * rho,
         }
 
 
+_GLYCOL_30_PROPERTIES = dict(rho_l=1029.85, cp_l=3841, k_l=0.4622, mu_l=0.0016295)
+
+_OVERRIDES = (
+    ("liquid_density", "rho_l"),
+    ("liquid_viscosity", "mu_l"),
+    ("specific_heat", "cp_l"),
+    ("thermal_conductivity", "k_l"),
+)
+
+
 @lru_cache(maxsize=256)
-def _property_model(fluid: Fluid) -> ConstantWater:
-    values = {"GMF": fluid.gas_mass_fraction}
+def _properties(fluid: Fluid) -> FluidProperties:
+    """Return the constant property snapshot of a fluid, cached by its complete value.
+
+    NOTE(refactor): ``glycol_water`` uses DOWFROST HD reference values for 30% propylene
+    glycol by volume at 40 C, frozen rather than a temperature-dependent glycol correlation:
+    https://www.dow.com/content/dam/dcc/documents/en-us/productdatasheet/180/
+    180-01315-01-dowfrost-hd-tds.pdf (table, page 3).
+    """
+    values = {"gmf": fluid.gas_mass_fraction}
     if fluid.kind == "glycol_water":
-        # NOTE(refactor): DOWFROST HD, 30% propylene glycol by volume at 40 C.
-        # Frozen reference values, not a temperature-dependent glycol correlation.
-        # https://www.dow.com/content/dam/dcc/documents/en-us/productdatasheet/180/
-        # 180-01315-01-dowfrost-hd-tds.pdf (table, page 3).
-        values.update(RHOL=1029.85, CPL=3841, TCL=0.4622, VISL=0.0016295)
-    for field, key in (
-        ("liquid_density", "RHOL"),
-        ("liquid_viscosity", "VISL"),
-        ("specific_heat", "CPL"),
-        ("thermal_conductivity", "TCL"),
-    ):
+        values.update(_GLYCOL_30_PROPERTIES)
+    for field, name in _OVERRIDES:
         value = getattr(fluid, field)
         if value is not None:
-            values[key] = value
-    return ConstantWater(**values)
+            values[name] = value
+    return FluidProperties(**values)
 
 
 BRINE = Fluid()

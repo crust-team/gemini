@@ -8,8 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from gemini.core.physics import units
 from gemini.core.types.ports import Ports
 from gemini.core.types.quantities import Fraction
+from gemini.errors import UnitError
 from gemini.utils.mappings import AttributeMapping
-from gemini.utils.strings import join_path
+from gemini.utils.strings import did_you_mean, join_names, join_path
 
 
 class Health(BaseModel):
@@ -17,7 +18,7 @@ class Health(BaseModel):
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     assessed: bool = Field(True, description="Diagnostic model was evaluated [-]")
-    score: Fraction = Field(..., ge=0, le=1, description="Condition score, one is nominal [-]")
+    score: Fraction = Field(..., description="Condition score, one is nominal [-]")
     alarm: bool = Field(..., description="Whether a monitoring limit is exceeded [-]")
     message: str = Field(..., description="Explanation of the condition [-]")
     metrics: dict[str, float] = Field(default_factory=dict)
@@ -31,13 +32,22 @@ class Values(AttributeMapping):
         super().__init__(values)
         object.__setattr__(self, "_declarations", dict(declarations or {}))
 
+    def _unknown(self, name):
+        """Name the unknown value, the valid names and the closest match."""
+        return (
+            f"unknown value {name!r}; valid names: {join_names(self._values)}"
+            f"{did_you_mean(name, self._values)}"
+        )
+
     def model_dump(self, **kwargs):
-        """Return a copy for engine storage and health calculations."""
-        del kwargs
+        """Return a copy for engine storage and health calculations; options are ignored."""
         return self._values.copy()
 
     def get(self, name, default=None, *, unit=None):
-        """Return one value, optionally converted from its declared SI unit."""
+        """Return one value, optionally converted from its declared SI unit.
+
+        Differences such as a temperature difference convert by scale only.
+        """
         if name not in self._values:
             return default
         value = self._values[name]
@@ -45,13 +55,18 @@ class Values(AttributeMapping):
             return value
         declaration = self._declarations.get(name)
         if declaration is None or declaration.unit is None:
-            raise ValueError(f"{name}: no physical unit is declared")
-        return units.convert(value, declaration.unit, unit)
+            raise UnitError(f"{name}: unit = None; expected a declared physical unit")
+        return units.convert(value, declaration.unit, unit, declaration.quantity)
 
 
 @dataclass(frozen=True)
 class ModuleResult:
-    """Computed outputs, outgoing flows and immutable evaluation audit data."""
+    """Computed outputs, outgoing flows and the evaluation audit data of one call.
+
+    ``outputs`` and ``outlets`` are read-only mappings. ``inputs`` and ``children`` are plain
+    dictionaries captured at evaluation time; treat them as read-only. ``leaves()`` treats a
+    result without called children as a leaf.
+    """
 
     outputs: Values
     outlets: Ports

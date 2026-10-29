@@ -1,5 +1,7 @@
 """Public data types for GEMINI modules."""
 
+from gemini.core.physics.units import Quantity
+
 from .bindings import Binding, ColumnInfo, DatedParams, ModuleBindings
 from .cost import Cost
 from .declarations import (
@@ -10,7 +12,6 @@ from .declarations import (
     Outlet,
     Output,
     Parameter,
-    Quantity,
 )
 from .flows import Stream
 from .fluid import BRINE, GLYCOL_30, WATER, Fluid

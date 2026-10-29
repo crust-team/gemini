@@ -1,7 +1,17 @@
-"""Unit conversions at package and correlation boundaries; historical factors retained."""
+"""Unit conversions at package and correlation boundaries; historical factors retained.
+
+The ``*_to_*`` functions convert at correlation boundaries that use US or laboratory units.
+``_UNITS`` is the single table of public data units: every unit maps to its SI unit, a scale
+and an offset, ``si = value * scale + offset``. ``to_si``, ``convert``, ``value_in_si``,
+``si_unit`` and the unit sets of ``Profile`` and ``Stream`` all read it.
+"""
 
 import math
 import re
+from dataclasses import dataclass
+
+from gemini.errors import UnitError
+from gemini.utils.strings import did_you_mean
 
 SECONDS_PER_DAY = 24 * 3600
 SECONDS_PER_YEAR = 365.25 * SECONDS_PER_DAY
@@ -223,112 +233,131 @@ def mol_l_bar_to_mol_m3_pa(x: float) -> float:
     return x * 0.01
 
 
-def to_si(value: float, unit: str) -> float:
-    """Convert a bound scalar to SI; volume flow remains [m3/s] until density is known."""
-    conversions = {
-        "bar": (1e5, 0),
-        "barg": (1e5, 101325),
-        "degC": (1, 273.15),
-        "C": (1, 273.15),
-        "°C": (1, 273.15),
-        "K": (1, 0),
-        "m3/h": (1 / 3600, 0),
-        "m3/s": (1, 0),
-        "l/s": (1e-3, 0),
-        "kg/s": (1, 0),
-        "t/h": (1000 / 3600, 0),
-        "Hz": (1, 0),
-        "W": (1, 0),
-        "kW": (1000, 0),
-        "MW": (1e6, 0),
-        "J": (1, 0),
-        "kWh": (3.6e6, 0),
-        "currency/J": (1, 0),
-        "currency/kWh": (1 / 3.6e6, 0),
-        "Pa": (1, 0),
-        "m": (1, 0),
-        "ft": (0.3048, 0),
-        "s": (1, 0),
-        "m2": (1, 0),
-        "m3": (1, 0),
-        "rad": (1, 0),
-        "kg/m3": (1, 0),
-        "Pa.s": (1, 0),
-        "J/kg/K": (1, 0),
-        "W/m/K": (1, 0),
-        "W/m2/K": (1, 0),
-        "W/K": (1, 0),
-        "m2": (1, 0),
-        "m3/s/Pa": (1, 0),
-        "-": (1, 0),
-    }
-    if unit not in conversions:
-        raise ValueError(f"Unknown data unit {unit!r}")
-    scale, offset = conversions[unit]
-    return float(value) * scale + offset
-
-
-_DIMENSIONS = {
-    "Pa": {"Pa", "bar", "barg"},
-    "K": {"K", "degC", "C", "°C"},
-    "m3/s": {"m3/s", "m3/h", "l/s"},
-    "kg/s": {"kg/s", "t/h"},
-    "W": {"W", "kW", "MW"},
-    "J": {"J", "kWh"},
-    "m": {"m", "ft"},
-    "-": {"-"},
+_UNITS = {
+    "Pa": ("Pa", 1, 0),
+    "bar": ("Pa", 1e5, 0),
+    "barg": ("Pa", 1e5, 101325),
+    "K": ("K", 1, 0),
+    "degC": ("K", 1, 273.15),
+    "C": ("K", 1, 273.15),
+    "°C": ("K", 1, 273.15),
+    "m3/s": ("m3/s", 1, 0),
+    "m3/h": ("m3/s", 1 / 3600, 0),
+    "l/s": ("m3/s", 1e-3, 0),
+    "kg/s": ("kg/s", 1, 0),
+    "t/h": ("kg/s", 1000 / 3600, 0),
+    "Hz": ("Hz", 1, 0),
+    "W": ("W", 1, 0),
+    "kW": ("W", 1000, 0),
+    "MW": ("W", 1e6, 0),
+    "J": ("J", 1, 0),
+    "kWh": ("J", 3.6e6, 0),
+    "currency": ("currency", 1, 0),
+    "currency/year": ("currency/year", 1, 0),
+    "currency/J": ("currency/J", 1, 0),
+    "currency/kWh": ("currency/J", 1 / 3.6e6, 0),
+    "m": ("m", 1, 0),
+    "ft": ("m", 0.3048, 0),
+    "s": ("s", 1, 0),
+    "m/s": ("m/s", 1, 0),
+    "m2": ("m2", 1, 0),
+    "m3": ("m3", 1, 0),
+    "rad": ("rad", 1, 0),
+    "kg/m3": ("kg/m3", 1, 0),
+    "Pa.s": ("Pa.s", 1, 0),
+    "J/kg/K": ("J/kg/K", 1, 0),
+    "W/m/K": ("W/m/K", 1, 0),
+    "W/m2/K": ("W/m2/K", 1, 0),
+    "W/K": ("W/K", 1, 0),
+    "m3/s/Pa": ("m3/s/Pa", 1, 0),
+    "-": ("-", 1, 0),
 }
 
+_NUMBER_AND_UNIT = re.compile(r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+(.+?)\s*")
 
-def value_in_si(value, expected_unit=None, path="value"):
-    """Convert a unit string or Quantity-like object to a declaration's SI unit."""
-    supplied = None
-    if hasattr(value, "value") and hasattr(value, "unit"):
-        value, supplied = value.value, value.unit
-    elif isinstance(value, str):
-        match = re.fullmatch(
-            r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+(.+?)\s*", value
+
+@dataclass(frozen=True)
+class Quantity:
+    """A scalar and unit accepted at public API boundaries."""
+
+    value: float
+    unit: str
+
+
+def _entry(unit, path="units"):
+    """Return ``(si_unit, scale, offset)`` of a known unit."""
+    if unit not in _UNITS:
+        raise UnitError(
+            f"{path}: unit = {unit!r}; expected a known unit{did_you_mean(unit, _UNITS)}"
         )
-        if match is None:
-            return value
-        value, supplied = float(match.group(1)), match.group(2)
-    if supplied is None:
+    return _UNITS[unit]
+
+
+def _offset(unit, quantity):
+    """Return the offset of ``unit``, or zero for a ``*_difference`` quantity.
+
+    A difference of 10 degC is a difference of 10 K, and a pressure difference in barg equals
+    the same difference in bar, so differences convert by scale only.
+    """
+    if quantity is not None and quantity.endswith("_difference"):
+        return 0
+    return _UNITS[unit][2]
+
+
+def si_unit(unit):
+    """Return the SI unit that ``unit`` converts to, or ``None`` for an unknown unit."""
+    entry = _UNITS.get(unit)
+    return entry[0] if entry else None
+
+
+def to_si(value: float, unit: str, quantity: str | None = None) -> float:
+    """Convert a bound scalar to SI; volume flow remains [m3/s] until density is known."""
+    _, scale, _ = _entry(unit, "units.to_si")
+    return float(value) * scale + _offset(unit, quantity)
+
+
+def split_quantity(value):
+    """Return ``(number, unit)`` for a ``Quantity`` or ``"<number> <unit>"`` text.
+
+    Any other value, including text that is not a number followed by a unit, returns
+    ``(value, None)``.
+    """
+    if isinstance(value, Quantity):
+        return value.value, value.unit
+    if isinstance(value, str):
+        match = _NUMBER_AND_UNIT.fullmatch(value)
+        if match is not None:
+            return float(match.group(1)), match.group(2)
+    return value, None
+
+
+def value_in_si(value, expected_unit=None, path="value", quantity=None):
+    """Convert a unit string or ``Quantity`` to a declaration's SI unit.
+
+    Values without a unit, and every value of a declaration without a unit, pass unchanged.
+    ``quantity`` names the declared quantity so that differences ignore unit offsets.
+    """
+    number, supplied = split_quantity(value)
+    if supplied is None or expected_unit is None:
         return value
-    allowed = _DIMENSIONS.get(expected_unit, {expected_unit})
-    if expected_unit is not None and supplied not in allowed:
-        raise ValueError(
-            f"{path}: unit {supplied!r} is incompatible with expected {expected_unit!r}"
+    if _entry(supplied, path)[0] != expected_unit:
+        raise UnitError(f"{path}: unit = {supplied!r}; expected a unit of {expected_unit!r}")
+    return to_si(number, supplied, quantity)
+
+
+def convert(value, from_unit, to_unit, quantity=None):
+    """Convert a scalar between units of the same dimension through SI.
+
+    A unit converts to itself even when it is not in the unit table. ``quantity`` names the
+    declared quantity so that differences ignore unit offsets.
+    """
+    if from_unit == to_unit and from_unit not in _UNITS:
+        return value
+    source, target = _entry(from_unit, "units.convert"), _entry(to_unit, "units.convert")
+    if source[0] != target[0]:
+        raise UnitError(
+            f"units.convert: unit = {to_unit!r}; expected a unit of {source[0]!r} "
+            f"to convert from {from_unit!r}"
         )
-    return to_si(value, supplied)
-
-
-def convert(value, from_unit, to_unit):
-    """Convert a scalar between supported units of the same dimension."""
-    dimensions = [values for values in _DIMENSIONS.values() if from_unit in values]
-    if not dimensions or to_unit not in dimensions[0]:
-        raise ValueError(f"Cannot convert {from_unit!r} to {to_unit!r}")
-    si = to_si(value, from_unit)
-    targets = {
-        "Pa": (1, 0),
-        "bar": (1e5, 0),
-        "barg": (1e5, 101325),
-        "K": (1, 0),
-        "degC": (1, 273.15),
-        "C": (1, 273.15),
-        "°C": (1, 273.15),
-        "m3/s": (1, 0),
-        "m3/h": (1 / 3600, 0),
-        "l/s": (1e-3, 0),
-        "kg/s": (1, 0),
-        "t/h": (1000 / 3600, 0),
-        "W": (1, 0),
-        "kW": (1000, 0),
-        "MW": (1e6, 0),
-        "J": (1, 0),
-        "kWh": (3.6e6, 0),
-        "m": (1, 0),
-        "ft": (0.3048, 0),
-        "-": (1, 0),
-    }
-    scale, offset = targets[to_unit]
-    return (si - offset) / scale
+    si = to_si(value, from_unit, quantity)
+    return (si - _offset(to_unit, quantity)) / target[1]

@@ -5,31 +5,35 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 
-from gemini.core.physics.units import to_si
+from gemini.core.physics import units
+from gemini.errors import DatasetError, UnitError
 from gemini.utils.time import to_utc_index
 
-# Input dimension and stored unit; conversion itself is owned by core.physics.units.
-_UNITS = {
-    "W": ("power", "W"),
-    "kW": ("power", "W"),
-    "MW": ("power", "W"),
-    "K": ("temperature", "K"),
-    "degC": ("temperature", "K"),
-    "Pa": ("pressure", "Pa"),
-    "bar": ("pressure", "Pa"),
-    "barg": ("pressure", "Pa"),
-    "kg/s": ("mass_flow", "kg/s"),
-    "m3/s": ("volume_flow", "m3/s"),
-    "m3/h": ("volume_flow", "m3/s"),
-    "Hz": ("frequency", "Hz"),
-    "J": ("energy", "J"),
-    "kWh": ("energy", "J"),
-    "currency/J": ("money_per_energy", "currency/J"),
-    "currency/kWh": ("money_per_energy", "currency/J"),
-    "-": ("dimensionless", "-"),
+_QUANTITIES = {
+    "W": "power",
+    "K": "temperature",
+    "Pa": "pressure",
+    "kg/s": "mass_flow",
+    "m3/s": "volume_flow",
+    "Hz": "frequency",
+    "J": "energy",
+    "currency/J": "money_per_energy",
+    "-": "dimensionless",
 }
+"""Quantity name recorded for each SI unit a profile may hold.
+
+A raw profile unit is accepted when ``units`` converts it to one of these SI units.
+"""
+
+
+def _quantity_and_si_unit(unit):
+    """Return the quantity name and SI unit of a supported raw profile unit."""
+    si_unit = units.si_unit(unit)
+    if si_unit not in _QUANTITIES:
+        raise UnitError(f"Profile: unit = {unit!r}; expected a unit of {', '.join(_QUANTITIES)}")
+    return _QUANTITIES[si_unit], si_unit
 
 
 class Profile(BaseModel):
@@ -46,6 +50,7 @@ class Profile(BaseModel):
     unit: str
     index: list[datetime]
     values: list[float]
+    _times: pd.DatetimeIndex = PrivateAttr()
 
     @model_validator(mode="after")
     def samples(self):
@@ -58,65 +63,47 @@ class Profile(BaseModel):
         if not np.isfinite(self.values).all():
             raise ValueError("Profile values must be finite")
         self.index = index.to_pydatetime().tolist()
+        self._times = pd.DatetimeIndex(self.index)
         return self
 
     @classmethod
     def from_series(cls, series, unit, tz="UTC"):
         """Convert an in-memory pandas Series in a supported raw unit to an SI profile."""
-        if unit not in _UNITS:
-            raise ValueError(f"Unsupported profile unit {unit!r}")
+        quantity, si_unit = _quantity_and_si_unit(unit)
         index = to_utc_index(series.index, tz)
-        quantity, si_unit = _UNITS[unit]
         return cls(
             name=series.name or "profile",
             quantity=quantity,
             unit=si_unit,
             index=index.to_pydatetime().tolist(),
-            values=[to_si(value, unit) for value in series.to_numpy()],
+            values=[units.to_si(value, unit) for value in series.to_numpy()],
         )
 
     @classmethod
-    def constant(cls, *args, unit=None, clock=None, **kwargs):
-        """Build a raw-unit constant on a clock, or an explicitly named SI time series.
+    def constant(cls, value, *, unit, clock):
+        """Build a constant profile on every tick of ``clock`` from a raw-unit value.
 
-        Common form: Profile.constant(150, unit="m3/h", clock=clock).
-        The existing explicit name/quantity/unit/value/start/periods/step form remains valid.
+        Example: ``Profile.constant(150, unit="m3/h", clock=clock)``.
         """
-        if clock is not None:
-            if len(args) != 1 or kwargs:
-                raise TypeError("Use constant(value, unit=..., clock=...)")
-            if unit not in _UNITS:
-                raise ValueError(f"Unsupported profile unit {unit!r}")
-            quantity, si_unit = _UNITS[unit]
-            ticks = list(clock)
-            return cls(
-                name="constant",
-                quantity=quantity,
-                unit=si_unit,
-                index=ticks,
-                values=[to_si(args[0], unit)] * len(ticks),
-            )
-        names = ("name", "quantity", "unit", "value", "start", "periods", "step")
-        values = dict(zip(names, args)) | kwargs
-        if unit is not None:
-            values["unit"] = unit
-        if values["periods"] <= 0 or values["step"].total_seconds() <= 0:
-            raise ValueError("Profile periods and step must be positive")
-        index = pd.date_range(values["start"], periods=values["periods"], freq=values["step"])
+        quantity, si_unit = _quantity_and_si_unit(unit)
+        ticks = list(clock)
         return cls(
-            name=values["name"],
-            quantity=values["quantity"],
-            unit=values["unit"],
-            index=index.to_pydatetime().tolist(),
-            values=[values["value"]] * len(index),
+            name="constant",
+            quantity=quantity,
+            unit=si_unit,
+            index=ticks,
+            values=[units.to_si(value, unit)] * len(ticks),
         )
 
     def at(self, t: datetime) -> float:
         """Return the previous sample, raising before the profile starts."""
         target = pd.to_datetime(t, utc=True)
-        position = pd.DatetimeIndex(self.index).searchsorted(target, side="right") - 1
+        position = self._times.searchsorted(target, side="right") - 1
         if position < 0:
-            raise ValueError("Requested time precedes profile")
+            raise DatasetError(
+                f"Profile {self.name}: time = {target}; expected a time at or after the "
+                f"first sample {self._times[0]}"
+            )
         return self.values[position]
 
     def resample(self, step: timedelta, how: Literal["mean", "sum", "first"]):
@@ -125,6 +112,11 @@ class Profile(BaseModel):
             raise ValueError("Require a positive step and mean, sum or first")
         groups = self.to_series().resample(step)
         series = groups.sum(min_count=1) if how == "sum" else getattr(groups, how)()
+        if series.isna().any():
+            raise DatasetError(
+                f"Profile {self.name}: resample bin at {series.index[series.isna()][0]} is "
+                "empty; expected at least one sample in every bin"
+            )
         return type(self)(
             name=self.name,
             quantity=self.quantity,

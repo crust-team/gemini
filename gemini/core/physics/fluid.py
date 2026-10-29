@@ -1,4 +1,8 @@
-"""Constant fluid properties inherited from GEMINI's PVTConstantSTP model."""
+"""Constant fluid properties inherited from GEMINI's PVTConstantSTP model.
+
+The defaults are the original constant-water values; pressure and temperature do not change
+them. ``gemini.core.types.Fluid`` builds and caches one snapshot per fluid.
+"""
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,43 +26,3 @@ class FluidProperties(BaseModel):
     def density(self) -> float:
         """Return homogeneous mixture density [kg/m3]."""
         return 1 / (self.gmf / self.rho_g + (1 - self.gmf) / self.rho_l)
-
-
-class ConstantWater:
-    """Constant PVT model with the original uppercase override keys."""
-
-    def __init__(self, **overrides: float):
-        """Validate legacy RHOL, VISL, etc. overrides, all in SI units."""
-        names = dict(
-            RHOL="rho_l",
-            RHOG="rho_g",
-            GMF="gmf",
-            VISL="mu_l",
-            VISG="mu_g",
-            CPL="cp_l",
-            CPG="cp_g",
-            TCL="k_l",
-            TCG="k_g",
-            SIGMA="sigma",
-        )
-        # These original metadata fields never affected get_pvt's returned values.
-        metadata = {
-            "HG",
-            "HL",
-            "SG",
-            "SL",
-            "pressure_max",
-            "pressure_min",
-            "temperature_max",
-            "temperature_min",
-        }
-        unknown = set(overrides) - names.keys() - metadata
-        if unknown:
-            raise ValueError(f"Unknown constant-water properties: {sorted(unknown)}")
-        self._properties = FluidProperties(
-            **{names[k]: v for k, v in overrides.items() if k in names}
-        )
-
-    def properties(self, p: float, T: float) -> FluidProperties:
-        """Return constant properties for pressure [Pa] and temperature [K]."""
-        return self._properties

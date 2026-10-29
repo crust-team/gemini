@@ -1,15 +1,14 @@
-"""Original constant-water defaults and override validation."""
+"""Constant fluid property snapshot: original defaults, mixture density and validation."""
 
 import pytest
 from pydantic import ValidationError
 
-from gemini.core.physics.fluid import ConstantWater
+from gemini.core.physics.fluid import FluidProperties
 
 
-def test_original_defaults_and_overrides():
-    """The new API retains all ten properties returned by PVTConstantSTP."""
-    props = ConstantWater().properties(100000, 288.15)
-    assert props.model_dump() == dict(
+def test_original_defaults():
+    """The snapshot retains all ten properties returned by PVTConstantSTP."""
+    assert FluidProperties().model_dump() == dict(
         rho_g=1.976,
         rho_l=1000,
         gmf=0,
@@ -21,6 +20,14 @@ def test_original_defaults_and_overrides():
         k_l=1.6,
         sigma=0.0728,
     )
-    assert ConstantWater(RHOL=1068, VISL=0.00065).properties(1, 300).mu_l == 0.00065
+
+
+def test_mixture_density_and_validation():
+    """Density is the homogeneous mixture; impossible properties are rejected."""
+    assert FluidProperties(rho_l=1068).density == 1068
+    assert FluidProperties(gmf=0.5).density == pytest.approx(1 / (0.5 / 1.976 + 0.5 / 1000))
+    for override in ({"rho_l": -1}, {"gmf": 1}, {"mu_l": 0}):
+        with pytest.raises(ValidationError):
+            FluidProperties(**override)
     with pytest.raises(ValidationError):
-        ConstantWater(RHOL=-1)
+        FluidProperties().rho_l = 1
