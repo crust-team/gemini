@@ -1,22 +1,5 @@
 # Changelog
 
-## Types and handwritten plants
-
-- Add quantity schemas, immutable Fluid dtypes, reporting energy flows, Profiles and Costs.
-- Replace GraphPlant and serialized links with explicit Doublet/GeothermalExamplePlant wiring.
-- Preserve golden values and expose unresolved pump work and electricity reconciliation limits.
-
-## [Unreleased] — composable modules
-
-- Replace equipment contracts with recursive Module, Sequential and GraphPlant APIs.
-- Move equipment into core/modules; remove the former runtime wrappers and execution loop.
-- Add dated configuration, explicit GEMINI binding audits and portable plant JSON.
-- Implement filters, liquid-only degassing and simple injection-pump physics.
-- Add independent twin/history/live modes, bounded calibration, scenarios, event logs and exports.
-- Validate all 17,280 observations; preserve golden values and document source-data accuracy limits.
-- Preserve the workspace dataset name geothermal_doublet and provide nine runnable examples.
-
-
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
@@ -24,27 +7,79 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+The package was rebuilt as composable modules with handwritten plants, in-memory data and one
+finite engine, and then cleaned up. Old import paths are not retained.
+
 ### Added
-- Validated SI equipment components, streams, health hooks and automatic component discovery.
-- Shared physics, parameter mappers, heat exchanger and boiler models, five runnable examples.
-- Immutable physics golden values and offline CSV monitoring regression checks.
-- Agent conventions in `AGENTS.md`, `CLAUDE.md` and `.claude/docs/`.
+- Composable `Module` equipment with declared parameters, ports, controls, boundaries and
+  outputs, the handwritten `Doublet` plant and the example `DoubletHeatPlant`, portable plant
+  JSON with dated parameters and bindings, and the `gm.legacy` bridge to old GEMINI projects.
+- `Engine.simulate`, `Engine.replay` and `Engine.live` with callbacks, results, checkpoints and
+  resume; bounded calibration through replay; quantity declarations, immutable fluids, profiles,
+  costs and mass/energy audits. Eight runnable examples under `examples/`.
+- Leaf packages `gemini.utils` (shared string, time, hook, mapping, context and file helpers;
+  `python -m gemini.utils.collect_env`) and `gemini.errors` (every error class, also deriving
+  from the matching built-in exception, as `gm.errors`).
+- Development and release test profiles: `make test` runs `scripts/test_changed.py` on what
+  changed and what imports it within a 300 s budget, `make test-release` runs every tier on the
+  full-year data; CI runs the development profile on feature branches and the release profile
+  for `main`.
+- Quality gates: `tests/unit/test_code_quality.py` (comments, nesting, function length,
+  framework name), flake8 `max-complexity = 10` without ignoring bare `except`, the package
+  boundary test and mirror tests for every source file.
 
 ### Changed
-- Consolidate the suite into the installable `gemini` Python package.
-- Rewrite monitoring modules to use components while preserving the existing eight output tags.
-- Move example plant data to `datasets/geothermal_doublet` and API documentation to `docs`.
-- Return ESP efficiency as a fraction; report undefined radial diagnostics as unavailable.
+- The `Module` base class is explicit: modules are built without arguments and configured with
+  `update_params`, which returns the module; there is no class registry or `__init__` wrapping;
+  the values of one call live in a single `_Call` context record; `fluid` is a validated
+  property; plant files and checkpoints import classes only through `class_path`/`import_class`.
+- Declaration listings recurse by default and key results by dotted path; `inlets()` and
+  `outlets()` list the module's own ports. `health(result, measured)` receives the call's
+  `ModuleResult`; `load_state_dict` takes `strict`; `has_input_value` and
+  `clear_param_overrides` were added.
+- Ports and controls follow one naming rule: `ProductionReservoir.production_rate` (was `m_dot`),
+  `DoubletHeatPlant.secondary_in` (was `secondary`, also in `plant.json` and the data columns),
+  `Doublet.return_in`/`supply_out` (were `return_stream`/`supply`) and
+  `Boiler.temperature_setpoint` (was `setpoint_T`). `MissingMeasurement` became
+  `gm.errors.MissingMeasurementError`, and costs are summed by
+  `gemini.core.types.cost.total_cost(plant)` over modules that define `capex()`.
+- Physics consists of plain functions with one unit table; `ConstantWater` became
+  `FluidProperties`, and `Profile.constant(value, unit=, clock=)` is the only constant form.
+- Runtime settings are context-local; ESP efficiency is a fraction; undefined radial
+  diagnostics are reported as unavailable.
 
 ### Removed
-- Flask interface, application/UI workflows, container stack and platform launcher scripts.
-- UI-only dependencies and obsolete model base classes; old import paths are not retained.
+- `gm.modules.list/get/create`, the module catalogue and engine registry, `Sequential`,
+  `fidelity`, `apply`, `column_units`, `last_result(s)`, `Module.cost`, keyword-value
+  construction, `runtime.dtype` and `runtime.manual_seed`, `gemini.design`, `gemini.agentic`, the
+  legacy `nodes=` options and `plant.legacy_info`, `Results.save_csv/save_parquet`,
+  `Dataset.frame/describe/reopen`, `Progress`, `AlarmCollector` and `Output(optional=)`.
+- The Flask interface, application/UI workflows, container stack, platform launcher scripts and
+  UI-only dependencies.
+
+### Fixed
+- Engine: resume gives the same results as an uninterrupted run; daily clocks follow local
+  midnight across DST; offset timestamps load across DST switches; the event log no longer turns
+  NaN into errors and always removes its hooks; live runs anchor their grid at the committed
+  position, reuse the checkpointed step for single rows and keep the caller's plant and error
+  policy; NumPy integer durations are seconds; text time axes are accepted.
+- Modules: redefining a module class or reusing a built-in class name no longer fails; assigned
+  fluids are kept; slicing a `ModuleList` no longer re-paths its children; `UNSET` keeps its
+  identity under copy and pickling.
+- Physics: differences convert without unit offsets; the Beggs–Brill map covers its exact
+  regime boundaries; two-phase reverse flow uses mirrored friction; zero flow, zero CO2, NaN and
+  out-of-range inputs raise `PhysicsRangeError` instead of crashing; `Stream(flow="10")` raises
+  `UnitError`.
+- Legacy: conversion reads the in-memory project; `write_csv` writes midnight timestamps;
+  calibration tolerates a NaN duty row; the t/h ESP head guess is correct; `check_wiring` works
+  on a copy; `barg` converts from SI correctly; an ambiguous data CSV and unknown runtime keys
+  raise explicit errors; mixed timestamp spellings parse.
 
 ## [1.0.3] - 2026-10-13
-## added
+### Added
 - parameters and tag names of the original doublet example using CSV data
 ### Fixed
-- fix influxsb writing data float
+- fix influxdb writing data float
 
 ## [1.0.2] - 2026-10-12
 ### Fixed

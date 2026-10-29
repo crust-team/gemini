@@ -1,24 +1,38 @@
 # Implementation conventions
 
-Use Python 3.11, Black, isort, 100-character lines and Flake8 docstrings. Preserve captured
-numbers. Intentional physical or numerical decisions require `NOTE(refactor)`, explanation and
-regression evidence. Use SI internally: K, Pa, kg/s, m, W, J and s.
+Use Python 3.11, Black, isort, 100-character lines and Flake8 with docstrings. Preserve captured
+numbers. Use SI internally: K, Pa, kg/s, m, W, J and s. Record an intentional physical or
+numerical decision as a `NOTE(refactor):` sentence in the docstring of the function, class or
+test that makes it, with its explanation and regression evidence, and list lasting decisions in
+[refactor-notes.md](refactor-notes.md).
 
-Dependencies flow:
+## Dependencies
 
-`core.physics` ← `core.types` ← `core.modules` ← `core.data` ← `core.engine`
-← `core.legacy` ← `optim` / `design` ← `agentic` ← `gemini/__init__`.
+A package may import only the packages to its left:
+
+`gemini.utils`, `gemini.errors` ← `core.physics` ← `core.types` ← `core.runtime` ← `core.modules`
+← `core.data` ← `core.engine` ← `core.legacy` ← `optim` ← `gemini/__init__`.
+
+`gemini.utils` and `gemini.errors` are leaf packages: they import only the standard library,
+installed dependencies and themselves, never another part of `gemini`
+(`tests/unit/test_package_boundaries.py` enforces this). There are two documented exceptions to
+the order. `core.physics.hydraulics` imports `Stream` and `Fluid` for type checking only, and
+`Stream.__init__` in `core.types.flows` imports `core.runtime` inside the function to read the
+default fluid, because a module-level import would form a cycle through `core.types.fluid`.
+`core.data` imports no module or engine code and `core.legacy` imports no engine code.
 
 Core packages outside `core.legacy` never interpret old project names, tags, tables or node
 mappings. Old-format knowledge stays in `gemini.core.legacy`, publicly available as `gm.legacy`.
 Equipment performs no file or database access. Calibration predicts only through public replay.
-Plants are handwritten; configuration files fill a tree but do not construct runtime wiring.
+Plants are handwritten; plant files fill a tree but do not construct runtime wiring.
 
 ## Module rules
 
-1. Assign declarations and children only in `__init__`.
-2. Section order is `Modules`, `Parameters`, `Inlets`, `Controls`, `Boundaries`, `States`,
-   `Outputs`, `Outlets`, using plain `# Section` comments without decorative dashes.
+1. Assign declarations and children only in `__init__`, after `super().__init__()`.
+2. Constructor sections are `# Modules`, `# Parameters`, `# Inlets`, `# Controls`,
+   `# Boundaries`, `# States`, `# Outputs`, `# Outlets`, in that order, with empty sections
+   omitted. No built-in module declares states today; stateful equipment sets `stateful = True`
+   and implements `initial_state` and `step`.
 3. Controls are settable commands; boundaries are uncontrollable external conditions.
 4. `forward` is exactly `forward(self, inlets)` and reads declared streams through the immutable
    `Ports` mapping, such as `inlets.suction`. Controls and boundaries are applied before the call
@@ -31,15 +45,117 @@ Plants are handwritten; configuration files fill a tree but do not construct run
    Zero- and one-outlet modules use the same dictionary shape.
 8. Do not construct `ModuleResult` in module code; `Module.__call__` creates it.
 9. Keep value arguments out of `__init__`; structural tree-shape arguments are the exception.
+   Build a configured module with `ESP().update_params(...)`.
 10. Never declare metadata or lists that `Module` derives.
 11. Inlets and outlets carry `Stream` types only. Electricity, fuel and heat loss are outputs.
 12. Pre-hooks are exactly `(module, inlets)` and forward hooks are exactly
     `(module, inlets, outlets)`.
 
 Use dotted module paths consistently. Binding groups are `controls`, `boundaries`, `inlets`,
-`measured` and `state`. Reject unknown ports and parameters. Missing observations skip only
-their measured twin. Never disguise a thermal-only audit as full first-law closure or tune
-against a holdout merely to meet a threshold.
+`measured` and `state`. Reject unknown ports and parameters. In replay a missing observation
+skips only its measured twin; in simulation it skips the step. Never disguise a thermal-only
+audit as full first-law closure or tune against a holdout merely to meet a threshold.
 
-Examples live under `examples/<area>/<category>/NN_<name>.py`; shared artifacts live in
-`examples/shared/`, and generated output goes under ignored `runs/`.
+Examples live under `examples/<area>/<category>/NN_<name>.py`; the legacy bridge example
+`examples/legacy/00_gemini_project_bridge.py` is the one example without a category folder.
+Shared artifacts live in `examples/shared/`, and generated output goes under ignored `runs/`.
+
+## Naming
+
+Ports name the place where the stream crosses the module boundary, chosen in this order:
+
+1. established equipment terms: pumps `suction`/`discharge`, wells `wellhead`/`bottom`,
+   reservoirs `sandface`;
+2. phase-split outlets by phase: `liquid`, `gas`;
+3. a module with one inlet and one outlet of the same stream: `inlet`/`outlet`;
+4. otherwise `<stream>_in`/`<stream>_out`, always both halves (`hot_in`, `cold_out`,
+   `secondary_in`, `return_in`, `supply_out`).
+
+Outputs derived from a port field are named `<port>_<field>`, for example `hot_out_T`. Controls
+and boundaries name the commanded quantity in full words (`frequency`, `production_rate`);
+setpoints are `<quantity>_setpoint` (`pressure_setpoint`, `temperature_setpoint`). The `Stream`
+field symbols `m_dot`, `T` and `p` are reserved for `Stream` fields and binding field keys.
+
+Elsewhere use full words, not abbreviations. Booleans read as questions (`is_leaf`,
+`is_initialized`, `has_input_value`). Add an SI unit suffix only where the type does not carry the
+unit, for example the summary column `energy_J` or the constant `TEST_BUDGET_S`; declared
+quantities carry their unit and never repeat it in the name.
+
+Never name the framework the module design resembles, in code, docstrings, examples or
+documents; describe the concept itself. `test_no_framework_names_in_tracked_text_files` in
+`tests/unit/test_code_quality.py` fails on any occurrence in a tracked file.
+
+## Comments
+
+The only comments allowed in code are:
+
+- the fixed section headers: in `__init__` `# Modules`, `# Parameters`, `# Inlets`,
+  `# Controls`, `# Boundaries`, `# States`, `# Outputs`, `# Outlets`; in `forward` `# Modules` and
+  `# Outlets`;
+- tool directives with a specific code: `# noqa: <code>`, `# type: ignore[<code>]` and
+  `# pragma: no cover`.
+
+Everything worth explaining (why, units, sources, non-obvious physics or numerics) goes into
+docstrings. Intentional physical or numerical decisions are a `NOTE(refactor):` sentence in the
+docstring, never a comment. `test_only_section_headers_and_tool_directives_are_comments` in
+`tests/unit/test_code_quality.py` checks every Python file in `gemini/`, `examples/`, `tests/` and
+`scripts/`.
+
+## Code quality
+
+- Flat code: nest at most three blocks deep (an `elif` chain counts once), prefer guard clauses
+  and write no `else` after `return` or `raise`.
+- Small functions: about 40 lines of body and one job each. The documented exceptions, each with
+  its reason, are listed in `LONG_FUNCTIONS` in `tests/unit/test_code_quality.py`.
+- McCabe complexity at most 10 (`max-complexity = 10` in the `[tool.flake8]` section of
+  `pyproject.toml`).
+- Just enough code: no dead code, unused options or parameters, speculative generality or golfed
+  one-liners.
+- Clear names, as in [Naming](#naming).
+- Explicit errors: raise a `gm.errors` class (see [errors.md](errors.md)), never a bare
+  `except`, and no silent fallback that hides a failure.
+- A bug gets a failing test first; the fix makes it pass.
+
+Enforcement: `tests/unit/test_code_quality.py` checks nesting
+(`test_functions_nest_at_most_three_blocks`), function length
+(`test_functions_are_short_or_documented_exceptions`), `else` after an early exit
+(`test_no_else_after_an_early_exit`), builtin raises (`test_package_code_raises_gemini_errors`),
+comments and framework names. Flake8
+(`make lint` and the Lint workflow) checks complexity (C901), bare `except` (E722), unused imports
+and variables (F401, F841) and docstrings. The remaining points (just enough code, names and
+test-first bug fixes) are checked in review.
+
+## Implicit mechanisms
+
+The package avoids hidden behaviour. These are the only implicit mechanisms left, each with the
+reason it is needed:
+
+- `Module.__setattr__` registers what `__init__` assigns: a `Parameter`, `Inlet`, `Control`,
+  `Boundary`, `Output` or `Outlet` goes to its ordered registry and a `Module` becomes a child
+  with a dotted path. Assigning to a declared name sets the parameter, persists the control or
+  boundary (inside a running call, it changes that call only) or records the output of the
+  running call. Constructors therefore read as plain assignments in section order, and
+  `esp.frequency = 50` persists a command.
+- `Module.__getattr__` resolves names that are not ordinary attributes: parameter values, the
+  current control and boundary values (running call, then persisted value, then default),
+  outputs recorded in the running call, and otherwise the port and output declarations. This lets
+  `forward` and `_compute_outputs` read `self.ua` or `self.frequency` as plain values.
+- The values of one call live in one `_Call` record held in the `_current_call` context variable
+  of `gemini/core/modules/module.py`. Modules keep no per-call state on `self`, so nested,
+  re-entrant and concurrent calls stay separate and composite formulas can read the results of
+  their children's calls.
+- `gm.no_outputs()` and `gm.runtime.settings()` are context settings built on
+  `gemini.utils.context.ContextSetting`: a context variable change usable as a `with` block and
+  as a decorator, restored on exit.
+- `class_path`/`import_class` in `gemini/core/modules/module.py` are the only import-by-string.
+  Plant files and checkpoints must name the handwritten plant class that rebuilds the tree.
+- Attribute access on mappings: `Ports` and `Values` derive from
+  `gemini.utils.mappings.AttributeMapping`, so `result.outlets.discharge` equals
+  `result.outlets["discharge"]`, and `Results[path].field` returns a pandas Series through
+  `ModuleSeries.__getattr__`.
+- Two optional method protocols: a module that defines `capex()` returning a `Cost` declares its
+  own cost for `gemini.core.types.cost.total_cost(plant)`, which looks the method up by name; a
+  module that overrides `health(result, measured)` gets a diagnostic, which the engine calls
+  after each replayed twin (the base method returns `None`, meaning not assessed).
+
+Adding another implicit mechanism needs a reason of the same weight and an entry here.

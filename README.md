@@ -15,9 +15,8 @@ from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 SHARED = "examples/shared/doublet_heat"
 plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
-esp = gm.modules.ESP(
-    **{name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
-)
+design = {name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
+esp = gm.modules.ESP().update_params(**design)
 stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
 out = esp(suction=stream, frequency="50 Hz")
 assert out.outputs.head == esp({"suction": stream}, frequency="50 Hz").outputs.head
@@ -29,12 +28,11 @@ with gm.no_outputs():
     fluid_only = esp(suction=out.outlets.discharge, frequency="50 Hz")
 assert dict(fluid_only.outputs) == {}
 
-# Persist controls by assignment, or set any leaf input by path.
 esp.frequency = 50.0
 plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
 
-df = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
-data = gm.Dataset.from_frame(df, time_column="time")
+frame = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
+data = gm.Dataset.from_frame(frame, time_column="time")
 
 engine = gm.Engine()
 results = engine.replay(plant, data)
@@ -45,26 +43,31 @@ engine.save_checkpoint("runs/replay.ckpt")
 restored = gm.Engine.load_checkpoint("runs/replay.ckpt")
 assert len(restored.resume()) == len(results)
 
-fit = gm.optim.calibrate(
-    plant, data, params=[plant.get_parameter("heat_exchanger.ua")]
-)
+fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.ua")])
 print(fit)
 ```
 
-The application—not the package—reads CSV, databases, or APIs. `Dataset` accepts pandas, dicts,
+A module is built without arguments and configured with `update_params`, which returns it. Calls
+accept inlets by keyword, mapping or position; controls given at the call apply to that call only,
+while assignment (`esp.frequency = 50.0`) or `plant.set_inputs` persists them by dotted path.
+
+The application, not the package, reads CSV, databases, or APIs. `Dataset` accepts pandas, dicts,
 records, NumPy, and profiles already in memory. A plant owns bindings and dated parameters, so
 engine and optimizer calls never take a separate configuration.
 
-See [.claude/docs/api.md](.claude/docs/api.md),
-[data.md](.claude/docs/data.md), [engine.md](.claude/docs/engine.md), and
-[legacy.md](.claude/docs/legacy.md). Testing commands are:
+See [api.md](.claude/docs/api.md), [modules.md](.claude/docs/modules.md),
+[data.md](.claude/docs/data.md), [engine.md](.claude/docs/engine.md),
+[legacy.md](.claude/docs/legacy.md) and [errors.md](.claude/docs/errors.md). Report bugs with the
+output of `python -m gemini.utils.collect_env`.
+
+## Testing
 
 ```bash
-python -m pytest
-python -m pytest -n auto -m "e2e or slow" --dataset=fast
-python -m pytest -n auto -m "" --dataset=slow
+make test           # development profile: tests of what changed and what imports it
+make test-release   # release profile: every tier on the full-year dataset
+make lint           # flake8, black and isort
 ```
 
-The first command is the under-30-second unit/integration tier. The second runs real workflows
-on the committed July month; the final command is the full-year merge gate. See
-[testing.md](.claude/docs/testing.md) for markers, fixtures and golden-generation rules.
+Always test what changed and everything that imports it; never run the full suite locally. See
+[testing.md](.claude/docs/testing.md) for the profiles, markers, fixtures and golden-generation
+rules.

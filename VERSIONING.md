@@ -10,12 +10,9 @@ Version format: `MAJOR.MINOR.PATCH`
 - **MINOR**: backward-compatible feature additions.
 - **PATCH**: backward-compatible bug fixes and small improvements.
 
-Current project version is defined in `pyproject.toml`:
-
-```toml
-[tool.poetry]
-version = "1.0.0"
-```
+The current version is defined twice and the two must agree: `version` in the `[tool.poetry]`
+section of `pyproject.toml` and `__version__` in `gemini/__init__.py`;
+`tests/unit/test_public_api.py` checks that they are equal.
 
 ## Release notes source of truth
 
@@ -27,7 +24,7 @@ version = "1.0.0"
 
 1. Ensure `CHANGELOG.md` (`Unreleased`) is up to date.
 2. Choose next SemVer number (`MAJOR.MINOR.PATCH`).
-3. Update `pyproject.toml` version.
+3. Update the version in `pyproject.toml` and `__version__` in `gemini/__init__.py`.
 4. Create a new section in `CHANGELOG.md`:
    - `## [X.Y.Z] - YYYY-MM-DD`
 5. Commit the version/changelog changes.

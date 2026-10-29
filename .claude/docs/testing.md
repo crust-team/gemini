@@ -10,7 +10,10 @@ Every test belongs to one automatically marked folder tier:
 - `tests/fixtures/` contains immutable captured values, generators and golden outputs.
 
 The registered markers are `unit`, `integration`, `e2e` and `slow`, with strict marker checking.
-Default options run in parallel (`-n auto`) and select `not e2e and not slow`.
+Default options (`addopts` in `pyproject.toml`) run in parallel with `-n auto --dist loadgroup`
+and select `not e2e and not slow`; the profiles below choose their own markers. Use `make test`,
+`make test-release` and `make lint` (flake8, black and isort over `gemini`, `tests`, `examples`,
+`scripts` and `docs/conf.py`, as in the Lint workflow) rather than assembling commands by hand.
 
 ## Test profiles
 
@@ -57,7 +60,8 @@ targeting `main` and merge queues run the release profile and must pass.
 
 An individual fast-tier test call may take at most one second. In the development profile the
 root `tests/conftest.py` hook fails a slower unit or integration test, also inside xdist workers,
-with instructions to optimize it or mark it `slow`. The release profile does not enforce it.
+with instructions to optimize it or mark it `slow`. E2E tests, including the example smoke
+tests, are exempt, and the release profile does not enforce the budget.
 Marking is allowed only when the property inherently needs long elapsed work or a large real-data
 window; add a one-line reason to its docstring. Do not delete, skip or weaken a test to meet the
 budget.
@@ -92,9 +96,10 @@ change and are never a routine speed optimization.
 
 ## Shared fixtures
 
-Read-only expensive setup belongs in session or module fixtures. `selected_frame` and
-`selected_dataset` load chosen e2e data once; `fast_frame`, `fast_dataset` and
-`reference_dataset` serve short behaviour checks; `shared_plant` validates `plant.json` once.
+Read-only expensive setup belongs in session or module fixtures. `dataset_path`,
+`selected_frame` and `selected_dataset` load the chosen e2e data once; `fast_frame`,
+`fast_dataset` and `reference_dataset` serve short behaviour checks; `shared_plant` validates
+`plant.json` once; `module_classes` lists every shipped module class and the example plants.
 Never mutate these objects. Request `fresh_plant` for a function-scoped deep copy or
 `module_plant` when one workflow shares a copied plant across assertions. Prefer the shortest
 `Dataset.window` that still crosses every boundary relevant to the property.
@@ -109,13 +114,34 @@ The suite must remain safe under `pytest -n auto`:
 - do not rely on test order or process-global state;
 - deep-copy mutable plants instead of changing session fixtures.
 
-`tests/unit/test_mirror.py` enforces source mirroring: every source file has a mirrored test file
-that defines at least one test, except the files listed in its documented `PLACEHOLDERS` set.
-Only `tests/unit/core/legacy/`, `tests/e2e/test_legacy_bridge.py` and the `check_wiring` audit in
-`tests/e2e/test_full_replay.py` read old formats. Shared paths live in `tests/fixtures/__init__.py`
-(`ROOT`, `FIXTURES`, `SHARED`, `OLD_PROJECT`). Examples run as subprocesses in `tmp_path` with an
-`examples` symlink, so their output never lands in the repository. Expensive module-scoped e2e
-fixtures carry `pytest.mark.xdist_group`; the default `--dist loadgroup` runs each group on one
-worker so the fixture is built once. E2E retains the literal quickstart,
-reconciliation, calibration holdout, balances/electricity limits, alarm rates, bridge round
-trips, example subprocesses, live idempotency and exact interrupt/resume coverage.
+## Structure and quality tests
+
+`tests/unit/test_mirror.py` enforces source mirroring: every `gemini/<path>/<name>.py` except
+`__init__.py`, including `gemini/utils/` and `gemini/errors/`, has a mirrored
+`tests/unit/<path>/test_<name>.py` that defines at least one test. Its `PLACEHOLDERS` set of
+mirrors still holding only a docstring is empty and must never grow.
+`tests/unit/test_package_boundaries.py` checks that `gemini.utils` and `gemini.errors` import
+nothing else from `gemini`. `tests/unit/test_code_quality.py` enforces the comment rule, the
+nesting limit, the function-length limit with its `LONG_FUNCTIONS` exceptions and the ban on the
+framework name (see [conventions.md](conventions.md#code-quality)); flake8 enforces complexity.
+`tests/unit/test_public_api.py` pins the curated `gm` names and the version.
+
+## Old formats, examples and e2e coverage
+
+Old-format files are read only by `tests/unit/core/legacy/`, `tests/e2e/test_legacy_bridge.py`,
+the `check_wiring` audit in `tests/e2e/test_full_replay.py`, and the golden reconstructions that
+build equipment from the original `.param` files: the subsurface and heat-exchanger unit tests,
+`tests/unit/core/physics/test_geometry.py`, `tests/integration/test_plant.py` and the historical
+`tests/fixtures/capture_golden.py`. Shared paths live in `tests/fixtures/__init__.py` (`ROOT`,
+`FIXTURES`, `SHARED`, `OLD_PROJECT`).
+
+The example smoke tests are the e2e cases of `tests/e2e/test_examples.py`, one per numbered
+example. They run in both profiles (the development profile selects them when a numbered
+example changes) and are exempt from the one-second budget. Each example runs as a
+subprocess in `tmp_path` with an `examples` symlink, so its output never lands in the repository;
+`GEMINI_EXAMPLE_DATASET` points the examples that read the shared CSV at the selected dataset.
+Expensive module-scoped e2e fixtures carry `pytest.mark.xdist_group`; the default
+`--dist loadgroup` runs each group on one worker so the fixture is built once. E2E retains the
+quickstart acceptance path (`tests/e2e/test_quickstart.py`), reconciliation, calibration
+holdout, balances/electricity limits, alarm rates, bridge round trips, example subprocesses, live
+idempotency and exact interrupt/resume coverage.

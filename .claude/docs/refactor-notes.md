@@ -1,8 +1,9 @@
 # Numerical decisions and known limitations
 
 These decisions preserve the useful evidence from the previous package migration. All original
-25 physics cases and eight captured monitoring outputs remain unchanged. Historical graph behaviour
-and threshold exceptions are annotated `NOTE(refactor)` next to the implementation or test.
+25 physics cases and eight captured monitoring outputs remain unchanged. Historical behaviour
+and threshold exceptions are recorded as `NOTE(refactor):` sentences in the docstrings of the
+implementation or test.
 
 ## Retained decisions
 
@@ -15,7 +16,7 @@ and threshold exceptions are annotated `NOTE(refactor)` next to the implementati
   the trajectory interval crossing pump depth, and inferred discharge used a single vertical
   tubing section. These errors are reproduced only in golden tests. New graphs retain the
   complete trajectory and correct SI productivity. The old first-snapshot correction policy
-  has no production caller; configuration selects the date-active snapshot.
+  has no production caller; the plant selects the date-active snapshot.
 - Injection DPDT and corrosion use negative internal flow. Outlet ports now preserve the
   incoming mass-flow sign; numerical pressure/temperature and golden results are unchanged.
 - An unconfigured zero aquifer drainage radius yields unavailable radial diagnostics (`None`),
@@ -37,36 +38,41 @@ and threshold exceptions are annotated `NOTE(refactor)` next to the implementati
 
 ## New model and configuration decisions
 
-- Filter clean loss is 0.016 bar at 149 m3/h, scaling quadratically with mass flow. Solids loading and
-  particle capture are not modelled; the existing clogging diagnostic remains available.
+- Filter clean loss is 0.016 bar at 149 m3/h, scaling quadratically with mass flow. Solids
+  loading and particle capture are not modelled; the existing clogging diagnostic remains
+  available.
 - The degasser passes liquid at configured outlet pressure or inlet minus 0.149 bar, with
   zero gas flow. Booster and blowdown pass streams through and report `modelled=False`.
 - No injection-pump curves exist in the project. Use the measured discharge setpoint in twins;
   Q*deltaP/PowerDraw implies efficiency 0.80000 within CSV rounding. The example explicitly
   selects 0.8 while standalone equipment defaults to 0.7. Scenarios default to 51.5 bar.
-- The buried ESP is represented by below-pump and riser well segments. The earlier graph used original file stems and an extra `<well>_riser` child;
-  the types phase maps these into `doublet.well` and `doublet.riser`. The riser is connected after ESP discharge.
-  Both segments use the same trajectory slicing as `intake_conditions` and
-  `wellhead_from_discharge`. Segment outputs retain the well schema's `wellhead` field name;
-  on the below-pump node this denotes its local upper endpoint (pump intake).
-- Port mapping is explicit, including HX primary/secondary ports and both degasser outlets.
-  Every unknown property/tag is reported. Empty tags, redundant observations and absent
-  measured sandface conditions have individually recorded reasons in legacy bridge diagnostics.
-- Supplemental CSV bindings supply filter pressure differences, HX duty/loss, degasser inlet
-  temperature and production rate. Unmeasured secondary pressure is assumed 5 bar absolute.
-- Immutable Fluid definitions and import diagnostics live in portable configuration. Each timestep selects
-  dated design snapshots; explicitly applied fits persist as overrides until changed.
+- The buried ESP is represented by below-pump and riser well segments, `doublet.well` and
+  `doublet.riser`; the riser is connected after ESP discharge. Both segments use the same
+  trajectory slicing as `intake_conditions` and `wellhead_from_discharge`. Segment outputs
+  retain the well's `wellhead` port name; on the below-pump segment it denotes its local upper
+  endpoint (pump intake).
+- Port mapping is explicit (`tables.PORTS`), including the HX hot/cold ports and both degasser
+  outlets. Every unmapped old property or tag is listed in one `GeminiWarning` from
+  `legacy.to_plant`. Redundant observations and absent measured sandface conditions are left
+  unbound with an individual reason in `tables.IGNORED_TAGS`; empty tags are skipped.
+- Supplemental CSV bindings supply filter pressure differences, HX duty and hot-side pressure
+  loss, degasser inlet temperature and production rate. Unmeasured secondary pressure is assumed
+  5 bar absolute.
+- Immutable Fluid definitions and the bridge's assumptions live in the plant JSON. Each timestep
+  selects dated design snapshots; explicitly applied fits persist as overrides until changed.
 - Calibration uses dimensionless residuals scaled by each measured output's median magnitude.
-  It never applies results unless `apply=True` and the optimizer succeeds. A fit window must
-  stay within one dated design snapshot. Vector coefficients use scaled optimizer coordinates.
-- Missing data is counted per module/column and skips only that measured twin. Lack of a health
-  model is reported as `assessed=False`, never as evidence of healthy operation.
+  It applies results by default (`apply=True`) and only when the optimizer succeeds. A fit window
+  must stay within one dated design snapshot. Vector coefficients use scaled optimizer
+  coordinates.
+- In replay, missing data is counted per module/column and skips only that measured twin; in
+  simulation it skips the step. Lack of a health model is reported as `assessed=False`, never as
+  evidence of healthy operation.
 
 ## Measured reconciliation and explicit exceptions
 
 The full CSV has 17,280 rows, all labelled Normal. All eight bound models cover every row.
 The two unbound original assets (production well and receiving aquifer) and generated riser
-run in chained scenarios, which cover all eleven graph children.
+run in chained scenarios, which cover all eleven leaf modules.
 
 - ESP head median error: **63.1678%**, versus requested 10%. The supplied 15-stage curve
   disagrees with the CSV despite verified SI flow/pressure conversions. The regression limit
@@ -75,7 +81,7 @@ run in chained scenarios, which cover all eleven graph children.
   explicitly preserves that limitation. ESP alarm rate is consequently **100%**, versus 5%.
 - Filter A/B pressure-loss median errors: **1.6961%**, within the requested 20%.
 - Injection-pump power median error: **0.001232%** with the explicit 0.8 efficiency.
-- First-week HX fit: UA **7,138,598.617 W/K**; normalised RMS **0.380432 → 0.000294183**.
+- First-week HX fit: UA **7,138,598.75 W/K**; normalised RMS **0.380432 → 0.000294183**.
   Holdout duty median/max errors: **0.6293% / 0.9523%**. Hot outlet median/max absolute
   errors: **0.3388 / 0.5661 K**; cold: **0.3037 / 0.4889 K**. Only the hot maximum limit
   changes, from 0.5 to 0.6 K: apparent UA varies from 3.45 to 10.60 MW/K despite Normal labels.
@@ -92,20 +98,20 @@ The architecture and execution checks pass; these exceptions mean the original p
 accuracy and alarm-rate targets are not all met by the supplied project. Correct pump curves,
 reservoir pressure/temperature and an appropriate variable-UA reference are the next data work.
 
-
 ## Retained typed-model decisions and limits
 
 - Every numeric equipment contract uses quantity metadata. Polynomial coefficients (ESP and
   injection-pump head/power) remain mixed-unit lists; the unused degasser coefficient remains
   unknown-unit metadata. PipeSection's physics-layer fields declare equivalent metadata
   without an upward import. Empirical ESP efficiency stays unbounded Dimensionless to retain
-  original results. ParamRef bounds carry the owner's dynamic unit, not a false common unit.
+  original results.
 - `NOTE(refactor)`: well corrosion/erosion helpers retain **mm/year** as the explicit literature
   unit exception. No physics correlation or golden result changed.
 - `NOTE(refactor)`: GLYCOL_30 uses inhibited DOWFROST HD reference properties at 40 C and 30%
   propylene glycol by volume: rho=1029.85, cp=3841, k=0.4622, mu=0.0016295 in SI. See the
   manufacturer citation in [types.md](types.md). It is not temperature-dependent; unsupported
-  concentrations are rejected. Brine/water defaults remain exactly the old ConstantWater values.
+  concentrations are rejected. Brine/water defaults remain exactly the old constant-water values,
+  now the defaults of `core.physics.fluid.FluidProperties`.
 - `NOTE(refactor)`: optional Fluid-based corrosion converts dissolved mass fraction through
   molar mass 0.04401 kg/mol and the existing Henry law at inlet temperature. Salt concentration
   is rho*salinity in kg/m3. This is an inlet/dilute approximation, without salting-out; explicit
@@ -113,20 +119,20 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   zero CO2-corrosion contribution when no gas chemistry is supplied.
 - `NOTE(refactor)`: ESP electricity is predicted shaft power divided by motor efficiency;
   efficiency defaults to one, preserving every existing power number. Boiler declares both
-  fuel and electricity ports, with zero on the unused side, and reports conversion heat loss.
+  fuel and electricity outputs, with zero on the unused side, and reports conversion heat loss.
 - Wells report signed environmental heat using external mass-flow sign and actual inlet/outlet
   temperatures. Injection's internal negative DPDT flow does not reverse its external balance.
-  Stream dtype properties govern stream transport; the golden reconstruction now explicitly
+  Stream fluid properties govern stream transport; the golden reconstruction now explicitly
   attaches its original brine to formerly default-water inlet streams. Expected fixtures are
   unchanged. Source composition/property overrides are serialized, with no mutable string registry.
 - `NOTE(refactor)`: the physical above-ESP riser remains an explicit child. Diagram verification
   expands ESP->surface into ESP->riser->surface and checks both edges; no connection is ignored.
   The result is ten observed connections and zero missing/extra links.
 - Doublet exposes separate production/injection limb methods because surface equipment connects
-  the limbs in the parent forward pass. Every equipment call still triggers hooks and capture;
+  the limbs in the parent forward pass. Every equipment call still runs its hooks and is recorded;
   the grouping object's forward hook runs only when Doublet itself is called.
-- ModuleResult now retains the actual inlet/control/child tree while preserving two-value
-  unpacking. Aggregation counts leaf energy outputs once; composite formulas do not duplicate
+- ModuleResult retains the actual inlet/control/child tree of the call; it is a frozen dataclass,
+  not a tuple. Aggregation counts leaf energy outputs once; composite formulas do not duplicate
   energy. Internal fluid transfers cancel in plant boundary totals. Reservoir withdrawal and
   deposition are explicit open-system source/sink boundaries.
 - `NOTE(refactor)`: **strict energy closure is not achieved**. Legacy pumps change pressure but
@@ -144,8 +150,5 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   reconciliation metrics remain exactly unchanged. These limitations are asserted and reported,
   not represented as passed physical-accuracy targets.
 - Profile sum resampling is summation, not energy integration; indices are UTC and previous
-  values are held. Scenario profiles must share an index. Cost aggregation rejects mixed
-  currency/year values and sums each module's own sourced contribution once.
-
-The engine-specific moves, verification, and checkpoint design are recorded in
-[`docs/engine-refactor-report.md`](../../docs/engine-refactor-report.md).
+  values are held. Profiles combined into a dataset must share an index. Cost aggregation
+  rejects mixed currency/year values and sums each module's own sourced contribution once.

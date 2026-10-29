@@ -5,11 +5,22 @@
 - `set_default_fluid` / `get_default_fluid`
 - `set_precision("float64" | "float32")` / `get_precision`
 - `set_display_units("si" | "field")` / `get_display_units`
-- `manual_seed(seed)`
 - `state()` / `load_state(mapping)`
+- `settings(**changes)`
 
-Use `with gm.runtime.settings(precision="float32", display_units="field"):` for temporary
-changes. Settings use `contextvars`, so nested scopes, threads and worker tasks restore their own
-state safely. Precision controls correlations that need legacy float32 parity. Display units
-affect representations only. A default fluid is copied into newly built modules and streams;
-explicit fluids always win. Checkpoints retain and restore the runtime state used by a run.
+Use `with gm.runtime.settings(precision="float32", display_units="field"):` or the same call as a
+decorator for temporary changes; it is built on `gemini.utils.context.ContextSetting`, nests, and
+restores the previous settings on exit. Settings are context-local: they live in one
+`contextvars.ContextVar`, so a change applies to the current context only. asyncio tasks start
+from a copy of their creator's settings, while new threads start from the defaults; code that
+hands work to threads passes `state()` along or runs it in `contextvars.copy_context()`.
+
+`state()` returns a JSON-safe copy of the settings. `load_state(mapping)` requires the complete
+mapping that `state()` returns. Unknown setting names, missing names in `load_state` and values
+outside the choices raise `gm.errors.UnknownNameError`; an invalid fluid raises a validation error.
+
+Precision selects the ESP's legacy float32 arithmetic, used for golden parity. Display units
+affect module representations only. A default fluid is copied into newly built modules and
+streams; explicit fluids always win. Checkpoints store the settings captured when a run starts.
+`resume()` and `live()` re-apply the saved precision and display units for their run; the default
+fluid is not re-applied because the plant already carries its fluids.
