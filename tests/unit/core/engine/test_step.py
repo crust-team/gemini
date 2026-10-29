@@ -217,3 +217,11 @@ def test_dated_parameters_apply_once_per_transition(fresh_plant, reference_datas
     for minutes in (0, 30, 60, 90):
         plan.apply_parameters(Recorder(), TIME + pd.Timedelta(minutes=minutes))
     assert calls == [TIME, TIME + pd.Timedelta(hours=1)]
+
+
+def test_measured_differences_convert_without_unit_offsets():
+    """A measured pressure drop bound in barg converts by scale only (E-physics-904)."""
+    module = gm.modules.Filter()
+    bindings = ModuleBindings(measured={"pressure_drop": Binding(column="dp", unit="barg")})
+    _, measured = prepare(module, bindings, {"dp": 0.5})
+    assert measured == {"pressure_drop": pytest.approx(5e4)}

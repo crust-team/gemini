@@ -15,9 +15,17 @@ DEFAULT_STEP = timedelta(hours=1)
 
 
 def to_utc(value):
-    """Return a timezone-aware UTC ``datetime``; naive values and strings are taken as UTC."""
+    """Return a timezone-aware UTC ``datetime``; naive values and strings are taken as UTC.
+
+    Accepts ISO-8601 text, ``datetime`` and ``pandas.Timestamp``; a bare ``date`` or a number has
+    no time of day or zone and raises ``TypeError``.
+    """
     if isinstance(value, str):
         value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if not isinstance(value, datetime):
+        raise TypeError(
+            f"timestamp = {value!r} ({type(value).__name__}); expected ISO-8601 text or a datetime"
+        )
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)

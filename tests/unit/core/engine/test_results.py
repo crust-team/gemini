@@ -40,6 +40,7 @@ def test_access_conversion_and_suggestions():
     rows = results()
     assert rows["pump"].head.tolist() == [2e5, 2e5]
     assert rows["pump"].get("head", unit="bar").tolist() == pytest.approx([2.0, 2.0])
+    assert rows["pump"].get("head", unit="barg").tolist() == pytest.approx([2.0, 2.0])
     with pytest.raises(gm.errors.UnknownResultError, match="did you mean 'pump'"):
         rows["pumps"]
     with pytest.raises(gm.errors.UnknownResultError, match="did you mean 'head'"):

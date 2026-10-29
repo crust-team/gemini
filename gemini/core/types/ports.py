@@ -1,13 +1,16 @@
 """Immutable named fluid ports passed through module calls."""
 
 from gemini.core.types.flows import Stream
-from gemini.errors import CallError
+from gemini.errors import CallError, UnknownPortError
 from gemini.utils.mappings import AttributeMapping
 from gemini.utils.strings import did_you_mean, join_names
 
 
 class Ports(AttributeMapping):
     """Read-only, ordered mapping of port names to fluid streams."""
+
+    key_error = UnknownPortError
+    attribute_error = UnknownPortError
 
     def __init__(self, values=None, *, path="module"):
         """Retain one private copy and the module path used in access errors."""

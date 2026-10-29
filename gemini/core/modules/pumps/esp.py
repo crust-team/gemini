@@ -126,8 +126,9 @@ class ESP(Module):
             * (units.bhp_to_w(1) / units.ft_head_to_pa(1))
         )
 
-    def health(self, predicted, measured):
+    def health(self, result, measured):
         """Score the worst available relative drift and the operating window."""
+        predicted = result.outputs
         drifts = {
             key: (measured[key] - getattr(predicted, key))
             / max(abs(getattr(predicted, key)), DRIFT_FLOOR)

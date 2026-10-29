@@ -157,7 +157,6 @@ class Module:
         object.__setattr__(self, "bindings", {})
         object.__setattr__(self, "boundary", {})
         object.__setattr__(self, "param_history", [DatedParams(params={})])
-        object.__setattr__(self, "_active_from", None)
         object.__setattr__(self, "_param_overrides", {})
 
     @property
@@ -487,6 +486,23 @@ class Module:
         selected = max(eligible, key=lambda item: item.valid_from or _EARLIEST)
         values = selected.params | self._param_overrides
         return {name: self._parameters[name].validate(value) for name, value in values.items()}
+
+    def clear_param_overrides(self):
+        """Forget explicit overrides, so values come from the dated snapshots alone."""
+        self._param_overrides = {}
+
+    def has_input_value(self, name):
+        """Return whether control or boundary ``name`` has a persisted value."""
+        return name in self._input_values
+
+    def _latest_snapshot_date(self):
+        """Return the newest snapshot date as ISO text, or ``None`` for undated designs.
+
+        Plant files store it as ``active_from``; loading ignores it because the snapshots
+        already contain it.
+        """
+        dates = [item.valid_from for item in self.param_history if item.valid_from is not None]
+        return max(dates).isoformat() if dates else None
 
     def apply_params_at(self, at):
         """Apply dated parameter snapshots recursively while retaining explicit overrides."""
@@ -852,8 +868,12 @@ class Module:
                 f"got ({', '.join(actual)})"
             )
 
-    def health(self, predicted, measured):
-        """Return optional equipment health; absence means no diagnostic model."""
+    def health(self, result, measured):
+        """Compare one call's ``ModuleResult`` with measured outputs; ``None`` means not assessed.
+
+        Equipment with a diagnostic model overrides this; the engine calls it after each replayed
+        twin with the bound measurements of that tick.
+        """
         return None
 
     def state_dict(self):
@@ -909,9 +929,7 @@ class Module:
                 "fluid": module._fluid.model_dump(mode="json"),
                 "param_history": [item.model_dump(mode="json") for item in module.param_history],
                 "param_overrides": to_jsonable_python(module._param_overrides),
-                "active_from": (
-                    module._active_from.isoformat() if module._active_from is not None else None
-                ),
+                "active_from": module._latest_snapshot_date(),
                 "bindings": {
                     key: value.model_dump(mode="json") for key, value in module.bindings.items()
                 },
@@ -953,8 +971,6 @@ class Module:
             DatedParams.model_validate(item) for item in entry.get("param_history", [])
         ] or [DatedParams(params=entry.get("params", {}))]
         self._param_overrides = dict(entry.get("param_overrides", {}))
-        active_from = entry.get("active_from")
-        self._active_from = to_utc(active_from) if active_from is not None else None
         self.bindings = {
             key: ModuleBindings.model_validate(value)
             for key, value in entry.get("bindings", {}).items()
@@ -980,7 +996,7 @@ class Module:
             value = parameter.value
             if isinstance(value, (dict, list, tuple)) or value is None:
                 continue
-            parts.append(f"{name}={_display(value, parameter.unit or '')}")
+            parts.append(f"{name}={_display(value, parameter.unit or '', parameter.quantity)}")
             if len(parts) == 4:
                 break
         return ", ".join(parts)
@@ -1014,11 +1030,11 @@ class Module:
         return "\n".join(lines)
 
 
-def _display(value, unit):
+def _display(value, unit, quantity):
     """Format one parameter value with its unit, in field units when the runtime asks for them."""
     if runtime.get_display_units() == "field" and unit in _FIELD_DISPLAY_UNITS:
         target = _FIELD_DISPLAY_UNITS[unit]
-        value, unit = units.convert(value, unit, target), target
+        value, unit = units.convert(value, unit, target, quantity), target
     shown = f"{value:.5g}" if isinstance(value, float) else str(value)
     return shown + (f" {unit}" if unit and unit != "-" else "")
 

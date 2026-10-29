@@ -145,7 +145,7 @@ class _Reservoir(Module):
             )
         return flow / (self.pressure - p_bh)
 
-    def health(self, predicted, measured):
+    def health(self, result, measured):
         """Alarm on declining measured PI or II relative to design.
 
         Returns ``None`` (not assessed) without both measurements, without a nonzero design

@@ -16,14 +16,14 @@ ENERGY_FIELDS = ("electricity", "fuel", "heat_loss")
 """Leaf outputs integrated over time into energy totals."""
 
 SERIES_UNITS = {
-    "head": "Pa",
-    "pressure_drop": "Pa",
-    "discharge_pressure": "Pa",
-    "power": "W",
-    "duty": "W",
-    "thermal_power": "W",
+    "head": ("Pa", "pressure_difference"),
+    "pressure_drop": ("Pa", "pressure_difference"),
+    "discharge_pressure": ("Pa", "pressure"),
+    "power": ("W", "power"),
+    "duty": ("W", "power"),
+    "thermal_power": ("W", "power"),
 }
-"""Stored SI units of the result fields that ``ModuleSeries.get`` can convert."""
+"""Stored SI unit and quantity of the result fields that ``ModuleSeries.get`` can convert."""
 
 
 class Summary(pd.DataFrame):
@@ -74,13 +74,13 @@ class ModuleSeries:
         series = getattr(self, field)
         if unit is None:
             return series
-        source = SERIES_UNITS.get(field)
-        if source is None:
+        if field not in SERIES_UNITS:
             raise ValueError(
                 f"{self._path}: result field = {field!r}; expected one of "
                 f"{join_names(SERIES_UNITS)} for unit conversion"
             )
-        return series.map(lambda value: units.convert(value, source, unit))
+        source, quantity = SERIES_UNITS[field]
+        return series.map(lambda value: units.convert(value, source, unit, quantity))
 
 
 def _add_skips(skip_counts, skips):

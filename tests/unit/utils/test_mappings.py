@@ -39,3 +39,19 @@ def test_nested_get_and_set():
     assert get_nested(data, ["stream_defaults", "filter"], {}) == {}
     set_nested(data, ["root_inputs", "secondary", "T"], 330.0)
     assert data["root_inputs"] == {"secondary": {"T": 330.0}}
+
+
+def test_subclasses_choose_the_error_classes():
+    """One error class deriving from both built-ins serves item and attribute access."""
+
+    class Missing(KeyError, AttributeError):
+        """Lookup error for both access forms."""
+
+    class Strict(Named):
+        key_error = Missing
+        attribute_error = Missing
+
+    with pytest.raises(Missing):
+        Strict({})["x"]
+    with pytest.raises(Missing):
+        Strict({}).x

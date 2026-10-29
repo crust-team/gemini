@@ -12,24 +12,7 @@ from tests.fixtures import ROOT
 
 SOURCE = ROOT / "gemini"
 UNIT_TESTS = ROOT / "tests/unit"
-PLACEHOLDERS = {
-    "core/engine/test_callbacks.py",
-    "core/engine/test_checkpoint.py",
-    "core/engine/test_engine.py",
-    "core/engine/test_step.py",
-    "core/legacy/test__loader.py",
-    "core/legacy/test_convert.py",
-    "core/modules/plants/test_doublet.py",
-    "core/modules/test_wiring.py",
-    "core/physics/test_constants.py",
-    "core/physics/test_erosion.py",
-    "core/physics/test_geometry.py",
-    "core/physics/test_heat_transfer.py",
-    "core/physics/test_pumps.py",
-    "core/types/test_flows.py",
-    "core/types/test_results.py",
-    "optim/test_calibrate.py",
-}
+PLACEHOLDERS = set()
 
 
 def _mirror(source):

@@ -18,11 +18,12 @@ def test_example_production_and_decline():
         mapping.read_property(DATA / "production_well_c774.param"),
     )
     c = ProductionReservoir().update_params(**p)
-    out = c(m_dot=40).outputs
-    flow = 40 / 1068
+    result = c(m_dot=40)
+    out, flow = result.outputs, 40 / 1068
     assert out.drawdown == pytest.approx(flow / c.productivity_index)
-    assert not c.health(out, dict(flow=flow, bottomhole_pressure=out.bottomhole_pressure)).alarm
-    assert c.health(out, dict(flow=flow * 0.84, bottomhole_pressure=out.bottomhole_pressure)).alarm
+    pressure = out.bottomhole_pressure
+    assert not c.health(result, dict(flow=flow, bottomhole_pressure=pressure)).alarm
+    assert c.health(result, dict(flow=flow * 0.84, bottomhole_pressure=pressure)).alarm
 
 
 def test_injection_zero_radius_is_explicit():
@@ -33,9 +34,10 @@ def test_injection_zero_radius_is_explicit():
         "injection",
     )
     c = InjectionReservoir().update_params(**p)
-    out = c(sandface=Stream(m_dot=-40, T=300, p=23e6)).outputs
+    result = c(sandface=Stream(m_dot=-40, T=300, p=23e6))
+    out = result.outputs
     assert out.bottomhole_pressure > c.pressure
     assert out.radial_bottomhole_pressure is None
     assert not c.health(
-        out, dict(flow=40 / 1068, bottomhole_pressure=out.bottomhole_pressure)
+        result, dict(flow=40 / 1068, bottomhole_pressure=out.bottomhole_pressure)
     ).alarm

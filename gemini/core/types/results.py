@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from gemini.core.physics import units
 from gemini.core.types.ports import Ports
 from gemini.core.types.quantities import Fraction
-from gemini.errors import UnitError
+from gemini.errors import UnitError, UnknownPortError
 from gemini.utils.mappings import AttributeMapping
 from gemini.utils.strings import did_you_mean, join_names, join_path
 
@@ -26,6 +26,9 @@ class Health(BaseModel):
 
 class Values(AttributeMapping):
     """Read-only attribute and mapping access to named call values."""
+
+    key_error = UnknownPortError
+    attribute_error = UnknownPortError
 
     def __init__(self, values=None, declarations=None):
         """Store immutable-by-interface values and declaration metadata."""

@@ -179,10 +179,8 @@ class _Observed:
     bindings: Any
 
     def unit(self, binding):
-        """Return the unit of a bound column."""
-        if binding.column in self.dataset.columns:
-            return self.dataset.columns[binding.column].unit
-        return binding.unit
+        """Return the unit of a bound column; dataset metadata wins over the binding."""
+        return self.dataset.unit(binding.column, binding.unit)
 
     def values(self, binding):
         """Return a bound column converted to SI."""

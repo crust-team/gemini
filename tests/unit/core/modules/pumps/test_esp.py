@@ -53,8 +53,9 @@ def test_fit_recovers_curve_and_health_threshold():
     fitted = ESP.fit_head_coefficients(flows, freq, heads, 12)
     other = ESP().update_params(**dict(ESP_PARAMS, head_coeff=fitted))
     assert other.head_function(0.037, 53) == pytest.approx(pump.head_function(0.037, 53), rel=1e-9)
-    out = pump(frequency=60, suction=Stream(m_dot=40, T=300, p=1e5)).outputs
-    assert not pump.health(out, {"power": out.power}).alarm
-    assert pump.health(out, {"power": out.power * 1.11}).alarm
+    result = pump(frequency=60, suction=Stream(m_dot=40, T=300, p=1e5))
+    power = result.outputs.power
+    assert not pump.health(result, {"power": power}).alarm
+    assert pump.health(result, {"power": power * 1.11}).alarm
     assert ESP.fit_head_correction([1, 2, 3], [3, 5, 7]) == pytest.approx((2, 1))
     assert len(pump.head_curve(50)) == 50

@@ -20,7 +20,8 @@ VOLUMETRIC_UNITS = {"m3/h", "m3/s"}
 """Flow units converted to mass flow with the fluid density at the boundary."""
 
 
-def _value(row, binding):
+def _value(row, binding, declaration=None):
+    """Return a bound value in SI; a declared difference quantity converts without offsets."""
     value = row.get(binding.column)
     try:
         finite = value is not None and math.isfinite(float(value))
@@ -28,7 +29,8 @@ def _value(row, binding):
         finite = False
     if not finite:
         raise MissingMeasurementError(binding.column)
-    return units.to_si(value, binding.unit)
+    quantity = declaration.quantity if declaration is not None else None
+    return units.to_si(value, binding.unit, quantity)
 
 
 def _is_volumetric_mass_flow(module, name, binding):
@@ -45,8 +47,9 @@ def _input_values(module, bindings, row):
     The density comes from the module's ``pressure`` and ``temperature`` parameters, which
     ``BindingPlan`` requires for such a binding.
     """
+    declarations = module.inputs(recurse=False)
     values = {
-        name: _value(row, binding)
+        name: _value(row, binding, declarations.get(name))
         for group in (bindings.controls, bindings.boundaries)
         for name, binding in group.items()
     }
@@ -68,31 +71,20 @@ def _inlet_stream(module, fields, row, defaults):
 
 
 def prepare(module, bindings, row, defaults=None):
-    """Convert one measured boundary into keyword arguments and observations.
-
-    For a heat exchanger with measured outlet temperatures, the observations also receive the
-    inlet temperatures, mass flows and heat capacities that ``HeatExchanger.health`` reads.
-    """
+    """Convert one measured boundary into keyword arguments and observations."""
     kwargs = _input_values(module, bindings, row)
     for port, fields in bindings.inlets.items():
         kwargs[port] = _inlet_stream(module, fields, row, (defaults or {}).get(port, {}))
-    measured = {name: _value(row, binding) for name, binding in bindings.measured.items()}
-    if module.name == "heat_exchanger" and {"hot_out_T", "cold_out_T"} <= measured.keys():
-        hot, cold = kwargs["hot_in"], kwargs["cold_in"]
-        measured.update(
-            hot_in_T=hot.T,
-            cold_in_T=cold.T,
-            m_dot_hot=hot.m_dot,
-            m_dot_cold=cold.m_dot,
-            cp_hot=hot.fluid.properties(hot.p, hot.T).cp_l,
-            cp_cold=cold.fluid.properties(cold.p, cold.T).cp_l,
-        )
+    outputs = module.outputs(recurse=False)
+    measured = {
+        name: _value(row, binding, outputs.get(name)) for name, binding in bindings.measured.items()
+    }
     return kwargs, measured
 
 
 def health_or_unavailable(module, result, measured):
     """Keep lack of diagnostics distinct from assessed nominal health."""
-    health = module.health(result.outputs, measured) if result.outputs else None
+    health = module.health(result, measured) if result.outputs else None
     return health or Health(
         score=1,
         alarm=False,
@@ -190,7 +182,7 @@ def _simulation_inputs(plant, dataset):
         module = plant.get_submodule(module_path)
         binding = _input_binding(plant, dataset, input_path, module, declaration)
         if binding is None:
-            if declaration.default is UNSET and name not in module._input_values:
+            if declaration.default is UNSET and not module.has_input_value(name):
                 missing.append(input_path)
             continue
         bound = ModuleBindings()

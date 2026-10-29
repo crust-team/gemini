@@ -1,6 +1,6 @@
 """UTC conversion, durations and tick spacing."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
@@ -25,6 +25,9 @@ def test_to_utc_treats_naive_values_as_utc_and_converts_aware_values():
     assert to_utc(datetime(2024, 7, 1)) == expected
     assert to_utc(pd.Timestamp("2024-07-01T02:00:00+02:00")) == expected
     assert to_utc(expected).tzinfo is timezone.utc
+    for invalid in (date(2024, 7, 1), 1720000000):
+        with pytest.raises(TypeError, match="expected ISO-8601 text or a datetime"):
+            to_utc(invalid)
 
 
 def test_parse_duration_accepts_seconds_and_pandas_syntax():

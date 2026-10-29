@@ -57,7 +57,7 @@ class Filter(Module):
     def _compute_outputs(self, inlets, outlets):
         self.pressure_drop = self._pressure_drop(inlets.inlet)
 
-    def health(self, predicted, measured):
+    def health(self, result, measured):
         """Alarm when measured filter pressure loss exceeds the clogging limit."""
         if "pressure_drop" not in measured:
             return None

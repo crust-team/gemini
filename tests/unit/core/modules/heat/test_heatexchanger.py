@@ -45,16 +45,17 @@ def test_measured_heat_exchanger_performance():
             "hot_in": Stream(m_dot=mh, T=measured["hot_in_T"], p=units.bar_to_pa(r.HEX_Pin)),
             "cold_in": Stream(m_dot=mc, T=measured["cold_in_T"], p=1e6, fluid=WATER),
         }
-        out = c(**streams).outputs
+        result = c(**streams)
+        out = result.outputs
         assert out.hot_out_T == pytest.approx(measured["hot_out_T"], abs=0.5)
         assert out.cold_out_T == pytest.approx(measured["cold_out_T"], abs=0.5)
         assert out.duty == pytest.approx(r.Thermal_PowerGen, rel=0.02)
         assert 10000 < out.dp_hot < 20000
-        assert not c.health(out, measured).alarm
+        assert not c.health(result, measured).alarm
         fouled = HeatExchanger().update_params(**(params | {"ua": ua * 0.8}))
         reduced = fouled(**streams).outputs
         degraded = measured | dict(hot_out_T=reduced.hot_out_T, cold_out_T=reduced.cold_out_T)
-        assert c.health(out, degraded).alarm
+        assert c.health(result, degraded).alarm
 
 
 @pytest.mark.parametrize("arrangement", ["parallel", "counterflow"])
@@ -100,11 +101,16 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
         m_dot_hot_nominal=10,
         m_dot_cold_nominal=10,
     )
-    measured = dict(
-        hot_in_T=350, hot_out_T=340, cold_in_T=300, cold_out_T=310, m_dot_hot=0, m_dot_cold=10
+    stopped = exchanger(
+        hot_in=Stream(m_dot=0, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6)
     )
-    assert exchanger.health(None, measured) is None
+    measured = dict(hot_out_T=340, cold_out_T=310)
+    assert exchanger.health(stopped, measured) is None
+    running = exchanger(
+        hot_in=Stream(m_dot=10, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6)
+    )
+    assert exchanger.health(running, measured) is not None
     exchanger.update_params(ua=0)
-    assert exchanger.health(None, measured | {"m_dot_hot": 10}) is None
+    assert exchanger.health(running, measured) is None
     with pytest.raises(gm.errors.UnknownCorrelationError, match="arrangement"):
         HeatExchanger.ua_from_measurements(350, 340, 300, 310, 10, 10, arrangement="cross")

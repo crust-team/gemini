@@ -6,9 +6,13 @@ from collections.abc import Iterator, Mapping
 class AttributeMapping(Mapping):
     """Ordered read-only mapping whose keys are also readable as attributes.
 
-    Subclasses describe unknown keys through ``_unknown(name)``; the message is raised as
-    ``KeyError`` for item access and ``AttributeError`` for attribute access.
+    Subclasses describe unknown keys through ``_unknown(name)``. The message is raised as
+    ``key_error`` for item access and ``attribute_error`` for attribute access; subclasses may
+    replace both with one class deriving from ``KeyError`` and ``AttributeError``.
     """
+
+    key_error = KeyError
+    attribute_error = AttributeError
 
     def __init__(self, values=None):
         """Keep a private copy of ``values``."""
@@ -23,7 +27,7 @@ class AttributeMapping(Mapping):
         try:
             return self._values[name]
         except KeyError as exc:
-            raise KeyError(self._unknown(name)) from exc
+            raise self.key_error(self._unknown(name)) from exc
 
     def __getattr__(self, name):
         """Return one value by attribute name."""
@@ -34,7 +38,7 @@ class AttributeMapping(Mapping):
         try:
             return values[name]
         except KeyError as exc:
-            raise AttributeError(self._unknown(name)) from exc
+            raise self.attribute_error(self._unknown(name)) from exc
 
     def __iter__(self) -> Iterator[str]:
         """Iterate keys in insertion order."""

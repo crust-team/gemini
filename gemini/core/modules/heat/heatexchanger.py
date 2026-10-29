@@ -176,12 +176,16 @@ class HeatExchanger(Module):
             raise InsufficientDataError(f"{name}: positive LMTD required; got {delta} K")
         return (qh + qc) / 2 / delta
 
-    def health(self, predicted, measured):
+    def health(self, result, measured):
         """Alarm when apparent conductance falls below the configured design fraction.
 
-        Returns ``None`` (not assessed) when a measurement is missing, the design UA is zero, or
-        the measurements cannot determine an apparent UA (see ``ua_from_measurements``).
+        With measured outlet temperatures, the inlet temperatures, mass flows and heat capacities
+        come from the call's inlet streams. Returns ``None`` (not assessed) when a measurement is
+        missing, the design UA is zero, or the measurements cannot determine an apparent UA (see
+        ``ua_from_measurements``).
         """
+        if {"hot_out_T", "cold_out_T"} <= measured.keys():
+            measured = measured | _inlet_measurements(result.inlets)
         keys = ("hot_in_T", "hot_out_T", "cold_in_T", "cold_out_T", "m_dot_hot", "m_dot_cold")
         if not set(keys) <= measured.keys() or not self.ua:
             return None
@@ -202,3 +206,16 @@ class HeatExchanger(Module):
             message="Apparent UA below fouling limit" if alarm else "Apparent UA within limit",
             metrics={"apparent_ua": apparent, "ua_ratio": ratio},
         )
+
+
+def _inlet_measurements(inlets):
+    """Return inlet temperatures [K], mass flows [kg/s] and heat capacities [J/kg/K]."""
+    hot, cold = inlets.hot_in, inlets.cold_in
+    return dict(
+        hot_in_T=hot.T,
+        cold_in_T=cold.T,
+        m_dot_hot=hot.m_dot,
+        m_dot_cold=cold.m_dot,
+        cp_hot=hot.fluid.properties(hot.p, hot.T).cp_l,
+        cp_cold=cold.fluid.properties(cold.p, cold.T).cp_l,
+    )

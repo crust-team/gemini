@@ -80,8 +80,7 @@ def _filled_module(plant, path, item):
         )
     module.param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
     values = module.params_at(None)
-    module._param_overrides = {}
-    module._active_from = item.params[-1].valid_from
+    module.clear_param_overrides()
     return {"params": values, "fluid": item.fluid.model_dump()}
 
 
