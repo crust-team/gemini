@@ -13,49 +13,68 @@ from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import WATER
 
 
+DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
+BRINE_DENSITY = 1050
+"""Brine density [kg/m3] that, with the retained cp = 4217.4 J/kg/K, reproduces the CSV duty.
+
+NOTE(refactor): the CSV implies rho*cp = 4.410 MJ/m3/K, unlike default water's 4.2174; density
+1050 kg/m3 with the retained cp predicts duty within 0.5 %.
+"""
+
+
+def measured_row(row):
+    """Return the SI terminal measurements of one old CSV row."""
+    return dict(
+        hot_in_T=units.c_to_k(row.T_p_in),
+        hot_out_T=units.c_to_k(row.T_p_out),
+        cold_in_T=units.c_to_k(row.T_s_in),
+        cold_out_T=units.c_to_k(row.T_s_out),
+        m_dot_hot=units.m3h_to_m3s(row.Qp) * BRINE_DENSITY,
+        m_dot_cold=units.m3h_to_m3s(row.Qs) * BRINE_DENSITY,
+    )
+
+
+def exchanger_for(row, measured, ua):
+    """Return the example heat exchanger sized for one row and the inlet streams."""
+    base = mapping.heatexchanger_params_from_gemini(
+        mapping.read_property(DATA / "heat_exchanger_3410.param")
+    )
+    params = base | dict(
+        ua=ua,
+        dp_hot_nominal=units.bar_to_pa(row.HEX_PDrop),
+        dp_cold_nominal=0,
+        m_dot_hot_nominal=measured["m_dot_hot"],
+        m_dot_cold_nominal=measured["m_dot_cold"],
+    )
+    streams = {
+        "hot_in": Stream(
+            m_dot=measured["m_dot_hot"], T=measured["hot_in_T"], p=units.bar_to_pa(row.HEX_Pin)
+        ),
+        "cold_in": Stream(
+            m_dot=measured["m_dot_cold"], T=measured["cold_in_T"], p=1e6, fluid=WATER
+        ),
+    }
+    return HeatExchanger().update_params(**params), streams
+
+
 def test_measured_heat_exchanger_performance():
     """Fit UA from measured terminal temperatures, then reproduce duty, temperatures and loss."""
-    data = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
-    rows = pd.read_csv(data / "doublet_2024_old.csv", sep=";", nrows=5)
-    base = mapping.heatexchanger_params_from_gemini(
-        mapping.read_property(data / "heat_exchanger_3410.param")
-    )
-    for _, r in rows.iterrows():
-        # NOTE(refactor): CSV implies rho*cp=4.410 MJ/m3/K, unlike default water's 4.2174.
-        # Density 1050 kg/m3 with the retained cp=4217.4 predicts duty within 0.5%.
-        mh, mc = units.m3h_to_m3s(r.Qp) * 1050, units.m3h_to_m3s(r.Qs) * 1050
-        measured = dict(
-            hot_in_T=units.c_to_k(r.T_p_in),
-            hot_out_T=units.c_to_k(r.T_p_out),
-            cold_in_T=units.c_to_k(r.T_s_in),
-            cold_out_T=units.c_to_k(r.T_s_out),
-            m_dot_hot=mh,
-            m_dot_cold=mc,
-        )
+    rows = pd.read_csv(DATA / "doublet_2024_old.csv", sep=";", nrows=5)
+    for _, row in rows.iterrows():
+        measured = measured_row(row)
         ua = HeatExchanger.ua_from_measurements(**measured)
-        params = base | dict(
-            ua=ua,
-            dp_hot_nominal=units.bar_to_pa(r.HEX_PDrop),
-            dp_cold_nominal=0,
-            m_dot_hot_nominal=mh,
-            m_dot_cold_nominal=mc,
-        )
-        c = HeatExchanger().update_params(**params)
-        streams = {
-            "hot_in": Stream(m_dot=mh, T=measured["hot_in_T"], p=units.bar_to_pa(r.HEX_Pin)),
-            "cold_in": Stream(m_dot=mc, T=measured["cold_in_T"], p=1e6, fluid=WATER),
-        }
-        result = c(**streams)
+        exchanger, streams = exchanger_for(row, measured, ua)
+        result = exchanger(**streams)
         out = result.outputs
         assert out.hot_out_T == pytest.approx(measured["hot_out_T"], abs=0.5)
         assert out.cold_out_T == pytest.approx(measured["cold_out_T"], abs=0.5)
-        assert out.duty == pytest.approx(r.Thermal_PowerGen, rel=0.02)
+        assert out.duty == pytest.approx(row.Thermal_PowerGen, rel=0.02)
         assert 10000 < out.dp_hot < 20000
-        assert not c.health(result, measured).alarm
-        fouled = HeatExchanger().update_params(**(params | {"ua": ua * 0.8}))
+        assert not exchanger.health(result, measured).alarm
+        fouled, _ = exchanger_for(row, measured, ua * 0.8)
         reduced = fouled(**streams).outputs
         degraded = measured | dict(hot_out_T=reduced.hot_out_T, cold_out_T=reduced.cold_out_T)
-        assert c.health(result, degraded).alarm
+        assert exchanger.health(result, degraded).alarm
 
 
 @pytest.mark.parametrize("arrangement", ["parallel", "counterflow"])

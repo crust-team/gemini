@@ -1,4 +1,7 @@
-"""Fit heat-exchanger conductance on seven days through the public calibration API."""
+"""Fit heat-exchanger conductance on seven days through the public calibration API.
+
+Run from the repository root: PYTHONPATH=. python examples/optim/calibrate/00_heat_exchanger_ua.py
+"""
 
 import os
 

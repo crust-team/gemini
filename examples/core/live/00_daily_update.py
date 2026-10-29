@@ -1,4 +1,7 @@
-"""Process two daily live updates once. Run: python examples/core/live/00_daily_update.py."""
+"""Process two daily live updates once each, as an external scheduler would.
+
+Run from the repository root: PYTHONPATH=. python examples/core/live/00_daily_update.py
+"""
 
 import os
 from tempfile import TemporaryDirectory

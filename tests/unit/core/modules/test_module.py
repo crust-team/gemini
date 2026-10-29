@@ -136,8 +136,40 @@ def test_outlet_dict_names_and_flow_types_are_checked(monkeypatch):
         module(inlet=stream)
 
 
-def test_output_records_are_nested_and_thread_local():
-    """Concurrent and nested evaluations never share output records."""
+class NestedParent(Module):
+    """Nested-call fixture copying its child's recorded output."""
+
+    def __init__(self):
+        """Declare one child inside a container and a copied output."""
+        super().__init__()
+
+        # Modules
+        self.children_by_name = ModuleDict({"child": PassThrough().update_params(value=3)})
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outputs
+        self.child_value = Output.of("children_by_name.child.result")
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Call the child and copy its recorded output."""
+
+        # Modules
+        child = self.children_by_name.child(inlet=inlets.inlet, multiplier=2)
+
+        # Outlets
+        outlet = child.outlets.outlet
+
+        outlets = dict(outlet=outlet)
+        return outlets
+
+
+def test_output_records_are_thread_local():
+    """Concurrent evaluations never share output records."""
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = PassThrough().update_params(value=2)
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -145,41 +177,14 @@ def test_output_records_are_nested_and_thread_local():
     assert [result.outputs.result for result in values] == [2 * value for value in range(1, 9)]
     assert module.result.soft_sensor
 
-    class Parent(Module):
-        """Nested-call fixture."""
 
-        def __init__(self):
-            super().__init__()
-
-            # Modules
-            self.children_by_name = ModuleDict({"child": PassThrough().update_params(value=3)})
-
-            # Inlets
-            self.inlet = Inlet(Stream)
-
-            # Outputs
-            self.child_value = Output.of("children_by_name.child.result")
-
-            # Outlets
-            self.outlet = Outlet(Stream)
-
-        def forward(self, inlets):
-            """Call the child and copy its recorded output."""
-
-            # Modules
-            inlet = inlets.inlet
-            child = self.children_by_name.child(inlet=inlet, multiplier=2)
-
-            # Outlets
-            outlet = child.outlets.outlet
-
-            outlets = dict(outlet=outlet)
-            return outlets
-
-    result = Parent()(inlet=stream)
+def test_output_records_are_nested_per_call():
+    """A child's call inside its parent keeps its own inputs and outputs."""
+    stream = Stream(m_dot=1, T=300, p=1e5)
+    result = NestedParent()(inlet=stream)
     assert result.outputs.child_value == 6
     assert result.children["children_by_name.child"].outputs.result == 6
-    assert Parent().children_by_name.child(inlet=stream).outputs.result == 3
+    assert NestedParent().children_by_name.child(inlet=stream).outputs.result == 3
 
 
 def test_uninitialized_and_hooks():

@@ -1,6 +1,6 @@
 """Replay measured twins and summarize soft sensors.
 
-Run: python examples/core/replay/00_doublet_soft_sensors.py.
+Run from the repository root: PYTHONPATH=. python examples/core/replay/00_doublet_soft_sensors.py
 """
 
 import os

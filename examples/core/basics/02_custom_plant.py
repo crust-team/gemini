@@ -1,4 +1,7 @@
-"""Small user-defined plant using a ModuleList."""
+"""Small user-defined plant using a ModuleList.
+
+Run from the repository root: PYTHONPATH=. python examples/core/basics/02_custom_plant.py
+"""
 
 import gemini as gm
 from gemini.core.types import Inlet, Outlet, Stream
@@ -24,19 +27,16 @@ class TreatmentTrain(gm.modules.Module):
         """Apply each filter in diagram order."""
 
         # Modules
-        inlet = inlets.inlet
-        filtered = self._apply_filters(inlet)
+        filtered = self._apply_filters(inlets.inlet)
 
         # Outlets
-        outlet = filtered
-
-        outlets = dict(outlet=outlet)
+        outlets = dict(outlet=filtered)
         return outlets
 
-    def _apply_filters(self, inlet):
-        stream = inlet
-        for filter_ in self.filters:
-            stream = filter_(inlet=stream).outlets.outlet
+    def _apply_filters(self, stream):
+        """Pass the stream through every filter in list order."""
+        for module in self.filters:
+            stream = module(inlet=stream).outlets.outlet
         return stream
 
 

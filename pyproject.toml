@@ -52,7 +52,8 @@ sphinx-autodoc-typehints = "2.3.0"
 
 [tool.flake8]
 max-line-length = 100
-extend-ignore = ["W503", "W504", "E127", "E128", "E203", "E402", "E722", "D202"]
+extend-ignore = ["W503", "W504", "E127", "E128", "E203", "D202"]
+max-complexity = 10
 
 [tool.black]
 line-length = 100
