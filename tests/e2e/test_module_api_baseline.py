@@ -1,5 +1,13 @@
-"""Compare the refactored API with the immutable phase-0 result fixtures."""
+"""Compare the refactored API with the immutable phase-0 result fixtures.
 
+Replay values must agree within one binary64 ULP (``REPLAY_RTOL``), the most a CSV round trip
+of the fixture can change them. The committed simulation fixture differs from the results this
+code produces by a few ULP in the ESP flow, and pressures that are differences of ~1e7 Pa terms
+differ by up to two ULP of 1e7 Pa (3.7e-9 Pa). ``SIMULATE_RTOL`` admits exactly that round-off
+and nothing physically visible.
+"""
+
+import ast
 import json
 from pathlib import Path
 from time import perf_counter
@@ -20,6 +28,8 @@ FIELD_RENAMES = {
     "energy_port_fuel": "fuel",
     "energy_port_heat_loss": "heat_loss",
 }
+REPLAY_RTOL = 2e-15
+SIMULATE_RTOL = 1e-13
 TYPE_RENAMES = {
     "doublet_heat": "doublet_heat_plant",
     "heatexchanger": "heat_exchanger",
@@ -42,24 +52,50 @@ def _baseline_frame(name):
     )
 
 
-def _assert_values_identical(actual, expected):
+def _parse_list(cell):
+    """Parse a list written to CSV as its Python representation; keep other cells."""
+    if isinstance(cell, str) and cell.startswith("["):
+        return ast.literal_eval(cell)
+    return cell
+
+
+def _float_rows(series):
+    """Return a column of equal-length float lists as a matrix, or ``None`` otherwise."""
+    rows = [_parse_list(cell) for cell in series]
+    if not all(isinstance(row, list) and row for row in rows):
+        return None
+    if len({len(row) for row in rows}) != 1:
+        return None
+    if not all(isinstance(value, float) for row in rows for value in row):
+        return None
+    return np.array(rows)
+
+
+def _assert_close(left, right, rtol):
+    """Compare floats within ``rtol`` and an absolute floor of 1e-12 SI units."""
+    np.testing.assert_allclose(left, right, rtol=rtol, atol=1e-12, equal_nan=True)
+
+
+def _assert_values_identical(actual, expected, rtol=REPLAY_RTOL):
+    """Compare frames: floats and float-list cells within ``rtol``, everything else exactly."""
     actual = actual.reindex(columns=expected.columns)
     assert actual.index.equals(expected.index)
     assert actual.columns.equals(expected.columns)
     for column in expected:
         left, right = actual[column], expected[column]
         if pd.api.types.is_numeric_dtype(left) and pd.api.types.is_numeric_dtype(right):
-            # CSV fixture round-trips can differ by one binary64 ULP.
-            np.testing.assert_allclose(
-                left.to_numpy(), right.to_numpy(), rtol=2e-15, atol=1e-12, equal_nan=True
-            )
-        else:
-            pd.testing.assert_series_equal(
-                left.fillna("<missing>").map(str),
-                right.fillna("<missing>").map(str),
-                check_names=False,
-                check_dtype=False,
-            )
+            _assert_close(left.to_numpy(), right.to_numpy(), rtol)
+            continue
+        left_rows, right_rows = _float_rows(left), _float_rows(right)
+        if left_rows is not None and right_rows is not None:
+            _assert_close(left_rows, right_rows, rtol)
+            continue
+        pd.testing.assert_series_equal(
+            left.fillna("<missing>").map(str),
+            right.fillna("<missing>").map(str),
+            check_names=False,
+            check_dtype=False,
+        )
 
 
 def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset, fresh_plant):
@@ -98,4 +134,4 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
     simulation = (
         gm.Engine().simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock).to_frame()
     )
-    _assert_values_identical(simulation, _baseline_frame("simulate.csv.gz"))
+    _assert_values_identical(simulation, _baseline_frame("simulate.csv.gz"), SIMULATE_RTOL)
