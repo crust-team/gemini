@@ -38,8 +38,8 @@ def test_plain_call_charges_an_empty_store():
     assert out.duty == pytest.approx(-CONDUCTANCE * 5)
     assert out.stored_cold == 0 and out.is_empty and not out.is_full
     assert result.outlets.outlet.m_dot == COLD.m_dot and result.outlets.outlet.p == COLD.p
-    audit = energy_balance(store, result)
-    assert abs(audit["residual"] - out.duty) / audit["in"] < 1e-12
+    assert out.heat_accumulation == out.duty
+    assert energy_balance(store, result)["relative_residual"] < 1e-12
     assert mass_balance(store, result)["residual"] == 0
 
 
@@ -151,5 +151,6 @@ def test_composite_step_freezes_both_stores():
     state, result = line.step(state, 1800, {"inlet": COLD})
     assert state["first"]["ice_fraction"] > state["second"]["ice_fraction"] > 0
     audit = energy_balance(line, result)
-    assert abs(audit["residual"] - result.outputs.duty) / audit["in"] < 1e-12
+    assert audit["relative_residual"] < 1e-12
+    assert audit["heat_accumulation"] == pytest.approx(result.outputs.duty, rel=1e-14)
     assert mass_balance(line, result)["residual"] == 0

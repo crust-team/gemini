@@ -1,11 +1,14 @@
 """Mass and sensible-energy audits over retained evaluation trees.
 
-A leaf exchanges energy outside its streams only through these ``Power`` outputs, each
-nonnegative and named the same in every module: ``electricity`` and ``fuel`` consumed,
-``heat_absorbed`` taken in from outside the plant (ambient air, a cooled building),
-``heat_loss`` lost to the environment, ``heat_supplied`` delivered to a consumer and
-``electricity_generated`` produced. The legacy isothermal pumps do not allocate electricity to
-fluid enthalpy, mechanical work or environmental loss. Report that unresolved energy explicitly;
+A leaf exchanges energy outside its streams only through these ``Power`` outputs, named the
+same in every module and nonnegative except the storage term below: ``electricity`` and
+``fuel`` consumed, ``heat_absorbed`` taken in from outside the plant (ambient air, a cooled
+building), ``heat_loss`` lost to the environment, ``heat_supplied`` delivered to a consumer and
+``electricity_generated`` produced. Storage is the one signed energy output:
+``heat_accumulation`` is the rate of increase of the energy a leaf stores (positive while
+charging, negative while discharging), counted as an outflow, so a storage leaf that reports it
+closes like any other leaf. The legacy isothermal pumps do not allocate electricity to fluid
+enthalpy, mechanical work or environmental loss. Report that unresolved energy explicitly;
 never manufacture heat loss to force a first-law residual to zero.
 """
 
@@ -16,8 +19,11 @@ from gemini.core.types.flows import Stream
 ENERGY_INPUTS = ("electricity", "fuel", "heat_absorbed")
 """Leaf outputs [W] that bring energy into a leaf from outside its streams."""
 
-ENERGY_OUTPUTS = ("heat_loss", "heat_supplied", "electricity_generated")
-"""Leaf outputs [W] that take energy out of a leaf other than through its streams."""
+ENERGY_OUTPUTS = ("heat_loss", "heat_supplied", "electricity_generated", "heat_accumulation")
+"""Leaf outputs [W] that take energy out of a leaf other than through its streams.
+
+All are nonnegative except ``heat_accumulation``, the signed rate of change of stored energy.
+"""
 
 
 def collect_flows(result_tree):

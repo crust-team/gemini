@@ -74,6 +74,11 @@ Shared conventions, stated once here and not repeated per module:
 | Demand | `HeatConsumer` | `supply_in` -> `return_out` | no | demand capped by return floor |
 | Demand | `CoolingConsumer` | `supply_in` -> `return_out` | no | sensible, latent, dew point |
 | Composite | `Doublet` | `return_in` -> `supply_out` | no | reservoir, wells, ESP, injector, sink |
+| Composite | `MultiWellPlant` | `return_in` -> `supply_out` | no | N producers, M injectors |
+| Composite | `HeatingSubstation` | `network_in` -> `network_out` | no | valve, HX, heat consumer |
+| Composite | `CoolingSubstation` | `network_in` -> `network_out` | no | valve, HX, cooler |
+| Composite | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
+| Composite | `ATESPlant` | `building_in` -> `building_out` | child | ATES, pump, HX, heat pump |
 
 ## Pumps
 
@@ -1449,3 +1454,267 @@ result = doublet(return_in=gm.Stream(m_dot=40, T="45 C", p="20 bar", fluid=doubl
 assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
 assert gm.modules.mass_balance(doublet, result)["residual"] == 0
 ```
+
+### MultiWellPlant
+
+Purpose: geothermal well field with N production limbs mixed into one supply and M injection
+limbs fed from one return.
+
+- Structure: `producers` (default 2) `ModuleList` of `ModuleDict(reservoir=ProductionReservoir,
+  well=ProductionWell, esp=ESP, riser=ProductionWell)`; `mixers` (`producers - 1` `Mixer`s);
+  `splitters` (`injectors - 1` `Splitter`s); `injectors` (default 1) `ModuleList` of
+  `ModuleDict(well=InjectionWell, sink=InjectionReservoir)`. Paths like
+  `producers.0.esp.frequency`, `injectors.1.sink...`. Fewer than one producer or injector
+  raises `ConfigurationError`.
+- Ports: `return_in` -> `supply_out`.
+- Parameters, controls, boundaries, states: none of its own (children's: `production_rate` per
+  reservoir, `frequency` per ESP, `split_fraction` per splitter).
+- Outputs: `electricity`, `heat_loss` (totals), `supply_out_T` (`Output.of` the last mixer's
+  `mixed_out_T`, or the single riser's `wellhead_temperature`).
+- Model: each limb is traversed like `Doublet.produce`. N-way mixing is a cascade of two-way
+  mixers, the running mix entering `first_in`; capacity-rate weighting is associative, so the
+  cascade gives `sum(m_i cp_i T_i) / sum(m_i cp_i)` at the lowest wellhead pressure. The return
+  is split by a cascade: splitter i sends its `split_fraction` of the flow reaching it to
+  injector i, the last injector takes the rest, so injector i receives `f_i prod_{j<i}(1 - f_j)`
+  (equal shares: `f_i = 1 / (M - i)`).
+- Assumptions: as in `Doublet`, the return boundary is independent of production within a call;
+  splitters stand for chokes or the injection-pump allocation; no field hydraulics.
+- Validity: that of the reservoirs, wells and ESPs; all limbs must deliver the same fluid
+  (`Mixer` raises `ConfigurationError` otherwise).
+
+```python
+import gemini as gm
+from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from gemini.core.modules import MultiWellPlant
+
+doublet = DoubletHeatPlant.load("examples/shared/doublet_heat/plant.json").doublet
+field = MultiWellPlant(producers=2, injectors=2)
+for limb, rate in zip(field.producers, (40.0, 30.0)):
+    for name in ("reservoir", "well", "esp", "riser"):
+        getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
+    limb.set_inputs({"reservoir.production_rate": rate, "esp.frequency": "50 Hz"})
+for limb in field.injectors:
+    limb.well.load_state_dict(doublet.injector.state_dict())
+    limb.sink.load_state_dict(doublet.sink.state_dict())
+field.splitters[0].split_fraction = 0.5
+returned = gm.Stream(flow=70, T=330, p=5e6, fluid=field.producers[0].riser.fluid)
+result = field(return_in=returned)
+print(result.outlets.supply_out.m_dot, result.outputs.supply_out_T)  # 70.0 344.23 K
+```
+
+### HeatingSubstation
+
+Purpose: indirect district-heating substation (Frederiksen and Werner 2013, *District Heating
+and Cooling*).
+
+- Children: `valve` (`Valve`, network side), `heat_exchanger` (network on `hot_in`, building on
+  `cold_in`), `consumer` (`HeatConsumer`).
+- Ports: `network_in` -> `network_out`.
+- Parameters: `building_flow` (`MassFlow`, > 0, required), `building_pressure` (`Pressure`,
+  > 0, required); the building fluid is the substation's `fluid`. No defaults: both are design
+  data of the building circuit.
+- Controls / boundaries: the children's (`valve.opening`, `consumer.heat_demand`).
+- States: none.
+- Outputs: `duty` (exchanger), `heat_supplied` (total), `unmet_demand`, `is_unmet`,
+  `building_supply_T`, `building_return_T`, `network_out_T`, `valve_pressure_drop`.
+- Model: the building loop (exchanger cold side -> consumer -> back) closes within one call:
+  `close_loop` finds the building return temperature that one pass reproduces, starting at
+  `min(consumer.minimum_return_temperature, T_network)`, clamped to at most the network
+  temperature after the valve; then valve, exchanger and consumer are called once. With the
+  demand met, `eps C_min (T_network - T_return) = Q`; beyond the exchanger's reach the return
+  sits at the consumer's floor and the rest is `unmet_demand`. The valve only throttles: the
+  network flow is imposed by `network_in`, the valve reports the drop at its opening.
+- Assumptions: building pump and hydraulics not modelled (no building-pump electricity); the
+  converged consumer return and the stream fed back to the exchanger differ by at most 1e-9 K
+  and appear as a boundary pair in the audit's `in`/`out` (the residual is unaffected).
+- Validity: the children's; forward flow; a stopped network or building circuit transfers no
+  heat. First-law closed (`relative_residual < 1e-12`), mass residual 0.
+
+```python
+import gemini as gm
+from gemini.core.modules import HeatingSubstation, energy_balance
+
+substation = HeatingSubstation().update_params(building_flow=3.0, building_pressure="3 bar")
+substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
+substation.heat_exchanger.update_params(
+    ua=2e4, dp_hot_nominal="0.2 bar", dp_cold_nominal="0.2 bar",
+    m_dot_hot_nominal=2, m_dot_cold_nominal=3,
+)
+substation.consumer.update_params(minimum_return_temperature="30 degC")
+substation.set_inputs({"valve.opening": 0.8, "consumer.heat_demand": "150 kW"})
+result = substation(network_in=gm.Stream(flow=2.0, T="75 degC", p="6 bar"))
+print(result.outputs.heat_supplied, result.outputs.building_return_T)  # 150000.0 325.44 K
+assert energy_balance(substation, result)["relative_residual"] < 1e-12
+```
+
+### CoolingSubstation
+
+Purpose: indirect district-cooling energy transfer station (ASHRAE 2013, *District Cooling
+Guide*).
+
+- Children: `valve` (network side), `heat_exchanger` (building on `hot_in`, network on
+  `cold_in`), `consumer` (`CoolingConsumer`).
+- Ports: `network_in` -> `network_out`.
+- Parameters: `building_flow`, `building_pressure` (required, as above).
+- Controls / boundaries: the children's (`valve.opening`, the consumer's sensible and latent
+  demand, indoor temperature and relative humidity).
+- Outputs: `duty`, `heat_absorbed` (total), `unmet_sensible`, `unmet_latent`, `is_unmet`,
+  `dew_point`, `building_supply_T`, `building_return_T`, `network_out_T`,
+  `valve_pressure_drop`.
+- Model: as the heating substation with the roles of the exchanger sides swapped. The iteration
+  starts at the consumer's return limit `min(maximum_return_temperature, indoor_temperature)`
+  (or the network temperature, if warmer) and is clamped to at least the network temperature.
+  The building supply temperature that reaches the consumer decides its dew-point test.
+- Limitation: the consumer's dew-point test is on/off, so near the threshold the loop can lack
+  a steady state (meeting the latent load warms the supply above the threshold, dropping it
+  cools it below). The iteration then raises `PhysicsRangeError`; with the test configuration
+  (latent 50 kW) a band of about 2 K of network temperature (280.6 to 282.4 K) fails. A partial
+  dehumidification model in `CoolingConsumer` would remove the band (open question).
+- First-law closed, mass residual 0.
+
+```python
+import gemini as gm
+from gemini.core.modules import CoolingSubstation
+
+substation = CoolingSubstation().update_params(building_flow=4.0, building_pressure="3 bar")
+substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
+substation.heat_exchanger.update_params(
+    ua=3e4, dp_hot_nominal="0.2 bar", dp_cold_nominal="0.2 bar",
+    m_dot_hot_nominal=4, m_dot_cold_nominal=3,
+)
+substation.consumer.update_params(maximum_return_temperature="18 degC", dew_point_margin=1.0)
+substation.set_inputs({
+    "valve.opening": 1.0,
+    "consumer.sensible_cooling_demand": "60 kW",
+    "consumer.latent_cooling_demand": "10 kW",
+    "consumer.indoor_temperature": "24 degC",
+    "consumer.indoor_relative_humidity": 0.5,
+})
+out = substation(network_in=gm.Stream(flow=3.0, T="6 degC", p="6 bar")).outputs
+print(out.heat_absorbed, out.unmet_latent)  # 70000.0 0.0
+```
+
+### DistrictNetwork
+
+Purpose: two-pipe district heating or cooling network with parallel substations.
+
+- Structure: `pump` (`CentrifugalPump`, network circulation), `supply_pipe` (`Pipe`),
+  `splitters` (`consumers - 1`), `substations` (`consumers` `HeatingSubstation`s for
+  `service="heating"`, `CoolingSubstation`s for `"cooling"`), `mixers` (`consumers - 1`),
+  `return_pipe` (`Pipe`). An unknown service or `consumers < 1` raises `ConfigurationError`.
+  The service choice mirrors the two substation classes.
+- Ports: `supply_in` -> `return_out`.
+- Parameters, controls, boundaries, states: none of its own.
+- Outputs: `heat_supplied` (heating networks only: a cooling network has no leaf declaring
+  it), `heat_absorbed`, `heat_loss`, `electricity` (totals), `return_out_T`.
+- Model: flow order pump -> supply pipe -> splitter cascade -> substations -> mixer cascade ->
+  return pipe. Cascades as in `MultiWellPlant` (substation i receives `f_i prod_{j<i}(1-f_j)`,
+  equal shares with `f_i = 1 / (N - i)`); splitters stand for balancing valves and branch
+  resistances, the network hydraulics are not solved. Pipes lump distribution losses or gains.
+- Balance: every child is closed in its own terms; the sensible audit's residual is the pump's
+  `hydraulic_power` (flow work dissipated by pipe and valve drops without a modelled
+  temperature rise). Mass residual 0.
+
+```python
+import gemini as gm
+from gemini.core.modules import DistrictNetwork, energy_balance
+
+network = DistrictNetwork(consumers=2, service="heating")
+network.pump.update_params(
+    head_coeff=[4e5, 0.0, -1e9], rated_frequency="50 Hz", best_efficiency=0.75,
+    best_efficiency_flow=0.004, motor_efficiency=0.9,
+)
+network.pump.frequency = "50 Hz"
+for pipe in (network.supply_pipe, network.return_pipe):
+    pipe.update_params(length=500, inner_diameter=0.1, elevation_change=0, u_value=1.0)
+    pipe.ambient_temperature = "10 degC"
+network.splitters[0].split_fraction = 0.5
+for substation in network.substations:
+    substation.update_params(building_flow=3.0, building_pressure="3 bar")
+    substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
+    substation.heat_exchanger.update_params(
+        ua=2e4, dp_hot_nominal="0.2 bar", dp_cold_nominal="0.2 bar",
+        m_dot_hot_nominal=2, m_dot_cold_nominal=3,
+    )
+    substation.consumer.update_params(minimum_return_temperature="30 degC")
+    substation.set_inputs({"valve.opening": 0.8, "consumer.heat_demand": "150 kW"})
+result = network(supply_in=gm.Stream(flow=4.0, T="75 degC", p="6 bar"))
+print(result.outputs.heat_supplied, result.outputs.return_out_T)  # 300000.0 329.36 K
+audit = energy_balance(network, result)
+print(audit["residual"], result.children["pump"].outputs.hydraulic_power)  # 1536.0 1536.0
+```
+
+### ATESPlant
+
+Purpose: seasonal low-temperature ATES plant with free cooling and a heat pump (Fleuchaus et
+al. 2018, Renewable and Sustainable Energy Reviews 94, 861-876; Bloemendal and Hartog 2018,
+Geothermics 71, 306-319).
+
+- Children: `storage` (`AquiferStorage`), `pump` (`CentrifugalPump`, well pump),
+  `heat_exchanger`, `heat_pump` (`HeatPump`, configure `mode="heating"`).
+- Ports: `building_in` -> `building_out`.
+- Parameters: `groundwater_pressure` (`Pressure`, > 0, required).
+- Controls: `groundwater_flow` (`MassFlow`, >= 0, required); season via `storage.mode`.
+- States: through the storage (`Module.step` steps it, also nested in a parent).
+- Outputs: `electricity`, `heat_loss`, `heat_absorbed`, `heat_accumulation` (totals),
+  `stored_energy`, `production_T`, `recovery_efficiency` (from the storage).
+- Topology by `storage.mode`: `"charge"` (summer): cold-well groundwater -> pump -> exchanger
+  cold side (building water on the hot side is cooled) -> warm well; heat pump not called.
+  `"discharge"` (winter): warm-well groundwater -> pump -> heat pump evaporator -> cold well;
+  the condenser heats `building_in` to the heat pump's setpoint; exchanger not called (the
+  winter source-circuit exchanger is lumped into the evaporator). `"idle"`: charge topology at
+  zero groundwater flow.
+- Groundwater loop: `AquiferStorage` produces at the start-of-step temperature of its source
+  store, independent of the injected water. The plant reads the new public
+  `storage.production_temperature()`, builds the produced stream (`groundwater_flow`,
+  `groundwater_pressure`, storage fluid), passes it through pump and exchanger or heat pump and
+  calls the storage once with the result, re-pressurised to `groundwater_pressure` (the storage
+  passes pressure through and well hydraulics are not modelled, so the pump head minus the
+  exchanger drop is what the unmodelled wells and aquifer consume). The storage's
+  `production_out` then equals the stream fed to the pump.
+- Balance: residual = pump `hydraulic_power` (flow work outside the sensible audit); mass 0.
+- Validity: the children's; in charge and idle the building water must be at least as warm as
+  the groundwater (exchanger hot side).
+
+```python
+import gemini as gm
+from gemini.core.modules import ATESPlant
+
+plant = ATESPlant().update_params(groundwater_pressure="3 bar")
+plant.storage.update_params(
+    aquifer_temperature="11 degC", aquifer_thickness=30, porosity=0.3,
+    rock_volumetric_heat_capacity=2.0e6, ground_conductivity=2.5,
+)
+plant.pump.update_params(
+    head_coeff=[3e5, 0.0, -1e8], rated_frequency="50 Hz", best_efficiency=0.7,
+    best_efficiency_flow=0.03, motor_efficiency=0.9,
+)
+plant.heat_exchanger.update_params(
+    ua=1e6, dp_hot_nominal="0.3 bar", dp_cold_nominal="0.3 bar",
+    m_dot_hot_nominal=40, m_dot_cold_nominal=30,
+)
+plant.heat_pump.update_params(mode="heating", capacity="2 MW")
+plant.set_inputs({
+    "groundwater_flow": 30.0, "storage.mode": "charge",
+    "pump.frequency": "50 Hz", "heat_pump.temperature_setpoint": "40 degC",
+})
+summer = gm.Stream(flow=40.0, T="17 degC", p="3 bar")
+state, result = plant.step(None, 3600, {"building_in": summer})
+state, result = plant.step(state, 3600, {"building_in": summer})
+print(result.outlets.building_out.T, result.outputs.stored_energy)  # 285.84 K 2.62e9 J
+plant.storage.mode = "discharge"
+state, result = plant.step(state, 3600, {"building_in": summer.with_(T=303.15)})
+print(result.outputs.production_T, result.outlets.building_out.T)  # 289.91 K 313.15 K
+```
+
+### Loop closure inside one call
+
+A composite with an internal closed circuit (the building loop of a substation) finds the
+circulated temperature first with `close_loop(update, start, path, lower, upper)` from
+`gemini/core/modules/plants/loops.py`: Wegstein's accelerated substitution (Wegstein 1958,
+"Accelerating convergence of iterative processes", Communications of the ACM 1(6), 9-13),
+tolerance 1e-9 K, at most 50 passes, then `PhysicsRangeError`. Each trial pass evaluates the
+stateless children with `Module.trial_outlets(inlets)`, which no running call records, and the
+composite then calls every child once with the converged inlets. A loop through a stateful leaf
+whose outlet depends only on its state (the ATES groundwater loop) reads the child's states first
+with `Module.start_states()` (`AquiferStorage.production_temperature()` uses it).

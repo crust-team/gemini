@@ -16,7 +16,7 @@ class GridConnection(Module):
     export_price * net_export in currency per second; negative values are revenue. Integrating
     it over a step gives the step's electricity cost.
 
-    The module has no ports and deliberately declares none of the six energy outputs audited by
+    The module has no ports and deliberately declares none of the seven energy outputs audited by
     ``energy_balance``: the plant's consumers and generators already report that energy, so
     repeating it here would count it twice. Assumptions: one tariff per direction, no reactive
     power, losses or demand charges.

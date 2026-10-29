@@ -165,6 +165,15 @@ children. Composites built from a variable number of children use the containers
 children) and `ModuleDict(mapping)` (caller-chosen keys that must not shadow module or mapping
 attributes). Containers compare and hash by identity like every module.
 
+A composite with a closed circuit inside one call (a substation's building loop) needs the
+circulated temperature before its first child call. It iterates with trial passes:
+`child.trial_outlets(inlets)` returns the outlets of a call that no running call records, with
+outputs skipped and pre-hooks run, and refuses stateful modules. When the loop has converged
+(`close_loop` in `gemini/core/modules/plants/loops.py`), the composite calls every child once, so
+formulas and balances see exactly one call each. `child.start_states()` returns the states a call
+of a stateful child would start from (its entry of the running step, else its initial states),
+for a loop through a stateful child whose outlet depends only on its state.
+
 ## Values
 
 Parameters, controls and boundaries are set by attribute assignment or in bulk:

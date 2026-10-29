@@ -918,6 +918,36 @@ class Module:
         result = self._run((inlets,), {}, step)
         return step.next_states or None, result
 
+    def start_states(self):
+        """Return the state values a call of this module would start from now.
+
+        Inside a running ``step`` these are the module's start-of-step entry, otherwise its
+        initial states. A composite reads a stateful child's states before calling it when the
+        child's outlet feeds back into the child's own inlet (the groundwater loop of an ATES
+        plant).
+        """
+        parent = _current_call.get()
+        return self._call_states(parent.step if parent is not None else None) or {}
+
+    def trial_outlets(self, inlets):
+        """Return the outlets of one call that no running call records, with outputs skipped.
+
+        A composite that closes a circulation loop within one call evaluates trial passes with
+        it, then calls each child once with the converged inlets, so formulas and balances see
+        only that call. Controls and boundaries resolve as in a call without keywords, and
+        pre-hooks run. A stateful module would evaluate at its initial states, so it is refused.
+        """
+        if self.stateful:
+            raise ConfigurationError(
+                f"{self.path}: stateful = True; expected a stateless module for a trial call"
+            )
+        token = _current_call.set(None)
+        try:
+            with no_outputs():
+                return self(inlets).outlets
+        finally:
+            _current_call.reset(token)
+
     def _initial_states(self):
         """Return the validated initial value of every declared state."""
         return {

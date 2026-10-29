@@ -1,0 +1,76 @@
+"""Cooling substation: building loop closure, dehumidification, limits and balances."""
+
+import math
+
+import pytest
+
+import gemini as gm
+from gemini.core.modules import energy_balance, mass_balance
+from gemini.core.modules.plants import CoolingSubstation
+from gemini.core.types import Stream
+
+CP = 4217.4
+NETWORK = Stream(m_dot=3.0, T=279.15, p=6e5)
+
+
+def counterflow_effectiveness(ua, c_min, c_max):
+    """Return the counterflow effectiveness [-] (Incropera et al., effectiveness-NTU)."""
+    ntu, ratio = ua / c_min, c_min / c_max
+    decay = math.exp(-ntu * (1 - ratio))
+    return (1 - decay) / (1 - ratio * decay)
+
+
+def test_met_loads_close_the_building_loop(plants):
+    """Sensible plus latent load enter the water; e C_min (T_return - T_network) = Q."""
+    substation = plants["cooling_substation"](CoolingSubstation())
+    result = substation(network_in=NETWORK)
+    out = result.outputs
+    effectiveness = counterflow_effectiveness(3e4, 3 * CP, 4 * CP)
+    assert out.heat_absorbed == pytest.approx(7e4, rel=1e-12)
+    assert out.duty == pytest.approx(7e4, rel=1e-9)
+    assert not out.is_unmet
+    assert out.network_out_T == pytest.approx(279.15 + 7e4 / (3 * CP), rel=1e-12)
+    expected_return = 279.15 + 7e4 / (effectiveness * 3 * CP)
+    assert out.building_return_T == pytest.approx(expected_return, abs=1e-8)
+    assert out.building_supply_T == pytest.approx(expected_return - 7e4 / (4 * CP), abs=1e-8)
+    assert out.building_supply_T < out.dew_point - 1.0
+    assert energy_balance(substation, result)["relative_residual"] < 1e-12
+    assert mass_balance(substation, result)["residual"] == 0
+
+
+def test_warm_network_cannot_dehumidify(plants):
+    """A supply too warm for the dew-point margin leaves the latent load unmet."""
+    substation = plants["cooling_substation"](CoolingSubstation())
+    out = substation(network_in=NETWORK.with_(T=284.15)).outputs
+    assert out.building_supply_T > out.dew_point - 1.0
+    assert out.unmet_latent == 1e4 and out.is_unmet
+    assert out.heat_absorbed == pytest.approx(6e4, rel=1e-12)
+    assert out.unmet_sensible == pytest.approx(0, abs=1e-6)
+
+
+def test_large_load_is_capped_at_the_return_limit(plants):
+    """Beyond the exchanger's reach the return sits at the 18 degC limit."""
+    substation = plants["cooling_substation"](CoolingSubstation(), sensible=5e5)
+    out = substation(network_in=NETWORK).outputs
+    effectiveness = counterflow_effectiveness(3e4, 3 * CP, 4 * CP)
+    available = effectiveness * 3 * CP * (291.15 - 279.15)
+    assert out.building_return_T == pytest.approx(291.15, abs=1e-8)
+    assert out.heat_absorbed == pytest.approx(available, rel=1e-9)
+    assert out.unmet_sensible == pytest.approx(5e5 - available, rel=1e-9)
+    assert out.unmet_latent == 1e4
+
+
+def test_stopped_network_and_invalid_inputs(plants):
+    """No network flow absorbs nothing; reverse flow raises."""
+    substation = plants["cooling_substation"](CoolingSubstation())
+    out = substation(network_in=NETWORK.with_(m_dot=0.0)).outputs
+    assert out.heat_absorbed == 0 and out.unmet_sensible == 6e4
+    with pytest.raises(gm.errors.PhysicsRangeError):
+        substation(network_in=NETWORK.with_(m_dot=-1.0))
+
+
+def test_loop_without_a_steady_state_raises(plants):
+    """At the dew-point threshold the on/off latent test leaves no fixed point of the loop."""
+    substation = plants["cooling_substation"](CoolingSubstation(), latent=5e4)
+    with pytest.raises(gm.errors.PhysicsRangeError, match="did not converge"):
+        substation(network_in=NETWORK.with_(T=281.15))

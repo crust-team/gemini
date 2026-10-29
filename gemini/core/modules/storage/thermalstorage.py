@@ -50,10 +50,9 @@ class ThermalStorage(Module):
     ``Q_amb < 0`` (a chilled tank in a warm room) as ``heat_absorbed``; the other one is zero.
 
     ``heat_accumulation`` is the rate of increase of the tank's sensible heat
-    ``rho cp V dT/dt`` at the start of the step. The stream audit of ``energy_balance`` has no
-    storage term, so its residual equals ``heat_accumulation``, not zero; the model is
-    first-law closed with that term. Each circuit keeps its mass flow, pressure and fluid
-    (constant tank volume, no pressure loss), so ``mass_balance`` closes.
+    ``rho cp V dT/dt`` at the start of the step; ``energy_balance`` counts it as the signed
+    storage outflow, so the tank is first-law closed. Each circuit keeps its mass flow, pressure
+    and fluid (constant tank volume, no pressure loss), so ``mass_balance`` closes.
 
     Assumptions and validity: single-phase liquid below boiling, no thermal stratification
     (a stratified tank delivers hotter discharge water than this model), constant fluid

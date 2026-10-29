@@ -131,11 +131,11 @@ The package avoids hidden behaviour. These are the only implicit mechanisms left
 reason it is needed:
 
 - `Module.__setattr__` registers what `__init__` assigns: a `Parameter`, `Inlet`, `Control`,
-  `Boundary`, `State`, `Output` or `Outlet` goes to its ordered registry and a `Module` becomes a child
-  with a dotted path. Assigning to a declared name sets the parameter, persists the control or
-  boundary (inside a running call, it changes that call only) or records the output of the
-  running call. Constructors therefore read as plain assignments in section order, and
-  `esp.frequency = 50` persists a command.
+  `Boundary`, `State`, `Output` or `Outlet` goes to its ordered registry and a `Module` becomes a
+  child with a dotted path. Assigning to a declared name sets the parameter, persists the control or
+  boundary (inside a running call, it changes that call only) or records the output of the running
+  call. Constructors therefore read as plain assignments in section order, and `esp.frequency = 50`
+  persists a command.
 - `Module.__getattr__` resolves names that are not ordinary attributes: parameter values, the
   current control and boundary values (running call, then persisted value, then default),
   outputs recorded in the running call, state values at the start of the running step (the

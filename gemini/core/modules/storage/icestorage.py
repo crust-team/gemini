@@ -51,9 +51,10 @@ class IceStorage(Module):
     three segments. Outlets and outputs use the start-of-step state.
 
     ``stored_cold = M * L * x`` is the latent cold available. The store is perfectly insulated
-    and the coil carries the glycol in a closed circuit, so ``mass_balance`` closes and the
-    residual of ``energy_balance`` (which has no storage term) equals ``duty``, the rate of
-    increase of the store's internal energy.
+    and the coil carries the glycol in a closed circuit, so ``mass_balance`` closes.
+    ``heat_accumulation`` equals ``duty``, the rate of increase of the store's internal energy
+    at the start of the step (negative while charging with cold); ``energy_balance`` counts it as
+    the signed storage outflow, so the store is first-law closed.
 
     Defaults: ``latent_heat`` 333.55 kJ/kg is the conventional latent heat of fusion of ice at
     0 degC and 101.325 kPa; IAPWS R10-06 (Feistel and Wagner 2006, *A new equation of state for
@@ -91,6 +92,7 @@ class IceStorage(Module):
         # Outputs
         self.stored_cold = Output(Energy)
         self.duty = Output(Power)
+        self.heat_accumulation = Output(Power)
         self.outlet_T = Output(Temperature)
         self.is_full = Output(bool)
         self.is_empty = Output(bool)
@@ -113,6 +115,7 @@ class IceStorage(Module):
         inlet = inlets.inlet
         self.stored_cold = self.water_mass * self.latent_heat * self.ice_fraction
         self.duty = self._conductance(inlet) * (inlet.T - self.temperature)
+        self.heat_accumulation = self.duty
         self.outlet_T = outlets.outlet.T
         self.is_full = self.ice_fraction >= 1
         self.is_empty = self.ice_fraction <= 0

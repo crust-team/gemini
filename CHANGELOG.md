@@ -36,6 +36,10 @@ finite engine, and then cleaned up. Old import paths are not retained.
   - storage `ThermalStorage`, `IceStorage`; control `PIDController`;
   - power `ORC`, `Separator`, `FlashTurbine`, `GridConnection`;
   - demand `HeatConsumer`, `CoolingConsumer`.
+- Composite plants in `gm.plants`: `MultiWellPlant`, `HeatingSubstation`, `CoolingSubstation`,
+  `DistrictNetwork` (heating or cooling) and `ATESPlant`, with the example
+  `examples/core/simulate/01_district_heating_and_cooling.py`; `Module.trial_outlets` and
+  `Module.start_states` for loops closed within one call.
 - Physics modules `compression`, `refrigeration`, `steam` (IAPWS-IF97), `ground` and
   `psychrometrics`.
 - `State(kind, default=...)` declarations with `_advance_states(inlets, outlets, dt)`: any module

@@ -120,16 +120,16 @@ claim absence of other corrosion mechanisms.
 ## Energy outputs and balances
 
 Energy that crosses a leaf other than in its streams is reported as `Power` outputs with fixed
-names; they are not flow ports. Six are nonnegative: the inflows `electricity` and `fuel`
-consumed and `heat_absorbed` from outside the plant (ambient air, the ground, a cooled
-building), and the outflows `heat_loss` to the environment, `heat_supplied` to a consumer and
-`electricity_generated`. `ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `core/modules/balance.py` list
-them. The seventh, `heat_accumulation`, is signed: the rate of increase of the heat a storage
-leaf holds (`ThermalStorage`), counted with the outflows, so a charging store (positive) and a
-discharging one (negative) both close. Declare only the outputs a module has. Fluid heat
-transferred between equipment remains in `Stream` states. `collect_flows(result)` sums these
-leaf outputs once, ignoring composite aggregates. `ModuleResult` captures incoming streams,
-controls and children at evaluation time; later evaluations do not replace these audit inputs.
+names; they are not flow ports. Six are nonnegative: the inflows `electricity` and `fuel` consumed
+and `heat_absorbed` from outside the plant (ambient air, the ground, a cooled building), and the
+outflows `heat_loss` to the environment, `heat_supplied` to a consumer and `electricity_generated`.
+`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `core/modules/balance.py` list them. The seventh,
+`heat_accumulation`, is signed: the rate of increase of the heat a storage leaf holds
+(`ThermalStorage`, `IceStorage`, `AquiferStorage`), counted with the outflows, so a charging store
+(positive) and a discharging one (negative) both close. Declare only the outputs a module has. Fluid
+heat transferred between equipment remains in `Stream` states. `collect_flows(result)` sums these
+leaf outputs once, ignoring composite aggregates. `ModuleResult` captures incoming streams, controls
+and children at evaluation time; later evaluations do not replace these audit inputs.
 
 `mass_balance(module, result)` includes aquifer withdrawal/deposition boundaries.
 `energy_balance(module, result)` audits sensible enthalpy (`m_dot * cp_l * T`) and these seven

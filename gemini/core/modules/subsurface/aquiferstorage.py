@@ -82,8 +82,15 @@ class AquiferStorage(Module):
     against R and H. Dispersion and fringe losses are not resolved, so
     ``ground_conductivity`` is calibratable as an effective value. Valid for low-temperature
     ATES (stores below about 30 degC, so buoyancy flow is weak).
-    The module is deliberately not first-law closed per call: the stream audit residual
-    equals the rate of change of ``stored_energy`` at the start of the step.
+    ``heat_accumulation`` is the rate of change of the stored heat at the start of the step: the
+    sensible enthalpy flow of ``injection_in`` minus that of ``production_out`` (``m_dot cp T``
+    per stream, the basis of ``energy_balance``) minus the net conduction loss. It is the signed
+    storage outflow of ``energy_balance``, so the well pair is first-law closed per call.
+
+    The production temperature does not depend on the injected stream, so a plant that closes
+    the groundwater loop through this module (production, pump, heat exchanger, injection)
+    reads it first with ``production_temperature()`` and then calls the module once with the
+    returned groundwater.
     """
 
     def __init__(self):
@@ -120,6 +127,7 @@ class AquiferStorage(Module):
         self.cold_temperature = Output(Temperature)
         self.heat_loss = Output(Power)
         self.heat_absorbed = Output(Power)
+        self.heat_accumulation = Output(Power)
 
         # Outlets
         self.production_out = Outlet(Stream)
@@ -130,7 +138,7 @@ class AquiferStorage(Module):
         # Outlets
         injection_in = inlets.injection_in
         self._volume_flow(injection_in)
-        production_out = injection_in.with_(T=self._production_temperature())
+        production_out = injection_in.with_(T=self._production_temperature(self._start_states()))
 
         outlets = dict(production_out=production_out)
         return outlets
@@ -150,6 +158,11 @@ class AquiferStorage(Module):
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
         self.heat_loss = sum(max(loss, 0) for loss in losses)
         self.heat_absorbed = sum(max(-loss, 0) for loss in losses)
+        self.heat_accumulation = (
+            _enthalpy_flow(inlets.injection_in)
+            - _enthalpy_flow(outlets.production_out)
+            - sum(losses)
+        )
 
     def _advance_states(self, inlets, outlets, dt):
         injection = inlets.injection_in
@@ -169,6 +182,16 @@ class AquiferStorage(Module):
         states["recovered_heat"] = self.recovered_heat + recovered
         return states
 
+    def production_temperature(self):
+        """Return the temperature [K] that ``production_out`` has in the running step.
+
+        It uses ``start_states()``: the start-of-step states inside a parent's ``Module.step``,
+        otherwise the initial states, like a call of the module would. ``mode`` resolves as in
+        a call without a ``mode`` keyword (persisted value, then default). Plants call this
+        before the module to evaluate the equipment between production and injection.
+        """
+        return self._production_temperature(self.start_states())
+
     def _moved_store(self, store, volume, injected_change):
         """Return a store's volume [m3] and temperature change [K] after this step's flow."""
         store_volume, change = self._volume(store), self._change(store)
@@ -187,12 +210,12 @@ class AquiferStorage(Module):
         conductance = self._store_conductance(store_volume, injection)
         return math.exp(-dt * conductance / (self._fluid_heat_capacity(injection) * store_volume))
 
-    def _production_temperature(self):
+    def _production_temperature(self, states):
         """Return the temperature [K] of the store produced from in the current mode."""
         source, _ = SOURCE_AND_TARGET.get(self.mode, (None, None))
         if source is None:
             return self.aquifer_temperature
-        return self.aquifer_temperature + self._change(source)
+        return self.aquifer_temperature + states[f"{source}_temperature_change"]
 
     def _store_conductance(self, store_volume, injection):
         """Return the conduction conductance [W/K] of a store of water volume [m3]."""
@@ -207,6 +230,10 @@ class AquiferStorage(Module):
             self.aquifer_thickness,
             self.storage_period,
         )
+
+    def _start_states(self):
+        """Return the store temperature changes [K] at the start of the running step."""
+        return {f"{store}_temperature_change": self._change(store) for store in STORES}
 
     def _volume(self, store):
         """Return a store's water volume [m3] at the start of the step."""
@@ -235,3 +262,8 @@ class AquiferStorage(Module):
                 "expected 0"
             )
         return injection.m_dot / injection.fluid.properties(injection.p, injection.T).rho_l
+
+
+def _enthalpy_flow(stream):
+    """Return the sensible enthalpy flow m_dot cp T [W] of a stream, as ``energy_balance``."""
+    return stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l * stream.T

@@ -101,8 +101,8 @@ def test_two_charge_steps_fill_and_mix_the_warm_store():
     assert result.outputs.production_T == 284.15
 
 
-def test_audit_residual_is_the_rate_of_change_of_stored_energy():
-    """Mass is balanced; the stream audit residual equals dE/dt at the start of the step."""
+def test_heat_accumulation_is_the_rate_of_change_of_stored_energy():
+    """Mass is balanced; heat_accumulation is dE/dt at the step start and closes the audit."""
     module = storage("discharge")
     start = {
         "warm_volume": 2e5,
@@ -119,7 +119,10 @@ def test_audit_residual_is_the_rate_of_change_of_stored_energy():
     assert out.heat_absorbed == pytest.approx(conductance(1e5) * 3)
     _, after = module.step(state, 1.0, {"injection_in": COLD})
     rate = after.outputs.stored_energy - out.stored_energy
-    assert energy_balance(module, result)["residual"] == pytest.approx(rate, rel=1e-6)
+    assert out.heat_accumulation == pytest.approx(rate, rel=1e-6)
+    audit = energy_balance(module, result)
+    assert audit["relative_residual"] < 1e-12
+    assert audit["heat_accumulation"] == out.heat_accumulation
     assert out.production_T == 289.15 and out.recovery_efficiency == pytest.approx(1 / 6)
     recovered = 1e12 + WATER * 30 / 1000 * 5.0
     assert state["recovered_heat"] == pytest.approx(recovered)
@@ -164,3 +167,48 @@ def test_composite_step_charges_through_the_plant():
     assert state["storage"]["warm_volume"] == pytest.approx(2 * 30 / 1000 * HOUR)
     assert result.outputs.stored_energy > 0
     assert result.outlets.return_out.T == 284.15
+    assert energy_balance(plant, result)["relative_residual"] < 1e-12
+    assert mass_balance(plant, result)["residual"] == 0
+
+
+class Reader(Module):
+    """Record the production temperature before calling the storage."""
+
+    def __init__(self, seen):
+        """Declare the test composite; ``seen`` collects the temperatures read."""
+        super().__init__()
+        object.__setattr__(self, "seen", seen)
+
+        # Modules
+        self.storage = storage("discharge")
+
+        # Inlets
+        self.supply_in = Inlet(Stream)
+
+        # Outlets
+        self.return_out = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Read the production temperature, then call the storage."""
+
+        # Modules
+        self.seen.append(self.storage.production_temperature())
+        stored = self.storage(injection_in=inlets.supply_in)
+
+        # Outlets
+        return_out = stored.outlets.production_out
+
+        outlets = dict(return_out=return_out)
+        return outlets
+
+
+def test_production_temperature_reads_the_running_step():
+    """Before its call a parent reads the start-of-step production temperature of the storage."""
+    seen = []
+    reader = Reader(seen)
+    result = reader(supply_in=COLD)
+    assert seen == [284.15] == [result.outlets.return_out.T]
+    start = {"warm_volume": 1e5, "warm_temperature_change": 4.0}
+    _, result = reader.step({"storage": start}, HOUR, {"supply_in": COLD})
+    assert seen[-1] == 288.15 == result.outlets.return_out.T
+    assert storage("idle").production_temperature() == 284.15
