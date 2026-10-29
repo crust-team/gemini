@@ -81,7 +81,7 @@ def co2_partial_pressure(
     gas_density: float,
     gas_molecular_weight: float,
     temperature_sample: float,
-    temperature_system: float
+    temperature_system: float,
 ) -> float:
     """Return CO2 partial pressure [Pa] from SI sample and system conditions.
 

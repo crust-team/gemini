@@ -10,8 +10,8 @@ Version format: `MAJOR.MINOR.PATCH`
 - **MINOR**: backward-compatible feature additions.
 - **PATCH**: backward-compatible bug fixes and small improvements.
 
-The current version is defined twice and the two must agree: `version` in the `[tool.poetry]`
-section of `pyproject.toml` and `__version__` in `gemini/__init__.py`;
+The current version is defined twice and the two must agree: `version` in the `[project]` section
+of `pyproject.toml` and `__version__` in `gemini/__init__.py`;
 `tests/unit/test_public_api.py` checks that they are equal.
 
 ## Release notes source of truth

@@ -51,4 +51,4 @@ def test_readable_tree():
 def test_version_matches_the_package_metadata():
     """The version literal in ``gemini/__init__.py`` is the one in ``pyproject.toml``."""
     project = tomllib.loads((Path(__file__).parents[2] / "pyproject.toml").read_text())
-    assert gm.__version__ == project["tool"]["poetry"]["version"]
+    assert gm.__version__ == project["project"]["version"]
