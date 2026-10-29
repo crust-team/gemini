@@ -12,7 +12,7 @@ from gemini.core.types import Stream
 def test_boiler_balance(fuel):
     """Electric and gas boilers conserve total modeled energy."""
     boiler = Boiler().update_params(fuel_type=fuel, capacity=1e6, efficiency=0.9)
-    result = boiler(inlet=Stream(m_dot=10, T=300, p=1e6), setpoint_T=320)
+    result = boiler(inlet=Stream(m_dot=10, T=300, p=1e6), temperature_setpoint=320)
     assert mass_balance(boiler, result)["residual"] == 0
     assert energy_balance(boiler, result)["relative_residual"] < 1e-12
     assert collect_flows(result)["electricity" if fuel == "electric" else "fuel"] > 0

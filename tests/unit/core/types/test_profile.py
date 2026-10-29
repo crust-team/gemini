@@ -55,15 +55,15 @@ def test_profiles_drive_scenario():
     boiler.update_params(fuel_type="electric", capacity=1e6, efficiency=0.9)
     boiler.bindings = {
         "": ModuleBindings(
-            controls={"setpoint_T": Binding(column="setpoint_T", unit="K")},
+            controls={"temperature_setpoint": Binding(column="temperature_setpoint", unit="K")},
             inlets={"inlet": {}},
         )
     }
     boiler.boundary = {"stream_defaults": {"": {"inlet": inlet}}}
     result = gm.Engine(on_error="raise").simulate(
         boiler,
-        gm.Dataset.from_profiles({"setpoint_T": target}),
-        gm.Clock.from_data(gm.Dataset.from_profiles({"setpoint_T": target})),
+        gm.Dataset.from_profiles({"temperature_setpoint": target}),
+        gm.Clock.from_data(gm.Dataset.from_profiles({"temperature_setpoint": target})),
     )
     assert len(result) == 3
     assert result.to_frame()["", "outlet_T"].tolist() == [320] * 3

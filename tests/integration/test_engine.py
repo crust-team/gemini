@@ -244,11 +244,13 @@ def test_error_policies_and_missing_columns(setup):
     assert result["filters.hot"].pressure_drop.notna().all()
     with pytest.raises(gm.errors.StepError, match="doublet.esp"):
         gm.Engine(on_error="raise").replay(plant, gm.Dataset.from_frame(frame))
-    with pytest.raises(gm.errors.BindingError, match="suction.p, doublet.reservoir.m_dot"):
+    with pytest.raises(
+        gm.errors.BindingError, match="suction.p, doublet.reservoir.production_rate"
+    ):
         gm.Engine().replay(
             plant,
             gm.Dataset.from_frame(
-                frame.drop(columns=["doublet.esp.suction.p", "doublet.reservoir.m_dot"])
+                frame.drop(columns=["doublet.esp.suction.p", "doublet.reservoir.production_rate"])
             ),
         )
 

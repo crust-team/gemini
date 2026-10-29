@@ -50,11 +50,11 @@ def test_to_plant_fills_parameters_bindings_and_boundary(converted):
     assert converted.doublet.riser.segment == "above_esp"
     assert converted.injection_pump.efficiency == 0.8
     assert str(converted.heat_exchanger.param_history[0].valid_from) == "2020-01-01 00:00:00+00:00"
-    assert converted.bindings["doublet.reservoir"].controls["m_dot"].column == (
-        "doublet.reservoir.m_dot"
+    assert converted.bindings["doublet.reservoir"].controls["production_rate"].column == (
+        "doublet.reservoir.production_rate"
     )
-    assert converted.bindings[""].inlets["secondary"]["T"].unit == "K"
-    assert converted.boundary["root_inputs"]["secondary"]["m_dot"] == 40
+    assert converted.bindings[""].inlets["secondary_in"]["T"].unit == "K"
+    assert converted.boundary["root_inputs"]["secondary_in"]["m_dot"] == 40
     assert converted.fluid.liquid_density == 1068
     assert not hasattr(converted, "legacy_info")
 
@@ -74,7 +74,7 @@ def test_to_dataset_converts_and_reports_missing_columns(project):
     data = gm.legacy.to_dataset(project, frame)
     values = data.to_frame()
     assert values["doublet.esp.suction.p"].iloc[0] == pytest.approx(59.491e5)
-    assert values["doublet.reservoir.m_dot"].iloc[0] == pytest.approx(149.191 / 3600)
+    assert values["doublet.reservoir.production_rate"].iloc[0] == pytest.approx(149.191 / 3600)
     assert data.columns["heat_exchanger.hot_out_T"].unit == "K"
     assert values["production_wellhead_pressure"].iloc[0] == pytest.approx(10e5)
     assert values["esp_status"].iloc[0] == "Normal"

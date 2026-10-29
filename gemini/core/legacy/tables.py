@@ -196,7 +196,7 @@ SUPPLEMENTS = {
         ("measured.duty", "Thermal_PowerGen", "W"),
         ("measured.dp_hot", "HEX_PDrop", "bar"),
     ],
-    "production_reservoir": [("controls.m_dot", "Qp", "m3/h")],
+    "production_reservoir": [("controls.production_rate", "Qp", "m3/h")],
 }
 """Dataset channels the project tags omit, bound only when the data CSV has the column.
 
@@ -208,7 +208,7 @@ also bind their pressure drop from the ``_PDrop`` column next to their ``_Pin`` 
 EXTRA_COLUMNS = {"Pwh_prod": ("production_wellhead_pressure", "bar")}
 """Unbound data CSV columns that ``to_dataset`` keeps, converted to SI: old -> (new, unit)."""
 
-ROOT_INLETS = {"secondary": {"m_dot": ("Qs", "m3/h"), "T": ("T_s_in", "degC")}}
+ROOT_INLETS = {"secondary_in": {"m_dot": ("Qs", "m3/h"), "T": ("T_s_in", "degC")}}
 """Data CSV columns of the plant's secondary inlet: field -> (column, unit)."""
 
 ASSUMED_SECONDARY_PRESSURE = 5e5
@@ -238,7 +238,7 @@ setpoint. The example efficiency is explicit in the snapshot; no curve is fabric
 EXAMPLE_BULK_HEAT_CAPACITY = 4.410e6
 """Volumetric heat capacity [J/m3/K] inferred from the example heat balance."""
 
-ROOT_DEFAULTS = {"secondary": {"m_dot": 40, "T": 293.15, "p": ASSUMED_SECONDARY_PRESSURE}}
+ROOT_DEFAULTS = {"secondary_in": {"m_dot": 40, "T": 293.15, "p": ASSUMED_SECONDARY_PRESSURE}}
 """Plant inlets assumed by simulations without their measurements: kg/s, K, Pa.
 
 NOTE(refactor): two-control simulations need an assumed secondary boundary. Store 40 kg/s,
@@ -246,7 +246,7 @@ NOTE(refactor): two-control simulations need an assumed secondary boundary. Stor
 """
 
 TRACE_CONTROLS = {
-    "doublet.reservoir.m_dot": 40.0,
+    "doublet.reservoir.production_rate": 40.0,
     "doublet.esp.frequency": 60.0,
     "injection_pump.pressure_setpoint": INJECTION_SETPOINT,
 }

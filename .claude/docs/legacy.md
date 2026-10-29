@@ -17,5 +17,5 @@ private loader. New engine/modules/examples contain no old naming or conversion 
 bridge example is the only example that reads old files.
 
 Converted control columns use their owning leaf path. The shared doublet therefore uses
-`doublet.reservoir.m_dot`, `doublet.esp.frequency`, and
+`doublet.reservoir.production_rate`, `doublet.esp.frequency`, and
 `injection_pump.pressure_setpoint`, without duplicate plant-level control columns.

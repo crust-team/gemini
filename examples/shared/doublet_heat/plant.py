@@ -28,7 +28,7 @@ class DoubletHeatPlant(Module):
         self.injection_pump = InjectionPump()
 
         # Inlets
-        self.secondary = Inlet(Stream)
+        self.secondary_in = Inlet(Stream)
 
         # Outputs
         self.thermal_power = Output.of("heat_exchanger.duty")
@@ -45,11 +45,10 @@ class DoubletHeatPlant(Module):
         """Connect the doublet limbs through the modeled surface equipment."""
 
         # Modules
-        secondary = inlets.secondary
         supply = self.doublet.produce()
         degassed = self.degasser(inlet=supply)
         filtered = self.filters.hot(inlet=degassed.outlets.liquid)
-        exchanged = self.heat_exchanger(hot_in=filtered.outlets.outlet, cold_in=secondary)
+        exchanged = self.heat_exchanger(hot_in=filtered.outlets.outlet, cold_in=inlets.secondary_in)
         returned = self.filters.cold(inlet=exchanged.outlets.hot_out)
         pumped = self.injection_pump(suction=returned.outlets.outlet)
         self.doublet.inject(pumped.outlets.discharge)

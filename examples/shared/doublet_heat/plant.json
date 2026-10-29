@@ -248,8 +248,8 @@
         },
         "doublet.reservoir": {
           "controls": {
-            "m_dot": {
-              "column": "doublet.reservoir.m_dot",
+            "production_rate": {
+              "column": "doublet.reservoir.production_rate",
               "unit": "m3/s"
             }
           },
@@ -262,13 +262,13 @@
           "controls": {},
           "boundaries": {},
           "inlets": {
-            "secondary": {
+            "secondary_in": {
               "m_dot": {
-                "column": "secondary.m_dot",
+                "column": "secondary_in.m_dot",
                 "unit": "m3/s"
               },
               "T": {
-                "column": "secondary.T",
+                "column": "secondary_in.T",
                 "unit": "K"
               }
             }
@@ -298,7 +298,7 @@
           "Profiles lacking secondary measurements assume 40 kg/s at 20 C and 5 bar."
         ],
         "root_inputs": {
-          "secondary": {
+          "secondary_in": {
             "m_dot": 40,
             "T": 293.15,
             "p": 500000.0,

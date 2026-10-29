@@ -124,7 +124,7 @@ def _injection_ipr(inputs):
 def _production_ipr(inputs):
     """Evaluate the production inflow performance at one withdrawal rate."""
     reservoir = configured(ProductionReservoir, _reservoir_parameters())
-    outputs = reservoir(m_dot=inputs["flow"] * 1000).outputs
+    outputs = reservoir(production_rate=inputs["flow"] * 1000).outputs
     return dict(bottomhole_pressure=outputs.bottomhole_pressure)
 
 
@@ -151,7 +151,7 @@ def _reservoir_dp(inputs):
         skin=inputs["skin_factor"],
     )
     reservoir = configured(ProductionReservoir, parameters)
-    outputs = reservoir(m_dot=inputs["flow"] * inputs["density"]).outputs
+    outputs = reservoir(production_rate=inputs["flow"] * inputs["density"]).outputs
     return dict(
         Hydrostatic_dp=outputs.hydrostatic_dp,
         skin_dp=outputs.skin_dp,

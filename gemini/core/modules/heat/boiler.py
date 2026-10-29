@@ -33,7 +33,7 @@ class Boiler(Module):
         self.inlet = Inlet(Stream)
 
         # Controls
-        self.setpoint_T = Control(Temperature)
+        self.temperature_setpoint = Control(Temperature)
 
         # Outputs
         self.duty = Output(Power)
@@ -78,4 +78,4 @@ class Boiler(Module):
 
     def _requested_duty(self, inlet, cp):
         """Return the heat flow [W] that would lift the inlet to the setpoint, without the cap."""
-        return inlet.m_dot * cp * max(0, self.setpoint_T - inlet.T)
+        return inlet.m_dot * cp * max(0, self.temperature_setpoint - inlet.T)

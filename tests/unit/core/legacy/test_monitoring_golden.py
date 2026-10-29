@@ -100,7 +100,7 @@ def _esp_vlp_values(row, well_property, esp_property, reservoir_property):
         reservoir_parameters["pressure"], reservoir_parameters["temperature"]
     ).rho_l
     mass = units.m3h_to_m3s(row.Qp) * density
-    intake = well.intake_conditions(reservoir(m_dot=mass).outlets["sandface"])
+    intake = well.intake_conditions(reservoir(production_rate=mass).outlets["sandface"])
     wellhead = Stream(
         m_dot=mass, p=units.bar_to_pa(row.Pwh_prod), T=units.c_to_k(row.T_p_in), fluid=well.fluid
     )

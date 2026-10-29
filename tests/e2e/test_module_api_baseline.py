@@ -117,7 +117,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
 
     clock = gm.Clock.days(2027, 1, 1, days=1)
     profiles = {
-        "doublet.reservoir.m_dot": gm.Profile.constant(150, unit="m3/h", clock=clock),
+        "doublet.reservoir.production_rate": gm.Profile.constant(150, unit="m3/h", clock=clock),
         "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }

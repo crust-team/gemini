@@ -76,7 +76,7 @@ def _leaf_mass(module, result):
     incoming = sum(s.m_dot for s in _streams(result.inlets))
     outgoing = sum(s.m_dot for s in _streams(result.outlets))
     if isinstance(module, ProductionReservoir):
-        incoming += result.inputs["m_dot"]
+        incoming += result.inputs["production_rate"]
     elif isinstance(module, InjectionReservoir):
         outgoing += sum(s.m_dot for s in _streams(result.inlets))
     return incoming, outgoing

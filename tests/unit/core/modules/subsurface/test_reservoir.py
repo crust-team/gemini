@@ -18,7 +18,7 @@ def test_example_production_and_decline():
         mapping.read_property(DATA / "production_well_c774.param"),
     )
     c = ProductionReservoir().update_params(**p)
-    result = c(m_dot=40)
+    result = c(production_rate=40)
     out, flow = result.outputs, 40 / 1068
     assert out.drawdown == pytest.approx(flow / c.productivity_index)
     pressure = out.bottomhole_pressure

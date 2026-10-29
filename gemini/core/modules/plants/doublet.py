@@ -32,14 +32,14 @@ class Doublet(Module):
         self.sink = InjectionReservoir()
 
         # Inlets
-        self.return_stream = Inlet(Stream)
+        self.return_in = Inlet(Stream)
 
         # Outputs
         self.electricity = Output.total("electricity")
         self.heat_loss = Output.total("heat_loss")
 
         # Outlets
-        self.supply = Outlet(Stream)
+        self.supply_out = Outlet(Stream)
 
     def produce(self):
         """Traverse reservoir, lower well, ESP and riser."""
@@ -58,10 +58,10 @@ class Doublet(Module):
         """Evaluate both limbs for an independently specified return boundary."""
 
         # Modules
-        self.inject(inlets.return_stream)
+        self.inject(inlets.return_in)
 
         # Outlets
-        supply = self.produce()
+        supply_out = self.produce()
 
-        outlets = dict(supply=supply)
+        outlets = dict(supply_out=supply_out)
         return outlets

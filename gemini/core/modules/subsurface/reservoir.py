@@ -180,7 +180,7 @@ class ProductionReservoir(_Reservoir):
         super().__init__("production")
 
         # Controls
-        self.m_dot = Control(MassFlow, ge=0)
+        self.production_rate = Control(MassFlow, ge=0)
 
         # Outlets
         self.sandface = Outlet(Stream)
@@ -191,10 +191,10 @@ class ProductionReservoir(_Reservoir):
         # Outlets
         if self.productivity_index is None:
             raise ConfigurationError(f"{self.path}: productivity_index is required")
-        flow = self.m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
+        flow = self.production_rate / self.fluid.properties(self.pressure, self.temperature).rho_l
         p_bh = self.pressure - flow / self.productivity_index
 
-        sandface = Stream(m_dot=self.m_dot, T=self.temperature, p=p_bh, fluid=self.fluid)
+        sandface = Stream(m_dot=self.production_rate, T=self.temperature, p=p_bh, fluid=self.fluid)
 
         outlets = dict(sandface=sandface)
         return outlets
