@@ -179,4 +179,14 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
 - pandas 3 results carry a microsecond time index and the `str` text dtype where pandas 2 gave
   nanoseconds and `object`; values are unchanged. Timestamp indexes of any resolution are
   compared in nanoseconds (`Loader`, `median_step`, `interval_seconds`).
+- With identical parsed inputs, replay (1,313,280 full-year cells), simulation, HX calibration
+  and every golden case are bit-identical on Python 3.11 between the former pins (NumPy 2.2.6,
+  pandas 2.3.3, SciPy 1.13.1) and both the newest and the lowest declared dependencies. Two
+  sub-ULP differences remain elsewhere, both far inside every tolerance and left as they are:
+  - Python 3.12 sums floats with compensated summation in the built-in `sum()`, which the ESP
+    head and power polynomials use (`core/physics/pumps.py`): ESP head and discharge pressure
+    move by up to 1.4e-15 relative (1.9e-9 Pa) in 28,532 replay cells, and three golden ESP
+    values by up to 5.8e-16.
+  - NumPy 2.5's `polyfit` moves the golden reservoir pressure estimate from 21999999.999999974
+    to 21999999.999999993 Pa (8.5e-16 relative).
 
