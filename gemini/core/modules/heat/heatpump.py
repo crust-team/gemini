@@ -53,7 +53,10 @@ class HeatPump(Module):
     machines summarised by Arpagaus et al. (2018), "High temperature heat pumps: Market overview,
     state of the art, research status, refrigerants, and application potentials", Energy 152,
     985-1010, who report Carnot fractions of about 0.4 to 0.6 (default 0.5). Outlet temperatures
-    are not checked against the freezing point of the fluid.
+    are not checked against the freezing point of the fluid unless
+    ``minimum_source_outlet_temperature`` is set: it caps a heating duty so the source leaves no
+    colder than the minimum (upstream GEMINI ``Ts_in_minimum``) and raises a cooling setpoint
+    below it to the minimum.
     """
 
     def __init__(self):
@@ -68,6 +71,7 @@ class HeatPump(Module):
         self.lorenz_efficiency = Parameter(Efficiency, default=0.5)
         self.minimum_temperature_lift = Parameter(TemperatureDifference, default=10, gt=0)
         self.minimum_part_load = Parameter(Fraction, default=0)
+        self.minimum_source_outlet_temperature = Parameter(Temperature | None, default=None)
 
         # Inlets
         self.source_in = Inlet(Stream)
@@ -118,35 +122,94 @@ class HeatPump(Module):
                 f"{self.path}: cop_model = 'lorenz' with mode = 'cooling'; expected "
                 "mode = 'heating' (the Lorenz COP is defined for heating only)"
             )
-        if heating:
-            requested = sink_rate * max(0, self.temperature_setpoint - sink_in.T)
-        else:
-            requested = source_rate * max(0, source_in.T - self.temperature_setpoint)
-        duty = 0.0
-        if source_rate and sink_rate:
-            duty = refrigeration.part_load_duty(requested, self.capacity, self.minimum_part_load)
-        if heating:
-            sink_T = sink_in.T + duty / sink_rate if duty else sink_in.T
-            source_T = self._source_outlet_T(source_in, sink_in, source_rate, sink_T, duty)
-            evaporator = duty - duty / self._cop(source_in, sink_in, source_T, sink_T)
-            condenser = duty
-        else:
-            source_T = source_in.T - duty / source_rate if duty else source_in.T
-            sink_T = self._sink_outlet_T(sink_in.T, sink_rate, source_T, duty)
-            evaporator = duty
-            condenser = duty + duty / self._cop(source_in, sink_in, source_T, sink_T)
+        operate = self._heating if heating else self._cooling
+        duty, is_capped, source_T, sink_T = operate(source_in, sink_in, source_rate, sink_rate)
+        cop = self._cop(source_in, sink_in, source_T, sink_T) if duty else None
+        evaporator, condenser = duty, duty
+        if duty and heating:
+            evaporator = duty - duty / cop
+        if duty and not heating:
+            condenser = duty + duty / cop
         return {
-            "cop": self._cop(source_in, sink_in, source_T, sink_T) if duty else None,
+            "cop": cop,
             "useful_duty": duty,
             "evaporator_duty": evaporator,
             "condenser_duty": condenser,
             "electricity": condenser - evaporator,
             "temperature_lift": sink_T - source_T,
-            "is_capped": bool(duty) and requested > self.capacity,
+            "is_capped": is_capped,
             "is_running": duty > 0,
             "source_out_T": source_T,
             "sink_out_T": sink_T,
         }
+
+    def _heating(self, source_in, sink_in, source_rate, sink_rate):
+        """Return the heating duty [W], the capped flag and the source and sink outlets [K].
+
+        The sink is heated towards the setpoint. When the source outlet would fall below
+        ``minimum_source_outlet_temperature``, the duty is reduced until the source leaves at
+        that minimum (``_duty_at_source_limit``), the sink outlet drops with it and the machine
+        reports ``is_capped``.
+        """
+        requested = sink_rate * max(0, self.temperature_setpoint - sink_in.T)
+        duty = self._duty(requested, source_rate, sink_rate)
+        if not duty:
+            return 0.0, False, source_in.T, sink_in.T
+        sink_T = sink_in.T + duty / sink_rate
+        source_T = self._source_outlet_T(source_in, sink_in, source_rate, sink_T, duty)
+        limit = self.minimum_source_outlet_temperature
+        if limit is None or source_T >= limit:
+            return duty, requested > self.capacity, source_T, sink_T
+        limited = self._duty_at_source_limit(source_in, sink_in, source_rate, sink_rate, duty)
+        duty = self._duty(limited, source_rate, sink_rate)
+        if not duty:
+            return 0.0, False, source_in.T, sink_in.T
+        return duty, True, limit, sink_in.T + duty / sink_rate
+
+    def _cooling(self, source_in, sink_in, source_rate, sink_rate):
+        """Return the cooling duty [W], the capped flag and the source and sink outlets [K].
+
+        The source is cooled towards the setpoint, raised to
+        ``minimum_source_outlet_temperature`` when that is warmer; a raised setpoint reports
+        ``is_capped``.
+        """
+        limit = self.minimum_source_outlet_temperature
+        is_limited = limit is not None and self.temperature_setpoint < limit
+        setpoint = limit if is_limited else self.temperature_setpoint
+        requested = source_rate * max(0, source_in.T - setpoint)
+        duty = self._duty(requested, source_rate, sink_rate)
+        if not duty:
+            return 0.0, False, source_in.T, sink_in.T
+        source_T = source_in.T - duty / source_rate
+        sink_T = self._sink_outlet_T(sink_in.T, sink_rate, source_T, duty)
+        return duty, requested > self.capacity or is_limited, source_T, sink_T
+
+    def _duty(self, requested, source_rate, sink_rate):
+        """Return the delivered useful duty [W]: zero with a stopped circuit, else part load."""
+        if not source_rate or not sink_rate:
+            return 0.0
+        return refrigeration.part_load_duty(requested, self.capacity, self.minimum_part_load)
+
+    def _duty_at_source_limit(self, source_in, sink_in, source_rate, sink_rate, duty):
+        """Return the heating duty [W] whose evaporator cools the source exactly to its minimum.
+
+        The evaporator may take at most C_source (T_in - T_min). Its demand Q (1 - 1 / COP),
+        with the sink outlet T_sink_in + Q / C_sink and the source outlet T_min in the COP,
+        rises from zero at Q = 0 to more than the available heat at the requested duty, whose
+        unconstrained source outlet is colder than T_min; ``brentq`` finds the duty between.
+        A source inlet at or below the minimum leaves no duty.
+        """
+        limit = self.minimum_source_outlet_temperature
+        available = source_rate * (source_in.T - limit)
+        if available <= 0:
+            return 0.0
+
+        def shortfall(useful):
+            sink_T = sink_in.T + useful / sink_rate
+            cop = self._cop(source_in, sink_in, limit, sink_T)
+            return useful * (1 - 1 / cop) - available
+
+        return brentq(shortfall, 0.0, duty)
 
     def _cop(self, source_in, sink_in, source_T, sink_T):
         """Return the COP [-] of the mode and COP model at the given outlet temperatures [K]."""
@@ -167,8 +230,6 @@ class HeatPump(Module):
         otherwise x = (T_in - Q/C * (1 - 1/eta)) / (1 + Q / (C * eta * T_h)). The Lorenz COP is
         solved numerically by ``_lorenz_source_outlet_T``.
         """
-        if not duty:
-            return source_in.T
         if self.cop_model == "lorenz":
             return self._lorenz_source_outlet_T(source_in, sink_in, rate, sink_T, duty)
         inlet_T = source_in.T
@@ -214,8 +275,6 @@ class HeatPump(Module):
         otherwise y = (T_in + Q/C * (1 - 1/eta)) / (1 - Q / (C * eta * T_c)), which needs a sink
         capacity rate C above Q / (eta * T_c).
         """
-        if not duty:
-            return inlet_T
         eta, lift, load = self.carnot_efficiency, self.minimum_temperature_lift, duty / rate
         floored = inlet_T + load * (1 + lift / (eta * source_T))
         if floored - source_T <= lift:

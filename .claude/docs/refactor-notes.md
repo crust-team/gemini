@@ -198,6 +198,10 @@ ported into the refactored structure; only missing behaviour was added.
 - `HeatPump(cop_model="lorenz")` reproduces the upstream Lorenz case (COP 6.5310, source outlet
   18.8279 degC, 580694.44 W); electricity is 88913.17 W against upstream's 88913.32 W, the
   Nelder-Mead tolerance of the upstream solve. It is heating only, as upstream.
+- `HeatPump.minimum_source_outlet_temperature` is upstream `Ts_in_minimum` (despite its name a
+  minimum **outlet**): upstream re-solves with the source outlet fixed and lets the sink outlet
+  drop, which is the duty reduction implemented here. It is optional (default `None`), so no
+  existing number changes.
 - The Carnot mode keeps the refactored model: upstream evaluates the COP at the sink outlet and
   the **source inlet** without a lift floor (COP 4.4144 in its test case), the refactored model at
   both outlets with a 10 K floor (3.1012 for the same inputs).

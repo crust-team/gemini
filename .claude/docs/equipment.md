@@ -707,9 +707,13 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
     the machine data.
   - `minimum_part_load` (`Fraction`, default 0): below this share of capacity the machine is off
     for the step.
+  - `minimum_source_outlet_temperature` (`Temperature | None`, default `None`): lowest source
+    outlet, for example freeze or scaling protection of the evaporator (upstream GEMINI
+    `Ts_in_minimum`).
 - **Controls**: `temperature_setpoint`: sink outlet when heating, source outlet when cooling.
 - **Outputs**: `cop` (`None` when off), `useful_duty`, `evaporator_duty`, `condenser_duty`,
-  `electricity`, `temperature_lift`, `is_capped` (capacity limited), `is_running`,
+  `electricity`, `temperature_lift`, `is_capped` (limited by capacity or by the minimum source
+  outlet), `is_running`,
   `source_out_T`, `sink_out_T`.
 - **Model**: requested duty `C |T_in - T_set|` on the controlled circuit, then
   `refrigeration.part_load_duty`; `COP = eta T_sink_out / max(lift, L)` when heating and
@@ -720,6 +724,11 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
   the log-mean temperatures of the sink and source glides (`refrigeration.lorenz_cop_heating`,
   Lorenz 1894); the source outlet is then found by `brentq` between `T_in - Q / C` and `T_in`.
   `cop_model="lorenz"` with `mode="cooling"` raises `ConfigurationError`.
+- **Minimum source outlet**: when heating would cool the source below
+  `minimum_source_outlet_temperature`, the duty is reduced (`brentq` on `Q (1 - 1/COP) = C_source
+  (T_in - T_min)`) so the source leaves at the minimum and the sink outlet drops; a source inlet at
+  or below the minimum leaves the machine off. In cooling mode a setpoint below the minimum is
+  raised to it.
 - **Validity**: lifts of about 10 to 80 K. A heating COP of 1 or less (source inlet at or below
   `(1 - eta) T_sink_out`) and a cooling sink too small to reject the heat raise
   `PhysicsRangeError`. Outlets are not checked against freezing. Constant Carnot fraction, no

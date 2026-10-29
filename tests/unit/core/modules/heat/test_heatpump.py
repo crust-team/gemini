@@ -148,3 +148,43 @@ def test_lorenz_mode_limits():
         heat_pump("heating", cop_model="lorenz", lorenz_efficiency=0.1)(
             source_in=source.with_(T=250), sink_in=sink, temperature_setpoint=340
         )
+
+
+@pytest.mark.parametrize("cop_model", ["carnot", "lorenz"])
+def test_minimum_source_outlet_caps_the_heating_duty(cop_model):
+    """A source that would leave below the minimum caps the duty; the sink outlet drops.
+
+    Upstream GEMINI ``Ts_in_minimum`` behaviour: unconstrained, this source leaves at
+    292.78 K (Carnot); with a 295 K minimum the evaporator takes exactly C (300 - 295).
+    """
+    pump = heat_pump("heating", cop_model=cop_model, minimum_source_outlet_temperature=295)
+    source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
+    result = pump(source_in=source, sink_in=sink, temperature_setpoint=340)
+    out = result.outputs
+    assert out.source_out_T == 295 and result.outlets.source_out.T == 295
+    assert 320 < out.sink_out_T < 340 and out.is_capped and out.is_running
+    assert out.evaporator_duty == pytest.approx(20 * CP * 5, rel=1e-10)
+    assert out.useful_duty == pytest.approx(10 * CP * (out.sink_out_T - 320))
+    assert energy_balance(pump, result)["relative_residual"] < 1e-12
+    unconstrained = heat_pump("heating", cop_model=cop_model)(
+        source_in=source, sink_in=sink, temperature_setpoint=340
+    )
+    assert unconstrained.outputs.source_out_T < 295
+
+
+def test_minimum_source_outlet_switches_off_or_raises_a_cooling_setpoint():
+    """A source inlet at the minimum leaves no heating duty; a colder chiller setpoint is raised."""
+    source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
+    pump = heat_pump("heating", minimum_source_outlet_temperature=300)
+    out = pump(source_in=source, sink_in=sink, temperature_setpoint=340).outputs
+    assert not out.is_running and out.useful_duty == 0 and out.sink_out_T == 320
+    chiller = heat_pump("cooling", minimum_source_outlet_temperature=283)
+    result = chiller(
+        source_in=Stream(m_dot=20, T=285, p=3e5),
+        sink_in=Stream(m_dot=30, T=300, p=3e5),
+        temperature_setpoint=280,
+    )
+    assert result.outputs.source_out_T == pytest.approx(283)
+    assert result.outputs.is_capped
+    assert result.outputs.useful_duty == pytest.approx(20 * CP * 2)
+    assert energy_balance(chiller, result)["relative_residual"] < 1e-12
