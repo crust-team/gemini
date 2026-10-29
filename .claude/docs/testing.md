@@ -99,7 +99,7 @@ change and are never a routine speed optimization.
 Read-only expensive setup belongs in session or module fixtures. `dataset_path`,
 `selected_frame` and `selected_dataset` load the chosen e2e data once; `fast_frame`,
 `fast_dataset` and `reference_dataset` serve short behaviour checks; `shared_plant` validates
-`plant.json` once; `module_classes` lists every shipped module class and the example plants.
+`plant.json` once; a test that takes `module_class` runs once per shipped module class and example plant (`pytest_generate_tests` in `tests/conftest.py`), so each class stays within the per-test budget.
 Never mutate these objects. Request `fresh_plant` for a function-scoped deep copy or
 `module_plant` when one workflow shares a copied plant across assertions. Prefer the shortest
 `Dataset.window` that still crosses every boundary relevant to the property.

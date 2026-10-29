@@ -80,8 +80,7 @@ def shared_plant():
     return plant
 
 
-@pytest.fixture(scope="session")
-def module_classes():
+def shipped_module_classes():
     """Return every concrete module class shipped in ``gemini`` and the shared example plant."""
     exported = [getattr(gm.modules, name) for name in gm.modules.__all__]
     classes = [
@@ -90,6 +89,13 @@ def module_classes():
         if isinstance(item, type) and issubclass(item, Module) and item is not Module
     ]
     return tuple(classes) + (gm.plants.Doublet, DoubletHeatPlant)
+
+
+def pytest_generate_tests(metafunc):
+    """Run a test that takes ``module_class`` once per shipped module class."""
+    if "module_class" in metafunc.fixturenames:
+        classes = shipped_module_classes()
+        metafunc.parametrize("module_class", classes, ids=[cls.__name__ for cls in classes])
 
 
 @pytest.fixture

@@ -11,8 +11,8 @@ def test_metadata_is_derived():
     assert "ua: W/K, calibratable" in HeatExchanger.help()
 
 
-def test_every_module_class_is_documented(module_classes):
+def test_every_module_class_is_documented(module_class):
     """Each shipped module explains itself in its class docstring."""
-    for cls in module_classes:
-        assert issubclass(cls, Module)
-        assert cls.__doc__ and cls.__doc__.strip(), cls.__name__
+    cls = module_class
+    assert issubclass(cls, Module)
+    assert cls.__doc__ and cls.__doc__.strip(), cls.__name__

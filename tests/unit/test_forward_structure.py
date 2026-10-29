@@ -124,67 +124,67 @@ def _assert_declared_accesses(cls, method_name, variable, declared):
         )
 
 
-def test_fixed_signatures_and_declared_port_accesses(module_classes):
+def test_fixed_signatures_and_declared_port_accesses(module_class):
     """Every module lifecycle method receives fixed Ports and reads only declared names."""
-    for cls in module_classes:
-        _assert_fixed_signature(cls, "forward", ["self", "inlets"])
-        _assert_fixed_signature(cls, "_compute_outputs", ["self", "inlets", "outlets"])
-        if cls().stateful and "_advance_states" in cls.__dict__:
-            _assert_fixed_signature(cls, "_advance_states", ["self", "inlets", "outlets", "dt"])
-        module = cls()
-        inlet_names = list(module.inlets())
-        outlet_names = list(module.outlets())
-        _assert_declared_accesses(cls, "forward", "inlets", inlet_names)
-        _assert_declared_accesses(cls, "_compute_outputs", "inlets", inlet_names)
-        _assert_declared_accesses(cls, "_compute_outputs", "outlets", outlet_names)
+    cls = module_class
+    _assert_fixed_signature(cls, "forward", ["self", "inlets"])
+    _assert_fixed_signature(cls, "_compute_outputs", ["self", "inlets", "outlets"])
+    if cls().stateful and "_advance_states" in cls.__dict__:
+        _assert_fixed_signature(cls, "_advance_states", ["self", "inlets", "outlets", "dt"])
+    module = cls()
+    inlet_names = list(module.inlets())
+    outlet_names = list(module.outlets())
+    _assert_declared_accesses(cls, "forward", "inlets", inlet_names)
+    _assert_declared_accesses(cls, "_compute_outputs", "inlets", inlet_names)
+    _assert_declared_accesses(cls, "_compute_outputs", "outlets", outlet_names)
 
 
-def test_registered_forward_structure(module_classes):
+def test_registered_forward_structure(module_class):
     """Forwards accept inlets, move only fluids and never assign module attributes."""
-    for cls in module_classes:
-        if "forward" not in cls.__dict__:
-            continue
-        module = cls()
-        source, tree = _source_tree(cls.forward)
-        _assert_ordered_sections(cls, source, FORWARD_SECTIONS)
-        composite = not module.is_leaf
-        comments = {comment for comment, _ in _comments(source)}
-        assert ("# Modules" in comments) == composite
-        assert ("# Outlets" in comments) == bool(module.outlets())
-        assert not _self_assignments(tree), f"{cls.__name__}: forward assigns to self"
+    cls = module_class
+    if "forward" not in cls.__dict__:
+        return
+    module = cls()
+    source, tree = _source_tree(cls.forward)
+    _assert_ordered_sections(cls, source, FORWARD_SECTIONS)
+    composite = not module.is_leaf
+    comments = {comment for comment, _ in _comments(source)}
+    assert ("# Modules" in comments) == composite
+    assert ("# Outlets" in comments) == bool(module.outlets())
+    assert not _self_assignments(tree), f"{cls.__name__}: forward assigns to self"
 
-        declarations = list(module.inlets().values()) + list(module.outlets().values())
-        assert all(
-            isinstance(declaration.kind, type) and issubclass(declaration.kind, Stream)
-            for declaration in declarations
-        )
-        _assert_return_block(cls, tree, list(module.outlets()))
+    declarations = list(module.inlets().values()) + list(module.outlets().values())
+    assert all(
+        isinstance(declaration.kind, type) and issubclass(declaration.kind, Stream)
+        for declaration in declarations
+    )
+    _assert_return_block(cls, tree, list(module.outlets()))
 
 
-def test_leaf_and_composite_output_conventions(module_classes):
+def test_leaf_and_composite_output_conventions(module_class):
     """Leaves compute plain outputs; composites declare formulas only."""
-    for cls in module_classes:
-        module = cls()
-        outputs = list(module.outputs(recurse=False).values())
-        if module.is_leaf:
-            assert all(output.formula is None for output in outputs)
-            if outputs:
-                assert type(module)._compute_outputs is not Module._compute_outputs
-        else:
-            assert all(output.formula is not None for output in outputs)
-            assert type(module)._compute_outputs is Module._compute_outputs
+    cls = module_class
+    module = cls()
+    outputs = list(module.outputs(recurse=False).values())
+    if module.is_leaf:
+        assert all(output.formula is None for output in outputs)
+        if outputs:
+            assert type(module)._compute_outputs is not Module._compute_outputs
+    else:
+        assert all(output.formula is not None for output in outputs)
+        assert type(module)._compute_outputs is Module._compute_outputs
 
 
-def test_method_and_declaration_section_order(module_classes):
+def test_method_and_declaration_section_order(module_class):
     """Lifecycle methods and declaration sections retain one readable order."""
-    for cls in module_classes:
-        methods = [
-            name
-            for name, value in cls.__dict__.items()
-            if inspect.isfunction(value) and name in LIFECYCLE
-        ]
-        expected = [name for name in LIFECYCLE if name in methods]
-        assert methods == expected, f"{cls.__name__}: lifecycle method order is {methods}"
-        if "__init__" in cls.__dict__:
-            source, _ = _source_tree(cls.__dict__["__init__"])
-            _assert_ordered_sections(cls, source, INIT_SECTIONS)
+    cls = module_class
+    methods = [
+        name
+        for name, value in cls.__dict__.items()
+        if inspect.isfunction(value) and name in LIFECYCLE
+    ]
+    expected = [name for name in LIFECYCLE if name in methods]
+    assert methods == expected, f"{cls.__name__}: lifecycle method order is {methods}"
+    if "__init__" in cls.__dict__:
+        source, _ = _source_tree(cls.__dict__["__init__"])
+        _assert_ordered_sections(cls, source, INIT_SECTIONS)
