@@ -12,6 +12,13 @@ Well, reservoir, ESP and exchanger data are the upstream example's. The reservoi
 instead of producing from a reservoir temperature. Degasser and filters use the refactored
 models' plant-calibrated defaults.
 
+Upstream fitted the injectivity index, 2.3 m3/h/bar, to a wellhead pressure of 44.47 bar at
+125.1 m3/h with a well traversal that adds the injector's friction instead of subtracting it.
+With the correct sign that index needs 54.86 bar, so the example recalibrates it from the same
+point: the 44.47 bar wellhead stream is traversed down the injector and
+``InjectionReservoir.injectivity_from_measurements`` gives Q / (p_bh - p_res), about
+2.84 m3/h/bar. The plant runs with both indices.
+
 Run from the repository root:
 PYTHONPATH=. python examples/core/simulate/02_parallel_heat_exchangers.py
 """
@@ -52,6 +59,13 @@ INJECTOR_SURVEY = [
 ]
 """Upstream injector survey stations: MD [m], TVD [m], inner diameter [m]."""
 
+UPSTREAM_INJECTIVITY = 2.3 / 3.6e8
+"""Upstream injectivity index [m3/s/Pa]: 2.3 m3/h/bar, fitted with the friction sign reversed."""
+
+FITTED_INJECTION = gm.Stream(flow="125.1 m3/h", T="70 degC", p="44.47 bar")
+"""Injector wellhead point upstream fitted its injectivity to (the temperature does not enter
+the constant-property traversal)."""
+
 
 class ParallelExchangerPlant(gm.modules.Module):
     """Nodal doublet whose brine heats one secondary network through three parallel exchangers."""
@@ -77,6 +91,7 @@ class ParallelExchangerPlant(gm.modules.Module):
         # Outputs
         self.production_rate = Output.of("doublet.riser.wellhead.m_dot")
         self.injection_pressure = Output.of("doublet.injection_pump.discharge_pressure")
+        self.injection_pump_electricity = Output.of("doublet.injection_pump.electricity")
         self.duty = Output.total("duty")
         self.electricity = Output.total("electricity")
         self.secondary_out_T = Output.of(f"secondary_mixers.{len(SHARES) - 2}.mixed_out_T")
@@ -169,10 +184,22 @@ def configure_doublet(doublet):
         pipe_path=survey_path(INJECTOR_SURVEY), soil_temperature="20 degC"
     )
     doublet.sink.update_params(
-        pressure="180 bar", injectivity_index=2.3 / 3.6e8, top_depth=1883, **reservoir
+        pressure="180 bar", injectivity_index=UPSTREAM_INJECTIVITY, top_depth=1883, **reservoir
     )
     doublet.update_params(production_rates=(5, 60), maximum_injection_pressure="500 bar")
     doublet.wellhead_pressure = "10 bar"
+
+
+def recalibrated_injectivity(doublet):
+    """Return the injectivity index [m3/s/Pa] that reproduces ``FITTED_INJECTION``.
+
+    The wellhead stream is traversed down the injection well to its bottom pressure, then
+    ``InjectionReservoir.injectivity_from_measurements`` gives Q / (p_bh - p_res) with the
+    volume flow Q at the aquifer's fluid density.
+    """
+    bottom = doublet.injector(wellhead=FITTED_INJECTION).outlets.bottom
+    flow = abs(bottom.m_dot) / doublet.sink.fluid.properties(bottom.p, bottom.T).rho_l
+    return doublet.sink.injectivity_from_measurements(flow, bottom.p)
 
 
 def configure_exchangers(plant):
@@ -196,10 +223,21 @@ plant = ParallelExchangerPlant()
 configure_doublet(plant.doublet)
 configure_exchangers(plant)
 secondary = gm.Stream(flow="125.1 m3/h", T="20 degC", p="3 bar", fluid=gm.Fluid(kind="water"))
+upstream = plant(secondary_in=secondary).outputs
+injectivity = recalibrated_injectivity(plant.doublet)
+plant.doublet.sink.update_params(injectivity_index=injectivity)
 result = plant(secondary_in=secondary)
 out = result.outputs
 print(f"Primary flow (nodal solve):  {out.production_rate / 1000 * 3600:.2f} m3/h")
-print(f"Injection wellhead pressure: {out.get('injection_pressure', unit='bar'):.2f} bar")
+for label, index, run in (
+    ("upstream", UPSTREAM_INJECTIVITY, upstream),
+    ("recalibrated", injectivity, out),
+):
+    print(
+        f"Injectivity {label:<12}     {index * 3.6e8:.4f} m3/h/bar: injection "
+        f"{run.get('injection_pressure', unit='bar'):.2f} bar, pump "
+        f"{run.get('injection_pump_electricity', unit='kW'):.1f} kW"
+    )
 for index in range(len(SHARES)):
     exchanger = result.children[f"heat_exchangers.{index}"].outputs
     print(
@@ -211,3 +249,4 @@ print(f"Secondary outlet:            {out.get('secondary_out_T', unit='degC'):.2
 print(f"Electricity (ESP and pump):  {out.get('electricity', unit='MW'):.4f} MW")
 print(f"Mass residual:               {gm.modules.mass_balance(plant, result)['residual']} kg/s")
 assert energy_balance(plant, result)["relative_thermal_residual"] < 1e-9
+assert abs(out.get("injection_pressure", unit="bar") - 44.47) < 0.05

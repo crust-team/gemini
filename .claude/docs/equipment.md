@@ -1781,7 +1781,8 @@ the injection pump to the solved pressure, or to its suction pressure when the s
 exchangers (upstream `parallel_hex_plant`: 125.10 m3/h at 10 bar, the measured 125 m3/h the
 upstream index was fitted to; injection 54.86 bar where upstream computes 44.47 bar, because
 upstream adds the injector's 5.20 bar friction instead of subtracting it, see
-[refactor-notes.md](refactor-notes.md#upstream-development-port)).
+[refactor-notes.md](refactor-notes.md#upstream-development-port)); the example therefore also
+recalibrates the injectivity to 2.8430 m3/h/bar, which restores 44.47 bar.
 `examples/core/simulate/03_boiler_chp_secondary.py` (upstream `doublet_plant`) adds a boiler and
 a CHP on the secondary side and reports `emissions`; its 3100 m injector needs no pump, so the
 injection pump draws zero electricity.
