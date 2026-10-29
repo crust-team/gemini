@@ -1,4 +1,9 @@
-"""Measured-boundary and chained module evaluation."""
+"""Measured-boundary and chained module evaluation.
+
+Both step functions return ``(outputs, skips, errors)``: outputs map module paths to
+``(ModuleResult, Health)``, skips map paths to counted missing-data reasons and errors are
+recorded module failures under ``on_error="record"``.
+"""
 
 import math
 from collections import Counter
@@ -6,9 +11,13 @@ from copy import deepcopy
 
 from gemini.core.physics import units
 from gemini.core.types import Fluid, Health, Stream
+from gemini.core.types.bindings import Binding, ModuleBindings
 from gemini.core.types.declarations import UNSET
-from gemini.errors import MissingMeasurementError
-from gemini.utils.strings import join_path, split_path
+from gemini.errors import BindingError, MissingMeasurementError, StepError
+from gemini.utils.strings import did_you_mean, join_names, join_path, split_path
+
+VOLUMETRIC_UNITS = {"m3/h", "m3/s"}
+"""Flow units converted to mass flow with the fluid density at the boundary."""
 
 
 def _value(row, binding):
@@ -22,37 +31,51 @@ def _value(row, binding):
     return units.to_si(value, binding.unit)
 
 
-def prepare(module, bindings, row, defaults=None):
-    """Convert one measured boundary into keyword arguments and observations."""
-    kwargs = {
+def _is_volumetric_mass_flow(module, name, binding):
+    """Whether a kg/s control or boundary is bound to a volumetric flow column."""
+    declaration = module.inputs().get(name)
+    return (
+        declaration is not None and declaration.unit == "kg/s" and binding.unit in VOLUMETRIC_UNITS
+    )
+
+
+def _input_values(module, bindings, row):
+    """Return control and boundary values in SI; volumetric mass flows use the module state.
+
+    The density comes from the module's ``pressure`` and ``temperature`` parameters, which
+    ``BindingPlan`` requires for such a binding.
+    """
+    values = {
         name: _value(row, binding)
         for group in (bindings.controls, bindings.boundaries)
         for name, binding in group.items()
     }
     for name, binding in (bindings.controls | bindings.boundaries).items():
-        declaration = module.inputs().get(name)
-        if (
-            declaration is not None
-            and declaration.unit == "kg/s"
-            and binding.unit
-            in {
-                "m3/h",
-                "m3/s",
-            }
-        ):
-            pressure = getattr(module, "pressure", 1e5)
-            temperature = getattr(module, "temperature", 300)
-            kwargs[name] *= module.fluid.properties(pressure, temperature).density
+        if _is_volumetric_mass_flow(module, name, binding):
+            values[name] *= module.fluid.properties(module.pressure, module.temperature).density
+    return values
+
+
+def _inlet_stream(module, fields, row, defaults):
+    """Build one inlet stream from bound fields over its defaults and the module fluid."""
+    values = dict(defaults)
+    values.update({name: _value(row, binding) for name, binding in fields.items()})
+    values.setdefault("fluid", module.fluid)
+    values["fluid"] = Fluid.model_validate(values["fluid"])
+    if "m_dot" in fields and fields["m_dot"].unit in VOLUMETRIC_UNITS:
+        values["m_dot"] *= values["fluid"].properties(values["p"], values["T"]).density
+    return Stream.model_validate(values)
+
+
+def prepare(module, bindings, row, defaults=None):
+    """Convert one measured boundary into keyword arguments and observations.
+
+    For a heat exchanger with measured outlet temperatures, the observations also receive the
+    inlet temperatures, mass flows and heat capacities that ``HeatExchanger.health`` reads.
+    """
+    kwargs = _input_values(module, bindings, row)
     for port, fields in bindings.inlets.items():
-        values = dict((defaults or {}).get(port, {}))
-        values.update({name: _value(row, binding) for name, binding in fields.items()})
-        values.setdefault("fluid", module.fluid)
-        values["fluid"] = Fluid.model_validate(values["fluid"])
-        if "m_dot" in fields and fields["m_dot"].unit in {"m3/h", "m3/s"}:
-            if not {"p", "T"} <= values.keys():
-                raise MissingMeasurementError(f"{port}: pressure and temperature required")
-            values["m_dot"] *= values["fluid"].properties(values["p"], values["T"]).density
-        kwargs[port] = Stream.model_validate(values)
+        kwargs[port] = _inlet_stream(module, fields, row, (defaults or {}).get(port, {}))
     measured = {name: _value(row, binding) for name, binding in bindings.measured.items()}
     if module.name == "heat_exchanger" and {"hot_out_T", "cold_out_T"} <= measured.keys():
         hot, cold = kwargs["hot_in"], kwargs["cold_in"]
@@ -79,93 +102,44 @@ def health_or_unavailable(module, result, measured):
 
 
 class BindingPlan:
-    """Resolve module objects and required columns once for a run."""
+    """Resolve module objects, bindings and required columns once for a run.
+
+    ``entries`` holds ``(path, module, bindings, stream_defaults)`` per evaluated module. In
+    simulate the only entry is the root with its inlet bindings; ``chained_inputs`` holds
+    ``(path, module, bindings)`` for every leaf control or boundary that has a data column,
+    and ``root_inlets`` the root inlet values given in ``plant.boundary["root_inputs"]``.
+    """
 
     def __init__(self, plant, dataset, kind, only=None, on_error="record"):
         """Compile declarations and dataset bindings for repeated evaluations."""
-        from gemini.core.types.bindings import Binding, ModuleBindings
-
-        self.entries, self.columns, self.chained_inputs = [], set(), []
-        self._started, self._next_change = False, None
-        self._dates = sorted(
-            {
-                snapshot.valid_from
-                for module in plant.modules()
-                for snapshot in module.param_history
-                if snapshot.valid_from is not None
-            }
-        )
-        self.stateful = any(module.stateful for module in plant.modules())
+        _check_only(plant, only)
         self.on_error = on_error
-        self.skips, self.errors = {}, []
-        if only is not None:
-            for path in only:
-                plant.get_submodule(path)
-                if path not in plant.bindings:
-                    raise ValueError(f"{path}: no measured boundary bindings")
+        self.stateful = any(module.stateful for module in plant.modules())
+        self._dates = _parameter_dates(plant)
+        self._started, self._next_change = False, None
+        root_inputs = plant.boundary.get("root_inputs", {})
+        self.root_inlets = {
+            name: value for name, value in root_inputs.items() if name in plant.inlets()
+        }
+        self.chained_inputs, self.columns = [], set()
         bindings = plant.bindings
         if kind == "simulate":
-            root = bindings.get("", ModuleBindings()).model_copy(deep=True)
-            root.controls, root.boundaries = {}, {}
-            root.measured, root.state = {}, {}
-            bindings = {"": root}
-            missing_inputs = []
-            for input_path, declaration in plant.inputs(recurse=True).items():
-                module_path, name = split_path(input_path)
-                module = plant.get_submodule(module_path)
-                original = plant.bindings.get(module_path, ModuleBindings())
-                group = original.controls if name in module.controls() else original.boundaries
-                binding = group.get(name)
-                if binding is None and input_path in dataset.names:
-                    binding = Binding(column=input_path, unit=declaration.unit or "-")
-                if binding is not None and binding.column in dataset.names:
-                    binding = binding.model_copy(deep=True)
-                    if binding.column in dataset.columns:
-                        binding.unit = dataset.columns[binding.column].unit
-                    bound = ModuleBindings()
-                    target = bound.controls if name in module.controls() else bound.boundaries
-                    target[name] = binding
-                    self.chained_inputs.append((module_path, module, bound))
-                    self.columns.add(binding.column)
-                elif declaration.default is UNSET and name not in module._input_values:
-                    missing_inputs.append(input_path)
-            if missing_inputs:
-                raise ValueError(
-                    "Simulation inputs have no data column or default: "
-                    + ", ".join(sorted(missing_inputs))
-                )
+            self.chained_inputs, self.columns = _simulation_inputs(plant, dataset)
+            root = bindings.get("", ModuleBindings())
+            bindings = {"": ModuleBindings(inlets=root.inlets)}
+        self.entries = []
         for path, original in bindings.items():
-            if kind != "simulate" and (not path or only is not None and path not in only):
-                if path or plant._children or only is not None and path not in only:
-                    continue
-            bound = original.model_copy(deep=True)
-            module = plant.get_submodule(path)
-            groups = [
-                bound.controls,
-                bound.boundaries,
-                bound.measured,
-                bound.state,
-                *bound.inlets.values(),
-            ]
-            for group in groups:
-                for field, binding in list(group.items()):
-                    if kind == "simulate" and binding.column not in dataset.names:
-                        if _default_for(plant, path, group, field, bound) is not None:
-                            del group[field]
-                            continue
-                    if binding.column in dataset.columns:
-                        binding.unit = dataset.columns[binding.column].unit
-                    self.columns.add(binding.column)
-            defaults = deepcopy(plant.boundary.get("stream_defaults", {}).get(path, {}))
-            if path == "":
-                root = plant.boundary.get("root_inputs", {})
-                for inlet in bound.inlets:
-                    if inlet in root:
-                        defaults.setdefault(inlet, root[inlet])
-            self.entries.append((path, module, bound, defaults))
+            if kind != "simulate" and not _is_twin(plant, path, only):
+                continue
+            entry, columns = _compile_entry(plant, dataset, kind, path, original)
+            self.entries.append(entry)
+            self.columns |= columns
         missing = sorted(self.columns - set(dataset.names))
         if missing:
-            raise ValueError("Dataset is missing bound columns: " + ", ".join(missing))
+            raise BindingError(
+                f"{plant.path}: bound columns = {join_names(missing)}; expected dataset columns"
+                f"{did_you_mean(missing[0], dataset.names)}"
+            )
 
     def apply_parameters(self, plant, at):
         """Apply dated design transitions once."""
@@ -175,69 +149,210 @@ class BindingPlan:
             self._next_change = next((date for date in self._dates if date > at), None)
 
 
-def _default_for(plant, path, group, field, bound):
-    defaults = plant.boundary.get("root_inputs", {}) if path == "" else {}
-    if group is bound.controls or group is bound.boundaries:
-        return defaults.get(field)
+def _check_only(plant, only):
+    """Reject ``only`` paths that are not modules with measured bindings."""
+    for path in only or ():
+        plant.get_submodule(path)
+        if path not in plant.bindings:
+            raise BindingError(
+                f"{plant.path}: only path = {path!r}; expected a module with measured "
+                f"bindings{did_you_mean(path, plant.bindings)}"
+            )
+
+
+def _parameter_dates(plant):
+    """Return the sorted instants at which any dated parameter snapshot starts."""
+    return sorted(
+        {
+            snapshot.valid_from
+            for module in plant.modules()
+            for snapshot in module.param_history
+            if snapshot.valid_from is not None
+        }
+    )
+
+
+def _is_twin(plant, path, only):
+    """Whether replay evaluates the bindings at ``path`` as a measured twin.
+
+    The root entry of a composite plant describes the plant's own boundary, which replay never
+    evaluates; ``only`` selects a subset of twins.
+    """
+    is_selected = only is None or path in only
+    return is_selected and not (path == "" and not plant.is_leaf)
+
+
+def _simulation_inputs(plant, dataset):
+    """Return the leaf inputs with a data column and their columns; reject inputs with none."""
+    chained, columns, missing = [], set(), []
+    for input_path, declaration in plant.inputs(recurse=True).items():
+        module_path, name = split_path(input_path)
+        module = plant.get_submodule(module_path)
+        binding = _input_binding(plant, dataset, input_path, module, declaration)
+        if binding is None:
+            if declaration.default is UNSET and name not in module._input_values:
+                missing.append(input_path)
+            continue
+        bound = ModuleBindings()
+        target = bound.controls if name in module.controls() else bound.boundaries
+        target[name] = binding
+        _check_volumetric_inputs(module_path, module, bound)
+        chained.append((module_path, module, bound))
+        columns.add(binding.column)
+    if missing:
+        raise BindingError(
+            f"{plant.path}: simulation inputs = {join_names(sorted(missing))}; expected a data "
+            "column or a default for each"
+        )
+    return chained, columns
+
+
+def _input_binding(plant, dataset, input_path, module, declaration):
+    """Return a leaf input's binding when its column exists, with the dataset's unit.
+
+    An input without a binding is bound to a column named after its dotted path.
+    """
+    module_path, name = split_path(input_path)
+    original = plant.bindings.get(module_path, ModuleBindings())
+    group = original.controls if name in module.controls() else original.boundaries
+    binding = group.get(name)
+    if binding is None and input_path in dataset.names:
+        binding = Binding(column=input_path, unit=declaration.unit or "-")
+    if binding is None or binding.column not in dataset.names:
+        return None
+    binding = binding.model_copy(deep=True)
+    binding.unit = dataset.unit(binding.column, binding.unit)
+    return binding
+
+
+def _compile_entry(plant, dataset, kind, path, original):
+    """Return one plan entry and its columns, with units taken from the dataset.
+
+    In simulate, an inlet field whose column is absent is dropped when
+    ``plant.boundary["root_inputs"]`` gives it a default.
+    """
+    bound = original.model_copy(deep=True)
+    module = plant.get_submodule(path)
+    root_inputs = plant.boundary.get("root_inputs", {})
+    columns = set()
+    for group in (bound.controls, bound.boundaries, bound.measured, bound.state):
+        columns |= _resolve_units(group, dataset)
     for port, fields in bound.inlets.items():
-        if group is fields:
-            return defaults.get(port, {}).get(field)
-    return None
+        if kind == "simulate":
+            _drop_defaulted_fields(fields, root_inputs.get(port, {}), dataset)
+        columns |= _resolve_units(fields, dataset)
+    defaults = deepcopy(plant.boundary.get("stream_defaults", {}).get(path, {}))
+    if path == "":
+        for inlet in bound.inlets:
+            if inlet in root_inputs:
+                defaults.setdefault(inlet, root_inputs[inlet])
+    _check_volumetric_inputs(path, module, bound)
+    _check_volumetric_inlets(path, bound, defaults)
+    return (path, module, bound, defaults), columns
+
+
+def _resolve_units(group, dataset):
+    """Take each binding's unit from the dataset metadata; return the bound columns."""
+    for binding in group.values():
+        binding.unit = dataset.unit(binding.column, binding.unit)
+    return {binding.column for binding in group.values()}
+
+
+def _drop_defaulted_fields(fields, defaults, dataset):
+    """Remove inlet fields without a data column that have a default value."""
+    for field, binding in list(fields.items()):
+        if binding.column not in dataset.names and defaults.get(field) is not None:
+            del fields[field]
+
+
+def _check_volumetric_inputs(path, module, bound):
+    """Require ``pressure``/``temperature`` parameters to convert a volumetric mass flow."""
+    parameters = dict(module.named_parameters(recurse=False))
+    for name, binding in (bound.controls | bound.boundaries).items():
+        if _is_volumetric_mass_flow(module, name, binding) and not (
+            {"pressure", "temperature"} <= parameters.keys()
+        ):
+            raise BindingError(
+                f"{path or module.path}: {name} = {binding.column!r} [{binding.unit}]; expected "
+                "a module with pressure and temperature parameters to convert it to kg/s"
+            )
+
+
+def _check_volumetric_inlets(path, bound, defaults):
+    """Require ``p`` and ``T`` (bound or default) for an inlet whose flow is volumetric."""
+    for port, fields in bound.inlets.items():
+        flow = fields.get("m_dot")
+        known = fields.keys() | defaults.get(port, {}).keys()
+        if flow is not None and flow.unit in VOLUMETRIC_UNITS and not {"p", "T"} <= known:
+            raise BindingError(
+                f"{path}: {port}.m_dot = {flow.column!r} [{flow.unit}]; expected p and T "
+                "bindings or defaults to convert it to kg/s"
+            )
 
 
 def twin_step(plant, sample, states, plan):
     """Evaluate each measured twin independently."""
     plan.apply_parameters(plant, sample.t)
-    results = {}
-    plan.skips, plan.errors = {}, []
+    outputs, skips, errors = {}, {}, []
     for path, module, bound, defaults in plan.entries:
         try:
-            kwargs, measured = prepare(module, bound, sample.row, defaults)
-            applied = {name: kwargs.pop(name) for name in module.inputs() if name in kwargs}
-            module.set_inputs(applied)
-            if module.stateful:
-                state = (
-                    {key: _value(sample.row, binding) for key, binding in bound.state.items()}
-                    if bound.state
-                    else deepcopy(states[path]) if path in states else module.initial_state()
-                )
-                next_state, prediction = module.step(state, sample.dt, kwargs)
-            else:
-                prediction = module(kwargs)
-            results[path] = prediction, health_or_unavailable(module, prediction, measured)
-            if module.stateful:
-                states[path] = state if bound.state else next_state
+            outputs[path] = _evaluate_twin(path, module, bound, defaults, sample, states)
         except MissingMeasurementError as exc:
-            plan.skips.setdefault(path, Counter())[str(exc)] += 1
+            skips.setdefault(path, Counter())[str(exc)] += 1
         except Exception as exc:
             if plan.on_error == "raise":
-                raise ValueError(f"{module.path}: {exc}") from exc
-            plan.errors.append(dict(module=path, message=str(exc), type=type(exc).__name__))
-    return results
+                raise StepError(f"{module.path}: {exc}") from exc
+            errors.append(dict(module=path, message=str(exc), type=type(exc).__name__))
+    return outputs, skips, errors
+
+
+def _evaluate_twin(path, module, bound, defaults, sample, states):
+    """Call one twin on its measured boundary; a stateful twin also advances its state."""
+    kwargs, measured = prepare(module, bound, sample.row, defaults)
+    applied = {name: kwargs.pop(name) for name in module.inputs() if name in kwargs}
+    module.set_inputs(applied)
+    if not module.stateful:
+        prediction = module(kwargs)
+        return prediction, health_or_unavailable(module, prediction, measured)
+    state = _initial_state(path, module, bound, sample.row, states)
+    next_state, prediction = module.step(state, sample.dt, kwargs)
+    evaluated = prediction, health_or_unavailable(module, prediction, measured)
+    states[path] = state if bound.state else next_state
+    return evaluated
+
+
+def _initial_state(path, module, bound, row, states):
+    """Return the measured state, else the previous state, else the module's initial state.
+
+    A twin skipped for missing data keeps its previous state; the skipped tick's dt is not
+    integrated.
+    """
+    if bound.state:
+        return {key: _value(row, binding) for key, binding in bound.state.items()}
+    if path in states:
+        return deepcopy(states[path])
+    return module.initial_state()
 
 
 def chained_step(plant, sample, states, plan):
-    """Apply root bindings to one handwritten plant call."""
+    """Apply root bindings to one handwritten plant call; missing data skips the step."""
     plan.apply_parameters(plant, sample.t)
-    plan.skips, plan.errors = {}, []
     _, _, bound, defaults = plan.entries[0]
-    kwargs = {
-        name: value
-        for name, value in deepcopy(plant.boundary.get("root_inputs", {})).items()
-        if name in plant.inlets()
-    }
-    measured_kwargs, _ = prepare(plant, bound, sample.row, defaults)
-    kwargs.update(measured_kwargs)
-    input_values = {name: kwargs.pop(name) for name in plant.inputs() if name in kwargs}
-    for path, module, input_bindings in plan.chained_inputs:
-        values, _ = prepare(module, input_bindings, sample.row)
-        input_values.update({join_path(path, name): value for name, value in values.items()})
+    try:
+        kwargs = plan.root_inlets | prepare(plant, bound, sample.row, defaults)[0]
+        input_values = {}
+        for path, module, input_bindings in plan.chained_inputs:
+            values, _ = prepare(module, input_bindings, sample.row)
+            input_values.update({join_path(path, name): value for name, value in values.items()})
+    except MissingMeasurementError as exc:
+        return {}, {"": Counter({str(exc): 1})}, []
     plant.set_inputs(input_values)
     if plan.stateful:
         states[""], result = plant.step(states.get("", plant.initial_state()), sample.dt, kwargs)
     else:
         result = plant(kwargs)
-    return {
+    outputs = {
         path: (child, health_or_unavailable(plant.get_submodule(path), child, {}))
         for path, child in result.leaves().items()
     }
+    return outputs, {}, []

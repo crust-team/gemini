@@ -1,7 +1,8 @@
-"""Loader sampling and gap tests."""
+"""Loader alignment, gaps and chunked reads."""
 
 from datetime import timedelta
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -9,23 +10,50 @@ import gemini as gm
 from gemini.core.data.loader import Loader
 
 
-def test_mean_previous_exact_and_gaps():
-    """Hourly means are hand-checkable and stale previous rows become missing."""
+@pytest.fixture
+def source():
+    """Twelve 15-minute rows with a numeric value and a text flag."""
     index = pd.date_range("2024-01-01", periods=12, freq="15min", tz="UTC")
-    source = gm.Dataset.from_frame(
-        pd.DataFrame({"v": range(12), "status": ["Normal"] * 12}, index=index)
-    )
-    clock = gm.Clock.range(index[0], index[-1], "1h")
-    assert [sample.row["v"] for sample in Loader(source, clock, align="mean")] == [1.5, 5.5, 9.5]
+    frame = pd.DataFrame({"v": range(12), "status": ["Normal"] * 11 + ["Alarm"]}, index=index)
+    return gm.Dataset.from_frame(frame)
+
+
+def test_mean_bins_use_the_clock_durations(source):
+    """Hourly means are hand-checkable; the final bin uses the clock's one-hour step."""
+    clock = gm.Clock.range(source.start, source.end, "1h")
+    rows = list(Loader(source, clock.ticks, align="mean", durations=clock.durations))
+    assert [sample.row["v"] for sample in rows] == [1.5, 5.5, 9.5]
+    assert rows[-1].row["status"] == "Alarm"
+    assert [sample.dt for sample in rows] == [3600.0] * 3
+
+
+def test_previous_holds_until_max_gap_and_exact_needs_a_row(source):
+    """Stale previous rows become NaN; exact alignment only accepts rows at the tick."""
+    index = source.to_frame().index
     sparse = gm.Dataset.from_frame(source.to_frame().drop(index[1:8]))
-    rows = list(
-        Loader(
-            sparse,
-            gm.Clock.range(index[0], index[-1], "15min"),
-            max_gap=timedelta(minutes=30),
-        )
-    )
-    assert rows[2].row["v"] == 0
-    assert rows[3].gap and rows[3].missing == ("v", "status")
-    with pytest.raises(ValueError, match="absent_a, absent_b"):
-        Loader(source, clock, columns=["absent_b", "absent_a"])
+    ticks = gm.Clock.range(index[0], index[-1], "15min").ticks
+    rows = list(Loader(sparse, ticks, max_gap=timedelta(minutes=30)))
+    assert [sample.row["v"] for sample in rows[:3]] == [0, 0, 0]
+    assert np.isnan(rows[3].row["v"]) and np.isnan(rows[3].row["status"])
+    assert rows[8].row["v"] == 8
+    exact = list(Loader(sparse, ticks, align="exact", max_gap=timedelta(hours=3)))
+    assert exact[0].row["v"] == 0 and np.isnan(exact[1].row["v"])
+
+
+def test_chunks_and_default_durations(source):
+    """Small chunks give the same samples; without durations the native step ends the clock."""
+    ticks = source.to_frame().index
+    whole = list(Loader(source, ticks))
+    chunked = list(Loader(source, ticks, chunk=timedelta(minutes=40)))
+    assert [(s.t, s.dt, s.row) for s in chunked] == [(s.t, s.dt, s.row) for s in whole]
+    assert whole[-1].dt == 900.0
+
+
+def test_options_and_columns_are_validated(source):
+    """Invalid options fail at construction; unknown columns fail on the first read."""
+    with pytest.raises(ValueError, match="align = 'nearest'"):
+        Loader(source, source.to_frame().index, align="nearest")
+    with pytest.raises(ValueError, match="chunk"):
+        Loader(source, source.to_frame().index, chunk=timedelta(0))
+    with pytest.raises(gm.errors.DatasetError, match="absent_a, absent_b"):
+        list(Loader(source, source.to_frame().index, columns=["absent_b", "absent_a"]))

@@ -6,8 +6,24 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from gemini.core.physics import units
 from gemini.core.types.flows import Stream
+from gemini.errors import UnknownResultError
 from gemini.utils.files import decode_cells, encode_cells, read_json
+from gemini.utils.strings import did_you_mean, join_names
+
+ENERGY_FIELDS = ("electricity", "fuel", "heat_loss")
+"""Leaf outputs integrated over time into energy totals."""
+
+SERIES_UNITS = {
+    "head": "Pa",
+    "pressure_drop": "Pa",
+    "discharge_pressure": "Pa",
+    "power": "W",
+    "duty": "W",
+    "thermal_power": "W",
+}
+"""Stored SI units of the result fields that ``ModuleSeries.get`` can convert."""
 
 
 class Summary(pd.DataFrame):
@@ -29,42 +45,50 @@ class Summary(pd.DataFrame):
         ]
         return self[columns].to_string(float_format=lambda value: f"{value:.6g}")
 
-    def __str__(self):
-        """Use the same concise view for print and interactive display."""
-        return self.__repr__()
+    __str__ = __repr__
 
 
 class ModuleSeries:
     """Attribute access to a module's output series."""
 
-    def __init__(self, frame):
-        """Retain the module's field-indexed frame."""
+    def __init__(self, frame, path=""):
+        """Retain the module's field-indexed frame and its path for error messages."""
         self._frame = frame
+        self._path = path
 
     def __getattr__(self, field):
         """Return one pandas Series or an informative unknown-field error."""
         if field not in self._frame:
-            raise AttributeError(f"Unknown result field {field!r}; available: {list(self._frame)}")
+            raise UnknownResultError(
+                f"{self._path}: result field = {field!r}; expected one of "
+                f"{join_names(self._frame)}{did_you_mean(field, self._frame)}"
+            )
         return self._frame[field]
 
     def get(self, field, unit=None):
-        """Return a series, optionally converted from its stored SI unit."""
+        """Return a series, optionally converted from its stored SI unit.
+
+        Results store no per-field unit metadata, so conversion is limited to the fields in
+        ``SERIES_UNITS`` (head, pressure drops, powers and duties); other fields raise.
+        """
         series = getattr(self, field)
         if unit is None:
             return series
-        from gemini.core.physics import units
-
-        source = {
-            "head": "Pa",
-            "pressure_drop": "Pa",
-            "discharge_pressure": "Pa",
-            "power": "W",
-            "duty": "W",
-            "thermal_power": "W",
-        }.get(field)
+        source = SERIES_UNITS.get(field)
         if source is None:
-            raise ValueError(f"No stored unit metadata for result field {field!r}")
+            raise ValueError(
+                f"{self._path}: result field = {field!r}; expected one of "
+                f"{join_names(SERIES_UNITS)} for unit conversion"
+            )
         return series.map(lambda value: units.convert(value, source, unit))
+
+
+def _add_skips(skip_counts, skips):
+    """Add one step's ``{path: {reason: count}}`` skips into running totals."""
+    for path, reasons in skips.items():
+        target = skip_counts.setdefault(path, {})
+        for reason, count in reasons.items():
+            target[reason] = target.get(reason, 0) + count
 
 
 class Results:
@@ -83,9 +107,7 @@ class Results:
         row = {}
         for path, (result, health) in results.items():
             row.update({(path, key): value for key, value in result.outputs.model_dump().items()})
-            self._energy.update(
-                (path, key) for key in ("electricity", "fuel", "heat_loss") if key in result.outputs
-            )
+            self._energy.update((path, key) for key in ENERGY_FIELDS if key in result.outputs)
             streams = [
                 flow
                 for flow in (dict(result.inlets) | dict(result.outlets)).values()
@@ -103,10 +125,7 @@ class Results:
         self._dt.append(dt)
         self._rows.append(row)
         self._skips.append(skips or {})
-        for path, reasons in (skips or {}).items():
-            target = self.skip_counts.setdefault(path, {})
-            for reason, count in reasons.items():
-                target[reason] = target.get(reason, 0) + count
+        _add_skips(self.skip_counts, skips or {})
         self.errors.extend(dict(error, timestamp=at.isoformat()) for error in (errors or []))
         self._frame = None
 
@@ -116,10 +135,17 @@ class Results:
 
     def __getitem__(self, path):
         """Expose module outputs as pandas Series through attributes."""
-        return ModuleSeries(self.to_frame()[path])
+        frame = self._cached_frame()
+        paths = list(frame.columns.get_level_values(0).unique())
+        if path not in paths:
+            raise UnknownResultError(
+                f"Results: module path = {path!r}; expected one of "
+                f"{join_names(paths)}{did_you_mean(path, paths)}"
+            )
+        return ModuleSeries(frame[path].copy(), path)
 
-    def to_frame(self):
-        """Return a copy with (module_path, field) MultiIndex columns."""
+    def _cached_frame(self):
+        """Return the shared table, built once after each append; callers must not change it."""
         if self._frame is None:
             self._frame = pd.DataFrame(
                 self._rows, index=pd.DatetimeIndex(self._times, name="timestamp")
@@ -127,82 +153,85 @@ class Results:
             self._frame.columns = pd.MultiIndex.from_tuples(
                 self._frame.columns, names=["module_path", "field"]
             )
-        return self._frame.copy()
+        return self._frame
+
+    def to_frame(self):
+        """Return a copy with (module_path, field) MultiIndex columns."""
+        return self._cached_frame().copy()
 
     def summary(self):
         """Report energy per port (J/MWh), peaks, evaluated hours, alarms and skip reasons."""
         frame = self.to_frame()
-        rows = []
+        recorded = set(frame.columns.get_level_values(0))
         paths = sorted(
-            set(frame.columns.get_level_values(0))
-            | self.skip_counts.keys()
-            | {error["module"] for error in self.errors}
+            recorded | self.skip_counts.keys() | {error["module"] for error in self.errors}
         )
         dt = pd.Series(self._dt, index=frame.index, dtype=float)
+        rows = []
         for path in paths:
-            fields = (
-                frame[path]
-                if path in frame.columns.get_level_values(0)
-                else pd.DataFrame(index=frame.index)
-            )
-            active = fields.notna().any(axis=1)
-            alarms = fields.get("health_alarm", pd.Series(False, index=frame.index)).eq(True)
-            info = dict(
-                module=path,
-                hours=float(dt[active].sum() / 3600),
-                operating_hours=float(dt[fields.get("operating", active).eq(True)].sum() / 3600),
-                errors=sum(error["module"] == path for error in self.errors),
-                peaks={
-                    field: float(fields[field].max())
-                    for field in fields
-                    if not field.startswith("health_")
-                    and (path, field) not in self._energy
-                    and field != "operating"
-                    and pd.api.types.is_numeric_dtype(fields[field])
-                },
-                alarms=int(alarms.sum()),
-                alarm_rate=float(alarms[active].mean()) if active.any() else 0,
-                skipped=sum(self.skip_counts.get(path, {}).values()),
-                reasons=dict(self.skip_counts.get(path, {})),
-            )
-            ports = sorted(key for key in self._energy if key[0] == path)
-            for _, field in ports:
-                power = fields[field]
-                energy = float((power * dt).sum())
-                rows.append(
-                    info
-                    | dict(
-                        port=field,
-                        energy_J=energy,
-                        energy_MWh=energy / 3.6e9,
-                        peak_W=float(power.max()),
-                    )
-                )
-            if not ports:
-                power_fields = [
-                    name for name in ("duty", "power", "thermal_power") if name in fields
-                ]
-                peak = float(fields[power_fields].max().max()) if power_fields else np.nan
-                rows.append(info | dict(port="", energy_J=0.0, energy_MWh=0.0, peak_W=peak))
+            fields = frame[path] if path in recorded else pd.DataFrame(index=frame.index)
+            rows.extend(self._summary_rows(path, fields, dt))
         return Summary(pd.DataFrame(rows).set_index(["module", "port"])) if rows else Summary()
+
+    def _module_info(self, path, fields, dt):
+        """Return evaluated and operating hours, peaks, alarms, errors and skips of one path."""
+        active = fields.notna().any(axis=1)
+        alarms = fields.get("health_alarm", pd.Series(False, index=fields.index)).eq(True)
+        return dict(
+            module=path,
+            hours=float(dt[active].sum() / 3600),
+            operating_hours=float(dt[fields.get("operating", active).eq(True)].sum() / 3600),
+            errors=sum(error["module"] == path for error in self.errors),
+            peaks={
+                field: float(fields[field].max())
+                for field in fields
+                if not field.startswith("health_")
+                and (path, field) not in self._energy
+                and field != "operating"
+                and pd.api.types.is_numeric_dtype(fields[field])
+            },
+            alarms=int(alarms.sum()),
+            alarm_rate=float(alarms[active].mean()) if active.any() else 0,
+            skipped=sum(self.skip_counts.get(path, {}).values()),
+            reasons=dict(self.skip_counts.get(path, {})),
+        )
+
+    def _summary_rows(self, path, fields, dt):
+        """Return one row per energy output of a path, or one row with its peak power."""
+        info = self._module_info(path, fields, dt)
+        ports = sorted(field for owner, field in self._energy if owner == path)
+        if not ports:
+            power_fields = [name for name in ("duty", "power", "thermal_power") if name in fields]
+            peak = float(fields[power_fields].max().max()) if power_fields else np.nan
+            return [info | dict(port="", energy_J=0.0, energy_MWh=0.0, peak_W=peak)]
+        rows = []
+        for field in ports:
+            power = fields[field]
+            energy = float((power * dt).sum())
+            rows.append(
+                info
+                | dict(
+                    port=field,
+                    energy_J=energy,
+                    energy_MWh=energy / 3.6e9,
+                    peak_W=float(power.max()),
+                )
+            )
+        return rows
 
     def __repr__(self):
         """Print a compact human-readable summary."""
         return str(self.summary())
 
-    def save_csv(self, path):
-        """Export a conventional analysis CSV with two header rows."""
-        self.to_frame().to_csv(path)
-
-    def save_parquet(self, path):
-        """Export a conventional analysis Parquet file."""
-        self.to_frame().to_parquet(path)
-
     def save(self, path):
         """Save exact cell values plus metadata; use Parquet when installed, otherwise CSV.
 
         Cells are JSON-encoded to retain lists, flags, full float precision and missing values.
-        Returns the actual data filename; load accepts that filename or the original basename.
+        The format depends on whether ``pyarrow`` imports: a path without a ``.csv``/``.parquet``
+        suffix gets the available one, and a ``.parquet`` path becomes ``.csv`` without it. A
+        Parquet file, including one written for a checkpoint, therefore needs ``pyarrow`` to
+        load. Returns the actual data filename; load accepts that filename or the original
+        basename.
         """
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -277,10 +306,7 @@ class Results:
         result._energy = self._energy.copy()
         result._skips = self._skips[start:]
         for skipped in result._skips:
-            for path, reasons in skipped.items():
-                target = result.skip_counts.setdefault(path, {})
-                for reason, count in reasons.items():
-                    target[reason] = target.get(reason, 0) + count
+            _add_skips(result.skip_counts, skipped)
         times = {t.isoformat() for t in result._times}
         result.errors = [error for error in self.errors if error["timestamp"] in times]
         return result

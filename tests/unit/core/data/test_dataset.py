@@ -40,7 +40,7 @@ def test_timezones_duplicates_profiles_and_validation():
     frame = pd.DataFrame({"time": ["2024-01-01 00:00", "2024-01-01 01:00"], "x": [1, 2]})
     data = gm.Dataset.from_frame(frame, "time", tz="Europe/Oslo")
     assert data.start.hour == 23 and data.start.day == 31
-    with pytest.raises(ValueError, match="unique"):
+    with pytest.raises(gm.errors.DatasetError, match="timestamp = 2023-12-31T23:00:00"):
         gm.Dataset.from_dict({"x": [1, 2]}, [data.start, data.start])
     clock = gm.Clock.days(2027, 1, 1)
     profiles = gm.Dataset.from_profiles(
@@ -66,6 +66,32 @@ def test_offset_timestamps_across_daylight_saving_switches_load_as_utc():
     data = gm.Dataset.from_frame(frame, "time", tz="Europe/Oslo")
     hours = [t.strftime("%Y-%m-%d %H:%M") for t in data.to_frame().index]
     assert hours == ["2024-03-31 00:00", "2024-03-31 01:00", "2024-10-27 00:00", "2024-10-27 01:00"]
+
+
+def test_dict_and_numpy_constructors_accept_string_time_axes():
+    """Bug E-engine-010: ISO strings failed in from_dict/from_numpy but worked in from_records."""
+    time = ["2024-01-01 01:00", "2024-01-01 02:00"]
+    by_dict = gm.Dataset.from_dict({"x": [1.0, 2.0]}, time, tz="Europe/Oslo")
+    by_numpy = gm.Dataset.from_numpy(time, [[1.0], [2.0]], ["x"], tz="Europe/Oslo")
+    assert by_dict.fingerprint() == by_numpy.fingerprint()
+    assert by_dict.start.hour == 0
+
+
+def test_invalid_tables_name_the_offending_values():
+    """Construction and reads report the bad value and suggest a close column name."""
+    time = pd.date_range("2024-01-01", periods=2, freq="1h", tz="UTC")
+    with pytest.raises(gm.errors.DatasetError, match="frame = list"):
+        gm.Dataset([1, 2])
+    with pytest.raises(gm.errors.DatasetError, match="unit metadata columns = flwo.*'flow'"):
+        gm.Dataset.from_dict({"flow": [1, 2]}, time, units={"flwo": "W"})
+    with pytest.raises(gm.errors.DatasetError, match=r"shape = \(2, 1\); expected \(rows, 2\)"):
+        gm.Dataset.from_numpy(time, [[1], [2]], ["a", "b"])
+    with pytest.raises(gm.errors.DatasetError, match="time_column = 'tim'.*'time'"):
+        gm.Dataset.from_frame(pd.DataFrame({"time": time, "x": [1, 2]}), "tim")
+    data = gm.Dataset.from_dict({"flow": [1, 2]}, time, units={"flow": "m3/h"})
+    with pytest.raises(gm.errors.DatasetError, match="columns = flwo; .*'flow'"):
+        data.read(columns=["flwo"])
+    assert data.unit("flow", "kg/s") == "m3/h" and data.unit("other", "kg/s") == "kg/s"
 
 
 def test_core_data_has_no_file_or_network_readers():

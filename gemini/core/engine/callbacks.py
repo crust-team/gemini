@@ -1,7 +1,9 @@
-"""JSON-lines event tracing attached through the public module hooks."""
+"""Engine lifecycle callbacks: a JSON-lines event log and periodic checkpoints."""
 
 import json
+import numbers
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 
@@ -11,7 +13,12 @@ from gemini.utils.time import parse_duration
 
 
 class Callback:
-    """Override any lifecycle hook; callbacks run in registration order between steps."""
+    """Override any lifecycle hook; callbacks run in registration order between steps.
+
+    ``on_error`` observes only a failure that ends the run. Module failures recorded under
+    ``on_error="record"`` are results: they are in ``engine.results.errors`` when
+    ``on_step_end`` runs.
+    """
 
     def on_run_start(self, engine):
         """Observe a new or resumed finite run."""
@@ -23,14 +30,24 @@ class Callback:
         """Observe the completed sample after results and position have committed."""
 
     def on_error(self, engine, error):
-        """Observe a failure with checkpoint-consistent state."""
+        """Observe the failure that ends a run, with checkpoint-consistent state."""
 
     def on_run_end(self, engine):
         """Observe a successfully exhausted finite clock."""
 
 
+def _jsonable(value):
+    """Return ``value`` as JSON-compatible data; unknown objects become their ``str``."""
+    return to_jsonable_python(value, fallback=str)
+
+
 class EventLog(Callback):
-    """Append events to a file, or retain them in memory when no path is supplied."""
+    """Append events to a JSON-lines file, or retain them in memory when no path is supplied.
+
+    Every module is observed through a forward pre-hook and a forward hook, attached at run
+    start and removed when the run ends or fails. Logging never changes a run: non-finite
+    floats are written as ``NaN``/``Infinity`` and other unknown values as strings.
+    """
 
     def __init__(self, path=None):
         """Create a detached event sink."""
@@ -40,16 +57,16 @@ class EventLog(Callback):
         self.events = []
         self._handles = []
         self._starts = {}
+        self._logged_errors = 0
 
     def log(self, kind, **payload):
         """Record a timestamped event, including future agent interactions."""
         event = {"ts": datetime.now(timezone.utc).isoformat(), "kind": kind, **payload}
-        encoded = json.dumps(event, allow_nan=False)
         if self.path is None:
             self.events.append(event)
-        else:
-            with self.path.open("a") as handle:
-                handle.write(encoded + "\n")
+            return event
+        with self.path.open("a") as handle:
+            handle.write(json.dumps(event) + "\n")
         return event
 
     def attach(self, plant):
@@ -57,38 +74,27 @@ class EventLog(Callback):
         self.detach()
         for path, module in plant.named_modules():
             module_path = path or plant.path
-
-            def make_before(path):
-                def before(module, inlets):
-                    inputs = dict(inlets) | {
-                        name: getattr(module, name) for name in module.inputs()
-                    }
-                    self._starts[path] = perf_counter(), to_jsonable_python(inputs)
-
-                return before
-
-            def make_after(path):
-                def after(module, inlets, outlets):
-                    start, inputs = self._starts.pop(path)
-                    self.log(
-                        "forward",
-                        module_path=path,
-                        inputs=inputs,
-                        outputs=to_jsonable_python(
-                            {name: getattr(module, name) for name in module.outputs()}
-                        ),
-                        duration_ms=(perf_counter() - start) * 1000,
-                    )
-
-                return after
-
-            self._handles.extend(
-                [
-                    module.register_forward_pre_hook(make_before(module_path)),
-                    module.register_forward_hook(make_after(module_path)),
-                ]
+            self._handles.append(
+                module.register_forward_pre_hook(partial(self._before, module_path))
             )
+            self._handles.append(module.register_forward_hook(partial(self._after, module_path)))
         return self
+
+    def _before(self, path, module, inlets):
+        """Remember the start time and the inlets, controls and boundaries of one call."""
+        inputs = dict(inlets) | {name: getattr(module, name) for name in module.inputs()}
+        self._starts[path] = perf_counter(), _jsonable(inputs)
+
+    def _after(self, path, module, inlets, outlets):
+        """Log one module call with its inputs, outputs and duration."""
+        start, inputs = self._starts.pop(path)
+        self.log(
+            "forward",
+            module_path=path,
+            inputs=inputs,
+            outputs=_jsonable({name: getattr(module, name) for name in module.outputs()}),
+            duration_ms=(perf_counter() - start) * 1000,
+        )
 
     def detach(self):
         """Remove all owned hooks, leaving other observers intact."""
@@ -100,17 +106,22 @@ class EventLog(Callback):
     def on_run_start(self, engine):
         """Record run mode and attach equipment observers."""
         self.log("run_start", run_kind=engine.run_kind)
+        self._logged_errors = len(engine.results.errors)
         self.attach(engine.plant)
 
     def on_step_end(self, engine, sample):
-        """Record completed tick timing."""
+        """Record the step's recorded module errors, then the completed tick timing."""
+        for error in engine.results.errors[self._logged_errors :]:
+            self.log(
+                "error", module=error["module"], message=error["message"], error_type=error["type"]
+            )
+        self._logged_errors = len(engine.results.errors)
         self.log("step_end", time=sample.t.isoformat(), dt=sample.dt)
 
     def on_error(self, engine, error):
-        """Record errors and detach after interruptions."""
+        """Record the failure that ended the run and remove owned observers."""
         self.log("error", message=str(error), error_type=type(error).__name__)
-        if not isinstance(error, Exception) or engine.on_error == "raise":
-            self.detach()
+        self.detach()
 
     def on_run_end(self, engine):
         """Record completion and remove owned observers."""
@@ -118,49 +129,21 @@ class EventLog(Callback):
         self.detach()
 
 
-class Progress(Callback):
-    """Emit periodic progress through Python logging."""
-
-    def __init__(self, every=100):
-        """Choose a positive reporting interval in completed steps."""
-        if every <= 0:
-            raise ValueError("Progress interval must be positive")
-        self.every = every
-
-    def on_step_end(self, engine, sample):
-        """Log every N completed steps."""
-        import logging
-
-        if len(engine.results) % self.every == 0:
-            logging.getLogger(__name__).info(
-                "%s: %d steps at %s", engine.run_kind, len(engine.results), sample.t.isoformat()
-            )
-
-
-class AlarmCollector(Callback):
-    """Collect timestamped module alarms without repeatedly materialising the full frame."""
-
-    def __init__(self):
-        """Start an empty alarm list."""
-        self.alarms = []
-
-    def on_step_end(self, engine, sample):
-        """Record alarms on the latest completed row."""
-        for (path, field), value in engine.results._rows[-1].items():
-            if field == "health_alarm" and value:
-                self.alarms.append(dict(timestamp=sample.t, module=path))
-
-
 class AutoCheckpoint(Callback):
     """Save at completed-step boundaries, every N steps or elapsed simulation duration."""
 
     def __init__(self, path, every=100):
-        """Configure a positive step count or duration such as '1h'."""
+        """Configure a positive step count (any integer type) or a duration such as '1h'."""
         self.path = path
-        self.every = every if isinstance(every, int) else parse_duration(every)
-        if isinstance(every, int) and every <= 0:
-            raise ValueError("Checkpoint interval must be positive")
         self._elapsed = 0.0
+        if not isinstance(every, numbers.Integral):
+            self.every = parse_duration(every)
+            return
+        if every <= 0:
+            raise ValueError(
+                f"AutoCheckpoint: every = {every!r}; expected a positive step count or duration"
+            )
+        self.every = int(every)
 
     def on_step_end(self, engine, sample):
         """Write only after the engine has committed position, states and results."""

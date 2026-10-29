@@ -4,6 +4,7 @@ Every timestamp inside GEMINI is timezone-aware UTC. Naive input is interpreted 
 chosen zone (UTC by default) and rejected when ambiguous or nonexistent at a DST switch.
 """
 
+import numbers
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -40,13 +41,17 @@ def to_utc_index(values, tz="UTC"):
 
 
 def parse_duration(step):
-    """Parse a positive duration given as seconds or as pandas syntax such as ``"15min"``."""
-    if isinstance(step, (int, float)):
-        value = pd.Timedelta(seconds=step)
+    """Parse a positive duration given as seconds or as pandas syntax such as ``"15min"``.
+
+    Any real number counts as seconds, including NumPy scalars such as ``np.int64(900)``, which
+    ``pd.Timedelta`` alone would read as nanoseconds.
+    """
+    if isinstance(step, numbers.Real):
+        value = pd.Timedelta(seconds=step.item() if isinstance(step, np.generic) else step)
     else:
         value = pd.Timedelta(step)
     if pd.isna(value) or value <= pd.Timedelta(0):
-        raise ValueError(f"Clock step must be positive, got {step!r}")
+        raise ValueError(f"duration = {step!r}; expected a positive duration")
     return value
 
 

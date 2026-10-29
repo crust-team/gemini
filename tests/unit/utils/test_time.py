@@ -33,8 +33,10 @@ def test_parse_duration_accepts_seconds_and_pandas_syntax():
     assert parse_duration(0.5) == pd.Timedelta(milliseconds=500)
     assert parse_duration("15min") == pd.Timedelta(minutes=15)
     assert parse_duration(timedelta(hours=1)) == pd.Timedelta(hours=1)
+    assert parse_duration(np.int64(900)) == pd.Timedelta(minutes=15)
+    assert parse_duration(np.float64(1.5)) == pd.Timedelta(seconds=1.5)
     for invalid in (0, -1, "0s"):
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match="expected a positive duration"):
             parse_duration(invalid)
 
 
