@@ -2,6 +2,8 @@
 
 ## Start here
 
+Test with the development profile (`make test`); see [Testing: Test profiles](.claude/docs/testing.md#test-profiles).
+
 Read every file in `.claude/docs/` before changing the repository:
 
 - [Public API](.claude/docs/api.md): curated imports and supported user workflows.

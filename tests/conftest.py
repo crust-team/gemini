@@ -3,6 +3,7 @@
 import copy
 import warnings
 from pathlib import Path
+from time import perf_counter
 
 import pandas as pd
 import pytest
@@ -17,6 +18,8 @@ TIER_MARKERS = {
 }
 
 ROOT = Path(__file__).parents[1]
+TEST_BUDGET_S = 1.0
+SESSION_BUDGET_S = 300.0
 DATASETS = {
     "fast": ROOT / "examples/shared/doublet_heat/doublet_2024_15min_month.csv",
     "slow": ROOT / "examples/shared/doublet_heat/doublet_2024_15min.csv",
@@ -102,20 +105,63 @@ def pytest_collection_modifyitems(items):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Fail an unmarked fast-tier call that exceeds the one-second budget."""
+    """Fail a development-profile fast-tier call that exceeds the one-second budget."""
     outcome = yield
     report = outcome.get_result()
     markers = {marker.name for marker in item.iter_markers()}
     if (
         report.when == "call"
         and report.passed
-        and report.duration > 1.0
-        and item.config.option.markexpr == "not e2e and not slow"
-        and not hasattr(item.config, "workerinput")
+        and report.duration > TEST_BUDGET_S
+        and item.config.getoption("--profile") == "development"
         and not markers.intersection({"e2e", "slow"})
     ):
         report.outcome = "failed"
         report.longrepr = (
-            f"Fast-tier test took {report.duration:.2f}s (budget: 1.00s). "
+            f"Fast-tier test took {report.duration:.2f}s (budget: {TEST_BUDGET_S:.2f}s). "
             "Move it to slow or make it faster, see .claude/docs/testing.md."
         )
+
+
+class DevelopmentBudget:
+    """Fail a development-profile run whose wall time exceeds the session budget.
+
+    Registered only in the controlling process, so under xdist it measures the whole parallel
+    run and sees every worker's reports.
+    """
+
+    def __init__(self):
+        """Start timing when the controller configures the session."""
+        self.started = perf_counter()
+        self.durations = []
+        self.elapsed = 0.0
+
+    def pytest_runtest_logreport(self, report):
+        """Remember each test phase duration for the slowest-test listing."""
+        self.durations.append((report.duration, report.when, report.nodeid))
+
+    @pytest.hookimpl(trylast=True)
+    def pytest_sessionfinish(self, session):
+        """Turn an over-budget run into a failed run."""
+        self.elapsed = perf_counter() - self.started
+        if self.elapsed > SESSION_BUDGET_S:
+            session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+    def pytest_terminal_summary(self, terminalreporter):
+        """Explain an over-budget run with its ten slowest test phases."""
+        if self.elapsed <= SESSION_BUDGET_S:
+            return
+        terminalreporter.section("development profile over budget", red=True)
+        terminalreporter.write_line(
+            f"Run took {self.elapsed:.0f}s (budget: {SESSION_BUDGET_S:.0f}s). "
+            "See .claude/docs/testing.md, section 'Test profiles'. Slowest tests:"
+        )
+        for duration, when, nodeid in sorted(self.durations, reverse=True)[:10]:
+            terminalreporter.write_line(f"{duration:8.2f}s {when:<8} {nodeid}")
+
+
+def pytest_configure(config):
+    """Register the session budget for development-profile runs in the controller."""
+    is_worker = hasattr(config, "workerinput")
+    if config.getoption("--profile") == "development" and not is_worker:
+        config.pluginmanager.register(DevelopmentBudget(), "development-budget")

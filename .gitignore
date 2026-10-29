@@ -20,3 +20,5 @@ docs/_build/
 *.pyc
 
 runs/
+
+.tmp/

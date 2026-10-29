@@ -3,6 +3,7 @@ name: Test
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
   merge_group:
 
@@ -10,11 +11,16 @@ permissions:
   contents: read
 
 jobs:
-  fast:
-    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+  development:
+    if: >-
+      (github.event_name == 'push' && github.ref_type == 'branch' &&
+       github.ref != 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.base_ref != 'main')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
@@ -24,30 +30,15 @@ jobs:
       run: |
         pip install poetry
         poetry install --extras parquet
-    - name: Run fast tier
-      run: poetry run pytest -n auto
+    - name: Run development profile against the base
+      env:
+        BASE: ${{ github.base_ref || 'main' }}
+      run: poetry run python scripts/test_changed.py --base "origin/$BASE"
 
-  fast-e2e:
-    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
-    needs: fast
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-        cache: pip
-    - name: Install dependencies
-      run: |
-        pip install poetry
-        poetry install --extras parquet
-    - name: Run slow tier on fast data
-      run: poetry run pytest -n auto -m "e2e or slow" --dataset=fast
-
-  full-year:
+  release:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'push' && github.ref_type == 'tag') ||
       (github.event_name == 'pull_request' && github.base_ref == 'main') ||
       github.event_name == 'merge_group'
     runs-on: ubuntu-latest
@@ -62,5 +53,5 @@ jobs:
       run: |
         pip install poetry
         poetry install --extras parquet
-    - name: Run all tests on full-year data
-      run: poetry run pytest -n auto -m "" --dataset=slow
+    - name: Run release profile on full-year data
+      run: poetry run pytest -n auto -m "" --dataset=slow --profile=release --durations=20

@@ -1,7 +1,8 @@
 # Testing
 
-`pytest` is the day-to-day fast tier and must finish in under 30 seconds. Every test belongs to
-one automatically marked folder tier:
+Always test what changed and everything that imports it; never run the full suite locally.
+
+Every test belongs to one automatically marked folder tier:
 
 - `tests/unit/` mirrors source files and receives `unit`.
 - `tests/integration/` combines runtime components and receives `integration`.
@@ -9,29 +10,57 @@ one automatically marked folder tier:
 - `tests/fixtures/` contains immutable captured values, generators and golden outputs.
 
 The registered markers are `unit`, `integration`, `e2e` and `slow`, with strict marker checking.
-Default options select `not e2e and not slow`. Run from the repository root:
+Default options run in parallel (`-n auto`) and select `not e2e and not slow`.
+
+## Test profiles
+
+Both profiles always run in parallel with `pytest-xdist`.
+
+**Development** is the default for local work, every task and every commit:
 
 ```bash
-pytest                                      # fast unit + integration tier
-pytest -n auto                              # parallel fast tier
-pytest -m "e2e or slow" --dataset=fast     # slow tier on July data
-pytest -n auto -m "" --dataset=fast         # every test, fast data
-pytest -n auto -m "" --dataset=slow         # every test, full-year merge gate
+make test                                    # same as: python scripts/test_changed.py
+python scripts/test_changed.py --dry-run     # print the selection and the reasons
+python scripts/test_changed.py --base origin/main -- -x
 ```
 
-An empty `-m ""` overrides the default selection. CI runs parallel fast and fast-data e2e jobs
-for feature work. Main pushes, pull requests targeting main and merge queues run every test with
-`--dataset=slow` as the merge gate.
+`scripts/test_changed.py` takes the files changed against `HEAD` (plus uncommitted and untracked
+files, plus commits since `--base <ref>`), builds the `ast` import graph of `gemini/`,
+`examples/`, `tests/` and `scripts/` (cached in `.tmp/test_changed/`), and selects the tests of the
+changed files and of every module that imports a changed module, directly or transitively:
+
+1. a changed test file runs itself; a changed `conftest.py` runs every test below it;
+2. `pyproject.toml`, `tests/conftest.py` and `tests/xdist_plugin.py` select every test;
+3. every affected `gemini/<path>/<name>.py` runs `tests/unit/<path>/test_<name>.py`, and every
+   affected test file runs; imports made by `conftest.py` files are not followed;
+4. a changed numbered example selects `tests/e2e/test_examples.py`;
+5. any other changed file selects the tests (or `conftest.py` scopes) whose source names its path.
+
+It prints what it chose and why, then runs `pytest -n auto -m "not slow" --dataset=fast
+--profile=development` on the selection. Tests marked `slow` belong to the release profile.
+The development budget is **300 s** wall time: a session-end guard in `tests/conftest.py` fails a
+development-profile run over 300 s and prints the 10 slowest test phases. An individual fast-tier
+test call may take at most one second (below).
+
+**Release** runs in CI before merging to `main` and for release tags:
+
+```bash
+make test-release      # pytest -n auto -m "" --dataset=slow --profile=release --durations=20
+```
+
+It runs every tier on the slow full-year dataset with no time budget; CI reports its durations.
+Pull requests and feature-branch pushes run the development profile against their base
+(`scripts/test_changed.py --base origin/<base>`). Pushes to `main`, release tags, pull requests
+targeting `main` and merge queues run the release profile and must pass.
 
 ## Speed budget and slow tests
 
-An individual fast-tier test call may take at most one second. During the serial default fast
-selection, the root `tests/conftest.py` hook fails a slower test with instructions to optimize it
-or mark it `slow`. It is not enforced in xdist workers or during all-tier runs, where concurrent
-load would distort a test's timing. Marking is allowed only when the property inherently needs
-long elapsed work or a large real-data window; add a one-line reason to its docstring. Do not
-delete, skip or weaken a test to meet the budget. Timing history and profiles live in
-[docs/testing/speed.md](../../docs/testing/speed.md).
+An individual fast-tier test call may take at most one second. In the development profile the
+root `tests/conftest.py` hook fails a slower unit or integration test, also inside xdist workers,
+with instructions to optimize it or mark it `slow`. The release profile does not enforce it.
+Marking is allowed only when the property inherently needs long elapsed work or a large real-data
+window; add a one-line reason to its docstring. Do not delete, skip or weaken a test to meet the
+budget.
 
 ## Fast and slow datasets
 
