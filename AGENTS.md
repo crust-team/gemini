@@ -19,6 +19,11 @@ Read every file in `.claude/docs/` before changing the repository:
 When a commit changes behaviour, structure or conventions, update the relevant document in the
 same commit.
 
+## Branching
+
+All work happens directly on `refactor`. Do not create another branch unless the user explicitly
+asks for one.
+
 GEMINI is a composable geothermal digital-twin package. Preserve captured numerical behavior.
 
 ## Layout
