@@ -37,6 +37,8 @@ EARLY_EXITS = (ast.Return, ast.Raise, ast.Continue, ast.Break)
 BUILTIN_ERRORS = {"ValueError", "TypeError", "KeyError", "RuntimeError"}
 VALIDATORS = {"model_validator", "field_validator"}
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
+FRAMEWORK_STEM = "tor" + "ch"
+"""Lowercase text that every ``FRAMEWORK`` match contains, checked before the slower regex."""
 
 
 def tracked_files():
@@ -185,12 +187,19 @@ def test_nesting_counts_blocks_but_not_elif_chains(source, expected):
 
 
 def test_no_framework_names_in_tracked_text_files():
-    """Concepts are described directly, without naming the framework the design resembles."""
+    """Concepts are described directly, without naming the framework the design resembles.
+
+    Only files containing ``FRAMEWORK_STEM`` are searched line by line: every match contains it,
+    so the result is the same, and the case-insensitive regex over the 17 MB of example CSVs no
+    longer pushes the test past the one-second budget on CI runners.
+    """
     found = []
     for path in tracked_files():
         try:
             text = (ROOT / path).read_text(encoding="utf-8")
         except UnicodeDecodeError:
+            continue
+        if FRAMEWORK_STEM not in text.lower():
             continue
         found.extend(
             f"{path}:{number}"
