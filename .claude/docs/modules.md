@@ -280,9 +280,72 @@ assert fast.outlets.discharge == a.outlets.discharge
 
 ## State and health
 
-Stateful equipment sets the class attribute `stateful = True` and implements
-`initial_state()` and `step(state, dt, inlets)`, returning `(next_state, result)`. The engine
-integrates it; a stateless composite refuses stateful descendants unless it overrides `step`.
+Stateful equipment declares its carried values as `State(kind, default=...)` in the `# States`
+section; `default` is the initial state. `forward` and `_compute_outputs` read a state as a plain
+attribute (`self.temperature`), which gives its value at the start of the step. A stateful leaf
+implements `_advance_states(self, inlets, outlets, dt)`, returning the end-of-step value of every
+state, after `_compute_outputs`; a state is never assigned directly. `module.stateful` is true
+when a module declares states, and `states(recurse=True)` lists them by dotted path.
+
+`step(state, dt, inlets)` returns `(next_state, result)` for any module. `initial_state()` and
+`state` are the module's own `{name: value}` mapping for a leaf and nest by child name for a
+composite, for example `{"storage": {"temperature": 330.0}}`; `None` means the initial states.
+A composite needs no `step` method: its `forward` runs once, every stateful descendant it calls
+starts from its entry and records its end-of-step entry, and a descendant that is not called
+keeps its state. A stateful module called twice in one step raises `ConfigurationError`. Outside
+`step`, a call evaluates at the initial states. The engine integrates these steps; see
+[engine.md](engine.md). A module that sets `stateful = True` without declaring states must
+override `step` itself, and a composite refuses to step such a descendant.
+
+```python
+from gemini.core.types import Power, State, Temperature
+
+
+class Tank(Module):
+    """Mixed tank whose temperature follows the inlet."""
+
+    def __init__(self):
+        super().__init__()
+
+        # Parameters
+        self.heat_capacity = Parameter(float, gt=0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # States
+        self.temperature = State(Temperature, default=300)
+
+        # Outputs
+        self.duty = Output(Power)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Leave at the tank temperature of the start of the step."""
+
+        # Outlets
+        outlet = inlets.inlet.with_(T=self.temperature)
+
+        outlets = dict(outlet=outlet)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.duty = self._duty(inlets.inlet)
+
+    def _advance_states(self, inlets, outlets, dt):
+        rise = self._duty(inlets.inlet) * dt / self.heat_capacity
+        return {"temperature": self.temperature + rise}
+
+    def _duty(self, inlet):
+        return inlet.m_dot * 4217.4 * (inlet.T - self.temperature)
+
+
+tank = Tank().update_params(heat_capacity=4.2e5)
+state, result = tank.step(None, 60, {"inlet": stream})
+assert result.outlets.outlet.T == 300 and state["temperature"] > 300
+```
 
 A module with a diagnostic model overrides `health(self, result, measured)`. It receives the
 call's `ModuleResult` and the measured outputs of that tick and returns a `Health` (`assessed`,
@@ -296,7 +359,8 @@ Constructor sections are ordered `Modules`, `Parameters`, `Inlets`, `Controls`, 
 `States`, `Outputs`, `Outlets`, with empty sections omitted. `forward` uses only `# Modules` on
 composites and `# Outlets` when outlets exist. It contains no `self.<name> = ...` assignments and
 ends with `outlets = dict(...)` followed by `return outlets`. Method order is `__init__`,
-`forward`, `_compute_outputs`, then private helpers. Signatures are always
+`forward`, `_compute_outputs`, `_advance_states` when the module has states, then private
+helpers. Signatures are always
 `forward(self, inlets)` and `_compute_outputs(self, inlets, outlets)`, including modules with no
 ports; parameters have no defaults or variadic forms.
 

@@ -181,6 +181,21 @@ class Boundary(Declaration):
     section = "boundary"
 
 
+class State(Declaration):
+    """Value a stateful module carries from one time step to the next.
+
+    ``default`` is the initial state. ``Module.step`` supplies the value at the start of a step
+    and ``_advance_states`` returns the value at its end; a plain call uses the initial state.
+    """
+
+    section = "state"
+
+    def __init__(self, kind, *, default, description=None, **bounds):
+        """Declare a carried value with its initial state."""
+        super().__init__(kind, default=default, description=description, **bounds)
+        self.validate(deepcopy(default))
+
+
 class Output(Declaration):
     """Computed value recorded for one call."""
 

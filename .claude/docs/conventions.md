@@ -31,8 +31,8 @@ Plants are handwritten; plant files fill a tree but do not construct runtime wir
 1. Assign declarations and children only in `__init__`, after `super().__init__()`.
 2. Constructor sections are `# Modules`, `# Parameters`, `# Inlets`, `# Controls`,
    `# Boundaries`, `# States`, `# Outputs`, `# Outlets`, in that order, with empty sections
-   omitted. No built-in module declares states today; stateful equipment sets `stateful = True`
-   and implements `initial_state` and `step`.
+   omitted. Stateful equipment declares `State(kind, default=...)` values and implements
+   `_advance_states(self, inlets, outlets, dt)`; see [modules.md](modules.md#state-and-health).
 3. Controls are settable commands; boundaries are uncontrollable external conditions.
 4. `forward` is exactly `forward(self, inlets)` and reads declared streams through the immutable
    `Ports` mapping, such as `inlets.suction`. Controls and boundaries are applied before the call
@@ -131,19 +131,22 @@ The package avoids hidden behaviour. These are the only implicit mechanisms left
 reason it is needed:
 
 - `Module.__setattr__` registers what `__init__` assigns: a `Parameter`, `Inlet`, `Control`,
-  `Boundary`, `Output` or `Outlet` goes to its ordered registry and a `Module` becomes a child
+  `Boundary`, `State`, `Output` or `Outlet` goes to its ordered registry and a `Module` becomes a child
   with a dotted path. Assigning to a declared name sets the parameter, persists the control or
   boundary (inside a running call, it changes that call only) or records the output of the
   running call. Constructors therefore read as plain assignments in section order, and
   `esp.frequency = 50` persists a command.
 - `Module.__getattr__` resolves names that are not ordinary attributes: parameter values, the
   current control and boundary values (running call, then persisted value, then default),
-  outputs recorded in the running call, and otherwise the port and output declarations. This lets
+  outputs recorded in the running call, state values at the start of the running step (the
+  initial states outside a step), and otherwise the port and output declarations. This lets
   `forward` and `_compute_outputs` read `self.ua` or `self.frequency` as plain values.
 - The values of one call live in one `_Call` record held in the `_current_call` context variable
   of `gemini/core/modules/module.py`. Modules keep no per-call state on `self`, so nested,
   re-entrant and concurrent calls stay separate and composite formulas can read the results of
-  their children's calls.
+  their children's calls. During `Module.step` each call record also points to the one `_Step`
+  record (time step and state trees), so a composite steps its stateful descendants through its
+  ordinary `forward` instead of a second, hand-written step method.
 - `gm.no_outputs()` and `gm.runtime.settings()` are context settings built on
   `gemini.utils.context.ContextSetting`: a context variable change usable as a `with` block and
   as a decorator, restored on exit.

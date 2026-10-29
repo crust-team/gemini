@@ -10,6 +10,7 @@ from gemini.core.modules.module import Module
 from gemini.core.types import Stream
 
 FORWARD_SECTIONS = ("# Modules", "# Outlets")
+LIFECYCLE = ("__init__", "forward", "_compute_outputs", "_advance_states")
 INIT_SECTIONS = (
     "# Modules",
     "# Parameters",
@@ -128,6 +129,8 @@ def test_fixed_signatures_and_declared_port_accesses(module_classes):
     for cls in module_classes:
         _assert_fixed_signature(cls, "forward", ["self", "inlets"])
         _assert_fixed_signature(cls, "_compute_outputs", ["self", "inlets", "outlets"])
+        if cls().stateful and "_advance_states" in cls.__dict__:
+            _assert_fixed_signature(cls, "_advance_states", ["self", "inlets", "outlets", "dt"])
         module = cls()
         inlet_names = list(module.inlets())
         outlet_names = list(module.outlets())
@@ -178,9 +181,9 @@ def test_method_and_declaration_section_order(module_classes):
         methods = [
             name
             for name, value in cls.__dict__.items()
-            if inspect.isfunction(value) and name in {"__init__", "forward", "_compute_outputs"}
+            if inspect.isfunction(value) and name in LIFECYCLE
         ]
-        expected = [name for name in ("__init__", "forward", "_compute_outputs") if name in methods]
+        expected = [name for name in LIFECYCLE if name in methods]
         assert methods == expected, f"{cls.__name__}: lifecycle method order is {methods}"
         if "__init__" in cls.__dict__:
             source, _ = _source_tree(cls.__dict__["__init__"])

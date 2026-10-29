@@ -38,7 +38,10 @@ SI unit and then validates it with a Pydantic `TypeAdapter`; a failure raises
 optional kind describes its non-null variant and a list describes its items.
 
 Use `Annotated[float, quantity(...)]` aliases for physical numeric declarations, including list
-items. Integer stage counts use `Count`. Use signed pressure/temperature *differences*
+items. Integer stage counts use `Count`.
+Every quantity's unit is its own SI unit in the unit table of `core/physics/units.py`
+(`test_every_quantity_unit_is_a_known_si_unit`); add the unit there together with a new
+quantity. Use signed pressure/temperature *differences*
 separately from nonnegative absolute pressure and strictly positive absolute temperature. A
 difference converts by scale only: `"5 degC"` as a `TemperatureDifference` is 5 K, not 278.15 K.
 Efficiencies used as design constraints are in (0, 1]; empirical ESP output efficiency remains

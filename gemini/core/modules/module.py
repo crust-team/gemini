@@ -1,14 +1,16 @@
 """Equipment modules: declarations and children registered in ``__init__``, called with inlets.
 
 A module registers what ``__init__`` assigns: ``Parameter``, ``Inlet``, ``Control``, ``Boundary``,
-``Output`` and ``Outlet`` declarations go to ordered registries and ``Module`` values become
-children with dotted paths. Calling a module validates the inlets, applies controls and
+``State``, ``Output`` and ``Outlet`` declarations go to ordered registries and ``Module`` values
+become children with dotted paths. Calling a module validates the inlets, applies controls and
 boundaries, runs the forward pre-hooks, ``forward``, the leaf ``_compute_outputs`` or composite
 output formulas and the forward hooks, then returns a ``ModuleResult``.
 
 The values of one call (resolved controls and boundaries, recorded outputs and the results of
 child calls) live in a ``_Call`` record held in the ``_current_call`` context variable while the
-call runs; it is the only per-call state. ``no_outputs()`` is the only other context setting.
+call runs; it is the only per-call state. During ``Module.step`` every call record also carries
+the ``_Step`` record with the time step and the state trees. ``no_outputs()`` is the only other
+context setting.
 """
 
 import importlib
@@ -32,6 +34,7 @@ from gemini.core.types.declarations import (
     Outlet,
     Output,
     Parameter,
+    State,
 )
 from gemini.core.types.fluid import Fluid
 from gemini.core.types.ports import Ports
@@ -50,6 +53,7 @@ from gemini.errors import (
 from gemini.utils.context import ContextSetting
 from gemini.utils.files import read_json, write_json
 from gemini.utils.hooks import RemovableHandle, has_signature
+from gemini.utils.mappings import get_nested, set_nested
 from gemini.utils.strings import (
     did_you_mean,
     first_paragraph,
@@ -70,6 +74,7 @@ _REGISTRIES = (
     (Inlet, "_inlets"),
     (Control, "_controls"),
     (Boundary, "_boundaries"),
+    (State, "_states"),
     (Output, "_outputs"),
     (Outlet, "_outlets"),
 )
@@ -106,17 +111,51 @@ def import_class(path):
 
 
 @dataclass
+class _Step:
+    """Time step and state trees of one ``Module.step`` in progress.
+
+    ``states`` holds the states at the start of the step and ``next_states`` the states at its
+    end, both nested by child name below the stepped module ``root``. ``next_states`` starts as a
+    copy of ``states``, so a stateful module that is not called keeps its state.
+    """
+
+    root: "Module"
+    dt: float
+    states: dict
+    next_states: dict
+    advanced: set = field(default_factory=set)
+
+    def start(self, keys):
+        """Return the start-of-step states of the module at ``keys``, or an empty mapping."""
+        return deepcopy(get_nested(self.states, keys, None) or {})
+
+    def advance(self, keys, values):
+        """Record the end-of-step states of the module at ``keys``; each module advances once."""
+        if keys in self.advanced:
+            path = ".".join(keys) or self.root.path
+            raise ConfigurationError(f"{path}: stateful module called more than once in one step")
+        self.advanced.add(keys)
+        if not keys:
+            self.next_states = values
+            return
+        set_nested(self.next_states, keys, values)
+
+
+@dataclass
 class _Call:
     """Values of one module call in progress.
 
     ``outputs`` is ``None`` when outputs are disabled. ``call_records`` collects the results of
     every child call made during this call, in call order. ``parent`` is the enclosing call.
+    ``states`` holds the module's own state values and ``step`` the running ``_Step``, if any.
     """
 
     module: "Module"
     inputs: dict
     outputs: dict | None
     parent: "_Call | None"
+    states: dict | None = None
+    step: _Step | None = None
     call_records: list = field(default_factory=list)
 
     def owned_by(self, module):
@@ -141,7 +180,6 @@ class Module:
     position in the tree, or the name for a standalone module.
     """
 
-    stateful = False
     repr_fields = ()
 
     def __init__(self):
@@ -168,6 +206,11 @@ class Module:
     def path(self):
         """Return the assigned tree path or standalone derived name."""
         return self._path or self.name
+
+    @property
+    def stateful(self):
+        """Whether the module declares states that ``step`` advances."""
+        return bool(self._states)
 
     @property
     def fluid(self):
@@ -224,6 +267,8 @@ class Module:
         if name in self._outputs:
             self._record_output(name, value)
             return
+        if name in self._states:
+            raise DeclarationError(f"{self.path}.{name}: a state changes only in _advance_states")
         if name in self._declarations():
             raise DeclarationError(f"{self.path}.{name}: cannot replace a declaration")
         self._children.pop(name, None)
@@ -276,6 +321,7 @@ class Module:
 
         Called only for names that are not ordinary attributes. Controls and boundaries resolve
         to the value of the running call, then the persisted value, then the declared default.
+        States resolve to the value at the start of the running step, else the initial state.
         Outputs resolve to the value recorded in the running call, otherwise to their
         declaration, as do inlets and outlets.
         """
@@ -284,6 +330,11 @@ class Module:
             return self._parameter_value(name)
         if name in registries.get("_controls", {}) or name in registries.get("_boundaries", {}):
             return self._input_value(name)
+        if name in registries.get("_states", {}):
+            call = _active_call(self)
+            if call is not None and call.states is not None:
+                return call.states[name]
+            return self._initial_states()[name]
         if name in registries.get("_outputs", {}):
             call = _active_call(self)
             if call is not None and call.outputs is not None and name in call.outputs:
@@ -397,6 +448,10 @@ class Module:
     def inputs(self, recurse=True):
         """Return controls followed by boundaries, by dotted path relative to this module."""
         return self.controls(recurse) | self.boundaries(recurse)
+
+    def states(self, recurse=True):
+        """Return state declarations by dotted path relative to this module."""
+        return self._section("_states", recurse)
 
     def outputs(self, recurse=True):
         """Return computed output declarations by dotted path relative to this module."""
@@ -519,6 +574,11 @@ class Module:
 
     def __call__(self, *args, **kwargs):
         """Apply controls and boundaries, run hooks and ``forward``, and validate outlets."""
+        parent = _current_call.get()
+        return self._run(args, kwargs, parent.step if parent is not None else None)
+
+    def _run(self, args, kwargs, step):
+        """Evaluate one call; inside a step a stateful module also advances its states."""
         missing = self.missing_parameters()
         if missing:
             raise MissingValueError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
@@ -530,10 +590,14 @@ class Module:
             inputs=self._resolve_inputs(supplied),
             outputs={} if outputs_enabled() else None,
             parent=parent,
+            states=self._call_states(step),
+            step=step,
         )
         token = _current_call.set(call)
         try:
             outlets = self._evaluate(inlets, call)
+            if step is not None and self._states:
+                step.advance(self._step_keys(step), self._next_states(inlets, outlets, step.dt))
         finally:
             _current_call.reset(token)
         result = ModuleResult(
@@ -819,29 +883,84 @@ class Module:
             raise OutputError(f"{self.path}: outputs left unassigned: {missing}")
 
     def initial_state(self):
-        """Return independent states for stateful descendants, or None for a leaf."""
+        """Return the initial states, nested by child name; ``None`` when nothing is stateful."""
+        if self._states:
+            return self._initial_states()
         states = {
-            name: child.initial_state()
+            name: child_state
             for name, child in self.named_children()
-            if child.stateful or child._children
+            if (child_state := child.initial_state()) is not None
         }
         return states or None
 
     def step(self, state, dt, inlets):
-        """Evaluate a stateless step; stateful equipment overrides this method.
+        """Advance every declared state over ``dt`` seconds; return ``(next_state, result)``.
 
-        A stateless composite cannot integrate stateful descendants, so it refuses them rather
-        than returning their state unchanged.
+        ``state`` is the tree ``initial_state`` returns, or ``None`` for the initial states. The
+        call runs as ``self(inlets)``; each stateful module called during it starts from its
+        entry in ``state`` and records its end-of-step entry. A descendant that is stateful
+        without declaring states steps itself, so a composite cannot step it and refuses.
         """
         if dt <= 0:
             raise ConfigurationError(f"{self.path}: dt = {dt} s; expected a positive step")
-        stateful = [path for path, module in self.named_modules() if path and module.stateful]
-        if stateful:
+        explicit = [
+            path
+            for path, module in self.named_modules()
+            if path and module.stateful and not module._states
+        ]
+        if explicit:
             raise ConfigurationError(
-                f"{self.path}: stateful descendants {', '.join(stateful)} need a step method "
+                f"{self.path}: stateful descendants {', '.join(explicit)} need a step method "
                 "on this composite that steps them"
             )
-        return state, self(inlets)
+        start = state if state is not None else self.initial_state() or {}
+        step = _Step(root=self, dt=dt, states=start, next_states=deepcopy(start))
+        result = self._run((inlets,), {}, step)
+        return step.next_states or None, result
+
+    def _initial_states(self):
+        """Return the validated initial value of every declared state."""
+        return {
+            name: state.validate(deepcopy(state.default)) for name, state in self._states.items()
+        }
+
+    def _call_states(self, step):
+        """Return the state values one call starts from, or ``None`` without declared states."""
+        if not self._states:
+            return None
+        if step is None:
+            return self._initial_states()
+        supplied = step.start(self._step_keys(step))
+        unknown = sorted(supplied.keys() - self._states.keys())
+        if unknown:
+            raise UnknownNameError(
+                f"{self.path}: unknown state {unknown[0]!r}; valid: {join_names(self._states)}"
+                f"{did_you_mean(unknown[0], self._states)}"
+            )
+        return self._initial_states() | {
+            name: self._states[name].validate(value) for name, value in supplied.items()
+        }
+
+    def _step_keys(self, step):
+        """Return the child names that lead from the stepped module to this module."""
+        if self is step.root:
+            return ()
+        prefix = step.root._path + "." if step.root._path else ""
+        return tuple(self._path.removeprefix(prefix).split("."))
+
+    def _next_states(self, inlets, outlets, dt):
+        """Validate the end-of-step states that ``_advance_states`` returns."""
+        values = self._advance_states(inlets, outlets, dt)
+        if not isinstance(values, Mapping) or values.keys() != self._states.keys():
+            raise ConfigurationError(
+                f"{self.path}: _advance_states returned {sorted(values or ())}; expected "
+                f"{join_names(self._states)}"
+            )
+        return {name: self._states[name].validate(value) for name, value in values.items()}
+
+    def _advance_states(self, inlets, outlets, dt):
+        """Return the end-of-step value of every declared state; stateful leaves override it."""
+        raise NotImplementedError(f"{type(self).__name__} declares states without _advance_states")
 
     def register_forward_pre_hook(self, fn):
         """Call ``fn(module, inlets)`` before each forward evaluation."""
@@ -1014,6 +1133,7 @@ class Module:
             ("Inlets", module._inlets),
             ("Controls", module._controls),
             ("Boundaries", module._boundaries),
+            ("States", module._states),
             ("Outputs", module._outputs),
             ("Outlets", module._outlets),
         ):

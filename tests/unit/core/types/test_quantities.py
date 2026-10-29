@@ -1,8 +1,12 @@
 """Physical aliases enforce bounds and retain dimensional metadata."""
 
+from typing import get_args
+
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from gemini.core.physics import units
+from gemini.core.types import quantities
 from gemini.core.types.quantities import Efficiency, Pressure, PressureDifference, Temperature
 
 
@@ -26,3 +30,12 @@ def test_quantities():
     assert schema["p"]["unit"] == "Pa"
     assert schema["p"]["quantity"] == "pressure"
     assert schema["p"]["minimum"] == 0
+
+
+def test_every_quantity_unit_is_a_known_si_unit():
+    """Each declared quantity's unit is in the unit table and is its own SI unit."""
+    for name in dir(quantities):
+        value = getattr(quantities, name)
+        for field in get_args(value)[1:]:
+            unit = field.json_schema_extra["unit"]
+            assert units.si_unit(unit) == unit, name
