@@ -5,7 +5,7 @@ simulation, historical replay, and externally scheduled live updates.
 
 ## Quickstart
 
-Run from the repository root with Python 3.11:
+Run from the repository root with Python 3.11, 3.12, 3.13 or 3.14:
 
 ```python
 import pandas as pd

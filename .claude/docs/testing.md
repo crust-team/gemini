@@ -54,7 +54,18 @@ make test-release      # pytest -n auto -m "" --dataset=slow --profile=release -
 It runs every tier on the slow full-year dataset with no time budget; CI reports its durations.
 Pull requests and feature-branch pushes run the development profile against their base
 (`scripts/test_changed.py --base origin/<base>`). Pushes to `main`, release tags, pull requests
-targeting `main` and merge queues run the release profile and must pass.
+targeting `main` and merge queues run the release profile and must pass; a manual run of the Test
+workflow (`workflow_dispatch`) runs the release profile on any branch.
+
+## Python versions and dependency ranges
+
+The Test workflow runs its profile on every supported Python, 3.11 to 3.14, with the newest
+dependencies, and on 3.11 and 3.14 with the lowest versions `pyproject.toml` declares
+(`uv pip install --resolution lowest-direct -e ".[parquet]" --group test`), which proves the
+ranges. Free-threaded 3.14t and the 3.15 beta run with `continue-on-error`, so their failures are
+reported without failing the build. Locally, `uv venv -p 3.11` and the same install reproduce
+any job. Raise a lower bound in `pyproject.toml` when code needs a newer API, and add an upper
+bound only for a known incompatibility.
 
 ## Speed budget and slow tests
 

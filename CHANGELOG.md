@@ -54,6 +54,11 @@ finite engine, and then cleaned up. Old import paths are not retained.
   `currency/s`, `currency/h`, `m.K/W`, `K/m`, `K/km`, `kJ/kg`, `kWh/K`, `MJ/m3/K`, `t` and
   `m3/h/bar^0.5`; the `Fluid` kind `"steam"` and the `STEAM` constant.
 - `Degasser.separation_efficiency` (default 0, which keeps the former results).
+- Python 3.12, 3.13 and 3.14 support (was 3.11 only). The Test workflow runs its profile on each
+  of them with the newest dependencies and on 3.11 and 3.14 with the declared lower bounds
+  (`uv pip install --resolution lowest-direct`); free-threaded 3.14t and the 3.15 beta run as
+  non-blocking jobs, and a manual run (`workflow_dispatch`) runs the release profile on any
+  branch. CI installs with uv; `poetry install` still works.
 
 ### Changed
 - The `Module` base class is explicit: modules are built without arguments and configured with
@@ -79,7 +84,9 @@ finite engine, and then cleaned up. Old import paths are not retained.
   output). `FlowCoefficient` allows zero, so a closed valve reports it.
 - Dependencies are version ranges instead of exact pins: pandas >= 2.2.2, including pandas 3;
   scipy >= 1.13.0; numpy >= 2.0.0; pydantic >= 2.5.0; pytz >= 2020.1; the `parquet` extra's
-  pyarrow >= 16.0.0.
+  pyarrow >= 16.0.0. On Python 3.13 and 3.14 the floors rise to the first releases with wheels
+  for them (for example numpy >= 2.3.2 on 3.14). Package metadata is in the PEP 621 `[project]`
+  table.
 - Development tools are PEP 735 dependency groups (`test`, `lint`, `docs` and `dev` with all
   three): pytest 9.2.0, pytest-xdist 3.8, flake8 7.5.0, Flake8-pyproject 1.2.4, black 26.10.1,
   isort 9.0.2, sphinx-rtd-theme 3.1.0 and Sphinx 9.2.0 (9.1.1 on Python 3.12 and 9.0.4 on 3.11,

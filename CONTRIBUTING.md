@@ -1,7 +1,8 @@
 # Contributing
 
-Use Python 3.11 and install development dependencies with `poetry install` (add
-`--extras parquet` for Parquet results). Read [AGENTS.md](AGENTS.md) and the documents it links
+GEMINI supports Python 3.11, 3.12, 3.13 and 3.14. Install the package with its development
+dependency groups with `poetry install` (add `--extras parquet` for Parquet results) or with
+`uv pip install -e ".[parquet]" --group dev`. Read [AGENTS.md](AGENTS.md) and the documents it links
 before changing equipment or physics; the implementation rules are in
 [.claude/docs/conventions.md](.claude/docs/conventions.md).
 
@@ -29,7 +30,10 @@ work as follows:
 
 CI runs the development test profile on pushes to feature branches and on pull requests into other
 branches, and the release profile on pushes to `main`, on release tags, on pull requests into
-`main` and in merge queues. Lint runs on every push, pull request and merge queue.
+`main` and in merge queues; a manual run of the Test workflow runs the release profile on any
+branch. Every run covers Python 3.11 to 3.14 with the newest dependencies, plus the declared lower
+bounds (`uv pip install --resolution lowest-direct`) on 3.11 and 3.14; free-threaded 3.14t and
+the 3.15 beta run as non-blocking jobs. Lint runs on every push, pull request and merge queue.
 
 ## Code quality guidelines
 

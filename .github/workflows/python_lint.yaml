@@ -11,18 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-        cache: pip
-    - name: Install dependencies
+    - uses: actions/checkout@v5
+    - uses: astral-sh/setup-uv@v7
+    - name: Install Python 3.11 and the lint tools
       run: |
-        pip install poetry
-        poetry install
+        uv venv --python 3.11
+        uv pip install --group lint
+        echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
     - name: Lint with flake8 black isort
       run: |
-        poetry run flake8 gemini tests examples scripts docs/conf.py
-        poetry run black --check gemini tests examples scripts docs/conf.py
-        poetry run isort --check-only gemini tests examples scripts docs/conf.py
+        flake8 gemini tests examples scripts docs/conf.py
+        black --check gemini tests examples scripts docs/conf.py
+        isort --check-only gemini tests examples scripts docs/conf.py

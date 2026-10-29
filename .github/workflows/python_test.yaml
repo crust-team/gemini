@@ -6,52 +6,65 @@ on:
     tags: ["v*"]
   pull_request:
   merge_group:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Test profile to run on every Python version
+        type: choice
+        options: [release, development]
+        default: release
 
 permissions:
   contents: read
 
 jobs:
-  development:
-    if: >-
-      (github.event_name == 'push' && github.ref_type == 'branch' &&
-       github.ref != 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.base_ref != 'main')
+  test:
+    name: Python ${{ matrix.python }} (${{ matrix.resolution }})
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        resolution: [highest]
+        experimental: [false]
+        include:
+          - python: "3.11"
+            resolution: lowest-direct
+            experimental: false
+          - python: "3.14"
+            resolution: lowest-direct
+            experimental: false
+          - python: "3.14t"
+            resolution: highest
+            experimental: true
+          - python: "3.15"
+            resolution: highest
+            experimental: true
+    env:
+      PROFILE: >-
+        ${{ (github.event_name == 'workflow_dispatch' && inputs.profile) ||
+        (((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'push' && github.ref_type == 'tag') ||
+        (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+        github.event_name == 'merge_group') && 'release') || 'development' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-        cache: pip
-    - name: Install dependencies
+    - uses: astral-sh/setup-uv@v7
+    - name: Install Python ${{ matrix.python }} and the ${{ matrix.resolution }} dependencies
       run: |
-        pip install poetry
-        poetry install --extras parquet
+        uv venv --python "${{ matrix.python }}"
+        uv pip install --resolution "${{ matrix.resolution }}" -e ".[parquet]" --group test
+        echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+    - name: Report the environment
+      run: python -m gemini.utils.collect_env
     - name: Run development profile against the base
+      if: env.PROFILE == 'development'
       env:
         BASE: ${{ github.base_ref || 'main' }}
-      run: poetry run python scripts/test_changed.py --base "origin/$BASE"
-
-  release:
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'push' && github.ref_type == 'tag') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
-      github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-        cache: pip
-    - name: Install dependencies
-      run: |
-        pip install poetry
-        poetry install --extras parquet
+      run: python scripts/test_changed.py --base "origin/$BASE"
     - name: Run release profile on full-year data
-      run: poetry run pytest -n auto -m "" --dataset=slow --profile=release --durations=20
+      if: env.PROFILE == 'release'
+      run: python -m pytest -n auto -m "" --dataset=slow --profile=release --durations=20

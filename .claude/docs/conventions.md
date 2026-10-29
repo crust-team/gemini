@@ -1,10 +1,10 @@
 # Implementation conventions
 
-Use Python 3.11, Black, isort, 100-character lines and Flake8 with docstrings. Preserve captured
-numbers. Use SI internally: K, Pa, kg/s, m, W, J and s. Record an intentional physical or
-numerical decision as a `NOTE(refactor):` sentence in the docstring of the function, class or
-test that makes it, with its explanation and regression evidence, and list lasting decisions in
-[refactor-notes.md](refactor-notes.md).
+Write for Python 3.11, the oldest supported version (3.11 to 3.14), and use Black, isort,
+100-character lines and Flake8 with docstrings. Preserve captured numbers. Use SI internally: K, Pa,
+kg/s, m, W, J and s. Record an intentional physical or numerical decision as a `NOTE(refactor):`
+sentence in the docstring of the function, class or test that makes it, with its explanation and
+regression evidence, and list lasting decisions in [refactor-notes.md](refactor-notes.md).
 
 ## Dependencies
 

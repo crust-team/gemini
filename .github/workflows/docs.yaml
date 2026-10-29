@@ -17,19 +17,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-        cache: pip
-    - name: Install dependencies
+    - uses: actions/checkout@v5
+    - uses: astral-sh/setup-uv@v7
+    - name: Install Python 3.14, the package and the docs tools
       run: |
-        pip install poetry
-        poetry install
+        uv venv --python 3.14
+        uv pip install -e . --group docs
+        echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
     - name: Build documentation
       run: |
-        poetry run sphinx-build -W -b html docs docs/_build/html
+        sphinx-build -W -b html docs docs/_build/html
     - name: Deploy to GitHub Pages
       if: github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v3
