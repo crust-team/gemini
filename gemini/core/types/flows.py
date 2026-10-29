@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from gemini.core.physics import units
 from gemini.core.types.fluid import BRINE, Fluid
 from gemini.core.types.quantities import MassFlow, Pressure, Temperature
-from gemini.errors import UnitError
+from gemini.errors import CallError, UnitError
 
 
 class Stream(BaseModel):
@@ -34,7 +34,7 @@ class Stream(BaseModel):
         pressure = units.value_in_si(data.get("p"), "Pa", "Stream.p")
         if "flow" in data:
             if "m_dot" in data:
-                raise TypeError("Stream: pass either flow or m_dot, not both")
+                raise CallError("Stream: pass either flow or m_dot, not both")
             data["m_dot"] = _mass_flow(data.pop("flow"), fluid, pressure, temperature)
         elif "m_dot" in data:
             data["m_dot"] = units.value_in_si(data["m_dot"], "kg/s", "Stream.m_dot")
@@ -42,7 +42,7 @@ class Stream(BaseModel):
         super().__init__(**data)
 
     def volumetric_flow(self) -> float:
-        """Return signed mixture volume flow [m3/s] using the stream dtype."""
+        """Return signed mixture volume flow [m3/s] using the stream fluid."""
         return self.m_dot / self.fluid.properties(self.p, self.T).density
 
     def with_(self, **changes) -> "Stream":

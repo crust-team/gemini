@@ -3,6 +3,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.types.quantities import AnnualMoney, Money, MoneyPerEnergy
+from gemini.errors import ConfigurationError
 
 
 class Cost(BaseModel):
@@ -30,7 +31,7 @@ def total_cost(module):
         return None
     first = costs[0]
     if any((c.currency, c.price_year) != (first.currency, first.price_year) for c in costs):
-        raise ValueError(
+        raise ConfigurationError(
             f"{module.path}: costs require the same currency and price year; got "
             f"{sorted({(c.currency, c.price_year) for c in costs})}"
         )

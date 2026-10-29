@@ -79,7 +79,7 @@ class _Coordinates:
 def _owner(plant, params):
     """Return the one module owning ``params``, its plant path and the parameter names."""
     if not params:
-        raise ValueError("calibrate: params = []; expected at least one Parameter")
+        raise ConfigurationError("calibrate: params = []; expected at least one Parameter")
     for parameter in params:
         if not parameter.calibratable:
             raise ConfigurationError(

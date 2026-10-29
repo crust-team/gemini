@@ -25,7 +25,7 @@ from gemini.core.types import (
     Stream,
     VolumeFlow,
 )
-from gemini.errors import InsufficientDataError, PhysicsRangeError
+from gemini.errors import ConfigurationError, InsufficientDataError, PhysicsRangeError
 
 MIN_EFFICIENCY_POWER = 0.1
 """Shaft power [W] below which the pump is treated as stopped and its efficiency as zero."""
@@ -179,7 +179,7 @@ class ESP(Module):
     def head_curve(self, frequency: float, n_points: int = 50) -> list[tuple[float, float]]:
         """Return plotting points as (flow [m3/s], head [Pa])."""
         if frequency <= 0 or n_points < 2:
-            raise ValueError(
+            raise ConfigurationError(
                 f"{self.path}: positive frequency and at least two curve points required; got "
                 f"frequency = {frequency} Hz, n_points = {n_points}"
             )

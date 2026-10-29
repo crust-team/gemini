@@ -420,8 +420,8 @@ class Module:
         registry = getattr(module, registry_name)
         if name not in registry:
             raise UnknownNameError(
-                f"{self.path}: unknown {kind} {path!r}{did_you_mean(name, registry)}; "
-                f"valid: {join_names(registry)}"
+                f"{self.path}: unknown {kind} {path!r}; valid: {join_names(registry)}"
+                f"{did_you_mean(name, registry)}"
             )
         return registry[name]
 
@@ -444,8 +444,8 @@ class Module:
         for path, value in mapping.items():
             if path not in declarations:
                 raise UnknownNameError(
-                    f"{self.path}: unknown control/boundary path {path!r}"
-                    f"{did_you_mean(path, declarations)}; valid: {join_names(declarations)}"
+                    f"{self.path}: unknown control/boundary path {path!r}; valid: "
+                    f"{join_names(declarations)}{did_you_mean(path, declarations)}"
                 )
             declaration = declarations[path]
             pending.append((declaration.owner, declaration.name, declaration.validate(value)))
@@ -593,8 +593,8 @@ class Module:
         if unknown:
             name = unknown[0]
             raise CallError(
-                f"{self.path}: unexpected keyword {name!r}{did_you_mean(name, valid_names)}; "
-                f"valid names: {join_names(valid_names)}"
+                f"{self.path}: unexpected keyword {name!r}; valid names: {join_names(valid_names)}"
+                f"{did_you_mean(name, valid_names)}"
             )
 
     def _mapping_inlets(self, mapping, kwargs):
@@ -609,8 +609,8 @@ class Module:
         if unknown:
             name = unknown[0]
             raise CallError(
-                f"{self.path}: unknown inlet {name!r}{did_you_mean(name, self._inlets)}; "
-                f"valid names: {valid}"
+                f"{self.path}: unknown inlet {name!r}; valid names: {valid}"
+                f"{did_you_mean(name, self._inlets)}"
             )
         return mapping
 
@@ -834,7 +834,7 @@ class Module:
         than returning their state unchanged.
         """
         if dt <= 0:
-            raise ValueError("dt must be positive [s]")
+            raise ConfigurationError(f"{self.path}: dt = {dt} s; expected a positive step")
         stateful = [path for path, module in self.named_modules() if path and module.stateful]
         if stateful:
             raise ConfigurationError(

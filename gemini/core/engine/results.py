@@ -8,7 +8,7 @@ import pandas as pd
 
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
-from gemini.errors import UnknownResultError
+from gemini.errors import UnitError, UnknownResultError
 from gemini.utils.files import decode_cells, encode_cells, read_json
 from gemini.utils.strings import did_you_mean, join_names
 
@@ -75,7 +75,7 @@ class ModuleSeries:
         if unit is None:
             return series
         if field not in SERIES_UNITS:
-            raise ValueError(
+            raise UnitError(
                 f"{self._path}: result field = {field!r}; expected one of "
                 f"{join_names(SERIES_UNITS)} for unit conversion"
             )

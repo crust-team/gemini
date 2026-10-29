@@ -1,4 +1,4 @@
-"""The complete public quickstart acceptance path."""
+"""The public quickstart acceptance path."""
 
 import pandas as pd
 import pytest
@@ -11,9 +11,9 @@ pytestmark = pytest.mark.e2e
 
 
 def test_quickstart(tmp_path, monkeypatch, dataset_path):
-    """Run the documented calls unchanged against the committed shared example.
+    """Run the quickstart calls against the committed shared example.
 
-    The body is the literal documented quickstart, so it stays one function.
+    The body is one end-to-end path through the public API, so it stays one function.
     """
     (tmp_path / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
     monkeypatch.chdir(tmp_path)

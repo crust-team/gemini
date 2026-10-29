@@ -109,7 +109,10 @@ class Profile(BaseModel):
     def resample(self, step: timedelta, how: Literal["mean", "sum", "first"]):
         """Aggregate in UTC left-closed bins; reject empty bins rather than filling them."""
         if step.total_seconds() <= 0 or how not in {"mean", "sum", "first"}:
-            raise ValueError("Require a positive step and mean, sum or first")
+            raise DatasetError(
+                f"Profile.resample: step = {step}, how = {how!r}; expected a positive step and "
+                "'mean', 'sum' or 'first'"
+            )
         groups = self.to_series().resample(step)
         series = groups.sum(min_count=1) if how == "sum" else getattr(groups, how)()
         if series.isna().any():

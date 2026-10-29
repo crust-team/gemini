@@ -31,8 +31,11 @@ NESTING = (ast.If, ast.For, ast.While, ast.With, ast.Try, ast.AsyncFor, ast.Asyn
 MAX_NESTING = 3
 MAX_LINES = 40
 LONG_FUNCTIONS = {
-    "tests/e2e/test_quickstart.py::test_quickstart": "the literal documented quickstart",
+    "tests/e2e/test_quickstart.py::test_quickstart": "one end-to-end quickstart path",
 }
+EARLY_EXITS = (ast.Return, ast.Raise, ast.Continue, ast.Break)
+BUILTIN_ERRORS = {"ValueError", "TypeError", "KeyError", "RuntimeError"}
+VALIDATORS = {"model_validator", "field_validator"}
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
 
 
@@ -115,6 +118,45 @@ def test_functions_are_short_or_documented_exceptions():
         if body_lines(function) > MAX_LINES
     }
     assert long == set(LONG_FUNCTIONS)
+
+
+def test_no_else_after_an_early_exit():
+    """A block that ends in ``return``, ``raise``, ``continue`` or ``break`` has no ``else``."""
+    found = [
+        f"{path}:{node.lineno}"
+        for path in python_files()
+        for node in ast.walk(ast.parse((ROOT / path).read_text()))
+        if isinstance(node, ast.If) and node.orelse and isinstance(node.body[-1], EARLY_EXITS)
+    ]
+    assert found == []
+
+
+def raised_name(node):
+    """Return the class name a ``raise`` statement raises, or None."""
+    exception = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
+    return exception.id if isinstance(exception, ast.Name) else None
+
+
+def is_validator(function):
+    """Tell whether a function is a validator, which must raise ``ValueError``."""
+    return any(
+        isinstance(decorator, ast.Call) and getattr(decorator.func, "id", None) in VALIDATORS
+        for decorator in function.decorator_list
+    )
+
+
+def test_package_code_raises_gemini_errors():
+    """Deliberate errors use ``gm.errors``; ``gemini.utils`` and validators are the exceptions."""
+    found = [
+        f"{path}:{node.lineno} {raised_name(node)}"
+        for path in python_files()
+        if path.startswith("gemini/") and not path.startswith("gemini/utils/")
+        for function in functions(path)
+        if not is_validator(function)
+        for node in ast.walk(function)
+        if isinstance(node, ast.Raise) and node.exc and raised_name(node) in BUILTIN_ERRORS
+    ]
+    assert found == []
 
 
 @pytest.mark.parametrize(

@@ -20,7 +20,7 @@ from gemini.core.types.quantities import (
 
 
 class Fluid(BaseModel):
-    """Stream dtype; composition is descriptive unless the property model uses it.
+    """Stream fluid; composition is descriptive unless the property model uses it.
 
     Salinity, CO2 and free gas are mass fractions. Glycol is a volume fraction,
     matching the cited manufacturer table. Constant STP does not infer brine

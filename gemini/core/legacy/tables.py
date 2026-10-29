@@ -19,6 +19,7 @@ from gemini.core.modules.subsurface import (
 )
 from gemini.core.modules.treatment import Degasser, Filter
 from gemini.core.physics import geometry, units
+from gemini.errors import LegacyFormatError
 from gemini.utils.files import read_json
 
 PORTS = {
@@ -401,7 +402,7 @@ def _well_params(properties, prefix, base_path):
     if not table:
         filename = properties.get(f"{prefix}_trajectory_file")
         if not filename:
-            raise ValueError(f"{prefix}: provide a trajectory table or trajectory file")
+            raise LegacyFormatError(f"{prefix}: provide a trajectory table or trajectory file")
         text = (Path(base_path) / filename).read_text(encoding="utf-8-sig")
         table = parse_trajectory_csv(text)
     tally = [

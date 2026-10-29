@@ -94,7 +94,7 @@ def test_call_output_and_signature_guards():
     ):
         module()
     with pytest.raises(
-        gm.errors.CallError, match="pass_through.*inlett.*did you mean 'inlet'.*valid names"
+        gm.errors.CallError, match="pass_through.*inlett.*valid names.*did you mean 'inlet'"
     ):
         module(inlett=stream)
     with pytest.raises(

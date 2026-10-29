@@ -391,7 +391,9 @@ def _traversal(path, direction):
     """Return the normalised direction and the path sections in traversal order."""
     direction = direction.strip().lower()
     if direction not in {"up", "down"}:
-        raise ValueError(f"pipe path: direction = {direction!r}; expected 'up' or 'down'")
+        raise UnknownCorrelationError(
+            f"pipe path: direction = {direction!r}; expected 'up' or 'down'"
+        )
     sections = path.sections if direction == "down" else list(reversed(path.sections))
     return direction, sections
 

@@ -13,7 +13,7 @@ from gemini.core.engine.clock import Clock
 from gemini.core.engine.results import Results
 from gemini.core.engine.step import BindingPlan, chained_step, twin_step
 from gemini.core.modules.module import class_path, import_class
-from gemini.errors import CheckpointError
+from gemini.errors import CheckpointError, ConfigurationError
 from gemini.utils.time import parse_duration, to_utc
 
 
@@ -36,7 +36,9 @@ class Engine:
     def __init__(self, callbacks=None, on_error="record"):
         """Configure lifecycle callbacks and either recording or raising ordinary errors."""
         if on_error not in {"record", "raise"}:
-            raise ValueError(f"Engine: on_error = {on_error!r}; expected 'record' or 'raise'")
+            raise ConfigurationError(
+                f"Engine: on_error = {on_error!r}; expected 'record' or 'raise'"
+            )
         self.callbacks = list(callbacks or [])
         self.on_error = on_error
         self.plant = None
