@@ -6,6 +6,7 @@ from gemini.core.modules.module import Module
 from gemini.core.physics import heat_transfer
 from gemini.core.types import (
     Fraction,
+    Health,
     Inlet,
     MassFlow,
     Outlet,
@@ -19,7 +20,6 @@ from gemini.core.types import (
     TemperatureDifference,
     ThermalConductance,
 )
-from gemini.core.types.results import Health
 from gemini.errors import InsufficientDataError, PhysicsRangeError, UnknownCorrelationError
 
 DEFAULT_CP = 4217.4

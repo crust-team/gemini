@@ -12,6 +12,7 @@ from gemini.core.types import (
     Efficiency,
     Fraction,
     Frequency,
+    Health,
     Inlet,
     Length,
     Outlet,
@@ -24,7 +25,6 @@ from gemini.core.types import (
     Stream,
     VolumeFlow,
 )
-from gemini.core.types.results import Health
 from gemini.errors import InsufficientDataError, PhysicsRangeError
 
 MIN_EFFICIENCY_POWER = 0.1

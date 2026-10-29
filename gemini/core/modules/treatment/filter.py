@@ -3,6 +3,7 @@
 from gemini.core.modules.module import Module
 from gemini.core.physics import units
 from gemini.core.types import (
+    Health,
     Inlet,
     MassFlow,
     Outlet,
@@ -11,7 +12,6 @@ from gemini.core.types import (
     PressureDifference,
     Stream,
 )
-from gemini.core.types.results import Health
 
 NOMINAL_MASS_FLOW = 149 / 3600 * 1068
 """Default clean-filter design flow [kg/s]: 149 m3/h of brine at 1068 kg/m3.

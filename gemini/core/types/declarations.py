@@ -186,11 +186,10 @@ class Output(Declaration):
 
     section = "output"
 
-    def __init__(self, kind, *, soft_sensor=False, optional=False, description=None):
+    def __init__(self, kind, *, soft_sensor=False, description=None):
         """Declare a computed value and its recording semantics."""
         super().__init__(kind, description=description)
         self.soft_sensor = soft_sensor
-        self.optional = optional
         self.formula = None
         self._formula_kind_given = True
         self._resolved_formula = None
@@ -222,7 +221,6 @@ class Output(Declaration):
     @classmethod
     def ratio(cls, numerator, denominator, kind=None, **kwargs):
         """Declare the ratio of two earlier outputs on the same module."""
-        kwargs.setdefault("optional", True)
         return cls._from_formula(("ratio", numerator, denominator), kind or Ratio | None, **kwargs)
 
     def infer_kind(self, declaration):

@@ -11,6 +11,7 @@ from gemini.core.types import (
     Density,
     Dimensionless,
     Fraction,
+    Health,
     Inlet,
     Length,
     MassFlow,
@@ -26,7 +27,6 @@ from gemini.core.types import (
     Viscosity,
 )
 from gemini.core.types.fluid import Fluid
-from gemini.core.types.results import Health
 from gemini.errors import ConfigurationError, InsufficientDataError, PhysicsRangeError
 
 FLUID_OVERRIDES = ("liquid_density", "liquid_viscosity")

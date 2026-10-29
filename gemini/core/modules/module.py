@@ -667,21 +667,14 @@ class Module:
 
     def _resolve_inputs(self, supplied):
         """Return validated controls and boundaries: supplied, persisted, then default values."""
-        resolved = {}
-        for name, declaration in (self._controls | self._boundaries).items():
-            if name in supplied:
-                value = supplied[name]
-            elif name in self._input_values:
-                value = self._input_values[name]
-            elif declaration.default is not UNSET:
-                value = deepcopy(declaration.default)
-            else:
-                raise MissingValueError(
-                    f"{declaration.path}: missing required {declaration.section} "
-                    f"{name!r} [{declaration.unit or '-'}]"
-                )
-            resolved[name] = declaration.validate(value)
-        return resolved
+        return {
+            name: (
+                declaration.validate(supplied[name])
+                if name in supplied
+                else self._input_value(name)
+            )
+            for name, declaration in (self._controls | self._boundaries).items()
+        }
 
     def _formula_candidates(self):
         candidates = []
