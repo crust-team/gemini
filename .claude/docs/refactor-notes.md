@@ -229,10 +229,14 @@ ported into the refactored structure; only missing behaviour was added.
   reservoir terms are `None` without a drainage radius; ESP efficiency is a fraction (upstream
   percent) and any number of curve coefficients is accepted; NORSOK takes its velocity from
   m3/s and its pH factor applies only at the tabulated temperatures (7 elsewhere); DLD uses the
-  velocity, not the volume flow; the DNV rate converts m/s to mm/year (3.15576e10, upstream text
-  31.5576e6); titanium, listed in the upstream text, stays rejected because the original check
+  velocity, not the volume flow; titanium, listed in the upstream text, stays rejected because the original check
   could never match it; the upstream `PVTConstantSTP` enthalpy, entropy and validity ranges have
   no counterpart in `FluidProperties`.
+- The DNV RP O501 (and Tulsa) rate converts its penetration speed from m/s to mm/year with
+  `1000 * 365.25 * 86400` = 3.15576e10, as the upstream code does (`C_unit`). The upstream
+  Sphinx page writes 31.5576e6 under a mm/year label: that is the seconds of a year alone
+  (m/s to m/year), a documentation typo that would understate the rate 1000-fold.
+  `test_dnv_year_constant_converts_metres_per_second_to_millimetres_per_year` checks it.
 - The Carnot mode keeps the refactored model: upstream evaluates the COP at the sink outlet and
   the **source inlet** without a lift floor (COP 4.4144 in its test case), the refactored model at
   both outlets with a 10 K floor (3.1012 for the same inputs).

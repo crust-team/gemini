@@ -85,3 +85,26 @@ def test_api_velocity_limit_and_comparison():
         erosion.api_erosional_velocity(0)
     with pytest.raises(PhysicsRangeError, match="limit = 0"):
         erosion.api_velocity_comparison(1, 0)
+
+
+def test_dnv_year_constant_converts_metres_per_second_to_millimetres_per_year():
+    """The DNV rate scales its penetration speed [m/s] by 1000 mm/m * 365.25 * 86400 s/year.
+
+    Upstream code uses ``C_unit = 1000 * (3600 * 24 * 365.25)`` = 3.15576e10 as well. The
+    upstream Sphinx page writes 31.5576e6, the seconds of a year alone (m/s to m/year), under a
+    mm/year label: a documentation typo that would understate the rate by a factor of 1000.
+    """
+    seconds_per_year = 365.25 * 86400
+    assert units.ms_to_mm_year(1) == pytest.approx(3.15576e10, rel=1e-15)
+    assert units.ms_to_mm_year(1) == pytest.approx(1000 * seconds_per_year, rel=1e-15)
+    assert 31.5576e6 == pytest.approx(seconds_per_year, rel=1e-15)
+    rate = erosion.erosion_rate("DNV", **FLOW)
+    area = math.pi * FLOW["diameter"] ** 2 / 4
+    mass_flow = FLOW["flow_rate"] * FLOW["rho_fluid"]
+    velocity = mass_flow / (FLOW["rho_fluid"] * area)
+    alpha = math.pi / 2
+    coefficients = (9.37, -42.295, 110.864, -175.804, 170.137, -98.398, 31.211, -4.17)
+    angle_function = sum(c * alpha ** (i + 1) for i, c in enumerate(coefficients))
+    penetration = mass_flow * 2e-9 * velocity**2.6 * angle_function / (7800 * area)
+    assert rate == pytest.approx(penetration * 3.15576e10, rel=1e-9)
+    assert rate / (penetration * 31.5576e6) == pytest.approx(1000, rel=1e-9)
