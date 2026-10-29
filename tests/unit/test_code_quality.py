@@ -85,46 +85,60 @@ def nesting(node, depth=0):
     return deepest
 
 
-def test_only_section_headers_and_tool_directives_are_comments():
+PYTHON_FILES = python_files()
+PACKAGE_FILES = [
+    path
+    for path in PYTHON_FILES
+    if path.startswith("gemini/") and not path.startswith("gemini/utils/")
+]
+
+
+@pytest.mark.parametrize("path", PYTHON_FILES)
+def test_only_section_headers_and_tool_directives_are_comments(path):
     """Explanations live in docstrings, never in comments inside code."""
     found = []
-    for path in python_files():
-        source = io.StringIO((ROOT / path).read_text())
-        for token in tokenize.generate_tokens(source.readline):
-            text = token.string.strip()
-            is_allowed = text in SECTION_HEADERS or TOOL_DIRECTIVE.fullmatch(text)
-            if token.type == tokenize.COMMENT and not is_allowed:
-                found.append(f"{path}:{token.start[0]}: {text}")
+    source = io.StringIO((ROOT / path).read_text())
+    for token in tokenize.generate_tokens(source.readline):
+        text = token.string.strip()
+        is_allowed = text in SECTION_HEADERS or TOOL_DIRECTIVE.fullmatch(text)
+        if token.type == tokenize.COMMENT and not is_allowed:
+            found.append(f"{path}:{token.start[0]}: {text}")
     assert found == []
 
 
-def test_functions_nest_at_most_three_blocks():
+@pytest.mark.parametrize("path", PYTHON_FILES)
+def test_functions_nest_at_most_three_blocks(path):
     """Guard clauses keep every function at most three blocks deep."""
     deep = [
         f"{path}:{function.lineno} {function.name} ({nesting(function)})"
-        for path in python_files()
         for function in functions(path)
         if nesting(function) > MAX_NESTING
     ]
     assert deep == []
 
 
-def test_functions_are_short_or_documented_exceptions():
+@pytest.mark.parametrize("path", PYTHON_FILES)
+def test_functions_are_short_or_documented_exceptions(path):
     """Functions stay within about 40 lines; each longer one is listed with its reason."""
     long = {
         f"{path}::{function.name}"
-        for path in python_files()
         for function in functions(path)
         if body_lines(function) > MAX_LINES
     }
-    assert long == set(LONG_FUNCTIONS)
+    assert long == {name for name in LONG_FUNCTIONS if name.startswith(f"{path}::")}
 
 
-def test_no_else_after_an_early_exit():
+def test_long_function_exceptions_exist():
+    """Every listed long-function exception names an existing function."""
+    names = {f"{path}::{function.name}" for path in PYTHON_FILES for function in functions(path)}
+    assert set(LONG_FUNCTIONS) <= names
+
+
+@pytest.mark.parametrize("path", PYTHON_FILES)
+def test_no_else_after_an_early_exit(path):
     """A block that ends in ``return``, ``raise``, ``continue`` or ``break`` has no ``else``."""
     found = [
         f"{path}:{node.lineno}"
-        for path in python_files()
         for node in ast.walk(ast.parse((ROOT / path).read_text()))
         if isinstance(node, ast.If) and node.orelse and isinstance(node.body[-1], EARLY_EXITS)
     ]
@@ -145,12 +159,11 @@ def is_validator(function):
     )
 
 
-def test_package_code_raises_gemini_errors():
+@pytest.mark.parametrize("path", PACKAGE_FILES)
+def test_package_code_raises_gemini_errors(path):
     """Deliberate errors use ``gm.errors``; ``gemini.utils`` and validators are the exceptions."""
     found = [
         f"{path}:{node.lineno} {raised_name(node)}"
-        for path in python_files()
-        if path.startswith("gemini/") and not path.startswith("gemini/utils/")
         for function in functions(path)
         if not is_validator(function)
         for node in ast.walk(function)
