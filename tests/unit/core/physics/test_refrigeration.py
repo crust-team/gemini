@@ -35,6 +35,35 @@ def test_carnot_cops_reject_invalid_inputs(call, match):
         call()
 
 
+def test_log_mean_temperature_and_lorenz_cop():
+    """Log-mean temperatures lie between the end points; zero glides give the Carnot COP."""
+    mean = refrigeration.log_mean_temperature(353.15, 303.15)
+    assert mean == pytest.approx(50 / math.log(353.15 / 303.15))
+    assert 303.15 < mean < (353.15 + 303.15) / 2
+    assert refrigeration.log_mean_temperature(300, 300) == 300
+    lorenz = refrigeration.lorenz_cop_heating(303.15, 353.15, 313.15, 290)
+    sink = refrigeration.log_mean_temperature(303.15, 353.15)
+    source = refrigeration.log_mean_temperature(313.15, 290)
+    assert lorenz == pytest.approx(sink / (sink - source))
+    flat = refrigeration.lorenz_cop_heating(330, 330, 290, 290)
+    assert flat == refrigeration.carnot_cop_heating(330, 290)
+    assert refrigeration.lorenz_cop_heating(330, 330, 325, 325, 10) == pytest.approx(33)
+
+
+@pytest.mark.parametrize(
+    "call, match",
+    [
+        (lambda: refrigeration.log_mean_temperature(0, 300), "inlet_temperature = 0"),
+        (lambda: refrigeration.log_mean_temperature(300, float("nan")), "nan"),
+        (lambda: refrigeration.lorenz_cop_heating(300, 300, 300, 300), "lift = 0"),
+    ],
+)
+def test_lorenz_relations_reject_invalid_inputs(call, match):
+    """Nonpositive temperatures, NaN and a nonpositive lift raise PhysicsRangeError."""
+    with pytest.raises(PhysicsRangeError, match=match):
+        call()
+
+
 def test_characteristic_temperature_difference_uses_celsius():
     """The difference ddt = t_G - a t_AC + r t_E is evaluated on Celsius temperatures."""
     ddt = refrigeration.characteristic_temperature_difference(363.15, 303.15, 285.15, 2.5, 1.6)

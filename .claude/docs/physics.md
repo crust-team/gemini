@@ -56,6 +56,11 @@ out-of-domain inputs raise `PhysicsRangeError`.
   minimum_lift)` and `carnot_cop_cooling(...)` = `T_source / max(...)`. Nonpositive
   temperatures and a nonpositive floored lift are rejected; for one lift, heating COP = cooling
   COP + 1.
+- `log_mean_temperature(T_in, T_out)` = `(T_in - T_out) / ln(T_in / T_out)` (`T_in` when equal),
+  the thermodynamic mean temperature of a sensible glide.
+- `lorenz_cop_heating(sink_in, sink_out, source_in, source_out, minimum_lift=0)` = `T_h /
+  max(T_h - T_s, minimum_lift)` with the log-mean sink and source temperatures (Lorenz 1894); it
+  equals the Carnot COP when both glides vanish.
 - `characteristic_temperature_difference(t_G, t_AC, t_E, a, r)` = `t_G - a t_AC + r t_E`,
   evaluated in degC from kelvin inputs: the published fits (Hellmann, Schweigler and Ziegler
   1999; Kuehn and Ziegler 2005) use Celsius, and the two bases agree only in the ideal Duehring

@@ -1,11 +1,13 @@
-"""Heat pump and electric chiller duties, Carnot-fraction COP and limits."""
+"""Heat pump and electric chiller duties, Carnot- and Lorenz-fraction COP and limits."""
 
 import pytest
 
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.heat import HeatPump
+from gemini.core.physics import refrigeration
 from gemini.core.types.flows import Stream
-from gemini.errors import PhysicsRangeError
+from gemini.core.types.fluid import Fluid
+from gemini.errors import ConfigurationError, PhysicsRangeError
 
 CP = 4217.4
 
@@ -107,4 +109,42 @@ def test_invalid_operating_points_raise():
             source_in=Stream(m_dot=100, T=290, p=3e5),
             sink_in=Stream(m_dot=0.1, T=300, p=3e5),
             temperature_setpoint=280,
+        )
+
+
+def test_lorenz_heating_reproduces_the_upstream_gemini_case():
+    """Upstream GEMINI ``HeatpumpBasic`` Lorenz case: 30 -> 80 C sink, 40 C source.
+
+    Upstream (Nelder-Mead) reports COP 6.5310, source outlet 18.8279 C, 580694.44 W and
+    88913.32 W; the root found here gives 88913.17 W, the duty divided by the same COP
+    without the optimizer's tolerance.
+    """
+    water = Fluid(kind="water", liquid_density=1000, specific_heat=4181)
+    pump = heat_pump("heating", capacity=1e7, cop_model="lorenz")
+    source = Stream(flow="20 m3/h", T="40 C", p=3e5, fluid=water)
+    sink = Stream(flow="10 m3/h", T="30 C", p=3e5, fluid=water)
+    result = pump(source_in=source, sink_in=sink, temperature_setpoint="80 C")
+    out = result.outputs
+    assert out.cop == pytest.approx(6.5310, abs=1e-4)
+    assert out.source_out_T - 273.15 == pytest.approx(18.8279, abs=1e-4)
+    assert out.useful_duty == pytest.approx(580694.44, abs=0.01)
+    assert out.electricity == pytest.approx(88913.17, abs=0.01)
+    expected = 0.5 * refrigeration.lorenz_cop_heating(
+        sink.T, out.sink_out_T, source.T, out.source_out_T, 10
+    )
+    assert out.cop == pytest.approx(expected, rel=1e-12)
+    assert energy_balance(pump, result)["relative_residual"] < 1e-12
+    assert mass_balance(pump, result)["residual"] == 0
+
+
+def test_lorenz_mode_limits():
+    """Lorenz cooling is undefined and a source too cold for a COP above 1 is out of range."""
+    source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
+    with pytest.raises(ConfigurationError, match="cop_model = 'lorenz'"):
+        heat_pump("cooling", cop_model="lorenz")(
+            source_in=source, sink_in=sink, temperature_setpoint=290
+        )
+    with pytest.raises(PhysicsRangeError, match="heating COP above 1"):
+        heat_pump("heating", cop_model="lorenz", lorenz_efficiency=0.1)(
+            source_in=source.with_(T=250), sink_in=sink, temperature_setpoint=340
         )

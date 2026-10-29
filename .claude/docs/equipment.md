@@ -51,7 +51,7 @@ Shared conventions, stated once here and not repeated per module:
 | Treatment | `Vent` | `inlet` -> `outlet` | no | vent or flare emissions |
 | Heat | `HeatExchanger` | `hot_in`, `cold_in` -> `hot_out`, `cold_out` | no | effectiveness-NTU |
 | Heat | `Boiler` | `inlet` -> `outlet` | no | setpoint duty, capacity, efficiency |
-| Heat | `HeatPump` | `source_in`, `sink_in` -> `source_out`, `sink_out` | no | Carnot COP |
+| Heat | `HeatPump` | `source_in`, `sink_in` -> `source_out`, `sink_out` | no | Carnot or Lorenz COP |
 | Heat | `AbsorptionUnit` | three `*_in` -> `*_out` circuits | no | characteristic equation |
 | Heat | `AdsorptionChiller` | three `*_in` -> `*_out` circuits | no | characteristic equation |
 | Heat | `CHP` | `inlet` -> `outlet` | no | Willans line, dump cooler |
@@ -697,8 +697,11 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
 - **Parameters**:
   - `mode` (`"heating"` or `"cooling"`, required), `capacity` (`Power`, > 0, required): cap on
     the useful duty.
+  - `cop_model` (`"carnot"` or `"lorenz"`, default `"carnot"`): Lorenz is heating only.
   - `carnot_efficiency` (`Efficiency`, default 0.5): Arpagaus et al. (2018), Energy 152,
     985-1010, report 0.4 to 0.6.
+  - `lorenz_efficiency` (`Efficiency`, default 0.5, the upstream GEMINI default): fraction of
+    the Lorenz COP, used by `cop_model="lorenz"`.
   - `minimum_temperature_lift` (`TemperatureDifference`, > 0, default 10 K): floor of the lift
     in the COP, an engineering bound (not a literature value); set it to the smallest lift in
     the machine data.
@@ -713,6 +716,10 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
   `eta T_source_out / max(lift, L)` when cooling, at the outlet temperatures. Because
   `Q_sink = Q_source + electricity`, the uncontrolled outlet is linear in itself and is solved in
   closed form (see the class docstring). Either circuit stopped means off.
+  With `cop_model="lorenz"` the heating COP is `eta_L T_h / max(T_h - T_s, L)` with `T_h`, `T_s`
+  the log-mean temperatures of the sink and source glides (`refrigeration.lorenz_cop_heating`,
+  Lorenz 1894); the source outlet is then found by `brentq` between `T_in - Q / C` and `T_in`.
+  `cop_model="lorenz"` with `mode="cooling"` raises `ConfigurationError`.
 - **Validity**: lifts of about 10 to 80 K. A heating COP of 1 or less (source inlet at or below
   `(1 - eta) T_sink_out`) and a cooling sink too small to reject the heat raise
   `PhysicsRangeError`. Outlets are not checked against freezing. Constant Carnot fraction, no
@@ -730,6 +737,15 @@ result = heat_pump(
     temperature_setpoint="67 C",
 )
 assert round(result.outputs.cop, 4) == 3.6015 and round(result.outputs.electricity) == 234202
+
+water = gm.Fluid(kind="water", liquid_density=1000, specific_heat=4181)
+lorenz = HeatPump().update_params(mode="heating", capacity="10 MW", cop_model="lorenz")
+result = lorenz(
+    source_in=gm.Stream(flow="20 m3/h", T="40 C", p="3 bar", fluid=water),
+    sink_in=gm.Stream(flow="10 m3/h", T="30 C", p="3 bar", fluid=water),
+    temperature_setpoint="80 C",
+)
+assert round(result.outputs.cop, 4) == 6.531 and round(result.outputs.electricity) == 88913
 ```
 
 ### AbsorptionUnit

@@ -190,3 +190,15 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   - NumPy 2.5's `polyfit` moves the golden reservoir pressure estimate from 21999999.999999974
     to 21999999.999999993 Pa (8.5e-16 relative).
 
+## Upstream development port
+
+The upstream GEMINI `development` branch (simulator, doubletA surface models, heat pump) was
+ported into the refactored structure; only missing behaviour was added.
+
+- `HeatPump(cop_model="lorenz")` reproduces the upstream Lorenz case (COP 6.5310, source outlet
+  18.8279 degC, 580694.44 W); electricity is 88913.17 W against upstream's 88913.32 W, the
+  Nelder-Mead tolerance of the upstream solve. It is heating only, as upstream.
+- The Carnot mode keeps the refactored model: upstream evaluates the COP at the sink outlet and
+  the **source inlet** without a lift floor (COP 4.4144 in its test case), the refactored model at
+  both outlets with a 10 K floor (3.1012 for the same inputs).
+

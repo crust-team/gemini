@@ -1,4 +1,4 @@
-"""Heat pump and chiller relations: Carnot COPs, sorption characteristic equations, part load.
+"""Heat pump and chiller relations: Carnot and Lorenz COPs, sorption equations, part load.
 
 All functions take and return SI values (K, W, W/K). The characteristic equation of sorption
 machines is defined on Celsius temperatures; ``characteristic_temperature_difference`` converts
@@ -62,6 +62,79 @@ def carnot_cop_cooling(
     """
     lift = _lift("carnot_cop_cooling", sink_temperature, source_temperature, minimum_lift)
     return source_temperature / lift
+
+
+def log_mean_temperature(inlet_temperature: float, outlet_temperature: float) -> float:
+    """Return the logarithmic mean (thermodynamic mean) temperature of a sensible glide.
+
+    Parameters
+    ----------
+    inlet_temperature, outlet_temperature : float
+        Positive absolute temperatures [K] at which a stream enters and leaves.
+
+    Returns
+    -------
+    float
+        T_m = (T_in - T_out) / ln(T_in / T_out) [K]; T_in when both are equal.
+
+    Notes
+    -----
+    T_m is the temperature at which a reversible engine exchanges the same heat and entropy as
+    a stream of constant heat capacity changing from T_in to T_out (Lorenz 1894; Moran and
+    Shapiro, Fundamentals of Engineering Thermodynamics, chapter 6). It lies between the
+    geometric and the arithmetic mean of the two temperatures.
+    """
+    _check_numbers(
+        "log_mean_temperature",
+        inlet_temperature=inlet_temperature,
+        outlet_temperature=outlet_temperature,
+    )
+    if inlet_temperature <= 0 or outlet_temperature <= 0:
+        raise PhysicsRangeError(
+            f"log_mean_temperature: inlet_temperature = {inlet_temperature} K, "
+            f"outlet_temperature = {outlet_temperature} K; expected positive temperatures"
+        )
+    if inlet_temperature == outlet_temperature:
+        return inlet_temperature
+    glide = inlet_temperature - outlet_temperature
+    return glide / math.log(inlet_temperature / outlet_temperature)
+
+
+def lorenz_cop_heating(
+    sink_inlet: float,
+    sink_outlet: float,
+    source_inlet: float,
+    source_outlet: float,
+    minimum_lift: float = 0.0,
+) -> float:
+    """Return the Lorenz (gliding-temperature) heating COP of a heat pump.
+
+    Parameters
+    ----------
+    sink_inlet, sink_outlet : float
+        Absolute temperatures [K] of the heated circuit at the condenser inlet and outlet.
+    source_inlet, source_outlet : float
+        Absolute temperatures [K] of the cooled circuit at the evaporator inlet and outlet.
+    minimum_lift : float
+        Lift floor [K] on the difference of the two log-mean temperatures.
+
+    Returns
+    -------
+    float
+        COP_h = T_h / max(T_h - T_s, minimum_lift) [-], with T_h and T_s the log-mean
+        temperatures of the sink and source glides (``log_mean_temperature``).
+
+    Notes
+    -----
+    Reference: Lorenz, H. (1894), "Die Ermittlung der Grenzwerte der thermodynamischen
+    Energieumwandlung", Zeitschrift fuer die gesamte Kaelte-Industrie 1, 1-11. The Lorenz cycle
+    is the reversible cycle between two streams of finite heat capacity; it reduces to the
+    Carnot COP when both glides vanish. It suits water-to-water machines whose circuits change
+    temperature by several kelvin.
+    """
+    sink = log_mean_temperature(sink_inlet, sink_outlet)
+    source = log_mean_temperature(source_inlet, source_outlet)
+    return sink / _lift("lorenz_cop_heating", sink, source, minimum_lift)
 
 
 def characteristic_temperature_difference(
