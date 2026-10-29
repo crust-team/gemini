@@ -28,22 +28,13 @@ jobs:
         pip install poetry
         poetry install
     - name: Build documentation
-      env:
-        DOCS_VERSION: ${{ github.ref_name }}
       run: |
         poetry run sphinx-build -W -b html docs docs/_build/html
-    - name: Compute docs destination
-      id: docs_destination
-      shell: bash
-      run: |
-        BRANCH="${GITHUB_REF_NAME}"
-        SAFE_BRANCH="${BRANCH//\//-}"
-        echo "destination=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
     - name: Deploy to GitHub Pages
       if: github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./docs/_build/html
-        destination_dir: ${{ steps.docs_destination.outputs.destination }}
+        destination_dir: main
         keep_files: true

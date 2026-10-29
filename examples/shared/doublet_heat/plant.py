@@ -17,7 +17,7 @@ class DoubletHeatPlant(Module):
     """Doublet, degasser, filters, heat exchanger and injection pump in diagram order."""
 
     def __init__(self):
-        """Declare the complete plant tree, ports, controls and outputs."""
+        """Declare the complete plant tree, ports and outputs."""
         super().__init__()
 
         # Modules
@@ -34,7 +34,6 @@ class DoubletHeatPlant(Module):
         self.thermal_power = Output.of("heat_exchanger.duty")
         self.electricity_use = Output.total("electricity")
         self.cop = Output.ratio("thermal_power", "electricity_use")
-        self.electricity = Output.total("electricity")
         self.heat_loss = Output.total("heat_loss")
 
         # Outlets

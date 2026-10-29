@@ -3,14 +3,9 @@
 .vscode
 venv
 __pycache__
-flask_session
-instance
 poetry.lock
-.coverage
-codedocumentation
 build
 .env
-.venv311/
 .pytest_cache/
 dist/
 docs/codedocumentation/

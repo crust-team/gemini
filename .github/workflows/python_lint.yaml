@@ -3,7 +3,7 @@
 
 name: Lint
 
-on: [push]
+on: [push, pull_request, merge_group]
 
 jobs:
   build:
@@ -23,6 +23,6 @@ jobs:
         poetry install
     - name: Lint with flake8 black isort
       run: |
-        poetry run flake8 gemini tests examples
-        poetry run black --check gemini tests examples
-        poetry run isort --check-only gemini tests examples
+        poetry run flake8 gemini tests examples scripts docs/conf.py
+        poetry run black --check gemini tests examples scripts docs/conf.py
+        poetry run isort --check-only gemini tests examples scripts docs/conf.py
