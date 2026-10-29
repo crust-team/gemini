@@ -95,15 +95,18 @@ claim absence of other corrosion mechanisms.
 
 ## Energy outputs and balances
 
-Electricity, fuel use and environmental heat loss are `Power` outputs named `electricity`,
-`fuel` and `heat_loss`; they are not flow ports. Fluid heat transferred between equipment remains
+Energy that crosses a leaf other than in its streams is reported as nonnegative `Power` outputs
+with fixed names; they are not flow ports. Inflows are `electricity` and `fuel` consumed and
+`heat_absorbed` from outside the plant (ambient air, a cooled building); outflows are
+`heat_loss` to the environment, `heat_supplied` to a consumer and `electricity_generated`.
+`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `core/modules/balance.py` list them. Fluid heat transferred between equipment remains
 in `Stream` states. `collect_flows(result)` sums these leaf outputs once, ignoring composite
 aggregates. `ModuleResult` captures incoming streams, controls and children at evaluation time;
 later evaluations do not replace these audit inputs.
 
 `mass_balance(module, result)` includes aquifer withdrawal/deposition boundaries.
-`energy_balance(module, result)` audits sensible enthalpy (`m_dot * cp_l * T`), electricity, fuel
-and reported environmental heat. Internal stream transfers cancel once; reported plant totals are
+`energy_balance(module, result)` audits sensible enthalpy (`m_dot * cp_l * T`) and these six
+energy outputs. Internal stream transfers cancel once; reported plant totals are
 boundary fluxes. Pressure, kinetic and gravitational energy are outside the thermal model.
 `residual` is always sum(in) minus sum(out). `thermal_residual` separately excludes
 **unresolved pump power**. The legacy isothermal pumps do not allocate electricity to work or

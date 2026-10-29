@@ -1,7 +1,11 @@
 """Mass and sensible-energy audits over retained evaluation trees.
 
-The legacy isothermal pumps do not allocate electricity to fluid enthalpy,
-mechanical work or environmental loss. Report that unresolved energy explicitly;
+A leaf exchanges energy outside its streams only through these ``Power`` outputs, each
+nonnegative and named the same in every module: ``electricity`` and ``fuel`` consumed,
+``heat_absorbed`` taken in from outside the plant (ambient air, a cooled building),
+``heat_loss`` lost to the environment, ``heat_supplied`` delivered to a consumer and
+``electricity_generated`` produced. The legacy isothermal pumps do not allocate electricity to
+fluid enthalpy, mechanical work or environmental loss. Report that unresolved energy explicitly;
 never manufacture heat loss to force a first-law residual to zero.
 """
 
@@ -10,17 +14,21 @@ from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservo
 from gemini.core.types.flows import Stream
 
 
+ENERGY_INPUTS = ("electricity", "fuel", "heat_absorbed")
+"""Leaf outputs [W] that bring energy into a leaf from outside its streams."""
+
+ENERGY_OUTPUTS = ("heat_loss", "heat_supplied", "electricity_generated")
+"""Leaf outputs [W] that take energy out of a leaf other than through its streams."""
+
+
 def collect_flows(result_tree):
     """Sum leaf energy outputs once, ignoring composite aggregate outputs [W]."""
     if isinstance(result_tree, dict):
         totals = [collect_flows(child) for child in result_tree.values()]
-        return {key: sum(t[key] for t in totals) for key in ("electricity", "fuel", "heat_loss")}
+        return {key: sum(t[key] for t in totals) for key in ENERGY_INPUTS + ENERGY_OUTPUTS}
     if result_tree.children:
         return collect_flows(result_tree.children)
-    totals = dict(electricity=0.0, fuel=0.0, heat_loss=0.0)
-    for name in totals:
-        totals[name] += result_tree.outputs.get(name, 0.0)
-    return totals
+    return {key: result_tree.outputs.get(key, 0.0) for key in ENERGY_INPUTS + ENERGY_OUTPUTS}
 
 
 def _streams(ports):
@@ -143,8 +151,8 @@ def _leaf_energy(module, result, flows):
         incoming += outgoing
     elif isinstance(module, InjectionReservoir):
         outgoing += incoming
-    incoming += flows["electricity"] + flows["fuel"]
-    outgoing += flows["heat_loss"]
+    incoming += sum(flows[key] for key in ENERGY_INPUTS)
+    outgoing += sum(flows[key] for key in ENERGY_OUTPUTS)
     is_pump = isinstance(module, (ESP, InjectionPump, BoosterPump))
     return {
         "residual": incoming - outgoing,

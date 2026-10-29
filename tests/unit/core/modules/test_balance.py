@@ -2,10 +2,43 @@
 
 import pytest
 
+from gemini.core.modules import Module
 from gemini.core.modules.balance import collect_flows, energy_balance, mass_balance
 from gemini.core.modules.heat import Boiler
 from gemini.core.modules.pumps import ESP, InjectionPump
-from gemini.core.types import Stream
+from gemini.core.types import Inlet, Outlet, Output, Power, Stream
+
+
+class Radiator(Module):
+    """Deliver a fixed share of the stream's heat to a consumer and lose a little."""
+
+    def __init__(self):
+        """Declare the ports and the energy outputs."""
+        super().__init__()
+
+        # Inlets
+        self.supply_in = Inlet(Stream)
+
+        # Outputs
+        self.heat_supplied = Output(Power)
+        self.heat_loss = Output(Power)
+
+        # Outlets
+        self.return_out = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Cool the stream by 10 K."""
+
+        # Outlets
+        return_out = inlets.supply_in.with_(T=inlets.supply_in.T - 10)
+
+        outlets = dict(return_out=return_out)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        released = inlets.supply_in.m_dot * 4217.4 * 10
+        self.heat_supplied = 0.9 * released
+        self.heat_loss = 0.1 * released
 
 
 @pytest.mark.parametrize("fuel", ["electric", "gas"])
@@ -40,3 +73,12 @@ def test_esp_motor_efficiency_does_not_change_shaft_power():
     second = pump(frequency=60, suction=inlet)
     assert second.outputs.power == first.outputs.power
     assert second.outputs.electricity == 2 * first.outputs.power
+
+
+def test_heat_supplied_to_a_consumer_closes_the_balance():
+    """Heat delivered across the plant boundary is an energy outflow, not a residual."""
+    radiator = Radiator()
+    result = radiator(supply_in=Stream(m_dot=2, T=350, p=1e6))
+    balance = energy_balance(radiator, result)
+    assert balance["heat_supplied"] == pytest.approx(0.9 * 2 * 4217.4 * 10)
+    assert balance["relative_residual"] < 1e-12
