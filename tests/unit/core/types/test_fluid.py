@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from gemini.core.physics.fluid import FluidProperties
 from gemini.core.types.flows import Stream
-from gemini.core.types.fluid import BRINE, GLYCOL_30, WATER, Fluid
+from gemini.core.types.fluid import BRINE, GLYCOL_30, STEAM, WATER, Fluid
 
 
 def test_fluid_properties_and_identity():
@@ -30,6 +30,15 @@ def test_fluid_properties_and_identity():
         Fluid(salinity=0.9, co2_mass_fraction=0.2)
     with pytest.raises(ValidationError):
         Stream(m_dot=1, T=300, p=1e5, fluid="brine")
+
+
+def test_steam_kind_labels_vapour_without_changing_other_fluids():
+    """``steam`` is a distinct, serialisable label; it keeps the default constant snapshot."""
+    assert STEAM == Fluid(kind="steam") and STEAM not in (BRINE, WATER)
+    assert STEAM.properties(6e5, 432) == FluidProperties()
+    stream = Stream(m_dot=20, T=432, p=6e5, fluid=STEAM)
+    assert Stream.model_validate_json(stream.model_dump_json()).fluid.kind == "steam"
+    assert BRINE.kind == "brine" and WATER.kind == "water"
 
 
 def test_corrosion_composition_conversion():

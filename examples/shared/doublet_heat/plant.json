@@ -1019,7 +1019,8 @@
       "params": {
         "p_out": null,
         "dp": 14900.0,
-        "heat_transfer_coeff": 100000.0
+        "heat_transfer_coeff": 100000.0,
+        "separation_efficiency": 0.0
       },
       "fluid": {
         "kind": "brine",
@@ -1039,7 +1040,8 @@
           "params": {
             "p_out": null,
             "dp": 14900.0,
-            "heat_transfer_coeff": 100000.0
+            "heat_transfer_coeff": 100000.0,
+            "separation_efficiency": 0.0
           }
         }
       ],

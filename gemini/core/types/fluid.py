@@ -25,10 +25,15 @@ class Fluid(BaseModel):
     Salinity, CO2 and free gas are mass fractions. Glycol is a volume fraction,
     matching the cited manufacturer table. Constant STP does not infer brine
     density or viscosity from salt concentration; supply measured overrides.
+
+    ``steam`` marks water vapour, such as the gas outlet of a flash ``Separator``. Its
+    constant property snapshot is the liquid-water default and does not describe vapour:
+    steam equipment takes enthalpy and entropy from ``gemini.core.physics.steam`` instead, so
+    do not convert a steam stream's volume flow or audit its latent heat with ``cp_l * T``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-    kind: Literal["brine", "water", "glycol_water"] = "brine"
+    kind: Literal["brine", "water", "glycol_water", "steam"] = "brine"
     salinity: Fraction = 0.0
     co2_mass_fraction: Fraction = 0.0
     gas_mass_fraction: Fraction = Field(0, lt=1)
@@ -103,3 +108,4 @@ def _properties(fluid: Fluid) -> FluidProperties:
 BRINE = Fluid()
 WATER = Fluid(kind="water")
 GLYCOL_30 = Fluid(kind="glycol_water", glycol_fraction=0.3)
+STEAM = Fluid(kind="steam")

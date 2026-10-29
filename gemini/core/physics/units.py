@@ -256,6 +256,8 @@ _UNITS = {
     "currency/year": ("currency/year", 1, 0),
     "currency/J": ("currency/J", 1, 0),
     "currency/kWh": ("currency/J", 1 / 3.6e6, 0),
+    "currency/s": ("currency/s", 1, 0),
+    "currency/h": ("currency/s", 1 / 3600, 0),
     "m": ("m", 1, 0),
     "ft": ("m", 0.3048, 0),
     "s": ("s", 1, 0),
@@ -264,6 +266,8 @@ _UNITS = {
     "m3": ("m3", 1, 0),
     "rad": ("rad", 1, 0),
     "kg/m3": ("kg/m3", 1, 0),
+    "g/m3": ("kg/m3", 1e-3, 0),
+    "mg/l": ("kg/m3", 1e-3, 0),
     "Pa.s": ("Pa.s", 1, 0),
     "J/kg/K": ("J/kg/K", 1, 0),
     "J/kg": ("J/kg", 1, 0),
@@ -283,6 +287,7 @@ _UNITS = {
     "W/K": ("W/K", 1, 0),
     "m3/s/Pa": ("m3/s/Pa", 1, 0),
     "-": ("-", 1, 0),
+    "ppm": ("-", 1e-6, 0),
 }
 
 _NUMBER_AND_UNIT = re.compile(r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+(.+?)\s*")

@@ -66,6 +66,7 @@ def test_convert_identity_for_every_declared_unit():
     """Every unit a quantity alias declares converts to itself."""
     for unit in ("W/K", "Hz", "kg/m3", "Pa.s", "m2", "m/s", "currency", "currency/year"):
         assert units.convert(5.0, unit, unit) == 5.0
+    assert units.convert(36.0, "currency/h", "currency/s") == pytest.approx(0.01)
     assert units.convert(5.0, "stages", "stages") == 5.0
 
 

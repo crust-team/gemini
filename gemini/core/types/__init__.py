@@ -15,7 +15,7 @@ from .declarations import (
     State,
 )
 from .flows import Stream
-from .fluid import BRINE, GLYCOL_30, WATER, Fluid
+from .fluid import BRINE, GLYCOL_30, STEAM, WATER, Fluid
 from .ports import Ports
 from .profile import Profile
 from .quantities import (
@@ -38,9 +38,11 @@ from .quantities import (
     Length,
     LinearPower,
     Mass,
+    MassConcentration,
     MassFlow,
     Money,
     MoneyPerEnergy,
+    MoneyRate,
     Permeability,
     Power,
     Pressure,
@@ -95,6 +97,7 @@ __all__ = [
     "Money",
     "AnnualMoney",
     "MoneyPerEnergy",
+    "MoneyRate",
     "Count",
     "Speed",
     "Mass",
@@ -104,6 +107,7 @@ __all__ = [
     "ThermalDiffusivity",
     "LinearPower",
     "FlowCoefficient",
+    "MassConcentration",
     "quantity",
 ] + [
     "Binding",
@@ -123,6 +127,7 @@ __all__ = [
     "Stream",
     "BRINE",
     "GLYCOL_30",
+    "STEAM",
     "WATER",
     "Fluid",
     "Profile",

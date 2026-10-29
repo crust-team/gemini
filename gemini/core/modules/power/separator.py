@@ -1,0 +1,103 @@
+"""Two-phase flash separator splitting geofluid into saturated steam and brine."""
+
+from gemini.core.modules.module import Module
+from gemini.core.physics import steam
+from gemini.core.types import (
+    STEAM,
+    Control,
+    Fraction,
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Pressure,
+    Stream,
+    Temperature,
+)
+from gemini.errors import PhysicsRangeError
+
+
+class Separator(Module):
+    """Flash separator: pressurised geofluid flashes to the separator pressure and splits.
+
+    The inlet liquid enthalpy is the IAPWS-IF97 region 1 enthalpy at the inlet temperature,
+    evaluated at the inlet pressure or, when that is below the saturation pressure of the
+    inlet temperature, at that saturation pressure. The inlet temperature is therefore that of
+    the liquid before it flashes, for example the reservoir temperature: adiabatic well flow
+    and throttling are isenthalpic. Flashing to ``pressure_setpoint`` gives the steam fraction
+    x = (h_in - h_f) / h_fg (DiPippo 2016, Geothermal Power Plants, 4th ed., section 5.2).
+    ``gas`` leaves as dry saturated steam (``Fluid`` kind ``steam``) and ``liquid`` as saturated
+    brine, both at the setpoint pressure and saturation temperature; a subcooled inlet
+    (h_in <= h_f) does not flash and the liquid keeps the inlet temperature.
+
+    Assumptions: pure-water properties (salts and non-condensable gases are ignored), perfect
+    phase separation (no carry-over), adiabatic vessel without pressure loss. The liquid keeps
+    the inlet fluid composition unchanged: salt concentration by flashing and the
+    partitioning of dissolved gas are not modelled. Valid for inlet temperatures of 273.15 K
+    to 623.15 K and setpoints of 611.213 Pa to 16.529 MPa.
+
+    NOTE(refactor): the energy audit of ``energy_balance`` uses sensible enthalpy
+    ``m_dot * cp_l * T`` and cannot represent the latent heat carried by the steam, so its
+    residual is not meaningful for this module. The model is closed in IF97 enthalpies:
+    m_in h_in = m_gas h_g + m_liquid h_f, which the unit tests check.
+    """
+
+    def __init__(self):
+        """Declare the separator inlet, pressure control, outputs and phase outlets."""
+        super().__init__()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.pressure_setpoint = Control(Pressure, gt=0)
+
+        # Outputs
+        self.steam_fraction = Output(Fraction)
+        self.steam_mass_flow = Output(MassFlow)
+        self.saturation_temperature = Output(Temperature)
+
+        # Outlets
+        self.liquid = Outlet(Stream)
+        self.gas = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Flash the inlet to the setpoint pressure and split it into brine and steam."""
+
+        # Outlets
+        inlet = inlets.inlet
+        fraction, saturation = self._flash(inlet)
+        steam_flow = fraction * inlet.m_dot
+        liquid_T = saturation.temperature if fraction > 0 else inlet.T
+
+        liquid = inlet.with_(m_dot=inlet.m_dot - steam_flow, T=liquid_T, p=self.pressure_setpoint)
+        gas = inlet.with_(
+            m_dot=steam_flow, T=saturation.temperature, p=self.pressure_setpoint, fluid=STEAM
+        )
+
+        outlets = dict(liquid=liquid, gas=gas)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        fraction, saturation = self._flash(inlets.inlet)
+        self.steam_fraction = fraction
+        self.steam_mass_flow = outlets.gas.m_dot
+        self.saturation_temperature = saturation.temperature
+
+    def _flash(self, inlet):
+        """Return the steam fraction [-] and the saturation state at the setpoint pressure."""
+        if inlet.m_dot < 0:
+            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        if inlet.fluid.kind == "steam":
+            raise PhysicsRangeError(
+                f"{self.path}: inlet.fluid.kind = 'steam'; expected a liquid geofluid"
+            )
+        if self.pressure_setpoint > inlet.p:
+            raise PhysicsRangeError(
+                f"{self.path}: pressure_setpoint = {self.pressure_setpoint} Pa; expected at most "
+                f"the inlet pressure {inlet.p} Pa"
+            )
+        liquid_pressure = max(inlet.p, steam.saturation_pressure(inlet.T))
+        enthalpy = steam.liquid_enthalpy(liquid_pressure, inlet.T)
+        fraction = steam.flash_fraction(enthalpy, self.pressure_setpoint)
+        return fraction, steam.saturation_properties(self.pressure_setpoint)

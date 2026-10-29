@@ -1,0 +1,143 @@
+"""IAPWS-IF97 saturation, region 1 and region 2 properties and wet steam expansion."""
+
+import pytest
+
+from gemini.core.physics import steam
+from gemini.errors import PhysicsRangeError
+
+IF97 = 1e-8
+"""Relative tolerance for the nine-digit IAPWS-IF97 verification values."""
+
+
+@pytest.mark.parametrize(
+    ("temperature", "pressure"),
+    [(300, 0.353658941e-2), (500, 0.263889776e1), (600, 0.123443146e2)],
+)
+def test_saturation_pressure_verification_values(temperature, pressure):
+    """IF97 table 35: saturation pressure [MPa] at 300 K, 500 K and 600 K."""
+    assert steam.saturation_pressure(temperature) == pytest.approx(pressure * 1e6, rel=IF97)
+
+
+@pytest.mark.parametrize(
+    ("pressure", "temperature"),
+    [(0.1, 0.372755919e3), (1, 0.453035632e3), (10, 0.584149488e3)],
+)
+def test_saturation_temperature_verification_values(pressure, temperature):
+    """IF97 table 36: saturation temperature [K]; eqs. 30 and 31 invert each other."""
+    assert steam.saturation_temperature(pressure * 1e6) == pytest.approx(temperature, rel=IF97)
+    round_trip = steam.saturation_pressure(steam.saturation_temperature(pressure * 1e6))
+    assert round_trip == pytest.approx(pressure * 1e6, rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    ("temperature", "pressure", "enthalpy", "entropy"),
+    [
+        (300, 3, 0.115331273e3, 0.392294792),
+        (300, 80, 0.184142828e3, 0.368563852),
+        (500, 3, 0.975542239e3, 0.258041912e1),
+    ],
+)
+def test_region_1_verification_values(temperature, pressure, enthalpy, entropy):
+    """IF97 table 5: liquid enthalpy [kJ/kg] and entropy [kJ/kg/K]."""
+    p = pressure * 1e6
+    assert steam.liquid_enthalpy(p, temperature) == pytest.approx(enthalpy * 1e3, rel=IF97)
+    assert steam.liquid_entropy(p, temperature) == pytest.approx(entropy * 1e3, rel=IF97)
+
+
+@pytest.mark.parametrize(
+    ("temperature", "pressure", "enthalpy", "entropy"),
+    [
+        (300, 0.0035, 0.254991145e4, 0.852238967e1),
+        (700, 0.0035, 0.333568375e4, 0.101749996e2),
+        (700, 30, 0.263149474e4, 0.517540298e1),
+    ],
+)
+def test_region_2_verification_values(temperature, pressure, enthalpy, entropy):
+    """IF97 table 15: vapour enthalpy [kJ/kg] and entropy [kJ/kg/K]."""
+    p = pressure * 1e6
+    assert steam.vapour_enthalpy(p, temperature) == pytest.approx(enthalpy * 1e3, rel=IF97)
+    assert steam.vapour_entropy(p, temperature) == pytest.approx(entropy * 1e3, rel=IF97)
+
+
+def test_b23_boundary_and_saturation_table():
+    """The B23 boundary meets the saturation line at 623.15 K; saturated states match tables.
+
+    The saturated values at 0.1 MPa and 1 MPa are those of the IAPWS-IF97 steam tables
+    (Wagner and Kretzschmar 2008, International Steam Tables, table 2) to five digits.
+    """
+    assert steam.b23_pressure(623.15) == pytest.approx(0.165291643e8, rel=IF97)
+    at_one_bar = steam.saturation_properties(1e5)
+    assert at_one_bar.temperature == pytest.approx(372.756, abs=1e-3)
+    assert at_one_bar.liquid_enthalpy == pytest.approx(417.44e3, rel=1e-5)
+    assert at_one_bar.vapour_enthalpy == pytest.approx(2674.95e3, rel=1e-5)
+    assert at_one_bar.evaporation_enthalpy == pytest.approx(2257.51e3, rel=1e-5)
+    assert at_one_bar.liquid_entropy == pytest.approx(1.30256e3, rel=1e-5)
+    at_ten_bar = steam.saturation_properties(1e6)
+    assert at_ten_bar.vapour_enthalpy == pytest.approx(2777.12e3, rel=1e-5)
+    assert at_ten_bar.evaporation_entropy == pytest.approx(6.58498e3 - 2.13843e3, rel=1e-5)
+
+
+def test_domain_limits_raise():
+    """States outside regions 1, 2 and 4 raise instead of extrapolating."""
+    calls = [
+        lambda: steam.saturation_pressure(650),
+        lambda: steam.saturation_temperature(500),
+        lambda: steam.saturation_properties(17e6),
+        lambda: steam.liquid_enthalpy(1e5, 400),
+        lambda: steam.liquid_entropy(1e6, 630),
+        lambda: steam.vapour_enthalpy(1e6, 400),
+        lambda: steam.vapour_entropy(0, 400),
+        lambda: steam.vapour_enthalpy(40e6, 700),
+        lambda: steam.b23_pressure(900),
+    ]
+    for call in calls:
+        with pytest.raises(PhysicsRangeError):
+            call()
+    with pytest.raises(PhysicsRangeError, match="saturation_pressure: temperature = nan"):
+        steam.saturation_pressure(float("nan"))
+
+
+def test_saturated_states_lie_inside_both_regions():
+    """Liquid and vapour exactly at saturation are accepted by the region checks."""
+    for pressure in (0.01e6, 0.6e6, 16e6):
+        temperature = steam.saturation_temperature(pressure)
+        saturation = steam.saturation_properties(pressure)
+        assert steam.liquid_enthalpy(pressure, temperature) == saturation.liquid_enthalpy
+        assert steam.vapour_entropy(pressure, temperature) == saturation.vapour_entropy
+
+
+def test_flash_fraction():
+    """Flash fraction (h - h_f) / h_fg; subcooled liquid gives zero, vapour is rejected."""
+    saturation = steam.saturation_properties(6e5)
+    half = saturation.liquid_enthalpy + 0.5 * saturation.evaporation_enthalpy
+    assert steam.flash_fraction(half, 6e5) == pytest.approx(0.5, rel=1e-12)
+    assert steam.flash_fraction(saturation.liquid_enthalpy - 1e3, 6e5) == 0
+    with pytest.raises(PhysicsRangeError, match="saturated vapour"):
+        steam.flash_fraction(saturation.vapour_enthalpy, 6e5)
+
+
+def test_baumann_expansion_matches_dipippo_closed_form():
+    """With a = 1 the exhaust enthalpy is DiPippo's eq. 5.13 with A = eta_d dh_s / 2."""
+    expansion = steam.baumann_expansion(6e5, 1e4, 0.85, 1)
+    inlet, outlet = steam.saturation_properties(6e5), steam.saturation_properties(1e4)
+    quality = (inlet.vapour_entropy - outlet.liquid_entropy) / outlet.evaporation_entropy
+    h_s = outlet.liquid_enthalpy + quality * outlet.evaporation_enthalpy
+    a = 0.425 * (inlet.vapour_enthalpy - h_s)
+    h_out = (
+        inlet.vapour_enthalpy - a * (1 - outlet.liquid_enthalpy / outlet.evaporation_enthalpy)
+    ) / (1 + a / outlet.evaporation_enthalpy)
+    assert expansion.isentropic_outlet_enthalpy == pytest.approx(h_s, rel=1e-12)
+    assert expansion.outlet_enthalpy == pytest.approx(h_out, rel=1e-12)
+    assert expansion.outlet_quality == pytest.approx(0.8678, abs=1e-4)
+    assert expansion.efficiency == pytest.approx(0.85 * (1 + expansion.outlet_quality) / 2)
+
+
+def test_baumann_expansion_limits():
+    """No moisture penalty at a = 0; reversed pressures, bad inputs and a dry exhaust raise."""
+    dry = steam.baumann_expansion(6e5, 1e4, 0.85, 0)
+    assert dry.efficiency == pytest.approx(0.85, rel=1e-12)
+    for args in ((1e4, 6e5, 0.85, 1), (6e5, 1e4, 0, 1), (6e5, 1e4, 0.85, -1)):
+        with pytest.raises(PhysicsRangeError):
+            steam.baumann_expansion(*args)
+    with pytest.raises(PhysicsRangeError, match="wet exhaust"):
+        steam.baumann_expansion(6e5, 4e5, 0.2, 1)

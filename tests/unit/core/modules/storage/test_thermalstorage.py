@@ -1,0 +1,187 @@
+"""Fully mixed storage tank: duties, exact lumped solution, balances and limits."""
+
+import math
+
+import pytest
+
+import gemini as gm
+from gemini.core.modules import Boiler, Module, energy_balance, mass_balance
+from gemini.core.modules.storage import ThermalStorage
+from gemini.core.types import Inlet, Outlet, Output, Stream
+
+CP = 4217.4
+"""Default fluid heat capacity [J/kg/K]."""
+
+CAPACITY = 1000 * CP * 2.0
+"""Heat capacity [J/K] of the 2 m3 test tank of default fluid (1000 kg/m3)."""
+
+CHARGE = Stream(m_dot=1.0, T=353.15, p=3e5)
+DISCHARGE = Stream(m_dot=0.5, T=313.15, p=3e5)
+
+
+def _tank(service="hot", **changes):
+    """Return a configured 2 m3 tank with UA = 10 W/K."""
+    params = dict(
+        service=service, volume=2.0, heat_loss_coefficient=10.0, reference_temperature=313.15
+    )
+    return ThermalStorage().update_params(**(params | changes))
+
+
+def _inlets(charge=CHARGE, discharge=DISCHARGE):
+    return {"charge_in": charge, "discharge_in": discharge}
+
+
+def test_plain_call_uses_the_initial_temperature():
+    """Outside a step the tank is at its initial 20 degC and direct circuits leave at it."""
+    result = _tank()(charge_in=CHARGE, discharge_in=DISCHARGE, ambient_temperature=293.15)
+    assert result.outlets.charge_out.T == result.outlets.discharge_out.T == 293.15
+    assert result.outputs.tank_temperature == 293.15
+    assert result.outputs.heat_loss == 0 and result.outputs.heat_absorbed == 0
+    assert result.outlets.charge_out.m_dot == CHARGE.m_dot
+    assert result.outlets.charge_out.p == CHARGE.p
+
+
+def test_hot_tank_step_matches_the_exact_solution_and_audits():
+    """A hot tank step reports start-of-step duties and advances with exp(-b dt / C)."""
+    tank = _tank()
+    tank.ambient_temperature = 293.15
+    state, result = tank.step({"temperature": 343.15}, 600, _inlets())
+    out = result.outputs
+    assert result.outlets.charge_out.T == result.outlets.discharge_out.T == 343.15
+    assert out.charge_duty == pytest.approx(1.0 * CP * 10)
+    assert out.discharge_duty == pytest.approx(0.5 * CP * 30)
+    assert out.heat_loss == pytest.approx(10 * 50) and out.heat_absorbed == 0
+    assert out.stored_energy == pytest.approx(CAPACITY * 30)
+    assert out.heat_accumulation == pytest.approx(CP * 10 - 0.5 * CP * 30 - 500)
+    b = 1.0 * CP + 0.5 * CP + 10
+    equilibrium = (1.0 * CP * 353.15 + 0.5 * CP * 313.15 + 10 * 293.15) / b
+    expected = equilibrium + (343.15 - equilibrium) * math.exp(-b * 600 / CAPACITY)
+    assert state["temperature"] == pytest.approx(expected, rel=1e-14)
+    audit = energy_balance(tank, result)
+    assert abs(audit["residual"] - out.heat_accumulation) / max(audit["in"], 1) < 1e-12
+    assert mass_balance(tank, result)["residual"] == 0
+    state, result = tank.step(state, 600, _inlets())
+    assert result.outputs.tank_temperature == pytest.approx(expected, rel=1e-14)
+
+
+def test_exact_solution_composes_and_reaches_equilibrium():
+    """Two half steps equal one full step, and a very long step reaches the equilibrium."""
+    tank = _tank()
+    tank.ambient_temperature = 293.15
+    half, _ = tank.step({"temperature": 300.0}, 900, _inlets())
+    half, _ = tank.step(half, 900, _inlets())
+    full, _ = tank.step({"temperature": 300.0}, 1800, _inlets())
+    assert half["temperature"] == pytest.approx(full["temperature"], rel=1e-13)
+    final, _ = tank.step({"temperature": 300.0}, 1e8, _inlets())
+    b = 1.5 * CP + 10
+    equilibrium = (1.0 * CP * 353.15 + 0.5 * CP * 313.15 + 10 * 293.15) / b
+    assert final["temperature"] == pytest.approx(equilibrium, rel=1e-14)
+
+
+def test_heat_exchanger_effectiveness_sets_the_circuit_outlets():
+    """An indirect circuit leaves at T_in - e (T_in - T) and transfers e m cp (T_in - T)."""
+    tank = _tank(charge_effectiveness=0.6, discharge_effectiveness=0.8)
+    result = tank(charge_in=CHARGE, discharge_in=DISCHARGE, ambient_temperature=293.15)
+    assert result.outlets.charge_out.T == pytest.approx(353.15 - 0.6 * 60)
+    assert result.outlets.discharge_out.T == pytest.approx(313.15 - 0.8 * 20)
+    assert result.outputs.charge_duty == pytest.approx(0.6 * CP * 60)
+    audit = energy_balance(tank, result)
+    assert abs(audit["residual"] - result.outputs.heat_accumulation) / audit["in"] < 1e-12
+
+
+def test_chilled_tank_in_a_warm_room_absorbs_heat():
+    """A chilled tank reports stored cold, positive service duties and heat_absorbed."""
+    tank = _tank("chilled", reference_temperature=285.15)
+    tank.ambient_temperature = 298.15
+    charge = Stream(m_dot=2.0, T=277.15, p=3e5)
+    discharge = Stream(m_dot=1.0, T=285.15, p=3e5)
+    state, result = tank.step({"temperature": 279.15}, 300, _inlets(charge, discharge))
+    out = result.outputs
+    assert out.stored_energy == pytest.approx(CAPACITY * 6)
+    assert out.charge_duty == pytest.approx(2.0 * CP * 2)
+    assert out.discharge_duty == pytest.approx(1.0 * CP * 6)
+    assert out.heat_loss == 0 and out.heat_absorbed == pytest.approx(10 * 19)
+    assert out.heat_accumulation == pytest.approx(-2.0 * CP * 2 + 1.0 * CP * 6 + 190)
+    audit = energy_balance(tank, result)
+    assert abs(audit["residual"] - out.heat_accumulation) / audit["in"] < 1e-12
+    assert state["temperature"] > 279.15
+
+
+def test_stopped_circuits_leave_only_ambient_cooling():
+    """Zero flows keep inlet temperatures and the tank cools by Newton's law exactly."""
+    tank = _tank()
+    tank.ambient_temperature = 293.15
+    stopped = _inlets(CHARGE.with_(m_dot=0), DISCHARGE.with_(m_dot=0))
+    state, result = tank.step({"temperature": 353.15}, 3600, stopped)
+    assert result.outlets.charge_out.T == CHARGE.T
+    assert result.outputs.charge_duty == 0 and result.outputs.discharge_duty == 0
+    expected = 293.15 + 60 * math.exp(-10 * 3600 / CAPACITY)
+    assert state["temperature"] == pytest.approx(expected, rel=1e-14)
+    insulated = _tank(heat_loss_coefficient=0)
+    insulated.ambient_temperature = 293.15
+    assert insulated.step({"temperature": 353.15}, 3600, stopped)[0] == {"temperature": 353.15}
+
+
+def test_invalid_inputs_raise():
+    """Reverse flow is outside the model; a missing ambient temperature is a missing value."""
+    tank = _tank()
+    with pytest.raises(gm.errors.PhysicsRangeError, match="thermal_storage: circuit m_dot = -1"):
+        tank(charge_in=CHARGE.with_(m_dot=-1), discharge_in=DISCHARGE, ambient_temperature=290)
+    with pytest.raises(gm.errors.MissingValueError):
+        tank(charge_in=CHARGE, discharge_in=DISCHARGE)
+    with pytest.raises(gm.errors.DeclarationError):
+        tank.update_params(charge_effectiveness=1.2)
+
+
+class BoilerCharging(Module):
+    """Boiler heating the charge circuit of a storage tank."""
+
+    def __init__(self):
+        """Declare the test composite."""
+        super().__init__()
+
+        # Modules
+        self.boiler = Boiler().update_params(fuel_type="gas", capacity=2e5, efficiency=0.9)
+        self.storage = _tank()
+
+        # Inlets
+        self.charge_in = Inlet(Stream)
+        self.discharge_in = Inlet(Stream)
+
+        # Outputs
+        self.fuel = Output.total("fuel")
+
+        # Outlets
+        self.charge_out = Outlet(Stream)
+        self.discharge_out = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Heat the charge water, then pass both circuits through the tank."""
+
+        # Modules
+        heated = self.boiler(inlet=inlets.charge_in)
+        stored = self.storage(charge_in=heated.outlets.outlet, discharge_in=inlets.discharge_in)
+
+        # Outlets
+        charge_out = stored.outlets.charge_out
+        discharge_out = stored.outlets.discharge_out
+
+        outlets = dict(charge_out=charge_out, discharge_out=discharge_out)
+        return outlets
+
+
+def test_composite_step_charges_the_tank():
+    """A composite steps the tank through its forward; the audit residual is the accumulation."""
+    plant = BoilerCharging()
+    plant.boiler.temperature_setpoint = 363.15
+    plant.storage.ambient_temperature = 293.15
+    assert plant.initial_state() == {"storage": {"temperature": 293.15}}
+    cold = Stream(m_dot=0.5, T=313.15, p=3e5)
+    state, _ = plant.step(None, 900, {"charge_in": cold, "discharge_in": DISCHARGE})
+    state, result = plant.step(state, 900, {"charge_in": cold, "discharge_in": DISCHARGE})
+    storage = result.children["storage"].outputs
+    assert state["storage"]["temperature"] > storage.tank_temperature > 293.15
+    assert result.outputs.fuel > 0
+    audit = energy_balance(plant, result)
+    assert abs(audit["residual"] - storage.heat_accumulation) / audit["in"] < 1e-12
+    assert mass_balance(plant, result)["residual"] == 0

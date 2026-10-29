@@ -36,6 +36,8 @@ TYPE_RENAMES = {
     "injectionwell": "injection_well",
     "productionwell": "production_well",
 }
+NEW_PARAMS = {"degasser": {"separation_efficiency": 0.0}}
+"""Parameters added after phase 0, at the defaults that reproduce the phase-0 behaviour."""
 
 
 def _baseline_frame(directory, name):
@@ -105,7 +107,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
         old_params.pop("coefficient_precision", None)
         if "path" in old_params:
             old_params["pipe_path"] = old_params.pop("path")
-        assert old_params == new["params"]
+        assert old_params | NEW_PARAMS.get(old_path, {}) == new["params"]
         assert old["fluid"] == new["fluid"]
 
     started = perf_counter()

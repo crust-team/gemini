@@ -1,0 +1,464 @@
+"""Saturated water and steam properties from IAPWS-IF97 and wet steam expansion.
+
+Every function takes and returns SI values: pressure [Pa], temperature [K], specific enthalpy
+[J/kg] and specific entropy [J/kg/K]. The equations are the exact IAPWS-IF97 equations, not
+fits to them, so they reproduce the IF97 verification values to their nine printed digits:
+
+- region 4 saturation pressure (IF97 eq. 30) and saturation temperature (eq. 31);
+- region 1 compressed liquid basic equation (eq. 7, table 2) for enthalpy and entropy;
+- region 2 vapour basic equation (eqs. 15 to 17, tables 10 and 11) for enthalpy and entropy,
+  with the B23 boundary equation (eq. 5) that limits region 2 above 623.15 K.
+
+Reference: IAPWS (2007), Revised Release on the IAPWS Industrial Formulation 1997 for the
+Thermodynamic Properties of Water and Steam (IAPWS-R7-97(2012)); Wagner, W. et al. (2000),
+The IAPWS Industrial Formulation 1997, J. Eng. Gas Turbines Power 122, 150-182.
+
+Saturated properties need regions 1 and 2, which border the saturation line only up to
+623.15 K (16.529 MPa); region 3 is not implemented, so saturation states above 623.15 K raise
+``PhysicsRangeError``. Geothermal flash plants operate far below this limit (separators at
+0.2 to 2 MPa, condensers at 5 to 15 kPa). All properties are those of pure water; dissolved
+salts and non-condensable gases are not represented.
+"""
+
+import math
+from dataclasses import dataclass
+
+from gemini.errors import PhysicsRangeError
+
+GAS_CONSTANT = 461.526
+"""IF97 specific gas constant of water R [J/kg/K]."""
+
+CRITICAL_TEMPERATURE = 647.096
+"""Critical temperature [K], the upper end of the saturation line."""
+
+CRITICAL_PRESSURE = 22.064e6
+"""Critical pressure [Pa]."""
+
+MINIMUM_TEMPERATURE = 273.15
+"""Lowest temperature of regions 1, 2 and 4 [K]."""
+
+REGION_1_MAXIMUM_TEMPERATURE = 623.15
+"""Upper temperature of region 1 and of the saturated states this module supports [K]."""
+
+REGION_2_MAXIMUM_TEMPERATURE = 1073.15
+"""Upper temperature of region 2 [K]."""
+
+B23_MAXIMUM_TEMPERATURE = 863.15
+"""Temperature above which region 2 extends to the maximum pressure [K]."""
+
+MAXIMUM_PRESSURE = 100e6
+"""Upper pressure of regions 1 and 2 [Pa]."""
+
+MINIMUM_PRESSURE = 611.213
+"""Saturation pressure at 273.15 K, the lowest IF97 saturation pressure [Pa]."""
+
+MAXIMUM_SATURATION_PRESSURE = 16.529164252605e6
+"""Saturation pressure at 623.15 K [Pa], the upper end of the supported saturation states."""
+
+SATURATION_TOLERANCE = 1e-9
+"""Relative pressure tolerance that keeps states computed on the saturation line in range."""
+
+_REGION_4 = (
+    0.11670521452767e4,
+    -0.72421316703206e6,
+    -0.17073846940092e2,
+    0.12020824702470e5,
+    -0.32325550322333e7,
+    0.14915108613530e2,
+    -0.48232657361591e4,
+    0.40511340542057e6,
+    -0.23855557567849,
+    0.65017534844798e3,
+)
+"""IF97 table 34: coefficients n1 to n10 of the saturation-line equation."""
+
+_B23 = (0.34805185628969e3, -0.11671859879975e1, 0.10192970039326e-2)
+"""IF97 table 1: coefficients n1 to n3 of the B23 boundary pressure [MPa] in T [K]."""
+
+_REGION_1 = (
+    (0, -2, 0.14632971213167),
+    (0, -1, -0.84548187169114),
+    (0, 0, -0.37563603672040e1),
+    (0, 1, 0.33855169168385e1),
+    (0, 2, -0.95791963387872),
+    (0, 3, 0.15772038513228),
+    (0, 4, -0.16616417199501e-1),
+    (0, 5, 0.81214629983568e-3),
+    (1, -9, 0.28319080123804e-3),
+    (1, -7, -0.60706301565874e-3),
+    (1, -1, -0.18990068218419e-1),
+    (1, 0, -0.32529748770505e-1),
+    (1, 1, -0.21841717175414e-1),
+    (1, 3, -0.52838357969930e-4),
+    (2, -3, -0.47184321073267e-3),
+    (2, 0, -0.30001780793026e-3),
+    (2, 1, 0.47661393906987e-4),
+    (2, 3, -0.44141845330846e-5),
+    (2, 17, -0.72694996297594e-15),
+    (3, -4, -0.31679644845054e-4),
+    (3, 0, -0.28270797985312e-5),
+    (3, 6, -0.85205128120103e-9),
+    (4, -5, -0.22425281908000e-5),
+    (4, -2, -0.65171222895601e-6),
+    (4, 10, -0.14341729937924e-12),
+    (5, -8, -0.40516996860117e-6),
+    (8, -11, -0.12734301741641e-8),
+    (8, -6, -0.17424871230634e-9),
+    (21, -29, -0.68762131295531e-18),
+    (23, -31, 0.14478307828521e-19),
+    (29, -38, 0.26335781662795e-22),
+    (30, -39, -0.11947622640071e-22),
+    (31, -40, 0.18228094581404e-23),
+    (32, -41, -0.93537087292458e-25),
+)
+"""IF97 table 2: exponents I, J and coefficients n of the region 1 Gibbs free energy."""
+
+_REGION_2_IDEAL = (
+    (0, -0.96927686500217e1),
+    (1, 0.10086655968018e2),
+    (-5, -0.56087911283020e-2),
+    (-4, 0.71452738081455e-1),
+    (-3, -0.40710498223928),
+    (-2, 0.14240819171444e1),
+    (-1, -0.43839511319450e1),
+    (2, -0.28408632460772),
+    (3, 0.21268463753307e-1),
+)
+"""IF97 table 10: exponents J0 and coefficients n0 of the region 2 ideal-gas part."""
+
+_REGION_2_RESIDUAL = (
+    (1, 0, -0.17731742473213e-2),
+    (1, 1, -0.17834862292358e-1),
+    (1, 2, -0.45996013696365e-1),
+    (1, 3, -0.57581259083432e-1),
+    (1, 6, -0.50325278727930e-1),
+    (2, 1, -0.33032641670203e-4),
+    (2, 2, -0.18948987516315e-3),
+    (2, 4, -0.39392777243355e-2),
+    (2, 7, -0.43797295650573e-1),
+    (2, 36, -0.26674547914087e-4),
+    (3, 0, 0.20481737692309e-7),
+    (3, 1, 0.43870667284435e-6),
+    (3, 3, -0.32277677238570e-4),
+    (3, 6, -0.15033924542148e-2),
+    (3, 35, -0.40668253562649e-1),
+    (4, 1, -0.78847309559367e-9),
+    (4, 2, 0.12790717852285e-7),
+    (4, 3, 0.48225372718507e-6),
+    (5, 7, 0.22922076337661e-5),
+    (6, 3, -0.16714766451061e-10),
+    (6, 16, -0.21171472321355e-2),
+    (6, 35, -0.23895741934104e2),
+    (7, 0, -0.59059564324270e-17),
+    (7, 11, -0.12621808899101e-5),
+    (7, 25, -0.38946842435739e-1),
+    (8, 8, 0.11256211360459e-10),
+    (8, 36, -0.82311340897998e1),
+    (9, 13, 0.19809712802088e-7),
+    (10, 4, 0.10406965210174e-18),
+    (10, 10, -0.10234747095929e-12),
+    (10, 14, -0.10018179379511e-8),
+    (16, 29, -0.80882908646985e-10),
+    (16, 50, 0.10693031879409),
+    (18, 57, -0.33662250574171),
+    (20, 20, 0.89185845355421e-24),
+    (20, 35, 0.30629316876232e-12),
+    (20, 48, -0.42002467698208e-5),
+    (21, 21, -0.59056029685639e-25),
+    (22, 53, 0.37826947613457e-5),
+    (23, 39, -0.12768608934681e-14),
+    (24, 26, 0.73087610595061e-28),
+    (24, 40, 0.55414715350778e-16),
+    (24, 58, -0.94369707241210e-6),
+)
+"""IF97 table 11: exponents I, J and coefficients n of the region 2 residual part."""
+
+
+@dataclass(frozen=True)
+class SaturationProperties:
+    """Saturated liquid and vapour state at one pressure (SI units)."""
+
+    pressure: float
+    temperature: float
+    liquid_enthalpy: float
+    vapour_enthalpy: float
+    liquid_entropy: float
+    vapour_entropy: float
+
+    @property
+    def evaporation_enthalpy(self) -> float:
+        """Return the latent heat h_g - h_f [J/kg]."""
+        return self.vapour_enthalpy - self.liquid_enthalpy
+
+    @property
+    def evaporation_entropy(self) -> float:
+        """Return s_g - s_f [J/kg/K]."""
+        return self.vapour_entropy - self.liquid_entropy
+
+
+@dataclass(frozen=True)
+class Expansion:
+    """Steam turbine expansion from dry saturated steam (SI units)."""
+
+    inlet_enthalpy: float
+    isentropic_outlet_enthalpy: float
+    outlet_enthalpy: float
+    outlet_quality: float
+    efficiency: float
+
+
+def saturation_pressure(temperature: float) -> float:
+    """Return the saturation pressure [Pa] of water at a temperature [K].
+
+    Notes
+    -----
+    IAPWS-IF97 eq. 30 with theta = T + n9 / (T - n10), A = theta^2 + n1 theta + n2,
+    B = n3 theta^2 + n4 theta + n5, C = n6 theta^2 + n7 theta + n8 and
+    p / 1 MPa = (2C / (-B + sqrt(B^2 - 4AC)))^4. Valid for 273.15 K <= T <= 647.096 K.
+    """
+    _check_range(
+        "saturation_pressure",
+        "temperature",
+        temperature,
+        "K",
+        MINIMUM_TEMPERATURE,
+        CRITICAL_TEMPERATURE,
+    )
+    n = _REGION_4
+    theta = temperature + n[8] / (temperature - n[9])
+    a = theta**2 + n[0] * theta + n[1]
+    b = n[2] * theta**2 + n[3] * theta + n[4]
+    c = n[5] * theta**2 + n[6] * theta + n[7]
+    return (2 * c / (-b + math.sqrt(b**2 - 4 * a * c))) ** 4 * 1e6
+
+
+def saturation_temperature(pressure: float) -> float:
+    """Return the saturation temperature [K] of water at a pressure [Pa].
+
+    Notes
+    -----
+    IAPWS-IF97 eq. 31 with beta = (p / 1 MPa)^0.25, E = beta^2 + n3 beta + n6,
+    F = n1 beta^2 + n4 beta + n7, G = n2 beta^2 + n5 beta + n8, D = 2G / (-F - sqrt(F^2 - 4EG))
+    and T = (n10 + D - sqrt((n10 + D)^2 - 4 (n9 + n10 D))) / 2. Valid for
+    611.213 Pa <= p <= 22.064 MPa, the saturation pressures of 273.15 K and the critical point.
+    """
+    _check_range(
+        "saturation_temperature", "pressure", pressure, "Pa", MINIMUM_PRESSURE, CRITICAL_PRESSURE
+    )
+    n = _REGION_4
+    beta = (pressure / 1e6) ** 0.25
+    e = beta**2 + n[2] * beta + n[5]
+    f = n[0] * beta**2 + n[3] * beta + n[6]
+    g = n[1] * beta**2 + n[4] * beta + n[7]
+    d = 2 * g / (-f - math.sqrt(f**2 - 4 * e * g))
+    return (n[9] + d - math.sqrt((n[9] + d) ** 2 - 4 * (n[8] + n[9] * d))) / 2
+
+
+def liquid_enthalpy(pressure: float, temperature: float) -> float:
+    """Return the specific enthalpy [J/kg] of liquid water in IF97 region 1.
+
+    Valid for 273.15 K <= T <= 623.15 K and saturation pressure <= p <= 100 MPa.
+    """
+    _check_liquid("liquid_enthalpy", pressure, temperature)
+    return _region_1(pressure, temperature)[0]
+
+
+def liquid_entropy(pressure: float, temperature: float) -> float:
+    """Return the specific entropy [J/kg/K] of liquid water in IF97 region 1.
+
+    Valid for 273.15 K <= T <= 623.15 K and saturation pressure <= p <= 100 MPa.
+    """
+    _check_liquid("liquid_entropy", pressure, temperature)
+    return _region_1(pressure, temperature)[1]
+
+
+def vapour_enthalpy(pressure: float, temperature: float) -> float:
+    """Return the specific enthalpy [J/kg] of steam in IF97 region 2.
+
+    Valid for 0 < p <= saturation pressure at 273.15 K <= T <= 623.15 K, 0 < p <= B23 pressure
+    up to 863.15 K and 0 < p <= 100 MPa up to 1073.15 K.
+    """
+    _check_vapour("vapour_enthalpy", pressure, temperature)
+    return _region_2(pressure, temperature)[0]
+
+
+def vapour_entropy(pressure: float, temperature: float) -> float:
+    """Return the specific entropy [J/kg/K] of steam in IF97 region 2.
+
+    Valid for 0 < p <= saturation pressure at 273.15 K <= T <= 623.15 K, 0 < p <= B23 pressure
+    up to 863.15 K and 0 < p <= 100 MPa up to 1073.15 K.
+    """
+    _check_vapour("vapour_entropy", pressure, temperature)
+    return _region_2(pressure, temperature)[1]
+
+
+def b23_pressure(temperature: float) -> float:
+    """Return the region 2/3 boundary pressure [Pa] (IF97 eq. 5, 623.15 K to 863.15 K)."""
+    _check_range(
+        "b23_pressure",
+        "temperature",
+        temperature,
+        "K",
+        REGION_1_MAXIMUM_TEMPERATURE,
+        B23_MAXIMUM_TEMPERATURE,
+    )
+    n = _B23
+    return (n[0] + n[1] * temperature + n[2] * temperature**2) * 1e6
+
+
+def saturation_properties(pressure: float) -> SaturationProperties:
+    """Return saturated liquid and vapour enthalpy and entropy at a pressure [Pa].
+
+    The saturation temperature comes from IF97 eq. 31; the liquid from region 1 and the vapour
+    from region 2 at that temperature. Valid for 611.213 Pa <= p <= 16.529 MPa, the saturation
+    pressures of 273.15 K and 623.15 K; region 3 above is not implemented.
+    """
+    _check_range(
+        "saturation_properties",
+        "pressure",
+        pressure,
+        "Pa",
+        MINIMUM_PRESSURE,
+        MAXIMUM_SATURATION_PRESSURE,
+    )
+    temperature = saturation_temperature(pressure)
+    liquid = _region_1(pressure, temperature)
+    vapour = _region_2(pressure, temperature)
+    return SaturationProperties(pressure, temperature, liquid[0], vapour[0], liquid[1], vapour[1])
+
+
+def flash_fraction(enthalpy: float, pressure: float) -> float:
+    """Return the steam mass fraction [-] after isenthalpic flashing to a pressure [Pa].
+
+    x = (h - h_f) / h_fg at the flash pressure, zero for subcooled liquid (h <= h_f).
+    An enthalpy at or above saturated vapour raises ``PhysicsRangeError``: the fluid does not
+    separate into two phases. Reference: DiPippo, R. (2016), Geothermal Power Plants, 4th ed.,
+    Butterworth-Heinemann, section 5.2 (single-flash plants).
+    """
+    saturation = saturation_properties(pressure)
+    if enthalpy >= saturation.vapour_enthalpy:
+        raise PhysicsRangeError(
+            f"flash_fraction: enthalpy = {enthalpy} J/kg; expected below the saturated vapour "
+            f"enthalpy {saturation.vapour_enthalpy} J/kg at {pressure} Pa"
+        )
+    return max(0.0, (enthalpy - saturation.liquid_enthalpy) / saturation.evaporation_enthalpy)
+
+
+def baumann_expansion(
+    inlet_pressure: float,
+    outlet_pressure: float,
+    dry_efficiency: float,
+    baumann_factor: float,
+) -> Expansion:
+    """Return the expansion of dry saturated steam into the wet region with the Baumann rule.
+
+    Parameters
+    ----------
+    inlet_pressure, outlet_pressure : float
+        Pressures [Pa] of the dry saturated inlet steam and of the exhaust, inlet > outlet.
+    dry_efficiency : float
+        Isentropic efficiency of the turbine expanding dry steam, in (0, 1] [-].
+    baumann_factor : float
+        Baumann factor a >= 0 [-]: the efficiency falls by a percent per percent of mean
+        moisture; a = 1 is the classical Baumann rule.
+
+    Notes
+    -----
+    The isentropic exhaust state follows from s_in = s_g(p_in): x_s = (s_in - s_f) / s_fg and
+    h_s = h_f + x_s h_fg at the outlet pressure. The wet efficiency is
+    eta = eta_d (1 - a (1 - (x_in + x_out) / 2)) with x_in = 1, and h_out = h_in - eta (h_in -
+    h_s). Since x_out = (h_out - h_f) / h_fg depends on eta, the linear system is solved in
+    closed form: x_out = (h_in - h_f - eta_d dh_s (1 - a / 2)) / (h_fg + a eta_d dh_s / 2). For
+    a = 1 this is DiPippo's eq. 5.13 with A = eta_d dh_s / 2. A dry or superheated exhaust
+    (x_out >= 1) is outside this wet-expansion model and raises ``PhysicsRangeError``.
+    Reference: Baumann, K. (1921), Some recent developments in large steam turbine practice,
+    J. Inst. Electr. Eng. 59, 565-623; DiPippo, R. (2016), Geothermal Power Plants, 4th ed.,
+    section 5.5.
+    """
+    if not 0 < dry_efficiency <= 1 or baumann_factor < 0:
+        raise PhysicsRangeError(
+            f"baumann_expansion: dry_efficiency = {dry_efficiency}, baumann_factor = "
+            f"{baumann_factor}; expected 0 < dry_efficiency <= 1 and baumann_factor >= 0"
+        )
+    if outlet_pressure >= inlet_pressure:
+        raise PhysicsRangeError(
+            f"baumann_expansion: outlet_pressure = {outlet_pressure} Pa; expected below "
+            f"inlet_pressure = {inlet_pressure} Pa"
+        )
+    inlet, outlet = saturation_properties(inlet_pressure), saturation_properties(outlet_pressure)
+    h_in = inlet.vapour_enthalpy
+    isentropic_quality = (inlet.vapour_entropy - outlet.liquid_entropy) / outlet.evaporation_entropy
+    h_s = outlet.liquid_enthalpy + isentropic_quality * outlet.evaporation_enthalpy
+    drop = dry_efficiency * (h_in - h_s)
+    quality = (h_in - outlet.liquid_enthalpy - drop * (1 - baumann_factor / 2)) / (
+        outlet.evaporation_enthalpy + baumann_factor * drop / 2
+    )
+    if quality >= 1:
+        raise PhysicsRangeError(
+            f"baumann_expansion: exhaust quality = {quality}; expected a wet exhaust below 1"
+        )
+    h_out = outlet.liquid_enthalpy + quality * outlet.evaporation_enthalpy
+    return Expansion(h_in, h_s, h_out, quality, (h_in - h_out) / (h_in - h_s))
+
+
+def _region_1(pressure, temperature):
+    """Return (h [J/kg], s [J/kg/K]) from the IF97 region 1 Gibbs free energy."""
+    pi = pressure / 16.53e6
+    tau = 1386 / temperature
+    gamma = gamma_tau = 0.0
+    for i, j, n in _REGION_1:
+        gamma += n * (7.1 - pi) ** i * (tau - 1.222) ** j
+        gamma_tau += n * (7.1 - pi) ** i * j * (tau - 1.222) ** (j - 1)
+    rt = GAS_CONSTANT * temperature
+    return rt * tau * gamma_tau, GAS_CONSTANT * (tau * gamma_tau - gamma)
+
+
+def _region_2(pressure, temperature):
+    """Return (h [J/kg], s [J/kg/K]) from the IF97 region 2 Gibbs free energy."""
+    pi = pressure / 1e6
+    tau = 540 / temperature
+    gamma = math.log(pi)
+    gamma_tau = 0.0
+    for j, n in _REGION_2_IDEAL:
+        gamma += n * tau**j
+        gamma_tau += n * j * tau ** (j - 1)
+    for i, j, n in _REGION_2_RESIDUAL:
+        gamma += n * pi**i * (tau - 0.5) ** j
+        gamma_tau += n * pi**i * j * (tau - 0.5) ** (j - 1)
+    rt = GAS_CONSTANT * temperature
+    return rt * tau * gamma_tau, GAS_CONSTANT * (tau * gamma_tau - gamma)
+
+
+def _check_range(function, name, value, unit, lower, upper):
+    """Raise ``PhysicsRangeError`` unless lower <= value <= upper (NaN fails)."""
+    if not lower <= value <= upper:
+        raise PhysicsRangeError(
+            f"{function}: {name} = {value} {unit}; expected {lower} {unit} to {upper} {unit}"
+        )
+
+
+def _check_liquid(function, pressure, temperature):
+    """Raise ``PhysicsRangeError`` outside IF97 region 1."""
+    _check_range(
+        function, "temperature", temperature, "K", MINIMUM_TEMPERATURE, REGION_1_MAXIMUM_TEMPERATURE
+    )
+    lower = saturation_pressure(temperature) * (1 - SATURATION_TOLERANCE)
+    _check_range(function, "pressure", pressure, "Pa", lower, MAXIMUM_PRESSURE)
+
+
+def _check_vapour(function, pressure, temperature):
+    """Raise ``PhysicsRangeError`` outside IF97 region 2."""
+    _check_range(
+        function, "temperature", temperature, "K", MINIMUM_TEMPERATURE, REGION_2_MAXIMUM_TEMPERATURE
+    )
+    if temperature <= REGION_1_MAXIMUM_TEMPERATURE:
+        upper = saturation_pressure(temperature) * (1 + SATURATION_TOLERANCE)
+    elif temperature <= B23_MAXIMUM_TEMPERATURE:
+        upper = b23_pressure(temperature)
+    else:
+        upper = MAXIMUM_PRESSURE
+    if not 0 < pressure <= upper:
+        raise PhysicsRangeError(
+            f"{function}: pressure = {pressure} Pa; expected 0 Pa < pressure <= {upper} Pa in "
+            f"region 2 at {temperature} K"
+        )
