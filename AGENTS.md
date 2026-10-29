@@ -13,6 +13,7 @@ Read every file in `.claude/docs/` before changing the repository:
 - [Conventions](.claude/docs/conventions.md): dependencies, naming, comments and code quality.
 - [Data](.claude/docs/data.md): in-memory datasets, sampling and gaps.
 - [Engine](.claude/docs/engine.md): clocks, runs, callbacks, results, checkpoints and live.
+- [Equipment](.claude/docs/equipment.md): every shipped module, its model and energy audit.
 - [Errors](.claude/docs/errors.md): the `gm.errors` classes and when each is raised.
 - [Legacy](.claude/docs/legacy.md): the old-format boundary and conversion rules.
 - [Modules](.claude/docs/modules.md): declarations, listings, calls, outputs, hooks and state.

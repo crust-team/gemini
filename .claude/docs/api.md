@@ -9,6 +9,27 @@ plants need no `core.*` imports. Writing a module imports its declarations (`Par
 `gemini.core.types`; see [modules.md](modules.md). New top-level names require a concrete common
 user workflow, documentation, and a public-API test.
 
+`gm.modules` is `gemini.core.modules`. It exports `Module`, `ModuleList`, `ModuleDict`, every
+shipped equipment class, the audits `collect_flows`, `energy_balance` and `mass_balance`, and
+`trace_wiring`; composite plants such as `Doublet` are in `gm.plants`. The equipment classes are
+(each one is described in [equipment.md](equipment.md)):
+
+- pumps: `ESP`, `InjectionPump`, `CentrifugalPump`, `LineShaftPump`, `GasCompressor`;
+- piping: `Pipe`, `Valve`, `Splitter`, `Mixer`, `PressurizationTank`;
+- treatment: `Filter`, `Degasser`, `Blowdown`, `Desander`, `InhibitorDosing`, `Vent`;
+- heat: `HeatExchanger`, `Boiler`, `HeatPump`, `AbsorptionUnit`, `AdsorptionChiller`, `CHP`,
+  `Cooler`;
+- subsurface: `ProductionReservoir`, `InjectionReservoir`, `ProductionWell`, `InjectionWell`,
+  `ThermalDecline`, `AquiferStorage`, `BoreholeField`, `DownholeHeatExchanger`;
+- storage and control: `ThermalStorage`, `IceStorage`, `PIDController`;
+- power: `ORC`, `Separator`, `FlashTurbine`, `GridConnection`;
+- demand: `HeatConsumer`, `CoolingConsumer`.
+
+`BoosterPump` was removed; use `CentrifugalPump`, which has a real head and efficiency curve
+instead of a pass-through with `modelled=False`. `Blowdown` now splits `feed_in` into
+`retained_out` and `blowdown_out` under the `blowdown_fraction` control (it was a pass-through
+`inlet` -> `outlet` with a `modelled` output).
+
 Plants own their complete design. A plant class defined in `examples/` or user code uses
 `plant.to_dict()`, `PlantClass.from_dict()`, `plant.save(path)`, and `PlantClass.load(path)`.
 The file records the importable root class, each module's class path, current parameters, dated

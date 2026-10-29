@@ -41,8 +41,13 @@ implementation or test.
 - Filter clean loss is 0.016 bar at 149 m3/h, scaling quadratically with mass flow. Solids
   loading and particle capture are not modelled; the existing clogging diagnostic remains
   available.
-- The degasser passes liquid at configured outlet pressure or inlet minus 0.149 bar, with
-  zero gas flow. Booster and blowdown pass streams through and report `modelled=False`.
+- The degasser passes liquid at configured outlet pressure or inlet minus 0.149 bar. Its
+  `separation_efficiency` defaults to 0, which keeps zero gas flow and reproduces the former
+  liquid-only model exactly for every fluid; the example brine carries no free gas either.
+- The former pass-through placeholders are real models now: `BoosterPump` was replaced by
+  `CentrifugalPump`, and `Blowdown` bleeds a commanded `blowdown_fraction` from `feed_in` to
+  `blowdown_out`. Neither reports `modelled` any more. The example plant uses neither, so its
+  numbers are unchanged.
 - No injection-pump curves exist in the project. Use the measured discharge setpoint in twins;
   Q*deltaP/PowerDraw implies efficiency 0.80000 within CSV rounding. The example explicitly
   selects 0.8 while standalone equipment defaults to 0.7. Scenarios default to 51.5 bar.
@@ -139,7 +144,11 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   not temperature and do not allocate their electrical input to mechanical energy or losses.
   The audit preserves a nonzero sum(in)-sum(out), with a separate `unresolved_power` diagnostic.
   No heat-loss port or fictitious shaft work is invented to make a test pass. Thermal accounting
-  excludes this explicitly unresolved input and excludes pressure/gravity/kinetic energy.
+  excludes this explicitly unresolved input and excludes pressure/gravity/kinetic energy. The
+  isothermal pumps are `ESP`, `InjectionPump` and `LineShaftPump` (same polynomial basis);
+  `CentrifugalPump` heats the liquid by its losses instead and is first-law closed when the flow
+  work is counted. The other documented audit residuals are listed in
+  [equipment.md](equipment.md).
 - On 100 evenly spaced rows, mass residual is zero and maximum relative modeled thermal residual
   is 2.363e-16. Strict energy residual is 212451 W median / 230372 W maximum; median/max relative
   residuals are 0.00176456 / 0.00187310 (normalized by boundary sensible-energy throughput).

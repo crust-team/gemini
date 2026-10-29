@@ -27,6 +27,29 @@ finite engine, and then cleaned up. Old import paths are not retained.
 - Quality gates: `tests/unit/test_code_quality.py` (comments, nesting, function length,
   framework name), flake8 `max-complexity = 10` without ignoring bare `except`, the package
   boundary test and mirror tests for every source file.
+- Equipment classes in `gm.modules`, each described in `.claude/docs/equipment.md`:
+  - pumps `CentrifugalPump`, `LineShaftPump`, `GasCompressor`;
+  - piping `Pipe`, `Valve`, `Splitter`, `Mixer`, `PressurizationTank`;
+  - treatment `Desander`, `InhibitorDosing`, `Vent`;
+  - heat `HeatPump`, `AbsorptionUnit`, `AdsorptionChiller`, `CHP`, `Cooler`;
+  - subsurface `ThermalDecline`, `AquiferStorage`, `BoreholeField`, `DownholeHeatExchanger`;
+  - storage `ThermalStorage`, `IceStorage`; control `PIDController`;
+  - power `ORC`, `Separator`, `FlashTurbine`, `GridConnection`;
+  - demand `HeatConsumer`, `CoolingConsumer`.
+- Physics modules `compression`, `refrigeration`, `steam` (IAPWS-IF97), `ground` and
+  `psychrometrics`.
+- `State(kind, default=...)` declarations with `_advance_states(inlets, outlets, dt)`: any module
+  steps with `module.step(state, dt, inlets)`, and a composite steps every stateful descendant
+  through its own `forward`, without a hand-written step method.
+- Energy-balance terms beyond `electricity`, `fuel` and `heat_loss`: `heat_absorbed`,
+  `heat_supplied`, `electricity_generated` and the signed stored-heat rate `heat_accumulation`
+  (`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `gemini/core/modules/balance.py`).
+- Quantities `Elevation`, `MassConcentration`, `MoneyRate`, `LinearThermalResistance`,
+  `TemperatureGradient`, `Speed`, `Mass`, `SpecificEnthalpy`, `HeatCapacity`,
+  `VolumetricHeatCapacity`, `ThermalDiffusivity` and `LinearPower`; units `g/m3`, `mg/l`, `ppm`,
+  `currency/s`, `currency/h`, `m.K/W`, `K/m`, `K/km`, `kJ/kg`, `kWh/K`, `MJ/m3/K`, `t` and
+  `m3/h/bar^0.5`; the `Fluid` kind `"steam"` and the `STEAM` constant.
+- `Degasser.separation_efficiency` (default 0, which keeps the former results).
 
 ### Changed
 - The `Module` base class is explicit: modules are built without arguments and configured with
@@ -47,6 +70,9 @@ finite engine, and then cleaned up. Old import paths are not retained.
   `FluidProperties`, and `Profile.constant(value, unit=, clock=)` is the only constant form.
 - Runtime settings are context-local; ESP efficiency is a fraction; undefined radial
   diagnostics are reported as unavailable.
+- `Blowdown` is a bleed split: `feed_in` -> `retained_out`, `blowdown_out` under the
+  `blowdown_fraction` control (was a pass-through `inlet` -> `outlet` with a `modelled`
+  output). `FlowCoefficient` allows zero, so a closed valve reports it.
 
 ### Removed
 - `gm.modules.list/get/create`, the module catalogue and engine registry, `Sequential`,
@@ -54,6 +80,7 @@ finite engine, and then cleaned up. Old import paths are not retained.
   construction, `runtime.dtype` and `runtime.manual_seed`, `gemini.design`, `gemini.agentic`, the
   legacy `nodes=` options and `plant.legacy_info`, `Results.save_csv/save_parquet`,
   `Dataset.frame/describe/reopen`, `Progress`, `AlarmCollector` and `Output(optional=)`.
+- `BoosterPump` (a pass-through placeholder with `modelled=False`); use `CentrifugalPump`.
 - The Flask interface, application/UI workflows, container stack, platform launcher scripts and
   UI-only dependencies.
 

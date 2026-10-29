@@ -7,7 +7,9 @@ the base class and read from `self`. Outputs are computed only after the fluid s
 
 Write a module with `Module` from `gemini.core.modules` (also `gm.modules.Module`) and the
 declarations from `gemini.core.types`. The base class has no class registry, string catalogue,
-sequential container, fidelity flag or cost method; plants are handwritten classes.
+sequential container, fidelity flag or cost method; plants are handwritten classes. The
+shipped equipment, with each model's ports, parameters, equations and energy-audit status, is
+listed in [equipment.md](equipment.md); its classes are good references for new modules.
 
 ## Construction and metadata
 
@@ -295,7 +297,10 @@ starts from its entry and records its end-of-step entry, and a descendant that i
 keeps its state. A stateful module called twice in one step raises `ConfigurationError`. Outside
 `step`, a call evaluates at the initial states. The engine integrates these steps; see
 [engine.md](engine.md). A module that sets `stateful = True` without declaring states must
-override `step` itself, and a composite refuses to step such a descendant.
+override `step` itself, and a composite refuses to step such a descendant. The shipped stateful
+leaves (`ThermalDecline`, `AquiferStorage`, `BoreholeField`, `ThermalStorage`, `IceStorage`,
+`PIDController`) and how each integrates over `dt` are described in
+[equipment.md](equipment.md).
 
 ```python
 from gemini.core.types import Power, State, Temperature
@@ -364,6 +369,8 @@ helpers. Signatures are always
 `forward(self, inlets)` and `_compute_outputs(self, inlets, outlets)`, including modules with no
 ports; parameters have no defaults or variadic forms.
 
-Inlets and outlets accept `Stream` types only. Electricity, fuel use and environmental heat loss
-are `Power` outputs. Results keep the same dotted `<module path>.<name>` addressing scheme. Port,
-control and output names follow the naming rule in [conventions.md](conventions.md#naming).
+Inlets and outlets accept `Stream` types only. Electricity, fuel use and heat exchanged with the
+environment or a consumer are `Power` outputs with the fixed names of
+[types.md](types.md#energy-outputs-and-balances). Results keep the same dotted
+`<module path>.<name>` addressing scheme. Port, control and output names follow the naming rule
+in [conventions.md](conventions.md#naming).
