@@ -16,30 +16,34 @@ OLD = ROOT / "examples/legacy/gemini_project_bridge/old_project"
 def example(fresh_plant, fast_dataset):
     """Prepare one real operating point."""
     data = fast_dataset.window(end=fast_dataset.start)
+    captured = {}
+
+    def capture(module, inlets):
+        captured.update(inlets)
+
+    handle = fresh_plant.register_forward_pre_hook(capture)
     gm.Engine(on_error="raise").simulate(fresh_plant, data, gm.Clock.from_data(data))
-    inputs = dict(fresh_plant.last_result.inputs) | dict(fresh_plant.last_result.inlets)
-    return fresh_plant, inputs
+    handle.remove()
+    return fresh_plant, captured
 
 
 def test_handwritten_wiring_and_split_helpers(example):
     """Every diagram link matches actual identities, including both sides of the buried ESP."""
     plant, inputs = example
     result = plant(**inputs)
-    assert set(plant.last_results) == {
-        path for path, module in plant.named_modules() if path and not module._children
+    leaves = result.leaves()
+    assert set(leaves) == {
+        path for path, module in plant.named_modules() if path and module.is_leaf
     }
     traced = trace_wiring(plant, inputs)
     assert len(traced) == 10
     project = gm.legacy.read_project(OLD)
     assert gm.legacy.check_wiring(plant, project) == []
     well = plant.doublet.well
-    bottom = plant.last_results["doublet.reservoir"].outlets["sandface"]
-    assert well.intake_conditions(bottom) == plant.last_results["doublet.well"].outlets["wellhead"]
-    discharge = plant.last_results["doublet.esp"].outlets["discharge"]
-    assert (
-        well.wellhead_from_discharge(discharge)
-        == plant.last_results["doublet.riser"].outlets["wellhead"]
-    )
+    bottom = leaves["doublet.reservoir"].outlets["sandface"]
+    assert well.intake_conditions(bottom) == leaves["doublet.well"].outlets["wellhead"]
+    discharge = leaves["doublet.esp"].outlets["discharge"]
+    assert well.wellhead_from_discharge(discharge) == leaves["doublet.riser"].outlets["wellhead"]
     assert result.outputs.electricity_use == collect_flows(result)["electricity"]
     assert result.outputs.cop == pytest.approx(
         result.outputs.thermal_power / result.outputs.electricity_use

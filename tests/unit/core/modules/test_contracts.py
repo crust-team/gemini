@@ -1,11 +1,18 @@
-"""Declaration metadata across every registered built-in module."""
+"""Metadata every module class derives from its class name and docstring."""
 
-from gemini.core.modules.module import MODULE_REGISTRY
+from gemini.core.modules import HeatExchanger, Module
 
 
 def test_metadata_is_derived():
-    """Names, descriptions and categories are derived at class creation."""
-    heat_exchanger = MODULE_REGISTRY["heat_exchanger"]
-    assert heat_exchanger.category == "heat"
-    assert heat_exchanger.description.startswith("Two-stream heat exchanger")
-    assert "name" not in heat_exchanger.__dict__ or heat_exchanger.name == "heat_exchanger"
+    """Names come from the class name and help text from the docstring."""
+    assert HeatExchanger().name == "heat_exchanger"
+    assert HeatExchanger().path == "heat_exchanger"
+    assert HeatExchanger.help().startswith("Two-stream heat exchanger")
+    assert "ua: W/K, calibratable" in HeatExchanger.help()
+
+
+def test_every_module_class_is_documented(module_classes):
+    """Each shipped module explains itself in its class docstring."""
+    for cls in module_classes:
+        assert issubclass(cls, Module)
+        assert cls.__doc__ and cls.__doc__.strip(), cls.__name__

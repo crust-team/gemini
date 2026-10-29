@@ -8,7 +8,7 @@ from gemini.core.types.flows import Stream
 
 def test_capacity_balance_and_no_cooling():
     """Capacity caps heat, energy input accounts for efficiency, and the boiler never cools."""
-    c = Boiler(fuel_type="gas", capacity=100000, efficiency=0.8)
+    c = Boiler().update_params(fuel_type="gas", capacity=100000, efficiency=0.8)
     s = Stream(m_dot=10, T=300, p=1e6)
     result = c(setpoint_T=360, inlet=s)
     out, streams = result.outputs, result.outlets

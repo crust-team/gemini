@@ -10,6 +10,7 @@ import pytest
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from gemini.core.modules import Module
 
 TIER_MARKERS = {
     "unit": pytest.mark.unit,
@@ -76,6 +77,18 @@ def shared_plant():
         plant = DoubletHeatPlant.load(ROOT / "examples/shared/doublet_heat/plant.json")
     assert not warnings_seen
     return plant
+
+
+@pytest.fixture(scope="session")
+def module_classes():
+    """Return every concrete module class shipped in ``gemini`` and the shared example plant."""
+    exported = [getattr(gm.modules, name) for name in gm.modules.__all__]
+    classes = [
+        item
+        for item in exported
+        if isinstance(item, type) and issubclass(item, Module) and item is not Module
+    ]
+    return tuple(classes) + (gm.plants.Doublet, DoubletHeatPlant)
 
 
 @pytest.fixture

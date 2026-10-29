@@ -6,9 +6,7 @@ import io
 import textwrap
 import tokenize
 
-from examples.shared.doublet_heat.plant import DoubletHeatPlant  # noqa: F401
-from gemini.core.modules.module import MODULE_REGISTRY, Module
-from gemini.core.modules.plants import Doublet  # noqa: F401
+from gemini.core.modules.module import Module
 from gemini.core.types import Stream
 
 FORWARD_SECTIONS = ("# Modules", "# Outlets")
@@ -125,17 +123,12 @@ def _assert_declared_accesses(cls, method_name, variable, declared):
         )
 
 
-def test_fixed_signatures_and_declared_port_accesses():
+def test_fixed_signatures_and_declared_port_accesses(module_classes):
     """Every module lifecycle method receives fixed Ports and reads only declared names."""
-    for cls in MODULE_REGISTRY.values():
-        if not cls.__module__.startswith(("gemini.", "examples.")):
-            continue
+    for cls in module_classes:
         _assert_fixed_signature(cls, "forward", ["self", "inlets"])
         _assert_fixed_signature(cls, "_compute_outputs", ["self", "inlets", "outlets"])
-        try:
-            module = cls()
-        except (TypeError, ValueError):
-            continue
+        module = cls()
         inlet_names = list(module.inlets())
         outlet_names = list(module.outlets())
         _assert_declared_accesses(cls, "forward", "inlets", inlet_names)
@@ -143,15 +136,12 @@ def test_fixed_signatures_and_declared_port_accesses():
         _assert_declared_accesses(cls, "_compute_outputs", "outlets", outlet_names)
 
 
-def test_registered_forward_structure():
+def test_registered_forward_structure(module_classes):
     """Forwards accept inlets, move only fluids and never assign module attributes."""
-    for cls in MODULE_REGISTRY.values():
-        if "forward" not in cls.__dict__ or not cls.__module__.startswith(("gemini.", "examples.")):
+    for cls in module_classes:
+        if "forward" not in cls.__dict__:
             continue
-        try:
-            module = cls()
-        except (TypeError, ValueError):
-            continue
+        module = cls()
         source, tree = _source_tree(cls.forward)
         _assert_ordered_sections(cls, source, FORWARD_SECTIONS)
         composite = not module.is_leaf
@@ -168,15 +158,10 @@ def test_registered_forward_structure():
         _assert_return_block(cls, tree, list(module.outlets()))
 
 
-def test_leaf_and_composite_output_conventions():
+def test_leaf_and_composite_output_conventions(module_classes):
     """Leaves compute plain outputs; composites declare formulas only."""
-    for cls in MODULE_REGISTRY.values():
-        if not cls.__module__.startswith(("gemini.", "examples.")):
-            continue
-        try:
-            module = cls()
-        except (TypeError, ValueError):
-            continue
+    for cls in module_classes:
+        module = cls()
         outputs = list(module.outputs().values())
         if module.is_leaf:
             assert all(output.formula is None for output in outputs)
@@ -187,11 +172,9 @@ def test_leaf_and_composite_output_conventions():
             assert type(module)._compute_outputs is Module._compute_outputs
 
 
-def test_method_and_declaration_section_order():
+def test_method_and_declaration_section_order(module_classes):
     """Lifecycle methods and declaration sections retain one readable order."""
-    for cls in MODULE_REGISTRY.values():
-        if not cls.__module__.startswith(("gemini.", "examples.")):
-            continue
+    for cls in module_classes:
         methods = [
             name
             for name, value in cls.__dict__.items()

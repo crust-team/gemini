@@ -101,6 +101,7 @@ keys address nested fields. Profiles must have identical indices; resample expli
 For stateful scenarios, dt remains the caller's explicit integration step in seconds.
 
 `Cost` stores investment, annual fixed cost and variable currency/J of useful output, together
-with currency, price year and a source citation. `Module.capex()` returns an optional Cost;
-`Module.cost()` sums each module's own contribution once and rejects mixed currencies or years.
-Composite `capex` must therefore describe only its own additional cost, not repeat child costs.
+with currency, price year and a source citation. A module declares its own cost by defining
+`capex()` returning a `Cost`; `gemini.core.types.cost.total_cost(plant)` sums each module's own
+contribution once and rejects mixed currencies or years. Composite `capex` must therefore describe
+only its own additional cost, not repeat child costs.

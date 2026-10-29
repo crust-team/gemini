@@ -93,14 +93,11 @@ def to_plant(project, plant, nodes=None):
         for name, value in module.params_at(None).items():
             module.get_parameter(name).set(value, explicit=False)
         module._active_from = item.at().valid_from
-        module._active_params = item.at().params.copy()
         module._param_overrides = {}
-        module._fluid = item.fluid
-        module.fluid = module._resolve_fluid()
+        module.fluid = item.fluid
     plant.bindings, _ = _converted_bindings(design)
     plant.boundary = deepcopy(design.boundary)
-    plant._fluid = next(iter(design.modules.values())).fluid
-    plant.fluid = plant._resolve_fluid()
+    plant.fluid = next(iter(design.modules.values())).fluid
     plant.legacy_info = {
         "ignored": design.ignored,
         "unmapped": design.unmapped,

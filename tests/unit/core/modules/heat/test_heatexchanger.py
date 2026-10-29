@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+import gemini as gm
 from gemini.core.legacy import tables as mapping
 from gemini.core.modules.heat import HeatExchanger
 from gemini.core.physics import units
@@ -39,7 +40,7 @@ def test_measured_heat_exchanger_performance():
             m_dot_hot_nominal=mh,
             m_dot_cold_nominal=mc,
         )
-        c = HeatExchanger(**params)
+        c = HeatExchanger().update_params(**params)
         streams = {
             "hot_in": Stream(m_dot=mh, T=measured["hot_in_T"], p=units.bar_to_pa(r.HEX_Pin)),
             "cold_in": Stream(m_dot=mc, T=measured["cold_in_T"], p=1e6, fluid=WATER),
@@ -50,7 +51,7 @@ def test_measured_heat_exchanger_performance():
         assert out.duty == pytest.approx(r.Thermal_PowerGen, rel=0.02)
         assert 10000 < out.dp_hot < 20000
         assert not c.health(out, measured).alarm
-        fouled = HeatExchanger(**(params | {"ua": ua * 0.8}))
+        fouled = HeatExchanger().update_params(**(params | {"ua": ua * 0.8}))
         reduced = fouled(**streams).outputs
         degraded = measured | dict(hot_out_T=reduced.hot_out_T, cold_out_T=reduced.cold_out_T)
         assert c.health(out, degraded).alarm
@@ -67,7 +68,7 @@ def test_first_law_equal_capacity_and_limits(arrangement):
         m_dot_hot_nominal=10,
         m_dot_cold_nominal=10,
     )
-    c = HeatExchanger(**p)
+    c = HeatExchanger().update_params(**p)
     hot, cold = Stream(m_dot=10, T=350, p=1e6), Stream(m_dot=10, T=300, p=1e6)
     result = c(hot_in=hot, cold_in=cold)
     out, streams = result.outputs, result.outlets
@@ -86,5 +87,24 @@ def test_first_law_equal_capacity_and_limits(arrangement):
 
 def test_invalid_measurements():
     """A temperature cross or a gross heat-balance mismatch cannot identify a valid UA."""
-    with pytest.raises(ValueError):
+    with pytest.raises(gm.errors.InsufficientDataError):
         HeatExchanger.ua_from_measurements(350, 340, 300, 340, 10, 10)
+
+
+def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
+    """E-modules-011/012: zero flow or zero design UA mean not assessed, not an error."""
+    exchanger = HeatExchanger().update_params(
+        ua=100000,
+        dp_hot_nominal=1000,
+        dp_cold_nominal=1000,
+        m_dot_hot_nominal=10,
+        m_dot_cold_nominal=10,
+    )
+    measured = dict(
+        hot_in_T=350, hot_out_T=340, cold_in_T=300, cold_out_T=310, m_dot_hot=0, m_dot_cold=10
+    )
+    assert exchanger.health(None, measured) is None
+    exchanger.update_params(ua=0)
+    assert exchanger.health(None, measured | {"m_dot_hot": 10}) is None
+    with pytest.raises(gm.errors.UnknownCorrelationError, match="arrangement"):
+        HeatExchanger.ua_from_measurements(350, 340, 300, 310, 10, 10, arrangement="cross")

@@ -8,8 +8,14 @@ import numpy as np
 import pandas as pd
 
 import gemini as gm
-from gemini.core.engine import registry
 from gemini.core.legacy import tables as mapping
+from gemini.core.modules import (
+    ESP,
+    InjectionReservoir,
+    InjectionWell,
+    ProductionReservoir,
+    ProductionWell,
+)
 from gemini.core.physics import geometry, units
 from gemini.core.types.flows import Stream
 from tests.unit.test_golden import assert_values
@@ -26,7 +32,7 @@ def test_captured_monitoring_values():
         return mapping.read_property(DATA / (name + ".param"))
 
     w, e, r = read("production_well_c774"), read("esp_1ee3"), read("reservoir_c1b5")
-    pump = registry.create("esp", mapping.esp_params_from_gemini(e))
+    pump = ESP().update_params(**mapping.esp_params_from_gemini(e))
     with gm.runtime.settings(precision="float32"):
         result = pump(
             frequency=row.ESP_freq,
@@ -45,7 +51,7 @@ def test_captured_monitoring_values():
     # NOTE(refactor): historical IPR interpreted the labelled m3/h/bar value as m3/s/bar.
     params = mapping.production_reservoir_params_from_gemini(r, w)
     params["productivity_index"] = units.m3s_per_bar_to_si(w["productionwell_productivity_index"])
-    reservoir = registry.create("production_reservoir", params)
+    reservoir = ProductionReservoir().update_params(**params)
     wp = mapping.productionwell_params_from_gemini(w, esp_property=e)
     table = w["productionwell_trajectory_table"]
     full = geometry.build_path(table)
@@ -59,7 +65,7 @@ def test_captured_monitoring_values():
         roughness=table[1]["roughness"],
     )
     wp["pipe_path"] = geometry.PipePath(sections=[top, *below])
-    well = registry.create("production_well", wp)
+    well = ProductionWell().update_params(**wp)
     well.fluid = reservoir.fluid
     mass = (
         units.m3h_to_m3s(row.Qp)
@@ -85,10 +91,10 @@ def test_captured_monitoring_values():
         }
     )
     w, r = read("injection_well_a06b"), read("reservoir_28fc")
-    reservoir = registry.create(
-        "injection_reservoir", mapping.injection_reservoir_params_from_gemini(r, w)
+    reservoir = InjectionReservoir().update_params(
+        **mapping.injection_reservoir_params_from_gemini(r, w)
     )
-    well = registry.create("injection_well", mapping.injectionwell_params_from_gemini(w))
+    well = InjectionWell().update_params(**mapping.injectionwell_params_from_gemini(w))
     well.fluid = reservoir.fluid
     p, T = units.bar_to_pa(row.InjectorPump_Pout), units.c_to_k(row.T_p_out)
     stream = Stream(

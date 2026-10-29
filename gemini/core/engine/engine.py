@@ -10,7 +10,7 @@ from gemini.core.engine import checkpoint as storage
 from gemini.core.engine.clock import Clock, LiveClock
 from gemini.core.engine.results import Results
 from gemini.core.engine.step import BindingPlan, chained_step, twin_step
-from gemini.core.modules.module import Module
+from gemini.core.modules.module import class_path, import_class
 from gemini.utils.time import to_utc
 
 
@@ -142,7 +142,7 @@ class Engine:
             raise RuntimeError("Checkpoints are only valid between completed steps")
         checkpoint = storage.Checkpoint(
             run_kind=self.run_kind,
-            plant_class=Module._class_name(type(self.plant)),
+            plant_class=class_path(type(self.plant)),
             plant=self.plant.to_dict(),
             module_states=self.module_states,
             clock=self.clock.describe() if self.clock is not None else None,
@@ -162,7 +162,7 @@ class Engine:
         """Restore a plant, dataset handle, finite schedule, states and completed results."""
         checkpoint = storage.load(path)
         engine = cls(callbacks, checkpoint.on_error)
-        plant_class = Module._import_class(checkpoint.plant_class)
+        plant_class = import_class(checkpoint.plant_class)
         engine.plant = plant_class.from_dict(checkpoint.plant)
         engine.run_kind, engine.position = checkpoint.run_kind, checkpoint.position
         engine.module_states, engine.only = checkpoint.module_states, checkpoint.only

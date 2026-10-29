@@ -17,7 +17,7 @@ def test_example_production_and_decline():
         mapping.read_property(DATA / "reservoir_c1b5.param"),
         mapping.read_property(DATA / "production_well_c774.param"),
     )
-    c = ProductionReservoir(**p)
+    c = ProductionReservoir().update_params(**p)
     out = c(m_dot=40).outputs
     flow = 40 / 1068
     assert out.drawdown == pytest.approx(flow / c.productivity_index)
@@ -32,7 +32,7 @@ def test_injection_zero_radius_is_explicit():
         mapping.read_property(DATA / "injection_well_a06b.param"),
         "injection",
     )
-    c = InjectionReservoir(**p)
+    c = InjectionReservoir().update_params(**p)
     out = c(sandface=Stream(m_dot=-40, T=300, p=23e6)).outputs
     assert out.bottomhole_pressure > c.pressure
     assert out.radial_bottomhole_pressure is None

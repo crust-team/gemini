@@ -12,7 +12,7 @@ SHARED = "examples/shared/doublet_heat"
 # a module, PyTorch style
 plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
 values = {name: p.value for name, p in plant.doublet.esp.named_parameters()}
-esp = gm.modules.ESP(**values | {"setting_depth": "1200 m"})
+esp = gm.modules.ESP().update_params(**values | {"setting_depth": "1200 m"})
 s = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
 a = esp(suction=s, frequency="50 Hz")
 b = esp({"suction": s}, frequency="50 Hz")
@@ -44,7 +44,7 @@ print(list(esp.inlets()), list(esp.controls()), list(esp.boundaries()))
 print(esp.get_control("frequency").unit)
 print(list(esp.outputs()), list(esp.outlets()))
 print(gm.modules.ESP.help())
-print(gm.modules.list())
+print(gm.modules.__all__)
 
 # uninitialized modules, keyword values, attribute assignment
 empty = gm.modules.ESP()

@@ -50,7 +50,7 @@ def test_profiles_drive_scenario():
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
     target = Profile.constant("target", "temperature", "K", 320, start, 3, timedelta(hours=1))
     inlet = dict(m_dot=1, T=300, p=1e5)
-    boiler = Boiler(fuel_type="electric", capacity=1e6, efficiency=0.9)
+    boiler = Boiler().update_params(fuel_type="electric", capacity=1e6, efficiency=0.9)
     boiler.bindings = {
         "": ModuleBindings(
             controls={"setpoint_T": Binding(column="setpoint_T", unit="K")},

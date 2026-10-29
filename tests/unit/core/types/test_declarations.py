@@ -60,28 +60,29 @@ class Declared(Module):
 
 def test_parameter_units_shape_and_metadata():
     """Parameters validate units and vector shape once assigned."""
-    module = Declared(length="1200 m", coefficients=[1, 2])
+    module = Declared().update_params(length="1200 m", coefficients=[1, 2])
     assert module.length == 1200
     assert module.get_parameter("length").unit == "m"
     with pytest.raises(TypeError, match="shape"):
-        Declared(length=1, coefficients=[1])
+        Declared().update_params(length=1, coefficients=[1])
     with pytest.raises(TypeError, match="expected m"):
-        Declared(length="12 bar", coefficients=[1, 2])
+        Declared().update_params(length="12 bar", coefficients=[1, 2])
 
 
 def test_parameter_history_projects_module_snapshots():
     """A parameter exposes its values from the module's canonical dated snapshots."""
-    module = Declared(length=1, coefficients=[1, 2])
+    module = Declared()
     changed = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    module.param_history.append(
-        DatedParams(valid_from=changed, params={"length": 2, "coefficients": [3, 4]})
-    )
+    module.param_history = [
+        DatedParams(params={"length": 1, "coefficients": [1, 2]}),
+        DatedParams(valid_from=changed, params={"length": 2, "coefficients": [3, 4]}),
+    ]
     assert module.get_parameter("length").history == [(None, 1.0), (changed, 2.0)]
 
 
 def test_all_sections_list_own_declarations():
     """Section listings expose declaration objects without duplicate schemas."""
-    module = Declared(length=1, coefficients=[1, 2])
+    module = Declared().update_params(length=1, coefficients=[1, 2])
     assert list(module.inlets()) == ["inlet"]
     assert list(module.controls()) == ["command"]
     assert list(module.boundaries()) == ["weather"]

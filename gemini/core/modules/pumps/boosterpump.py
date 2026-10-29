@@ -5,12 +5,10 @@ from gemini.core.types import Inlet, Outlet, Output, Stream
 
 
 class BoosterPump(Module):
-    """Maintains circulation pressure through the surface geothermal loop."""
-
-    fidelity = "passthrough"
+    """Booster pump placeholder: passes the stream through unchanged; ``modelled`` is False."""
 
     def __init__(self):
-        """Declare booster pump design data, ports and computed performance."""
+        """Declare the ports and the unmodelled-performance flag."""
         super().__init__()
 
         # Inlets

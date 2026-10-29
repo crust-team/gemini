@@ -1,0 +1,63 @@
+"""Shared well traversal, correction and direction checks."""
+
+from pathlib import Path
+
+import pytest
+
+import gemini as gm
+from gemini.core.legacy import tables as mapping
+from gemini.core.modules.subsurface import InjectionWell, ProductionWell
+from gemini.core.types.flows import Stream
+
+DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
+
+
+def production_well():
+    """Return the example production well."""
+    return ProductionWell().update_params(
+        **mapping.productionwell_params_from_gemini(
+            mapping.read_property(DATA / "production_well_c774.param"),
+            esp_property=mapping.read_property(DATA / "esp_1ee3.param"),
+        )
+    )
+
+
+def test_both_wells_share_the_design_parameters_in_order():
+    """The shared base declares the same six parameters first in both wells."""
+    shared = [
+        "pipe_path",
+        "friction_correlation",
+        "friction_correlation_2p",
+        "correction_factors",
+        "soil_temperature",
+        "u_value",
+    ]
+    assert list(dict(InjectionWell().named_parameters())) == shared
+    assert list(dict(ProductionWell().named_parameters()))[:6] == shared
+
+
+def test_correction_applies_the_affine_pressure_factors():
+    """The corrected outlet uses ``a * p + b`` and the traversal temperature."""
+    well = production_well()
+    well.correction_factors = (1.0, 1000.0)
+    stream = Stream(m_dot=40, T=353.15, p=25e6)
+    result = well.traverse(stream, well.pipe_path.total_length, 0, "up")
+    corrected = well.corrected(stream, result)
+    assert corrected.p == result.p_out + 1000.0
+    assert corrected.T == result.T_out
+    assert corrected.m_dot == stream.m_dot
+
+
+def test_traversal_direction_must_match_the_depth_interval():
+    """Upward traversal from shallow to deep is rejected with both depths in the message."""
+    well = production_well()
+    with pytest.raises(gm.errors.PhysicsRangeError, match="conflicts with direction up"):
+        well.traverse(Stream(m_dot=40, T=353.15, p=25e6), 0, 100, "up")
+
+
+def test_esp_split_needs_a_configured_depth():
+    """Splitting at the ESP without an ESP depth inside the path is a configuration error."""
+    well = production_well()
+    well.esp_depth = None
+    with pytest.raises(gm.errors.ConfigurationError, match="esp_depth"):
+        well.intake_conditions(Stream(m_dot=40, T=353.15, p=25e6))

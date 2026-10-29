@@ -14,6 +14,7 @@ from gemini.core.types import (
     Stream,
     Temperature,
 )
+from gemini.errors import PhysicsRangeError
 
 
 class Boiler(Module):
@@ -52,10 +53,9 @@ class Boiler(Module):
         # Outlets
         inlet = inlets.inlet
         if inlet.m_dot < 0:
-            raise ValueError(f"{self.path}: negative mass flow {inlet.m_dot}")
+            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
         cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        requested = inlet.m_dot * cp * max(0, self.setpoint_T - inlet.T)
-        duty = min(requested, self.capacity)
+        duty = min(self._requested_duty(inlet, cp), self.capacity)
         outlet_T = inlet.T + duty / (inlet.m_dot * cp) if inlet.m_dot else inlet.T
 
         outlet = inlet.with_(T=outlet_T)
@@ -67,7 +67,7 @@ class Boiler(Module):
         inlet = inlets.inlet
         outlet = outlets.outlet
         cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        requested = inlet.m_dot * cp * max(0, self.setpoint_T - inlet.T)
+        requested = self._requested_duty(inlet, cp)
         self.duty = min(requested, self.capacity)
         self.fuel_or_power = self.duty / self.efficiency
         self.outlet_T = outlet.T
@@ -75,3 +75,7 @@ class Boiler(Module):
         self.electricity = self.fuel_or_power if self.fuel_type == "electric" else 0
         self.fuel = self.fuel_or_power if self.fuel_type == "gas" else 0
         self.heat_loss = self.fuel_or_power - self.duty
+
+    def _requested_duty(self, inlet, cp):
+        """Return the heat flow [W] that would lift the inlet to the setpoint, without the cap."""
+        return inlet.m_dot * cp * max(0, self.setpoint_T - inlet.T)

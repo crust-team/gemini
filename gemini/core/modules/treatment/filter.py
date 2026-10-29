@@ -13,20 +13,26 @@ from gemini.core.types import (
 )
 from gemini.core.types.results import Health
 
+NOMINAL_MASS_FLOW = 149 / 3600 * 1068
+"""Default clean-filter design flow [kg/s]: 149 m3/h of brine at 1068 kg/m3.
+
+NOTE(refactor): nominal clean loss from the example (0.016 bar at 149 m3/h).
+"""
+
 
 class Filter(Module):
-    """Removes suspended solids before reinjection into the aquifer."""
+    """Filter with a quadratic clean-filter pressure loss and a clogging alarm.
 
-    fidelity = "simple"
+    Solids removal itself is not modelled.
+    """
 
     def __init__(self):
         """Declare filter design data, inlet and computed pressure drop."""
         super().__init__()
 
         # Parameters
-        # NOTE(refactor): nominal clean loss from the example (0.016 bar at 149 m3/h).
         self.dp_nominal = Parameter(PressureDifference, default=1600, ge=0)
-        self.m_dot_nominal = Parameter(MassFlow, default=149 / 3600 * 1068, gt=0)
+        self.m_dot_nominal = Parameter(MassFlow, default=NOMINAL_MASS_FLOW, gt=0)
         self.clogging_dp = Parameter(PressureDifference, default=units.bar_to_pa(0.5), gt=0)
 
         # Inlets
@@ -43,15 +49,13 @@ class Filter(Module):
 
         # Outlets
         inlet = inlets.inlet
-        pressure_drop = self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
-        outlet = inlet.with_(p=inlet.p - pressure_drop)
+        outlet = inlet.with_(p=inlet.p - self._pressure_drop(inlet))
 
         outlets = dict(outlet=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
-        self.pressure_drop = self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
+        self.pressure_drop = self._pressure_drop(inlets.inlet)
 
     def health(self, predicted, measured):
         """Alarm when measured filter pressure loss exceeds the clogging limit."""
@@ -59,13 +63,18 @@ class Filter(Module):
             return None
         dp = measured["pressure_drop"]
         ratio = max(0, dp) / self.clogging_dp
+        alarm = dp > self.clogging_dp
         return Health(
             score=max(0, 1 - ratio),
-            alarm=dp > self.clogging_dp,
+            alarm=alarm,
             message=(
                 "Filter pressure drop exceeds limit"
-                if dp > self.clogging_dp
+                if alarm
                 else "Filter pressure drop within limit"
             ),
             metrics={"pressure_drop": dp},
         )
+
+    def _pressure_drop(self, inlet):
+        """Return the clean-filter loss [Pa], quadratic in mass flow."""
+        return self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2

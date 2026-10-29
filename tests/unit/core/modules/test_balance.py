@@ -11,7 +11,7 @@ from gemini.core.types import Stream
 @pytest.mark.parametrize("fuel", ["electric", "gas"])
 def test_boiler_balance(fuel):
     """Electric and gas boilers conserve total modeled energy."""
-    boiler = Boiler(fuel_type=fuel, capacity=1e6, efficiency=0.9)
+    boiler = Boiler().update_params(fuel_type=fuel, capacity=1e6, efficiency=0.9)
     result = boiler(inlet=Stream(m_dot=10, T=300, p=1e6), setpoint_T=320)
     assert mass_balance(boiler, result)["residual"] == 0
     assert energy_balance(boiler, result)["relative_residual"] < 1e-12
@@ -20,7 +20,7 @@ def test_boiler_balance(fuel):
 
 def test_unresolved_pump_work():
     """Isothermal pump electricity remains explicit unresolved work."""
-    pump = InjectionPump(efficiency=0.8)
+    pump = InjectionPump().update_params(efficiency=0.8)
     result = pump(suction=Stream(m_dot=10, T=300, p=1e6), pressure_setpoint=2e6)
     balance = energy_balance(pump, result)
     assert balance["unresolved_power"] == pytest.approx(result.outputs.power)
@@ -29,7 +29,7 @@ def test_unresolved_pump_work():
 
 def test_esp_motor_efficiency_does_not_change_shaft_power():
     """Motor efficiency changes grid draw while shaft prediction stays fixed."""
-    pump = ESP(
+    pump = ESP().update_params(
         no_stages=10,
         head_coeff=[10, 0, 0, 0, 0, 0],
         power_coeff=[1, 0, 0, 0, 0, 0],

@@ -2,8 +2,6 @@
 
 import inspect
 
-from gemini.core.modules.module import MODULE_REGISTRY
-
 SECTIONS = [
     "# Modules",
     "# Parameters",
@@ -15,11 +13,9 @@ SECTIONS = [
 ]
 
 
-def test_quantity_declarations_expose_units():
+def test_quantity_declarations_expose_units(module_classes):
     """Annotated numeric declarations retain machine-readable units."""
-    for cls in MODULE_REGISTRY.values():
-        if cls.category in {"container", "user"}:
-            continue
+    for cls in module_classes:
         module = cls()
         for declaration in module._declarations().values():
             schema = declaration.schema
@@ -30,11 +26,9 @@ def test_quantity_declarations_expose_units():
                 assert declaration.unit is not None, (cls, declaration.name)
 
 
-def test_init_section_comments_are_ordered():
+def test_init_section_comments_are_ordered(module_classes):
     """Module declarations use fixed plain-text section comments in order."""
-    for cls in MODULE_REGISTRY.values():
-        if cls.category in {"container", "user"}:
-            continue
+    for cls in module_classes:
         source = inspect.getsource(cls.__init__)
         positions = [source.find(section) for section in SECTIONS if section in source]
         assert positions == sorted(positions), cls

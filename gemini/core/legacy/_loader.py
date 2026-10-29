@@ -239,9 +239,8 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
                 # the standalone equipment default stays 0.7.
                 params["efficiency"] = 0.8
             # Geometry models become plain JSON values at the portable config boundary.
-            from gemini.core.modules.catalogue import get
-
-            params = get(kind)(**params).state_dict()[""]["params"]
+            module = mapping.MODULE_TYPES[kind]().update_params(**params)
+            params = module.state_dict()[""]["params"]
             snapshots.append(DatedParams(valid_from=timestamp, params=params))
         modules[name] = ModuleDesign(type=kind, params=snapshots)
         bound = ModuleBindings()

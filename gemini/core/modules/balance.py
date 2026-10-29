@@ -5,6 +5,8 @@ mechanical work or environmental loss. Report that unresolved energy explicitly;
 never manufacture heat loss to force a first-law residual to zero.
 """
 
+from gemini.core.modules.pumps import ESP, BoosterPump, InjectionPump
+from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.core.types.flows import Stream
 
 
@@ -58,12 +60,7 @@ def mass_balance(module, result):
         residual = sum(c["residual"] for c in children.values())
     else:
         children = {}
-        incoming = sum(s.m_dot for s in _streams(result.inlets))
-        outgoing = sum(s.m_dot for s in _streams(result.outlets))
-        if module.name == "production_reservoir":
-            incoming += result.inputs["m_dot"]
-        elif module.name == "injection_reservoir":
-            outgoing += sum(s.m_dot for s in _streams(result.inlets))
+        incoming, outgoing = _leaf_mass(module, result)
         residual = incoming - outgoing
     return {
         "in": incoming,
@@ -72,6 +69,17 @@ def mass_balance(module, result):
         "relative_residual": abs(residual) / max(abs(incoming), abs(outgoing), 1),
         "modules": children,
     }
+
+
+def _leaf_mass(module, result):
+    """Return a leaf's mass in- and outflow, counting aquifers as open boundaries."""
+    incoming = sum(s.m_dot for s in _streams(result.inlets))
+    outgoing = sum(s.m_dot for s in _streams(result.outlets))
+    if isinstance(module, ProductionReservoir):
+        incoming += result.inputs["m_dot"]
+    elif isinstance(module, InjectionReservoir):
+        outgoing += sum(s.m_dot for s in _streams(result.inlets))
+    return incoming, outgoing
 
 
 def energy_balance(module, result):
@@ -84,36 +92,15 @@ def energy_balance(module, result):
     """
     flows = collect_flows(result)
     if result.children:
-        children = {
-            path: energy_balance(module.get_submodule(path), child)
-            for path, child in result.leaves().items()
-        }
-        residual = sum(c["residual"] for c in children.values())
-        unresolved = sum(c["unresolved_power"] for c in children.values())
-        incoming = sum(c["in"] for c in children.values())
-        outgoing = sum(c["out"] for c in children.values())
-        internal = _internal_flux(result, _enthalpy)
-        incoming -= internal
-        outgoing -= internal
-        heat = getattr(result.outputs, "thermal_power", 0.0)
+        totals = _composite_energy(module, result)
     else:
-        children = {}
-        incoming = sum(_enthalpy(s) for s in _streams(result.inlets))
-        outgoing = sum(_enthalpy(s) for s in _streams(result.outlets))
-        if module.name == "production_reservoir":
-            incoming += outgoing
-        elif module.name == "injection_reservoir":
-            outgoing += incoming
-        incoming += flows["electricity"] + flows["fuel"]
-        outgoing += flows["heat_loss"]
-        residual = incoming - outgoing
-        # NOTE(refactor): isothermal legacy pumps lack a thermodynamic work/loss model.
-        # This term exposes missing bookkeeping; it is NOT a modeled heat-loss port.
-        unresolved = flows["electricity"] if module.category == "pumps" else 0.0
-        heat = getattr(result.outputs, "duty", 0.0)
+        totals = _leaf_energy(module, result, flows)
+    incoming, outgoing, residual, unresolved = (
+        totals[key] for key in ("in", "out", "residual", "unresolved_power")
+    )
     scale = max(abs(incoming), abs(outgoing), 1)
     return flows | {
-        "heat_delivered": heat,
+        "heat_delivered": totals["heat_delivered"],
         "losses": flows["heat_loss"],
         "in": incoming,
         "out": outgoing,
@@ -122,5 +109,48 @@ def energy_balance(module, result):
         "unresolved_power": unresolved,
         "thermal_residual": residual - unresolved,
         "relative_thermal_residual": abs(residual - unresolved) / scale,
+        "modules": totals["modules"],
+    }
+
+
+def _composite_energy(module, result):
+    """Sum the leaf audits of a composite and cancel streams passed between its leaves."""
+    children = {
+        path: energy_balance(module.get_submodule(path), child)
+        for path, child in result.leaves().items()
+    }
+    internal = _internal_flux(result, _enthalpy)
+    return {
+        "residual": sum(c["residual"] for c in children.values()),
+        "unresolved_power": sum(c["unresolved_power"] for c in children.values()),
+        "in": sum(c["in"] for c in children.values()) - internal,
+        "out": sum(c["out"] for c in children.values()) - internal,
+        "heat_delivered": getattr(result.outputs, "thermal_power", 0.0),
         "modules": children,
+    }
+
+
+def _leaf_energy(module, result, flows):
+    """Audit one leaf; aquifers are open boundaries.
+
+    NOTE(refactor): isothermal legacy pumps lack a thermodynamic work/loss model, so their
+    electricity is reported as ``unresolved_power``. This term exposes missing bookkeeping; it is
+    NOT a modeled heat-loss port.
+    """
+    incoming = sum(_enthalpy(s) for s in _streams(result.inlets))
+    outgoing = sum(_enthalpy(s) for s in _streams(result.outlets))
+    if isinstance(module, ProductionReservoir):
+        incoming += outgoing
+    elif isinstance(module, InjectionReservoir):
+        outgoing += incoming
+    incoming += flows["electricity"] + flows["fuel"]
+    outgoing += flows["heat_loss"]
+    is_pump = isinstance(module, (ESP, InjectionPump, BoosterPump))
+    return {
+        "residual": incoming - outgoing,
+        "unresolved_power": flows["electricity"] if is_pump else 0.0,
+        "in": incoming,
+        "out": outgoing,
+        "heat_delivered": getattr(result.outputs, "duty", 0.0),
+        "modules": {},
     }

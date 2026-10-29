@@ -1,4 +1,4 @@
-"""Mass conservation and fidelity for Filter."""
+"""Mass conservation for Filter."""
 
 from gemini.core.modules.treatment import Filter
 from gemini.core.types.flows import Stream
@@ -11,7 +11,6 @@ def test_equipment_forward():
     assert sum(s.m_dot for s in result.outlets.values() if isinstance(s, Stream)) == 1
     assert result.outlets["outlet"].T == 300
     assert result.outlets["outlet"].p >= 0
-    assert c.fidelity == "simple"
 
 
 def test_clogging_alarm():

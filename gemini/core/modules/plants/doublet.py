@@ -58,12 +58,10 @@ class Doublet(Module):
         """Evaluate both limbs for an independently specified return boundary."""
 
         # Modules
-        return_stream = inlets.return_stream
-        produced_supply = self.produce()
-        self.inject(return_stream)
+        self.inject(inlets.return_stream)
 
         # Outlets
-        supply = produced_supply
+        supply = self.produce()
 
         outlets = dict(supply=supply)
         return outlets

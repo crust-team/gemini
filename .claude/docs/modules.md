@@ -5,6 +5,18 @@ once in `__init__`. Every `forward` receives the same read-only `Ports` mapping 
 dictionary containing exactly the declared fluid outlets. Controls and boundaries are applied by
 the base class and read from `self`. Outputs are computed only after the fluid step succeeds.
 
+## Construction and metadata
+
+Construct a module without arguments and set its values afterwards; `update_params` returns the
+module, so `ESP().update_params(no_stages=12, ...)` builds a configured pump. Only structural
+tree-shape arguments (for example `ModuleList(modules)`) go to `__init__`. There is no class
+registry and no class-creation hook: `module.name` is the snake_case class name computed on access,
+`Module.help()` reads the class docstring, and any number of classes may share a name.
+`module.fluid` is a validated property saved by `state_dict()`; reservoirs apply their
+`liquid_density`/`liquid_viscosity` overrides when it is read. Plant files and checkpoints store
+the root class as `module:qualname` through `class_path`/`import_class` in `module.py`, the only
+import-by-string in the package.
+
 ## Leaf modules
 
 Leaves declare ordinary `Output(kind)` values and implement
@@ -178,6 +190,16 @@ handle = pump.register_forward_hook(observe)
 
 Hook return values are ignored. Any non-fixed hook signature fails at registration. Remove a hook
 with `handle.remove()`.
+
+## Per-call values
+
+The values of one call (resolved controls and boundaries, recorded outputs and the results of
+child calls) live in one `_Call` record held in a context variable while the call runs. Attribute
+access on a module returns parameter values, the control/boundary value of its running call
+(even from a descendant's hook), the persisted value or the default, outputs recorded in its
+running call, and port declarations otherwise. Child calls made from pre-hooks are recorded on
+the module whose call is running. A module keeps no result after the call returns: use the
+returned `ModuleResult`.
 
 ## Skipping outputs
 

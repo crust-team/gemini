@@ -3,10 +3,32 @@
 import csv
 from pathlib import Path
 
+from gemini.core.modules import (
+    ESP,
+    Degasser,
+    Filter,
+    HeatExchanger,
+    InjectionPump,
+    InjectionReservoir,
+    InjectionWell,
+    ProductionReservoir,
+    ProductionWell,
+)
 from gemini.core.physics import geometry, units
 from gemini.utils.files import read_json
 
 # All old-format names are intentionally confined to the legacy package.
+MODULE_TYPES = {
+    "production_reservoir": ProductionReservoir,
+    "injection_reservoir": InjectionReservoir,
+    "production_well": ProductionWell,
+    "injection_well": InjectionWell,
+    "esp": ESP,
+    "injection_pump": InjectionPump,
+    "filter": Filter,
+    "degasser": Degasser,
+    "heat_exchanger": HeatExchanger,
+}
 TYPES = {
     "production_well": "production_well",
     "injection_well": "injection_well",

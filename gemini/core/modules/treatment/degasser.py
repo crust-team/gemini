@@ -14,9 +14,11 @@ from gemini.core.types import (
 
 
 class Degasser(Module):
-    """Separates released gas from the produced geothermal brine."""
+    """Degasser applying a pressure loss to the liquid; gas separation is not modelled.
 
-    fidelity = "passthrough"
+    The liquid leaves at ``p_out`` when set, otherwise ``dp`` below the inlet pressure.
+    NOTE(refactor): the 0.149 bar default loss comes from Sep_Pin/Sep_Pout in the example.
+    """
 
     def __init__(self):
         """Declare degasser design data, inlet and split outlets."""
@@ -43,7 +45,6 @@ class Degasser(Module):
 
         # Outlets
         inlet = inlets.inlet
-        # NOTE(refactor): 0.149 bar default loss comes from Sep_Pin/Sep_Pout in the example.
         pressure = self.p_out if self.p_out is not None else inlet.p - self.dp
         liquid = inlet.with_(p=pressure)
         gas = liquid.with_(m_dot=0)

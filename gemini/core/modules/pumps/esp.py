@@ -25,6 +25,13 @@ from gemini.core.types import (
     VolumeFlow,
 )
 from gemini.core.types.results import Health
+from gemini.errors import InsufficientDataError, PhysicsRangeError
+
+MIN_EFFICIENCY_POWER = 0.1
+"""Shaft power [W] below which the pump is treated as stopped and its efficiency as zero."""
+
+DRIFT_FLOOR = 1e-12
+"""Smallest prediction magnitude used as a drift denominator, so a zero prediction is finite."""
 
 
 class ESP(Module):
@@ -69,26 +76,6 @@ class ESP(Module):
         # Outlets
         self.discharge = Outlet(Stream)
 
-    def head_function(self, flow: float, frequency: float) -> float:
-        """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""
-        return pumps.head(flow, frequency, self.no_stages, self._coefficients(self.head_coeff))
-
-    def power_function(self, flow: float, frequency: float) -> float:
-        """Return shaft power [W] for flow [m3/s] and frequency [Hz]."""
-        return pumps.power(flow, frequency, self.no_stages, self._coefficients(self.power_coeff))
-
-    @staticmethod
-    def efficiency_function(flow: float, head: float, power: float) -> float:
-        """Return retained hydraulic efficiency as a fraction."""
-        if power < 0.1:
-            return 0.0
-        return (
-            units.m3s_to_bbl_per_day(flow)
-            / constants.ESP_EFFICIENCY_FLOW_FACTOR
-            * (head / power)
-            * (units.bhp_to_w(1) / units.ft_head_to_pa(1))
-        )
-
     def forward(self, inlets):
         """Raise the suction-stream pressure by the pump-curve head."""
 
@@ -96,7 +83,9 @@ class ESP(Module):
         suction = inlets.suction
         flow = suction.volumetric_flow()
         if flow < 0:
-            raise ValueError(f"{self.path}: reverse volume flow {flow} is unsupported")
+            raise PhysicsRangeError(
+                f"{self.path}: suction volume flow = {flow} m3/s; reverse flow is unsupported"
+            )
         head = self.head_function(flow, self.frequency)
 
         discharge = suction.with_(p=suction.p + head)
@@ -117,18 +106,31 @@ class ESP(Module):
         self.bep_ratio = self.flow / (self.bep_flow * scale)
         self.electricity = self.power / self.motor_efficiency
 
+    def head_function(self, flow: float, frequency: float) -> float:
+        """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""
+        return pumps.head(flow, frequency, self.no_stages, self._coefficients(self.head_coeff))
+
+    def power_function(self, flow: float, frequency: float) -> float:
+        """Return shaft power [W] for flow [m3/s] and frequency [Hz]."""
+        return pumps.power(flow, frequency, self.no_stages, self._coefficients(self.power_coeff))
+
     @staticmethod
-    def _coefficients(values):
-        # NOTE(refactor): old monitoring uses NumPy float32 arithmetic when selected globally.
+    def efficiency_function(flow: float, head: float, power: float) -> float:
+        """Return retained hydraulic efficiency as a fraction."""
+        if power < MIN_EFFICIENCY_POWER:
+            return 0.0
         return (
-            np.asarray(values, dtype=np.float32) if runtime.get_precision() == "float32" else values
+            units.m3s_to_bbl_per_day(flow)
+            / constants.ESP_EFFICIENCY_FLOW_FACTOR
+            * (head / power)
+            * (units.bhp_to_w(1) / units.ft_head_to_pa(1))
         )
 
     def health(self, predicted, measured):
         """Score the worst available relative drift and the operating window."""
         drifts = {
             key: (measured[key] - getattr(predicted, key))
-            / max(abs(getattr(predicted, key)), 1e-12)
+            / max(abs(getattr(predicted, key)), DRIFT_FLOOR)
             for key in ("power", "head", "discharge_pressure")
             if key in measured
         }
@@ -149,13 +151,17 @@ class ESP(Module):
         """Fit six ascending US-basis head coefficients from SI observations."""
         q, f, h = map(lambda value: np.asarray(value, dtype=float), (flows, frequencies, heads))
         if q.shape != f.shape or q.shape != h.shape or q.ndim != 1 or len(q) < 6:
-            raise ValueError("esp: at least six matching observations required")
+            raise InsufficientDataError(
+                f"{cls.__name__}: at least six matching observations required"
+            )
         if no_stages <= 0 or np.any(f <= 0) or np.any(q < 0) or not np.isfinite([q, f, h]).all():
-            raise ValueError("esp: fitting requires finite positive stages and frequencies")
+            raise InsufficientDataError(
+                f"{cls.__name__}: fitting requires finite positive stages and frequencies"
+            )
         x = units.m3s_to_bbl_per_day(q)
         y = units.pa_to_ft_head(h) / (no_stages * (f / constants.ESP_REFERENCE_FREQUENCY) ** 2)
         if len(np.unique(x)) < 6:
-            raise ValueError("esp: six distinct flow values are required")
+            raise InsufficientDataError(f"{cls.__name__}: six distinct flow values are required")
         return np.polynomial.Polynomial.fit(x, y, 5).convert().coef.tolist()
 
     @classmethod
@@ -163,16 +169,31 @@ class ESP(Module):
         """Fit the retained affine VLP correction in Pa."""
         x, y = map(lambda value: np.asarray(value, dtype=float), (measured, theoretical))
         if x.shape != y.shape or len(x) < 2 or not np.isfinite([x, y]).all() or np.var(x) == 0:
-            raise ValueError("esp: two or more finite, distinct measurements required")
+            raise InsufficientDataError(
+                f"{cls.__name__}: two or more finite, distinct measurements required"
+            )
         slope = np.sum((x - x.mean()) * (y - y.mean())) / np.sum((x - x.mean()) ** 2)
         return float(slope), float(y.mean() - slope * x.mean())
 
     def head_curve(self, frequency: float, n_points: int = 50) -> list[tuple[float, float]]:
         """Return plotting points as (flow [m3/s], head [Pa])."""
         if frequency <= 0 or n_points < 2:
-            raise ValueError("esp: positive frequency and at least two curve points required")
+            raise ValueError(
+                f"{self.path}: positive frequency and at least two curve points required; got "
+                f"frequency = {frequency} Hz, n_points = {n_points}"
+            )
         scale = frequency / constants.ESP_REFERENCE_FREQUENCY
         return [
             (float(flow), self.head_function(flow / scale, frequency))
             for flow in np.linspace(0, 2 * self.max_flow * scale, n_points)
         ]
+
+    @staticmethod
+    def _coefficients(values):
+        """Return curve coefficients in the selected runtime precision.
+
+        NOTE(refactor): old monitoring uses NumPy float32 arithmetic when selected globally.
+        """
+        if runtime.get_precision() == "float32":
+            return np.asarray(values, dtype=np.float32)
+        return values

@@ -31,10 +31,14 @@ ESP_PARAMS = {
 
 def test_original_nonzero_power_reference():
     """Preserve the original 200 m3/h, 60 Hz reference beyond the zero-power example."""
-    output = ESP(**ESP_PARAMS)(
-        frequency=60,
-        suction=Stream(m_dot=units.m3h_to_m3s(200) * 1000, T=300, p=100000),
-    ).outputs
+    output = (
+        ESP()
+        .update_params(**ESP_PARAMS)(
+            frequency=60,
+            suction=Stream(m_dot=units.m3h_to_m3s(200) * 1000, T=300, p=100000),
+        )
+        .outputs
+    )
     assert units.pa_to_bar(output.head) == pytest.approx(23.37, abs=0.01)
     assert output.power == pytest.approx(183890, abs=10)
     assert output.efficiency == pytest.approx(0.7053, abs=0.0001)
@@ -42,12 +46,12 @@ def test_original_nonzero_power_reference():
 
 def test_fit_recovers_curve_and_health_threshold():
     """Synthetic curve fitting predicts withheld operating points and flags measured drift."""
-    pump = ESP(**ESP_PARAMS)
+    pump = ESP().update_params(**ESP_PARAMS)
     flows = np.linspace(0.01, 0.06, 20)
     freq = np.linspace(40, 60, 20)
     heads = [pump.head_function(q, f) for q, f in zip(flows, freq)]
     fitted = ESP.fit_head_coefficients(flows, freq, heads, 12)
-    other = ESP(**dict(ESP_PARAMS, head_coeff=fitted))
+    other = ESP().update_params(**dict(ESP_PARAMS, head_coeff=fitted))
     assert other.head_function(0.037, 53) == pytest.approx(pump.head_function(0.037, 53), rel=1e-9)
     out = pump(frequency=60, suction=Stream(m_dot=40, T=300, p=1e5)).outputs
     assert not pump.health(out, {"power": out.power}).alarm

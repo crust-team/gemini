@@ -10,7 +10,7 @@ from gemini.core.types.flows import Stream
 def test_injection_flow_sign_and_pressure():
     """Ports conserve mass while the internal DPDT correlation retains its negative sign."""
     data = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
-    c = InjectionWell(
+    c = InjectionWell().update_params(
         **mapping.injectionwell_params_from_gemini(
             mapping.read_property(data / "injection_well_a06b.param")
         )
@@ -25,7 +25,7 @@ def test_injection_flow_sign_and_pressure():
 def test_corrosion_profile_uses_injection_flow_sign():
     """Positive surface flow and negative downhole flow describe the same injection state."""
     data = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
-    well = InjectionWell(
+    well = InjectionWell().update_params(
         **mapping.injectionwell_params_from_gemini(
             mapping.read_property(data / "injection_well_a06b.param")
         )

@@ -88,13 +88,18 @@ def verification(tmp_path_factory, selected_dataset, module_plant):
     balances, electricity = [], []
     count = 0
 
+    latest = {}
+
+    def record(module, inlets):
+        latest["inlets"] = inlets
+
     class Audit(Callback):
-        """Sample completed plant results without changing module hooks."""
+        """Sample completed plant results by re-evaluating the committed step's inlets."""
 
         def on_step_end(self, current, sample):
             """Audit the immutable result after the engine commits a step."""
             nonlocal count
-            result = current.plant.last_result
+            result = current.plant(latest["inlets"])
             electricity.append(result.outputs.electricity_use)
             if count in sampled:
                 mass = gm.modules.mass_balance(current.plant, result)
@@ -114,8 +119,10 @@ def verification(tmp_path_factory, selected_dataset, module_plant):
                 )
             count += 1
 
+    handle = plant.register_forward_pre_hook(record)
     chain = gm.Engine([Audit()]).simulate(plant, dataset, gm.Clock.from_data(dataset)).to_frame()
-    traced = gm.modules.trace_wiring(plant, dict(plant.last_result.inlets))
+    handle.remove()
+    traced = gm.modules.trace_wiring(plant, dict(latest["inlets"]))
     mismatches = gm.legacy.check_wiring(plant, gm.legacy.read_project(OLD))
     assert mismatches == []
     report["wiring"] = {"edges": len(traced), "mismatches": mismatches}

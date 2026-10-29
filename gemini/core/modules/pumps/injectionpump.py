@@ -16,12 +16,12 @@ from gemini.core.types import (
     PressureDifference,
     Stream,
 )
+from gemini.errors import ConfigurationError, PhysicsRangeError
 
 
 class InjectionPump(Module):
     """Raise brine pressure with a simple hydraulic-power estimate."""
 
-    fidelity = "simple"
     repr_fields = ("no_stages", "efficiency", "pump_type")
 
     def __init__(self):
@@ -56,19 +56,11 @@ class InjectionPump(Module):
 
         # Outlets
         suction = inlets.suction
-        flow = suction.volumetric_flow()
-        if flow < 0:
-            raise ValueError(f"{self.path}: reverse flow is unsupported")
-        if self.head_coeff is not None:
-            if self.no_stages is None:
-                raise ValueError(f"{self.path}: curves require no_stages")
-            head = pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
-        elif self.pressure_setpoint is not None:
-            head = self.pressure_setpoint - suction.p
-        else:
-            raise ValueError(f"{self.path}: supply discharge_pressure or pump curves")
+        head = self._head(suction)
         if head < 0:
-            raise ValueError(f"{self.path}: discharge pressure is below suction pressure")
+            raise PhysicsRangeError(
+                f"{self.path}: head = {head} Pa; discharge pressure is below suction pressure"
+            )
 
         discharge = suction.with_(p=suction.p + head)
 
@@ -80,8 +72,29 @@ class InjectionPump(Module):
         discharge = outlets.discharge
         flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
-        self.power = flow * self.head / self.efficiency
         if self.head_coeff is not None and self.power_coeff is not None:
             self.power = pumps.power(flow, self.frequency, self.no_stages, self.power_coeff)
+        else:
+            self.power = flow * self.head / self.efficiency
         self.discharge_pressure = discharge.p
         self.electricity = self.power
+
+    def _head(self, suction):
+        """Return the pressure rise [Pa] from the head curve, else from the pressure setpoint.
+
+        A ``power_coeff`` curve is used for power only together with a ``head_coeff`` curve.
+        """
+        flow = suction.volumetric_flow()
+        if flow < 0:
+            raise PhysicsRangeError(
+                f"{self.path}: suction volume flow = {flow} m3/s; reverse flow is unsupported"
+            )
+        if self.head_coeff is not None:
+            if self.no_stages is None:
+                raise ConfigurationError(f"{self.path}: head_coeff curves require no_stages")
+            return pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
+        if self.pressure_setpoint is not None:
+            return self.pressure_setpoint - suction.p
+        raise ConfigurationError(
+            f"{self.path}: supply the pressure_setpoint control or head_coeff and no_stages"
+        )

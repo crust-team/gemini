@@ -25,7 +25,12 @@ from gemini.core.types import (
     Temperature,
     Viscosity,
 )
+from gemini.core.types.fluid import Fluid
 from gemini.core.types.results import Health
+from gemini.errors import ConfigurationError, InsufficientDataError, PhysicsRangeError
+
+FLUID_OVERRIDES = ("liquid_density", "liquid_viscosity")
+"""Reservoir parameters that, when set, replace the matching property of the module fluid."""
 
 
 class _Reservoir(Module):
@@ -58,10 +63,22 @@ class _Reservoir(Module):
         self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
         self.drawdown = Output(PressureDifference)
         self.overpressure = Output(PressureDifference)
-        self.flow_dp = Output(PressureDifference | None, optional=True)
-        self.skin_dp = Output(PressureDifference | None, optional=True)
+        self.flow_dp = Output(PressureDifference | None)
+        self.skin_dp = Output(PressureDifference | None)
         self.hydrostatic_dp = Output(PressureDifference)
-        self.radial_bottomhole_pressure = Output(Pressure | None, optional=True)
+        self.radial_bottomhole_pressure = Output(Pressure | None)
+
+    @property
+    def fluid(self):
+        """Return the module fluid with the reservoir's liquid density and viscosity overrides."""
+        overrides = {name: getattr(self, name) for name in FLUID_OVERRIDES}
+        set_overrides = {name: value for name, value in overrides.items() if value is not None}
+        return Fluid.model_validate(self._fluid.model_dump() | set_overrides)
+
+    @fluid.setter
+    def fluid(self, value):
+        """Set and validate the module fluid without the overrides; ``state_dict`` saves it."""
+        Module.fluid.fset(self, value)
 
     def _calculate_outputs(self, flow, p_bh):
         properties = self.fluid.properties(self.pressure, self.temperature)
@@ -99,10 +116,12 @@ class _Reservoir(Module):
             or np.any(q == 0)
             or not np.isfinite([q, p]).all()
         ):
-            raise ValueError("Reservoir pressure estimation needs matching finite samples")
+            raise InsufficientDataError(
+                "Reservoir pressure estimation needs at least two matching finite, nonzero samples"
+            )
         x, y = 1 / q, p / q
         if np.ptp(x) == 0 or np.ptp(y) == 0:
-            raise ValueError("Reservoir pressure regression requires variation")
+            raise InsufficientDataError("Reservoir pressure regression requires variation")
         coefficients = np.polyfit(x, y, 1)
         residual = y - np.poly1d(coefficients)(x)
         r_squared = 1 - np.sum(residual**2) / np.sum((y - np.mean(y)) ** 2)
@@ -111,26 +130,39 @@ class _Reservoir(Module):
     def injectivity_from_measurements(self, flow, p_bh):
         """Return injectivity [m3/s/Pa] from one measurement."""
         if p_bh == self.pressure:
-            raise ValueError("Injection reservoir: zero pressure differential")
+            raise PhysicsRangeError(
+                f"{self.path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
+                "injectivity needs a pressure differential"
+            )
         return flow / (p_bh - self.pressure)
 
     def productivity_from_measurements(self, flow, p_bh):
         """Return productivity [m3/s/Pa] from one measurement."""
         if p_bh == self.pressure:
-            raise ValueError("Production reservoir: zero pressure differential")
+            raise PhysicsRangeError(
+                f"{self.path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
+                "productivity needs a pressure differential"
+            )
         return flow / (self.pressure - p_bh)
 
     def health(self, predicted, measured):
-        """Alarm on declining measured PI or II relative to design."""
-        if not {"flow", "bottomhole_pressure"} <= measured.keys():
-            return None
+        """Alarm on declining measured PI or II relative to design.
+
+        Returns ``None`` (not assessed) without both measurements, without a nonzero design
+        index, or when the measured bottomhole pressure equals the reservoir pressure.
+        """
         production = self.role == "production"
-        actual = (
+        nominal = self.productivity_index if production else self.injectivity_index
+        if not {"flow", "bottomhole_pressure"} <= measured.keys() or not nominal:
+            return None
+        if measured["bottomhole_pressure"] == self.pressure:
+            return None
+        estimate = (
             self.productivity_from_measurements
             if production
             else self.injectivity_from_measurements
-        )(measured["flow"], measured["bottomhole_pressure"])
-        nominal = self.productivity_index if production else self.injectivity_index
+        )
+        actual = estimate(measured["flow"], measured["bottomhole_pressure"])
         ratio = actual / nominal
         return Health(
             score=min(1, max(0, ratio)),
@@ -158,7 +190,7 @@ class ProductionReservoir(_Reservoir):
 
         # Outlets
         if self.productivity_index is None:
-            raise ValueError(f"{self.path}: productivity_index is required")
+            raise ConfigurationError(f"{self.path}: productivity_index is required")
         flow = self.m_dot / self.fluid.properties(self.pressure, self.temperature).rho_l
         p_bh = self.pressure - flow / self.productivity_index
 
@@ -185,15 +217,16 @@ class InjectionReservoir(_Reservoir):
         self.sandface = Inlet(Stream)
 
     def forward(self, inlets):
-        """Calculate required bottomhole pressure from the sandface flow."""
+        """Receive the sandface stream; the aquifer has no outlet."""
 
+        if self.injectivity_index is None:
+            raise ConfigurationError(f"{self.path}: injectivity_index is required")
         outlets = dict()
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
+        """Calculate the bottomhole pressure the sandface flow requires."""
         sandface = inlets.sandface
-        if self.injectivity_index is None:
-            raise ValueError(f"{self.path}: injectivity_index is required")
         flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
         p_bh = self.pressure + flow / self.injectivity_index
         for name, value in self._calculate_outputs(flow, p_bh).items():

@@ -2,9 +2,9 @@
 
 import pytest
 
-from gemini.core.modules.container import Sequential
+from gemini.core.modules import ModuleList
 from gemini.core.modules.treatment.filter import Filter
-from gemini.core.types.cost import Cost
+from gemini.core.types.cost import Cost, total_cost
 
 
 class CostedFilter(Filter):
@@ -22,12 +22,13 @@ def test_cost_aggregation():
         capex=100, opex_fixed=10, opex_variable=0.001, price_year=2024, source="test fixture"
     )
     second.estimate = first.estimate
-    plant = Sequential(first, second)
-    assert plant.cost().capex == 200
-    assert plant.cost().opex_fixed == 20
-    assert plant.cost().opex_variable == 0.002
+    plant = ModuleList([first, second])
+    assert total_cost(plant).capex == 200
+    assert total_cost(plant).opex_fixed == 20
+    assert total_cost(plant).opex_variable == 0.002
+    assert total_cost(plant).source == "test fixture"
     for change in ({"currency": "USD"}, {"price_year": 2025}):
         second.estimate = first.estimate.model_copy(update=change)
         with pytest.raises(ValueError, match="currency and price year"):
-            plant.cost()
-    assert Filter().cost() is None
+            total_cost(plant)
+    assert total_cost(Filter()) is None

@@ -20,6 +20,10 @@ from gemini.core.types import (
     ThermalConductance,
 )
 from gemini.core.types.results import Health
+from gemini.errors import InsufficientDataError, PhysicsRangeError, UnknownCorrelationError
+
+DEFAULT_CP = 4217.4
+"""Liquid heat capacity [J/kg/K] assumed when measurements give none; the ``Fluid`` default."""
 
 
 class HeatExchanger(Module):
@@ -82,27 +86,16 @@ class HeatExchanger(Module):
 
     def _performance(self, hot_in, cold_in):
         if hot_in.m_dot < 0 or cold_in.m_dot < 0:
-            raise ValueError(f"{self.path}: negative mass flow")
-        if hot_in.T < cold_in.T:
-            raise ValueError(f"{self.path}: hot inlet is below cold inlet")
-        cp_h = hot_in.fluid.properties(hot_in.p, hot_in.T).cp_l
-        cp_c = cold_in.fluid.properties(cold_in.p, cold_in.T).cp_l
-        c_hot, c_cold = hot_in.m_dot * cp_h, cold_in.m_dot * cp_c
-        c_min, c_max = min(c_hot, c_cold), max(c_hot, c_cold)
-        if c_min == 0:
-            effectiveness = ntu = duty = 0.0
-            hot_T, cold_T = hot_in.T, cold_in.T
-        else:
-            ntu = heat_transfer.ntu(self.ua, c_min)
-            method = (
-                heat_transfer.effectiveness_counterflow
-                if self.arrangement == "counterflow"
-                else heat_transfer.effectiveness_parallel
+            raise PhysicsRangeError(
+                f"{self.path}: negative mass flow hot_in.m_dot = {hot_in.m_dot} kg/s, "
+                f"cold_in.m_dot = {cold_in.m_dot} kg/s; expected >= 0"
             )
-            effectiveness = method(ntu, c_min / c_max)
-            duty = effectiveness * c_min * (hot_in.T - cold_in.T)
-            hot_T = hot_in.T - duty / c_hot
-            cold_T = cold_in.T + duty / c_cold
+        if hot_in.T < cold_in.T:
+            raise PhysicsRangeError(
+                f"{self.path}: hot inlet is below cold inlet: hot_in.T = {hot_in.T} K, "
+                f"cold_in.T = {cold_in.T} K"
+            )
+        effectiveness, ntu, duty, hot_T, cold_T = self._heat_balance(hot_in, cold_in)
         dp_hot = self.dp_hot_nominal * (hot_in.m_dot / self.m_dot_hot_nominal) ** 2
         dp_cold = self.dp_cold_nominal * (cold_in.m_dot / self.m_dot_cold_nominal) ** 2
         if self.arrangement == "counterflow":
@@ -121,6 +114,27 @@ class HeatExchanger(Module):
             "approach_T": min(dt1, dt2),
         }
 
+    def _heat_balance(self, hot_in, cold_in):
+        """Return effectiveness, NTU, duty [W] and both outlet temperatures [K].
+
+        A stopped stream (zero heat capacity rate) transfers no heat.
+        """
+        cp_h = hot_in.fluid.properties(hot_in.p, hot_in.T).cp_l
+        cp_c = cold_in.fluid.properties(cold_in.p, cold_in.T).cp_l
+        c_hot, c_cold = hot_in.m_dot * cp_h, cold_in.m_dot * cp_c
+        c_min, c_max = min(c_hot, c_cold), max(c_hot, c_cold)
+        if c_min == 0:
+            return 0.0, 0.0, 0.0, hot_in.T, cold_in.T
+        ntu = heat_transfer.ntu(self.ua, c_min)
+        method = (
+            heat_transfer.effectiveness_counterflow
+            if self.arrangement == "counterflow"
+            else heat_transfer.effectiveness_parallel
+        )
+        effectiveness = method(ntu, c_min / c_max)
+        duty = effectiveness * c_min * (hot_in.T - cold_in.T)
+        return effectiveness, ntu, duty, hot_in.T - duty / c_hot, cold_in.T + duty / c_cold
+
     @classmethod
     def ua_from_measurements(
         cls,
@@ -131,47 +145,60 @@ class HeatExchanger(Module):
         m_dot_hot,
         m_dot_cold,
         *,
-        cp_hot=4217.4,
-        cp_cold=4217.4,
+        cp_hot=DEFAULT_CP,
+        cp_cold=DEFAULT_CP,
         arrangement="counterflow",
     ):
-        """Estimate apparent UA [W/K] from measured temperatures and mass flows."""
+        """Estimate apparent UA [W/K] from measured temperatures and mass flows.
+
+        Raises ``InsufficientDataError`` when the measurements cannot determine UA: a stopped
+        stream, hot and cold duties that disagree by more than 5 %, or no positive LMTD.
+        """
+        name = cls.__name__
+        if arrangement not in {"counterflow", "parallel"}:
+            raise UnknownCorrelationError(
+                f"{name}: unknown arrangement {arrangement!r}; expected counterflow or parallel"
+            )
         if min(m_dot_hot, m_dot_cold, cp_hot, cp_cold) <= 0:
-            raise ValueError("heat_exchanger: mass flows and heat capacities must be positive")
+            raise InsufficientDataError(f"{name}: mass flows and heat capacities must be positive")
         qh = m_dot_hot * cp_hot * (hot_in_T - hot_out_T)
         qc = m_dot_cold * cp_cold * (cold_out_T - cold_in_T)
         if min(qh, qc) <= 0 or abs(qh - qc) / max(qh, qc) > 0.05:
-            raise ValueError("heat_exchanger: hot/cold duties must agree within 5%")
+            raise InsufficientDataError(
+                f"{name}: hot/cold duties must agree within 5%; got {qh} W and {qc} W"
+            )
         if arrangement == "counterflow":
             dt1, dt2 = hot_in_T - cold_out_T, hot_out_T - cold_in_T
-        elif arrangement == "parallel":
-            dt1, dt2 = hot_in_T - cold_in_T, hot_out_T - cold_out_T
         else:
-            raise ValueError(f"heat_exchanger: unknown arrangement {arrangement!r}")
+            dt1, dt2 = hot_in_T - cold_in_T, hot_out_T - cold_out_T
         delta = heat_transfer.lmtd(dt1, dt2)
         if delta <= 0:
-            raise ValueError("heat_exchanger: positive LMTD required")
+            raise InsufficientDataError(f"{name}: positive LMTD required; got {delta} K")
         return (qh + qc) / 2 / delta
 
     def health(self, predicted, measured):
-        """Alarm when apparent conductance falls below the configured design fraction."""
+        """Alarm when apparent conductance falls below the configured design fraction.
+
+        Returns ``None`` (not assessed) when a measurement is missing, the design UA is zero, or
+        the measurements cannot determine an apparent UA (see ``ua_from_measurements``).
+        """
         keys = ("hot_in_T", "hot_out_T", "cold_in_T", "cold_out_T", "m_dot_hot", "m_dot_cold")
-        if not set(keys) <= measured.keys():
+        if not set(keys) <= measured.keys() or not self.ua:
             return None
-        apparent = self.ua_from_measurements(
-            **{key: measured[key] for key in keys},
-            cp_hot=measured.get("cp_hot", 4217.4),
-            cp_cold=measured.get("cp_cold", 4217.4),
-            arrangement=self.arrangement,
-        )
-        ratio = apparent / self.ua if self.ua else 1.0
+        try:
+            apparent = self.ua_from_measurements(
+                **{key: measured[key] for key in keys},
+                cp_hot=measured.get("cp_hot", DEFAULT_CP),
+                cp_cold=measured.get("cp_cold", DEFAULT_CP),
+                arrangement=self.arrangement,
+            )
+        except InsufficientDataError:
+            return None
+        ratio = apparent / self.ua
+        alarm = ratio < 1 - self.fouling_threshold
         return Health(
             score=min(1, max(0, ratio)),
-            alarm=ratio < 1 - self.fouling_threshold,
-            message=(
-                "Apparent UA below fouling limit"
-                if ratio < 1 - self.fouling_threshold
-                else "Apparent UA within limit"
-            ),
+            alarm=alarm,
+            message="Apparent UA below fouling limit" if alarm else "Apparent UA within limit",
             metrics={"apparent_ua": apparent, "ua_ratio": ratio},
         )

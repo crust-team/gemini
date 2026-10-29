@@ -5,12 +5,10 @@ from gemini.core.types import Inlet, Outlet, Output, Stream
 
 
 class Blowdown(Module):
-    """Removes a controlled fraction of circulating brine."""
-
-    fidelity = "passthrough"
+    """Blowdown placeholder: passes the stream through unchanged; ``modelled`` is False."""
 
     def __init__(self):
-        """Declare blowdown fraction, inlet and split outlets."""
+        """Declare the ports and the unmodelled-performance flag."""
         super().__init__()
 
         # Inlets

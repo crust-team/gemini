@@ -12,7 +12,7 @@ from gemini.core.types.flows import Stream
 def test_split_esp_traversal():
     """Split at 600 m inside a section; pumping raises the resulting wellhead pressure."""
     data = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
-    c = ProductionWell(
+    c = ProductionWell().update_params(
         **mapping.productionwell_params_from_gemini(
             mapping.read_property(data / "production_well_c774.param"),
             esp_property=mapping.read_property(data / "esp_1ee3.param"),

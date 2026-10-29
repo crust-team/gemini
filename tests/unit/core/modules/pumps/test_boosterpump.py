@@ -1,4 +1,4 @@
-"""Mass conservation and fidelity for BoosterPump."""
+"""Mass conservation for BoosterPump."""
 
 from gemini.core.modules.pumps import BoosterPump
 from gemini.core.types.flows import Stream
@@ -11,4 +11,4 @@ def test_equipment_forward():
     assert sum(s.m_dot for s in result.outlets.values() if isinstance(s, Stream)) == 1
     assert result.outlets["discharge"].T == 300
     assert result.outlets["discharge"].p >= 0
-    assert c.fidelity == "passthrough"
+    assert result.outputs.modelled is False
