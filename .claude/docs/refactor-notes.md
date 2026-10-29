@@ -207,6 +207,11 @@ ported into the refactored structure; only missing behaviour was added.
   doublet-A inputs the rate is 135.8666 m3/h against the reference 135.9258 m3/h (-0.059 m3/h,
   -0.044 %) and the ESP shaft power 174406.5 W against 174444.7 W (-0.022 %), within upstream's
   1 % tolerance, without tuning. Upstream's injector "bracket floor" result is `None` here.
+- `emissions` replaces the upstream KPI helpers, which named the `boiler`, `chp` and
+  `producer_well` components. Upstream offset only the ESP's electricity by CHP generation and
+  charged the injection pump in full; here all consumption is netted against all generation.
+  Its reference total (4083 kg CO2/day) depends on the upstream fuel-driven boiler and CHP
+  formulas, which were not ported, so it is not reproduced.
 - The Carnot mode keeps the refactored model: upstream evaluates the COP at the sink outlet and
   the **source inlet** without a lift floor (COP 4.4144 in its test case), the refactored model at
   both outlets with a 10 K floor (3.1012 for the same inputs).

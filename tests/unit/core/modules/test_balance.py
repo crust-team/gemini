@@ -3,8 +3,8 @@
 import pytest
 
 from gemini.core.modules import Module
-from gemini.core.modules.balance import collect_flows, energy_balance, mass_balance
-from gemini.core.modules.heat import Boiler
+from gemini.core.modules.balance import collect_flows, emissions, energy_balance, mass_balance
+from gemini.core.modules.heat import CHP, Boiler
 from gemini.core.modules.pumps import ESP, InjectionPump
 from gemini.core.types import Inlet, Outlet, Output, Power, Stream
 
@@ -82,3 +82,77 @@ def test_heat_supplied_to_a_consumer_closes_the_balance():
     balance = energy_balance(radiator, result)
     assert balance["heat_supplied"] == pytest.approx(0.9 * 2 * 4217.4 * 10)
     assert balance["relative_residual"] < 1e-12
+
+
+GAS_FACTOR = 56.6 / 1e9
+"""Natural-gas CO2 factor [kg/J] of the upstream GEMINI doublet example: 56.6 kg/GJ."""
+
+GRID_FACTOR = 0.3 / 3.6e6
+"""Grid-electricity CO2 factor [kg/J] of the upstream GEMINI doublet example: 0.3 kg/kWh."""
+
+
+class GasHeatedInjection(Module):
+    """Heat a return stream with a CHP and a boiler, then pump it into an injector."""
+
+    def __init__(self):
+        """Declare the three leaves and the plant ports."""
+        super().__init__()
+
+        # Modules
+        self.chp = CHP().update_params(
+            electric_capacity=1e5,
+            electric_efficiency=0.4,
+            thermal_efficiency=0.45,
+            maximum_outlet_temperature=363.15,
+        )
+        self.boiler = Boiler().update_params(fuel_type="gas", capacity=1e6, efficiency=0.9)
+        self.pump = InjectionPump().update_params(efficiency=0.8)
+
+        # Inlets
+        self.return_in = Inlet(Stream)
+
+        # Outlets
+        self.injected = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Pass the stream through CHP, boiler and pump in flow order."""
+
+        # Modules
+        heated = self.chp(inlet=inlets.return_in).outlets.outlet
+        topped = self.boiler(inlet=heated).outlets.outlet
+        pumped = self.pump(suction=topped)
+
+        # Outlets
+        injected = pumped.outlets.discharge
+
+        outlets = dict(injected=injected)
+        return outlets
+
+
+@pytest.mark.parametrize("load", [0.2, 1.0])
+def test_emissions_charge_fuel_and_net_grid_electricity(load):
+    """Fuel is charged in full; CHP electricity offsets the 60 kW pump before the grid."""
+    plant = GasHeatedInjection()
+    plant.set_inputs(
+        {
+            "chp.load_fraction": load,
+            "boiler.temperature_setpoint": 343.15,
+            "pump.pressure_setpoint": 50e5,
+        }
+    )
+    result = plant(return_in=Stream(m_dot=10, T=313.15, p=2e5))
+    flows = collect_flows(result)
+    pump_power = 10 / 1000 * 48e5 / 0.8
+    assert flows["electricity"] == pytest.approx(pump_power)
+    assert flows["electricity_generated"] == pytest.approx(load * 1e5)
+    grid = {0.2: pump_power - 2e4, 1.0: 0.0}[load]
+    expected = flows["fuel"] * GAS_FACTOR + grid * GRID_FACTOR
+    assert emissions(result, GAS_FACTOR, GRID_FACTOR) == pytest.approx(expected, rel=1e-12)
+
+
+def test_emissions_without_energy_outputs_are_zero():
+    """A leaf that burns and draws nothing emits nothing."""
+    result = Boiler().update_params(fuel_type="gas", capacity=1e6, efficiency=0.9)(
+        inlet=Stream(m_dot=10, T=350, p=2e5), temperature_setpoint=340
+    )
+    assert emissions(result, GAS_FACTOR, GRID_FACTOR) == 0

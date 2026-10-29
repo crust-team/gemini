@@ -36,6 +36,23 @@ def collect_flows(result_tree):
     return {key: result_tree.outputs.get(key, 0.0) for key in ENERGY_INPUTS + ENERGY_OUTPUTS}
 
 
+def emissions(result_tree, fuel_factor, electricity_factor):
+    """Return the CO2 emission rate [kg/s] of the fuel burnt and the grid electricity drawn.
+
+    ``fuel * fuel_factor + max(0, electricity - electricity_generated) * electricity_factor``
+    over the leaf totals of ``collect_flows``, for any plant topology. Factors are SI [kg/J]:
+    divide kg/GJ by 1e9 and kg/kWh by 3.6e6. On-site generation (a ``CHP``, an ``ORC``)
+    offsets consumption before grid electricity is charged, and a surplus earns no credit, as
+    the upstream GEMINI KPI charged the ESP only for the part the CHP did not cover. Fuel is
+    charged on its full lower-heating-value input, also when it feeds a generator, so CHP
+    electricity is not charged twice. Gas vented or flared by a ``Vent`` is reported by its own
+    ``co2_emission`` output and is not included.
+    """
+    flows = collect_flows(result_tree)
+    grid = max(0.0, flows["electricity"] - flows["electricity_generated"])
+    return flows["fuel"] * fuel_factor + grid * electricity_factor
+
+
 def _streams(ports):
     return [value for value in ports.values() if isinstance(value, Stream)]
 

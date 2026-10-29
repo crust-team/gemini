@@ -1,6 +1,6 @@
 """Public composable equipment and plant API."""
 
-from .balance import collect_flows, energy_balance, mass_balance
+from .balance import collect_flows, emissions, energy_balance, mass_balance
 from .container import ModuleDict, ModuleList
 from .control import PIDController
 from .demand import CoolingConsumer, HeatConsumer
@@ -74,6 +74,7 @@ __all__ = [
     "DistrictNetwork",
     "ATESPlant",
     "collect_flows",
+    "emissions",
     "energy_balance",
     "mass_balance",
     "trace_wiring",
