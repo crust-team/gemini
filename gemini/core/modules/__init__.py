@@ -4,7 +4,7 @@ from .balance import collect_flows, energy_balance, mass_balance
 from .container import ModuleDict, ModuleList
 from .control import PIDController
 from .demand import CoolingConsumer, HeatConsumer
-from .heat import Boiler, HeatExchanger
+from .heat import CHP, AbsorptionUnit, AdsorptionChiller, Boiler, Cooler, HeatExchanger, HeatPump
 from .module import Module
 from .piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
 from .power import ORC, FlashTurbine, GridConnection, Separator
@@ -29,6 +29,11 @@ __all__ = [
     "ModuleDict",
     "Boiler",
     "HeatExchanger",
+    "HeatPump",
+    "AbsorptionUnit",
+    "AdsorptionChiller",
+    "CHP",
+    "Cooler",
     "ESP",
     "InjectionPump",
     "CentrifugalPump",
