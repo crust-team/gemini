@@ -23,16 +23,6 @@ DATASETS = {
 }
 
 
-def pytest_addoption(parser):
-    """Add the committed real-data selection used by end-to-end tests."""
-    parser.addoption(
-        "--dataset",
-        choices=sorted(DATASETS),
-        default="fast",
-        help="committed e2e dataset: fast July month (default) or slow full year",
-    )
-
-
 @pytest.fixture(scope="session")
 def dataset_name(request):
     """Return the selected committed dataset name."""
@@ -108,3 +98,24 @@ def pytest_collection_modifyitems(items):
         marker = TIER_MARKERS.get(tier)
         if marker is not None:
             item.add_marker(marker)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Fail an unmarked fast-tier call that exceeds the one-second budget."""
+    outcome = yield
+    report = outcome.get_result()
+    markers = {marker.name for marker in item.iter_markers()}
+    if (
+        report.when == "call"
+        and report.passed
+        and report.duration > 1.0
+        and item.config.option.markexpr == "not e2e and not slow"
+        and not hasattr(item.config, "workerinput")
+        and not markers.intersection({"e2e", "slow"})
+    ):
+        report.outcome = "failed"
+        report.longrepr = (
+            f"Fast-tier test took {report.duration:.2f}s (budget: 1.00s). "
+            "Move it to slow or make it faster, see .claude/docs/testing.md."
+        )

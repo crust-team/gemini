@@ -1,5 +1,24 @@
 # GEMINI Python package
 
+## Start here
+
+Read every file in `.claude/docs/` before changing the repository:
+
+- [Public API](.claude/docs/api.md): curated imports and supported user workflows.
+- [Conventions](.claude/docs/conventions.md): dependencies, style and module contracts.
+- [Data](.claude/docs/data.md): in-memory datasets, sampling and gaps.
+- [Engine](.claude/docs/engine.md): replay, simulation, live runs and checkpoints.
+- [Legacy](.claude/docs/legacy.md): the old-format boundary and conversion rules.
+- [Modules](.claude/docs/modules.md): declarations, forwarding, outputs and hooks.
+- [Physics](.claude/docs/physics.md): SI correlations and numerical constraints.
+- [Refactor notes](.claude/docs/refactor-notes.md): retained numbers and known limitations.
+- [Runtime](.claude/docs/runtime.md): context-local process settings.
+- [Testing](.claude/docs/testing.md): tiers, datasets, budgets, fixtures and CI.
+- [Types](.claude/docs/types.md): streams, fluids, declarations, profiles and balances.
+
+When a commit changes behaviour, structure or conventions, update the relevant document in the
+same commit.
+
 GEMINI is a composable geothermal digital-twin package. Preserve captured numerical behavior.
 
 ## Layout
@@ -20,20 +39,6 @@ gemini/
 examples/             # package/category/NN_name.py; shared plant/data outside package
 tests/                # unit mirror, integration, e2e and immutable fixtures
 ```
-
-## Read before coding
-
-- [Public API](.claude/docs/api.md)
-- [Engine and checkpoints](.claude/docs/engine.md)
-- [Data and sampling](.claude/docs/data.md)
-- [Legacy bridge](.claude/docs/legacy.md)
-- [Conventions](.claude/docs/conventions.md)
-- [Core types](.claude/docs/types.md)
-- [Writing modules](.claude/docs/modules.md)
-- [Physics](.claude/docs/physics.md)
-- [Testing](.claude/docs/testing.md)
-- [Numerical decisions](.claude/docs/refactor-notes.md)
-- [Runtime settings](.claude/docs/runtime.md)
 
 Work locally; do not push or open a PR. Modules declare parameters and ports in `__init__`;
 `forward(self, inlets)` receives one immutable `Ports` mapping while controls and boundaries are

@@ -172,4 +172,37 @@ untouched full dataset.
 
 ## After
 
-To be completed after all phases.
+Measured on 2026-10-29 after all phases:
+
+| Selection | Before | After |
+| --- | ---: | ---: |
+| default fast tier, serial | 15.39 s | **9.18 s** |
+| default fast tier, `-n auto` | unavailable (xdist not installed) | **7.60 s** |
+| all 152 tests, fast data, serial | unavailable | **116.44 s** |
+| all 152 tests, fast data, `-n auto` | unavailable | **82.95 s** |
+| all 152 tests, full-year data, serial | 609.40 s | **621.30 s** |
+| all 152 tests, full-year data, `-n auto` | unavailable | **506.23 s** |
+
+The slow serial variation confirms the full-year workload was preserved rather than optimized by
+changing results. The feature/default paths are faster because they select the July fixture and
+share immutable setup; the full-year CI improvement comes from xdist. In the duration run, the
+default tier's slowest call was 0.60 s, below the enforced one-second budget.
+
+### Ten biggest wins
+
+| Test or fixture | Before | After | Change |
+| --- | ---: | ---: | --- |
+| quickstart | 195.73 s | 37.58 s | selected July while retaining every public workflow |
+| module API | 186.71 s | 23.41 s | selected July for replay and optimizer evaluations |
+| full-replay verification fixture | 103.35 s | 19.02 s | selected July; still replay/calibrate/holdout/simulate |
+| replay example subprocess | 46.01 s | 8.09 s | example test passes selected July path through the environment |
+| baseline replay parity | 40.81 s | 10.96 s | compares against the generated unchanged-code July golden |
+| default fast tier | 15.39 s | 9.18 s | session datasets/plant plus cheap isolated plant copies |
+| live idempotency | 0.90 s | 0.07 s | minimal stateful plant and two ticks preserve checkpoint semantics |
+| interrupt/resume simulation | 0.89 s | 0.38 s | 12-step window still crosses the interruption boundary |
+| interrupt/resume replay | 0.73 s | 0.34 s | same shorter exact-resume window |
+| repeated plant/data setup | 0.35–0.44 s/test | 0.23 s once | session load; mutating tests use `deepcopy` |
+
+No test was moved to `slow`; the existing 15 e2e cases remain e2e. No production cache was
+added because profiles showed engine-step/module-validation volume, not repeated pure fluid or
+correlation calls, dominated runtime.
