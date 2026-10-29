@@ -24,12 +24,12 @@ dependencies = [
     "pandas>=2.2.2",
     "scipy>=1.13.0",
     "numpy>=2.0.0",
-    "pytz==2024.2",
+    "pytz>=2020.1",
     "pydantic>=2.5.0",
 ]
 
 [project.optional-dependencies]
-parquet = ["pyarrow>=15"]
+parquet = ["pyarrow>=16.0.0"]
 
 [project.urls]
 homepage = "https://nwn.nu/projecten/innovaties/datagedreven-optimalisatie-aardwarmte-systemen/"
