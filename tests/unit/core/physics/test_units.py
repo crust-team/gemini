@@ -98,3 +98,10 @@ def test_value_in_si_only_converts_quantity_objects():
     """Objects that merely carry value and unit attributes are not quantities."""
     duck = SimpleNamespace(value=3, unit="ft")
     assert units.value_in_si(duck, "m") is duck
+
+
+def test_duration_and_productivity_index_field_units():
+    """Durations accept minutes, hours and days; productivity indices accept m3/h/bar."""
+    assert units.convert(1.5, "h", "s") == 5400
+    assert units.convert(2, "d", "min") == 2880
+    assert units.convert(36, "m3/h/bar", "m3/s/Pa") == pytest.approx(1e-7)

@@ -108,7 +108,9 @@ class LineShaftPump(Module):
         self.pump_power = pump_power
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction
-        self.efficiency = flow * self.head / pump_power if pump_power >= MIN_EFFICIENCY_POWER else 0
+        self.efficiency = (
+            flow * self.head / pump_power if pump_power >= MIN_EFFICIENCY_POWER else 0.0
+        )
         self.electricity = self.shaft_power / self.motor_efficiency
 
     def _head(self, flow):
