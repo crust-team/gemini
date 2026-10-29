@@ -9,7 +9,6 @@ and nothing physically visible.
 
 import ast
 import json
-from pathlib import Path
 from time import perf_counter
 
 import numpy as np
@@ -17,11 +16,11 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from tests.fixtures import FIXTURES
 
 pytestmark = pytest.mark.e2e
-ROOT = Path(__file__).parents[2]
-BASELINE = ROOT / "tests/fixtures/module_api_baseline"
-FAST_BASELINE = ROOT / "tests/fixtures/module_api_fast"
+BASELINE = FIXTURES / "module_api_baseline"
+FAST_BASELINE = FIXTURES / "module_api_fast"
 PATH_RENAMES = {"filter_hot": "filters.hot", "filter_return": "filters.cold"}
 FIELD_RENAMES = {
     "energy_port_electricity": "electricity",
@@ -39,14 +38,10 @@ TYPE_RENAMES = {
 }
 
 
-def _baseline_frame(name):
+def _baseline_frame(directory, name):
+    """Read one captured result frame and apply the documented path and field renames."""
     return (
-        pd.read_csv(
-            BASELINE / name,
-            header=[0, 1],
-            index_col=0,
-            parse_dates=True,
-        )
+        pd.read_csv(directory / name, header=[0, 1], index_col=0, parse_dates=True)
         .rename(columns=PATH_RENAMES, level=0)
         .rename(columns=FIELD_RENAMES, level=1)
     )
@@ -118,12 +113,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
     elapsed = perf_counter() - started
     assert elapsed < 60
     baseline = BASELINE if dataset_name == "slow" else FAST_BASELINE
-    expected = (
-        pd.read_csv(baseline / "replay.csv.gz", header=[0, 1], index_col=0, parse_dates=True)
-        .rename(columns=PATH_RENAMES, level=0)
-        .rename(columns=FIELD_RENAMES, level=1)
-    )
-    _assert_values_identical(replay, expected)
+    _assert_values_identical(replay, _baseline_frame(baseline, "replay.csv.gz"))
 
     clock = gm.Clock.days(2027, 1, 1, days=1)
     profiles = {
@@ -134,4 +124,6 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
     simulation = (
         gm.Engine().simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock).to_frame()
     )
-    _assert_values_identical(simulation, _baseline_frame("simulate.csv.gz"), SIMULATE_RTOL)
+    _assert_values_identical(
+        simulation, _baseline_frame(BASELINE, "simulate.csv.gz"), SIMULATE_RTOL
+    )

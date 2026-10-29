@@ -1,33 +1,33 @@
-"""Run every documented example without external services."""
+"""Run every numbered example as a user would, without external services.
+
+Examples resolve their shared data as ``examples/...`` relative to the working directory and
+write generated output below ``runs/``. Each one runs in its own ``tmp_path`` that links
+``examples`` to the repository copy, so shared paths resolve unchanged while all output stays
+in the temporary directory.
+"""
 
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).parents[2]
+from tests.fixtures import ROOT
+
 pytestmark = pytest.mark.e2e
+EXAMPLES = sorted((ROOT / "examples").glob("**/[0-9][0-9]_*.py"))
 
 
-@pytest.mark.parametrize(
-    "path",
-    [
-        path
-        for path in sorted((ROOT / "examples").glob("**/[0-9][0-9]_*.py"))
-        if path.name != "01_module_api.py"
-    ],
-    ids=str,
-)
-def test_example(path, dataset_path):
+@pytest.mark.parametrize("path", EXAMPLES, ids=[str(path.relative_to(ROOT)) for path in EXAMPLES])
+def test_example(path, dataset_path, tmp_path):
     """Examples load the checked-in dataset, execute cleanly and produce useful output."""
+    (tmp_path / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
     env = os.environ.copy()
     env["GEMINI_EXAMPLE_DATASET"] = str(dataset_path)
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(ROOT), env.get("PYTHONPATH"))))
     completed = subprocess.run(
         [sys.executable, str(path)],
-        cwd=ROOT,
+        cwd=tmp_path,
         capture_output=True,
         text=True,
         timeout=180,

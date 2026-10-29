@@ -1,20 +1,21 @@
 """The complete public quickstart acceptance path."""
 
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from tests.fixtures import ROOT
 
 pytestmark = pytest.mark.e2e
 
 
 def test_quickstart(tmp_path, monkeypatch, dataset_path):
-    """Run the documented calls unchanged against the committed shared example."""
-    root = Path(__file__).parents[2]
-    (tmp_path / "examples").symlink_to(root / "examples", target_is_directory=True)
+    """Run the documented calls unchanged against the committed shared example.
+
+    The body is the literal documented quickstart, so it stays one function.
+    """
+    (tmp_path / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
     monkeypatch.chdir(tmp_path)
 
     SHARED = "examples/shared/doublet_heat"

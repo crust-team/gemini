@@ -1,21 +1,21 @@
 """Capture phase-0 state and results before the module API migration.
 
-Run only from the untouched ``refactor`` implementation.  The generated fixtures are
-comparison inputs for the new API and must not be regenerated after the migration.
+Historical generator of ``module_api_baseline/``, committed in 3102a12. It ran once as
+``PYTHONPATH=. python tests/fixtures/capture_module_api_baseline.py`` on the untouched
+``refactor`` implementation. The files are comparison inputs for the new API; running it now
+would overwrite immutable goldens with new-API output, so never run it again.
 """
 
 import json
-from pathlib import Path
 from time import perf_counter
 
 import pandas as pd
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from tests.fixtures import FIXTURES, SHARED
 
-ROOT = Path(__file__).resolve().parents[2]
-SHARED = ROOT / "examples/shared/doublet_heat"
-OUTPUT = Path(__file__).with_name("module_api_baseline")
+OUTPUT = FIXTURES / "module_api_baseline"
 
 
 def main():

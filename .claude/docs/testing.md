@@ -78,13 +78,15 @@ dataset or any golden. Full-year replay/simulate goldens remain under
 `tests/fixtures/module_api_baseline/`; the fast replay golden is under
 `tests/fixtures/module_api_fast/`.
 
-Regenerate the July byte-for-byte slice and unchanged-code replay golden with:
+Regenerate the July slice (byte-for-byte) and the unchanged-code replay golden with:
 
 ```bash
 PYTHONPATH=. python tests/fixtures/generate_fast_fixtures.py
 ```
 
-The generator fixes gzip metadata for reproducible output. Review generated diffs and run e2e
+The generator fixes gzip metadata for reproducible output. The replay golden reproduces within
+the documented `REPLAY_RTOL` (one binary64 ULP), not byte for byte: the committed file was
+captured in another numeric environment. Review generated diffs and run e2e
 on both datasets before accepting a golden change. Golden changes are evidence of a numerical
 change and are never a routine speed optimization.
 
@@ -107,7 +109,13 @@ The suite must remain safe under `pytest -n auto`:
 - do not rely on test order or process-global state;
 - deep-copy mutable plants instead of changing session fixtures.
 
-`tests/unit/test_mirror.py` enforces source mirroring. Only `tests/unit/core/legacy/` and
-`tests/e2e/test_legacy_bridge.py` read old formats. E2E retains the literal quickstart,
+`tests/unit/test_mirror.py` enforces source mirroring: every source file has a mirrored test file
+that defines at least one test, except the files listed in its documented `PLACEHOLDERS` set.
+Only `tests/unit/core/legacy/`, `tests/e2e/test_legacy_bridge.py` and the `check_wiring` audit in
+`tests/e2e/test_full_replay.py` read old formats. Shared paths live in `tests/fixtures/__init__.py`
+(`ROOT`, `FIXTURES`, `SHARED`, `OLD_PROJECT`). Examples run as subprocesses in `tmp_path` with an
+`examples` symlink, so their output never lands in the repository. Expensive module-scoped e2e
+fixtures carry `pytest.mark.xdist_group`; the default `--dist loadgroup` runs each group on one
+worker so the fixture is built once. E2E retains the literal quickstart,
 reconciliation, calibration holdout, balances/electricity limits, alarm rates, bridge round
 trips, example subprocesses, live idempotency and exact interrupt/resume coverage.

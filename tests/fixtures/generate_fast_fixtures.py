@@ -1,17 +1,22 @@
-"""Generate the July 2024 fast dataset and its unchanged-code replay golden."""
+"""Generate the July 2024 fast dataset and its unchanged-code replay golden.
 
-from pathlib import Path
+Run from the repository root as ``PYTHONPATH=. python tests/fixtures/generate_fast_fixtures.py``;
+it overwrites both committed files in place, so run it only for a reviewed numerical change. The
+dataset slice is reproduced byte for byte. The replay golden was written in another numeric
+environment: regenerating it here, even at its capture commit 56d90be, changes 401 rows by a few
+ULP, which the e2e comparison tolerates. A changed golden is evidence of a numerical change,
+never a routine update (see ``.claude/docs/testing.md``).
+"""
 
 import pandas as pd
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from tests.fixtures import FIXTURES, SHARED
 
-ROOT = Path(__file__).parents[2]
-SHARED = ROOT / "examples/shared/doublet_heat"
 SOURCE = SHARED / "doublet_2024_15min.csv"
 FAST = SHARED / "doublet_2024_15min_month.csv"
-GOLDEN = ROOT / "tests/fixtures/module_api_fast/replay.csv.gz"
+GOLDEN = FIXTURES / "module_api_fast/replay.csv.gz"
 
 
 def generate_dataset():

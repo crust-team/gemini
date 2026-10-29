@@ -74,6 +74,7 @@ def reference_dataset():
 def shared_plant():
     """Load and validate one read-only shared plant design."""
     with warnings.catch_warnings(record=True) as warnings_seen:
+        warnings.simplefilter("always")
         plant = DoubletHeatPlant.load(ROOT / "examples/shared/doublet_heat/plant.json")
     assert not warnings_seen
     return plant
