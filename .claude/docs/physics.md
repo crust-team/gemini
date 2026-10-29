@@ -3,7 +3,8 @@
 `gemini/core/physics` contains reusable correlations: unit conversions, constants, fluid
 properties, geometry, hydraulics, heat transfer, pumps, chemistry, corrosion and erosion, and for
 the equipment catalogue ([equipment.md](equipment.md)) gas compression, refrigeration cycles,
-IAPWS-IF97 steam, ground heat transport and psychrometrics (sections below).
+IAPWS-IF97 steam, ground heat transport and psychrometrics (sections below, the original GEMINI
+correlations first).
 
 - Use plain typed functions and SI inputs/outputs; small structured return models are allowed.
 - State dimensions, reference formulas and assumptions in docstrings.
@@ -30,6 +31,220 @@ IAPWS-IF97 steam, ground heat transport and psychrometrics (sections below).
   `tests/unit/test_golden.py` and the physics unit tests. Intentional changes require a
   `NOTE(refactor):` sentence in the docstring and measured or physical evidence; see
   [refactor-notes.md](refactor-notes.md).
+
+## Fluid properties
+
+`fluid.py` holds the constant-property snapshot `FluidProperties` and `core/types/fluid.py` the
+immutable `Fluid` that selects it (the inherited GEMINI `PVTConstantSTP` model, property model
+`constant_stp`). Pressure and temperature do not change any property: `Fluid.properties(p, T)`
+returns one cached snapshot per complete `Fluid` value.
+
+- Defaults (water near standard conditions): `rho_l` = 1000 kg/m3, `rho_g` = 1.976 kg/m3,
+  `gmf` = 0, `mu_l` = 0.001 Pa s, `mu_g` = 21.29e-6 Pa s, `cp_l` = 4217.4 J/kg/K, `cp_g` =
+  819 J/kg/K, `k_l` = 1.6 W/m/K, `k_g` = 0.0147 W/m/K, `sigma` = 0.0728 N/m.
+- `density` = `1 / (gmf / rho_g + (1 - gmf) / rho_l)` [kg/m3], the homogeneous mixture density
+  from the gas mass fraction `gmf`.
+- `kind` is `brine` (default), `water`, `glycol_water` or `steam`. `glycol_water` replaces the
+  liquid values by DOWFROST HD, 30 % propylene glycol by volume at 40 degC: `rho_l` = 1029.85,
+  `cp_l` = 3841, `k_l` = 0.4622, `mu_l` = 0.0016295 (SI). `liquid_density`, `liquid_viscosity`,
+  `specific_heat` and `thermal_conductivity` override the four liquid values after that.
+- `corrosion_inputs(p, T)` = `co2_partial_pressure = w_CO2 rho_l / M_CO2 / henry_constant(T)`
+  [Pa] and `ionic_strength = salinity rho_l` [kg/m3], with `M_CO2` = 0.04401 kg/mol: the
+  dissolved CO2 mass fraction becomes a concentration and the Henry law (Chemistry) is inverted.
+
+Salinity, CO2 and free gas are mass fractions; glycol is a volume fraction. Brine density and
+viscosity are not inferred from salinity: supply the overrides. A `steam` fluid carries the
+liquid-water snapshot, not vapour properties (use `steam.py`). Mass fractions summing above one,
+a glycol fraction on another kind, or a glycol fraction other than 0.3 raise a pydantic
+`ValueError`, not `PhysicsRangeError`; `gmf` must lie in [0, 1) and properties must be positive.
+
+## Hydraulics
+
+`hydraulics.py` marches pressure and temperature along a `PipePath` of `PipeSection`s (length
+[m], inclination [rad], inner diameter [m], roughness [m]). Inclination is measured from
+horizontal, positive when descending in surface-to-bottom order. Friction and gravity drops are
+signed so that the pressure rises by both when flowing down and falls by both when flowing up.
+
+- `darcy_weisbach_dp(u, rho, theta, mu, D, K, L)` = friction `f rho L / D |u| u / 2` and
+  gravity `rho g L sin(theta)` [Pa], with `Re = |u| rho D / mu` and the Swamee and Jain (1976)
+  friction factor `f = 0.25 / log10(K / (3.7 D) + 5.74 / Re^0.9)^2`; `g` = 9.81 m/s2. Zero
+  velocity gives zero friction.
+- `beggs_brill_dp(us_g, us_l, ...)`: two-phase friction and gravity drops (Beggs and Brill 1973,
+  as in Shoham 2006, p. 59). The regime and holdup use the US basis (ft/s, lbm/ft3, dyne/cm,
+  ft, `g` = 32.17405 ft/s2). With no-slip holdup `lambda = us_l / (us_g + us_l)`, liquid
+  velocity number `N_Lv = 1.938 us_l (rho_l / sigma)^0.25` and `Fr = u_m^2 / (g D)`, the
+  boundaries are `L1 = 316 lambda^0.302`, `L2 = 0.0009252 lambda^-2.4684`, `L3 = 0.10
+  lambda^-1.4516` and `L4 = 0.5 lambda^-6.738`.
+- Horizontal holdup `a lambda^b / Fr^c` with `(a, b, c)` = (0.98, 0.4846, 0.0868) segregated,
+  (0.845, 0.5351, 0.0173) intermittent, (1.065, 0.5824, 0.0609) distributed; inclined holdup
+  `H_l = H_0 psi` with `psi = 1 + C (sin 1.8 theta - 0.333 sin^3 1.8 theta)` and `C = max(0,
+  (1 - lambda) ln(d lambda^e N_Lv^f Fr^h))`. Downhill flow uses (4.7, -0.3692, 0.1244, -0.5056)
+  in every regime; uphill segregated (0.011, -3.768, 3.539, -1.614), uphill intermittent (2.96,
+  0.305, -0.4473, 0.0978), uphill distributed `psi = 1`. The transition regime blends the
+  segregated and intermittent holdups with `A = (L3 - Fr) / (L3 - L2)`; `H_l` is clamped to
+  [0, 1].
+- Friction: `y = lambda / H_l^2`, `s = ln(2.2 y - 1.2)` for `1 < y < 1.2`, otherwise `s = ln y /
+  (-0.0523 + 3.182 ln y - 0.8725 (ln y)^2 + 0.01853 (ln y)^4)`; the multiplier is `exp(s)`. The
+  no-slip mixture `rho_m`, `mu_m` give `Re = u_m rho_m D / mu_m`, `f_n = (-0.8685 ln((1.964
+  ln Re - 3.8215) / Re + K / (3.71 D)))^-2`, friction `0.5 rho_m u_m |u_m| f_n exp(s) L / D`
+  and gravity `(H_l rho_l + (1 - H_l) rho_g) g L sin(theta)` [Pa]. The SI terms use inputs
+  converted to the US basis and back, which changes the last bits and is kept for the goldens.
+- `pipe_path_profile(path, stream, fluid, direction, u_value, T_ambient)` takes each section
+  from `Fluid.properties`: `Q = m_dot / density`, `us_l = (1 - gmf) m / rho_l / A` and, with
+  `A = pi D^2 / 4`, Darcy-Weisbach when the gas mass flow is zero, otherwise Beggs-Brill with
+  `us_g = gmf / rho_g / A`; the gas velocity keeps the original form, which ignores the flow
+  rate. Pressures are floored at 0.001 Pa. `direction` is `up` or `down`; zero flow gives zero
+  drops (gravity too). The marched outlet is uncorrected; the affine correction
+  `p = a p_out + b` belongs to the `Well` module.
+- `geometry.build_path(trajectory, tally)` makes one section per trajectory interval:
+  `sin(theta) = delta_TVD / delta_MD`, rounded to 0.01 degree as in WIMS, with the diameter and
+  roughness of the interval's end point, split at tally joints (a tally interval covering the
+  piece midpoint overrides them). Example roughness 2e-5 is metres.
+
+Beggs-Brill needs a nonzero liquid and mixture velocity and a positive holdup after clamping,
+and a point inside the regime map; otherwise `PhysicsRangeError`. `build_path` raises it for
+fewer than two points, nonincreasing MD or `|delta TVD| > delta MD`; unsupported correlation
+names or a direction other than `up` or `down` raise `UnknownCorrelationError`.
+
+## Reservoir inflow
+
+The reservoir modules (`modules/subsurface/reservoir.py`) combine a linear inflow relation with
+the radial Darcy terms of `hydraulics.py` (Akin 2019); volume flow `Q` is at reservoir
+conditions, `Q = m_dot / rho_l`.
+
+- Production: `p_bh = p_res - Q / PI` [Pa], `PI` the productivity index [m3/s/Pa].
+- Injection: `p_bh = p_res + Q / II` [Pa], `II` the injectivity index [m3/s/Pa] and `Q` the
+  absolute volume flow of the arriving stream.
+- `productivity_from_measurements` = `Q / (p_res - p_bh)` and `injectivity_from_measurements`
+  = `Q / (p_bh - p_res)`; equal pressures raise `PhysicsRangeError`.
+- `estimate_pressure(Q_i, p_bh,i)` fits `p_bh / Q = p_res (1 / Q) + b` by least squares: the
+  slope is the reservoir pressure and the second return value is the R-squared of the fit.
+- `radial_pressure_drops(Q, mu, k, h, r_e, r_w, S)` = flow drop `Q mu ln(r_e / r_w) / (2 pi k
+  h)` and skin drop `Q mu S / (2 pi k h)` [Pa]; the radial bottomhole pressure is `p_res +
+  flow drop + skin drop`.
+- `hydrostatic_dp(rho, height)` = `rho g height` [Pa] with `g` = 9.81 m/s2; the reservoir
+  reports it for `rho_l` and the top depth.
+
+A nonpositive `k`, `h`, `r_e` or `r_w` raises `PhysicsRangeError`; `estimate_pressure` needs at
+least two finite, nonzero, varying samples (`InsufficientDataError`). Both indices default to
+`None` and a missing one raises `ConfigurationError`. The linear relations take the viscosity
+and density only through the flow; `mu_l` and `rho_l` come from the reservoir fluid with its
+`liquid_density` and `liquid_viscosity` overrides.
+
+## Pumps
+
+`pumps.py` holds the TNO R11363 (2022) polynomial curves of an electrical submersible pump on
+the historical US basis, used by `ESP`. The coefficients are ascending powers `c_i` of the flow
+`q` in bbl/day, fitted at the catalogue frequency `ESP_REFERENCE_FREQUENCY` = 60 Hz, one pump
+stage:
+
+- `head(Q, f, N, c)` = `N (f / 60)^2 sum(c_i q^i) * 2988.30167` [Pa]; the coefficients give ft
+  of head and `2988.30167` Pa/ft converts it.
+- `power(Q, f, N, c)` = `N (f / 60)^3 sum(c_i q^i) * 745.7` [W]; the coefficients give bhp and
+  `745.7` W/bhp converts it.
+- `q = Q * 543439.650564` bbl/day for a flow `Q` in m3/s. Head follows the square and power the
+  cube of the frequency ratio (affinity laws).
+- `ESP.efficiency_function(Q, H, P)` = `(q / 135773) (H / P) (745.7 / 2988.30167)` [-], a
+  fraction, and 0 when `P < 0.1` W (it is in `modules/pumps/esp.py`).
+
+The polynomials are only valid inside the flow range of the manufacturer curve; the functions
+do not check it and raise nothing. Any number of coefficients is accepted.
+
+## Chemistry
+
+`chemistry.py` holds the Henry-law CO2 partition of GEMINI water-analysis workflows, which
+supplies the CO2 partial pressure for the corrosion correlations. Temperatures are in K,
+pressures in Pa and concentrations in mol/m3:
+
+- `henry_constant(T)` = `0.01 * 0.0385 exp(2400 (1 / T - 1 / 293.15))` [mol/m3/Pa]: 0.0385
+  mol/l/bar at 293.15 K, the factor 0.01 converting to SI.
+- `co2_solubility_liquid(x, T, p)` = `x K_H(T) p` [mol/m3], the dissolved CO2 of a gas of mole
+  fraction `x` at pressure `p`.
+- `co2_solubility_gas(x, GWR, rho_gas, M_gas)` = `x GWR rho_gas / M_gas` [mol/m3] for a standard
+  gas-water volume ratio `GWR`, standard gas density [kg/m3] and molar mass [kg/mol].
+- `co2_partial_pressure(...)` = `(C_liquid(T_sample, p_gas) + C_gas) / K_H(T_system)` [Pa]: the
+  CO2 of the sample, dissolved and in gas, is repartitioned by Henry's law at the system
+  temperature.
+
+The functions apply no range checks; a nonpositive temperature is outside the model.
+
+## Corrosion
+
+`corrosion.py` holds the NORSOK M-506 and de Waard-Lotz CO2 corrosion correlations, DLM (Milliams
+1991) and DLD (Dugstad 1995), through the SI boundary `co2_corrosion_rate(model, ...)` with
+`model` `NORSOK`, `DLM` or `DLD`. Inside, the correlations keep their published basis (degC,
+bar, NORSOK water flow in m3/day, viscosity in cP, bicarbonate in mg/l, ionic strength in g/l).
+Rates are in mm/year, the explicit literature-unit exception of the package.
+
+- Fugacity: `f = 10^(p (0.0031 - 1.4 / T)) p_CO2` [bar] with `p` the total pressure, capped at
+  250 bar, and `T` in K. `p_CO2` is `co2_partial_pressure` [Pa], else `co2_fraction * p`.
+- Scale factor `F = min(10^(2400 / T - e log10 f - 6.7), 1)` for `T >= 2400 / (6.7 + 0.6 log10 f)`,
+  otherwise 1, with `e` = 0.6 (DLM) or 0.44 (DLD).
+- DLM = `10^(5.8 - 1710 / T + 0.67 log10 f) F` [mm/year]; it ignores the flow.
+- DLD = `F / (1 / CR_r + 1 / CR_m)` with `CR_r = 10^(4.93 - 1119 / T + 0.58 log10 f)` and
+  `CR_m = 2.45 u^0.8 / D^0.2 f`, `u` the velocity from the flow and the diameter.
+- NORSOK = `A K_t f^0.62 (tau / 19)^(0.146 + 0.0324 log10 f) f(pH)`. `K_t` interpolates
+  linearly in degC over 5, 15, 20, 40, 60, 80, 90, 120, 150 with 0.42, 1.59, 4.762, 8.927,
+  10.695, 9.949, 6.250, 7.770, 5.203 and takes the end values outside. The wall shear stress
+  is `tau = rho f_w u^2 / 2` with `f_w = 0.001375 (1 + (20000 K / D + 10^6 mu / (u D rho))^0.33)`
+  (`mu` in Pa s, `K` roughness).
+- `pH` solves the carbonate charge balance for `[H+]` by Newton's method (start 10^-3.5, or
+  10^-2.9 above 20 bar CO2; tolerance 1e-6 relative; at most 100 steps and then the last
+  iterate without a warning), with equilibrium constants that depend on degF, psi and mol/l
+  (bicarbonate molar mass 61.2 g/mol, NaCl 58.44 g/mol); the pH is rounded to 0.01. A
+  nonpositive root gives pH 99.99.
+- `f(pH)` has piecewise formulas only at the exactly tabulated temperatures 5, 15, 20, 40, 60,
+  80, 90, 120 and 150 degC and for pH 3.5 to 6.5; elsewhere it is 7, so the rate jumps between
+  40.000 and 40.001 degC. The 5 degC first segment keeps `2.0676 + 0.2309 pH` where the other
+  temperatures use `- 0.2309`. Both are retained numerical decisions of the goldens.
+- Defaults: `water_density` 1000 kg/m3, `water_viscosity` 0.001 Pa s, `diameter` 0.1 m,
+  `roughness` 5e-5 m, `bicarb_concentration` 0.268 kg/m3, `ionic_strength` 71 kg/m3. With
+  `fitted=True` the constants (`A`, `B`, `C`, `D`; NORSOK only `A`, the rate scale) can be
+  replaced through `coefficients`.
+- Wall loss: `wall_loss(rates, durations)` = `cumsum(rate * dt / year)` [mm] with a 365.25-day
+  year; `remaining_wall_thickness(r_o, r_i, loss)` = `r_o - (r_i + loss)`; and
+  `time_to_minimum_wall(t, t_min, rate)` = `(t - t_min) / rate` [s], 0 at or below the minimum,
+  infinity for a nonpositive or nonfinite rate and NaN for missing values.
+
+A CO2 partial pressure of zero, a zero flow for NORSOK and DLD, a negative flow (complex rate)
+and equilibrium-constant underflow near 360 degC raise `PhysicsRangeError`; neither
+`co2_fraction` nor `co2_partial_pressure` raises `MissingChemistryError`; another model name
+raises `UnknownCorrelationError`.
+
+## Erosion
+
+`erosion.py` holds the DNV RP O501, Oka (2005) and E/CRC Tulsa solid-particle erosion rates and
+the API RP 14E velocity limit. `erosion_rate(model, ...)` is the SI boundary (flow in m3/s,
+angle in rad, hardness in Pa, particle diameter in m) and returns mm/year, the explicit
+literature-unit exception of the package. Inside, the flow is in m3/h, the angle in degrees and
+radians as each formula needs, the hardness in GPa and the Oka particle diameter in mm.
+
+- Shared terms: the particle mass flow equals the total fluid mass flow (no solids fraction),
+  `m_p = Q rho_f`; the velocity is `U = m_p / (rho_f A)`, `A = pi D^2 / 4`, and the impacted
+  area is `A_t = A / sin(alpha)`.
+- DNV = `Y m_p K U^n F(alpha) / (rho_pipe A_t)` with `Y = 1000 * 365.25 * 86400` mm/year per
+  m/s and `F` the seventh-order polynomial of `alpha` [rad] `alpha (9.37 + alpha (-42.295 +
+  alpha (110.864 + alpha (-175.804 + alpha (170.137 + alpha (-98.398 + alpha (31.211 - 4.17
+  alpha)))))))`. `(K, n, rho_pipe)` is (2e-9, 2.6, 7800) for `steel`, (0.3e-9, 3.6, 1800) for
+  `grp/epoxy` and (0.6e-9, 3.6, 1800) for `grp/vinyl ester` (case-insensitive).
+- Oka = `year m_p / A_t E` with `A_t` in mm2 and `E = K Hv^k1 (U / U_ref)^k2(Hv) (d_p / d_ref)^k3`
+  [mm3/kg], `Hv` in GPa and `d_p` in mm. For `SIO2`, `SIC`, `GLASS`: `U_ref` = 104, 99, 100 m/s;
+  `d_ref` = 326, 326, 200; `k1` = -0.12, -0.05, -0.16; `k2` = `2.3 Hv^0.038`, `3 Hv^0.085`,
+  2.1; `k3` = 0.19; `K` = 65, 45, 27.
+- Tulsa = `Y E_r m_p / (rho_pipe A_t)` with `E_r = 2.17e-7 H_b^-0.59 F_s U^2.41 F(alpha)`,
+  `F(alpha) = 5.4 alpha - 10.11 alpha^2 + 10.93 alpha^3 - 6.33 alpha^4 + 1.42 alpha^5` and the
+  Brinell hardness `H_b = 0.95057 Hv / 0.009807 - 0.03743` from the Vickers hardness in GPa.
+- Defaults: `alpha` = pi/2, `material` `steel`, `hardness` 1e9 Pa, `particle_material` `SIO2`,
+  `particle_diameter` 0.0001 m, `rho_pipe` 7800 kg/m3, `shape_factor` 0.5.
+- `api_erosional_velocity(rho)` = `0.3048 / sqrt(0.0283 / 0.454) * 125 / sqrt(rho)` [m/s], the
+  API RP 14E criterion with `C` = 125 and its imperial conversions;
+  `api_velocity_comparison(u, limit)` returns the ratio `u / limit`, the margin `limit - u` and
+  the flag `u > limit`.
+
+Model names are case-insensitive (`DNV`, `DNVGL`, `OKA`, `TULSA`, `E/CRC Tulsa`, `ECRC`); `API`
+is a velocity limit, not a rate. Unknown names, DNV materials (titanium is rejected) and Oka
+particle materials raise `UnknownCorrelationError`. A zero impact angle, a negative flow (complex
+rate) and a nonpositive density or API limit raise `PhysicsRangeError`.
 
 ## Compression
 

@@ -212,6 +212,18 @@ ported into the refactored structure; only missing behaviour was added.
   charged the injection pump in full; here all consumption is netted against all generation.
   Its reference total (4083 kg CO2/day) depends on the upstream fuel-driven boiler and CHP
   formulas, which were not ported, so it is not reproduced.
+- The upstream Sphinx model pages became the correlation sections of
+  [physics.md](physics.md), written from the code. Where they disagree the code is documented:
+  SI boundaries instead of bar, degC, cP, m3/day or m3/h, degrees, GPa and mm; roughness in
+  metres (upstream text: mm); DPDT takes the stream mass flow and the affine correction sits in
+  `Well`; the Beggs–Brill Froude number uses `g` = 32.17405 ft/s2 on its US basis; radial
+  reservoir terms are `None` without a drainage radius; ESP efficiency is a fraction (upstream
+  percent) and any number of curve coefficients is accepted; NORSOK takes its velocity from
+  m3/s and its pH factor applies only at the tabulated temperatures (7 elsewhere); DLD uses the
+  velocity, not the volume flow; the DNV rate converts m/s to mm/year (3.15576e10, upstream text
+  31.5576e6); titanium, listed in the upstream text, stays rejected because the original check
+  could never match it; the upstream `PVTConstantSTP` enthalpy, entropy and validity ranges have
+  no counterpart in `FluidProperties`.
 - The Carnot mode keeps the refactored model: upstream evaluates the COP at the sink outlet and
   the **source inlet** without a lift floor (COP 4.4144 in its test case), the refactored model at
   both outlets with a 10 K floor (3.1012 for the same inputs).
