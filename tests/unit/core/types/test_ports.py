@@ -3,6 +3,7 @@
 import pytest
 
 from gemini.core.types import Ports, Stream
+from gemini.errors import UnknownPortError
 
 
 @pytest.fixture
@@ -40,7 +41,7 @@ def test_unknown_names_include_path_valid_names_and_suggestion(streams):
         AttributeError, match="plant.esp.*suctoin.*valid names: suction.*did you mean 'suction'"
     ):
         ports.suctoin
-    with pytest.raises(KeyError, match="plant.esp.*discharge.*valid names: suction"):
+    with pytest.raises(UnknownPortError, match="plant.esp.*discharge.*valid names: suction"):
         ports["discharge"]
 
 

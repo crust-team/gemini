@@ -6,7 +6,7 @@ from gemini.core.types import Ports, Stream
 from gemini.core.types.declarations import Output
 from gemini.core.types.quantities import Power, PressureDifference, TemperatureDifference
 from gemini.core.types.results import Health, ModuleResult, Values
-from gemini.errors import UnitError
+from gemini.errors import UnitError, UnknownPortError
 
 
 @pytest.fixture
@@ -34,9 +34,9 @@ def test_values_mapping_and_unit_conversion(values):
 
 def test_unknown_values_suggest_close_names(values):
     """Misspelled names list the valid names and the closest one."""
-    with pytest.raises(AttributeError, match="'powr'.*valid names: power.*did you mean 'power'"):
+    with pytest.raises(UnknownPortError, match="'powr'.*valid names: power.*did you mean 'power'"):
         values.powr
-    with pytest.raises(KeyError, match="'hed'"):
+    with pytest.raises(UnknownPortError, match="'hed'"):
         values["hed"]
 
 
