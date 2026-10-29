@@ -13,7 +13,6 @@ from gemini.core.modules.pumps import ESP, BoosterPump, InjectionPump
 from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.core.types.flows import Stream
 
-
 ENERGY_INPUTS = ("electricity", "fuel", "heat_absorbed")
 """Leaf outputs [W] that bring energy into a leaf from outside its streams."""
 

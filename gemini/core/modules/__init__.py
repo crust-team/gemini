@@ -2,6 +2,7 @@
 
 from .balance import collect_flows, energy_balance, mass_balance
 from .container import ModuleDict, ModuleList
+from .demand import CoolingConsumer, HeatConsumer
 from .heat import Boiler, HeatExchanger
 from .module import Module
 from .pumps import ESP, BoosterPump, InjectionPump
@@ -25,6 +26,8 @@ __all__ = [
     "Blowdown",
     "Degasser",
     "Filter",
+    "HeatConsumer",
+    "CoolingConsumer",
     "collect_flows",
     "energy_balance",
     "mass_balance",
