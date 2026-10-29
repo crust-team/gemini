@@ -943,6 +943,9 @@ the injected stream as a sink.
 - **Model**: linear IPR `p_bh = p_res - Q / PI` (production) and `p_bh = p_res + Q / II`
   (injection); radial Darcy diagnostics through `hydraulics.radial_pressure_drops`.
 - **Health**: alarm when the measured index falls below `1 - decline_threshold` of design.
+- **Helpers**: `ProductionReservoir.sandface_stream(production_rate)` and
+  `InjectionReservoir.required_pressure(sandface)` evaluate the IPR without a call; `forward` and
+  the outputs use them, and so does the [nodal analysis](#nodal-well-analysis).
 - **Energy audit**: open boundaries, residual zero by construction.
 
 ```python
@@ -1743,3 +1746,58 @@ stateless children with `Module.trial_outlets(inlets)`, which no running call re
 composite then calls every child once with the converged inlets. A loop through a stateful leaf
 whose outlet depends only on its state (the ATES groundwater loop) reads the child's states first
 with `Module.start_states()` (`AquiferStorage.production_temperature()` uses it).
+
+### Nodal well analysis
+
+`gemini.core.modules.plants.nodal` (module import only, not in `gm.plants`) finds the operating
+point at which well and reservoir agree, ported from the upstream GEMINI simulator
+(`nodal_solver`, `well_flow`). Each function evaluates the plant's own modules with
+`ProductionReservoir.sandface_stream`, `InjectionReservoir.required_pressure` and
+`Module.trial_outlets`, so no running call records a trial, and solves with
+`scipy.optimize.brentq`. Call it before the plant call and apply the result as a command.
+
+- `solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, riser=None)`:
+  the rate [kg/s] whose sandface stream, lifted through `well` (below the ESP), `esp` and
+  `riser`, arrives at `wellhead_pressure` [Pa]; without an ESP `well` is the full well.
+- `solve_injection_rate(well, sink, wellhead, rates)`: the rate at which the injection well's
+  bottom pressure equals `sink.required_pressure`, for the wellhead stream's pressure.
+- `solve_injection_pressure(well, sink, wellhead, pressures)`: the wellhead pressure an
+  injection pump must deliver for the stream's rate, or `None` when the pressure at `low`
+  (pass the pump suction) already suffices. `None` means no pump: command the `InjectionPump`
+  to its suction pressure, which draws zero electricity. Upstream returned the bracket floor.
+
+Brackets are required: `(low, high)` must lie inside the well model's domain (very small rates
+can cool the stream below 0 K through the heat loss, very large ones drive the traversed
+pressure below zero) and give residuals of opposite sign; otherwise `PhysicsRangeError` names
+the trial value or both residuals. On the upstream doublet-A configuration (2400 m producer,
+10-stage ESP at 650 m, 3 bar wellhead) the solve gives 135.8666 m3/h at 69 Hz (upstream
+135.9258, -0.044 %) and 174406.5 W ESP shaft power at 65 Hz (upstream 174444.7, -0.022 %); the
+3100 m injector needs no pump (`None`, upstream 0.001 bar).
+
+```python
+from gemini.core.modules import ESP, ProductionReservoir, ProductionWell
+from gemini.core.modules.plants import nodal
+from gemini.core.physics.geometry import build_path
+
+path = build_path([dict(MD=d, TVD=d, ID=0.15, roughness=0.01) for d in (0, 300, 400, 600, 2400)])
+reservoir = ProductionReservoir().update_params(
+    pressure="250 bar", temperature="80 C", permeability=1e-12, thickness=100,
+    drainage_radius=0, top_depth=2400, productivity_index=10 / 3.6e8, wellbore_radius=0.1,
+)
+well, riser = (
+    ProductionWell().update_params(
+        pipe_path=path, soil_temperature="20 C", segment=segment, esp_depth=650
+    )
+    for segment in ("below_esp", "above_esp")
+)
+esp = ESP().update_params(
+    no_stages=10,
+    head_coeff=[83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
+    power_coeff=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+)
+esp.frequency = "69 Hz"
+rate = nodal.solve_production_rate(reservoir, well, 3e5, (5, 60), esp=esp, riser=riser)
+assert round(rate * 3.6, 4) == 135.8666
+reservoir.production_rate = rate
+```
+

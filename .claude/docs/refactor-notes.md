@@ -202,6 +202,11 @@ ported into the refactored structure; only missing behaviour was added.
   minimum **outlet**): upstream re-solves with the source outlet fixed and lets the sink outlet
   drop, which is the duty reduction implemented here. It is optional (default `None`), so no
   existing number changes.
+- Nodal analysis (`plants/nodal.py`) walks the wells upward from the sandface, as the plant
+  does, where upstream walks downward from the wellhead; both match one balance. On the upstream
+  doublet-A inputs the rate is 135.8666 m3/h against the reference 135.9258 m3/h (-0.059 m3/h,
+  -0.044 %) and the ESP shaft power 174406.5 W against 174444.7 W (-0.022 %), within upstream's
+  1 % tolerance, without tuning. Upstream's injector "bracket floor" result is `None` here.
 - The Carnot mode keeps the refactored model: upstream evaluates the COP at the sink outlet and
   the **source inlet** without a lift floor (COP 4.4144 in its test case), the refactored model at
   both outlets with a 10 K floor (3.1012 for the same inputs).

@@ -189,12 +189,7 @@ class ProductionReservoir(_Reservoir):
         """Apply the linear production IPR and emit the sandface stream."""
 
         # Outlets
-        if self.productivity_index is None:
-            raise ConfigurationError(f"{self.path}: productivity_index is required")
-        flow = self.production_rate / self.fluid.properties(self.pressure, self.temperature).rho_l
-        p_bh = self.pressure - flow / self.productivity_index
-
-        sandface = Stream(m_dot=self.production_rate, T=self.temperature, p=p_bh, fluid=self.fluid)
+        sandface = self.sandface_stream(self.production_rate)
 
         outlets = dict(sandface=sandface)
         return outlets
@@ -204,6 +199,19 @@ class ProductionReservoir(_Reservoir):
         flow = sandface.volumetric_flow()
         for name, value in self._calculate_outputs(flow, sandface.p).items():
             setattr(self, name, value)
+
+    def sandface_stream(self, production_rate):
+        """Return the sandface stream [SI] the linear IPR delivers at a production rate [kg/s].
+
+        ``p_bh = pressure - Q / productivity_index`` with the volume flow Q at reservoir
+        conditions. ``forward`` uses it for the commanded rate; the nodal solve of
+        ``gemini.core.modules.plants.nodal`` uses it for trial rates without a call.
+        """
+        if self.productivity_index is None:
+            raise ConfigurationError(f"{self.path}: productivity_index is required")
+        flow = production_rate / self.fluid.properties(self.pressure, self.temperature).rho_l
+        p_bh = self.pressure - flow / self.productivity_index
+        return Stream(m_dot=production_rate, T=self.temperature, p=p_bh, fluid=self.fluid)
 
 
 class InjectionReservoir(_Reservoir):
@@ -228,6 +236,18 @@ class InjectionReservoir(_Reservoir):
         """Calculate the bottomhole pressure the sandface flow requires."""
         sandface = inlets.sandface
         flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
-        p_bh = self.pressure + flow / self.injectivity_index
-        for name, value in self._calculate_outputs(flow, p_bh).items():
+        for name, value in self._calculate_outputs(flow, self.required_pressure(sandface)).items():
             setattr(self, name, value)
+
+    def required_pressure(self, sandface):
+        """Return the bottomhole pressure [Pa] the linear injectivity needs for a sandface stream.
+
+        ``p_bh = pressure + Q / injectivity_index`` with Q the absolute volume flow of the
+        stream. The aquifer accepts any arriving stream; the nodal solve of
+        ``gemini.core.modules.plants.nodal`` matches the injection well's bottom pressure to
+        this value.
+        """
+        if self.injectivity_index is None:
+            raise ConfigurationError(f"{self.path}: injectivity_index is required")
+        flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
+        return self.pressure + flow / self.injectivity_index
