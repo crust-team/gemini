@@ -1780,6 +1780,9 @@ the injection pump to the solved pressure, or to its suction pressure when the s
 `None`. `examples/core/simulate/02_parallel_heat_exchangers.py` uses it with three parallel
 exchangers (upstream `parallel_hex_plant`: 125.10 m3/h at 10 bar, the measured 125 m3/h the
 upstream index was fitted to; injection 54.86 bar where upstream reports about 44 bar measured).
+`examples/core/simulate/03_boiler_chp_secondary.py` (upstream `doublet_plant`) adds a boiler and
+a CHP on the secondary side and reports `emissions`; its 3100 m injector needs no pump, so the
+injection pump draws zero electricity.
 
 ```python
 from gemini.core.modules import ESP, ProductionReservoir, ProductionWell
