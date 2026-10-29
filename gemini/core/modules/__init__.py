@@ -10,7 +10,16 @@ from .piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
 from .power import ORC, FlashTurbine, GridConnection, Separator
 from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
 from .storage import IceStorage, ThermalStorage
-from .subsurface import InjectionReservoir, InjectionWell, ProductionReservoir, ProductionWell
+from .subsurface import (
+    AquiferStorage,
+    BoreholeField,
+    DownholeHeatExchanger,
+    InjectionReservoir,
+    InjectionWell,
+    ProductionReservoir,
+    ProductionWell,
+    ThermalDecline,
+)
 from .treatment import Blowdown, Degasser, Desander, Filter, InhibitorDosing, Vent
 from .wiring import trace_wiring
 
@@ -29,6 +38,10 @@ __all__ = [
     "InjectionWell",
     "ProductionReservoir",
     "ProductionWell",
+    "ThermalDecline",
+    "AquiferStorage",
+    "BoreholeField",
+    "DownholeHeatExchanger",
     "Blowdown",
     "Degasser",
     "Filter",

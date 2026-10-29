@@ -35,6 +35,8 @@ VolumetricHeatCapacity = Annotated[float, quantity("volumetric_heat_capacity", "
 ThermalDiffusivity = Annotated[float, quantity("thermal_diffusivity", "m2/s", gt=0)]
 LinearPower = Annotated[float, quantity("linear_power", "W/m")]
 ThermalConductivity = Annotated[float, quantity("thermal_conductivity", "W/m/K", gt=0)]
+LinearThermalResistance = Annotated[float, quantity("linear_thermal_resistance", "m.K/W", gt=0)]
+TemperatureGradient = Annotated[float, quantity("temperature_gradient", "K/m")]
 HeatTransferCoefficient = Annotated[float, quantity("heat_transfer_coefficient", "W/m2/K", ge=0)]
 ThermalConductance = Annotated[float, quantity("thermal_conductance", "W/K", ge=0)]
 Permeability = Annotated[float, quantity("permeability", "m2", gt=0)]

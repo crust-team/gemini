@@ -1,0 +1,347 @@
+"""Ground and aquifer heat transport: doublet breakthrough, conduction shapes, Ramey profiles.
+
+The functions are plain SI relations used by the subsurface equipment: the thermal
+breakthrough of a geothermal doublet (Gringarten and Sauty 1975), the conduction conductance
+of buried storage volumes (Incropera et al.; Carslaw and Jaeger 1959), the steady-flux
+borehole cell resistance (Hellstrom 1991) and the transient rock resistance and fluid
+temperature profile of a well in a linear geothermal gradient (Ramey 1962).
+"""
+
+import math
+
+from scipy.optimize import brentq
+
+from gemini.errors import PhysicsRangeError
+
+EULER_GAMMA = 0.5772156649015329
+"""Euler-Mascheroni constant [-] of the line-source long-time asymptote."""
+
+MIN_RAMEY_FOURIER = 25.0
+"""Smallest dimensionless time alpha*t/r**2 [-] for which the Ramey asymptote is within 1 %."""
+
+_SMALL_ANGLE = 0.1
+"""Streamline angle [rad] below which ``sin - theta*cos`` uses its Taylor series."""
+
+_ANGLE_MARGIN = 1e-12
+"""Relative distance [-] from 0 and pi of the streamline-angle root bracket."""
+
+
+def aquifer_volumetric_heat_capacity(
+    porosity: float, fluid_heat_capacity: float, rock_heat_capacity: float
+) -> float:
+    """Return the bulk volumetric heat capacity [J/m3/K] of a saturated aquifer.
+
+    Parameters
+    ----------
+    porosity : float
+        Connected porosity [-] in [0, 1].
+    fluid_heat_capacity, rock_heat_capacity : float
+        Positive volumetric heat capacities of the pore fluid and of the rock grains [J/m3/K].
+
+    Notes
+    -----
+    Volume-weighted mixing rule (rho c)_a = phi (rho c)_w + (1 - phi) (rho c)_r, which assumes
+    local thermal equilibrium between fluid and grains (Bear 1972, Dynamics of Fluids in
+    Porous Media).
+    """
+    _require_positive("aquifer_volumetric_heat_capacity", fluid=fluid_heat_capacity)
+    _require_positive("aquifer_volumetric_heat_capacity", rock=rock_heat_capacity)
+    if not 0 <= porosity <= 1:
+        raise PhysicsRangeError(
+            f"aquifer_volumetric_heat_capacity: porosity = {porosity}; expected a value in [0, 1]"
+        )
+    return porosity * fluid_heat_capacity + (1 - porosity) * rock_heat_capacity
+
+
+def doublet_breakthrough_volume(
+    well_spacing: float,
+    thickness: float,
+    aquifer_heat_capacity: float,
+    fluid_heat_capacity: float,
+) -> float:
+    """Return the injected volume [m3] at which the cold front reaches the producer.
+
+    Parameters
+    ----------
+    well_spacing, thickness : float
+        Positive distance between the injector and producer and aquifer thickness [m].
+    aquifer_heat_capacity, fluid_heat_capacity : float
+        Positive volumetric heat capacities of the saturated aquifer and the fluid [J/m3/K].
+
+    Returns
+    -------
+    float
+        V_B = pi L**2 H (rho c)_a / (3 (rho c)_w) [m3]; at a constant rate Q the breakthrough
+        time is V_B / Q.
+
+    Notes
+    -----
+    Reference: Gringarten and Sauty (1975), A theoretical study of heat extraction from
+    aquifers with uniform regional flow, J. Geophys. Res. 80(35), 4956-4962, breakthrough time
+    without heat exchange with the confining beds, t_B = pi L**2 H (rho c)_a / (3 Q (rho c)_w).
+    Valid for a balanced doublet of fully penetrating wells in a homogeneous, isotropic,
+    confined aquifer of constant thickness without regional flow.
+    """
+    _require_positive("doublet_breakthrough_volume", well_spacing=well_spacing)
+    _require_positive("doublet_breakthrough_volume", thickness=thickness)
+    _require_positive("doublet_breakthrough_volume", aquifer=aquifer_heat_capacity)
+    _require_positive("doublet_breakthrough_volume", fluid=fluid_heat_capacity)
+    return math.pi * well_spacing**2 * thickness * aquifer_heat_capacity / (3 * fluid_heat_capacity)
+
+
+def doublet_cold_fraction(volume_ratio: float) -> float:
+    """Return the share [-] of the produced flow that arrives at the injection temperature.
+
+    Parameters
+    ----------
+    volume_ratio : float
+        Nonnegative injected volume divided by the breakthrough volume V / V_B [-].
+
+    Returns
+    -------
+    float
+        Zero up to breakthrough, then theta / pi, where the streamline leaving the injector at
+        angle theta to the well axis has the thermal travel time t / t_B = V / V_B.
+
+    Notes
+    -----
+    The streamlines of a doublet (dipole) are circles through both wells. The streamline that
+    leaves the injector at angle theta carries the travel time
+    t(theta) / t_B = 3 (sin theta - theta cos theta) / sin(theta)**3 and bounds the share
+    theta / pi of the flow (Gringarten and Sauty 1975). With piston
+    displacement and no heat exchange with the confining beds, every streamline whose travel
+    time has passed delivers water at the injection temperature, so the producer temperature
+    is T_res - (theta / pi) (T_res - T_inj). The decline starts with a square-root shape,
+    theta ~ sqrt(5 (V / V_B - 1) / 2), and tends to one as V / V_B grows without bound.
+    """
+    if math.isnan(volume_ratio) or volume_ratio < 0:
+        raise PhysicsRangeError(
+            f"doublet_cold_fraction: volume_ratio = {volume_ratio}; expected a value >= 0"
+        )
+    if volume_ratio <= 1:
+        return 0.0
+    upper = math.pi * (1 - _ANGLE_MARGIN)
+    if _dipole_travel_time(upper) <= volume_ratio:
+        return 1.0
+    angle = brentq(
+        lambda theta: _dipole_travel_time(theta) - volume_ratio,
+        _ANGLE_MARGIN,
+        upper,
+        xtol=1e-14,
+    )
+    return angle / math.pi
+
+
+def cylinder_store_conductance(
+    conductivity: float, diffusivity: float, volume: float, height: float, period: float
+) -> float:
+    """Return the period-mean conduction conductance [W/K] of a cylindrical heat store.
+
+    Parameters
+    ----------
+    conductivity, diffusivity : float
+        Positive thermal conductivity [W/m/K] and diffusivity [m2/s] of the surroundings.
+    volume : float
+        Nonnegative thermal volume of the store [m3].
+    height : float
+        Positive height of the store, the aquifer or well-screen thickness [m].
+    period : float
+        Positive storage period over which the conduction boundary layer grows [s].
+
+    Returns
+    -------
+    float
+        UA = 2 k A / sqrt(pi alpha t_p) with A = 2 pi R**2 + 2 pi R H and
+        R = sqrt(V / (pi H)) [W/K]; zero for zero volume.
+
+    Notes
+    -----
+    A step of the store temperature drives the flux k dT / sqrt(pi alpha t) into a
+    semi-infinite medium (Carslaw and Jaeger 1959, Conduction of Heat in Solids);
+    its mean over the period t_p is 2 k dT / sqrt(pi alpha t_p). Applied to the whole
+    envelope (top, bottom and side) of the cylinder of the store's thermal radius, it makes
+    the losses scale with the area-to-volume ratio, the governing quantity of ATES thermal
+    recovery (Bloemendal and Hartog 2018, Geothermics 71, 306-319). Valid while the
+    penetration depth sqrt(alpha t_p) is small against R and H.
+    """
+    _require_positive("cylinder_store_conductance", conductivity=conductivity)
+    _require_positive("cylinder_store_conductance", diffusivity=diffusivity)
+    _require_positive("cylinder_store_conductance", height=height)
+    _require_positive("cylinder_store_conductance", period=period)
+    if math.isnan(volume) or volume < 0:
+        raise PhysicsRangeError(f"cylinder_store_conductance: volume = {volume} m3; expected >= 0")
+    radius = math.sqrt(volume / (math.pi * height))
+    area = 2 * math.pi * radius * (radius + height)
+    return 2 * conductivity * area / math.sqrt(math.pi * diffusivity * period)
+
+
+def vertical_cylinder_conductance(conductivity: float, length: float, diameter: float) -> float:
+    """Return the steady conductance [W/K] of a vertical cylinder below an isothermal surface.
+
+    Parameters
+    ----------
+    conductivity : float
+        Positive thermal conductivity of the ground [W/m/K].
+    length, diameter : float
+        Positive depth and diameter of the cylinder whose top is at the surface [m].
+
+    Returns
+    -------
+    float
+        UA = k S with S = 2 pi L / ln(4 L / D) [W/K].
+
+    Notes
+    -----
+    Reference: Incropera et al., Fundamentals of Heat and Mass Transfer, table 4.1, vertical
+    cylinder in a semi-infinite medium, derived for L >> D. Raises ``PhysicsRangeError`` for
+    ln(4 L / D) < 1 (L < 0.68 D), where the shape factor no longer applies.
+    """
+    _require_positive("vertical_cylinder_conductance", conductivity=conductivity)
+    _require_positive("vertical_cylinder_conductance", length=length)
+    _require_positive("vertical_cylinder_conductance", diameter=diameter)
+    logarithm = math.log(4 * length / diameter)
+    if logarithm < 1:
+        raise PhysicsRangeError(
+            f"vertical_cylinder_conductance: length = {length} m, diameter = {diameter} m; "
+            "expected ln(4 length / diameter) >= 1"
+        )
+    return conductivity * 2 * math.pi * length / logarithm
+
+
+def steady_flux_resistance(
+    conductivity: float, borehole_radius: float, cell_radius: float
+) -> float:
+    """Return the ground resistance [m K/W] between a borehole wall and its cell's mean.
+
+    Parameters
+    ----------
+    conductivity : float
+        Positive ground thermal conductivity [W/m/K].
+    borehole_radius, cell_radius : float
+        Borehole radius and the larger equivalent radius of its ground cell [m].
+
+    Returns
+    -------
+    float
+        R_sf = (ln(r_e / r_b) / (1 - x)**2 - 1 / (2 (1 - x)) - 1 / 4) / (2 pi k) with
+        x = (r_b / r_e)**2 [m K/W].
+
+    Notes
+    -----
+    Steady-flux regime of a borehole in a cylindrical cell with an adiabatic outer radius
+    r_e, where the whole cell warms or cools at the same rate (Hellstrom 1991, Ground Heat
+    Storage, Lund University). The expression is the exact annulus solution with
+    a uniform heat sink; for r_b << r_e it reduces to Hellstrom's (ln(r_e / r_b) - 3/4) /
+    (2 pi k). The regime is reached after about r_e**2 / (4 alpha).
+    """
+    _require_positive("steady_flux_resistance", conductivity=conductivity)
+    _require_positive("steady_flux_resistance", borehole_radius=borehole_radius)
+    if cell_radius <= borehole_radius:
+        raise PhysicsRangeError(
+            f"steady_flux_resistance: cell_radius = {cell_radius} m; expected more than "
+            f"borehole_radius = {borehole_radius} m"
+        )
+    x = (borehole_radius / cell_radius) ** 2
+    shape = math.log(cell_radius / borehole_radius) / (1 - x) ** 2 - 1 / (2 * (1 - x)) - 0.25
+    return shape / (2 * math.pi * conductivity)
+
+
+def ramey_time_function(time: float, diffusivity: float, radius: float) -> float:
+    """Return Ramey's dimensionless transient conduction function f(t) [-].
+
+    Parameters
+    ----------
+    time : float
+        Positive time since the well started to exchange heat [s].
+    diffusivity : float
+        Positive rock thermal diffusivity [m2/s].
+    radius : float
+        Positive borehole (outer heat-exchange) radius [m].
+
+    Returns
+    -------
+    float
+        f(t) = ln(2 sqrt(alpha t) / r) - gamma / 2 [-]; the rock adds the resistance
+        f(t) / (2 pi k) per unit length.
+
+    Notes
+    -----
+    Reference: Ramey (1962), Wellbore heat transmission, J. Petroleum Technology 14(4),
+    427-435, long-time line-source approximation f(t) = -ln(r / (2 sqrt(alpha t))) - 0.290;
+    gamma / 2 = 0.2886 is the exact constant of the exponential-integral asymptote. Raises
+    ``PhysicsRangeError`` below alpha t / r**2 = 25, where the approximation error exceeds
+    about 1 % (roughly the first days of operation).
+    """
+    _require_positive("ramey_time_function", time=time)
+    _require_positive("ramey_time_function", diffusivity=diffusivity)
+    _require_positive("ramey_time_function", radius=radius)
+    fourier = diffusivity * time / radius**2
+    if fourier < MIN_RAMEY_FOURIER:
+        raise PhysicsRangeError(
+            f"ramey_time_function: alpha t / r**2 = {fourier}; expected >= {MIN_RAMEY_FOURIER}"
+        )
+    return math.log(2 * math.sqrt(fourier)) - EULER_GAMMA / 2
+
+
+def ramey_fluid_temperature(
+    inlet_temperature: float,
+    top_temperature: float,
+    gradient: float,
+    length: float,
+    relaxation_length: float,
+) -> float:
+    """Return the temperature [K] of a fluid after flowing ``length`` down a geothermal gradient.
+
+    Parameters
+    ----------
+    inlet_temperature : float
+        Fluid temperature where it enters at the top [K].
+    top_temperature, gradient : float
+        Undisturbed rock temperature at the top [K] and its signed increase with depth [K/m].
+    length : float
+        Nonnegative vertical flow length [m].
+    relaxation_length : float
+        Positive A = m_dot cp R_total [m], with R_total the fluid-to-far-field resistance per
+        unit length [m K/W].
+
+    Returns
+    -------
+    float
+        T(z) = T_top + G z - G A + (T_in - T_top + G A) exp(-z / A) [K].
+
+    Notes
+    -----
+    Reference: Ramey (1962), Wellbore heat transmission, J. Petroleum Technology 14(4),
+    427-435, equation for an injection well: the steady energy balance
+    m_dot cp dT/dz = (T_rock(z) - T) / R_total with T_rock = T_top + G z, solved exactly for
+    a constant resistance. The fluid's own conduction, friction heating and pressure work are
+    neglected.
+    """
+    _require_positive("ramey_fluid_temperature", relaxation_length=relaxation_length)
+    if length < 0:
+        raise PhysicsRangeError(f"ramey_fluid_temperature: length = {length} m; expected >= 0")
+    offset = gradient * relaxation_length
+    decay = math.exp(-length / relaxation_length)
+    rock = top_temperature + gradient * length
+    return rock - offset + (inlet_temperature - top_temperature + offset) * decay
+
+
+def _dipole_travel_time(theta):
+    """Return t(theta) / t_B = 3 (sin theta - theta cos theta) / sin(theta)**3 [-].
+
+    Below ``_SMALL_ANGLE`` the difference uses its Taylor series
+    theta**3/3 - theta**5/30 + theta**7/840 - theta**9/45360 to avoid cancellation.
+    """
+    if theta < _SMALL_ANGLE:
+        square = theta * theta
+        difference = theta**3 * (1 / 3 - square / 30 + square**2 / 840 - square**3 / 45360)
+    else:
+        difference = math.sin(theta) - theta * math.cos(theta)
+    return 3 * difference / math.sin(theta) ** 3
+
+
+def _require_positive(function, **values):
+    """Raise ``PhysicsRangeError`` unless every value is a positive number."""
+    for name, value in values.items():
+        if math.isnan(value) or value <= 0:
+            raise PhysicsRangeError(f"{function}: {name} = {value}; expected a positive value")
