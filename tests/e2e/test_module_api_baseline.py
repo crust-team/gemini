@@ -5,6 +5,15 @@ of the fixture can change them. The committed simulation fixture differs from th
 code produces by a few ULP in the ESP flow, and pressures that are differences of ~1e7 Pa terms
 differ by up to two ULP of 1e7 Pa (3.7e-9 Pa). ``SIMULATE_RTOL`` admits exactly that round-off
 and nothing physically visible.
+
+NOTE(refactor): pandas 3 parses decimal text correctly rounded, as pandas 2 did only with
+``float_precision="round_trip"``. Its default parser read 44,022 cells of the July CSV (and the
+fixture CSVs) differently, by up to 2.3e-15 relative, and cancellation in differences of large
+terms amplifies that to 1.7e-13 relative (1.0e-8 W) in injector heat loss and 8.0e-14
+(7.7e-7 W/K) in apparent HX UA. pandas 2.3.3 with ``round_trip`` reproduces exactly these
+deviations, and its replay is bit-identical to pandas 3's on the same parsed values, so GEMINI's
+arithmetic is unchanged. ``PARSER_RTOL`` admits that parsing difference under pandas 3 only;
+pandas 2 keeps ``REPLAY_RTOL``.
 """
 
 import ast
@@ -28,6 +37,7 @@ FIELD_RENAMES = {
     "energy_port_heat_loss": "heat_loss",
 }
 REPLAY_RTOL = 2e-15
+PARSER_RTOL = 2e-13
 SIMULATE_RTOL = 1e-13
 TYPE_RENAMES = {
     "doublet_heat": "doublet_heat_plant",
@@ -88,8 +98,8 @@ def _assert_values_identical(actual, expected, rtol=REPLAY_RTOL):
             _assert_close(left_rows, right_rows, rtol)
             continue
         pd.testing.assert_series_equal(
-            left.fillna("<missing>").map(str),
-            right.fillna("<missing>").map(str),
+            left.astype(object).fillna("<missing>").map(str),
+            right.astype(object).fillna("<missing>").map(str),
             check_names=False,
             check_dtype=False,
         )
@@ -115,7 +125,8 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
     elapsed = perf_counter() - started
     assert elapsed < 60
     baseline = BASELINE if dataset_name == "slow" else FAST_BASELINE
-    _assert_values_identical(replay, _baseline_frame(baseline, "replay.csv.gz"))
+    rtol = PARSER_RTOL if int(pd.__version__.split(".")[0]) >= 3 else REPLAY_RTOL
+    _assert_values_identical(replay, _baseline_frame(baseline, "replay.csv.gz"), rtol)
 
     clock = gm.Clock.days(2027, 1, 1, days=1)
     profiles = {

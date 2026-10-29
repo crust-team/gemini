@@ -16,6 +16,9 @@ from gemini.utils.time import (
     to_utc_index,
 )
 
+AMBIGUOUS = (ValueError, pytz.exceptions.AmbiguousTimeError)
+"""pandas 3 raises ``ValueError`` for an ambiguous local time; pandas 2 raised pytz's error."""
+
 
 def test_to_utc_treats_naive_values_as_utc_and_converts_aware_values():
     """Strings, naive and aware datetimes all become aware UTC datetimes."""
@@ -73,5 +76,5 @@ def test_to_utc_index_localises_naive_values_and_keeps_offsets():
     aware = pd.DatetimeIndex(["2024-01-01 01:00"], tz="Europe/Oslo")
     assert to_utc_index(aware)[0] == pd.Timestamp("2024-01-01 00:00", tz="UTC")
     assert len(to_utc_index([])) == 0
-    with pytest.raises(pytz.exceptions.AmbiguousTimeError, match="2024-10-27 02:30"):
+    with pytest.raises(AMBIGUOUS, match="2024-10-27 02:30"):
         to_utc_index(["2024-10-27 02:30"], "Europe/Oslo")

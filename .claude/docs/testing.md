@@ -90,7 +90,10 @@ PYTHONPATH=. python tests/fixtures/generate_fast_fixtures.py
 
 The generator fixes gzip metadata for reproducible output. The replay golden reproduces within
 the documented `REPLAY_RTOL` (one binary64 ULP), not byte for byte: the committed file was
-captured in another numeric environment. Review generated diffs and run e2e
+captured in another numeric environment. Under pandas 3 the comparison uses `PARSER_RTOL`
+(2e-13) instead, because pandas 3 parses the CSV decimals correctly rounded where pandas 2 did
+not (see [refactor-notes.md](refactor-notes.md#dependency-upgrades)); never regenerate the golden
+to absorb a parser difference. Review generated diffs and run e2e
 on both datasets before accepting a golden change. Golden changes are evidence of a numerical
 change and are never a routine speed optimization.
 

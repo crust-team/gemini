@@ -57,6 +57,21 @@ class Accumulator(gm.modules.Module):
         return state, result
 
 
+def _reference(name, actual):
+    """Read a pickled pre-refactor frame at the column dtypes and time unit of ``actual``.
+
+    The pickles hold nanosecond times and object text columns; pandas 3 builds results with
+    microsecond times and its ``str`` text dtype. Values are compared unchanged.
+    """
+    old = pd.read_pickle(REFERENCE / name)
+    old = old.rename(columns={"filter_hot": "filters.hot", "filter_return": "filters.cold"})
+    for column in old:
+        old[column] = old[column].astype(actual[column].dtype)
+    if isinstance(old.index, pd.DatetimeIndex):
+        old.index = old.index.as_unit(actual.index.unit)
+    return old
+
+
 @pytest.fixture
 def setup(fresh_plant, reference_dataset):
     """Create a fresh plant and first-day measurements."""
@@ -70,17 +85,15 @@ def test_reference_replay_and_simulate(setup):
     ~1e-15 relative to the old raw-unit CSV conversion path, hence the simulate tolerance.
     """
     plant, data = setup
-    old = pd.read_pickle(REFERENCE / "replay.pkl")
-    old = old.rename(columns={"filter_hot": "filters.hot", "filter_return": "filters.cold"})
     actual = gm.Engine(on_error="raise").replay(plant, data).to_frame()
+    old = _reference("replay.pkl", actual)
     pd.testing.assert_frame_equal(actual[old.columns], old, check_names=False)
     clock = gm.Clock.days(2024, 6, 7)
     raw = data.read(data.start, data.start)
     assumed = pd.DataFrame([raw.iloc[0].to_dict()] * 24, index=list(clock))
     result = gm.Engine(on_error="raise").simulate(plant, gm.Dataset.from_frame(assumed), clock)
-    old = pd.read_pickle(REFERENCE / "simulate.pkl")
-    old = old.rename(columns={"filter_hot": "filters.hot", "filter_return": "filters.cold"})
     actual = result.to_frame()
+    old = _reference("simulate.pkl", actual)
     pd.testing.assert_frame_equal(
         actual[old.columns].reset_index(drop=True),
         old.reset_index(drop=True),

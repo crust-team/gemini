@@ -77,6 +77,11 @@ finite engine, and then cleaned up. Old import paths are not retained.
 - `Blowdown` is a bleed split: `feed_in` -> `retained_out`, `blowdown_out` under the
   `blowdown_fraction` control (was a pass-through `inlet` -> `outlet` with a `modelled`
   output). `FlowCoefficient` allows zero, so a closed valve reports it.
+- Dependencies are version ranges instead of exact pins: pandas >= 2.2.2, including pandas 3.
+  Under pandas 3, results have a microsecond time index and `str` text columns, ambiguous local
+  times raise `ValueError` instead of pytz's `AmbiguousTimeError`, and CSV decimals parse
+  correctly rounded, which moves replays of the example data by up to 1.7e-13 relative (see
+  `.claude/docs/refactor-notes.md`).
 
 ### Removed
 - `gm.modules.list/get/create`, the module catalogue and engine registry, `Sequential`,
@@ -109,6 +114,8 @@ finite engine, and then cleaned up. Old import paths are not retained.
   ns). Under pandas 3, which parses text times as microseconds, the loader compared them with
   nanosecond tick values, so every tick looked like a gap and replay silently skipped every twin;
   `native_step` and clock durations were also 1000 times too short.
+- Clocks: daily `Clock.days`/`Clock.year` steps follow local midnight across DST under pandas 3,
+  which reads a `Timedelta` frequency as a fixed 24 hours.
 
 ## [1.0.3] - 2026-10-13
 ### Added

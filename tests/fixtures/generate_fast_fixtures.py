@@ -4,8 +4,9 @@ Run from the repository root as ``PYTHONPATH=. python tests/fixtures/generate_fa
 it overwrites both committed files in place, so run it only for a reviewed numerical change. The
 dataset slice is reproduced byte for byte. The replay golden was written in another numeric
 environment: regenerating it here, even at its capture commit 56d90be, changes 401 rows by a few
-ULP, which the e2e comparison tolerates. A changed golden is evidence of a numerical change,
-never a routine update (see ``.claude/docs/testing.md``).
+ULP, which the e2e comparison tolerates. Under pandas 3 its correctly rounded CSV parser changes
+the replay by up to 1.7e-13 relative, which ``PARSER_RTOL`` tolerates. A changed golden is
+evidence of a numerical change, never a routine update (see ``.claude/docs/testing.md``).
 """
 
 import pandas as pd

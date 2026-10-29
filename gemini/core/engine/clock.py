@@ -109,9 +109,15 @@ class Clock:
         """Return the local calendar ticks in ``[start, end)``.
 
         A daily step follows local midnight, so in a DST zone the ticks are not a fixed UTC
-        grid. The compact ``FixedClock`` is used only when it reproduces the ticks exactly.
+        grid. A whole number of days is passed as calendar ``Day`` offsets because pandas 3 reads
+        a ``Timedelta`` frequency as a fixed 24 hours. The compact ``FixedClock`` is used only
+        when it reproduces the ticks exactly.
         """
-        ticks = pd.date_range(start, end, freq=parse_duration(step), inclusive="left")
+        frequency = parse_duration(step)
+        days, remainder = divmod(frequency, pd.Timedelta(days=1))
+        if days and not remainder:
+            frequency = pd.offsets.Day(days)
+        ticks = pd.date_range(start, end, freq=frequency, inclusive="left")
         grid = FixedClock(ticks[0], ticks[-1], step)
         if grid.ticks.equals(ticks.tz_convert("UTC")):
             return grid

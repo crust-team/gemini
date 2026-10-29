@@ -161,3 +161,18 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
 - Profile sum resampling is summation, not energy integration; indices are UTC and previous
   values are held. Profiles combined into a dataset must share an index. Cost aggregation
   rejects mixed currency/year values and sums each module's own sourced contribution once.
+
+## Dependency upgrades
+
+- `NOTE(refactor)`: pandas 3 parses decimal CSV text correctly rounded, as pandas 2 did only with
+  `float_precision="round_trip"`. The pandas 2 default parser reads 44,022 cells of the July CSV
+  differently, by up to 2.3e-15 relative, so replay under pandas 3 differs from the committed
+  pandas 2 fixtures by up to 1.7e-13 relative (1.0e-8 W) in injector heat loss, 8.0e-14
+  (7.7e-7 W/K) in apparent HX UA and at most 5.5e-15 elsewhere, on both datasets. pandas 2.3.3
+  with `round_trip` reproduces exactly these deviations and gives a bit-identical replay to
+  pandas 3, so the model arithmetic is unchanged. No fixture changed;
+  `tests/e2e/test_module_api_baseline.py` admits `PARSER_RTOL = 2e-13` under pandas 3 only.
+- pandas 3 results carry a microsecond time index and the `str` text dtype where pandas 2 gave
+  nanoseconds and `object`; values are unchanged. Timestamp indexes of any resolution are
+  compared in nanoseconds (`Loader`, `median_step`, `interval_seconds`).
+
