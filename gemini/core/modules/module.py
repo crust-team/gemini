@@ -365,54 +365,54 @@ class Module:
         """Whether this module owns no child modules."""
         return not self._children
 
-    def _named(self, registry_name, recurse=False):
+    def _named(self, registry_name, recurse):
         for path, module in self.named_modules() if recurse else [("", self)]:
             for name, declaration in getattr(module, registry_name).items():
                 yield join_path(path, name), declaration
 
+    def _section(self, registry_name, recurse):
+        return dict(self._named(registry_name, recurse))
+
     def parameters(self, recurse=True):
-        """Iterate parameter declarations."""
+        """Iterate parameter declarations of this module and, by default, its descendants."""
         for _, parameter in self._named("_parameters", recurse):
             yield parameter
 
     def named_parameters(self, recurse=True):
-        """Iterate dotted names and parameter declarations."""
+        """Iterate ``(dotted path, parameter)`` pairs relative to this module."""
         yield from self._named("_parameters", recurse)
 
     def calibratable_parameters(self, recurse=True):
         """Return only parameters explicitly marked calibratable."""
         return [p for p in self.parameters(recurse) if p.calibratable]
 
-    def _section(self, name, recurse=False):
-        return dict(self._named(name, recurse))
-
-    def inlets(self, recurse=False):
-        """Return inlet declarations by local or dotted name."""
-        return self._section("_inlets", recurse)
-
-    def controls(self, recurse=False):
-        """Return controllable input declarations."""
+    def controls(self, recurse=True):
+        """Return controllable input declarations by dotted path relative to this module."""
         return self._section("_controls", recurse)
 
-    def boundaries(self, recurse=False):
-        """Return external boundary declarations."""
+    def boundaries(self, recurse=True):
+        """Return external boundary declarations by dotted path relative to this module."""
         return self._section("_boundaries", recurse)
 
-    def inputs(self, recurse=False):
-        """Return controls followed by boundaries."""
+    def inputs(self, recurse=True):
+        """Return controls followed by boundaries, by dotted path relative to this module."""
         return self.controls(recurse) | self.boundaries(recurse)
 
-    def outputs(self, recurse=False):
-        """Return computed output declarations."""
+    def outputs(self, recurse=True):
+        """Return computed output declarations by dotted path relative to this module."""
         return self._section("_outputs", recurse)
 
-    def outlets(self, recurse=False):
-        """Return outgoing flow declarations."""
-        return self._section("_outlets", recurse)
-
-    def soft_sensors(self, recurse=False):
-        """Return outputs marked as inferred measurements."""
+    def soft_sensors(self, recurse=True):
+        """Return outputs marked as inferred measurements, by dotted path."""
         return {name: value for name, value in self.outputs(recurse).items() if value.soft_sensor}
+
+    def inlets(self):
+        """Return this module's own inlet declarations; a child's ports are internal wiring."""
+        return dict(self._inlets)
+
+    def outlets(self):
+        """Return this module's own outlet declarations; a child's ports are internal wiring."""
+        return dict(self._outlets)
 
     def _get_declaration(self, path, registry_name, kind):
         module_path, name = split_path(path)
@@ -439,7 +439,7 @@ class Module:
 
     def set_inputs(self, mapping):
         """Persist validated controls and boundaries addressed by relative dotted path."""
-        declarations = self.inputs(recurse=True)
+        declarations = self.inputs()
         pending = []
         for path, value in mapping.items():
             if path not in declarations:

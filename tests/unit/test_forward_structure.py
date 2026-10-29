@@ -162,7 +162,7 @@ def test_leaf_and_composite_output_conventions(module_classes):
     """Leaves compute plain outputs; composites declare formulas only."""
     for cls in module_classes:
         module = cls()
-        outputs = list(module.outputs().values())
+        outputs = list(module.outputs(recurse=False).values())
         if module.is_leaf:
             assert all(output.formula is None for output in outputs)
             if outputs:

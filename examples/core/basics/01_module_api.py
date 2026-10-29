@@ -60,7 +60,7 @@ fresh.load_state_dict(plant.state_dict())
 assert fresh.is_initialized
 print(plant)
 plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
-print(sorted(plant.controls(recurse=True)))
+print(sorted(plant.controls()))
 
 # runtime settings
 assert gm.runtime.get_precision() == "float64"

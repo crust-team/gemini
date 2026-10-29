@@ -82,7 +82,9 @@ class EventLog(Callback):
 
     def _before(self, path, module, inlets):
         """Remember the start time and the inlets, controls and boundaries of one call."""
-        inputs = dict(inlets) | {name: getattr(module, name) for name in module.inputs()}
+        inputs = dict(inlets) | {
+            name: getattr(module, name) for name in module.inputs(recurse=False)
+        }
         self._starts[path] = perf_counter(), _jsonable(inputs)
 
     def _after(self, path, module, inlets, outlets):
@@ -92,7 +94,9 @@ class EventLog(Callback):
             "forward",
             module_path=path,
             inputs=inputs,
-            outputs=_jsonable({name: getattr(module, name) for name in module.outputs()}),
+            outputs=_jsonable(
+                {name: getattr(module, name) for name in module.outputs(recurse=False)}
+            ),
             duration_ms=(perf_counter() - start) * 1000,
         )
 

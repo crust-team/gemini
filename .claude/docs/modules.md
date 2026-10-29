@@ -17,6 +17,17 @@ registry and no class-creation hook: `module.name` is the snake_case class name 
 the root class as `module:qualname` through `class_path`/`import_class` in `module.py`, the only
 import-by-string in the package.
 
+## Listing declarations
+
+Every declaration listing takes `recurse` with default `True` and keys its result by dotted path
+relative to the module (`"doublet.production_well.esp.frequency"` from the root):
+`parameters()` and `named_parameters()` iterate, `calibratable_parameters()` returns a list, and
+`controls()`, `boundaries()`, `inputs()`, `outputs()` and `soft_sensors()` return dicts. Pass
+`recurse=False` for the module's own declarations under their local names. `inlets()` and
+`outlets()` take no `recurse`: a child's ports are internal connections, not ports of the parent.
+`children()`/`named_children()` list direct children and `modules()`/`named_modules()` walk the
+tree.
+
 ## Leaf modules
 
 Leaves declare ordinary `Output(kind)` values and implement

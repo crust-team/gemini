@@ -35,7 +35,7 @@ def _value(row, binding, declaration=None):
 
 def _is_volumetric_mass_flow(module, name, binding):
     """Whether a kg/s control or boundary is bound to a volumetric flow column."""
-    declaration = module.inputs().get(name)
+    declaration = module.inputs(recurse=False).get(name)
     return (
         declaration is not None and declaration.unit == "kg/s" and binding.unit in VOLUMETRIC_UNITS
     )
@@ -177,7 +177,7 @@ def _is_twin(plant, path, only):
 def _simulation_inputs(plant, dataset):
     """Return the leaf inputs with a data column and their columns; reject inputs with none."""
     chained, columns, missing = [], set(), []
-    for input_path, declaration in plant.inputs(recurse=True).items():
+    for input_path, declaration in plant.inputs().items():
         module_path, name = split_path(input_path)
         module = plant.get_submodule(module_path)
         binding = _input_binding(plant, dataset, input_path, module, declaration)
@@ -186,7 +186,7 @@ def _simulation_inputs(plant, dataset):
                 missing.append(input_path)
             continue
         bound = ModuleBindings()
-        target = bound.controls if name in module.controls() else bound.boundaries
+        target = bound.controls if name in module.controls(recurse=False) else bound.boundaries
         target[name] = binding
         _check_volumetric_inputs(module_path, module, bound)
         chained.append((module_path, module, bound))
@@ -206,7 +206,7 @@ def _input_binding(plant, dataset, input_path, module, declaration):
     """
     module_path, name = split_path(input_path)
     original = plant.bindings.get(module_path, ModuleBindings())
-    group = original.controls if name in module.controls() else original.boundaries
+    group = original.controls if name in module.controls(recurse=False) else original.boundaries
     binding = group.get(name)
     if binding is None and input_path in dataset.names:
         binding = Binding(column=input_path, unit=declaration.unit or "-")
@@ -301,7 +301,7 @@ def twin_step(plant, sample, states, plan):
 def _evaluate_twin(path, module, bound, defaults, sample, states):
     """Call one twin on its measured boundary; a stateful twin also advances its state."""
     kwargs, measured = prepare(module, bound, sample.row, defaults)
-    applied = {name: kwargs.pop(name) for name in module.inputs() if name in kwargs}
+    applied = {name: kwargs.pop(name) for name in module.inputs(recurse=False) if name in kwargs}
     module.set_inputs(applied)
     if not module.stateful:
         prediction = module(kwargs)
