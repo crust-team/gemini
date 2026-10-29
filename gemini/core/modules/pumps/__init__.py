@@ -1,7 +1,9 @@
 """GEMINI pumps equipment modules."""
 
-from .boosterpump import BoosterPump
+from .centrifugalpump import CentrifugalPump
 from .esp import ESP
+from .gascompressor import GasCompressor
 from .injectionpump import InjectionPump
+from .lineshaftpump import LineShaftPump
 
-__all__ = ["ESP", "InjectionPump", "BoosterPump"]
+__all__ = ["ESP", "InjectionPump", "CentrifugalPump", "LineShaftPump", "GasCompressor"]

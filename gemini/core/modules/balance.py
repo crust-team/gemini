@@ -9,7 +9,7 @@ fluid enthalpy, mechanical work or environmental loss. Report that unresolved en
 never manufacture heat loss to force a first-law residual to zero.
 """
 
-from gemini.core.modules.pumps import ESP, BoosterPump, InjectionPump
+from gemini.core.modules.pumps import ESP, InjectionPump, LineShaftPump
 from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.core.types.flows import Stream
 
@@ -152,7 +152,7 @@ def _leaf_energy(module, result, flows):
         outgoing += incoming
     incoming += sum(flows[key] for key in ENERGY_INPUTS)
     outgoing += sum(flows[key] for key in ENERGY_OUTPUTS)
-    is_pump = isinstance(module, (ESP, InjectionPump, BoosterPump))
+    is_pump = isinstance(module, (ESP, InjectionPump, LineShaftPump))
     return {
         "residual": incoming - outgoing,
         "unresolved_power": flows["electricity"] if is_pump else 0.0,
