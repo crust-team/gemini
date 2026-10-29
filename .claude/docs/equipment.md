@@ -1774,6 +1774,13 @@ the trial value or both residuals. On the upstream doublet-A configuration (2400
 135.9258, -0.044 %) and 174406.5 W ESP shaft power at 65 Hz (upstream 174444.7, -0.022 %); the
 3100 m injector needs no pump (`None`, upstream 0.001 bar).
 
+`examples/shared/nodal_doublet/plant.py` (`NodalDoublet`) wraps both solves in a handwritten
+doublet: `produce()` solves the rate for its `wellhead_pressure` boundary, `inject(stream)` sets
+the injection pump to the solved pressure, or to its suction pressure when the solve returns
+`None`. `examples/core/simulate/02_parallel_heat_exchangers.py` uses it with three parallel
+exchangers (upstream `parallel_hex_plant`: 125.10 m3/h at 10 bar, the measured 125 m3/h the
+upstream index was fitted to; injection 54.86 bar where upstream reports about 44 bar measured).
+
 ```python
 from gemini.core.modules import ESP, ProductionReservoir, ProductionWell
 from gemini.core.modules.plants import nodal
