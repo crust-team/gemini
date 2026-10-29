@@ -1,1 +1,0 @@
-"""Design alternatives, sizing, economics."""

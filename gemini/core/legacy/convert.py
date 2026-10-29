@@ -1,5 +1,6 @@
 """Conversion between old GEMINI files and the new plant, Dataset and Results objects."""
 
+import warnings
 from copy import deepcopy
 
 import pandas as pd
@@ -8,275 +9,209 @@ from gemini.core.data.dataset import Dataset
 from gemini.core.modules.wiring import trace_wiring
 from gemini.core.physics import units
 from gemini.core.types import Binding, ModuleBindings
-from gemini.utils.strings import join_path
+from gemini.errors import GeminiWarning, LegacyFormatError
+from gemini.utils.mappings import set_nested
+from gemini.utils.strings import did_you_mean, join_path
+from gemini.utils.time import to_utc
 
-from ._loader import load_legacy_design
-from .tables import NODE_PATHS, PORTS, TYPES
+from . import tables
+from ._loader import load_legacy_design, node_kinds, node_paths
 
-_SI_UNITS = {
-    "bar": "Pa",
-    "barg": "Pa",
-    "degC": "K",
-    "m3/h": "m3/s",
-    "m3/s": "m3/s",
-    "kg/s": "kg/s",
-    "Hz": "Hz",
-    "W": "W",
-    "Pa": "Pa",
-    "K": "K",
-    "-": "-",
-}
-_ROOT_COLUMNS = {
-    "secondary.m_dot": "secondary_rate",
-    "secondary.T": "secondary_temperature",
-}
+_SECTIONS = ("controls", "boundaries", "inlets", "measured", "state")
 
 
-def _require_folder(project):
-    if project._folder is None:
-        raise ValueError("Legacy conversion requires a GeminiProject returned by read_project")
-    return project._folder
+def _si_unit(unit):
+    """Return the SI unit an old tag unit converts to."""
+    if unit not in tables.SI_UNITS:
+        raise LegacyFormatError(
+            f"old tag: unit = {unit!r}; expected one of {sorted(tables.SI_UNITS)}"
+            f"{did_you_mean(unit, tables.SI_UNITS)}"
+        )
+    return tables.SI_UNITS[unit]
 
 
-def _new_name(path, section, field, port=None):
-    if path == "" and section == "controls":
-        return _ROOT_COLUMNS.get(field, field)
-    if section == "inlets":
-        return join_path(path, f"{port}.{field}")
-    return join_path(path, field)
+def _from_si(value, unit):
+    """Convert an SI value back to the old tag unit."""
+    return units.convert(value, _si_unit(unit), unit)
+
+
+def _entries(section, values):
+    """Yield ``(keys, binding)`` of one bindings section; inlet keys are ``(port, field)``."""
+    if section != "inlets":
+        return [((field,), binding) for field, binding in values.items()]
+    return [
+        ((port, field), binding)
+        for port, fields in values.items()
+        for field, binding in fields.items()
+    ]
 
 
 def _converted_bindings(design):
+    """Return SI bindings to new column names, and the old binding of each new column.
+
+    New columns are the bound module path joined with the field (``doublet.esp.frequency``)
+    or with the port and field (``doublet.esp.suction.p``).
+    """
     converted, sources = {}, {}
     for path, old in design.bindings.items():
         bound = ModuleBindings()
-        for field, binding in old.controls.items():
-            name = _new_name(path, "controls", field)
-            bound.controls[field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
-            sources[name] = binding
-        for field, binding in old.boundaries.items():
-            name = _new_name(path, "boundaries", field)
-            bound.boundaries[field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
-            sources[name] = binding
-        for port, fields in old.inlets.items():
-            bound.inlets[port] = {}
-            for field, binding in fields.items():
-                name = _new_name(path, "inlets", field, port)
-                bound.inlets[port][field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
+        for section in _SECTIONS:
+            for keys, binding in _entries(section, getattr(old, section)):
+                name = join_path(path, ".".join(keys))
+                new = Binding(column=name, unit=_si_unit(binding.unit))
+                set_nested(getattr(bound, section), keys, new)
                 sources[name] = binding
-        for field, binding in old.measured.items():
-            name = _new_name(path, "measured", field)
-            bound.measured[field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
-            sources[name] = binding
-        for field, binding in old.state.items():
-            name = _new_name(path, "state", field)
-            bound.state[field] = Binding(column=name, unit=_SI_UNITS[binding.unit])
-            sources[name] = binding
         converted[path] = bound
     return converted, sources
 
 
-def to_plant(project, plant, nodes=None):
-    """Fill an existing example plant with converted SI parameters, histories and bindings."""
-    design = load_legacy_design(_require_folder(project))
-    if nodes is not None:
-        expected = {node_id: NODE_PATHS[node.name] for node_id, node in project.nodes.items()}
-        if nodes != expected:
-            raise ValueError(
-                f"Explicit legacy node map differs: {set(nodes.items()) ^ set(expected.items())}"
-            )
-    for path, item in design.modules.items():
-        module = plant.get_submodule(path)
-        if module.name != item.type:
-            raise ValueError(f"{path}: expected {module.name!r}, legacy maps to {item.type!r}")
-        module.param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
-        for name, value in module.params_at(None).items():
-            module.get_parameter(name).set(value, explicit=False)
-        module._active_from = item.at().valid_from
-        module._param_overrides = {}
-        module.fluid = item.fluid
+def _filled_module(plant, path, item):
+    """Return the plant module at ``path`` with the converted history of ``item``.
+
+    The current values are the latest snapshot (with any explicit override applied once), and
+    explicit overrides are cleared because the old project now defines the design.
+    """
+    module = plant.get_submodule(path)
+    expected = tables.MODULE_CLASSES[item.type]
+    if not isinstance(module, expected):
+        raise LegacyFormatError(
+            f"{path}: module type = {type(module).__name__}; expected {expected.__name__} for "
+            f"old kind {item.type!r}"
+        )
+    module.param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
+    values = module.params_at(None)
+    module._param_overrides = {}
+    module._active_from = item.params[-1].valid_from
+    return {"params": values, "fluid": item.fluid.model_dump()}
+
+
+def to_plant(project, plant):
+    """Fill an existing example plant with converted SI parameters, histories and bindings.
+
+    Old fields the bridge cannot map are listed in one ``GeminiWarning``.
+    """
+    design = load_legacy_design(project)
+    if design.unmapped:
+        warnings.warn(
+            f"Unmapped GEMINI fields: {', '.join(design.unmapped)}", GeminiWarning, stacklevel=2
+        )
+    state = {path: _filled_module(plant, path, item) for path, item in design.modules.items()}
+    state[""] = {"params": {}, "fluid": next(iter(design.modules.values())).fluid.model_dump()}
+    plant.load_state_dict(state, strict=False)
     plant.bindings, _ = _converted_bindings(design)
     plant.boundary = deepcopy(design.boundary)
-    plant.fluid = next(iter(design.modules.values())).fluid
-    plant.legacy_info = {
-        "ignored": design.ignored,
-        "unmapped": design.unmapped,
-        "nodes": nodes
-        or {node_id: NODE_PATHS[node.name] for node_id, node in project.nodes.items()},
-    }
     return plant
 
 
-def to_dataset(project, frame_old):
-    """Rename old tag columns, convert numeric values to SI and return an in-memory Dataset."""
-    design = load_legacy_design(_require_folder(project))
-    bindings, sources = _converted_bindings(design)
-    del bindings
-    frame = frame_old.copy()
+def to_dataset(project, frame):
+    """Rename old tag columns, convert numeric values to SI and return an in-memory Dataset.
+
+    Status columns are kept as text and ``tables.EXTRA_COLUMNS`` are kept converted to SI.
+    """
+    _, sources = _converted_bindings(load_legacy_design(project))
+    frame = frame.copy()
     time_column = next(
         (name for name in frame.columns if pd.api.types.is_datetime64_any_dtype(frame[name])),
         frame.columns[0],
     )
     index = pd.to_datetime(frame.pop(time_column), utc=True)
-    converted = {}
-    metadata = {}
-    missing = []
-    for name, source in sources.items():
-        if source.column not in frame:
-            missing.append(source.column)
-            continue
-        converted[name] = (
-            frame[source.column].map(lambda value: units.to_si(value, source.unit)).to_numpy()
-        )
-        metadata[name] = _SI_UNITS[source.unit]
+    missing = sorted({source.column for source in sources.values()} - set(frame.columns))
     if missing:
-        raise ValueError("Old CSV is missing bound tag columns: " + ", ".join(sorted(set(missing))))
+        raise LegacyFormatError(f"old CSV: bound tag columns {missing} are missing")
+    converted, metadata = {}, {}
+    for name, source in sources.items():
+        converted[name] = frame[source.column].map(lambda value: units.to_si(value, source.unit))
+        metadata[name] = _si_unit(source.unit)
     for name in frame.filter(like="status").columns:
-        converted[name] = frame[name].to_numpy()
-    if "Pwh_prod" in frame:
-        converted["production_wellhead_pressure"] = (
-            frame["Pwh_prod"].map(lambda value: units.to_si(value, "bar")).to_numpy()
-        )
-        metadata["production_wellhead_pressure"] = "Pa"
-    return Dataset.from_frame(pd.DataFrame(converted, index=index), units=metadata)
+        converted[name] = frame[name]
+    for old, (name, unit) in tables.EXTRA_COLUMNS.items():
+        if old in frame:
+            converted[name] = frame[old].map(lambda value: units.to_si(value, unit))
+            metadata[name] = _si_unit(unit)
+    columns = {name: values.to_numpy() for name, values in converted.items()}
+    return Dataset.from_frame(pd.DataFrame(columns, index=index), units=metadata)
 
 
-def from_plant(plant, template, nodes=None):
-    """Convert current parameters and dated histories into an old-project copy.
-
-    Properties without a faithful inverse (notably trajectory tables) retain the template's
-    raw value. New-format-only fields remain in the plant JSON and are not invented in GEMINI.
-    """
-    node_map = nodes or getattr(plant, "legacy_info", {}).get("nodes")
-    if node_map is None:
-        raise ValueError("from_plant requires nodes or a plant created by legacy.to_plant")
-    unknown = sorted(set(template.nodes) - set(node_map))
-    if unknown:
-        raise ValueError(f"Legacy node map is missing node ids: {unknown}")
-    converted = template.model_copy(deep=True)
-    for node_id, properties in converted.params.items():
-        path = node_map[node_id]
-        owner = plant.get_submodule(path)
-        dates = [snapshot.valid_from for snapshot in owner.param_history]
-        for name, legacy_param in properties.items():
-            source = owner
-            if name == "productionwell_productivity_index":
-                source = plant.get_submodule("doublet.reservoir")
-            elif name == "injectionwell_injectivity_index":
-                source = plant.get_submodule("doublet.sink")
-            elif name == "wellbore_radius" and path.endswith(".well"):
-                source = plant.get_submodule("doublet.reservoir")
-            elif name == "wellbore_radius" and path.endswith(".injector"):
-                source = plant.get_submodule("doublet.sink")
-            export_dates = dates or legacy_param.timestamps
-            if len(export_dates) == len(legacy_param.timestamps) and all(
-                _same_time(new, old) for new, old in zip(export_dates, legacy_param.timestamps)
-            ):
-                export_dates = legacy_param.timestamps
-            values = []
-            for index, timestamp in enumerate(export_dates):
-                params = source.params_at(timestamp)
-                original = legacy_param.values[min(index, len(legacy_param.values) - 1)]
-                values.append(_legacy_property(name, params, original))
-            legacy_param.timestamps = list(export_dates)
-            legacy_param.values = values
-    return converted
+def _export_dates(owner, legacy_param):
+    """Return the dates to export: the owner's history, or the old dates when they agree."""
+    dates = [snapshot.valid_from for snapshot in owner.param_history] or legacy_param.timestamps
+    old = legacy_param.timestamps
+    if len(dates) == len(old) and all(map(_same_time, dates, old)):
+        return list(old)
+    return list(dates)
 
 
 def _same_time(left, right):
     if left is None or right is None:
         return left is right
-    return pd.Timestamp(left).tz_localize(None) == pd.Timestamp(right).tz_localize(None)
+    return to_utc(left) == to_utc(right)
 
 
-def _coefficients(value):
-    return list(map(float, value.split(";"))) if isinstance(value, str) else list(value)
+def from_plant(plant, template):
+    """Convert current parameters and dated histories into an old-project copy.
+
+    Properties without a faithful inverse (notably trajectory tables) retain the template's
+    raw value. New-format-only fields remain in the plant JSON and are not invented in GEMINI.
+    """
+    paths = node_paths(template)
+    converted = template.model_copy(deep=True)
+    for node_id, properties in converted.params.items():
+        path = paths[node_id]
+        owner = plant.get_submodule(path)
+        for name, legacy_param in properties.items():
+            source = plant.get_submodule(tables.PROPERTY_OWNERS.get((path, name), path))
+            dates = _export_dates(owner, legacy_param)
+            values = []
+            for index, at in enumerate(dates):
+                original = legacy_param.values[min(index, len(legacy_param.values) - 1)]
+                values.append(_legacy_property(name, source.params_at(at), original))
+            legacy_param.values, legacy_param.timestamps = values, dates
+    return converted
 
 
 def _coefficient_value(values, original):
+    """Return new coefficients in the old spelling, or the original if they are unchanged."""
     values = list(values)
-    if _coefficients(original) == values:
+    if tables.parse_coefficients(original) == values:
         return original
     if isinstance(original, str):
         return ";".join(format(value, ".17g") for value in values)
     return values
 
 
+def _inverse(name, params):
+    """Return ``(new parameter, conversion from SI)`` of an old property, or ``None``."""
+    if name == "heat_transfer_coeff":
+        return ("ua" if "ua" in params else name), None
+    if name in tables.PROPERTY_INVERSE:
+        return tables.PROPERTY_INVERSE[name]
+    for suffix, key, conversion in tables.SUFFIX_INVERSE:
+        if name.endswith(suffix):
+            return key, conversion
+    return None
+
+
 def _legacy_property(name, params, original):
     """Return one old-format property while preserving unchanged raw representations."""
-    direct = {
-        "esp_depth": "setting_depth",
-        "esp_no_stage": "no_stages",
-        "esp_tubing": "tubing",
-        "esp_type": "pump_type",
-        "heat_transfer_coeff": ("ua" if "ua" in params else "heat_transfer_coeff"),
-        "injectionpump_no_stage": "no_stages",
-        "injectionpump_type": "pump_type",
-        "reservoir_thickness": "thickness",
-        "reservoir_radius": "drainage_radius",
-        "reservoir_top": "top_depth",
-        "liquid_density": "liquid_density",
-        "liquid_viscosity": "liquid_viscosity",
-        "skin": "skin",
-        "wellbore_radius": "wellbore_radius",
-    }
-    if name in direct:
-        value = params[direct[name]]
-    elif name == "esp_head_coeff":
-        return _coefficient_value(params["head_coeff"], original)
-    elif name == "esp_power_coeff":
-        return _coefficient_value(params["power_coeff"], original)
-    elif name == "esp_correction_factor":
-        return _coefficient_value(
-            [params["correction_factor"][0], units.pa_to_bar(params["correction_factor"][1])],
-            original,
-        )
-    elif name in {"esp_bep_flow", "esp_min_flow", "esp_max_flow"}:
-        value = units.m3s_to_m3h(params[name.removeprefix("esp_")])
-    elif name == "reservoir_pressure":
-        value = units.pa_to_bar(params["pressure"])
-    elif name == "reservoir_temperature":
-        value = units.k_to_c(params["temperature"])
-    elif name == "reservoir_permeability":
-        value = units.m2_to_md(params["permeability"])
-    elif name.endswith("_soil_temperature"):
-        value = units.k_to_c(params["soil_temperature"])
-    elif name.endswith("_friction_correlation"):
-        value = params["friction_correlation"]
-    elif name.endswith("_friction_correlation_2p"):
-        value = params["friction_correlation_2p"]
-    elif name.endswith("_friction_correction_factors"):
-        value = list(params["correction_factors"])
-    elif name.endswith("_productivity_index"):
-        value = units.index_from_si(params["productivity_index"])
-    elif name.endswith("_injectivity_index"):
-        value = units.index_from_si(params["injectivity_index"])
-    else:
+    if name in tables.COEFFICIENT_PROPERTIES:
+        return _coefficient_value(params[tables.COEFFICIENT_PROPERTIES[name]], original)
+    if name == "esp_correction_factor":
+        slope, offset = params["correction_factor"]
+        return _coefficient_value([slope, units.pa_to_bar(offset)], original)
+    inverse = _inverse(name, params)
+    if inverse is None:
         return original
+    key, conversion = inverse
+    value = params[key] if conversion is None else conversion(params[key])
     return original if value == original else value
 
 
-def _from_si(value, unit):
-    if unit in ("Pa", "K", "m3/s", "kg/s", "Hz", "W", "-"):
-        return value
-    if unit == "bar":
-        return value / 1e5
-    if unit == "degC":
-        return value - 273.15
-    if unit == "m3/h":
-        return value * 3600
-    return value
-
-
-def results_to_frame(results, project, nodes=None):
+def results_to_frame(results, project):
     """Convert predicted bound outputs to their old tag columns and units."""
-    del nodes
-    design = load_legacy_design(_require_folder(project))
+    design = load_legacy_design(project)
     frame = results.to_frame()
     output = pd.DataFrame({"Timestamp": frame.index.tz_convert("UTC").tz_localize(None)})
     for path, bound in design.bindings.items():
-        if path not in frame.columns.get_level_values(0):
-            continue
         for field, binding in bound.measured.items():
             if (path, field) in frame:
                 output[binding.column] = (
@@ -285,49 +220,56 @@ def results_to_frame(results, project, nodes=None):
     return output
 
 
-def check_wiring(plant, project, nodes=None):
-    """Return an empty list when observed plant stream identities match the old diagram."""
-    node_map = nodes or {node_id: NODE_PATHS[node.name] for node_id, node in project.nodes.items()}
-    try:
-        inputs = (
-            dict(plant.last_result.inlets)
-            if getattr(plant, "last_result", None) is not None
-            else deepcopy(plant.boundary["root_inputs"])
+def _traced_edges(plant):
+    """Return the stream connections of one step of a copy of ``plant`` with assumed inputs."""
+    if "root_inputs" not in plant.boundary:
+        raise LegacyFormatError(
+            f"{plant.path}: boundary.root_inputs is missing; expected a plant filled by "
+            "legacy.to_plant"
         )
-        if getattr(plant, "last_result", None) is None:
-            plant.set_inputs(
-                {
-                    "doublet.reservoir.m_dot": 40.0,
-                    "doublet.esp.frequency": 60.0,
-                    "injection_pump.pressure_setpoint": 5.15e6,
-                }
-            )
-        traced = trace_wiring(plant, inputs)
-    except Exception as exc:
-        return [f"Could not trace plant wiring: {exc}"]
-    incoming = {link.target for link in project.links}
+    trial = deepcopy(plant)
+    trial.set_inputs(tables.TRACE_CONTROLS)
+    return trace_wiring(trial, deepcopy(trial.boundary["root_inputs"]))
+
+
+def _endpoint(kinds, paths, node_id, port):
+    """Return ``(path, port)`` of a diagram link end, or ``None`` if the bridge cannot map it."""
+    ports = tables.PORTS.get(kinds.get(node_id), {})
+    if node_id not in paths or port not in ports:
+        return None
+    return paths[node_id], ports[port]
+
+
+def _expected_edges(project):
+    """Return the plant connections the old diagram describes and its unmapped link ends."""
+    kinds, paths = node_kinds(project), node_paths(project)
+    pumps = {pump: riser for pump, riser in tables.RISERS.values()}
     expected, errors = set(), []
     for link in project.links:
-        try:
-            source_node, target_node = project.nodes[link.source], project.nodes[link.target]
-            source_type = TYPES.get(source_node.type, source_node.type)
-            target_type = TYPES.get(target_node.type, target_node.type)
-            if source_type == "reservoir":
-                source_type = (
-                    "injection_reservoir" if source_node.id in incoming else "production_reservoir"
-                )
-            if target_type == "reservoir":
-                target_type = (
-                    "injection_reservoir" if target_node.id in incoming else "production_reservoir"
-                )
-            source = (node_map[source_node.id], PORTS[source_type][link.source_port])
-            target = (node_map[target_node.id], PORTS[target_type][link.target_port])
-            if source == ("doublet.esp", "discharge"):
-                expected.add((*source, "doublet.riser", "bottom"))
-                source = ("doublet.riser", "wellhead")
-            expected.add((*source, *target))
-        except KeyError as exc:
-            errors.append(f"Unmapped legacy diagram endpoint: {exc}")
+        source = _endpoint(kinds, paths, link.source, link.source_port)
+        target = _endpoint(kinds, paths, link.target, link.target_port)
+        if source is None or target is None:
+            errors.append(
+                f"Unmapped legacy diagram endpoint: {link.source}.{link.source_port} -> "
+                f"{link.target}.{link.target_port}"
+            )
+            continue
+        if source[0] in pumps and source[1] == "discharge":
+            expected.add((*source, pumps[source[0]], "bottom"))
+            source = (pumps[source[0]], "wellhead")
+        expected.add((*source, *target))
+    return expected, errors
+
+
+def check_wiring(plant, project):
+    """Return an empty list when observed plant stream identities match the old diagram.
+
+    One step runs on a copy of the plant with its assumed root inputs and
+    ``tables.TRACE_CONTROLS``, so the caller's plant is not changed. Failures to run the step
+    propagate.
+    """
+    traced = _traced_edges(plant)
+    expected, errors = _expected_edges(project)
     errors.extend(f"Missing connection: {edge}" for edge in sorted(expected - traced))
     errors.extend(f"Unexpected connection: {edge}" for edge in sorted(traced - expected))
     return errors

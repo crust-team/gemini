@@ -8,8 +8,22 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from gemini.core.engine.engine import Engine
+from gemini.core.modules.heat import HeatExchanger
+from gemini.core.modules.pumps import ESP
 from gemini.core.physics import heat_transfer
 from gemini.core.physics.units import to_si
+from gemini.errors import BindingError, ConfigurationError, InsufficientDataError
+from gemini.utils.strings import join_names, join_path
+
+_MASS_FLOW_UNITS = {"kg/s", "t/h"}
+"""Mass-flow units ``units.to_si`` accepts; other flow units are volume flows."""
+
+_FIT_TARGETS = [
+    (HeatExchanger, ("ua",), {"duty", "hot_out_T", "cold_out_T"}),
+    (ESP, ("head_coeff",), {"head", "discharge_pressure"}),
+    (ESP, None, {"power", "head", "discharge_pressure"}),
+]
+"""Measured outputs fitted per module class and parameter set (``None``: any parameters)."""
 
 
 @dataclass(frozen=True)
@@ -39,196 +53,296 @@ class CalibrationResult:
         )
 
 
-def calibrate(plant, dataset, params, start=None, end=None, engine=None, apply=True):
-    """Fit measured outputs with bounded least squares through the public replay API.
+@dataclass(frozen=True)
+class _Coordinates:
+    """Optimiser coordinates: every fitted value divided by its initial magnitude.
 
-    With apply=True, successful fits replace current parameters and persist as explicit
-    overrides. No dated history entry is added. apply=False leaves the plant unchanged.
-    Windows must lie in one design snapshot; holdout observations never enter the objective.
+    ``sizes`` maps each field to its value count and whether it is a list parameter.
     """
-    if not params:
-        raise ValueError("params must contain at least one Parameter")
-    if any(not parameter.calibratable for parameter in params):
-        raise ValueError("All calibration parameters must declare calibratable=True")
-    owners = {parameter.owner for parameter in params}
-    if len(owners) != 1:
-        raise ValueError("Calibrate parameters belonging to one module at a time")
-    original = owners.pop()
-    module_path = original._path
-    fields = [parameter.name for parameter in params]
-    dataset = dataset.window(start, end)
-    data = dataset.read(dataset.start, dataset.end)
-    if plant.get_submodule(module_path) is not original:
-        raise ValueError("Calibration parameters must belong to the supplied plant")
-    if not len(data):
-        raise ValueError(f"{module_path}: no complete calibration observations")
-    snapshots = {
-        max(
-            (p for p in original.param_history if p.valid_from is None or p.valid_from <= t),
-            key=lambda p: p.valid_from.timestamp() if p.valid_from else -np.inf,
-        ).valid_from
-        for t in data.index
-    }
-    if len(snapshots) != 1:
-        raise ValueError("Calibrate one dated design snapshot at a time")
-    trial = deepcopy(plant)
-    target = trial.get_submodule(module_path)
-    target.update_params(**original.params_at(data.index[0]))
-    bindings = plant.bindings[module_path]
-    targets = set(original.outputs()) & bindings.measured.keys()
-    if original.name == "heat_exchanger" and fields == ["ua"]:
-        targets &= {"duty", "hot_out_T", "cold_out_T"}
-    if original.name == "esp":
-        targets &= (
-            {"head", "discharge_pressure"}
-            if fields == ["head_coeff"]
-            else {"power", "head", "discharge_pressure"}
-        )
-    targets = sorted(targets)
-    if not targets:
-        raise ValueError(f"{module_path}: no measured outputs to fit")
-    measured = np.column_stack(
-        [
-            [
-                to_si(v, dataset.columns[b.column].unit if b.column in dataset.columns else b.unit)
-                for v in data[b.column]
-            ]
-            for b in [bindings.measured[k] for k in targets]
-        ]
-    )
-    scales = np.maximum(np.nanmedian(abs(measured), axis=0), 1e-12)
-    runner = engine if engine is not None else Engine(on_error="raise")
-    initial_values = {field: getattr(target, field) for field in fields}
-    refs = {parameter.name: parameter for parameter in target.calibratable_parameters(False)}
-    sizes, scale_x, initial, lower, upper = {}, [], [], [], []
-    for field in fields:
-        value = getattr(target, field)
-        if value is None or isinstance(value, bool):
-            raise ValueError(f"{module_path}.{field}: requires a numeric initial value")
-        values = np.atleast_1d(np.asarray(value, dtype=float))
-        sizes[field] = (len(values), isinstance(value, (list, tuple)))
-        scale = np.maximum(np.abs(values), 1e-30)
-        scale[values == 0] = 1
-        scale_x.extend(scale)
-        initial.extend(values / scale)
-        bounds = refs[field].bounds
-        low = bounds.get("ge", bounds.get("gt", -np.inf))
-        high = bounds.get("le", bounds.get("lt", np.inf))
-        if "gt" in bounds:
-            low = np.nextafter(low, np.inf)
-        if "lt" in bounds:
-            high = np.nextafter(high, -np.inf)
-        lower.extend(np.full(len(values), low) / scale)
-        upper.extend(np.full(len(values), high) / scale)
-    scale_x = np.asarray(scale_x)
 
-    def unpack(x):
+    sizes: dict[str, tuple[int, bool]]
+    scale: np.ndarray
+    initial: np.ndarray
+    lower: np.ndarray
+    upper: np.ndarray
+
+    def unpack(self, x):
+        """Return parameter values for coordinates ``x``."""
         values, offset = {}, 0
-        for key, (size, vector) in sizes.items():
-            part = (x[offset : offset + size] * scale_x[offset : offset + size]).tolist()
-            values[key] = part if vector else part[0]
+        for key, (size, is_vector) in self.sizes.items():
+            part = (x[offset : offset + size] * self.scale[offset : offset + size]).tolist()
+            values[key] = part if is_vector else part[0]
             offset += size
         return values
 
-    valid = None
 
-    def residual(x):
-        nonlocal valid
-        target.update_params(**unpack(x))
-        predictions = runner.replay(trial, dataset, only=[module_path]).to_frame()
-        if module_path not in predictions.columns.get_level_values(0):
-            raise ValueError(f"{module_path}: no complete calibration observations")
-        values = predictions[module_path].reindex(data.index)[targets].to_numpy(dtype=float)
-        if valid is None:
-            valid = np.isfinite(values).all(axis=1) & np.isfinite(measured).all(axis=1)
-            if not valid.any():
-                raise ValueError(f"{module_path}: no complete calibration observations")
-        return ((values[valid] - measured[valid]) / scales).ravel()
-
-    initial = np.asarray(initial)
-    before_values = residual(initial).reshape(-1, len(targets))
-    guess = initial.copy()
-    if original.name == "heat_exchanger" and fields == ["ua"]:
-
-        def raw_values(binding):
-            unit = (
-                dataset.columns[binding.column].unit
-                if binding.column in dataset.columns
-                else binding.unit
+def _owner(plant, params):
+    """Return the one module owning ``params``, its plant path and the parameter names."""
+    if not params:
+        raise ValueError("calibrate: params = []; expected at least one Parameter")
+    for parameter in params:
+        if not parameter.calibratable:
+            raise ConfigurationError(
+                f"{parameter.path}: calibratable = False; expected parameters declared with "
+                "calibratable=True"
             )
-            return np.array([to_si(value, unit) for value in data[binding.column]])
-
-        hot_in = raw_values(bindings.inlets["hot_in"]["T"])
-        cold_in = raw_values(bindings.inlets["cold_in"]["T"])
-        hot_out = measured[:, targets.index("hot_out_T")]
-        cold_out = measured[:, targets.index("cold_out_T")]
-        duty = measured[:, targets.index("duty")]
-        if original.arrangement == "counterflow":
-            differences = zip(hot_in - cold_out, hot_out - cold_in)
-        else:
-            differences = zip(hot_in - cold_in, hot_out - cold_out)
-        apparent = [
-            q / delta
-            for q, pair in zip(duty, differences)
-            if (delta := heat_transfer.lmtd(max(0, pair[0]), max(0, pair[1]))) > 0
-        ]
-        if apparent:
-            guess = np.asarray([np.median(apparent)]) / scale_x
-    if original.name == "esp" and fields == ["head_coeff"] and "head" in targets:
-
-        def raw(binding):
-            unit = (
-                dataset.columns[binding.column].unit
-                if binding.column in dataset.columns
-                else binding.unit
-            )
-            return np.array([to_si(v, unit) for v in data[binding.column]])
-
-        flow_binding = bindings.inlets["suction"]["m_dot"]
-        flows = raw(flow_binding)
-        flow_unit = (
-            dataset.columns[flow_binding.column].unit
-            if flow_binding.column in dataset.columns
-            else flow_binding.unit
+    owners = {parameter.owner for parameter in params}
+    if len(owners) != 1:
+        paths = sorted(owner.path for owner in owners)
+        raise ConfigurationError(
+            f"calibrate: parameter owners = {join_names(paths)}; expected one module at a time"
         )
-        if flow_unit == "kg/s":
-            pressures = raw(bindings.inlets["suction"]["p"])
-            temperatures = raw(bindings.inlets["suction"]["T"])
-            flows /= np.array(
-                [target.fluid.properties(p, t).density for p, t in zip(pressures, temperatures)]
-            )
-        coefficients = original.fit_head_coefficients(
-            flows[valid],
-            raw(bindings.controls["frequency"])[valid],
-            measured[valid, targets.index("head")],
-            target.no_stages,
+    module = owners.pop()
+    path = next((path for path, item in plant.named_modules() if item is module), None)
+    if path is None:
+        raise ConfigurationError(f"{module.path}: module is not part of the supplied plant")
+    fields = [parameter.name for parameter in params]
+    duplicates = sorted({field for field in fields if fields.count(field) > 1})
+    if duplicates:
+        raise ConfigurationError(
+            f"{join_path(path, duplicates[0])}: parameter given twice; expected each once"
         )
-        guess = np.asarray(coefficients) / scale_x
-    fitted = least_squares(
+    return module, path, fields
+
+
+def _check_single_snapshot(module, path, index):
+    """Reject windows that start before every dated snapshot or span a snapshot change."""
+    start, end = index[0], index[-1]
+    dates = [item.valid_from for item in module.param_history]
+    if all(date is not None and date > start for date in dates):
+        first = min(dates, default=None)
+        raise ConfigurationError(
+            f"{path}: calibration window starts {start}; first parameter snapshot valid_from = "
+            f"{first}; expected a window inside one dated design snapshot"
+        )
+    changes = sorted(date for date in dates if date is not None and start < date <= end)
+    if changes:
+        raise ConfigurationError(
+            f"{path}: parameter snapshots start at {changes[0]} inside the calibration window "
+            f"{start} to {end}; expected one dated design snapshot"
+        )
+
+
+def _fit_targets(module, path, measured, fields):
+    """Return the sorted measured outputs to fit for this module and parameter set."""
+    targets = set(module.outputs(recurse=False)) & measured.keys()
+    for module_class, target_fields, allowed in _FIT_TARGETS:
+        if isinstance(module, module_class) and target_fields in (None, tuple(fields)):
+            targets &= allowed
+            break
+    if not targets:
+        raise BindingError(
+            f"{path}: measured bindings = {join_names(sorted(measured))}; expected at least one "
+            f"output of {join_names(sorted(module.outputs(recurse=False)))}"
+        )
+    return sorted(targets)
+
+
+def _bounds(bounds):
+    """Return closed ``(lower, upper)`` limits of a parameter's ge/gt/le/lt bounds."""
+    low = bounds.get("ge", bounds.get("gt", -np.inf))
+    high = bounds.get("le", bounds.get("lt", np.inf))
+    if "gt" in bounds:
+        low = np.nextafter(low, np.inf)
+    if "lt" in bounds:
+        high = np.nextafter(high, -np.inf)
+    return low, high
+
+
+def _coordinates(module, path, fields):
+    """Return scaled coordinates starting at the module's current parameter values.
+
+    Each value is scaled by its magnitude (at least 1e-30), and zero values by 1.
+    """
+    sizes, scale, initial, lower, upper = {}, [], [], [], []
+    for field in fields:
+        value = getattr(module, field)
+        if value is None or isinstance(value, bool):
+            raise ConfigurationError(f"{path}.{field} = {value!r}; expected a numeric value")
+        values = np.atleast_1d(np.asarray(value, dtype=float))
+        sizes[field] = (len(values), isinstance(value, (list, tuple)))
+        field_scale = np.where(values == 0, 1.0, np.maximum(np.abs(values), 1e-30))
+        low, high = _bounds(module.get_parameter(field).bounds)
+        scale.extend(field_scale)
+        initial.extend(values / field_scale)
+        lower.extend(np.full(len(values), low) / field_scale)
+        upper.extend(np.full(len(values), high) / field_scale)
+    return _Coordinates(sizes, *map(np.asarray, (scale, initial, lower, upper)))
+
+
+@dataclass(frozen=True)
+class _Observed:
+    """Observations bound to the calibrated module; a dataset column unit wins over the binding."""
+
+    dataset: Any
+    data: Any
+    bindings: Any
+
+    def unit(self, binding):
+        """Return the unit of a bound column."""
+        if binding.column in self.dataset.columns:
+            return self.dataset.columns[binding.column].unit
+        return binding.unit
+
+    def values(self, binding):
+        """Return a bound column converted to SI."""
+        unit = self.unit(binding)
+        return np.array([to_si(value, unit) for value in self.data[binding.column]])
+
+
+def _ua_guess(module, observed, measured, valid):
+    """Return the median apparent UA [W/K] of the valid rows, or ``None`` if none is defined.
+
+    Each row gives ``duty / LMTD`` with temperature differences clipped at zero.
+    """
+    inlets = observed.bindings.inlets
+    hot_in = observed.values(inlets["hot_in"]["T"])[valid]
+    cold_in = observed.values(inlets["cold_in"]["T"])[valid]
+    hot_out, cold_out = measured["hot_out_T"][valid], measured["cold_out_T"][valid]
+    if module.arrangement == "counterflow":
+        differences = zip(hot_in - cold_out, hot_out - cold_in)
+    else:
+        differences = zip(hot_in - cold_in, hot_out - cold_out)
+    apparent = [
+        duty / delta
+        for duty, pair in zip(measured["duty"][valid], differences)
+        if (delta := heat_transfer.lmtd(max(0, pair[0]), max(0, pair[1]))) > 0
+    ]
+    return [np.median(apparent)] if apparent else None
+
+
+def _head_coefficient_guess(module, path, observed, measured, valid):
+    """Return head coefficients fitted to the valid rows, or ``None`` without head data.
+
+    Mass flows are converted to volume flows at the measured suction conditions.
+    """
+    if "head" not in measured:
+        return None
+    suction = observed.bindings.inlets["suction"]
+    flows = observed.values(suction["m_dot"])
+    if observed.unit(suction["m_dot"]) in _MASS_FLOW_UNITS:
+        pressures, temperatures = observed.values(suction["p"]), observed.values(suction["T"])
+        flows /= np.array(
+            [module.fluid.properties(p, t).density for p, t in zip(pressures, temperatures)]
+        )
+    distinct = len(np.unique(flows[valid]))
+    if distinct < 6:
+        raise InsufficientDataError(
+            f"{path}.head_coeff: distinct valid flows = {distinct}; expected at least 6 to seed "
+            "the head-curve guess"
+        )
+    frequencies = observed.values(observed.bindings.controls["frequency"])[valid]
+    return module.fit_head_coefficients(
+        flows[valid], frequencies, measured["head"][valid], module.no_stages
+    )
+
+
+def _initial_guess(module, path, fields, observed, measured, valid):
+    """Return an equipment-specific starting value for the fitted parameters, or ``None``."""
+    if isinstance(module, HeatExchanger) and fields == ["ua"]:
+        return _ua_guess(module, observed, measured, valid)
+    if isinstance(module, ESP) and fields == ["head_coeff"]:
+        return _head_coefficient_guess(module, path, observed, measured, valid)
+    return None
+
+
+def _predictor(runner, trial, dataset, index, path, targets, coordinates):
+    """Return ``predict(x)``: replayed targets [SI] for coordinates ``x``, one row per tick."""
+    target = trial.get_submodule(path)
+
+    def predict(x):
+        target.update_params(**coordinates.unpack(x))
+        predictions = runner.replay(trial, dataset, only=[path]).to_frame()
+        if path not in predictions.columns.get_level_values(0):
+            raise InsufficientDataError(f"{path}: module was skipped on every calibration row")
+        return predictions[path].reindex(index)[targets].to_numpy(dtype=float)
+
+    return predict
+
+
+def _valid_rows(predicted, measured, path):
+    """Return the rows where every target is both predicted and measured."""
+    valid = np.isfinite(predicted).all(axis=1) & np.isfinite(measured).all(axis=1)
+    if not valid.any():
+        raise InsufficientDataError(f"{path}: no row has every target measured and predicted")
+    return valid
+
+
+def _rms(values, axis=None):
+    return np.sqrt(np.mean(values**2, axis=axis))
+
+
+def _fit(residual, start, coordinates):
+    """Run the bounded least-squares fit: at most 200 evaluations, all tolerances 1e-10."""
+    return least_squares(
         residual,
-        guess,
-        bounds=(lower, upper),
+        start,
+        bounds=(coordinates.lower, coordinates.upper),
         x_scale="jac",
         max_nfev=200,
         ftol=1e-10,
         xtol=1e-10,
         gtol=1e-10,
     )
-    values = unpack(fitted.x)
-    after_values = residual(fitted.x).reshape(-1, len(targets))
+
+
+def _result(fitted, values, initial, targets, errors_before, errors_after, applied):
+    """Summarise a fit; errors are scaled residuals with one column per target."""
+    return CalibrationResult(
+        fitted=values,
+        rms_before=float(_rms(errors_before)),
+        rms_after=float(_rms(errors_after)),
+        observations=len(errors_before),
+        success=bool(fitted.success),
+        message=fitted.message,
+        applied=applied,
+        initial=initial,
+        rms_by_output_before=dict(zip(targets, _rms(errors_before, axis=0).tolist())),
+        rms_by_output_after=dict(zip(targets, _rms(errors_after, axis=0).tolist())),
+        evaluations=fitted.nfev,
+    )
+
+
+def calibrate(plant, dataset, params, start=None, end=None, engine=None, apply=True):
+    """Fit measured outputs with bounded least squares through the public replay API.
+
+    With apply=True, successful fits replace current parameters and persist as explicit
+    overrides. No dated history entry is added. apply=False leaves the plant unchanged.
+    Windows must lie in one design snapshot; holdout observations never enter the objective.
+    The rows fitted are those where every target is measured and predicted at the initial
+    values; equipment-specific starting guesses use the same rows.
+    """
+    original, path, fields = _owner(plant, params)
+    dataset = dataset.window(start, end)
+    data = dataset.read()
+    if not len(data):
+        raise InsufficientDataError(f"{path}: calibration window {start} to {end} has no rows")
+    _check_single_snapshot(original, path, data.index)
+    trial = deepcopy(plant)
+    target = trial.get_submodule(path)
+    target.update_params(**original.params_at(data.index[0]))
+    observed = _Observed(dataset, data, plant.bindings[path])
+    targets = _fit_targets(original, path, observed.bindings.measured, fields)
+    measured = {name: observed.values(observed.bindings.measured[name]) for name in targets}
+    matrix = np.column_stack([measured[name] for name in targets])
+    scales = np.maximum(np.nanmedian(abs(matrix), axis=0), 1e-12)
+    initial = {field: getattr(target, field) for field in fields}
+    coordinates = _coordinates(target, path, fields)
+    runner = engine if engine is not None else Engine(on_error="raise")
+    predict = _predictor(runner, trial, dataset, data.index, path, targets, coordinates)
+    before = predict(coordinates.initial)
+    valid = _valid_rows(before, matrix, path)
+
+    def residual(x):
+        return ((predict(x)[valid] - matrix[valid]) / scales).ravel()
+
+    guess = _initial_guess(target, path, fields, observed, measured, valid)
+    start_x = coordinates.initial if guess is None else np.asarray(guess) / coordinates.scale
+    fitted = _fit(residual, start_x, coordinates)
+    errors_before = (before[valid] - matrix[valid]) / scales
+    errors_after = residual(fitted.x).reshape(-1, len(targets))
+    values = coordinates.unpack(fitted.x)
     applied = bool(apply and fitted.success)
     if applied:
         original.update_params(**values)
-    return CalibrationResult(
-        values,
-        float(np.sqrt(np.mean(before_values**2))),
-        float(np.sqrt(np.mean(after_values**2))),
-        int(valid.sum()),
-        bool(fitted.success),
-        fitted.message,
-        applied,
-        initial_values,
-        dict(zip(targets, np.sqrt(np.mean(before_values**2, axis=0)).tolist())),
-        dict(zip(targets, np.sqrt(np.mean(after_values**2, axis=0)).tolist())),
-        fitted.nfev,
-    )
+    return _result(fitted, values, initial, targets, errors_before, errors_after, applied)

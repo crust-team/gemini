@@ -1,5 +1,7 @@
 """Calibration application, public replay objective and scalar/vector fits."""
 
+import copy
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -7,6 +9,8 @@ import pytest
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.engine.step import prepare
+from gemini.core.types import Binding
+from gemini.errors import ConfigurationError, InsufficientDataError
 
 
 def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
@@ -67,3 +71,66 @@ def test_esp_head_coefficients(fresh_plant, fast_dataset):
     assert pump.head_coeff == original
     assert fit.observations == 16
     print(fit)
+
+
+def _head_rows(plant, source, flows, column_scale=1.0):
+    """Return synthetic ESP rows whose measured head is 80 % of the model head."""
+    first = source.read(source.start, source.start).iloc[0]
+    pump = plant.doublet.esp
+    bindings = plant.bindings["doublet.esp"]
+    column = bindings.inlets["suction"]["m_dot"].column
+    rows = []
+    for flow in flows:
+        row = first.to_dict()
+        row[column] = flow * column_scale
+        kwargs, _ = prepare(pump, bindings, row)
+        row["doublet.esp.head"] = pump(**kwargs).outputs.head * 0.8
+        row["doublet.esp.discharge_pressure"] = (
+            row["doublet.esp.suction.p"] + row["doublet.esp.head"]
+        )
+        rows.append(row)
+    index = pd.date_range(source.start, periods=len(rows), freq="15min")
+    return gm.Dataset.from_frame(pd.DataFrame(rows, index=index))
+
+
+def test_hx_guess_ignores_rows_without_measured_duty(fresh_plant, reference_dataset):
+    """A missing duty observation is left out of the UA guess as it is of the residual."""
+    frame = reference_dataset.window(end="2024-06-07T02:45Z").to_frame()
+    frame.loc[frame.index[3], "heat_exchanger.duty"] = np.nan
+    data = gm.Dataset(frame, reference_dataset.columns)
+    ua = fresh_plant.get_parameter("heat_exchanger.ua")
+    fit = gm.optim.calibrate(fresh_plant, data, params=[ua], apply=False)
+    assert fit.success and fit.observations == len(frame) - 1
+
+
+def test_esp_head_guess_converts_any_mass_flow_unit(fresh_plant, fast_dataset):
+    """Mass flows bound in t/h start from the same head-curve guess as flows in kg/s."""
+    fits = {}
+    for unit, column_scale in (("kg/s", 1.0), ("t/h", 3.6)):
+        plant = copy.deepcopy(fresh_plant)
+        suction = plant.bindings["doublet.esp"].inlets["suction"]
+        suction["m_dot"] = Binding(column=suction["m_dot"].column, unit=unit)
+        data = _head_rows(plant, fast_dataset, np.linspace(25, 45, 16), column_scale)
+        head = plant.get_parameter("doublet.esp.head_coeff")
+        fits[unit] = gm.optim.calibrate(plant, data, params=[head], apply=False)
+    assert fits["t/h"].success and fits["t/h"].rms_after < 1e-8
+    assert fits["t/h"].evaluations == fits["kg/s"].evaluations
+
+
+def test_esp_head_guess_names_too_few_flows(fresh_plant, fast_dataset):
+    """Steady flow cannot seed the six-coefficient head guess; the error says so."""
+    data = _head_rows(fresh_plant, fast_dataset, [0.03] * 8)
+    head = fresh_plant.get_parameter("doublet.esp.head_coeff")
+    with pytest.raises(InsufficientDataError, match="doublet.esp.head_coeff.*distinct"):
+        gm.optim.calibrate(fresh_plant, data, params=[head], apply=False)
+
+
+def test_window_before_the_first_snapshot_is_rejected(fresh_plant, reference_dataset):
+    """A window starting before every dated design snapshot names the first date."""
+    history = fresh_plant.heat_exchanger.param_history
+    fresh_plant.heat_exchanger.param_history = [
+        history[0].model_copy(update={"valid_from": pd.Timestamp("2024-06-07T01:00Z")})
+    ]
+    ua = fresh_plant.get_parameter("heat_exchanger.ua")
+    with pytest.raises(ConfigurationError, match="2024-06-07 01:00"):
+        gm.optim.calibrate(fresh_plant, reference_dataset.window(end="2024-06-07T02:45Z"), [ua])

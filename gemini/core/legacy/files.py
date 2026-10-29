@@ -1,6 +1,9 @@
-"""Faithful raw I/O for the old GEMINI project and semicolon CSV formats."""
+"""Faithful raw I/O for the old GEMINI project and semicolon CSV formats.
 
-import json
+Old files are UTF-8. Old timestamps are wall-clock times without a zone; the bridge reads them
+as UTC.
+"""
+
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -9,7 +12,14 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
+from gemini.errors import LegacyFormatError
 from gemini.utils.files import read_json, write_json
+
+OLD_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+"""Timestamp spelling of old .param files and data CSVs."""
+
+TAG_KINDS = ("measured", "filtered", "calculated")
+"""Tag sections the typed model keeps; other raw sections survive only in the raw files."""
 
 
 class GeminiNode(BaseModel):
@@ -33,12 +43,11 @@ class GeminiLink(BaseModel):
 
 
 class GeminiParam(BaseModel):
-    """Raw dated old property values and optional documented unit."""
+    """Raw dated old property values."""
 
     model_config = ConfigDict(extra="forbid")
     values: list[Any]
     timestamps: list[datetime | None]
-    unit: str | None = None
 
 
 class GeminiTags(BaseModel):
@@ -51,188 +60,227 @@ class GeminiTags(BaseModel):
 
 
 class GeminiProject(BaseModel):
-    """Typed old project plus private raw material for lossless round trips."""
+    """Typed old project plus private raw material for lossless round trips.
+
+    ``read_project`` also keeps the raw diagram and .param files, every other file of the
+    folder as bytes (the data CSV and trajectory files), and each node's timestamp axis, which
+    the typed parameters cannot hold for a node without properties.
+    """
 
     model_config = ConfigDict(extra="forbid")
     nodes: dict[str, GeminiNode]
     links: list[GeminiLink]
     params: dict[str, dict[str, GeminiParam]]
     tags: dict[str, GeminiTags]
-    _folder: Path | None = PrivateAttr(default=None)
     _diagram: dict | None = PrivateAttr(default=None)
     _param_files: dict[str, dict] = PrivateAttr(default_factory=dict)
+    _timestamps: dict[str, list[datetime | None]] = PrivateAttr(default_factory=dict)
     _auxiliary: dict[str, bytes] = PrivateAttr(default_factory=dict)
 
 
-def _one_tag(values):
-    populated = [str(value) for value in values if value]
-    if len(set(populated)) > 1:
-        raise ValueError(f"time-varying tag columns are unsupported: {populated!r}")
-    return populated[0] if populated else ""
+def parameter_times(project, node_id):
+    """Return the one timestamp axis shared by every property of an old node."""
+    properties = project.params[node_id]
+    if not properties:
+        return project._timestamps.get(node_id, [None])
+    timestamps = next(iter(properties.values())).timestamps
+    if any(value.timestamps != timestamps for value in properties.values()):
+        raise LegacyFormatError(f"{node_id}: old properties require one shared timestamp axis")
+    return timestamps
+
+
+def _read_json(path, what):
+    """Read one old JSON file, naming the file in any error."""
+    try:
+        return read_json(path)
+    except (OSError, ValueError) as exc:
+        raise LegacyFormatError(f"{path}: invalid {what}: {exc}") from exc
+
+
+def _parse_node(cell, path):
+    properties = cell.get("properties", {})
+    node_id = cell.get("id")
+    try:
+        return GeminiNode(
+            id=node_id,
+            type=properties["type"],
+            name=properties["name"],
+            ports=[item["id"] for item in cell.get("ports", {}).get("items", [])],
+        )
+    except (KeyError, TypeError) as exc:
+        raise LegacyFormatError(f"{path}: malformed model node {node_id!r}: {exc}") from exc
+
+
+def _parse_link(cell, path):
+    try:
+        return GeminiLink(
+            source=cell["source"]["id"],
+            source_port=cell["source"]["port"],
+            target=cell["target"]["id"],
+            target_port=cell["target"]["port"],
+        )
+    except KeyError as exc:
+        raise LegacyFormatError(f"{path}: malformed link field {exc}") from exc
+
+
+def _parse_diagram(diagram, path):
+    """Return the typed model nodes by id and the links of an old diagram."""
+    cells = diagram.get("cells", [])
+    nodes = [_parse_node(cell, path) for cell in cells if cell.get("type") == "devs.Model"]
+    links = [_parse_link(cell, path) for cell in cells if cell.get("type") == "devs.Link"]
+    return {node.id: node for node in nodes}, links
+
+
+def _parse_tags(raw, path):
+    """Collapse each tag's per-timestamp column list to one column ("" when unbound)."""
+    tags = {}
+    for kind in TAG_KINDS:
+        tags[kind] = {}
+        for name, values in raw.get("tagnames", {}).get(kind, {}).items():
+            populated = sorted({str(value) for value in values if value})
+            if len(populated) > 1:
+                raise LegacyFormatError(
+                    f"{path}: tagnames.{kind}.{name} = {populated!r}; expected one column for "
+                    "every timestamp"
+                )
+            tags[kind][name] = populated[0] if populated else ""
+    return GeminiTags(**tags)
+
+
+def _parse_param_file(raw, path):
+    """Return the node id, parsed timestamps and typed properties of one .param file."""
+    try:
+        node_id = raw["id"]
+        timestamps = raw["parameters"]["timestamps"]
+        properties = raw["parameters"]["property"]
+    except (KeyError, TypeError) as exc:
+        raise LegacyFormatError(f"{path}: malformed old parameter file: {exc}") from exc
+    times = [pd.Timestamp(value).to_pydatetime() if value else None for value in timestamps]
+    params = {}
+    for name, values in properties.items():
+        values = values if isinstance(values, list) else [values]
+        if len(values) != len(times):
+            raise LegacyFormatError(
+                f"{path}: parameters.property.{name} has {len(values)} values for "
+                f"{len(times)} timestamps"
+            )
+        params[name] = GeminiParam(values=values, timestamps=times)
+    return node_id, times, params
 
 
 def read_project(folder):
     """Read and validate old diagram/.param files without interpreting physical values."""
     folder = Path(folder)
     diagram_path = folder / "diagram.json"
-    try:
-        diagram = read_json(diagram_path)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"{diagram_path}: invalid old diagram JSON: {exc}") from exc
-    nodes, links = {}, []
-    for cell in diagram.get("cells", []):
-        if cell.get("type") == "devs.Model":
-            properties = cell.get("properties", {})
-            node_id = cell.get("id")
-            try:
-                nodes[node_id] = GeminiNode(
-                    id=node_id,
-                    type=properties["type"],
-                    name=properties["name"],
-                    ports=[item["id"] for item in cell.get("ports", {}).get("items", [])],
-                )
-            except (KeyError, TypeError) as exc:
-                raise ValueError(
-                    f"{diagram_path}: malformed model node {node_id!r}: {exc}"
-                ) from exc
-        elif cell.get("type") == "devs.Link":
-            try:
-                links.append(
-                    GeminiLink(
-                        source=cell["source"]["id"],
-                        source_port=cell["source"]["port"],
-                        target=cell["target"]["id"],
-                        target_port=cell["target"]["port"],
-                    )
-                )
-            except KeyError as exc:
-                raise ValueError(f"{diagram_path}: malformed link field {exc}") from exc
-
-    params, tags, raw_files = {}, {}, {}
+    diagram = _read_json(diagram_path, "old diagram JSON")
+    nodes, links = _parse_diagram(diagram, diagram_path)
+    params, tags, timestamps, raw_files = {}, {}, {}, {}
     for path in sorted(folder.glob("*.param")):
-        try:
-            raw = read_json(path)
-            node_id = raw["id"]
-            timestamps = raw["parameters"]["timestamps"]
-            properties = raw["parameters"]["property"]
-        except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
-            raise ValueError(f"{path}: malformed old parameter file: {exc}") from exc
+        raw = _read_json(path, "old parameter file")
+        node_id, times, properties = _parse_param_file(raw, path)
         if node_id not in nodes:
-            raise ValueError(f"{path}: node id {node_id!r} is absent from diagram.json")
-        parsed_times = [
-            pd.Timestamp(value).to_pydatetime() if value else None for value in timestamps
-        ]
-        params[node_id] = {}
-        for name, values in properties.items():
-            values = values if isinstance(values, list) else [values]
-            if len(values) != len(parsed_times):
-                raise ValueError(
-                    f"{path}: parameters.property.{name} has {len(values)} values for "
-                    f"{len(parsed_times)} timestamps"
-                )
-            params[node_id][name] = GeminiParam(values=values, timestamps=parsed_times)
-        raw_tags = raw.get("tagnames", {})
-        tags[node_id] = GeminiTags(
-            **{
-                kind: {name: _one_tag(values) for name, values in raw_tags.get(kind, {}).items()}
-                for kind in ("measured", "filtered", "calculated")
-            }
-        )
+            raise LegacyFormatError(f"{path}: node id {node_id!r} is absent from diagram.json")
+        params[node_id], timestamps[node_id] = properties, times
+        tags[node_id] = _parse_tags(raw, path)
         raw_files[path.name] = raw
     if set(params) != set(nodes):
-        missing = sorted(set(nodes) - set(params))
-        extra = sorted(set(params) - set(nodes))
-        raise ValueError(f"Old project node/.param mismatch: missing={missing}, extra={extra}")
+        raise LegacyFormatError(
+            f"{folder}: diagram nodes without a .param file = {sorted(set(nodes) - set(params))}"
+        )
     project = GeminiProject(nodes=nodes, links=links, params=params, tags=tags)
-    project._folder = folder
     project._diagram = diagram
     project._param_files = raw_files
+    project._timestamps = timestamps
+    skipped = set(raw_files) | {"diagram.json"}
     for path in folder.iterdir():
-        if path.is_file() and path.name not in raw_files and path.name != "diagram.json":
+        if path.is_file() and path.name not in skipped:
             project._auxiliary[path.name] = path.read_bytes()
     return project
+
+
+def _format_times(timestamps):
+    return [value.strftime(OLD_TIME_FORMAT) if value else None for value in timestamps]
+
+
+def _tagnames(tags, count):
+    """Return the raw tag sections with each column repeated for ``count`` timestamps."""
+    return {
+        kind: {name: [column] * count for name, column in getattr(tags, kind).items()}
+        for kind in TAG_KINDS
+    }
+
+
+def _new_diagram(project):
+    nodes = [
+        {
+            "id": node.id,
+            "type": "devs.Model",
+            "ports": {"items": [{"id": port} for port in node.ports]},
+            "properties": {"name": node.name, "type": node.type},
+        }
+        for node in project.nodes.values()
+    ]
+    links = [
+        {
+            "id": f"link-{index}",
+            "type": "devs.Link",
+            "source": {"id": link.source, "port": link.source_port},
+            "target": {"id": link.target, "port": link.target_port},
+        }
+        for index, link in enumerate(project.links)
+    ]
+    return {"cells": nodes + links}
+
+
+def _new_param_file(project, node):
+    timestamps = parameter_times(project, node.id)
+    formatted = _format_times(timestamps)
+    tags = _tagnames(project.tags.get(node.id, GeminiTags()), len(timestamps))
+    return {
+        "id": node.id,
+        "name": node.name,
+        "type": node.type,
+        "parameters": {
+            "property": {name: value.values for name, value in project.params[node.id].items()},
+            "timestamps": formatted,
+        },
+        "tagnames": tags | {"timestamps": formatted},
+    }
+
+
+def _updated_param_files(project):
+    """Return the raw .param files of a parsed project with its typed values written in.
+
+    Raw tag sections the typed model does not know are kept, in their original order.
+    """
+    if _parse_diagram(project._diagram, "diagram.json") != (project.nodes, project.links):
+        raise LegacyFormatError(
+            "write_project: nodes or links differ from the parsed diagram.json; expected "
+            "the parsed topology (edit parameters and tags only)"
+        )
+    param_files = deepcopy(project._param_files)
+    by_id = {raw["id"]: raw for raw in param_files.values()}
+    for node_id, properties in project.params.items():
+        raw = by_id[node_id]
+        timestamps = parameter_times(project, node_id)
+        formatted = _format_times(timestamps)
+        raw["parameters"]["timestamps"] = formatted
+        raw["parameters"]["property"] = {name: value.values for name, value in properties.items()}
+        tags = _tagnames(project.tags.get(node_id, GeminiTags()), len(timestamps))
+        raw["tagnames"] = raw.get("tagnames", {}) | tags | {"timestamps": formatted}
+    return param_files
 
 
 def write_project(project, folder):
     """Write old project files; parsed projects retain values exactly after JSON normalisation."""
     folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
-    diagram = project._diagram
-    param_files = deepcopy(project._param_files)
-    if diagram is None:
-        diagram = {"cells": []}
-        for node in project.nodes.values():
-            diagram["cells"].append(
-                {
-                    "id": node.id,
-                    "type": "devs.Model",
-                    "ports": {"items": [{"id": port} for port in node.ports]},
-                    "properties": {"name": node.name, "type": node.type},
-                }
-            )
-        for index, link in enumerate(project.links):
-            diagram["cells"].append(
-                {
-                    "id": f"link-{index}",
-                    "type": "devs.Link",
-                    "source": {"id": link.source, "port": link.source_port},
-                    "target": {"id": link.target, "port": link.target_port},
-                }
-            )
-        param_files = {}
-        for node_id, node in project.nodes.items():
-            values = project.params[node_id]
-            timestamps = next(iter(values.values())).timestamps if values else [None]
-            count = len(timestamps)
-            tags = project.tags.get(node_id, GeminiTags())
-            param_files[node.name + ".param"] = {
-                "id": node.id,
-                "name": node.name,
-                "type": node.type,
-                "parameters": {
-                    "property": {name: value.values for name, value in values.items()},
-                    "timestamps": [
-                        value.strftime("%Y-%m-%d %H:%M:%S") if value else None
-                        for value in timestamps
-                    ],
-                },
-                "tagnames": {
-                    kind: {name: [column] * count for name, column in getattr(tags, kind).items()}
-                    for kind in ("measured", "filtered", "calculated")
-                }
-                | {
-                    "timestamps": [
-                        value.strftime("%Y-%m-%d %H:%M:%S") if value else None
-                        for value in timestamps
-                    ]
-                },
-            }
+    if project._diagram is None:
+        diagram = _new_diagram(project)
+        param_files = {
+            node.name + ".param": _new_param_file(project, node) for node in project.nodes.values()
+        }
     else:
-        by_id = {raw["id"]: raw for raw in param_files.values()}
-        for node_id, properties in project.params.items():
-            raw = by_id[node_id]
-            if not properties:
-                # The typed old model has no place to retain a timestamp axis for an empty
-                # property block, so keep the faithful raw file unchanged.
-                continue
-            timestamps = next(iter(properties.values())).timestamps if properties else []
-            for value in properties.values():
-                if value.timestamps != timestamps:
-                    raise ValueError(f"{node_id}: old properties require one shared timestamp axis")
-            formatted = [
-                value.strftime("%Y-%m-%d %H:%M:%S") if value else None for value in timestamps
-            ]
-            raw["parameters"]["timestamps"] = formatted
-            raw["parameters"]["property"] = {
-                name: value.values for name, value in properties.items()
-            }
-            tags = project.tags.get(node_id, GeminiTags())
-            raw["tagnames"] = {
-                kind: {
-                    name: [column] * len(timestamps) for name, column in getattr(tags, kind).items()
-                }
-                for kind in ("measured", "filtered", "calculated")
-            } | {"timestamps": formatted}
+        diagram, param_files = project._diagram, _updated_param_files(project)
     write_json(folder / "diagram.json", diagram, indent=4)
     for name, raw in param_files.items():
         write_json(folder / name, raw, indent=4)
@@ -240,19 +288,28 @@ def write_project(project, folder):
         (folder / name).write_bytes(value)
 
 
+def _parse_times(column, path):
+    """Parse old timestamps written as ``OLD_TIME_FORMAT`` or ISO 8601, never guessing order."""
+    for time_format in (OLD_TIME_FORMAT, "ISO8601"):
+        try:
+            return pd.to_datetime(column, format=time_format)
+        except (TypeError, ValueError):
+            continue
+    raise LegacyFormatError(
+        f"{path}: {column.name} = {column.iloc[0]!r}; expected {OLD_TIME_FORMAT} or ISO 8601"
+    )
+
+
 def read_csv(path):
-    """Read an old semicolon CSV and parse its first timestamp-like column."""
+    """Read an old semicolon CSV and parse its first column as timestamps."""
     path = Path(path)
     try:
-        frame = pd.read_csv(path, sep=";")
-    except (OSError, pd.errors.ParserError) as exc:
-        raise ValueError(f"{path}: invalid old CSV: {exc}") from exc
+        frame = pd.read_csv(path, sep=";", encoding="utf-8-sig")
+    except (OSError, ValueError) as exc:
+        raise LegacyFormatError(f"{path}: invalid old CSV: {exc}") from exc
     if len(frame.columns):
         first = frame.columns[0]
-        try:
-            frame[first] = pd.to_datetime(frame[first], format="mixed")
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{path}: invalid timestamp column {first!r}: {exc}") from exc
+        frame[first] = _parse_times(frame[first], path)
     return frame
 
 
@@ -260,7 +317,4 @@ def write_csv(frame, path):
     """Write the old semicolon CSV with its conventional timestamp representation."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    output = frame.copy()
-    if len(output.columns) and pd.api.types.is_datetime64_any_dtype(output.iloc[:, 0]):
-        output.iloc[:, 0] = output.iloc[:, 0].dt.strftime("%Y-%m-%d %H:%M:%S")
-    output.to_csv(path, sep=";", index=False)
+    frame.to_csv(path, sep=";", index=False, date_format=OLD_TIME_FORMAT)

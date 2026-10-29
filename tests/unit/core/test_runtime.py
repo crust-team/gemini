@@ -2,7 +2,10 @@
 
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+
 import gemini as gm
+from gemini.errors import UnknownNameError
 
 
 def test_settings_restore_and_context_isolation():
@@ -23,3 +26,36 @@ def test_state_round_trip():
     gm.runtime.set_display_units("field")
     gm.runtime.load_state(before)
     assert gm.runtime.state() == before
+
+
+def test_unknown_settings_are_rejected():
+    """A misspelled setting raises with a suggestion instead of doing nothing."""
+    with pytest.raises(UnknownNameError, match="did you mean 'precision'"):
+        with gm.runtime.settings(precison="float32"):
+            pass
+    with pytest.raises(UnknownNameError, match="float16"):
+        with gm.runtime.settings(precision="float16"):
+            pass
+    assert gm.runtime.get_precision() == "float64"
+
+
+def test_partial_or_unknown_state_is_rejected():
+    """load_state needs every setting and nothing else, so later reads cannot fail."""
+    before = gm.runtime.state()
+    with pytest.raises(UnknownNameError, match="precision"):
+        gm.runtime.load_state({})
+    with pytest.raises(UnknownNameError, match="colour"):
+        gm.runtime.load_state(before | {"colour": "red"})
+    assert gm.runtime.state() == before
+
+
+def test_settings_decorator_and_default_fluid():
+    """A decorated function sees the setting on every call; fluids are validated."""
+
+    @gm.runtime.settings(display_units="field", default_fluid=gm.WATER)
+    def current():
+        return gm.runtime.get_display_units(), gm.runtime.get_default_fluid()
+
+    assert current() == ("field", gm.WATER)
+    assert gm.runtime.get_display_units() == "si"
+    assert gm.runtime.get_default_fluid() == gm.BRINE

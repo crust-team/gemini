@@ -871,17 +871,21 @@ class Module:
             for path, module in self.named_modules()
         }
 
-    def load_state_dict(self, state):
-        """Validate every snapshot of the complete tree before applying any of them."""
+    def load_state_dict(self, state, strict=True):
+        """Validate snapshots before applying any of them.
+
+        With ``strict`` the snapshot paths must equal the tree's module paths; otherwise only the
+        modules named in ``state`` are filled and unknown paths are rejected.
+        """
         modules = dict(self.named_modules())
-        if state.keys() != modules.keys():
+        missing, unexpected = modules.keys() - state.keys(), state.keys() - modules.keys()
+        if unexpected or (strict and missing):
             raise PlantFormatError(
-                f"{self.path}: state paths differ; missing={modules.keys() - state.keys()}, "
-                f"unexpected={state.keys() - modules.keys()}"
+                f"{self.path}: state paths differ; missing={missing}, unexpected={unexpected}"
             )
         pending = []
-        for path, module in modules.items():
-            entry = state[path]
+        for path, entry in state.items():
+            module = modules[path]
             values = {
                 name: module.get_parameter(name).validate(value)
                 for name, value in entry["params"].items()
