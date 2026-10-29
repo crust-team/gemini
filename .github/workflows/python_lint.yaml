@@ -23,6 +23,6 @@ jobs:
         poetry install
     - name: Lint with flake8 black isort
       run: |
-        poetry run flake8 gemini tests
-        poetry run black --check gemini tests
-        poetry run isort --check-only gemini tests
+        poetry run flake8 gemini tests examples
+        poetry run black --check gemini tests examples
+        poetry run isort --check-only gemini tests examples

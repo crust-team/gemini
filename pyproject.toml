@@ -64,7 +64,7 @@ line_length = 100
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
-addopts = "--strict-markers -m 'not e2e and not slow'"
+addopts = "-p tests.xdist_plugin --strict-markers -m 'not e2e and not slow'"
 markers = [
     "unit: isolated tests mirroring one source unit",
     "integration: tests combining multiple runtime components",

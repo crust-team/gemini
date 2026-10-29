@@ -35,6 +35,13 @@ They should be of value.
 - Rules of the linter may only be ignored when approved by the software leads. Prefer to silence individual lines by <TODO show how to silence individual errors>'
 
 ## Testing
+
+Run `pytest` for the fast tier while developing. Before merging, run
+`pytest -n auto -m "" --dataset=slow`; feature CI also runs
+`pytest -n auto -m "e2e or slow" --dataset=fast`. The tier markers, one-second test budget,
+shared fixtures, datasets and golden workflow are defined in
+[.claude/docs/testing.md](.claude/docs/testing.md).
+
 ### Unit testing
 - Every function should be covered by a unit test. Some functions allow more easily for unit tests and some are not
   worth unit testing. This is up to the teams discretion.
@@ -44,4 +51,3 @@ of code being tested is too big. The amount of code being tested is referred to 
 - Use mocks to isolate 'unit-under-test' where applicable.
 - Coverage percentage should be >80%. This is a guideline, not a hard rule. Breaking this guideline is allowed if the 
   arguments has swayed the developers team and not just the developer and reviewer.
-

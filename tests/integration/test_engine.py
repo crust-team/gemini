@@ -145,22 +145,27 @@ def test_interrupt_resume(setup, tmp_path, kind):
     assert loaded.resume() is actual
 
 
-def test_live_idempotency(setup, tmp_path):
+def test_live_idempotency(tmp_path):
     """New engine calls process only newly available timestamps; repeated now returns no rows."""
-    plant, _ = setup
-    _, data = setup
+    plant = Accumulator()
+    plant.bindings = {"": ModuleBindings(controls={"rate": Binding(column="rate", unit="-")})}
+    frame = pd.DataFrame(
+        {"rate": [1.0, 1.0]},
+        index=pd.date_range("2024-01-01", periods=2, freq="15min", tz="UTC"),
+    )
+    data = gm.Dataset.from_frame(frame)
     path = tmp_path / "live.ckpt"
-    first_now = data.start + pd.Timedelta(hours=1)
-    second_now = data.start + pd.Timedelta(hours=2)
+    first_now = data.start
+    second_now = data.start + pd.Timedelta(minutes=15)
     out = gm.Engine().live(plant, data, path, now=first_now)
-    assert len(out) == 5
+    assert len(out) == 1
     second = gm.Engine().live(plant, data, path, now=second_now)
-    assert len(second) == 4
+    assert len(second) == 1
     assert not set(out.to_frame().index) & set(second.to_frame().index)
     engine = gm.Engine()
     assert len(engine.live(plant, data, path, now=second_now)) == 0
-    assert len(engine.results) == 9
-    assert len(gm.Engine.load_checkpoint(path).resume()) == 9
+    assert len(engine.results) == 2
+    assert len(gm.Engine.load_checkpoint(path).resume()) == 2
 
 
 def test_missing_data_dates_events_and_export(setup, tmp_path):

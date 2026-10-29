@@ -57,5 +57,14 @@ engine and optimizer calls never take a separate configuration.
 
 See [.claude/docs/api.md](.claude/docs/api.md),
 [data.md](.claude/docs/data.md), [engine.md](.claude/docs/engine.md), and
-[legacy.md](.claude/docs/legacy.md). Run `python -m pytest -m "not e2e"` for the fast suite and
-`python -m pytest` for all real-data workflows.
+[legacy.md](.claude/docs/legacy.md). Testing commands are:
+
+```bash
+python -m pytest
+python -m pytest -n auto -m "e2e or slow" --dataset=fast
+python -m pytest -n auto -m "" --dataset=slow
+```
+
+The first command is the under-30-second unit/integration tier. The second runs real workflows
+on the committed July month; the final command is the full-year merge gate. See
+[testing.md](.claude/docs/testing.md) for markers, fixtures and golden-generation rules.
