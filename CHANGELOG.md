@@ -80,6 +80,10 @@ finite engine, and then cleaned up. Old import paths are not retained.
 - Dependencies are version ranges instead of exact pins: pandas >= 2.2.2, including pandas 3;
   scipy >= 1.13.0; numpy >= 2.0.0; pydantic >= 2.5.0; pytz >= 2020.1; the `parquet` extra's
   pyarrow >= 16.0.0.
+- Development tools are PEP 735 dependency groups (`test`, `lint`, `docs` and `dev` with all
+  three): pytest 9.2.0, pytest-xdist 3.8, flake8 7.5.0, Flake8-pyproject 1.2.4, black 26.10.1,
+  isort 9.0.2, sphinx-rtd-theme 3.1.0 and Sphinx 9.2.0 (9.1.1 on Python 3.12 and 9.0.4 on 3.11,
+  the last releases for them).
   Under pandas 3, results have a microsecond time index and `str` text columns, ambiguous local
   times raise `ValueError` instead of pytz's `AmbiguousTimeError`, and CSV decimals parse
   correctly rounded, which moves replays of the example data by up to 1.7e-13 relative (see
