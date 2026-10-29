@@ -64,7 +64,7 @@ def get_nested(mapping, keys, default=None):
 
 
 def set_nested(mapping, keys, value):
-    """Set ``mapping[k1][k2]... = value``, creating missing intermediate dicts."""
+    """Set ``mapping[k1][k2][...] = value``, creating missing intermediate dicts."""
     *parents, last = keys
     for key in parents:
         mapping = mapping.setdefault(key, {})
