@@ -9,7 +9,7 @@ this). Import helpers from their topic module, for example
 | File | Contents |
 | --- | --- |
 | `strings.py` | `snake_case`, `first_paragraph`, `join_path`, `split_path`, `join_names`, `did_you_mean` |
-| `time.py` | `to_utc`, `parse_duration`, `median_step`, `interval_seconds`, `DEFAULT_STEP` |
+| `time.py` | `to_utc`, `to_utc_index`, `parse_duration`, `median_step`, `interval_seconds`, `DEFAULT_STEP` |
 | `hooks.py` | `RemovableHandle` (ordered hook dicts, safe double `remove()`), `has_signature` |
 | `mappings.py` | `AttributeMapping` (base of `Ports` and `Values`), `get_nested`, `set_nested` |
 | `context.py` | `ContextSetting`: a context variable change usable as `with` and as a decorator |

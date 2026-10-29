@@ -5,8 +5,16 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 import pytest
+import pytz
 
-from gemini.utils.time import DEFAULT_STEP, interval_seconds, median_step, parse_duration, to_utc
+from gemini.utils.time import (
+    DEFAULT_STEP,
+    interval_seconds,
+    median_step,
+    parse_duration,
+    to_utc,
+    to_utc_index,
+)
 
 
 def test_to_utc_treats_naive_values_as_utc_and_converts_aware_values():
@@ -40,3 +48,17 @@ def test_median_step_and_interval_seconds():
     seconds = interval_seconds(index, DEFAULT_STEP)
     np.testing.assert_array_equal(seconds, [900.0, 900.0, 3600.0, 3600.0])
     assert interval_seconds(index[:0], pd.Timedelta(minutes=5)).tolist() == [300.0]
+
+
+def test_to_utc_index_localises_naive_values_and_keeps_offsets():
+    """Naive values are local to ``tz``; offsets may change between values at DST switches."""
+    naive = to_utc_index(["2024-07-01 02:00", "2024-07-01 03:00"], "Europe/Oslo")
+    assert [t.hour for t in naive] == [0, 1]
+    assert str(naive.tz) == "UTC"
+    offsets = to_utc_index(["2024-03-31T01:00:00+01:00", "2024-03-31T03:00:00+02:00"])
+    assert [t.hour for t in offsets] == [0, 1]
+    aware = pd.DatetimeIndex(["2024-01-01 01:00"], tz="Europe/Oslo")
+    assert to_utc_index(aware)[0] == pd.Timestamp("2024-01-01 00:00", tz="UTC")
+    assert len(to_utc_index([])) == 0
+    with pytest.raises(pytz.exceptions.AmbiguousTimeError, match="2024-10-27 02:30"):
+        to_utc_index(["2024-10-27 02:30"], "Europe/Oslo")

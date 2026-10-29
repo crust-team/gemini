@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from gemini.core.types.bindings import ColumnInfo
-from gemini.utils.time import median_step, to_utc
+from gemini.utils.time import median_step, to_utc, to_utc_index
 
 
 def _metadata(units):
@@ -143,16 +143,14 @@ class Dataset:
         if time_column is not None:
             if time_column not in frame:
                 raise ValueError(f"Dataset time column {time_column!r} is missing")
-            index = pd.DatetimeIndex(pd.to_datetime(frame.pop(time_column), format="mixed"))
+            times = frame.pop(time_column)
+        elif isinstance(frame.index, pd.DatetimeIndex):
+            times = frame.index
         else:
-            if not isinstance(frame.index, pd.DatetimeIndex):
-                raise TypeError(
-                    "Dataset.from_frame requires a DatetimeIndex when time_column is omitted"
-                )
-            index = pd.DatetimeIndex(frame.index)
-        if index.tz is None:
-            index = index.tz_localize(tz, ambiguous="raise", nonexistent="raise")
-        frame.index = index.tz_convert("UTC")
+            raise TypeError(
+                "Dataset.from_frame requires a DatetimeIndex when time_column is omitted"
+            )
+        frame.index = to_utc_index(times, tz)
         return Dataset(frame, units)
 
     @staticmethod

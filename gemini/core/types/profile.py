@@ -8,6 +8,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from gemini.core.physics.units import to_si
+from gemini.utils.time import to_utc_index
 
 # Input dimension and stored unit; conversion itself is owned by core.physics.units.
 _UNITS = {
@@ -64,15 +65,13 @@ class Profile(BaseModel):
         """Convert an in-memory pandas Series in a supported raw unit to an SI profile."""
         if unit not in _UNITS:
             raise ValueError(f"Unsupported profile unit {unit!r}")
-        index = pd.DatetimeIndex(pd.to_datetime(series.index))
-        if index.tz is None:
-            index = index.tz_localize(tz, ambiguous="raise", nonexistent="raise")
+        index = to_utc_index(series.index, tz)
         quantity, si_unit = _UNITS[unit]
         return cls(
             name=series.name or "profile",
             quantity=quantity,
             unit=si_unit,
-            index=index.tz_convert("UTC").to_pydatetime().tolist(),
+            index=index.to_pydatetime().tolist(),
             values=[to_si(value, unit) for value in series.to_numpy()],
         )
 

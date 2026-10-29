@@ -50,6 +50,24 @@ def test_timezones_duplicates_profiles_and_validation():
     assert profiles.to_frame().flow.iloc[0] == pytest.approx(150 / 3600)
 
 
+def test_offset_timestamps_across_daylight_saving_switches_load_as_utc():
+    """Exported local timestamps change their UTC offset at DST switches (bug E-engine-002)."""
+    frame = pd.DataFrame(
+        {
+            "time": [
+                "2024-03-31T01:00:00+01:00",
+                "2024-03-31T03:00:00+02:00",
+                "2024-10-27T02:00:00+02:00",
+                "2024-10-27T02:00:00+01:00",
+            ],
+            "x": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    data = gm.Dataset.from_frame(frame, "time", tz="Europe/Oslo")
+    hours = [t.strftime("%Y-%m-%d %H:%M") for t in data.to_frame().index]
+    assert hours == ["2024-03-31 00:00", "2024-03-31 01:00", "2024-10-27 00:00", "2024-10-27 01:00"]
+
+
 def test_core_data_has_no_file_or_network_readers():
     """The runtime data package stays an in-memory boundary."""
     root = Path(gm.__file__).parent / "core/data"

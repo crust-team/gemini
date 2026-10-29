@@ -22,6 +22,23 @@ def to_utc(value):
     return value.astimezone(timezone.utc)
 
 
+def to_utc_index(values, tz="UTC"):
+    """Return timestamps as a UTC ``DatetimeIndex``.
+
+    Naive values are local times in ``tz`` and fail when ambiguous or nonexistent at a DST
+    switch. Values with UTC offsets keep their own offsets, which may differ between values
+    because exported local data changes offset at every DST switch.
+    """
+    if not isinstance(values, pd.DatetimeIndex) and len(values):
+        first = pd.Timestamp(pd.Index(values)[0])
+        if first.tzinfo is not None:
+            return pd.DatetimeIndex(pd.to_datetime(values, format="mixed", utc=True))
+    index = pd.DatetimeIndex(pd.to_datetime(values, format="mixed"))
+    if index.tz is None:
+        index = index.tz_localize(tz, ambiguous="raise", nonexistent="raise")
+    return index.tz_convert("UTC")
+
+
 def parse_duration(step):
     """Parse a positive duration given as seconds or as pandas syntax such as ``"15min"``."""
     if isinstance(step, (int, float)):
