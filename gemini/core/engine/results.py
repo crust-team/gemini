@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from gemini.core.types.flows import Stream
+from gemini.utils.files import decode_cells, encode_cells, read_json
 
 
 class Summary(pd.DataFrame):
@@ -216,9 +217,8 @@ class Results:
         elif path.suffix == ".parquet" and suffix == ".csv":
             path = path.with_suffix(".csv")
         frame = self.to_frame()
-        encoded = frame.map(lambda v: json.dumps(v, allow_nan=True))
+        encoded = encode_cells(frame)
         encoded.columns = [str(i) for i in range(len(frame.columns))]
-        encoded.index = [t.isoformat() for t in frame.index]
         if path.suffix == ".parquet":
             encoded.to_parquet(path)
         else:
@@ -247,13 +247,13 @@ class Results:
                 ),
                 path,
             )
-        metadata = json.loads(Path(str(path) + ".json").read_text())
+        metadata = read_json(str(path) + ".json")
         frame = (
             pd.read_parquet(path)
             if path.suffix == ".parquet"
             else pd.read_csv(path, index_col=0, dtype=str, keep_default_na=False)
         )
-        frame = frame.map(json.loads)
+        frame = decode_cells(frame)
         frame.columns = pd.MultiIndex.from_tuples(
             metadata["columns"], names=["module_path", "field"]
         )

@@ -7,10 +7,8 @@ from copy import deepcopy
 from gemini.core.physics import units
 from gemini.core.types import Fluid, Health, Stream
 from gemini.core.types.declarations import UNSET
-
-
-class MissingMeasurement(ValueError):
-    """A required bound column is absent or nonfinite."""
+from gemini.errors import MissingMeasurementError
+from gemini.utils.strings import join_path, split_path
 
 
 def _value(row, binding):
@@ -20,7 +18,7 @@ def _value(row, binding):
     except (TypeError, ValueError):
         finite = False
     if not finite:
-        raise MissingMeasurement(binding.column)
+        raise MissingMeasurementError(binding.column)
     return units.to_si(value, binding.unit)
 
 
@@ -52,7 +50,7 @@ def prepare(module, bindings, row, defaults=None):
         values["fluid"] = Fluid.model_validate(values["fluid"])
         if "m_dot" in fields and fields["m_dot"].unit in {"m3/h", "m3/s"}:
             if not {"p", "T"} <= values.keys():
-                raise MissingMeasurement(f"{port}: pressure and temperature required")
+                raise MissingMeasurementError(f"{port}: pressure and temperature required")
             values["m_dot"] *= values["fluid"].properties(values["p"], values["T"]).density
         kwargs[port] = Stream.model_validate(values)
     measured = {name: _value(row, binding) for name, binding in bindings.measured.items()}
@@ -113,7 +111,7 @@ class BindingPlan:
             bindings = {"": root}
             missing_inputs = []
             for input_path, declaration in plant.inputs(recurse=True).items():
-                module_path, _, name = input_path.rpartition(".")
+                module_path, name = split_path(input_path)
                 module = plant.get_submodule(module_path)
                 original = plant.bindings.get(module_path, ModuleBindings())
                 group = original.controls if name in module.controls() else original.boundaries
@@ -209,7 +207,7 @@ def twin_step(plant, sample, states, plan):
             results[path] = prediction, health_or_unavailable(module, prediction, measured)
             if module.stateful:
                 states[path] = state if bound.state else next_state
-        except MissingMeasurement as exc:
+        except MissingMeasurementError as exc:
             plan.skips.setdefault(path, Counter())[str(exc)] += 1
         except Exception as exc:
             if plan.on_error == "raise":
@@ -233,9 +231,7 @@ def chained_step(plant, sample, states, plan):
     input_values = {name: kwargs.pop(name) for name in plant.inputs() if name in kwargs}
     for path, module, input_bindings in plan.chained_inputs:
         values, _ = prepare(module, input_bindings, sample.row)
-        input_values.update(
-            {f"{path}.{name}" if path else name: value for name, value in values.items()}
-        )
+        input_values.update({join_path(path, name): value for name, value in values.items()})
     plant.set_inputs(input_values)
     if plan.stateful:
         states[""], result = plant.step(states.get("", plant.initial_state()), sample.dt, kwargs)

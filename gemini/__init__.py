@@ -1,6 +1,6 @@
 """GEMINI: load a plant, choose a dataset, and simulate, replay or run live."""
 
-from gemini import optim
+from gemini import errors, optim
 from gemini.core import legacy, modules, runtime
 from gemini.core.data.dataset import Dataset
 from gemini.core.engine.clock import Clock
@@ -28,6 +28,7 @@ __all__ = [
     "plants",
     "legacy",
     "optim",
+    "errors",
     "no_outputs",
     "__version__",
 ]

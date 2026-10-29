@@ -9,6 +9,8 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
+from gemini.utils.files import read_json, write_json
+
 
 class GeminiNode(BaseModel):
     """One old diagram model node."""
@@ -74,7 +76,7 @@ def read_project(folder):
     folder = Path(folder)
     diagram_path = folder / "diagram.json"
     try:
-        diagram = json.loads(diagram_path.read_text())
+        diagram = read_json(diagram_path)
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"{diagram_path}: invalid old diagram JSON: {exc}") from exc
     nodes, links = {}, []
@@ -109,7 +111,7 @@ def read_project(folder):
     params, tags, raw_files = {}, {}, {}
     for path in sorted(folder.glob("*.param")):
         try:
-            raw = json.loads(path.read_text())
+            raw = read_json(path)
             node_id = raw["id"]
             timestamps = raw["parameters"]["timestamps"]
             properties = raw["parameters"]["property"]
@@ -231,9 +233,9 @@ def write_project(project, folder):
                 }
                 for kind in ("measured", "filtered", "calculated")
             } | {"timestamps": formatted}
-    (folder / "diagram.json").write_text(json.dumps(diagram, indent=4) + "\n")
+    write_json(folder / "diagram.json", diagram, indent=4)
     for name, raw in param_files.items():
-        (folder / name).write_text(json.dumps(raw, indent=4) + "\n")
+        write_json(folder / name, raw, indent=4)
     for name, value in project._auxiliary.items():
         (folder / name).write_bytes(value)
 

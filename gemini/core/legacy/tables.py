@@ -1,10 +1,10 @@
 """Convert GEMINI property snapshots to component parameters at the configuration edge."""
 
 import csv
-import json
 from pathlib import Path
 
 from gemini.core.physics import geometry, units
+from gemini.utils.files import read_json
 
 # All old-format names are intentionally confined to the legacy package.
 TYPES = {
@@ -64,7 +64,7 @@ def snapshot(properties: dict, index: int = 0) -> dict:
 
 def read_property(path: str | Path, index: int = 0) -> dict:
     """Read an example .param file and return its scalar property snapshot."""
-    return snapshot(json.loads(Path(path).read_text())["parameters"]["property"], index)
+    return snapshot(read_json(path)["parameters"]["property"], index)
 
 
 def _values(properties):

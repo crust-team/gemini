@@ -1,6 +1,5 @@
 """Versioned checkpoint manifests with atomic publication of complete result generations."""
 
-import json
 import os
 import uuid
 from datetime import datetime, timezone
@@ -10,11 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.data.dataset import Dataset
-
-
-def _encode_cell(value):
-    """JSON-encode NumPy-backed pandas scalars without losing float bits."""
-    return json.dumps(value.item() if hasattr(value, "item") else value, allow_nan=True)
+from gemini.utils.files import decode_cells, encode_cells, read_json, write_json
 
 
 class Checkpoint(BaseModel):
@@ -43,20 +38,9 @@ def _write_dataset(path, dataset):
     temporary = path.with_name(path.name + ".tmp")
     metadata_path = Path(str(path) + ".json")
     metadata_temporary = Path(str(temporary) + ".json")
-    encoded = frame.map(_encode_cell)
-    encoded.index = [value.isoformat() for value in frame.index]
-    encoded.to_csv(temporary, index_label="time")
-    metadata_temporary.write_text(
-        json.dumps(
-            {
-                "units": {
-                    name: info.model_dump(mode="json") for name, info in dataset.columns.items()
-                },
-            },
-            indent=2,
-        )
-        + "\n"
-    )
+    encode_cells(frame).to_csv(temporary, index_label="time")
+    units = {name: info.model_dump(mode="json") for name, info in dataset.columns.items()}
+    write_json(metadata_temporary, {"units": units})
     os.replace(temporary, path)
     os.replace(metadata_temporary, metadata_path)
 
@@ -66,8 +50,8 @@ def read_dataset(path):
     import pandas as pd
 
     path = Path(path)
-    metadata = json.loads(Path(str(path) + ".json").read_text())
-    frame = pd.read_csv(path, index_col="time", dtype=str, keep_default_na=False).map(json.loads)
+    metadata = read_json(str(path) + ".json")
+    frame = decode_cells(pd.read_csv(path, index_col="time", dtype=str, keep_default_na=False))
     frame.index = pd.to_datetime(frame.index, utc=True)
     return Dataset.from_frame(frame, units=metadata.get("units"))
 
@@ -116,7 +100,7 @@ def save(path, checkpoint, results, remaining_data=None):
 
 def load(path):
     """Validate the version and prevent sibling result paths from escaping the checkpoint folder."""
-    checkpoint = Checkpoint.model_validate(json.loads(Path(path).read_text()))
+    checkpoint = Checkpoint.model_validate(read_json(path))
     for field in ("results_file", "remaining_data_file"):
         value = getattr(checkpoint, field)
         if value and Path(value).name != value:

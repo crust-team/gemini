@@ -8,6 +8,7 @@ from gemini.core.data.dataset import Dataset
 from gemini.core.modules.wiring import trace_wiring
 from gemini.core.physics import units
 from gemini.core.types import Binding, ModuleBindings
+from gemini.utils.strings import join_path
 
 from ._loader import load_legacy_design
 from .tables import NODE_PATHS, PORTS, TYPES
@@ -40,10 +41,9 @@ def _require_folder(project):
 def _new_name(path, section, field, port=None):
     if path == "" and section == "controls":
         return _ROOT_COLUMNS.get(field, field)
-    prefix = f"{path}." if path else ""
     if section == "inlets":
-        return f"{prefix}{port}.{field}"
-    return f"{prefix}{field}"
+        return join_path(path, f"{port}.{field}")
+    return join_path(path, field)
 
 
 def _converted_bindings(design):

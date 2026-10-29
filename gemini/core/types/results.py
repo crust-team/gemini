@@ -1,13 +1,15 @@
 """Health and immutable per-call module results."""
 
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Mapping
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini.core.physics import units
 from gemini.core.types.ports import Ports
 from gemini.core.types.quantities import Fraction
+from gemini.utils.mappings import AttributeMapping
+from gemini.utils.strings import join_path
 
 
 class Health(BaseModel):
@@ -21,35 +23,13 @@ class Health(BaseModel):
     metrics: dict[str, float] = Field(default_factory=dict)
 
 
-class Values(Mapping[str, Any]):
+class Values(AttributeMapping):
     """Read-only attribute and mapping access to named call values."""
 
     def __init__(self, values=None, declarations=None):
         """Store immutable-by-interface values and declaration metadata."""
-        self._values = dict(values or {})
-        self._declarations = dict(declarations or {})
-
-    def __getitem__(self, name):
-        """Return a value by mapping key."""
-        return self._values[name]
-
-    def __getattr__(self, name):
-        """Return a value by attribute name."""
-        values = self.__dict__.get("_values")
-        if values is None:
-            raise AttributeError(name)
-        try:
-            return values[name]
-        except KeyError as exc:
-            raise AttributeError(name) from exc
-
-    def __iter__(self) -> Iterator[str]:
-        """Iterate value names."""
-        return iter(self._values)
-
-    def __len__(self):
-        """Return the number of recorded values."""
-        return len(self._values)
+        super().__init__(values)
+        object.__setattr__(self, "_declarations", dict(declarations or {}))
 
     def model_dump(self, **kwargs):
         """Return a copy for engine storage and health calculations."""
@@ -67,10 +47,6 @@ class Values(Mapping[str, Any]):
         if declaration is None or declaration.unit is None:
             raise ValueError(f"{name}: no physical unit is declared")
         return units.convert(value, declaration.unit, unit)
-
-    def __repr__(self):
-        """Represent the contained values as a plain mapping."""
-        return repr(self._values)
 
 
 @dataclass(frozen=True)
@@ -91,5 +67,5 @@ class ModuleResult:
             return {prefix: self}
         result = {}
         for name, child in self.children.items():
-            result.update(child.leaves(f"{prefix}.{name}" if prefix else name))
+            result.update(child.leaves(join_path(prefix, name)))
         return result

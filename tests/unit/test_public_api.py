@@ -22,6 +22,7 @@ def test_public_names_and_docs():
         "modules",
         "plants",
         "optim",
+        "errors",
         "no_outputs",
         "__version__",
     }

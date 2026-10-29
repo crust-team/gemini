@@ -7,6 +7,8 @@ from time import perf_counter
 
 from pydantic_core import to_jsonable_python
 
+from gemini.utils.time import parse_duration
+
 
 class Callback:
     """Override any lifecycle hook; callbacks run in registration order between steps."""
@@ -154,10 +156,8 @@ class AutoCheckpoint(Callback):
 
     def __init__(self, path, every=100):
         """Configure a positive step count or duration such as '1h'."""
-        from gemini.core.engine.clock import duration
-
         self.path = path
-        self.every = every if isinstance(every, int) else duration(every)
+        self.every = every if isinstance(every, int) else parse_duration(every)
         if isinstance(every, int) and every <= 0:
             raise ValueError("Checkpoint interval must be positive")
         self._elapsed = 0.0

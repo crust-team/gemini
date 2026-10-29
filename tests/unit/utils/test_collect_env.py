@@ -1,0 +1,24 @@
+"""Environment report for bug reports."""
+
+from gemini.utils import collect_env
+
+
+def test_environment_lists_python_package_and_dependencies():
+    """The report names Python, the package and every main dependency."""
+    names = [name for name, _ in collect_env.environment()]
+    assert names[:5] == ["python", "platform", "gemini", "gemini path", "git commit"]
+    assert set(collect_env.DEPENDENCIES) <= set(names)
+    assert collect_env.version("surely-not-installed-package") == "not installed"
+
+
+def test_git_commit_outside_a_checkout_is_unknown(tmp_path):
+    """A folder that is not a git checkout reports an unknown commit."""
+    assert collect_env.git_commit(tmp_path) == "unknown"
+
+
+def test_main_prints_one_line_per_item(capsys):
+    """``python -m gemini.utils.collect_env`` prints ``name: value`` lines."""
+    collect_env.main()
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("python: ")
+    assert len(lines) == len(collect_env.environment())

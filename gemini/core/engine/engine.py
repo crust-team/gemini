@@ -11,7 +11,7 @@ from gemini.core.engine.clock import Clock, LiveClock
 from gemini.core.engine.results import Results
 from gemini.core.engine.step import BindingPlan, chained_step, twin_step
 from gemini.core.modules.module import Module
-from gemini.core.types.bindings import utc
+from gemini.utils.time import to_utc
 
 
 class Engine:
@@ -42,7 +42,7 @@ class Engine:
                 [
                     t
                     for t in clock
-                    if (start is None or t >= utc(start)) and (end is None or t <= utc(end))
+                    if (start is None or t >= to_utc(start)) and (end is None or t <= to_utc(end))
                 ],
                 clock.step,
             )
@@ -71,7 +71,7 @@ class Engine:
             plant = self.plant
         else:
             self.position, self.results, self.module_states = None, Results(), {}
-        now = utc(now) if now is not None else datetime.now(timezone.utc)
+        now = to_utc(now) if now is not None else datetime.now(timezone.utc)
         latest = dataset.end
         if latest is None or dataset.start is None:
             clock = Clock([])

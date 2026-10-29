@@ -1,20 +1,11 @@
 """Portable sensor and dated-parameter metadata shared by modules and data."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-def utc(value):
-    """Normalise naive project timestamps and aware timestamps to UTC."""
-    if isinstance(value, str):
-        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    return (
-        value.replace(tzinfo=timezone.utc)
-        if value.tzinfo is None
-        else value.astimezone(timezone.utc)
-    )
+from gemini.utils.time import to_utc
 
 
 class ConfigModel(BaseModel):
@@ -33,7 +24,7 @@ class DatedParams(ConfigModel):
     @classmethod
     def normalise_time(cls, value):
         """Interpret naive project dates as UTC."""
-        return utc(value) if value is not None else None
+        return to_utc(value) if value is not None else None
 
 
 class Binding(ConfigModel):

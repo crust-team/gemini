@@ -1,11 +1,11 @@
 """Context-local global numerical and display settings."""
 
-from contextlib import contextmanager
 from contextvars import ContextVar
 
 import numpy as np
 
 from gemini.core.types.fluid import BRINE, Fluid
+from gemini.utils.context import ContextSetting
 
 _state = ContextVar(
     "gemini_runtime_state",
@@ -77,17 +77,17 @@ def manual_seed(seed):
     np.random.seed(seed)
 
 
-@contextmanager
 def settings(**changes):
-    """Temporarily apply settings and restore the previous context on exit."""
-    current = _state.get()
-    updated = current.copy()
-    if "default_fluid" in changes:
-        changes["default_fluid"] = Fluid.model_validate(changes["default_fluid"])
-    updated.update(changes)
-    _validate(updated["precision"], updated["display_units"])
-    token = _state.set(updated)
-    try:
-        yield
-    finally:
-        _state.reset(token)
+    """Apply settings inside a ``with`` block or a decorated function, then restore them.
+
+    Changes are validated and merged into the settings current at entry.
+    """
+
+    def update(current):
+        updated = current | changes
+        if "default_fluid" in changes:
+            updated["default_fluid"] = Fluid.model_validate(changes["default_fluid"])
+        _validate(updated["precision"], updated["display_units"])
+        return updated
+
+    return ContextSetting(_state, update)

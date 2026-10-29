@@ -6,6 +6,8 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
+from gemini.utils.time import DEFAULT_STEP, interval_seconds
+
 
 class Sample(NamedTuple):
     """One aligned observation and explicit missing-data information."""
@@ -32,7 +34,7 @@ class Loader:
         if absent:
             raise ValueError(f"Dataset is missing bound columns: {', '.join(absent)}")
         self.max_gap = pd.Timedelta(
-            max_gap if max_gap is not None else 2 * (dataset.native_step or timedelta(hours=1))
+            max_gap if max_gap is not None else 2 * (dataset.native_step or DEFAULT_STEP)
         )
         self.chunk = pd.Timedelta(chunk)
         if self.max_gap < pd.Timedelta(0) or self.chunk <= pd.Timedelta(0):
@@ -44,10 +46,7 @@ class Loader:
         if not len(ticks):
             return
         ticks = pd.to_datetime(ticks, utc=True)
-        seconds = np.append(
-            np.diff(ticks.asi8) / 1e9,
-            (self.dataset.native_step or timedelta(hours=1)).total_seconds(),
-        )
+        seconds = interval_seconds(ticks, self.dataset.native_step or DEFAULT_STEP)
         if hasattr(self.ticks, "dt"):
             seconds = np.asarray([self.ticks.dt(t.to_pydatetime()) for t in ticks])
         offset = 0

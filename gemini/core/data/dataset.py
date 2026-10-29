@@ -6,7 +6,8 @@ import json
 import numpy as np
 import pandas as pd
 
-from gemini.core.types.bindings import ColumnInfo, utc
+from gemini.core.types.bindings import ColumnInfo
+from gemini.utils.time import median_step, to_utc
 
 
 def _metadata(units):
@@ -63,8 +64,7 @@ class Dataset:
         """Return median timestamp spacing, or None when fewer than two rows exist."""
         if len(self) < 2:
             return None
-        nanoseconds = int(np.median(np.diff(self._frame.index.asi8)))
-        return pd.Timedelta(nanoseconds, unit="ns").to_pytimedelta()
+        return median_step(self._frame.index).to_pytimedelta()
 
     def read(self, start=None, end=None, columns=None):
         """Return an independent inclusive UTC window and optional column subset."""
@@ -72,8 +72,8 @@ class Dataset:
         missing = sorted(set(selected) - set(self.names))
         if missing:
             raise ValueError("Dataset is missing columns: " + ", ".join(missing))
-        lower = utc(start) if start is not None else None
-        upper = utc(end) if end is not None else None
+        lower = to_utc(start) if start is not None else None
+        upper = to_utc(end) if end is not None else None
         if lower is not None and upper is not None and lower > upper:
             return self._frame.iloc[:0].loc[:, selected].copy()
         return self._frame.loc[lower:upper, selected].copy()
@@ -86,7 +86,7 @@ class Dataset:
         """Return rows strictly after a timestamp."""
         if t is None:
             return type(self)(self._frame, self.columns)
-        frame = self._frame.loc[self._frame.index > pd.Timestamp(utc(t))]
+        frame = self._frame.loc[self._frame.index > pd.Timestamp(to_utc(t))]
         return type(self)(frame, self.columns)
 
     def __len__(self):

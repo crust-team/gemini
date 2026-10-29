@@ -2,23 +2,18 @@
 
 import importlib
 import inspect
-import json
-import re
-from collections import OrderedDict
 from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
-from difflib import get_close_matches
 from functools import wraps
-from pathlib import Path
 from typing import Literal
 
 from pydantic_core import to_jsonable_python
 
 from gemini.core import runtime
 from gemini.core.physics import units
-from gemini.core.types.bindings import ColumnInfo, DatedParams, ModuleBindings, utc
+from gemini.core.types.bindings import ColumnInfo, DatedParams, ModuleBindings
 from gemini.core.types.cost import Cost
 from gemini.core.types.declarations import (
     UNSET,
@@ -33,6 +28,18 @@ from gemini.core.types.declarations import (
 from gemini.core.types.fluid import Fluid
 from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult, Values
+from gemini.utils.context import ContextSetting
+from gemini.utils.files import read_json, write_json
+from gemini.utils.hooks import RemovableHandle, has_signature
+from gemini.utils.strings import (
+    did_you_mean,
+    first_paragraph,
+    join_names,
+    join_path,
+    snake_case,
+    split_path,
+)
+from gemini.utils.time import to_utc
 
 _evaluation = ContextVar("module_evaluation", default=None)
 _output_call = ContextVar("module_output_call", default=None)
@@ -41,35 +48,14 @@ _outputs_enabled = ContextVar("module_outputs_enabled", default=True)
 MODULE_REGISTRY = {}
 
 
-def _snake_case(name):
-    return re.sub(r"(?<!^)(?=[A-Z][a-z])|(?<=[a-z0-9])(?=[A-Z])", "_", name).lower()
-
-
-@contextmanager
 def no_outputs():
     """Skip output computation and hooks within a nestable context or decorator."""
-    token = _outputs_enabled.set(False)
-    try:
-        yield
-    finally:
-        _outputs_enabled.reset(token)
+    return ContextSetting(_outputs_enabled, lambda current: False)
 
 
 def outputs_enabled():
     """Return whether the current context records computed outputs."""
     return _outputs_enabled.get()
-
-
-class RemovableHandle:
-    """Removable registration; removal is idempotent."""
-
-    def __init__(self, hooks, key):
-        """Retain the hook mapping and opaque registration key."""
-        self._hooks, self._key = hooks, key
-
-    def remove(self):
-        """Stop calling this hook."""
-        self._hooks.pop(self._key, None)
 
 
 class Module:
@@ -87,8 +73,8 @@ class Module:
         doc = inspect.getdoc(cls)
         if not doc:
             raise TypeError(f"{cls.__name__} must have a class docstring")
-        cls.name = _snake_case(cls.__name__)
-        cls.description = doc.split("\n\n", 1)[0].replace("\n", " ")
+        cls.name = snake_case(cls.__name__)
+        cls.description = first_paragraph(doc)
         parts = cls.__module__.split(".")
         cls.category = (
             parts[parts.index("modules") + 1]
@@ -149,11 +135,7 @@ class Module:
             "_pre_hooks",
             "_hooks",
         ):
-            object.__setattr__(
-                self,
-                name,
-                OrderedDict() if name in {"_pre_hooks", "_hooks"} else {},
-            )
+            object.__setattr__(self, name, {})
         object.__setattr__(self, "_input_values", {})
         object.__setattr__(self, "_path", "")
         object.__setattr__(self, "_initialising", True)
@@ -191,7 +173,7 @@ class Module:
         for declaration in self._declarations().values():
             declaration.bind(self, declaration.name)
         for name, child in self.named_children():
-            child._set_path(f"{path}.{name}" if path else name)
+            child._set_path(join_path(path, name))
 
     def _declarations(self):
         result = {}
@@ -308,7 +290,7 @@ class Module:
             raise ValueError("Module ownership cannot contain a cycle")
         self._children[name] = module
         object.__setattr__(self, name, module)
-        module._set_path(f"{self._path}.{name}" if self._path else name)
+        module._set_path(join_path(self._path, name))
 
     def named_children(self):
         """Iterate immediate children in insertion order."""
@@ -328,7 +310,7 @@ class Module:
             seen.add(id(module))
             yield path, module
             for name, child in module.named_children():
-                yield from walk(child, f"{path}.{name}" if path else name)
+                yield from walk(child, join_path(path, name))
 
         yield from walk(self, prefix)
 
@@ -355,7 +337,7 @@ class Module:
     def _named(self, registry_name, recurse=False):
         for path, module in self.named_modules() if recurse else [("", self)]:
             for name, declaration in getattr(module, registry_name).items():
-                yield f"{path}.{name}" if path else name, declaration
+                yield join_path(path, name), declaration
 
     def parameters(self, recurse=True):
         """Iterate parameter declarations."""
@@ -403,19 +385,19 @@ class Module:
 
     def get_parameter(self, path):
         """Return parameter metadata by local or dotted path."""
-        module_path, _, name = path.rpartition(".")
+        module_path, name = split_path(path)
         module = self.get_submodule(module_path)
         if name not in module._parameters:
-            valid = ", ".join(module._parameters) or "<none>"
+            valid = join_names(module._parameters)
             raise ValueError(f"{self.path}: unknown parameter {path!r}; valid: {valid}")
         return module._parameters[name]
 
     def _get_input(self, path, registry_name, kind):
-        module_path, _, name = path.rpartition(".")
+        module_path, name = split_path(path)
         module = self.get_submodule(module_path)
         registry = getattr(module, registry_name)
         if name not in registry:
-            valid = ", ".join(registry) or "<none>"
+            valid = join_names(registry)
             raise ValueError(f"{self.path}: unknown {kind} {path!r}; valid: {valid}")
         return registry[name]
 
@@ -433,9 +415,8 @@ class Module:
         pending = []
         for path, value in mapping.items():
             if path not in declarations:
-                suggestion = get_close_matches(path, declarations, n=1)
-                detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
-                valid = ", ".join(declarations) or "<none>"
+                detail = did_you_mean(path, declarations)
+                valid = join_names(declarations)
                 raise ValueError(
                     f"{self.path}: unknown control/boundary path {path!r}{detail}; valid: {valid}"
                 )
@@ -470,11 +451,11 @@ class Module:
         eligible = [
             item
             for item in self.param_history
-            if at is None or item.valid_from is None or item.valid_from <= utc(at)
+            if at is None or item.valid_from is None or item.valid_from <= to_utc(at)
         ]
         if not eligible:
             raise ValueError(f"{self.path}: no parameters valid at {at}")
-        selected = max(eligible, key=lambda item: item.valid_from or utc("0001-01-01"))
+        selected = max(eligible, key=lambda item: item.valid_from or to_utc("0001-01-01"))
         values = selected.params | self._param_overrides
         return {name: self._parameters[name].validate(value) for name, value in values.items()}
 
@@ -509,7 +490,7 @@ class Module:
     def _split_call_args(self, args, kwargs):
         inlet_names = list(self._inlets)
         valid_names = inlet_names + list(self._controls) + list(self._boundaries)
-        valid_inlets = ", ".join(inlet_names) or "<none>"
+        valid_inlets = join_names(inlet_names)
         mapping = len(args) == 1 and isinstance(args[0], Mapping)
         if mapping:
             inlet_values = args[0]
@@ -522,8 +503,7 @@ class Module:
             unknown = [name for name in inlet_values if name not in self._inlets]
             if unknown:
                 name = unknown[0]
-                suggestion = get_close_matches(str(name), inlet_names, n=1)
-                detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                detail = did_you_mean(name, inlet_names)
                 raise TypeError(
                     f"{self.path}: unknown inlet {name!r}{detail}; " f"valid names: {valid_inlets}"
                 )
@@ -535,11 +515,10 @@ class Module:
         unknown = [name for name in kwargs if name not in valid_names]
         if unknown:
             name = unknown[0]
-            suggestion = get_close_matches(str(name), valid_names, n=1)
-            detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+            detail = did_you_mean(name, valid_names)
             raise TypeError(
                 f"{self.path}: unexpected keyword {name!r}{detail}; "
-                f"valid names: {', '.join(valid_names) or '<none>'}"
+                f"valid names: {join_names(valid_names)}"
             )
         if not mapping:
             inlet_values = dict(zip(inlet_names, args))
@@ -581,7 +560,7 @@ class Module:
             raise ValueError(
                 f"{self.path}: outlet names missing={sorted(missing)}, extra={sorted(extra)}"
             )
-        valid = ", ".join(self._outlets) or "<none>"
+        valid = join_names(self._outlets)
         validated = []
         for name, declaration in self._outlets.items():
             try:
@@ -651,9 +630,7 @@ class Module:
                 declaration = Output(field.annotation)
                 access = ("outlet", remainder[0], remainder[1])
         if declaration is None:
-            candidates = self._formula_candidates()
-            suggestion = get_close_matches(target, candidates, n=1)
-            detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+            detail = did_you_mean(target, self._formula_candidates())
             raise ValueError(f"{self.path}: unknown output formula path {target!r}{detail}")
         return module_path, access, declaration
 
@@ -687,8 +664,7 @@ class Module:
                             for field in module._outputs
                         }
                     )
-                    suggestion = get_close_matches(target, names, n=1)
-                    detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                    detail = did_you_mean(target, names)
                     raise ValueError(
                         f"{self.path}: no descendant leaf declares output {target!r}{detail}"
                     )
@@ -712,8 +688,7 @@ class Module:
                 numerator, denominator = arguments
                 for reference in (numerator, denominator):
                     if reference not in seen:
-                        suggestion = get_close_matches(reference, seen, n=1)
-                        detail = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                        detail = did_you_mean(reference, seen)
                         raise ValueError(
                             f"{self.path}.{name}: ratio references unavailable earlier output "
                             f"{reference!r}{detail}"
@@ -724,7 +699,7 @@ class Module:
     @staticmethod
     def _recorded_calls(call_records, prefix=""):
         for path, result in call_records:
-            full_path = f"{prefix}.{path}" if prefix else path
+            full_path = join_path(prefix, path)
             yield full_path, result
             yield from Module._recorded_calls(result.call_records, full_path)
 
@@ -827,27 +802,16 @@ class Module:
     def register_forward_pre_hook(self, fn):
         """Call ``fn(module, inlets)`` before each forward evaluation."""
         self._check_hook_signature(fn, ("module", "inlets"), "forward pre-hook")
-        key = object()
-        self._pre_hooks[key] = fn
-        return RemovableHandle(self._pre_hooks, key)
+        return RemovableHandle(self._pre_hooks, fn)
 
     def register_forward_hook(self, fn):
         """Call ``fn(module, inlets, outlets)`` after output computation."""
         self._check_hook_signature(fn, ("module", "inlets", "outlets"), "forward hook")
-        key = object()
-        self._hooks[key] = fn
-        return RemovableHandle(self._hooks, key)
+        return RemovableHandle(self._hooks, fn)
 
     def _check_hook_signature(self, fn, expected, kind):
-        parameters = inspect.signature(fn).parameters
-        actual = tuple(parameters)
-        invalid = actual != expected or any(
-            parameter.kind
-            not in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-            or parameter.default is not inspect.Parameter.empty
-            for parameter in parameters.values()
-        )
-        if invalid:
+        if not has_signature(fn, expected):
+            actual = tuple(inspect.signature(fn).parameters)
             raise TypeError(
                 f"{self.path}: {kind} signature must be ({', '.join(expected)}); "
                 f"got ({', '.join(actual)})"
@@ -967,7 +931,7 @@ class Module:
             ] or [DatedParams(params=entry.get("params", {}))]
             module._param_overrides = dict(entry.get("param_overrides", {}))
             module._active_from = (
-                utc(entry["active_from"]) if entry.get("active_from") is not None else None
+                to_utc(entry["active_from"]) if entry.get("active_from") is not None else None
             )
             module._active_params = entry.get("params", {}).copy()
             module.bindings = {
@@ -979,14 +943,12 @@ class Module:
 
     def save(self, path):
         """Save the complete portable module tree as JSON."""
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2) + "\n")
+        write_json(path, self.to_dict())
 
     @classmethod
     def load(cls, path):
         """Load a JSON plant file as this exact self-building class."""
-        return cls.from_dict(json.loads(Path(path).read_text()))
+        return cls.from_dict(read_json(path))
 
     def column_units(self):
         """Collect raw binding units and reject conflicts."""

@@ -1,7 +1,6 @@
 """Import GEMINI projects with explicit parameter, port and sensor-tag accounting."""
 
 import csv
-import json
 import warnings
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,9 +13,11 @@ from gemini.core.types.bindings import (
     ConfigModel,
     DatedParams,
     ModuleBindings,
-    utc,
 )
 from gemini.core.types.fluid import BRINE, Fluid
+from gemini.utils.files import read_json
+from gemini.utils.mappings import set_nested
+from gemini.utils.time import to_utc
 
 from . import tables as mapping
 from .tables import NODE_PATHS, TYPES
@@ -45,7 +46,7 @@ class ModuleDesign(ConfigModel):
         eligible = [
             item
             for item in self.params
-            if at is None or item.valid_from is None or item.valid_from <= utc(at)
+            if at is None or item.valid_from is None or item.valid_from <= to_utc(at)
         ]
         if not eligible:
             raise ValueError(f"{self.type}: no parameters valid at {at}")
@@ -167,7 +168,7 @@ def _bind(bindings, target, column, unit):
     section, *parts = target.split(".")
     binding = Binding(column=column, unit=unit)
     if section == "inlets":
-        bindings.inlets.setdefault(parts[0], {})[parts[1]] = binding
+        set_nested(bindings.inlets, parts, binding)
     else:
         getattr(bindings, section)[parts[0]] = binding
 
@@ -181,8 +182,8 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
     if csv_path is not None:
         with csv_path.open() as handle:
             columns = set(next(csv.reader(handle, delimiter=";")))
-    diagram = json.loads((folder / "diagram.json").read_text())["cells"]
-    raw = {p.stem: json.loads(p.read_text()) for p in sorted(folder.glob("*.param"))}
+    diagram = read_json(folder / "diagram.json")["cells"]
+    raw = {p.stem: read_json(p) for p in sorted(folder.glob("*.param"))}
     ids = {value["id"]: key for key, value in raw.items()}
     nodes = {c["id"] for c in diagram if c["type"] == "devs.Model"}
     if nodes != ids.keys():
@@ -365,7 +366,7 @@ def load_legacy_design(folder: str | Path) -> LegacyDesign:
     boundary.setdefault("assumptions", []).append(
         "Profiles lacking secondary measurements assume 40 kg/s at 20 C and 5 bar."
     )
-    conf = json.loads((folder / "plant.conf").read_text())
+    conf = read_json(folder / "plant.conf")
     for key in unmapped:
         warnings.warn(f"Unmapped GEMINI field: {key}", stacklevel=2)
     return LegacyDesign(

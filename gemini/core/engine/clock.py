@@ -1,20 +1,10 @@
 """Finite UTC clocks owned by the execution engine."""
 
 from abc import ABC
-from datetime import timedelta
 
-import numpy as np
 import pandas as pd
 
-from gemini.core.types.bindings import utc
-
-
-def duration(step):
-    """Parse a positive fixed duration in seconds or pandas duration syntax."""
-    value = pd.Timedelta(seconds=step) if isinstance(step, (int, float)) else pd.Timedelta(step)
-    if pd.isna(value) or value <= pd.Timedelta(0):
-        raise ValueError(f"Clock step must be positive, got {step!r}")
-    return value
+from gemini.utils.time import DEFAULT_STEP, interval_seconds, median_step, parse_duration, to_utc
 
 
 class Clock(ABC):
@@ -25,13 +15,9 @@ class Clock(ABC):
         self.ticks = pd.DatetimeIndex(pd.to_datetime(list(ticks), utc=True))
         if not self.ticks.is_unique or not self.ticks.is_monotonic_increasing or self.ticks.hasnans:
             raise ValueError("Clock ticks must be strictly increasing and finite")
-        inferred = (
-            pd.Timedelta(int(np.median(np.diff(self.ticks.asi8))), unit="ns")
-            if len(self.ticks) > 1
-            else timedelta(hours=1)
-        )
-        self.step = duration(step if step is not None else inferred)
-        self._durations = np.append(np.diff(self.ticks.asi8) / 1e9, self.step.total_seconds())
+        inferred = median_step(self.ticks) or DEFAULT_STEP
+        self.step = parse_duration(step if step is not None else inferred)
+        self._durations = interval_seconds(self.ticks, self.step)
 
     def __iter__(self):
         """Iterate UTC datetimes without sleeping or scheduling."""
@@ -43,7 +29,7 @@ class Clock(ABC):
 
     def position(self, t):
         """Return the exact tick position; reject timestamps outside this clock."""
-        return int(self.ticks.get_loc(pd.Timestamp(utc(t))))
+        return int(self.ticks.get_loc(pd.Timestamp(to_utc(t))))
 
     def dt(self, t):
         """Return seconds to the next tick, using the declared step for the final tick."""
@@ -51,7 +37,7 @@ class Clock(ABC):
 
     def after(self, t):
         """Return strictly subsequent ticks, retaining the original final-step duration."""
-        return Clock(self.ticks[self.ticks > pd.Timestamp(utc(t))], self.step)
+        return Clock(self.ticks[self.ticks > pd.Timestamp(to_utc(t))], self.step)
 
     def describe(self):
         """Return full irregular ticks or a compact fixed-range descriptor."""
@@ -69,7 +55,7 @@ class Clock(ABC):
         """Cover one calendar year in the chosen timezone, excluding the next year's start."""
         start = pd.Timestamp(year=year, month=1, day=1, tz=tz)
         end = pd.Timestamp(year=year + 1, month=1, day=1, tz=tz)
-        ticks = pd.date_range(start, end, freq=duration(step), inclusive="left")
+        ticks = pd.date_range(start, end, freq=parse_duration(step), inclusive="left")
         return FixedClock(ticks[0], ticks[-1], step)
 
     @staticmethod
@@ -79,7 +65,7 @@ class Clock(ABC):
             raise ValueError("days must be positive")
         start = pd.Timestamp(year=year, month=month, day=day, tz=tz)
         end = start + pd.DateOffset(days=days)
-        ticks = pd.date_range(start, end, freq=duration(step), inclusive="left")
+        ticks = pd.date_range(start, end, freq=parse_duration(step), inclusive="left")
         return FixedClock(ticks[0], ticks[-1], step)
 
     @staticmethod
@@ -98,7 +84,7 @@ class FixedClock(Clock):
 
     def __init__(self, start, end, step):
         """Convert bounds to UTC before building the grid."""
-        super().__init__(pd.date_range(utc(start), utc(end), freq=duration(step)), step)
+        super().__init__(pd.date_range(to_utc(start), to_utc(end), freq=parse_duration(step)), step)
 
     def describe(self):
         """Store regular ranges compactly; preserve empty schedules explicitly."""
@@ -122,7 +108,7 @@ class DataClock(Clock):
         elif step is None:
             ticks = dataset.read(dataset.start, dataset.end, columns=[]).index
         else:
-            ticks = pd.date_range(dataset.start, dataset.end, freq=duration(step))
+            ticks = pd.date_range(dataset.start, dataset.end, freq=parse_duration(step))
         super().__init__(ticks, step or dataset.native_step)
 
 
@@ -131,9 +117,9 @@ class LiveClock(Clock):
 
     def __init__(self, last_processed, now, step, start=None):
         """Select only new completed ticks; never sleep or infer a scheduler."""
-        step = duration(step)
-        anchor = utc(start) if start is not None else utc(last_processed or now)
-        ticks = pd.date_range(anchor, utc(now), freq=step)
+        step = parse_duration(step)
+        anchor = to_utc(start) if start is not None else to_utc(last_processed or now)
+        ticks = pd.date_range(anchor, to_utc(now), freq=step)
         if last_processed is not None:
-            ticks = ticks[ticks > pd.Timestamp(utc(last_processed))]
+            ticks = ticks[ticks > pd.Timestamp(to_utc(last_processed))]
         super().__init__(ticks, step)
