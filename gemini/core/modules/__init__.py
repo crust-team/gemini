@@ -5,6 +5,7 @@ from .container import ModuleDict, ModuleList
 from .demand import CoolingConsumer, HeatConsumer
 from .heat import Boiler, HeatExchanger
 from .module import Module
+from .piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
 from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
 from .subsurface import InjectionReservoir, InjectionWell, ProductionReservoir, ProductionWell
 from .treatment import Blowdown, Degasser, Filter
@@ -30,6 +31,11 @@ __all__ = [
     "Filter",
     "HeatConsumer",
     "CoolingConsumer",
+    "Mixer",
+    "Pipe",
+    "PressurizationTank",
+    "Splitter",
+    "Valve",
     "collect_flows",
     "energy_balance",
     "mass_balance",
