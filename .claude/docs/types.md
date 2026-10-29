@@ -145,8 +145,9 @@ liquid enthalpy (gas, steam), is listed in [equipment.md](equipment.md).
 `emissions(result, fuel_factor, electricity_factor)` turns the same leaf totals into a CO2 rate
 [kg/s] for any topology: `fuel * fuel_factor + max(0, electricity - electricity_generated) *
 electricity_factor`. Factors are SI kg/J (kg/GJ / 1e9, kg/kWh / 3.6e6; the unit table has no
-emission-factor units). On-site generation offsets consumption before grid electricity is
-charged and a surplus earns no credit; fuel is charged on its full input, so CHP electricity is
+emission-factor units). All on-site generation offsets the electricity of all consumers (ESP,
+pumps, compressors, heat pumps), not only the ESP as in the upstream GEMINI KPI, before grid
+electricity is charged; a surplus earns no credit; fuel is charged on its full input, so CHP electricity is
 not charged twice. A `Vent`'s `co2_emission` is a separate output and is not included.
 
 ## Profiles and costs
