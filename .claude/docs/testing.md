@@ -152,8 +152,9 @@ build equipment from the original `.param` files: the subsurface and heat-exchan
 
 The example smoke tests are the e2e cases of `tests/e2e/test_examples.py`, one per numbered
 example. They run in both profiles (the development profile selects them when a numbered
-example changes) and are exempt from the one-second budget. Each example runs as a
-subprocess in `tmp_path` with an `examples` symlink, so its output never lands in the repository;
+example changes) and are exempt from the one-second budget; a 900 s hang guard (`TIMEOUT_S`)
+stops a stuck one. Each example runs as a subprocess in `tmp_path` with an `examples` symlink, so
+its output never lands in the repository;
 `GEMINI_EXAMPLE_DATASET` points the examples that read the shared CSV at the selected dataset.
 Expensive module-scoped e2e fixtures carry `pytest.mark.xdist_group`; the default
 `--dist loadgroup` runs each group on one worker so the fixture is built once. E2E retains the

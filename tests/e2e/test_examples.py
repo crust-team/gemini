@@ -16,6 +16,9 @@ from tests.fixtures import ROOT
 
 pytestmark = pytest.mark.e2e
 EXAMPLES = sorted((ROOT / "examples").glob("**/[0-9][0-9]_*.py"))
+TIMEOUT_S = 900
+"""Hang guard per example, not a speed limit: the full-year module API example takes 110-180 s
+on 4-vCPU CI runners beside the other release-profile workers, and that profile has no budget."""
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=[str(path.relative_to(ROOT)) for path in EXAMPLES])
@@ -30,7 +33,7 @@ def test_example(path, dataset_path, tmp_path):
         cwd=tmp_path,
         capture_output=True,
         text=True,
-        timeout=180,
+        timeout=TIMEOUT_S,
         env=env,
     )
     assert completed.returncode == 0, completed.stderr
