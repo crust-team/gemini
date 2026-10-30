@@ -83,4 +83,3 @@ def test_valve_matches_traced():
     ]
     for module in (valve(), valve(characteristic="linear", rangeability=20)):
         assert_module_matches(module, rows)
-
