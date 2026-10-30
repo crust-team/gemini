@@ -215,3 +215,39 @@ def test_apparent_conductance_by_hand_and_every_code():
 
         apparent.__name__ = f"apparent_conductance_{arrangement}"
         assert_function_matches(apparent, rows if arrangement == "counterflow" else rows[:3])
+
+
+def test_exchanger_balance_matches_effectiveness_ntu():
+    """The balance conserves energy and gives zero for a stopped stream, in both arrangements."""
+    effectiveness, units_, duty, hot_out, cold_out = heat_transfer.exchanger_balance(
+        350.0, 300.0, 1000.0, 2000.0, 1000.0, True
+    )
+    assert units_ == 1
+    assert effectiveness == pytest.approx((1 - math.exp(-0.5)) / (1 - 0.5 * math.exp(-0.5)))
+    assert duty == pytest.approx(effectiveness * 1000 * 50)
+    assert hot_out == 350 - duty / 1000 and cold_out == 300 + duty / 2000
+    stopped = heat_transfer.exchanger_balance(350.0, 300.0, 0.0, 2000.0, 1000.0, False)
+    assert stopped == (0.0, 0.0, 0.0, 350.0, 300.0)
+    for counterflow in (True, False):
+        rows = [(350.0, 300.0, 1000.0, 2000.0, 1000.0), (350.0, 300.0, 0.0, 2000.0, 1000.0)]
+        assert_function_matches(heat_transfer.exchanger_balance, rows, counterflow=counterflow)
+
+
+def test_conductance_ratio_and_mean_temperature():
+    """The fouling ratio is UA over the design UA; the mean is arithmetic."""
+    assert heat_transfer.conductance_ratio(80.0, 100.0) == 0.8
+    assert heat_transfer.mean_temperature(300.0, 310.0) == 305
+    assert_function_matches(heat_transfer.conductance_ratio, [(80.0, 100.0), (120.0, 100.0)])
+    assert_function_matches(heat_transfer.mean_temperature, [(300.0, 310.0), (280.0, 300.0)])
+
+
+def test_sensible_latent_loads_serve_the_sensible_load_first():
+    """Short capacity cuts the latent load; a dry coil has none; fans scale with the duty."""
+    assert heat_transfer.sensible_latent_loads(100.0, 60.0, 60.0, False) == (60.0, 40.0)
+    assert heat_transfer.sensible_latent_loads(100.0, 120.0, 60.0, False) == (100.0, 0.0)
+    assert heat_transfer.sensible_latent_loads(100.0, 60.0, 30.0, True) == (60.0, 0.0)
+    rows = [(100.0, 60.0, 60.0), (100.0, 120.0, 60.0), (100.0, 60.0, 30.0)]
+    for dry in (True, False):
+        assert_function_matches(heat_transfer.sensible_latent_loads, rows, is_dry=dry)
+    assert heat_transfer.fan_power(1000.0, 0.02) == 20
+    assert_function_matches(heat_transfer.fan_power, [(1000.0, 0.02), (0.0, 0.02)])

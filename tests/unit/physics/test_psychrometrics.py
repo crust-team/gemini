@@ -181,3 +181,10 @@ def test_humidity_ratio_and_wet_bulb_on_arrays_match_floats():
         assert_same_error(
             psychrometrics.wet_bulb_temperature, [wet_rows[0], bad], PhysicsRangeError
         )
+
+
+def test_evaporation_rate_is_duty_over_latent_heat():
+    """One megawatt at the default latent heat evaporates 1e6 / 2.43e6 kg/s."""
+    rate = psychrometrics.evaporation_rate(1e6, psychrometrics.DEFAULT_LATENT_HEAT)
+    assert rate == pytest.approx(0.4115226)
+    assert_function_matches(psychrometrics.evaporation_rate, [(1e6, 2.43e6), (0.0, 2.43e6)])

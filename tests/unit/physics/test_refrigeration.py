@@ -235,3 +235,107 @@ def test_part_load_duty_on_arrays_matches_floats():
     assert_function_matches(refrigeration.part_load_duty, rows)
     for bad in [(-1.0, 100.0, 0.2), (1.0, 0.0, 0.2), (1.0, 100.0, 1.5), (1.0, 100.0, NAN)]:
         assert_same_error(refrigeration.part_load_duty, [rows[0], bad], PhysicsRangeError)
+
+
+def test_fraction_cops_scale_the_reversible_cops():
+    """Each fraction COP is the efficiency times its reversible COP at the outlet temperatures."""
+    args = (0.5, 10, 300, 330, 285, 280)
+    assert refrigeration.carnot_fraction_cop_heating(*args) == 0.5 * 330 / 50
+    assert refrigeration.carnot_fraction_cop_cooling(*args) == 0.5 * 280 / 50
+    lorenz = refrigeration.lorenz_fraction_cop_heating(*args)
+    assert lorenz == 0.5 * refrigeration.lorenz_cop_heating(300, 330, 285, 280, 10)
+    rows = [
+        (0.5, 10, 300, 330, 285, 280),
+        (0.4, 5, 310, 340, 290, 288),
+        (0.6, 10, 300, 305, 299, 298),
+    ]
+    for function in (
+        refrigeration.carnot_fraction_cop_heating,
+        refrigeration.carnot_fraction_cop_cooling,
+        refrigeration.lorenz_fraction_cop_heating,
+    ):
+        assert_function_matches(function, rows)
+
+
+def test_heat_pump_duties_close_the_first_law():
+    """Evaporator plus electricity equals the condenser duty, from either side."""
+    assert refrigeration.heating_evaporator_duty(900.0, 3.0) == pytest.approx(600)
+    assert refrigeration.cooling_condenser_duty(600.0, 3.0) == pytest.approx(800)
+    rows = [(900.0, 3.0), (100.0, 2.5)]
+    assert_function_matches(refrigeration.heating_evaporator_duty, rows)
+    assert_function_matches(refrigeration.cooling_condenser_duty, rows)
+
+
+def test_carnot_heating_source_outlet_balances_the_evaporator():
+    """The closed form satisfies C (T_in - x) = Q (1 - 1 / COP) on both lift branches."""
+    for inlet, change, sink, lift in ((285.0, 4.0, 330.0, 10.0), (320.0, 4.0, 330.0, 10.0)):
+        outlet = refrigeration.carnot_heating_source_outlet(inlet, change, sink, 0.5, lift)
+        cop = 0.5 * sink / max(sink - outlet, lift)
+        assert inlet - outlet == pytest.approx(change * (1 - 1 / cop))
+    assert refrigeration.heating_cop_minimum_source(330.0, 0.5) == 165
+    rows = [(285.0, 4.0, 330.0, 0.5, 10.0), (320.0, 4.0, 330.0, 0.5, 10.0)]
+    assert_function_matches(refrigeration.carnot_heating_source_outlet, rows)
+
+
+def test_carnot_cooling_sink_outlet_balances_the_condenser():
+    """The closed form satisfies C (y - T_in) = Q (1 + 1 / COP) on both lift branches."""
+    for inlet, change, source, lift in ((300.0, 3.0, 280.0, 10.0), (275.0, 3.0, 280.0, 10.0)):
+        outlet, within_floor, denominator = refrigeration.carnot_cooling_sink_outlet(
+            inlet, change, source, 0.5, lift
+        )
+        cop = 0.5 * source / max(outlet - source, lift)
+        assert outlet - inlet == pytest.approx(change * (1 + 1 / cop))
+        assert denominator == pytest.approx(1 - change / (0.5 * source))
+    assert refrigeration.cooling_minimum_sink_rate(1400.0, 0.5, 280.0) == 10
+    rows = [(300.0, 3.0, 280.0, 0.5, 10.0), (275.0, 3.0, 280.0, 0.5, 10.0)]
+    assert_function_matches(refrigeration.carnot_cooling_sink_outlet, rows)
+
+
+def test_lorenz_surplus_and_shortfall_vanish_at_the_balance():
+    """The solver functions are zero where the evaporator balance closes."""
+    outlet = 283.0
+    cop = refrigeration.lorenz_fraction_cop_heating(0.5, 10, 300, 330, 288, outlet)
+    duty = 1000.0
+    rate = duty * (1 - 1 / cop) / (288 - outlet)
+    surplus = refrigeration.lorenz_source_surplus(outlet, rate, 288, 300, 330, duty, 0.5, 10)
+    assert surplus == pytest.approx(0, abs=1e-9)
+    shortfall = refrigeration.source_limit_shortfall(
+        refrigeration.carnot_fraction_cop_heating, 900.0, 300.0, 30.0, 288.0, 283.0, 100.0, 0.5, 10
+    )
+    sink_outlet = 300 + 900 / 30
+    cop = 0.5 * sink_outlet / max(sink_outlet - 283, 10)
+    assert shortfall == pytest.approx(900 * (1 - 1 / cop) - 100)
+    rows = [
+        (outlet, rate, 288, 300, 330, duty, 0.5, 10),
+        (284.0, rate, 288, 300, 330, duty, 0.5, 10),
+    ]
+    assert_function_matches(refrigeration.lorenz_source_surplus, rows)
+
+    def shortfall_rows(*row):
+        return refrigeration.source_limit_shortfall(refrigeration.carnot_fraction_cop_heating, *row)
+
+    shortfall_rows.__name__ = "source_limit_shortfall"
+    assert_function_matches(shortfall_rows, [(900.0, 300.0, 30.0, 288.0, 283.0, 100.0, 0.5, 10)])
+
+
+def test_sorption_duties_close_the_first_law():
+    """Generator, electricity and rejection follow the thermal COP and the auxiliary ratio."""
+    generator, electricity, rejection = refrigeration.sorption_duties(70.0, 0.7, 0.02)
+    assert generator == pytest.approx(100)
+    assert electricity == pytest.approx(1.4)
+    assert rejection == pytest.approx(171.4)
+    assert refrigeration.sorption_rejection_ratio(0.7, 0.02) == pytest.approx(171.4 / 70)
+    assert refrigeration.coefficient_of_performance(70.0, 100.0) == pytest.approx(0.7)
+    rows = [(70.0, 0.7, 0.02), (0.0, 0.55, 0.0)]
+    assert_function_matches(refrigeration.sorption_duties, rows)
+    assert_function_matches(refrigeration.sorption_rejection_ratio, [(0.7, 0.02), (0.55, 0.0)])
+    assert_function_matches(refrigeration.coefficient_of_performance, [(70.0, 100.0), (1.0, 2.0)])
+
+
+def test_sorption_delivered_duty_takes_the_smallest_limit():
+    """The request, the characteristic equation and the capacity each limit the duty."""
+    assert refrigeration.sorption_delivered_duty(100.0, 200.0, 300.0, 1.0) == (100.0, False)
+    assert refrigeration.sorption_delivered_duty(100.0, 50.0, 300.0, 1.0) == (50.0, True)
+    assert refrigeration.sorption_delivered_duty(300.0, 500.0, 200.0, 2.0) == (100.0, True)
+    rows = [(100.0, 200.0, 300.0, 1.0), (100.0, 50.0, 300.0, 1.0), (300.0, 500.0, 200.0, 2.0)]
+    assert_function_matches(refrigeration.sorption_delivered_duty, rows)
