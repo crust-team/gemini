@@ -5,6 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import heat_transfer, storage
 from gemini.types import (
     Boundary,
     Energy,
@@ -87,7 +88,7 @@ class ThermalStorage(Module):
         self.ambient_temperature = Boundary(Temperature)
 
         # States
-        self.temperature = State(Temperature, default=293.15)
+        self.temperature = State(Temperature, default=storage.DEFAULT_TANK_TEMPERATURE)
 
         # Outputs
         self.tank_temperature = Output(Temperature)
@@ -116,42 +117,43 @@ class ThermalStorage(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        sign = 1 if self.service == "hot" else -1
         charge = self._circuit_heat(inlets.charge_in, self.charge_effectiveness)
         discharge = self._circuit_heat(inlets.discharge_in, self.discharge_effectiveness)
-        ambient = self.heat_loss_coefficient * (self.temperature - self.ambient_temperature)
-        self.tank_temperature = self.temperature
-        self.stored_energy = (
-            sign
-            * self._capacity(inlets.charge_in)
-            * (self.temperature - self.reference_temperature)
+        ambient = heat_transfer.heat_rate(
+            self.heat_loss_coefficient, self.temperature - self.ambient_temperature
         )
-        self.charge_duty = sign * charge
-        self.discharge_duty = -sign * discharge
+        reports = storage.tank_service_report(
+            self.service == "hot",
+            self._capacity(inlets.charge_in),
+            self.temperature,
+            self.reference_temperature,
+            charge,
+            discharge,
+        )
+        self.tank_temperature = self.temperature
+        self.stored_energy, self.charge_duty, self.discharge_duty = reports
         self.heat_accumulation = charge + discharge - ambient
-        self.heat_loss = ops.maximum(ambient, 0.0)
-        self.heat_absorbed = ops.maximum(-ambient, 0.0)
+        self.heat_loss, self.heat_absorbed = heat_transfer.signed_parts(ambient)
 
     def _advance_states(self, inlets, outlets, dt):
-        terms = [
-            (self._conductance(inlets.charge_in, self.charge_effectiveness), inlets.charge_in.T),
-            (
-                self._conductance(inlets.discharge_in, self.discharge_effectiveness),
-                inlets.discharge_in.T,
-            ),
-            (self.heat_loss_coefficient, self.ambient_temperature),
-        ]
-        total = sum(conductance for conductance, _ in terms)
-        weighted = sum(conductance * temperature for conductance, temperature in terms)
-        equilibrium = weighted / total
-        decay = ops.exp(-total * dt / self._capacity(inlets.charge_in))
-        relaxed = equilibrium + (self.temperature - equilibrium) * decay
-        return {"temperature": ops.where(total == 0, self.temperature, relaxed)}
+        charge_in, discharge_in = inlets.charge_in, inlets.discharge_in
+        relaxed = storage.tank_relaxation(
+            self.temperature,
+            self._capacity(charge_in),
+            dt,
+            self._conductance(charge_in, self.charge_effectiveness),
+            charge_in.T,
+            self._conductance(discharge_in, self.discharge_effectiveness),
+            discharge_in.T,
+            self.heat_loss_coefficient,
+            self.ambient_temperature,
+        )
+        return {"temperature": relaxed}
 
     def _capacity(self, charge_in):
         """Return the tank heat capacity rho * cp * V [J/K] of ``module.fluid``."""
         properties = self.fluid.properties(charge_in.p, self.temperature)
-        return properties.liquid_volumetric_heat_capacity * self.volume
+        return storage.tank_capacity(properties.liquid_volumetric_heat_capacity, self.volume)
 
     def _conductance(self, stream, effectiveness):
         """Return the circuit conductance e * m_dot * cp [W/K]; reject reverse flow."""
@@ -162,16 +164,20 @@ class ThermalStorage(Module):
             path=self.path,
             m_dot=stream.m_dot,
         )
-        return effectiveness * stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l
+        return storage.circuit_conductance(effectiveness, stream.heat_capacity_rate())
 
     def _circuit_heat(self, stream, effectiveness):
         """Return the heat flow [W] from a circuit into the start-of-step tank."""
-        return self._conductance(stream, effectiveness) * (stream.T - self.temperature)
+        return heat_transfer.heat_rate(
+            self._conductance(stream, effectiveness), stream.T - self.temperature
+        )
 
     def _outlet_temperature(self, stream, effectiveness):
         """Return a circuit's outlet temperature [K]; a stopped circuit keeps its inlet value."""
         return ops.where(
             self._conductance(stream, effectiveness) == 0,
             stream.T,
-            stream.T - effectiveness * (stream.T - self.temperature),
+            heat_transfer.effectiveness_outlet_temperature(
+                stream.T, effectiveness, self.temperature
+            ),
         )

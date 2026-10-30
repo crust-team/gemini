@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer
+from gemini.physics import heat_transfer, storage, units
 from gemini.types import (
     Duty,
     Energy,
@@ -21,9 +21,6 @@ from gemini.types import (
     Temperature,
     ThermalConductance,
 )
-
-MAX_SEGMENTS = 3
-"""Most phase segments one step can cross: liquid, freezing or melting, then solid (or back)."""
 
 
 class IceStorage(Module):
@@ -71,8 +68,9 @@ class IceStorage(Module):
 
     NOTE(refactor): the ice fraction and the temperature are states, so the module is a graph
     break until ``scan`` exists; its arithmetic is written with ops all the same, and the segment
-    loop of ``_advance_states`` runs its fixed ``MAX_SEGMENTS`` passes, a finished pass keeping
-    its state.
+    loop of ``storage.ice_advance`` runs its fixed ``storage.MAX_SEGMENTS`` passes, a finished
+    pass keeping its state. The coil follows ``heat_transfer.ambient_effectiveness`` and
+    ``storage.circuit_conductance``; the segments are ``storage.ice_step``.
     """
 
     def __init__(self):
@@ -82,17 +80,21 @@ class IceStorage(Module):
         # Parameters
         self.water_mass = Parameter(Mass, gt=0)
         self.ua = Parameter(ThermalConductance, gt=0)
-        self.latent_heat = Parameter(SpecificEnthalpy, default=333550, gt=0)
-        self.freezing_temperature = Parameter(Temperature, default=273.15)
-        self.water_heat_capacity = Parameter(SpecificHeat, default=4219.9)
-        self.ice_heat_capacity = Parameter(SpecificHeat, default=2096.8)
+        self.latent_heat = Parameter(SpecificEnthalpy, default=storage.DEFAULT_LATENT_HEAT, gt=0)
+        self.freezing_temperature = Parameter(
+            Temperature, default=storage.DEFAULT_FREEZING_TEMPERATURE
+        )
+        self.water_heat_capacity = Parameter(
+            SpecificHeat, default=storage.DEFAULT_WATER_HEAT_CAPACITY
+        )
+        self.ice_heat_capacity = Parameter(SpecificHeat, default=storage.DEFAULT_ICE_HEAT_CAPACITY)
 
         # Inlets
         self.inlet = Inlet(Stream, stream="chilled_water")
 
         # States
         self.ice_fraction = State(Fraction, default=0)
-        self.temperature = State(Temperature, default=273.15)
+        self.temperature = State(Temperature, default=units.ZERO_CELSIUS)
 
         # Outputs
         self.stored_cold = Output(Energy)
@@ -111,15 +113,21 @@ class IceStorage(Module):
         # Outlets
         inlet = inlets.inlet
         effectiveness = self._effectiveness(inlet)
-        outlet = inlet.with_(T=inlet.T - effectiveness * (inlet.T - self.temperature))
+        outlet = inlet.with_(
+            T=heat_transfer.effectiveness_outlet_temperature(
+                inlet.T, effectiveness, self.temperature
+            )
+        )
 
         outlets = dict(outlet=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
-        self.stored_cold = self.water_mass * self.latent_heat * self.ice_fraction
-        self.duty = self._conductance(inlet) * (inlet.T - self.temperature)
+        self.stored_cold = storage.ice_stored_cold(
+            self.water_mass, self.latent_heat, self.ice_fraction
+        )
+        self.duty = heat_transfer.heat_rate(self._conductance(inlet), inlet.T - self.temperature)
         self.heat_accumulation = self.duty
         self.outlet_T = outlets.outlet.T
         self.is_full = self.ice_fraction >= 1
@@ -127,19 +135,19 @@ class IceStorage(Module):
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.inlet
-        conductance = self._conductance(inlet)
-        state = (self.ice_fraction, self.temperature, dt)
-        for _ in range(MAX_SEGMENTS):
-            finished = ops.logical_or(state[2] <= 0, conductance == 0)
-            advanced = self._segment(*state, inlet.T, conductance)
-            state = self._select(finished, state, advanced)
-        fraction, temperature, _ = state
+        fraction, temperature = storage.ice_advance(
+            self.ice_fraction,
+            self.temperature,
+            dt,
+            inlet.T,
+            self._conductance(inlet),
+            self.water_mass,
+            self.latent_heat,
+            self.freezing_temperature,
+            self.water_heat_capacity,
+            self.ice_heat_capacity,
+        )
         return {"ice_fraction": fraction, "temperature": temperature}
-
-    @staticmethod
-    def _select(condition, if_true, if_false):
-        """Return the tuple of ``if_true`` where ``condition`` holds, else of ``if_false``."""
-        return tuple(ops.where(condition, a, b) for a, b in zip(if_true, if_false))
 
     def _rate(self, inlet):
         """Return the glycol capacity rate m_dot * cp [W/K]; reject reverse flow."""
@@ -156,12 +164,11 @@ class IceStorage(Module):
         """Return the coil effectiveness 1 - exp(-UA / C) [-] after checking the store state."""
         self._check_state()
         rate = self._rate(inlet)
-        transfer_units = heat_transfer.ntu(self.ua, rate)
-        return ops.where(rate == 0, 0.0, heat_transfer.effectiveness_counterflow(transfer_units, 0))
+        return heat_transfer.ambient_effectiveness(self.ua, rate)
 
     def _conductance(self, inlet):
         """Return the coil conductance e * m_dot * cp [W/K]."""
-        return self._effectiveness(inlet) * self._rate(inlet)
+        return storage.circuit_conductance(self._effectiveness(inlet), self._rate(inlet))
 
     def _check_state(self):
         """Require the store temperature to match its phase (see the class docstring)."""
@@ -185,54 +192,3 @@ class IceStorage(Module):
             fraction=fraction,
             freezing=freezing,
         )
-
-    def _segment(self, fraction, temperature, duration, inlet_T, conductance):
-        """Advance one phase segment; return the fraction, temperature and time left [s]."""
-        freezing = self.freezing_temperature
-        liquid = ops.logical_or(
-            temperature > freezing, ops.logical_and(fraction == 0, inlet_T > freezing)
-        )
-        solid = ops.logical_or(
-            temperature < freezing, ops.logical_and(fraction == 1, inlet_T < freezing)
-        )
-        water = self.water_mass * self.water_heat_capacity
-        ice = self.water_mass * self.ice_heat_capacity
-        args = (fraction, temperature, inlet_T)
-        return self._select(
-            liquid,
-            self._sensible(*args, water / conductance, duration),
-            self._select(
-                solid,
-                self._sensible(*args, ice / conductance, duration),
-                self._latent(fraction, conductance * (inlet_T - freezing), duration),
-            ),
-        )
-
-    def _sensible(self, fraction, temperature, inlet_T, time_constant, duration):
-        """Relax an all-liquid or all-ice store towards the inlet, stopping at freezing."""
-        freezing = self.freezing_temperature
-        crosses = (temperature - freezing) * (inlet_T - freezing) < 0
-        reach = time_constant * ops.log((temperature - inlet_T) / (freezing - inlet_T))
-        stops = ops.logical_and(crosses, reach < duration)
-        relaxed = inlet_T + (temperature - inlet_T) * ops.exp(-duration / time_constant)
-        overshoots = ops.logical_and(crosses, (relaxed - freezing) * (temperature - freezing) <= 0)
-        return (
-            fraction,
-            ops.where(ops.logical_or(stops, overshoots), freezing, relaxed),
-            ops.where(stops, duration - reach, 0.0),
-        )
-
-    def _latent(self, fraction, heat, duration):
-        """Freeze (heat < 0) or melt (heat > 0) at constant duty until full, empty or done."""
-        freezing = self.freezing_temperature
-        latent_capacity = self.water_mass * self.latent_heat
-        target = ops.where(heat > 0, 0.0, 1.0)
-        reach = latent_capacity * ops.abs(target - fraction) / ops.abs(heat)
-        changed = fraction - heat * duration / latent_capacity
-        reached = reach < duration
-        moved = (
-            ops.where(reached, target, ops.minimum(1.0, ops.maximum(0.0, changed))),
-            freezing,
-            ops.where(reached, duration - reach, 0.0),
-        )
-        return self._select(heat == 0, (fraction, freezing, 0.0), moved)
