@@ -114,7 +114,8 @@ are not computed.
 
 `plant.save(path)` and `gm.Plant.load(path)` read and write the spec. `gm.plants.migrate(old)`
 converts every older stored format (a format 2 file written before 0.2.0 gets explicit names for
-its free ports, `<path with underscores>_<port>`, the automatic names it relied on), and `scripts/migrate_plants.py` runs it over files. Loading an
+its free ports, `<path with underscores>_<port>`, the automatic names it relied on, and the fluid
+fields of 0.2.0, with a reservoir's `liquid_density` and `liquid_viscosity` moved onto its fluid), and `scripts/migrate_plants.py` runs it over files. Loading an
 old file without it raises `ValidationError` with code `old_format`, naming `gm.plants.migrate`.
 
 ## Level 3: subclassing

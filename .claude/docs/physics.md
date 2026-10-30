@@ -94,6 +94,19 @@ Constant fluid properties inherited from GEMINI's PVTConstantSTP model.
   mixture, `q_l = m (1 - x) / rho_l`.
 - `heat_capacity_rate(mass_flow, heat_capacity)`: heat capacity rate [W/K] of a stream, `C = m cp`.
 
+### `gas.py`
+
+A gas from its composition, a mapping of species to mole fraction (`SPECIES`: `CH4`, `C2H6`, `C3H8`,
+`CO2`, `N2`, with molar mass, lower heating value and burning carbon atoms).
+
+- `molar_mass(composition)` [kg/mol]; `mass_fraction(composition, species)` [-].
+- `ideal_gas_density(pressure, temperature, mass_per_mole)` [kg/m3], `normal_density(composition)` at
+  `NORMAL_TEMPERATURE` and `NORMAL_PRESSURE`.
+- `lower_heating_value(composition)` [J/kg]; `combustion_co2(composition)`: kg of CO2 formed per kg of
+  gas, without the CO2 the gas carries.
+- `gas_mass_fraction(ratio, density_normal, liquid_density)` and its inverse `gas_liquid_ratio`.
+- `GRID_COMPOSITION`: a published grid analysis, the default of `GasGrid` and `GasMakeup`.
+
 ### `geometry.py`
 
 Pure in-memory pipe geometry calculations.
@@ -564,10 +577,13 @@ returns one cached snapshot per complete `Fluid` value.
 - `density` = `1 / (gmf / rho_g + (1 - gmf) / rho_l)` [kg/m3], the homogeneous mixture density
   from the gas mass fraction `gmf`; `fluid.mixture_density(liquid_density, gas_density,
   gas_mass_fraction)` is the same formula for floats, arrays and traced values.
-- `kind` is `brine` (default), `water`, `glycol_water` or `steam`. `glycol_water` replaces the
+- `kind` is `brine` (default), `water`, `glycol_water`, `steam` or `gas`. `glycol_water` replaces the
   liquid values by DOWFROST HD, 30 % propylene glycol by volume at 40 degC: `rho_l` = 1029.85,
-  `cp_l` = 3841, `k_l` = 0.4622, `mu_l` = 0.0016295 (SI). `liquid_density`, `liquid_viscosity`,
-  `specific_heat` and `thermal_conductivity` override the four liquid values after that.
+  `cp_l` = 3841, `k_l` = 0.4622, `mu_l` = 0.0016295 (SI). `density`, `viscosity`,
+  `specific_heat` and `thermal_conductivity` override the four values after that: those of the
+  liquid, and those of the gas of a `gas` fluid, whose `rho_l` and `rho_g` otherwise are its density
+  at normal conditions. Its density at a stream's `p` and `T` is `Fluid.density_at`, ideal-gas.
+- `gas_liquid_ratio` `R` with `gas_composition` gives `gmf = R rho_n / (rho_l + R rho_n)`.
 - `corrosion_inputs(p, T)` = `co2_partial_pressure = w_CO2 rho_l / M_CO2 / henry_constant(T)`
   [Pa] and `ionic_strength = salinity rho_l` [kg/m3], with `M_CO2` = 0.04401 kg/mol: the
   dissolved CO2 mass fraction becomes a concentration and the Henry law (Chemistry) is inverted;
@@ -666,8 +682,7 @@ A nonpositive `k`, `h`, `r_e` or `r_w` raises `PhysicsError`;
 `estimate_reservoir_pressure` needs at
 least two finite, nonzero, varying samples (`PhysicsError`). Both indices default to
 `None` and a missing one raises `ValidationError`. The linear relations take the viscosity
-and density only through the flow; `mu_l` and `rho_l` come from the reservoir fluid with its
-`liquid_density` and `liquid_viscosity` overrides.
+and density only through the flow; `mu_l` and `rho_l` come from the reservoir fluid.
 
 ## Pumps
 

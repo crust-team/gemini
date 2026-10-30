@@ -24,8 +24,7 @@ tree-shape arguments (for example `ModuleList(modules)`) go to `__init__`. There
 class-creation hook: `module.name` is the snake_case class name computed on access,
 `Module.help()` reads the first paragraph of the class docstring and lists the declarations, and
 any number of classes may share a name. `module.path` is the dotted position in the tree, or the
-name for a standalone module. `module.fluid` is a validated property saved by `state_dict()`;
-reservoirs apply their `liquid_density`/`liquid_viscosity` overrides when it is read. Plant files
+name for a standalone module. `module.fluid` is a validated property saved by `state_dict()`. Plant files
 and checkpoints store the root class as `module:qualname` through `class_path`/`import_class` in
 `module.py`, the only import-by-string in the package.
 

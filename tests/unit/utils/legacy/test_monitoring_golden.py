@@ -86,6 +86,7 @@ def _esp_vlp_values(row, well_property, esp_property, reservoir_property):
     """Infer ESP intake and corrected outlet pressure from the reservoir and wellhead sides."""
     reservoir_parameters = _historical_ipr_parameters(reservoir_property, well_property)
     reservoir = configured(ProductionReservoir, reservoir_parameters)
+    reservoir.fluid = tables.reservoir_fluid(reservoir_property)
     well_parameters = tables.productionwell_params_from_gemini(
         well_property, esp_property=esp_property
     )
@@ -118,6 +119,7 @@ def _injection_values(row):
         InjectionReservoir,
         tables.injection_reservoir_params_from_gemini(reservoir_property, well_property),
     )
+    reservoir.fluid = tables.reservoir_fluid(reservoir_property)
     well = configured(InjectionWell, tables.injectionwell_params_from_gemini(well_property))
     well.fluid = reservoir.fluid
     pressure, temperature = units.bar_to_pa(row.InjectorPump_Pout), units.c_to_k(row.T_p_out)

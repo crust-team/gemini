@@ -97,7 +97,7 @@ class Stream:
 
     def volumetric_flow(self):
         """Return signed mixture volume flow [m3/s] using the stream fluid."""
-        return fluid_physics.volume_flow(self.m_dot, self.fluid.properties(self.p, self.T).density)
+        return fluid_physics.volume_flow(self.m_dot, self.fluid.density_at(self.p, self.T))
 
     def heat_capacity_rate(self):
         """Return the signed heat capacity rate ``m_dot * cp_l`` [W/K] of the stream."""
@@ -222,7 +222,7 @@ _EXPECTED = {"m_dot": "a finite mass flow", "T": "T > 0 and finite", "p": "p >= 
 
 def mass_flow(volume_flow, fluid, pressure, temperature):
     """Return a volume flow [m3/s] as mass flow [kg/s] with the density of ``fluid`` at (p, T)."""
-    return volume_flow * fluid.properties(pressure, temperature).density
+    return volume_flow * fluid.density_at(pressure, temperature)
 
 
 def _mass_flow(flow, fluid, pressure, temperature):

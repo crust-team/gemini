@@ -10,7 +10,6 @@ from gemini.physics import fluid as fluid_physics
 from gemini.physics import hydraulics
 from gemini.types import (
     Control,
-    Density,
     Dimensionless,
     Fraction,
     Health,
@@ -26,13 +25,8 @@ from gemini.types import (
     ProductivityIndex,
     Stream,
     Temperature,
-    Viscosity,
 )
-from gemini.types.fluid import Fluid
 from gemini.types.results import NOT_ASSESSED
-
-FLUID_OVERRIDES = ("liquid_density", "liquid_viscosity")
-"""Reservoir parameters that, when set, replace the matching property of the module fluid."""
 
 
 class _Reservoir(Module):
@@ -57,8 +51,6 @@ class _Reservoir(Module):
         )
         self.skin = Parameter(Dimensionless, default=0, calibratable=True)
         self.wellbore_radius = Parameter(Length, gt=0)
-        self.liquid_density = Parameter(Density | None, default=None, structural=True)
-        self.liquid_viscosity = Parameter(Viscosity | None, default=None, structural=True)
         self.decline_threshold = Parameter(
             Fraction, default=diagnostics.DEFAULT_DECLINE_THRESHOLD, gt=0, le=1
         )
@@ -71,30 +63,6 @@ class _Reservoir(Module):
         self.skin_pressure_drop = Output(PressureDifference | None)
         self.hydrostatic_pressure_drop = Output(PressureDifference)
         self.radial_bottomhole_pressure = Output(Pressure | None)
-
-        self._fluid_cache = (None, None, None)
-
-    @property
-    def fluid(self):
-        """Return the module fluid with the reservoir's liquid density and viscosity overrides.
-
-        The overrides decide the fluid, so they are structural parameters, read as plain values
-        in a trace. The fluid is rebuilt only when the module fluid or an override changes.
-        """
-        overrides = {name: self._parameter_value(name) for name in FLUID_OVERRIDES}
-        values = tuple(overrides.values())
-        source, stored_values, stored_fluid = self._fluid_cache
-        if source is self._fluid and stored_values == values:
-            return stored_fluid
-        set_overrides = {name: value for name, value in overrides.items() if value is not None}
-        fluid = Fluid.model_validate(self._fluid.model_dump() | set_overrides)
-        self._fluid_cache = (self._fluid, values, fluid)
-        return fluid
-
-    @fluid.setter
-    def fluid(self, value):
-        """Set and validate the module fluid without the overrides; ``state_dict`` saves it."""
-        Module.fluid.fset(self, value)
 
     def _calculate_outputs(self, flow, p_bh):
         properties = self.fluid.properties(self.pressure, self.temperature)

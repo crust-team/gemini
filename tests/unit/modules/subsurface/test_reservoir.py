@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from gemini.errors import ValidationError
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.types import Inlet
 from gemini.types.flows import Stream
@@ -21,6 +22,7 @@ def test_example_production_and_decline():
         mapping.read_property(DATA / "production_well_c774.param"),
     )
     c = ProductionReservoir().update_params(**p)
+    c.fluid = mapping.reservoir_fluid(mapping.read_property(DATA / "reservoir_c1b5.param"))
     result = c(production_rate=40)
     out, flow = result.outputs, 40 / 1068
     assert out.drawdown == pytest.approx(flow / c.productivity_index)
@@ -99,10 +101,12 @@ def _producer(**changes):
 
 
 def test_production_reservoir_matches_traced():
-    """Radial diagnostics, fluid overrides and several rates equal one call per row."""
+    """Radial diagnostics, another fluid and several rates equal one call per row."""
     rows = [dict(rows=ROW, production_rate=rate) for rate in (0.0, 5.0, 40.0, 120.0)]
     assert_module_matches(_producer(), rows)
-    assert_module_matches(_producer(liquid_density=990.0, liquid_viscosity=5e-4), rows)
+    dense = _producer()
+    dense.fluid = Fluid(density=990.0, viscosity=5e-4)
+    assert_module_matches(dense, rows)
 
 
 def test_reservoir_without_drainage_radius_matches_traced():
@@ -130,15 +134,15 @@ def test_injection_reservoir_matches_traced():
     assert_module_matches(sink, rows)
 
 
-def test_fluid_is_rebuilt_only_when_an_override_changes():
-    """The fluid property returns the same object until the overrides or module fluid change."""
-    producer = _producer(liquid_density=990.0)
-    first = producer.fluid
-    assert producer.fluid is first and first.liquid_density == 990.0
-    producer.update_params(liquid_density=1010.0)
-    assert producer.fluid.liquid_density == 1010.0
-    producer.fluid = Fluid(salinity=0.1)
-    assert producer.fluid.salinity == 0.1 and producer.fluid.liquid_density == 1010.0
+def test_the_fluid_owns_the_density_and_viscosity():
+    """A reservoir has no density or viscosity of its own: it reads its fluid."""
+    producer = _producer()
+    producer.fluid = Fluid(density=990.0, viscosity=5e-4)
+    assert producer(rows=ROW, production_rate=9.9).outputs.drawdown == pytest.approx(
+        0.01 / producer.productivity_index
+    )
+    with pytest.raises(ValidationError):
+        producer.update_params(liquid_density=990.0)
 
 
 def _health_rows(module, call):

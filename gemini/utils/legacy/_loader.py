@@ -242,15 +242,15 @@ def _project_fluid(project, kinds, modules, paths, columns):
     params = modules[paths[reservoir]].params[-1].params
     properties = _snapshot(project, reservoir, -1)
     brine = Fluid(
-        liquid_density=params.get("liquid_density") or tables.FALLBACK_LIQUID_DENSITY,
-        liquid_viscosity=params.get("liquid_viscosity") or tables.FALLBACK_LIQUID_VISCOSITY,
+        density=properties.get("liquid_density") or tables.FALLBACK_LIQUID_DENSITY,
+        viscosity=properties.get("liquid_viscosity") or tables.FALLBACK_LIQUID_VISCOSITY,
         salinity=properties.get("salinity", 0),
         co2_mass_fraction=properties.get("co2_mass_fraction", 0),
         gas_mass_fraction=properties.get("gas_mass_fraction", 0),
     )
     if not tables.HEAT_BALANCE_COLUMNS <= columns:
         return brine
-    heat_capacity = tables.EXAMPLE_BULK_HEAT_CAPACITY / brine.liquid_density
+    heat_capacity = tables.EXAMPLE_BULK_HEAT_CAPACITY / brine.density
     return Fluid.model_validate(brine.model_dump() | {"specific_heat": heat_capacity})
 
 

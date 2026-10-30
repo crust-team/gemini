@@ -121,7 +121,7 @@ def test_lorenz_heating_reproduces_the_upstream_gemini_case():
     88913.32 W; the root found here gives 88913.17 W, the duty divided by the same COP
     without the optimizer's tolerance.
     """
-    water = Fluid(kind="water", liquid_density=1000, specific_heat=4181)
+    water = Fluid(kind="water", density=1000, specific_heat=4181)
     pump = heat_pump("heating", capacity=1e7, cop_model="lorenz")
     source = Stream(flow="20 m3/h", T="40 C", p=3e5, fluid=water)
     sink = Stream(flow="10 m3/h", T="30 C", p=3e5, fluid=water)

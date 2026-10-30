@@ -317,6 +317,8 @@ _UNITS = {
     "g/m3": ("kg/m3", MILLI, 0),
     "mg/l": ("kg/m3", MILLI, 0),
     "Pa.s": ("Pa.s", 1, 0),
+    "mPa.s": ("Pa.s", MILLI, 0),
+    "mPa*s": ("Pa.s", MILLI, 0),
     "J/kg/K": ("J/kg/K", 1, 0),
     "J/kg": ("J/kg", 1, 0),
     "kJ/kg": ("J/kg", KILO, 0),
@@ -340,6 +342,7 @@ _UNITS = {
     "m3/h/bar": ("m3/s/Pa", 1 / SECONDS_PER_HOUR / PA_PER_BAR, 0),
     "-": ("-", 1, 0),
     "ppm": ("-", 1e-6, 0),
+    "Nm3/m3": ("-", 1, 0),
 }
 
 _NUMBER_AND_UNIT = re.compile(r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+(.+?)\s*")

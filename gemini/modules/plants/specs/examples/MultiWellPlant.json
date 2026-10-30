@@ -18,9 +18,7 @@
                 "drainage_radius": 1000.0,
                 "top_depth": 1800.0,
                 "productivity_index": 5.833333333333333e-08,
-                "wellbore_radius": 0.0765,
-                "liquid_density": 1068.0,
-                "liquid_viscosity": 0.00065
+                "wellbore_radius": 0.0765
               }
             },
             "well": {
@@ -222,9 +220,7 @@
                 "drainage_radius": 1000.0,
                 "top_depth": 1800.0,
                 "productivity_index": 5.833333333333333e-08,
-                "wellbore_radius": 0.0765,
-                "liquid_density": 1068.0,
-                "liquid_viscosity": 0.00065
+                "wellbore_radius": 0.0765
               }
             },
             "well": {
@@ -472,9 +468,7 @@
                 "drainage_radius": 0.0,
                 "top_depth": 0.0,
                 "injectivity_index": 5.5555555555555555e-08,
-                "wellbore_radius": 0.0765,
-                "liquid_density": 1068.0,
-                "liquid_viscosity": 0.00065
+                "wellbore_radius": 0.0765
               }
             }
           }
@@ -543,10 +537,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -555,10 +551,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -567,10 +565,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -579,10 +579,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -591,10 +593,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -603,10 +607,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -615,10 +621,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -627,10 +635,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -639,10 +649,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
@@ -651,10 +663,12 @@
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
       "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
       "glycol_fraction": 0.0,
       "property_model": "constant_stp",
-      "liquid_density": 1068.0,
-      "liquid_viscosity": 0.00065,
+      "density": 1068.0,
+      "viscosity": 0.00065,
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     }

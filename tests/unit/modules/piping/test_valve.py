@@ -47,7 +47,7 @@ def test_inherent_characteristics():
 
 def test_density_enters_the_sizing_equation():
     """The sizing equation dp = rho / 1000 (q / Kv)^2 gives a denser brine less drop."""
-    brine = Fluid(liquid_density=1050)
+    brine = Fluid(density=1050)
     stream = Stream(m_dot=STREAM.m_dot, T=353.15, p=5e5, fluid=brine)
     drop = valve()(inlet=stream, opening=1).outputs.pressure_drop
     assert drop == pytest.approx(1.05 * (10 / 1050 / KV) ** 2, rel=1e-12)

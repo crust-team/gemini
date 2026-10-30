@@ -67,6 +67,10 @@ RENAMED_NAMES = {
 """Parameter and output names of the first frozen API and their current names."""
 
 
+FLUID_NAMES = {"liquid_density": "density", "liquid_viscosity": "viscosity"}
+"""Fluid fields renamed in 0.2.0; a reservoir parameter of these names moved onto its fluid."""
+
+
 def _failed(message, path=None):
     return ValidationError(message, code="migration_failed", path=path)
 
@@ -101,8 +105,8 @@ def _sections(entries, plant=None):
     default = runtime.get_default_fluid()
     sections = {"fluids": {}, "boundary": {}, "bindings": {}, "param_history": {}}
     for path, entry in entries.items():
-        if "fluid" in entry and Fluid.model_validate(entry["fluid"]) != default:
-            sections["fluids"][path] = entry["fluid"]
+        if "fluid" in entry and Fluid.model_validate(_fluid_names(entry["fluid"])) != default:
+            sections["fluids"][path] = _fluid_names(entry["fluid"])
         if entry.get("boundary"):
             sections["boundary"][path] = deepcopy(entry["boundary"])
         for key, value in entry.get("bindings", {}).items():
@@ -191,14 +195,61 @@ def _convert(old):
     name = old["plant_type"].split(":")[-1].split(".")[-1]
     entries = {path: _current_entry(entry) for path, entry in old["modules"].items()}
     if library.has(name):
-        spec = _structured(name, entries)
+        spec = _current_fluids(_structured(name, entries))
         problems = reader.problems(Plant, spec)
         if problems:
             raise _failed(
                 f"{problems[0]['path']}: {problems[0]['message']}", path=problems[0]["path"]
             )
         return spec
-    return _handwritten(name, entries)
+    return _current_fluids(_handwritten(name, entries))
+
+
+def _fluid_names(stored):
+    """Return stored data with every fluid in it, at any depth, in the form of 0.2.0."""
+    if isinstance(stored, list):
+        return [_fluid_names(item) for item in stored]
+    if not isinstance(stored, dict):
+        return stored
+    renamed = {FLUID_NAMES.get(key, key): _fluid_names(value) for key, value in stored.items()}
+    if "property_model" in renamed:
+        return Fluid.model_validate(renamed).model_dump(mode="json")
+    return renamed
+
+
+def _moved_fluid_params(spec, path, params):
+    """Move the reservoir fluid parameters of ``params`` onto the fluids of their modules."""
+    for name in [name for name in params if name.rsplit(".", 1)[-1] in FLUID_NAMES]:
+        value = params.pop(name)
+        if value is None:
+            continue
+        owner, _, field = join_path(path, name).rpartition(".")
+        fluids = spec.setdefault("fluids", {})
+        fluids[owner] = fluids.get(owner, {}) | {FLUID_NAMES[field]: value}
+
+
+def _current_fluids(spec):
+    """Return a format 2 spec with fluid fields of 0.2.0, reservoir parameters moved onto them."""
+    spec["fluids"] = _fluid_names(spec.get("fluids", {}))
+    if "boundary" in spec:
+        spec["boundary"] = _fluid_names(spec["boundary"])
+    _moved_fluid_params(spec, "", spec.get("params", {}))
+    for name, entry in _entries_of(spec.get("modules", {})):
+        _moved_fluid_params(spec, name, entry.get("params", {}))
+    if not spec["fluids"]:
+        del spec["fluids"]
+    for entries in spec.get("param_history", {}).values():
+        for entry in entries:
+            entry["params"] = {k: v for k, v in entry["params"].items() if k not in FLUID_NAMES}
+    return spec
+
+
+def _entries_of(modules, prefix=""):
+    """Yield ``(path, entry)`` of the module entries of a spec, looking through groups."""
+    for name, entry in modules.items():
+        path = join_path(prefix, name)
+        yield path, entry
+        yield from _entries_of(entry.get("modules", {}), path)
 
 
 def _named_ports(spec):
@@ -219,14 +270,15 @@ def _named_ports(spec):
 def migrate(old):
     """Convert a format 1 plant file to a format 2 spec; a spec is returned as a copy.
 
-    A format 2 spec written before 0.2.0 gets explicit names for its free ports.
+    A format 2 spec written before 0.2.0 gets explicit names for its free ports, the fluid fields
+    of 0.2.0 and the reservoir ``liquid_density`` and ``liquid_viscosity`` on the module's fluid.
 
     A tree whose root class is a shipped plant takes that plant's wiring, with the stored
     values filled in; any other root is written as a handwritten root with flat dotted params.
     Failures raise ``ValidationError`` with code ``migration_failed``.
     """
     if isinstance(old, dict) and old.get("format") == FORMAT:
-        return _named_ports(deepcopy(old))
+        return _named_ports(_current_fluids(deepcopy(old)))
     try:
         return _convert(old)
     except GeminiError:

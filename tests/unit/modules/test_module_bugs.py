@@ -92,10 +92,10 @@ def test_assigned_fluid_survives_parameter_changes_and_is_saved():
     assert Filter().load_state_dict(module.state_dict()).fluid == gm.WATER
 
 
-def test_dotted_parameter_update_refreshes_descendant_fluid(fresh_plant):
-    """E-modules-004: a reservoir density override applies as soon as it is set."""
-    fresh_plant.update_params(**{"doublet.reservoir.liquid_density": 1100})
-    assert fresh_plant.doublet.reservoir.fluid.liquid_density == 1100
+def test_a_reservoir_fluid_applies_as_soon_as_it_is_set(fresh_plant):
+    """E-modules-004: the fluid of a reservoir holds its density, read when the fluid is set."""
+    fresh_plant.doublet.reservoir.fluid = gm.Fluid(density=1100)
+    assert fresh_plant.doublet.reservoir.fluid.density == 1100
 
 
 class Child(Module):

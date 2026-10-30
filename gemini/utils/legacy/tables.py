@@ -16,6 +16,7 @@ from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.treatment import Degasser, Filter
 from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.physics import geometry, separation, units
+from gemini.types.fluid import Fluid
 from gemini.utils.files import read_json
 
 PORTS = {
@@ -292,8 +293,6 @@ PROPERTY_INVERSE = {
     "reservoir_pressure": ("pressure", units.pa_to_bar),
     "reservoir_temperature": ("temperature", units.k_to_c),
     "reservoir_permeability": ("permeability", units.m2_to_md),
-    "liquid_density": ("liquid_density", None),
-    "liquid_viscosity": ("liquid_viscosity", None),
     "skin": ("skin", None),
     "wellbore_radius": ("wellbore_radius", None),
 }
@@ -372,8 +371,6 @@ def reservoir_params_from_gemini(
         top_depth=properties["reservoir_top"],
         wellbore_radius=well.get("wellbore_radius", properties.get("wellbore_radius", 0.0765)),
         skin=properties.get("skin", 0),
-        liquid_density=properties.get("liquid_density"),
-        liquid_viscosity=properties.get("liquid_viscosity"),
     )
     for key, prefix in [
         ("productivity_index", "productionwell"),
@@ -382,6 +379,13 @@ def reservoir_params_from_gemini(
         value = well.get(f"{prefix}_{key}", properties.get(key))
         result[key] = units.index_to_si(value) if value is not None else None
     return result
+
+
+def reservoir_fluid(properties: dict) -> Fluid:
+    """Return the fluid of an old reservoir: its stored density and viscosity, when given."""
+    return Fluid(
+        density=properties.get("liquid_density"), viscosity=properties.get("liquid_viscosity")
+    )
 
 
 def production_reservoir_params_from_gemini(properties: dict, well_property: dict) -> dict:

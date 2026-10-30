@@ -27,7 +27,7 @@ def test_mass_flow_inputs_and_units():
 
 def test_volume_flow_uses_the_stream_fluid_density():
     """Volume flow units convert to mass flow with the selected fluid."""
-    fluid = Fluid(liquid_density=1068)
+    fluid = Fluid(density=1068)
     stream = Stream(flow="360 m3/h", T=300, p=1e5, fluid=fluid)
     assert stream.m_dot == pytest.approx(106.8)
     assert stream.volumetric_flow() == pytest.approx(0.1)
@@ -68,7 +68,7 @@ def test_with_revalidates_the_copy():
 
 def test_stream_carries_array_values_and_keeps_the_physical_limits():
     """A stream over time computes volume flow from its fluid; copies keep p >= 0, T > 0."""
-    fluid = Fluid(liquid_density=1068)
+    fluid = Fluid(density=1068)
     stream = Stream(m_dot=np.array([10.68, 21.36]), T=np.array([300.0, 310.0]), p=1e5, fluid=fluid)
     assert stream.volumetric_flow().tolist() == pytest.approx([0.01, 0.02], rel=1e-15)
     assert stream.with_(p=np.array([2e5, 3e5])).p.tolist() == [2e5, 3e5]

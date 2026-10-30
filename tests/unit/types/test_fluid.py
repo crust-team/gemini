@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError as PydanticError
 from pydantic_core import to_jsonable_python
 
+import gemini as gm
 from gemini.errors import ValidationError
 from gemini.physics.fluid import FluidProperties
 from gemini.types.flows import Stream
@@ -18,7 +19,7 @@ from tests.fixtures.errors import raises
 def test_fluid_properties_and_identity():
     """Defaults preserve all legacy numbers; overrides travel with streams and cache safely."""
     assert BRINE.properties(1e5, 300) == FluidProperties()
-    brine = Fluid(liquid_density=1068, liquid_viscosity=0.00065, co2_mass_fraction=0.01)
+    brine = Fluid(density=1068, viscosity=0.00065, co2_mass_fraction=0.01)
     stream = Stream(m_dot=106.8, p=1e5, T=300, fluid=brine)
     assert stream.volumetric_flow() == pytest.approx(0.1)
     assert stream.with_(T=310).fluid == brine
@@ -33,7 +34,7 @@ def test_fluid_properties_and_identity():
     assert Stream(**json.loads(json.dumps(to_jsonable_python(stream)))) == stream
     with pytest.raises(PydanticError):
         brine.salinity = 0.5
-    with pytest.raises(PydanticError):
+    with pytest.raises(gm.errors.ValidationError):
         Fluid(salinity=0.9, co2_mass_fraction=0.2)
     with raises(ValidationError, "invalid_call"):
         Stream(m_dot=1, T=300, p=1e5, fluid="brine")
@@ -52,7 +53,7 @@ def test_corrosion_composition_conversion():
     """Dissolved mass fraction is converted through Henry law, never used as gas mole fraction."""
     from gemini.physics.chemistry import henry_constant
 
-    fluid = Fluid(salinity=0.07, co2_mass_fraction=0.001, liquid_density=1068)
+    fluid = Fluid(salinity=0.07, co2_mass_fraction=0.001, density=1068)
     values = fluid.corrosion_inputs(1e6, 300)
     assert values["ionic_strength"] == pytest.approx(74.76)
     assert values["co2_partial_pressure"] * henry_constant(300) == pytest.approx(1.068 / 0.04401)
@@ -60,7 +61,66 @@ def test_corrosion_composition_conversion():
 
 def test_corrosion_inputs_on_arrays_match_floats():
     """The conversion works on arrays of pressure and temperature."""
-    fluid = Fluid(salinity=0.07, co2_mass_fraction=0.001, liquid_density=1068)
+    fluid = Fluid(salinity=0.07, co2_mass_fraction=0.001, density=1068)
     assert_function_matches(fluid.corrosion_inputs, [(1e6, 300.0), (2e6, 340.0), (5e5, 285.0)])
     values = fluid.corrosion_inputs(np.array([1e6, 2e6]), np.array([300.0, 340.0]))
     assert values["co2_partial_pressure"].shape == (2,)
+
+
+HACKATHON = dict(
+    density="1030 kg/m3",
+    viscosity="0.4 mPa*s",
+    gas_liquid_ratio="0.8 Nm3/m3",
+    gas_composition={"CH4": 0.8, "CO2": 0.2},
+)
+
+
+def test_the_hackathon_brine_derives_its_gas_mass_fraction():
+    """Unit strings become SI; 0.8 Nm3/m3 of the 80/20 gas is 7.49e-4 of the mass."""
+    brine = Fluid(**HACKATHON)
+    assert brine.density == 1030 and brine.viscosity == pytest.approx(4e-4)
+    assert brine.normal_density() == pytest.approx(0.96534, abs=1e-4)
+    assert brine.gas_mass_fraction == pytest.approx(7.4923e-4, rel=1e-3)
+    assert brine.properties(1e5, 300).gmf == brine.gas_mass_fraction
+
+
+def test_a_fluid_with_a_ratio_round_trips_and_hashes():
+    """A dump leaves the derived fraction out, so it reads back; a composition does not stop a hash."""
+    brine = Fluid(**HACKATHON)
+    dumped = brine.model_dump(mode="json")
+    assert "gas_mass_fraction" not in dumped
+    again = Fluid.model_validate(dumped)
+    assert again == brine and hash(again) == hash(brine)
+    assert brine.properties(1e5, 300) is again.properties(1e5, 300)
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        dict(gas_liquid_ratio=0.8, gas_composition={"CH4": 1.0}, gas_mass_fraction=1e-3),
+        dict(gas_liquid_ratio=0.8),
+        dict(gas_composition={"CH4": 1.0}),
+        dict(gas_liquid_ratio=0.8, gas_composition={"CH4": 0.5}),
+        dict(gas_liquid_ratio=0.8, gas_composition={"H2": 1.0}),
+        dict(kind="gas"),
+    ],
+    ids=["both", "no-composition", "no-ratio", "sum", "species", "gas-without-composition"],
+)
+def test_a_gas_description_that_does_not_fit_is_refused(fields):
+    """Ratio with composition, or a mass fraction, never both; known species summing to one."""
+    with pytest.raises(gm.errors.ValidationError):
+        Fluid(**fields)
+
+
+def test_a_gas_fluid_is_an_ideal_gas_of_its_composition():
+    """Density follows the stream's pressure and temperature, also on arrays."""
+    gas = Fluid(kind="gas", gas_composition={"CH4": 0.8, "CO2": 0.2})
+    normal = gas.density_at(101325.0, 273.15)
+    assert normal == pytest.approx(gas.normal_density())
+    assert gas.density_at(202650.0, 273.15) == pytest.approx(2 * normal)
+    stream = Stream(m_dot=1.0, p=101325.0, T=273.15, fluid=gas)
+    assert stream.volumetric_flow() == pytest.approx(1 / normal)
+    assert gas.density_at(np.array([101325.0, 202650.0]), 273.15)[1] == pytest.approx(2 * normal)
+    assert Stream(flow="10 m3/h", p=101325.0, T=273.15, fluid=gas).m_dot == pytest.approx(
+        10 / 3600 * normal
+    )

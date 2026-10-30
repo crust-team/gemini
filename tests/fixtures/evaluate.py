@@ -24,6 +24,7 @@ from gemini.physics import (
     units,
 )
 from gemini.types.flows import Stream
+from gemini.types.fluid import Fluid
 from tests.fixtures import FIXTURES
 
 GOLDEN_VALUES = FIXTURES / "golden_values.json"
@@ -145,12 +146,9 @@ def _reservoir_estimate(inputs):
 
 def _reservoir_dp(inputs):
     """Evaluate hydrostatic, skin, flow and radial pressure terms with measured fluid data."""
-    parameters = _reservoir_parameters() | dict(
-        liquid_density=inputs["density"],
-        liquid_viscosity=inputs["viscosity"],
-        skin=inputs["skin_factor"],
-    )
+    parameters = _reservoir_parameters() | dict(skin=inputs["skin_factor"])
     reservoir = configured(ProductionReservoir, parameters)
+    reservoir.fluid = Fluid(density=inputs["density"], viscosity=inputs["viscosity"])
     outputs = reservoir(production_rate=inputs["flow"] * inputs["density"]).outputs
     return dict(
         Hydrostatic_dp=outputs.hydrostatic_pressure_drop,

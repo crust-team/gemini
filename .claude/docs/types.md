@@ -145,7 +145,25 @@ guard of the graph cache; numeric parameters are graph inputs by default.
 `BRINE` and `WATER` use the defaults of `gemini.physics.fluid.FluidProperties` (a frozen slots
 dataclass: numbers become `float`, bounds raise `PhysicsError`), the original
 constant-water numbers. `Fluid` carries salinity, dissolved CO2 and free-gas mass fractions.
-Density, viscosity, heat capacity and conductivity overrides are validated and immutable.
+`density`, `viscosity`, `specific_heat` and `thermal_conductivity` are validated and immutable, take
+unit strings (`"0.4 mPa*s"`) and describe the liquid of a brine or water fluid and the gas of a gas
+fluid; a mixture density is a computed property, never an input. Reservoirs hold no density or
+viscosity: the fluid owns its properties. A value that does not fit raises `ValidationError`.
+
+Free gas is `gas_liquid_ratio` (normal m3 of free gas per m3 of produced liquid, at 0 degC and
+1.01325 bar a, unit `Nm3/m3`) with `gas_composition` (mole fractions summing to one; species `CH4`,
+`C2H6`, `C3H8`, `CO2`, `N2`), which derive `gas_mass_fraction` through `physics/gas.py`, or
+`gas_mass_fraction` directly; giving both raises `ValidationError`. A dump leaves the derived
+fraction out, so it reads back.
+
+`co2_mass_fraction` is the CO2 dissolved in the liquid, which corrosion reads. It is a different
+thing from the CO2 in the free gas, which is part of `gas_composition` and which burners carry
+through to `co2_emission`.
+
+`Fluid(kind="gas", gas_composition=...)` is a gas fluid, what the `gas` outlet of a `Degasser`
+carries. `fluid.density_at(p, T)` is its ideal-gas density at a stream's `p` and `T`, floats, arrays
+or traced values, and `stream.volumetric_flow()` uses it; its `properties` snapshot holds the
+density at normal conditions.
 `fluid.properties(p, T)` returns a `FluidProperties` snapshot cached by the complete Fluid value.
 No string registry, registration side effects or string compatibility adapters remain. Salt
 concentration alone does not change properties under `constant_stp`; supply measured property

@@ -39,7 +39,7 @@ def test_invalid_inputs_raise():
     with raises(gm.errors.ValidationError, "invalid_design", match="expected the same fluid"):
         Mixer()(first_in=HOT, second_in=COLD.with_(fluid=WATER))
     with raises(gm.errors.ValidationError, "invalid_design"):
-        Mixer()(first_in=HOT, second_in=COLD.with_(fluid=Fluid(liquid_density=1050)))
+        Mixer()(first_in=HOT, second_in=COLD.with_(fluid=Fluid(density=1050)))
     with pytest.raises(gm.errors.PhysicsError, match="mixer: first_in.m_dot = -1"):
         Mixer()(first_in=HOT.with_(m_dot=-1), second_in=COLD)
 

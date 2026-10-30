@@ -32,8 +32,8 @@ Shared conventions, stated once here and not repeated per module:
   are the graph breaks, which run tick by tick: `ThermalDecline`, `AquiferStorage`,
   `BoreholeField`, `ThermalStorage`, `IceStorage` and `PIDController`, stateful until `scan` exists
   (see [native-engine.md](native-engine.md)). Structural parameters, fixed in a trace and a graph
-  cache guard, are `ProductionReservoir`/`InjectionReservoir` `drainage_radius`, `liquid_density`
-  and `liquid_viscosity`, `ProductionWell.esp_depth` and `Degasser.separation_efficiency`.
+  cache guard, are `ProductionReservoir`/`InjectionReservoir` `drainage_radius`,
+  `ProductionWell.esp_depth` and `Degasser.separation_efficiency`.
 
 ## Overview
 
@@ -502,7 +502,7 @@ Filter with a quadratic clean-filter pressure loss and a clogging diagnostic.
 import gemini as gm
 from gemini.modules import Filter
 
-brine = gm.Fluid(liquid_density=1068)
+brine = gm.Fluid(density=1068)
 result = Filter()(inlet=gm.Stream(flow="149 m3/h", T="80 C", p="5 bar", fluid=brine))
 assert round(result.outputs.get("pressure_drop", unit="bar"), 9) == 0.016
 ```
@@ -813,7 +813,7 @@ result = heat_pump(
 )
 assert round(result.outputs.cop, 4) == 3.6015 and round(result.outputs.electricity) == 234202
 
-water = gm.Fluid(kind="water", liquid_density=1000, specific_heat=4181)
+water = gm.Fluid(kind="water", density=1000, specific_heat=4181)
 lorenz = HeatPump().update_params(mode="heating", capacity="10 MW", cop_model="lorenz")
 result = lorenz(
     source_in=gm.Stream(flow="20 m3/h", T="40 C", p="3 bar", fluid=water),
@@ -1000,8 +1000,7 @@ the injected stream as a sink.
   `wellbore_radius` (> 0), all required; `productivity_index` (required by the production
   reservoir) and `injectivity_index` (required by the injection reservoir), both
   `ProductivityIndex | None` in m3/s/Pa, calibratable; `skin` (default 0, calibratable);
-  `liquid_density`, `liquid_viscosity` (default `None`; when set they override the module
-  fluid); `decline_threshold` (default 0.15); `role` (fixed by the class).
+  `decline_threshold` (default 0.15); `role` (fixed by the class).
 - **Controls**: `ProductionReservoir.production_rate` (`MassFlow`, >= 0).
 - **Outputs**: `bottomhole_pressure` (soft sensor), `drawdown` (production), `overpressure`
   (injection), `flow_pressure_drop`, `skin_pressure_drop`, `radial_bottomhole_pressure` (`None` without a drainage

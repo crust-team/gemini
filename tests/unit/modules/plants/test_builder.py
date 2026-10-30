@@ -60,9 +60,9 @@ def test_an_unconnected_port_is_reported_with_its_path():
     plant.add("Degasser", "degasser")
     plant.connect("feed", "degasser.inlet")
     plant.connect("degasser.liquid", "product")
-    assert [
-        (item["path"], item["code"]) for item in plant.validate(on_error="record")
-    ] == [("degasser.gas", "unconnected_port")]
+    assert [(item["path"], item["code"]) for item in plant.validate(on_error="record")] == [
+        ("degasser.gas", "unconnected_port")
+    ]
     with raises(ValidationError, "unconnected_port"):
         plant.validate()
     with raises(ValidationError, "unconnected_port") as caught:
