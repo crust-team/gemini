@@ -66,8 +66,8 @@ def test_bindable_lists_what_a_module_accepts(exchanger):
 def test_bindings_check_units_against_the_declaration(exchanger):
     """A column in a unit of another dimension is refused; a fitting one is stored."""
     with raises(ValidationError, "invalid_unit"):
-        exchanger.set_bindings("", {"measured": {"duty": {"column": "d", "unit": "bar"}}})
-    exchanger.set_bindings("", {"measured": {"duty": {"column": "d", "unit": "kW"}}})
+        exchanger.set_bindings("", {"duty": {"column": "d", "unit": "bar"}})
+    exchanger.set_bindings("", {"duty": {"column": "d", "unit": "kW"}})
     assert exchanger.bindings[""].measured["duty"].unit == "kW"
     exchanger.set_bindings("", {})
     assert exchanger.bindings == {}
@@ -76,11 +76,66 @@ def test_bindings_check_units_against_the_declaration(exchanger):
 def test_bindings_reject_unknown_names_and_fields(exchanger):
     """Names and inlet fields are checked."""
     with raises(ValidationError, "unknown_name"):
-        exchanger.set_bindings("", {"measured": {"dutty": {"column": "d", "unit": "kW"}}})
+        exchanger.set_bindings("", {"dutty": {"column": "d", "unit": "kW"}})
     with raises(ValidationError, "unknown_name"):
-        exchanger.set_bindings("", {"inlets": {"hot_in": {"q": {"column": "d", "unit": "K"}}}})
+        exchanger.set_bindings("", {"hot_in.q": {"column": "d", "unit": "K"}})
     with raises(ValidationError, "invalid_binding"):
-        exchanger.set_bindings("", {"measured": {"duty": {"column": "d"}}})
+        exchanger.set_bindings("", {"duty": {"column": "d"}})
+
+
+def test_a_key_is_a_declaration_name_and_a_value_a_column(exchanger):
+    """A name finds its section; a column alone has the declaration's SI unit."""
+    exchanger.set_bindings("", {"duty": "q", "hot_in.m_dot": {"column": "flow", "unit": "m3/h"}})
+    bound = exchanger.bindings[""]
+    assert bound.measured["duty"].column == "q" and bound.measured["duty"].unit == "W"
+    assert bound.inlets["hot_in"]["m_dot"].unit == "m3/h"
+
+
+def test_each_kind_of_declaration_binds_by_its_name():
+    """Controls, boundaries, outputs, states and inlet fields need no section."""
+    tank = gm.modules.ThermalStorage()
+    control = next(iter(tank._controls), None)
+    state = next(iter(tank._states))
+    output = next(iter(tank._outputs))
+    port = next(iter(tank._inlets))
+    keys = [key for key in (control, state, output, f"{port}.T") if key]
+    tank.set_bindings("", {key: f"column_{index}" for index, key in enumerate(keys)})
+    bound = tank.bindings[""]
+    assert state in bound.state and output in bound.measured and "T" in bound.inlets[port]
+
+
+def test_the_section_form_is_refused(exchanger):
+    """Only the flat form is read: the old key is an unknown name, and says what is valid."""
+    with raises(ValidationError, "unknown_name", match="unknown name 'measured'.*duty") as caught:
+        exchanger.set_bindings("", {"measured": {"duty": "d"}})
+    assert caught.value.path == "measured"
+
+
+def test_a_name_declared_twice_raises_and_names_the_clash(exchanger):
+    """No shipped module has one; the resolver refuses to guess."""
+    exchanger._controls["duty"] = exchanger._outputs["duty"]
+    with raises(ValidationError, "invalid_binding", match="'duty' is declared as controls and"):
+        exchanger.set_bindings("", {"duty": "d"})
+    del exchanger._controls["duty"]
+
+
+def test_bindings_are_not_a_list(exchanger):
+    """Anything but a mapping is refused."""
+    with raises(ValidationError, "invalid_binding"):
+        exchanger.set_bindings("", ["duty"])
+
+
+def test_flat_writes_the_column_alone_when_the_unit_is_the_declared_one(exchanger):
+    """A file stays readable; a column in another unit keeps it."""
+    bound = design.sectioned(
+        exchanger, {"duty": "q", "effectiveness": "e", "hot_in.T": {"column": "t", "unit": "degC"}}
+    )
+    assert design.flat(exchanger, bound) == {
+        "duty": "q",
+        "effectiveness": "e",
+        "hot_in.T": {"column": "t", "unit": "degC"},
+    }
+    assert design.flat(None, bound)["duty"] == {"column": "q", "unit": "W"}
 
 
 def test_a_volume_flow_column_fits_a_mass_flow_inlet_field():

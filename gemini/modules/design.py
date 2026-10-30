@@ -6,6 +6,7 @@ that module and a (possibly dotted) parameter name; values are validated by thei
 so unit strings are accepted and stored in SI.
 """
 
+from collections.abc import Mapping
 from copy import deepcopy
 
 from pydantic import ValidationError as PydanticError
@@ -13,7 +14,7 @@ from pydantic_core import to_jsonable_python
 
 from gemini.errors import ValidationError
 from gemini.physics import units
-from gemini.types.bindings import DatedParams, ModuleBindings
+from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from gemini.types.flows import STREAM_FIELDS
 from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import close_matches, did_you_mean, join_names
@@ -21,6 +22,14 @@ from gemini.utils.time import EARLIEST, to_utc
 
 FIELD_UNITS = {"m_dot": ("kg/s", "m3/s"), "T": ("K",), "p": ("Pa",)}
 """The SI units a column bound to a stream field may have; a volume flow becomes mass flow."""
+
+NAMED = {
+    "controls": "_controls",
+    "boundaries": "_boundaries",
+    "measured": "_outputs",
+    "state": "_states",
+}
+"""The sections a plain name binds, each with the declarations of a module that hold them."""
 
 
 def _date(item):
@@ -122,29 +131,75 @@ def bindable(module, path):
     }
 
 
-def _fits(unit, accepted):
-    """Return whether ``unit`` converts to one of the SI units in ``accepted`` (``None``: any)."""
-    return accepted is None or units.si_unit(unit) in accepted
+def _flat_names(target):
+    """Return every key a binding of ``target`` may have, each a declaration name."""
+    names = [name for section in NAMED for name in getattr(target, NAMED[section])]
+    return names + [f"{port}.{field}" for port in target._inlets for field in STREAM_FIELDS]
 
 
-def _check_name(section, name, valid):
-    if name not in valid:
+def _unknown(target, key):
+    """Return the error of a binding key that ``target`` does not declare."""
+    valid = _flat_names(target)
+    return ValidationError(
+        f"bindings: unknown name {key!r}; valid: {join_names(valid)}{did_you_mean(key, valid)}",
+        path=key,
+        suggestions=close_matches(key, valid),
+        code="unknown_name",
+    )
+
+
+def _section_of(target, key):
+    """Return the section that declares the name ``key``; a clash names both."""
+    found = [section for section, owner in NAMED.items() if key in getattr(target, owner)]
+    if not found:
+        raise _unknown(target, key)
+    if len(found) > 1:
         raise ValidationError(
-            f"{section}: unknown name {name!r}; valid: {join_names(valid)}"
-            f"{did_you_mean(name, valid)}",
-            path=f"{section}.{name}",
-            suggestions=close_matches(name, valid),
-            code="unknown_name",
+            f"bindings: {key!r} is declared as {' and '.join(found)} of {target.path}; "
+            "expected a name unique within the module",
+            path=key,
+            code="invalid_binding",
         )
+    return found[0]
 
 
-def _check_unit(path, binding, accepted):
-    if not _fits(binding.unit, accepted):
-        raise ValidationError(
-            f"{path}.unit: unit = {binding.unit!r}; expected a unit of {join_names(accepted)}",
-            path=f"{path}.unit",
-            code="invalid_unit",
-        )
+def _binding(key, value, unit):
+    """Return the binding of a column name, in ``unit``, or of ``{column, unit}``."""
+    if isinstance(value, str):
+        return Binding(column=value, unit=unit)
+    try:
+        return Binding.model_validate(value)
+    except PydanticError as error:
+        raise ValidationError(f"bindings: {error}", path=key, code="invalid_binding") from error
+
+
+def _add_named(target, bound, key, value):
+    """Add the binding of a control, boundary, measured output or state."""
+    section = _section_of(target, key)
+    declared = getattr(target, NAMED[section])[key].unit
+    binding = _binding(key, value, declared or "-")
+    if not _fits(binding.unit, _accepted(declared, section)):
+        raise _wrong_unit(key, binding, _accepted(declared, section))
+    getattr(bound, section)[key] = binding
+
+
+def _add_field(target, bound, key, value):
+    """Add the binding of an inlet field, ``key`` being ``port.field``."""
+    port, _, field = key.rpartition(".")
+    if port not in target._inlets or field not in FIELD_UNITS:
+        raise _unknown(target, key)
+    binding = _binding(key, value, FIELD_UNITS[field][0])
+    if not _fits(binding.unit, FIELD_UNITS[field]):
+        raise _wrong_unit(key, binding, FIELD_UNITS[field])
+    bound.inlets.setdefault(port, {})[field] = binding
+
+
+def _wrong_unit(key, binding, accepted):
+    return ValidationError(
+        f"{key}.unit: unit = {binding.unit!r}; expected a unit of {join_names(accepted)}",
+        path=f"{key}.unit",
+        code="invalid_unit",
+    )
 
 
 def _accepted(declared, section):
@@ -155,41 +210,57 @@ def _accepted(declared, section):
     return (declared, "m3/s") if volumetric else (declared,)
 
 
-def _check_section(section, bound, declarations):
-    for name, binding in bound.items():
-        _check_name(section, name, declarations)
-        _check_unit(f"{section}.{name}", binding, _accepted(declarations[name].unit, section))
+def _fits(unit, accepted):
+    """Return whether ``unit`` converts to one of the SI units in ``accepted`` (``None``: any)."""
+    return accepted is None or units.si_unit(unit) in accepted
 
 
-def _check_inlets(bound, inlets):
-    for port, fields in bound.items():
-        _check_name("inlets", port, inlets)
-        for field_name, binding in fields.items():
-            _check_name(f"inlets.{port}", field_name, FIELD_UNITS)
-            _check_unit(f"inlets.{port}.{field_name}", binding, FIELD_UNITS[field_name])
+def sectioned(target, bindings):
+    """Return the ``ModuleBindings`` of the flat ``bindings``, names and units checked.
+
+    A key is a control, boundary, measured output or state of the module, or ``port.field`` of an
+    inlet. A value is a column name, whose unit comes from the run input's metadata or else the
+    declaration's SI unit, or ``{column, unit}``.
+    """
+    if not isinstance(bindings, Mapping):
+        raise ValidationError(
+            f"bindings = {type(bindings).__name__}; expected a mapping of names to columns",
+            code="invalid_binding",
+        )
+    bound = ModuleBindings()
+    for key, value in bindings.items():
+        add = _add_field if "." in key else _add_named
+        add(target, bound, key, value)
+    return bound
 
 
-def _parsed_bindings(bindings):
-    try:
-        return ModuleBindings.model_validate(bindings)
-    except PydanticError as error:
-        raise ValidationError(f"bindings: {error}", code="invalid_binding") from error
+def _stored(binding, unit):
+    """Return a binding as a file holds it: the column alone when ``unit`` is its unit."""
+    return binding.column if binding.unit == unit else binding.model_dump()
+
+
+def flat(target, bound):
+    """Return the flat form of the ``ModuleBindings`` of ``target``, or of no module (``None``)."""
+    result = {}
+    for section, owner in NAMED.items():
+        declarations = getattr(target, owner, {})
+        for name, binding in getattr(bound, section).items():
+            declaration = declarations.get(name)
+            unit = declaration.unit if declaration is not None else None
+            result[name] = _stored(binding, unit or "-")
+    for port, fields in bound.inlets.items():
+        for field, binding in fields.items():
+            result[f"{port}.{field}"] = _stored(binding, FIELD_UNITS[field][0])
+    return result
 
 
 def set_bindings(module, path, bindings):
     """Replace the bindings of the module at ``path``, checking names and units; return ``module``.
 
-    ``bindings`` has the shape of ``ModuleBindings``: ``controls``, ``boundaries``, ``measured``
-    and ``state`` map a name to ``{column, unit}`` and ``inlets`` maps a port to its fields. A
-    binding whose unit does not convert to the unit of its declaration is refused.
+    ``bindings`` maps declaration names to columns (``sectioned``); a binding whose unit does not
+    convert to the unit of its declaration is refused.
     """
-    target = module.get_module(path)
-    parsed = _parsed_bindings(bindings)
-    _check_section("controls", parsed.controls, target._controls)
-    _check_section("boundaries", parsed.boundaries, target._boundaries)
-    _check_section("measured", parsed.measured, target._outputs)
-    _check_section("state", parsed.state, target._states)
-    _check_inlets(parsed.inlets, target._inlets)
+    parsed = sectioned(module.get_module(path), bindings)
     if parsed == ModuleBindings():
         module.bindings.pop(path, None)
     else:

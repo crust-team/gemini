@@ -57,17 +57,19 @@ class Plant(PortResolver, Module):
     def _type_label(self):
         return self._name
 
-    def add(self, kind, name=None, **params):
+    def add(self, kind, name=None, params=None):
         """Add a module of registry name or class ``kind`` and return it.
 
-        ``params`` are design values, unit strings accepted. ``name`` defaults to the snake case
-        type, numbered when taken; a dotted name adds into a group such as ``filters.hot``.
+        ``params`` is one dict of design values, the dict ``set_params`` takes: unit strings
+        accepted, dotted names for a composite. ``name`` defaults to the snake case type, numbered
+        when taken; a dotted name adds into a group such as ``filters.hot``.
         """
         module, type_name = make_module(kind)
         key = self._free_name(name, type_name)
         baseline = writer.baseline_of(module)
-        module.set_params("", params)
-        self._attach(key, module, dict(params), baseline)
+        stated = dict(params or {})
+        module.set_params("", stated)
+        self._attach(key, module, stated, baseline)
         return module
 
     def _attach(self, key, module, stated, baseline):

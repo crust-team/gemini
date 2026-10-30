@@ -109,13 +109,13 @@ def test_sections_are_checked_per_path(spec):
         spec,
         fluids={"nowhere": {}},
         boundary={"pipe": []},
-        bindings={"pipe": {"measured": {"nothing": {"column": "c", "unit": "W"}}}},
+        bindings={"pipe": {"nothing": {"column": "c", "unit": "W"}}},
         param_history={"pipe": [{"valid_from": "2020-01-01", "params": {"lenght": 1}}]},
     )
     assert {item["path"] for item in found} == {
         "fluids.nowhere",
         "boundary.pipe",
-        "bindings.pipe.measured.nothing",
+        "bindings.pipe.nothing",
         "param_history.pipe",
     }
 

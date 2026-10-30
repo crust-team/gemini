@@ -1,253 +1,90 @@
 {
   "bindings": {
     "": {
-      "boundaries": {},
-      "controls": {},
-      "inlets": {
-        "secondary_in": {
-          "T": {
-            "column": "secondary_in.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "secondary_in.m_dot",
-            "unit": "m3/s"
-          }
-        }
-      },
-      "measured": {},
-      "state": {}
+      "secondary_in.T": "secondary_in.T",
+      "secondary_in.m_dot": {
+        "column": "secondary_in.m_dot",
+        "unit": "m3/s"
+      }
     },
     "degasser": {
-      "boundaries": {},
-      "controls": {},
-      "inlets": {
-        "inlet": {
-          "T": {
-            "column": "degasser.inlet.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "degasser.inlet.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "degasser.inlet.p",
-            "unit": "Pa"
-          }
-        }
+      "inlet.T": "degasser.inlet.T",
+      "inlet.m_dot": {
+        "column": "degasser.inlet.m_dot",
+        "unit": "m3/s"
       },
-      "measured": {},
-      "state": {}
+      "inlet.p": "degasser.inlet.p"
     },
     "doublet.esp": {
-      "boundaries": {},
-      "controls": {
-        "frequency": {
-          "column": "doublet.esp.frequency",
-          "unit": "Hz"
-        }
+      "discharge_pressure": "doublet.esp.discharge_pressure",
+      "frequency": "doublet.esp.frequency",
+      "head": "doublet.esp.head",
+      "power": "doublet.esp.power",
+      "suction.T": "doublet.esp.suction.T",
+      "suction.m_dot": {
+        "column": "doublet.esp.suction.m_dot",
+        "unit": "m3/s"
       },
-      "inlets": {
-        "suction": {
-          "T": {
-            "column": "doublet.esp.suction.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "doublet.esp.suction.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "doublet.esp.suction.p",
-            "unit": "Pa"
-          }
-        }
-      },
-      "measured": {
-        "discharge_pressure": {
-          "column": "doublet.esp.discharge_pressure",
-          "unit": "Pa"
-        },
-        "head": {
-          "column": "doublet.esp.head",
-          "unit": "Pa"
-        },
-        "power": {
-          "column": "doublet.esp.power",
-          "unit": "W"
-        }
-      },
-      "state": {}
+      "suction.p": "doublet.esp.suction.p"
     },
     "doublet.injector": {
-      "boundaries": {},
-      "controls": {},
-      "inlets": {
-        "wellhead": {
-          "T": {
-            "column": "doublet.injector.wellhead.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "doublet.injector.wellhead.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "doublet.injector.wellhead.p",
-            "unit": "Pa"
-          }
-        }
+      "wellhead.T": "doublet.injector.wellhead.T",
+      "wellhead.m_dot": {
+        "column": "doublet.injector.wellhead.m_dot",
+        "unit": "m3/s"
       },
-      "measured": {},
-      "state": {}
+      "wellhead.p": "doublet.injector.wellhead.p"
     },
     "doublet.reservoir": {
-      "boundaries": {},
-      "controls": {
-        "production_rate": {
-          "column": "doublet.reservoir.production_rate",
-          "unit": "m3/s"
-        }
-      },
-      "inlets": {},
-      "measured": {},
-      "state": {}
+      "production_rate": {
+        "column": "doublet.reservoir.production_rate",
+        "unit": "m3/s"
+      }
     },
     "filters.cold": {
-      "boundaries": {},
-      "controls": {},
-      "inlets": {
-        "inlet": {
-          "T": {
-            "column": "filters.cold.inlet.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "filters.cold.inlet.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "filters.cold.inlet.p",
-            "unit": "Pa"
-          }
-        }
+      "inlet.T": "filters.cold.inlet.T",
+      "inlet.m_dot": {
+        "column": "filters.cold.inlet.m_dot",
+        "unit": "m3/s"
       },
-      "measured": {
-        "pressure_drop": {
-          "column": "filters.cold.pressure_drop",
-          "unit": "Pa"
-        }
-      },
-      "state": {}
+      "inlet.p": "filters.cold.inlet.p",
+      "pressure_drop": "filters.cold.pressure_drop"
     },
     "filters.hot": {
-      "boundaries": {},
-      "controls": {},
-      "inlets": {
-        "inlet": {
-          "T": {
-            "column": "filters.hot.inlet.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "filters.hot.inlet.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "filters.hot.inlet.p",
-            "unit": "Pa"
-          }
-        }
+      "inlet.T": "filters.hot.inlet.T",
+      "inlet.m_dot": {
+        "column": "filters.hot.inlet.m_dot",
+        "unit": "m3/s"
       },
-      "measured": {
-        "pressure_drop": {
-          "column": "filters.hot.pressure_drop",
-          "unit": "Pa"
-        }
-      },
-      "state": {}
+      "inlet.p": "filters.hot.inlet.p",
+      "pressure_drop": "filters.hot.pressure_drop"
     },
     "heat_exchanger": {
-      "boundaries": {},
-      "controls": {},
-      "inlets": {
-        "cold_in": {
-          "T": {
-            "column": "heat_exchanger.cold_in.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "heat_exchanger.cold_in.m_dot",
-            "unit": "m3/s"
-          }
-        },
-        "hot_in": {
-          "T": {
-            "column": "heat_exchanger.hot_in.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "heat_exchanger.hot_in.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "heat_exchanger.hot_in.p",
-            "unit": "Pa"
-          }
-        }
+      "cold_in.T": "heat_exchanger.cold_in.T",
+      "cold_in.m_dot": {
+        "column": "heat_exchanger.cold_in.m_dot",
+        "unit": "m3/s"
       },
-      "measured": {
-        "cold_out_T": {
-          "column": "heat_exchanger.cold_out_T",
-          "unit": "K"
-        },
-        "duty": {
-          "column": "heat_exchanger.duty",
-          "unit": "W"
-        },
-        "hot_out_T": {
-          "column": "heat_exchanger.hot_out_T",
-          "unit": "K"
-        },
-        "hot_pressure_drop": {
-          "column": "heat_exchanger.dp_hot",
-          "unit": "Pa"
-        }
+      "cold_out_T": "heat_exchanger.cold_out_T",
+      "duty": "heat_exchanger.duty",
+      "hot_in.T": "heat_exchanger.hot_in.T",
+      "hot_in.m_dot": {
+        "column": "heat_exchanger.hot_in.m_dot",
+        "unit": "m3/s"
       },
-      "state": {}
+      "hot_in.p": "heat_exchanger.hot_in.p",
+      "hot_out_T": "heat_exchanger.hot_out_T",
+      "hot_pressure_drop": "heat_exchanger.dp_hot"
     },
     "injection_pump": {
-      "boundaries": {},
-      "controls": {
-        "pressure_setpoint": {
-          "column": "injection_pump.pressure_setpoint",
-          "unit": "Pa"
-        }
+      "power": "injection_pump.power",
+      "pressure_setpoint": "injection_pump.pressure_setpoint",
+      "suction.T": "injection_pump.suction.T",
+      "suction.m_dot": {
+        "column": "injection_pump.suction.m_dot",
+        "unit": "m3/s"
       },
-      "inlets": {
-        "suction": {
-          "T": {
-            "column": "injection_pump.suction.T",
-            "unit": "K"
-          },
-          "m_dot": {
-            "column": "injection_pump.suction.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "injection_pump.suction.p",
-            "unit": "Pa"
-          }
-        }
-      },
-      "measured": {
-        "power": {
-          "column": "injection_pump.power",
-          "unit": "W"
-        }
-      },
-      "state": {}
+      "suction.p": "injection_pump.suction.p"
     }
   },
   "boundary": {

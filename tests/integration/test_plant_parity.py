@@ -22,9 +22,9 @@ ROWS = 24
 
 def _add_modules(plant, modules):
     for name, entry in modules.items():
-        plant.add(entry["type"], name, **entry.get("params", {}))
+        plant.add(entry["type"], name, params=entry.get("params", {}))
         for child, item in entry.get("modules", {}).items():
-            plant.add(item["type"], f"{name}.{child}", **item["params"])
+            plant.add(item["type"], f"{name}.{child}", params=item["params"])
 
 
 def _fill_sections(plant, spec):

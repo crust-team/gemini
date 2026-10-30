@@ -7,6 +7,7 @@ handwritten root writes its class as ``type`` and every parameter of its tree as
 """
 
 from contextlib import contextmanager
+from functools import partial
 
 from pydantic import ValidationError as PydanticError
 from pydantic_core import to_jsonable_python
@@ -14,7 +15,7 @@ from pydantic_core import to_jsonable_python
 from gemini.backends import runtime
 from gemini.errors import GeminiError, ValidationError
 from gemini.modules import design
-from gemini.types.bindings import DatedParams, ModuleBindings
+from gemini.types.bindings import DatedParams
 from gemini.types.fluid import Fluid
 from gemini.types.shapes import problem
 from gemini.utils.jsonable import to_plain
@@ -119,10 +120,13 @@ def _boundary(root):
 
 
 def _bindings(root, stated):
+    """Return the flat bindings of each path: stated while they still say the same."""
+    modules = dict(root.named_modules())
     result = {}
     for path, current in root.bindings.items():
-        kept = keep_stated(stated.get(path), current, ModuleBindings.model_validate)
-        result[path] = kept if kept is not None else current.model_dump(mode="json")
+        target = modules.get(path)
+        kept = keep_stated(stated.get(path), current, partial(design.sectioned, target))
+        result[path] = kept if kept is not None else design.flat(target, current)
     return result
 
 

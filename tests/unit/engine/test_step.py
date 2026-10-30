@@ -69,3 +69,29 @@ def test_parameter_stretches_follow_the_dated_transitions(fresh_plant, reference
     plan._dates = [TIME + pd.Timedelta(hours=1)]
     assert plan.parameter_stretches(ticks) == [(0, 2), (2, 4)]
     assert plan.parameter_stretches(ticks[:1]) == [(0, 1)]
+
+
+def _level_plant(binding):
+    """Return a valve whose control ``m_dot`` is bound as given."""
+    plant = Valve()
+    plant.set_bindings("", {"m_dot": binding})
+    return plant
+
+
+def test_a_column_alone_takes_the_unit_of_the_run_input_or_else_the_declared_one():
+    """The metadata of the dataset wins; without it the declaration's SI unit holds."""
+    plant = _level_plant("rate")
+    index = pd.date_range("2024-01-01", periods=2, freq="15min", tz="UTC")
+    frame = pd.DataFrame({"rate": [1.0, 2.0]}, index=index)
+    declared = BindingPlan(plant, gm.Dataset.from_frame(frame), "replay")
+    assert declared.twins[0].inputs()[0].binding.unit == "kg/s"
+    stated = gm.Dataset.from_frame(frame, units={"rate": "t/h"})
+    assert BindingPlan(plant, stated, "replay").twins[0].inputs()[0].binding.unit == "t/h"
+
+
+def test_a_stated_unit_is_the_one_used_without_metadata():
+    """``{column, unit}`` states the unit of the column."""
+    plant = _level_plant({"column": "rate", "unit": "t/h"})
+    index = pd.date_range("2024-01-01", periods=2, freq="15min", tz="UTC")
+    data = gm.Dataset.from_frame(pd.DataFrame({"rate": [1.0, 2.0]}, index=index))
+    assert BindingPlan(plant, data, "replay").twins[0].inputs()[0].binding.unit == "t/h"

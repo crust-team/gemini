@@ -207,3 +207,16 @@ def test_a_standalone_plant_path_is_its_snake_case_name():
     """The root path keeps the name the class-based plant had, in events and messages."""
     assert gm.Plant("DoubletHeatPlant").path == "doublet_heat_plant"
     assert gm.plants.get("DoubletHeatPlant").path == "doublet_heat_plant"
+
+
+def test_add_takes_one_dict_of_parameters_the_dict_of_set_params():
+    """Unit strings and dotted names, no keyword parameters."""
+    plant = gm.Plant("Params")
+    pipe = plant.add("Pipe", name="pipe", params={"length": "100 ft"})
+    assert pipe.length == pytest.approx(30.48)
+    doublet = plant.add("Doublet", name="d0", params={"reservoir.temperature": "87 degC"})
+    assert doublet.reservoir.temperature == pytest.approx(360.15)
+    plant.set_params("pipe", {"length": "200 ft"})
+    assert pipe.length == pytest.approx(60.96)
+    with pytest.raises(TypeError, match="length"):
+        plant.add("Pipe", name="other", length=5.0)

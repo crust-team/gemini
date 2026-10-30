@@ -584,7 +584,7 @@
  "schemas": {
   "check.schema.json": "8a57d8429749d44399831d8dcedf4288c77070665171246949e55476f138c3b3",
   "module_description.schema.json": "1162b599326e224813c700484e8ca41bba0596fd9d0eced4be43ce8edee48a86",
-  "plant_spec.schema.json": "b404fceb9c4124b68b96894ec446f2e73285424de87697d33857c0b7d8aa644e",
+  "plant_spec.schema.json": "54ac70e24e72ec4c91bfd73f1e4dc27181a9322f57732b49a4d4340f3de5f4ac",
   "problem.schema.json": "98fbbd71c3cdb8b5c55b3cca2d2829999ab8665e4eb7dd1062fcc77d970383b4",
   "profile.schema.json": "1d516189feaf3a16f2ef7090defeebcde7adfa7b0b509e50fdb577db138531ce",
   "results_summary.schema.json": "733213574165c3f2dc0176924aeb6eb350c38a75864b9dd1d146353fa442edf8",

@@ -29,7 +29,9 @@ print(plant.summary())
 print(plant.validate())
 ```
 
-`add(kind, name=None, **params)` takes a registry name or a class, and unit strings. `connect`
+`add(kind, name=None, params=None)` takes a registry name or a class and one dict of parameters,
+the dict `set_params` takes: unit strings accepted, dotted names for a composite
+(`params={"reservoir.temperature": "87 degC"}`). `connect`
 takes a handle, `"path.port"` or a module path. A module path picks the only free port of a fitting
 stream type; a port without a stream type fits anything. If several pairs fit, a `ValidationError`
 with code `ambiguous_port` lists them. A bare word that names no module is a plant port, as in
@@ -69,7 +71,7 @@ assert plant.to_spec() == spec
 | `name` | yes | plant name; `module.name` is its snake case |
 | `modules` | yes | `{id: {type, params}}`; a group is `{type: "ModuleDict", modules: {...}}` |
 | `connections` | yes | `[{source, target, kind?}]`, ends are `"path.port"` |
-| `bindings` | yes | `{path: {controls, boundaries, inlets, measured, state}}`, binding `{column, unit}` |
+| `bindings` | yes | `{path: {name: column}}`, flat; see [bindings](#parameters-by-date-and-bindings) |
 | `param_history` | yes | `{path: [{valid_from, params}]}`; one undated entry is the same as `params` and is not written |
 | `inlets`, `outlets` | no | `{plant port: "path.port"}` |
 | `outputs` | no | `{name: {"of": "path.output", "field"?}, {"sum": name} or {"ratio": [a, b]}}` |
@@ -151,5 +153,14 @@ plant.set_params("doublet.esp", {"stage_count": 14}, valid_from="2025-01-01")
 plant.params_at("doublet.esp", time="2024-06-01")
 plant.param_history("doublet.esp")
 plant.bindable("doublet.esp")
-plant.set_bindings("doublet.esp", {"controls": {"frequency": {"column": "esp_hz", "unit": "Hz"}}})
+plant.set_bindings("doublet.esp", {"frequency": "esp_hz"})
+plant.set_bindings("doublet.esp", {"frequency": {"column": "esp_rpm", "unit": "rpm"}})
+plant.set_bindings("doublet.esp", {"suction.p": {"column": "p_in", "unit": "bar"}})
 ```
+
+`set_bindings(path, bindings)` replaces the bindings of a module. A key is a declaration name: a
+control, boundary, measured output or state, which are unique within a module, or `port.field` of
+an inlet. A value is a column name, whose unit comes from the run input's metadata or else the
+declaration's SI unit, or `{column, unit}`. A name declared twice would raise `ValidationError`
+naming the clash; no shipped module has one. The plant file holds the same flat form and reads only
+that form: a section such as `controls` is an unknown name. `gm.plants.migrate` converts format 1.

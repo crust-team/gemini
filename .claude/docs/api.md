@@ -79,7 +79,7 @@ Three levels and one representation: see [plants.md](plants.md). The spec schema
 | Name | Returns | Status |
 | --- | --- | --- |
 | `gm.Plant(name)` | an empty plant, a normal composite `Module` | real |
-| `p.add(kind, name=None, **params)` | the added module; `kind` is a registry name or a class | real |
+| `p.add(kind, name=None, params=None)` | the added module; `kind` is a registry name or a class, `params` the dict `set_params` takes | real |
 | `p.connect(source, target, kind=None)` | nothing; `ValidationError` with candidates, see [plants.md](plants.md) | real |
 | `p.summary()` | text table | real |
 | `p.validate()` | `[{path, message, code, suggestions}]` | real |
@@ -104,7 +104,7 @@ On any plant, `path` being a dotted module path (`""` is the root):
 | `params_at(path, time=None)` | `{name: value}` in force at `time`, latest without one | real |
 | `param_history(path)` | `[{valid_from, params}]` | real |
 | `bindable(path)` | `{controls: [name], boundaries: [name], inlets: {port: [field]}, measured: [name], state: [name]}` | real |
-| `set_bindings(path, bindings)` | replaces them; binding is `{column, unit}`, units checked | real |
+| `set_bindings(path, bindings)` | replaces them; flat `{name: column}` or `{name: {column, unit}}`, `name` a declaration or `port.field`; units checked | real |
 | `get_module(path)`, `named_modules()` | a module, `(path, module)` pairs | real |
 | `save(path)`, `Module.load(path)` | writes or reads the spec as JSON | real |
 

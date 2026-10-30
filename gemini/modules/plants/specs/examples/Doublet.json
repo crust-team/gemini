@@ -279,78 +279,30 @@
   },
   "bindings": {
     "esp": {
-      "controls": {
-        "frequency": {
-          "column": "doublet.esp.frequency",
-          "unit": "Hz"
-        }
+      "frequency": "doublet.esp.frequency",
+      "head": "doublet.esp.head",
+      "discharge_pressure": "doublet.esp.discharge_pressure",
+      "power": "doublet.esp.power",
+      "suction.m_dot": {
+        "column": "doublet.esp.suction.m_dot",
+        "unit": "m3/s"
       },
-      "boundaries": {},
-      "inlets": {
-        "suction": {
-          "m_dot": {
-            "column": "doublet.esp.suction.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "doublet.esp.suction.p",
-            "unit": "Pa"
-          },
-          "T": {
-            "column": "doublet.esp.suction.T",
-            "unit": "K"
-          }
-        }
-      },
-      "measured": {
-        "head": {
-          "column": "doublet.esp.head",
-          "unit": "Pa"
-        },
-        "discharge_pressure": {
-          "column": "doublet.esp.discharge_pressure",
-          "unit": "Pa"
-        },
-        "power": {
-          "column": "doublet.esp.power",
-          "unit": "W"
-        }
-      },
-      "state": {}
+      "suction.p": "doublet.esp.suction.p",
+      "suction.T": "doublet.esp.suction.T"
     },
     "injector": {
-      "controls": {},
-      "boundaries": {},
-      "inlets": {
-        "wellhead": {
-          "m_dot": {
-            "column": "doublet.injector.wellhead.m_dot",
-            "unit": "m3/s"
-          },
-          "p": {
-            "column": "doublet.injector.wellhead.p",
-            "unit": "Pa"
-          },
-          "T": {
-            "column": "doublet.injector.wellhead.T",
-            "unit": "K"
-          }
-        }
+      "wellhead.m_dot": {
+        "column": "doublet.injector.wellhead.m_dot",
+        "unit": "m3/s"
       },
-      "measured": {},
-      "state": {}
+      "wellhead.p": "doublet.injector.wellhead.p",
+      "wellhead.T": "doublet.injector.wellhead.T"
     },
     "reservoir": {
-      "controls": {
-        "production_rate": {
-          "column": "doublet.reservoir.production_rate",
-          "unit": "m3/s"
-        }
-      },
-      "boundaries": {},
-      "inlets": {},
-      "measured": {},
-      "state": {}
+      "production_rate": {
+        "column": "doublet.reservoir.production_rate",
+        "unit": "m3/s"
+      }
     }
   },
   "param_history": {

@@ -4,6 +4,24 @@ from gemini.modules import registry
 from gemini.modules.plants.factory import GROUPS
 
 SECTION = {"type": "object", "additionalProperties": {"type": "object"}}
+BINDINGS = {
+    "type": "object",
+    "description": (
+        "Flat bindings of one module: a control, boundary, measured output or state name, or "
+        "port.field of an inlet, to a column name or {column, unit}."
+    ),
+    "additionalProperties": {
+        "anyOf": [
+            {"type": "string"},
+            {
+                "type": "object",
+                "required": ["column", "unit"],
+                "additionalProperties": False,
+                "properties": {"column": {"type": "string"}, "unit": {"type": "string"}},
+            },
+        ]
+    },
+}
 PORT = {"type": "string", "pattern": r"^[^.\s]+(\.[^.\s]+)+$"}
 
 
@@ -67,11 +85,11 @@ def spec_schema():
             "outputs": {"type": "object", "additionalProperties": _output()},
             "fluids": SECTION,
             "boundary": SECTION,
-            "bindings": SECTION,
+            "bindings": {"type": "object", "additionalProperties": {"$ref": "#/$defs/bindings"}},
             "param_history": {
                 "type": "object",
                 "additionalProperties": {"type": "array", "items": {"type": "object"}},
             },
         },
-        "$defs": {"module": _module()},
+        "$defs": {"module": _module(), "bindings": BINDINGS},
     }

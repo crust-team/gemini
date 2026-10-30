@@ -24,7 +24,7 @@ def test_fluids_bindings_and_history_round_trip():
     """Non-default sections are written and read back."""
     exchanger = gm.modules.HeatExchanger().update_params(thermal_conductance=1.0)
     exchanger.fluid = gm.WATER
-    exchanger.set_bindings("", {"measured": {"duty": {"column": "d", "unit": "kW"}}})
+    exchanger.set_bindings("", {"duty": {"column": "d", "unit": "kW"}})
     exchanger.set_params("", {"thermal_conductance": 2.0}, valid_from="2020-01-01")
     spec = exchanger.to_dict()
     assert spec["fluids"][""]["kind"] == "water" and "boundary" not in spec

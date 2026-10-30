@@ -4,9 +4,11 @@ from copy import deepcopy
 
 from gemini.backends import runtime
 from gemini.errors import GeminiError, ValidationError
+from gemini.modules import design
 from gemini.modules.plants import library, reader
 from gemini.modules.plants.builder import Plant
 from gemini.modules.serialization import FORMAT, SECTIONS, plain_value
+from gemini.types.bindings import ModuleBindings
 from gemini.types.fluid import Fluid
 from gemini.utils.strings import join_path
 
@@ -89,7 +91,13 @@ def _place(spec, path, params):
         raise _failed(f"module {path!r} is a group but has parameters", path=path)
 
 
-def _sections(entries):
+def _flat_bindings(plant, path, nested):
+    """Return the bindings of format 1, stored by section, in the flat form of format 2."""
+    target = plant._find_submodule(path) if plant is not None else None
+    return design.flat(target, ModuleBindings.model_validate(nested))
+
+
+def _sections(entries, plant=None):
     default = runtime.get_default_fluid()
     sections = {"fluids": {}, "boundary": {}, "bindings": {}, "param_history": {}}
     for path, entry in entries.items():
@@ -98,7 +106,8 @@ def _sections(entries):
         if entry.get("boundary"):
             sections["boundary"][path] = deepcopy(entry["boundary"])
         for key, value in entry.get("bindings", {}).items():
-            sections["bindings"][join_path(path, key)] = deepcopy(value)
+            bound = join_path(path, key)
+            sections["bindings"][bound] = _flat_bindings(plant, bound, value)
         history = entry.get("param_history", [])
         if len(history) != 1 or history[0].get("valid_from") is not None:
             sections["param_history"][path] = deepcopy(history)
@@ -131,7 +140,7 @@ def _structured(name, entries):
         if path:
             _place(spec, path, _changed(plant, path, entry.get("params", {})))
     kept = {key: value for key, value in spec.items() if key not in SECTIONS}
-    return kept | _sections(entries)
+    return kept | _sections(entries, plant)
 
 
 def _handwritten(name, entries):

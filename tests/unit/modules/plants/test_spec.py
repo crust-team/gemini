@@ -36,7 +36,7 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
         },
         "connections": [{"source": "pipe.outlet", "target": "valve.inlet"}],
         "inlets": {"feed": "pipe.inlet"},
-        "bindings": {"pipe": {"measured": {"heat_loss": {"column": "q", "unit": "kW"}}}},
+        "bindings": {"pipe": {"heat_loss": {"column": "q", "unit": "kW"}, "velocity": "v"}},
         "param_history": {
             "pipe": [
                 {"valid_from": "2020-01-01T00:00:00Z", "params": {"length": 30.48}},
@@ -83,10 +83,10 @@ def test_an_opened_plant_round_trips_its_nested_wiring():
 def test_params_set_since_and_validation_agree_with_the_builder():
     """``Plant.validate()`` is ``gm.plants.validate`` of its spec."""
     plant = gm.Plant("Same")
-    plant.add("Pipe", "pipe", length=5.0)
+    plant.add("Pipe", "pipe", params={"length": 5.0})
     assert plant.validate() == gm.plants.validate(plant.to_spec()) == []
     with pytest.raises(gm.errors.ValidationError):
-        plant.add("Pipe", "bad", length="5 bar")
+        plant.add("Pipe", "bad", params={"length": "5 bar"})
 
 
 def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
