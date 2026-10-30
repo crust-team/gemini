@@ -102,6 +102,24 @@ it always removes at run end or failure, and records non-finite floats as `NaN`/
 
 ## Results
 
+`Results` is columnar. `Results.commit(chunk)` is the one way in: a `ResultChunk`
+(`gemini/core/engine/chunks.py`) holds the ticks of one evaluation, whatever their number, one
+included: `times`, `durations`, a `PathColumns` per module path and the per-tick `skips` and
+`errors`. `PathColumns(present, columns)` has a boolean mask of the ticks the path was evaluated
+for and one column per field, every column with one entry per tick (entries of absent ticks are
+ignored). A column is a NumPy array or, for objects such as list outputs and message strings, a
+Python list; `PathColumns.of(result, health, present)` takes them from a leaf `ModuleResult` and
+a `Health` of arrays or scalars (scalars broadcast) and computes `operating` from the flows.
+Columns are kept by reference. `Results.append(at, outputs, dt, skips, errors)` stays as the
+one-tick form for plain results: the row waits as cells and joins the columns as one chunk when a
+table, file or slice is wanted. Chunks are concatenated lazily in `to_frame`, which gives the
+columns and dtypes a table built row by row would have: columns in the order of first appearance
+(paths by the first tick they are present, then as given), a typed array that is present
+everywhere keeps its dtype, floats with an absent tick are `float64` with NaN, and every other
+column (booleans or integers with an absent tick, lists, strings, `None`) is read as pandas reads
+a column of row values with NaN for absent ones. Energy fields and `operating` are computed from
+the columns.
+
 `Results[path]` returns the series of one module path; `Results[path].field` is a pandas Series
 and an unknown path or field raises `UnknownResultError`. Only leaf results are stored: twins in
 replay and the leaves of the plant call in simulation, not root or composite formula outputs.

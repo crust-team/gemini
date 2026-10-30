@@ -6,6 +6,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from gemini.core.engine.chunks import (
+    PathColumns,
+    ResultChunk,
+    assemble,
+    first_present,
+    merge,
+    row_cells,
+    rows_chunk,
+)
 from gemini.core.physics import units
 from gemini.errors import UnitError, UnknownResultError
 from gemini.utils.files import decode_cells, encode_cells, read_json
@@ -90,44 +99,67 @@ def _add_skips(skip_counts, skips):
             target[reason] = target.get(reason, 0) + count
 
 
-def _operating(result):
-    """Return whether any port of a result carries flow; a module without ports is operating."""
-    flows = [*result.inlets.values(), *result.outlets.values()]
-    return any(flow.m_dot != 0 for flow in flows) if flows else True
-
-
 class Results:
-    """Collect finite timestep outputs, energy totals, health, errors and explicit skips."""
+    """Collect finite timestep outputs, energy totals, health, errors and explicit skips.
+
+    Results are columnar. ``commit(chunk)`` is the one way in: a ``ResultChunk`` of any length,
+    one tick included. Chunks concatenate lazily in ``to_frame``.
+    """
 
     def __init__(self):
         """Start an independent result table."""
-        self._rows, self._times, self._dt = [], [], []
+        self._chunks, self._order, self._pending = [], {}, []
+        self._times, self._dt = [], []
         self.skip_counts, self.errors = {}, []
         self._energy = set()
         self._skips = []
         self._frame = None
 
+    def commit(self, chunk):
+        """Commit a chunk of ticks: its columns, durations, skips and errors."""
+        self._flush()
+        self._register(chunk)
+        self._record(chunk.times, chunk.durations, chunk.skips, chunk.errors)
+
     def append(self, at, results, dt=0, skips=None, errors=None):
-        """Append one completed step; count leaf energy outputs once."""
+        """Commit one completed step of plain results.
+
+        The one-tick form of ``commit``: the row waits as plain cells and joins the columns as
+        one chunk with the rows appended after it, when a table, a file or a slice is wanted.
+        """
         row = {}
         for path, (result, health) in results.items():
-            row.update({(path, key): value for key, value in result.outputs.items()})
-            self._energy.update((path, key) for key in ENERGY_FIELDS if key in result.outputs)
-            row[path, "operating"] = _operating(result)
-            if health is not None:
-                row[path, "health_assessed"] = health.assessed
-                row[path, "health_score"] = health.score
-                row[path, "health_alarm"] = health.alarm
-                row[path, "health_message"] = health.message
-                for key, value in health.metrics.items():
-                    row[path, "health_metric_" + key] = value
-        self._times.append(at)
-        self._dt.append(dt)
-        self._rows.append(row)
-        self._skips.append(skips or {})
-        _add_skips(self.skip_counts, skips or {})
-        self.errors.extend(dict(error, timestamp=at.isoformat()) for error in (errors or []))
+            row.update(row_cells(path, result, health))
+        self._pending.append(row)
+        self._record([at], [dt], [skips or {}], [(0, error) for error in errors or []])
+
+    def _record(self, times, durations, skips, errors):
+        """Keep the times, durations, skips and errors of committed ticks."""
+        self._times.extend(times)
+        self._dt.extend(durations)
+        self._skips.extend(skips if skips is not None else [{}] * len(times))
+        for skipped in skips or ():
+            _add_skips(self.skip_counts, skipped)
+        for row, error in errors:
+            self.errors.append(dict(error, timestamp=times[row].isoformat()))
         self._frame = None
+
+    def _register(self, chunk):
+        """Store a chunk: its new columns, in the order a row-by-row build meets them."""
+        for key in chunk.column_order():
+            self._order.setdefault(key, None)
+        for path, table in chunk.tables.items():
+            if table.present.any():
+                self._energy.update((path, name) for name in ENERGY_FIELDS if name in table.columns)
+        self._chunks.append(chunk)
+
+    def _flush(self):
+        """Turn the appended rows into one chunk."""
+        if not self._pending:
+            return
+        rows, self._pending = self._pending, []
+        first = len(self._times) - len(rows)
+        self._register(rows_chunk(self._times[first:], self._dt[first:], rows, None, ()))
 
     def __len__(self):
         """Count completed ticks, including skipped or failed rows."""
@@ -146,13 +178,11 @@ class Results:
 
     def _cached_frame(self):
         """Return the shared table, built once after each append; callers must not change it."""
+        self._flush()
         if self._frame is None:
-            self._frame = pd.DataFrame(
-                self._rows, index=pd.DatetimeIndex(self._times, name="timestamp")
-            )
-            self._frame.columns = pd.MultiIndex.from_tuples(
-                self._frame.columns, names=["module_path", "field"]
-            )
+            self._chunks = [merge(self._chunks)] if self._chunks else []
+            chunk = self._chunks[0] if self._chunks else ResultChunk([], [], {})
+            self._frame = assemble(chunk, list(self._order), self._times)
         return self._frame
 
     def to_frame(self):
@@ -287,8 +317,10 @@ class Results:
             metadata["columns"], names=["module_path", "field"]
         )
         result = cls()
-        result._times = pd.to_datetime(frame.index, utc=True).to_pydatetime().tolist()
-        result._rows = frame.to_dict("records")
+        times = pd.to_datetime(frame.index, utc=True).to_pydatetime().tolist()
+        result._chunks = [_stored_chunk(frame, times, metadata)]
+        result._order = dict.fromkeys(frame.columns)
+        result._times = times
         result._dt, result.skip_counts = metadata["dt"], metadata["skip_counts"]
         result.errors = metadata["errors"]
         result._skips = metadata["skips"]
@@ -297,12 +329,14 @@ class Results:
 
     def slice(self, start):
         """Return the new rows of a live call, with matching durations and diagnostics."""
+        self._flush()
         result = Results()
-        result._times, result._rows, result._dt = (
-            self._times[start:],
-            self._rows[start:],
-            self._dt[start:],
-        )
+        if self._chunks:
+            self._chunks = [merge(self._chunks)]
+            chunk = self._chunks[0].sliced(start)
+            result._chunks = [chunk]
+            result._order = _sliced_order(self._order, chunk)
+        result._times, result._dt = self._times[start:], self._dt[start:]
         result._energy = self._energy.copy()
         result._skips = self._skips[start:]
         for skipped in result._skips:
@@ -310,3 +344,19 @@ class Results:
         times = {t.isoformat() for t in result._times}
         result.errors = [error for error in self.errors if error["timestamp"] in times]
         return result
+
+
+def _sliced_order(order, chunk):
+    """Return the columns of a slice: those of paths present in it, by first tick present."""
+    first = {path: first_present(table) for path, table in chunk.tables.items()}
+    kept = [key for key in order if first.get(key[0]) is not None]
+    return dict.fromkeys(sorted(kept, key=lambda key: first[key[0]]))
+
+
+def _stored_chunk(frame, times, metadata):
+    """Return the whole loaded table as one chunk: every cell present, one list per column."""
+    tables = {}
+    for position, (path, name) in enumerate(frame.columns):
+        table = tables.setdefault(path, PathColumns(np.ones(len(times), dtype=bool), {}))
+        table.columns[name] = frame.iloc[:, position].tolist()
+    return ResultChunk(list(times), list(metadata["dt"]), tables)
