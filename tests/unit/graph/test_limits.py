@@ -84,3 +84,11 @@ def test_inlet_limits_fail_the_row_with_the_stream_error(gain):
     }
     with pytest.raises(PhysicsRangeError, match="Stream: T = 0.0 K"):
         Interpreter(graph, backends.get("numpy")).run(feeds)
+
+
+def test_not_a_number_against_a_bound_fails_like_the_untraced_call(bounded):
+    """Not-a-number satisfies no bound, so it fails the row like an untraced call."""
+    with pytest.raises(DeclarationError, match="bounded"):
+        _run(bounded, [2e5], [np.nan])
+    with pytest.raises(DeclarationError):
+        bounded(inlet=gm.Stream(m_dot=1.0, T=300.0, p=2e5, fluid=gm.WATER), setpoint=np.nan)

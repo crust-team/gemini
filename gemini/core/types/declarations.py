@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, fields
 from datetime import datetime
+from functools import partial
 from typing import Annotated, Any
 
 from pydantic import Field, TypeAdapter, ValidationError
@@ -38,6 +39,67 @@ class _Unset:
 UNSET = _Unset()
 
 
+_MISS = object()
+"""Result of a quick check that cannot decide; the full validation then runs."""
+
+_PLAIN_KEYS = {
+    "type",
+    "minimum",
+    "exclusiveMinimum",
+    "maximum",
+    "exclusiveMaximum",
+    "quantity",
+    "unit",
+    "additive",
+}
+
+
+def _exact(kind, optional, value):
+    """Return ``value`` when it is exactly a ``kind`` (or ``None`` if optional), else ``_MISS``."""
+    if type(value) is kind or (value is None and optional):
+        return value
+    return _MISS
+
+
+def _bounded_float(ge, gt, le, lt, optional, value):
+    """Return ``value`` when it is a ``float`` within every bound (NaN never is), else ``_MISS``."""
+    if type(value) is not float:
+        return None if value is None and optional else _MISS
+    if (
+        (ge is None or value >= ge)
+        and (gt is None or value > gt)
+        and (le is None or value <= le)
+        and (lt is None or value < lt)
+    ):
+        return value
+    return _MISS
+
+
+def _miss(value):
+    return _MISS
+
+
+def _quick_check(schema, limits):
+    """Return the cheap check of the common case of a declared kind, from its JSON schema.
+
+    Only a plain number, flag or text (or one of them or ``None``) has one: it accepts the value
+    exactly as validation would, unchanged, and returns ``_MISS`` for everything else. The
+    check is a ``functools.partial`` of module functions, so a declaration still copies and
+    pickles.
+    """
+    variants = schema.get("anyOf", [schema])
+    values = [variant for variant in variants if variant.get("type") != "null"]
+    if len(values) != 1 or set(values[0]) - _PLAIN_KEYS:
+        return _miss
+    optional = len(values) < len(variants)
+    kind = values[0].get("type")
+    if kind == "number" and limits:
+        bounds = (limits.get(key) for key in ("ge", "gt", "le", "lt"))
+        return partial(_bounded_float, *bounds, optional)
+    exact = {"number": float, "boolean": bool, "string": str}.get(kind)
+    return partial(_exact, exact, optional) if exact else _miss
+
+
 def _adapter(kind, bounds):
     """Return the Pydantic validator of ``kind`` with optional field bounds."""
     return TypeAdapter(Annotated[kind, Field(**bounds)] if bounds else kind)
@@ -70,10 +132,14 @@ def _schema_metadata(adapter):
     return schema, quantity, value_schema.get("unit"), value_schema.get("additive", False)
 
 
+_IMMUTABLE = (float, int, bool, str, type(None))
+
+
 class Declaration:
     """Validated metadata attached to one module instance."""
 
     section = "declaration"
+    _validated_default = _MISS
 
     def __init__(self, kind, *, default=UNSET, description=None, **bounds):
         """Build validation metadata for one declared value."""
@@ -86,6 +152,7 @@ class Declaration:
         self._adapter = _adapter(kind, bounds)
         self._limits = None
         self.schema, self.quantity, self.unit, self.additive = _schema_metadata(self._adapter)
+        self._quick = _quick_check(self.schema, self.limits())
 
     @property
     def path(self):
@@ -121,8 +188,24 @@ class Declaration:
         self.owner, self.name = owner, name
         return self
 
+    def default_value(self):
+        """Return the validated default as a fresh value, validating it only the first time."""
+        if self._validated_default is _MISS:
+            self._validated_default = self.validate(deepcopy(self.default))
+        if type(self._validated_default) in _IMMUTABLE:
+            return self._validated_default
+        return deepcopy(self._validated_default)
+
     def validate(self, value):
-        """Convert public units and validate the resulting SI value."""
+        """Convert public units and validate the resulting SI value.
+
+        A plain value of the declared kind inside its bounds (an exact ``float``, ``bool`` or
+        ``str``, or ``None`` for an optional kind) returns unchanged without units or Pydantic;
+        any other value, and every failure, takes the full path below.
+        """
+        accepted = self._quick(value)
+        if accepted is not _MISS:
+            return accepted
         try:
             value = units.value_in_si(value, self.unit, self.path, self.quantity)
             return self._adapter.validate_python(value)

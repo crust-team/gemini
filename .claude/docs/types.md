@@ -35,7 +35,12 @@ tighten quantity defaults.
 
 `declaration.validate(value)` converts a unit string or `gm.Quantity(value, unit)` to the declared
 SI unit and then validates it with a Pydantic `TypeAdapter`; a failure raises
-`gm.errors.DeclarationError`. Plain numbers are taken as SI. Each declaration exposes `schema`
+`gm.errors.DeclarationError`. Plain numbers are taken as SI. A cheap check built once per
+declaration is tried first and accepts only the common case, returned unchanged: an exact `float`
+inside its bounds (NaN never is), an exact `bool` or `str` for those kinds, `None` for an optional
+kind. Everything else, and every failure, takes the full path, so accepted values, coercions and
+messages are those of the full path by construction. `declaration.default_value()` validates the
+default once and hands out a fresh copy of mutable values. Each declaration exposes `schema`
 (the Pydantic JSON schema of its kind), `quantity` and `unit`, read from the annotation; an
 optional kind describes its non-null variant and a list describes its items.
 

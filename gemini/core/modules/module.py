@@ -427,7 +427,7 @@ class Module:
             return self._input_values[name]
         declaration = (self._controls | self._boundaries)[name]
         if declaration.default is not UNSET:
-            return declaration.validate(deepcopy(declaration.default))
+            return declaration.default_value()
         raise MissingValueError(
             f"{declaration.path}: {declaration.section} {name!r} has no value "
             f"[{declaration.unit or '-'}]"
@@ -985,9 +985,7 @@ class Module:
 
     def _initial_states(self):
         """Return the validated initial value of every declared state."""
-        return {
-            name: state.validate(deepcopy(state.default)) for name, state in self._states.items()
-        }
+        return {name: state.default_value() for name, state in self._states.items()}
 
     def _call_states(self, step):
         """Return the state values one call starts from, or ``None`` without declared states."""

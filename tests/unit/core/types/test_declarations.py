@@ -1,9 +1,11 @@
 """Ready-made declaration validation."""
 
 import copy
+import math
 import pickle
 from datetime import datetime, timezone
 
+import numpy as np
 import pytest
 
 from gemini.core.modules import Module
@@ -24,6 +26,7 @@ from gemini.core.types import (
     TemperatureDifference,
 )
 from gemini.core.types.bindings import DatedParams
+from gemini.core.types.declarations import _MISS
 from gemini.errors import DeclarationError
 
 
@@ -159,3 +162,75 @@ def test_limits_come_from_the_quantity_and_the_bounds():
     assert Output(bool).limits() == {}
     assert Output(Ratio | None).accepts_none() and not Output(float).accepts_none()
     assert Inlet(Stream).limits() == {}
+
+
+SAMPLES = [
+    0.0,
+    1.5,
+    -1.0,
+    1e30,
+    -1e30,
+    5e-324,
+    math.nan,
+    math.inf,
+    -math.inf,
+    0,
+    3,
+    True,
+    False,
+    np.float64(2.0),
+    np.float32(2.0),
+    np.int64(2),
+    "5 bar",
+    "300 K",
+    "2.0",
+    "text",
+    "50 Hz",
+    None,
+    [1.0, 2.0],
+    [1.0, -1.0],
+    (1.0, 2.0),
+    {"m_dot": 1.0},
+    b"1",
+    1 + 2j,
+]
+
+
+def _outcome(call, value):
+    try:
+        result = call(value)
+    except Exception as error:
+        return type(error), str(error)
+    return type(result), "nan" if result != result else repr(result)
+
+
+def _full_path(declaration):
+    full = copy.deepcopy(declaration)
+    full._quick = lambda value: _MISS
+    return full
+
+
+def test_the_quick_check_gives_the_result_or_error_of_the_full_path(module_class):
+    """Every declared kind and bound: a sample is accepted unchanged or takes the full path."""
+    try:
+        module = module_class()
+    except Exception:
+        pytest.skip("not constructible without arguments")
+    seen = set()
+    for _, owner in module.named_modules():
+        for declaration in owner._declarations().values():
+            signature = (repr(declaration.kind), repr(declaration.bounds), declaration.unit)
+            if isinstance(declaration, (Inlet, Outlet)) or signature in seen:
+                continue
+            seen.add(signature)
+            full = _full_path(declaration)
+            edges = [
+                bound + step
+                for bound in declaration.limits().values()
+                for step in (0.0, 1e-9, -1e-9)
+            ]
+            for value in [*SAMPLES, *edges]:
+                assert _outcome(declaration.validate, value) == _outcome(full.validate, value), (
+                    declaration.path,
+                    value,
+                )
