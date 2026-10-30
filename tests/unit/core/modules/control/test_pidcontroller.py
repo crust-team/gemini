@@ -1,5 +1,8 @@
 """Discrete PID controller: start-of-step command, integral, derivative and anti-windup."""
 
+from types import SimpleNamespace
+
+import numpy as np
 import pytest
 
 import gemini as gm
@@ -7,6 +10,7 @@ from gemini.core.modules import Module
 from gemini.core.modules.control import PIDController
 from gemini.core.modules.storage import ThermalStorage
 from gemini.core.types import Boundary, Control, Inlet, Outlet, Output, Stream, Temperature
+from tests.fixtures.equivalence import assert_close
 
 
 def _controller(**changes):
@@ -155,3 +159,43 @@ def test_controller_steps_inside_a_composite():
     assert result.outputs.command == pytest.approx(0.1 * 5)
     assert state["controller"]["integral"] == pytest.approx(0.1 * 60 / 600 * 5)
     assert state["storage"]["temperature"] > 293.15
+
+
+PID_ROWS = [
+    (0.5, 1.0, 0.9, 0.2, 60),
+    (0.9, 1.0, 0.5, 0.2, 60),
+    (0.1, 0.0, 0.5, 0.2, 60),
+    (0.5, 1.0, 0.5, 0.0, 30),
+]
+"""Rows of integral, setpoint, measurement, previous error and previous step [s]."""
+
+
+@pytest.mark.parametrize("direction", ["reverse", "direct"])
+@pytest.mark.parametrize("integral_time", [100.0, None])
+def test_pid_command_and_advance_match_per_row(monkeypatch, direction, integral_time):
+    """The command, the anti-windup integral and the stored error on stacked rows equal per row."""
+    pid = _controller(
+        direction=direction, integral_time=integral_time, derivative_time=5.0, output_max=1.2
+    )
+
+    def load(*columns):
+        for name, column in zip(
+            ("integral", "setpoint", "measurement", "previous_error", "previous_step"), columns
+        ):
+            monkeypatch.setattr(PIDController, name, column, raising=False)
+
+    def advance(*columns):
+        load(*columns)
+        return pid._advance_states(SimpleNamespace(), None, 60)
+
+    def command(*columns):
+        load(*columns)
+        return pid._unclamped_command()
+
+    stacked = [np.array(column) for column in zip(*PID_ROWS)]
+    assert_close(command(*stacked), [command(*row) for row in PID_ROWS], "unclamped command")
+    expected = [advance(*row) for row in PID_ROWS]
+    actual = advance(*stacked)
+    for name in ("integral", "previous_error"):
+        assert_close(actual[name], [e[name] for e in expected], name)
+    assert actual["previous_step"] == 60

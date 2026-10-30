@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
@@ -46,6 +47,10 @@ class PIDController(Module):
     A parent composite calls the controller in ``forward`` with ``measurement=`` (and
     optionally ``setpoint=``) and uses ``result.outputs.command``; the controller is stateful, so
     call it once per step.
+
+    NOTE(refactor): the integral, the previous error and the previous step are states, and
+    ``previous_error`` being ``None`` before the first step is structural, so the module is a
+    graph break until ``scan`` exists; its arithmetic is written with ops all the same.
     """
 
     def __init__(self):
@@ -84,7 +89,7 @@ class PIDController(Module):
     def _compute_outputs(self, inlets, outlets):
         unclamped = self._unclamped_command()
         self.error = self._error()
-        self.command = min(self.output_max, max(self.output_min, unclamped))
+        self.command = ops.minimum(self.output_max, ops.maximum(self.output_min, unclamped))
         self.is_saturated = self.command != unclamped
 
     def _advance_states(self, inlets, outlets, dt):
@@ -93,10 +98,9 @@ class PIDController(Module):
         increment = 0.0
         if self.integral_time is not None:
             increment = self.proportional_gain * dt / self.integral_time * error
-        winding_up = unclamped >= self.output_max and increment > 0
-        winding_down = unclamped <= self.output_min and increment < 0
-        if winding_up or winding_down:
-            increment = 0.0
+        winding_up = ops.logical_and(unclamped >= self.output_max, increment > 0)
+        winding_down = ops.logical_and(unclamped <= self.output_min, increment < 0)
+        increment = ops.where(ops.logical_or(winding_up, winding_down), 0.0, increment)
         return {"integral": self.integral + increment, "previous_error": error, "previous_step": dt}
 
     def _error(self):
@@ -107,11 +111,15 @@ class PIDController(Module):
 
     def _unclamped_command(self):
         """Return K * e + I + D from the start-of-step states, before the output limits."""
-        if self.output_min >= self.output_max:
-            raise ConfigurationError(
-                f"{self.path}: output_min = {self.output_min}, output_max = {self.output_max}; "
-                "expected output_min < output_max"
-            )
+        ops.check(
+            self.output_min < self.output_max,
+            ConfigurationError,
+            "{path}: output_min = {output_min}, output_max = {output_max}; "
+            "expected output_min < output_max",
+            path=self.path,
+            output_min=self.output_min,
+            output_max=self.output_max,
+        )
         error = self._error()
         derivative = 0.0
         if self.previous_error is not None and self.previous_step is not None:
