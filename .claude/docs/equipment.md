@@ -1835,3 +1835,44 @@ assert round(rate * 3.6, 4) == 135.8666
 reservoir.production_rate = rate
 ```
 
+### Heating and cooling template
+
+`heating_cooling` (`gm.plants.from_template("heating_cooling", parameters)`, file
+`plants/templates/heating_cooling.json`) is the Challenge 2 plant: one integrated heating and
+cooling spec whose units switch on and off. It is a plain template: no value ships, every size is a
+`null` default, and the physics is that of the modules below.
+
+- **Wiring.** Brine: `doublet` (`Doublet`) -> `degasser` -> `filters.hot` -> `heat_exchanger` ->
+  [`heat_pump`, source side] -> `filters.cold` -> `injection_pump` -> back to the doublet (opened,
+  as in `DoubletHeatPlant`). Hot water, in series: `heating_return_pipe` -> `heat_exchanger` (cold
+  side) -> [`heat_pump`, sink side] -> [`peak_boiler`] -> [`absorption_chiller`, generator] ->
+  [`adsorption_chiller`, generator] -> `heating_supply_pipe` -> `heating_consumer`. Chilled water,
+  in series: `cooling_return_pipe` -> [`absorption_chiller`] -> [`adsorption_chiller`] ->
+  [`compression_chiller`, a `HeatPump` in cooling mode] -> `cooling_supply_pipe` ->
+  `cooling_consumer`. Brackets are optional units.
+- **Ports.** Plant inlets: `heating_return_in`, `cooling_return_in` and the heat-rejection circuits
+  `absorption_cooling_in`, `adsorption_cooling_in`, `compression_rejection_in` (each goes with its
+  chiller). Plant outlets: `heating_return_out`, `cooling_return_out`, `gas` and the three
+  rejection outlets. The outputs are the automatic sums (`electricity`, `fuel`, `heat_loss`,
+  `heat_supplied`, `heat_absorbed`).
+- **Parameters.** `<unit>.enabled` for `heat_pump`, `peak_boiler`, `absorption_chiller`,
+  `adsorption_chiller`, `compression_chiller` and `cooling_loop` (the chillers, the cooling pipes
+  and the cooling consumer together); sizes `heat_exchanger.ua`, the chiller, heat pump and boiler
+  capacities, `peak_boiler.fuel_type` and `efficiency`; length, diameter, elevation change and
+  `u_value` of the four network pipes; the consumers' return temperatures. Other values are set
+  with `plant.set_params` after `from_template`.
+- **Presets.** `heating_only` (boiler and heating consumer), `heating_absorption_cooling`,
+  `heating_heat_pump_compression_cooling` and `heating_full_cooling` (all three chillers) are the
+  template filled with the switches off that name them (`tests/unit/core/modules/plants/
+  test_templating.py` keeps them equal), as plain specs with the size parameters of what remains.
+- **Run check.** `tests/integration/test_heating_cooling.py` (slow tier) runs two simulate ticks
+  of every preset and of the full template with units off, with the stated assumptions in
+  `tests/fixtures/heating_cooling.py`: the `doublet_heat` example values for the brine side, the
+  examples of this document for the other modules, 48.95 kg/s of 21.7 degC heating return, boiler
+  setpoint 85 degC. The sorption chillers need a driving temperature of at least 80 degC
+  (absorption) and at most 90 degC (adsorption) in this series order.
+- **Left out.** Hot and cold storage (`ThermalStorage`, `IceStorage`) and every closed return loop
+  need a `kind: "state"` connection (the tank couples its charge and discharge circuits through its
+  state, so a tank on both circuits of one chain is a loop), and running such a plant raises
+  `NotImplementedYet` until scan exists. Heat-rejection loops through a `Cooler` are loops too, so
+  they are plant ports here. `CHP` is not wired; it would sit beside `peak_boiler`.

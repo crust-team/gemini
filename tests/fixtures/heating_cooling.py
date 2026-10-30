@@ -1,0 +1,126 @@
+"""Stated assumptions to run the heating and cooling template once.
+
+The template ships without values. These are assumptions of the test run, not defaults: the
+doublet, degasser, heat exchanger and injection pump take the ``doublet_heat`` example values; the
+others take the examples in ``.claude/docs/equipment.md``; flows, temperatures and demands are
+round numbers chosen so that every unit runs.
+"""
+
+import pandas as pd
+
+import gemini as gm
+from gemini.core.modules.plants import templating
+
+SIZES = {
+    "heat_exchanger.ua": 1e5,
+    "heat_pump.capacity": 2e6,
+    "peak_boiler.fuel_type": "gas",
+    "peak_boiler.capacity": 15e6,
+    "peak_boiler.efficiency": 0.9,
+    "absorption_chiller.capacity": 3e5,
+    "adsorption_chiller.capacity": 1e5,
+    "compression_chiller.capacity": 5e5,
+    "heating_consumer.minimum_return_temperature": 313.15,
+    "cooling_consumer.maximum_return_temperature": 289.15,
+    "cooling_consumer.dew_point_margin": 3.0,
+}
+"""Template parameters of the run; the pipes are added by ``with_pipes``."""
+
+CHILLER_FIT = dict(
+    characteristic_slope=20000,
+    minimum_driving_difference=10,
+    rejection_coefficient=2.2,
+    evaporator_coefficient=1.2,
+    auxiliary_power_ratio=0.01,
+)
+ADSORPTION_FIT = dict(
+    characteristic_slope=2000,
+    minimum_driving_difference=5,
+    rejection_coefficient=2.0,
+    evaporator_coefficient=1.0,
+    auxiliary_power_ratio=0.02,
+)
+PIPE_SIZE = {"length": 100.0, "inner_diameter": 0.3, "elevation_change": 0.0, "u_value": 0.8}
+PIPES = ("heating_return_pipe", "heating_supply_pipe", "cooling_return_pipe", "cooling_supply_pipe")
+INPUTS = {
+    "doublet.reservoir.production_rate": 42.36,
+    "doublet.esp.frequency": 55.484,
+    "injection_pump.pressure_setpoint": 4568500.0,
+    "heat_pump.temperature_setpoint": 353.15,
+    "peak_boiler.temperature_setpoint": 358.15,
+    "absorption_chiller.temperature_setpoint": 279.15,
+    "adsorption_chiller.temperature_setpoint": 283.15,
+    "compression_chiller.temperature_setpoint": 281.15,
+    "heating_consumer.heat_demand": 1e5,
+    **{f"{pipe}.ambient_temperature": 283.15 for pipe in PIPES},
+    "cooling_consumer.sensible_cooling_demand": 5e4,
+    "cooling_consumer.latent_cooling_demand": 1e4,
+    "cooling_consumer.indoor_temperature": 297.15,
+    "cooling_consumer.indoor_relative_humidity": 0.5,
+}
+ROOT_STREAMS = {
+    "heating_return_in": ("48.95 kg/s", "21.7 degC"),
+    "cooling_return_in": ("10 kg/s", "12 degC"),
+    "absorption_cooling_in": ("25 kg/s", "30 degC"),
+    "adsorption_cooling_in": ("10 kg/s", "27 degC"),
+    "compression_rejection_in": ("30 kg/s", "30 degC"),
+}
+BRINE_MODULES = ("doublet", "degasser", "heat_exchanger", "injection_pump")
+
+
+def with_pipes(parameters):
+    """Return ``parameters`` and the geometry and insulation of the four network pipes."""
+    pipes = {f"{pipe}.{name}": value for pipe in PIPES for name, value in PIPE_SIZE.items()}
+    return parameters | pipes
+
+
+def example_values():
+    """Return the ``doublet_heat`` example's module values and fluids as a partial spec."""
+    shared = gm.plants.example("DoubletHeatPlant").to_spec()
+    modules = {name: shared["modules"][name] for name in BRINE_MODULES}
+    return {"modules": modules, "fluids": shared["fluids"]}
+
+
+def filled_spec(name, flags=None):
+    """Return the spec of template ``name`` with the run's sizes and the example values."""
+    declared = templating.load(name)["parameters"]
+    sizes = {key: value for key, value in with_pipes(SIZES).items() if key in declared}
+    template = gm.plants.from_template(name, sizes | (flags or {})).to_spec()
+    values = example_values()
+    for module, entry in values["modules"].items():
+        template["modules"][module]["params"] = (
+            template["modules"][module]["params"] | entry["params"]
+        )
+    return template | {"fluids": values["fluids"]}
+
+
+def configure(plant):
+    """Set the remaining parameters, the persisted inputs and the root streams of ``plant``."""
+    modules = dict(plant.named_modules())
+    for path, fit in {
+        "absorption_chiller": CHILLER_FIT,
+        "adsorption_chiller": ADSORPTION_FIT,
+    }.items():
+        if path in modules:
+            modules[path].update_params(**fit)
+    declared = plant.inputs()
+    plant.set_inputs({path: value for path, value in INPUTS.items() if path in declared})
+    plant.boundary = {"root_inputs": _root_streams(plant)}
+    return plant
+
+
+def _root_streams(plant):
+    streams = {}
+    for port in plant.inlets():
+        flow, temperature = ROOT_STREAMS[port]
+        stream = gm.Stream(flow=flow, T=temperature, p="5 bar")
+        streams[port] = {"m_dot": stream.m_dot, "T": stream.T, "p": stream.p}
+    return streams
+
+
+def two_ticks():
+    """Return a two-row input in the run-input format: only the ticks matter here."""
+    index = pd.DatetimeIndex(["2024-07-01T00:00:00Z", "2024-07-01T01:00:00Z"], name="time")
+    return gm.Dataset.from_frame(
+        pd.DataFrame({"unused": [0.0, 0.0]}, index=index).reset_index(), time_column="time"
+    )

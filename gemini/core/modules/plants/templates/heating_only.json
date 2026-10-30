@@ -1,0 +1,175 @@
+{
+  "title": "Geothermal heating",
+  "description": "Doublet, heat exchanger, peak boiler and the heating consumer; no cooling.",
+  "purpose": "heating",
+  "parameters": {
+    "heat_exchanger.ua": {
+      "default": null,
+      "unit": "W/K",
+      "description": "Heat transfer conductance of the geothermal heat exchanger."
+    },
+    "peak_boiler.fuel_type": {
+      "default": null,
+      "unit": null,
+      "description": "Peak boiler fuel: 'gas' or 'electric'."
+    },
+    "peak_boiler.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Peak boiler capacity."
+    },
+    "peak_boiler.efficiency": {
+      "default": null,
+      "unit": "-",
+      "description": "Peak boiler efficiency."
+    },
+    "heating_supply_pipe.length": {
+      "default": null,
+      "unit": "m",
+      "description": "Length of the heating supply pipe."
+    },
+    "heating_supply_pipe.inner_diameter": {
+      "default": null,
+      "unit": "m",
+      "description": "Inner diameter of the heating supply pipe."
+    },
+    "heating_supply_pipe.elevation_change": {
+      "default": null,
+      "unit": "m",
+      "description": "Elevation gain of the heating supply pipe from inlet to outlet."
+    },
+    "heating_supply_pipe.u_value": {
+      "default": null,
+      "unit": "W/m2/K",
+      "description": "Overall heat transfer coefficient of the heating supply pipe to its surroundings."
+    },
+    "heating_return_pipe.length": {
+      "default": null,
+      "unit": "m",
+      "description": "Length of the heating return pipe."
+    },
+    "heating_return_pipe.inner_diameter": {
+      "default": null,
+      "unit": "m",
+      "description": "Inner diameter of the heating return pipe."
+    },
+    "heating_return_pipe.elevation_change": {
+      "default": null,
+      "unit": "m",
+      "description": "Elevation gain of the heating return pipe from inlet to outlet."
+    },
+    "heating_return_pipe.u_value": {
+      "default": null,
+      "unit": "W/m2/K",
+      "description": "Overall heat transfer coefficient of the heating return pipe to its surroundings."
+    },
+    "heating_consumer.minimum_return_temperature": {
+      "default": null,
+      "unit": "K",
+      "description": "Lowest return temperature the heat consumer accepts."
+    }
+  },
+  "optional": {},
+  "spec": {
+    "format": 2,
+    "name": "HeatingOnly",
+    "modules": {
+      "doublet": {
+        "type": "Doublet",
+        "params": {}
+      },
+      "degasser": {
+        "type": "Degasser",
+        "params": {}
+      },
+      "filters": {
+        "type": "ModuleDict",
+        "modules": {
+          "hot": {
+            "type": "Filter",
+            "params": {}
+          },
+          "cold": {
+            "type": "Filter",
+            "params": {}
+          }
+        }
+      },
+      "heat_exchanger": {
+        "type": "HeatExchanger",
+        "params": {}
+      },
+      "injection_pump": {
+        "type": "InjectionPump",
+        "params": {}
+      },
+      "heating_return_pipe": {
+        "type": "Pipe",
+        "params": {}
+      },
+      "peak_boiler": {
+        "type": "Boiler",
+        "params": {}
+      },
+      "heating_supply_pipe": {
+        "type": "Pipe",
+        "params": {}
+      },
+      "heating_consumer": {
+        "type": "HeatConsumer",
+        "params": {}
+      }
+    },
+    "connections": [
+      {
+        "source": "doublet.supply_out",
+        "target": "degasser.inlet"
+      },
+      {
+        "source": "degasser.liquid",
+        "target": "filters.hot.inlet"
+      },
+      {
+        "source": "filters.hot.outlet",
+        "target": "heat_exchanger.hot_in"
+      },
+      {
+        "source": "filters.cold.outlet",
+        "target": "injection_pump.suction"
+      },
+      {
+        "source": "injection_pump.discharge",
+        "target": "doublet.return_in"
+      },
+      {
+        "source": "heating_return_pipe.outlet",
+        "target": "heat_exchanger.cold_in"
+      },
+      {
+        "source": "heating_supply_pipe.outlet",
+        "target": "heating_consumer.supply_in"
+      },
+      {
+        "source": "heat_exchanger.cold_out",
+        "target": "peak_boiler.inlet"
+      },
+      {
+        "source": "heat_exchanger.hot_out",
+        "target": "filters.cold.inlet"
+      },
+      {
+        "source": "peak_boiler.outlet",
+        "target": "heating_supply_pipe.inlet"
+      }
+    ],
+    "inlets": {
+      "heating_return_in": "heating_return_pipe.inlet"
+    },
+    "outlets": {
+      "heating_return_out": "heating_consumer.return_out",
+      "gas": "degasser.gas"
+    },
+    "bindings": {},
+    "param_history": {}
+  }
+}

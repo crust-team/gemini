@@ -1,0 +1,283 @@
+{
+  "title": "Heat pump heating with compression cooling",
+  "description": "Heating with a heat pump on the brine and a peak boiler, and a compression chiller for cooling.",
+  "purpose": "both",
+  "parameters": {
+    "heat_exchanger.ua": {
+      "default": null,
+      "unit": "W/K",
+      "description": "Heat transfer conductance of the geothermal heat exchanger."
+    },
+    "heat_pump.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Heat pump capacity (cap on the useful duty)."
+    },
+    "peak_boiler.fuel_type": {
+      "default": null,
+      "unit": null,
+      "description": "Peak boiler fuel: 'gas' or 'electric'."
+    },
+    "peak_boiler.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Peak boiler capacity."
+    },
+    "peak_boiler.efficiency": {
+      "default": null,
+      "unit": "-",
+      "description": "Peak boiler efficiency."
+    },
+    "compression_chiller.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Compression chiller capacity (cap on the evaporator duty)."
+    },
+    "heating_supply_pipe.length": {
+      "default": null,
+      "unit": "m",
+      "description": "Length of the heating supply pipe."
+    },
+    "heating_supply_pipe.inner_diameter": {
+      "default": null,
+      "unit": "m",
+      "description": "Inner diameter of the heating supply pipe."
+    },
+    "heating_supply_pipe.elevation_change": {
+      "default": null,
+      "unit": "m",
+      "description": "Elevation gain of the heating supply pipe from inlet to outlet."
+    },
+    "heating_supply_pipe.u_value": {
+      "default": null,
+      "unit": "W/m2/K",
+      "description": "Overall heat transfer coefficient of the heating supply pipe to its surroundings."
+    },
+    "heating_return_pipe.length": {
+      "default": null,
+      "unit": "m",
+      "description": "Length of the heating return pipe."
+    },
+    "heating_return_pipe.inner_diameter": {
+      "default": null,
+      "unit": "m",
+      "description": "Inner diameter of the heating return pipe."
+    },
+    "heating_return_pipe.elevation_change": {
+      "default": null,
+      "unit": "m",
+      "description": "Elevation gain of the heating return pipe from inlet to outlet."
+    },
+    "heating_return_pipe.u_value": {
+      "default": null,
+      "unit": "W/m2/K",
+      "description": "Overall heat transfer coefficient of the heating return pipe to its surroundings."
+    },
+    "cooling_supply_pipe.length": {
+      "default": null,
+      "unit": "m",
+      "description": "Length of the cooling supply pipe."
+    },
+    "cooling_supply_pipe.inner_diameter": {
+      "default": null,
+      "unit": "m",
+      "description": "Inner diameter of the cooling supply pipe."
+    },
+    "cooling_supply_pipe.elevation_change": {
+      "default": null,
+      "unit": "m",
+      "description": "Elevation gain of the cooling supply pipe from inlet to outlet."
+    },
+    "cooling_supply_pipe.u_value": {
+      "default": null,
+      "unit": "W/m2/K",
+      "description": "Overall heat transfer coefficient of the cooling supply pipe to its surroundings."
+    },
+    "cooling_return_pipe.length": {
+      "default": null,
+      "unit": "m",
+      "description": "Length of the cooling return pipe."
+    },
+    "cooling_return_pipe.inner_diameter": {
+      "default": null,
+      "unit": "m",
+      "description": "Inner diameter of the cooling return pipe."
+    },
+    "cooling_return_pipe.elevation_change": {
+      "default": null,
+      "unit": "m",
+      "description": "Elevation gain of the cooling return pipe from inlet to outlet."
+    },
+    "cooling_return_pipe.u_value": {
+      "default": null,
+      "unit": "W/m2/K",
+      "description": "Overall heat transfer coefficient of the cooling return pipe to its surroundings."
+    },
+    "heating_consumer.minimum_return_temperature": {
+      "default": null,
+      "unit": "K",
+      "description": "Lowest return temperature the heat consumer accepts."
+    },
+    "cooling_consumer.maximum_return_temperature": {
+      "default": null,
+      "unit": "K",
+      "description": "Highest return temperature the cooling consumer accepts."
+    },
+    "cooling_consumer.dew_point_margin": {
+      "default": null,
+      "unit": "K",
+      "description": "Margin above the dew point the cooling consumer keeps its supply at."
+    }
+  },
+  "optional": {},
+  "spec": {
+    "format": 2,
+    "name": "HeatingHeatPumpCompressionCooling",
+    "modules": {
+      "doublet": {
+        "type": "Doublet",
+        "params": {}
+      },
+      "degasser": {
+        "type": "Degasser",
+        "params": {}
+      },
+      "filters": {
+        "type": "ModuleDict",
+        "modules": {
+          "hot": {
+            "type": "Filter",
+            "params": {}
+          },
+          "cold": {
+            "type": "Filter",
+            "params": {}
+          }
+        }
+      },
+      "heat_exchanger": {
+        "type": "HeatExchanger",
+        "params": {}
+      },
+      "heat_pump": {
+        "type": "HeatPump",
+        "params": {
+          "mode": "heating"
+        }
+      },
+      "injection_pump": {
+        "type": "InjectionPump",
+        "params": {}
+      },
+      "heating_return_pipe": {
+        "type": "Pipe",
+        "params": {}
+      },
+      "peak_boiler": {
+        "type": "Boiler",
+        "params": {}
+      },
+      "heating_supply_pipe": {
+        "type": "Pipe",
+        "params": {}
+      },
+      "heating_consumer": {
+        "type": "HeatConsumer",
+        "params": {}
+      },
+      "cooling_return_pipe": {
+        "type": "Pipe",
+        "params": {}
+      },
+      "compression_chiller": {
+        "type": "HeatPump",
+        "params": {
+          "mode": "cooling"
+        }
+      },
+      "cooling_supply_pipe": {
+        "type": "Pipe",
+        "params": {}
+      },
+      "cooling_consumer": {
+        "type": "CoolingConsumer",
+        "params": {}
+      }
+    },
+    "connections": [
+      {
+        "source": "doublet.supply_out",
+        "target": "degasser.inlet"
+      },
+      {
+        "source": "degasser.liquid",
+        "target": "filters.hot.inlet"
+      },
+      {
+        "source": "filters.hot.outlet",
+        "target": "heat_exchanger.hot_in"
+      },
+      {
+        "source": "heat_exchanger.hot_out",
+        "target": "heat_pump.source_in"
+      },
+      {
+        "source": "heat_pump.source_out",
+        "target": "filters.cold.inlet"
+      },
+      {
+        "source": "filters.cold.outlet",
+        "target": "injection_pump.suction"
+      },
+      {
+        "source": "injection_pump.discharge",
+        "target": "doublet.return_in"
+      },
+      {
+        "source": "heating_return_pipe.outlet",
+        "target": "heat_exchanger.cold_in"
+      },
+      {
+        "source": "heat_exchanger.cold_out",
+        "target": "heat_pump.sink_in"
+      },
+      {
+        "source": "heat_pump.sink_out",
+        "target": "peak_boiler.inlet"
+      },
+      {
+        "source": "heating_supply_pipe.outlet",
+        "target": "heating_consumer.supply_in"
+      },
+      {
+        "source": "compression_chiller.source_out",
+        "target": "cooling_supply_pipe.inlet"
+      },
+      {
+        "source": "cooling_supply_pipe.outlet",
+        "target": "cooling_consumer.supply_in"
+      },
+      {
+        "source": "peak_boiler.outlet",
+        "target": "heating_supply_pipe.inlet"
+      },
+      {
+        "source": "cooling_return_pipe.outlet",
+        "target": "compression_chiller.source_in"
+      }
+    ],
+    "inlets": {
+      "heating_return_in": "heating_return_pipe.inlet",
+      "cooling_return_in": "cooling_return_pipe.inlet",
+      "compression_rejection_in": "compression_chiller.sink_in"
+    },
+    "outlets": {
+      "heating_return_out": "heating_consumer.return_out",
+      "cooling_return_out": "cooling_consumer.return_out",
+      "gas": "degasser.gas",
+      "compression_rejection_out": "compression_chiller.sink_out"
+    },
+    "bindings": {},
+    "param_history": {}
+  }
+}

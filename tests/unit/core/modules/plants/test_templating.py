@@ -18,8 +18,8 @@ def _chain_template():
             "last.dp_nominal": {"default": None, "unit": "Pa", "description": "Pressure drop."},
         },
         "optional": {
-            "middle": {"bypass": [{"source": "first.outlet", "target": "last.inlet"}]},
-            "first": {"bypass": []},
+            "middle": {"bypass": [{"source": "middle.inlet", "target": "middle.outlet"}]},
+            "first": {"bypass": [{"source": "first.inlet", "target": "first.outlet"}]},
         },
         "spec": {
             "format": 2,
@@ -55,11 +55,11 @@ def test_listing_names_every_template_with_its_summary():
         assert row["purpose"] in {"heating", "cooling", "both"}
 
 
-def test_every_template_fills_with_its_defaults_into_a_valid_spec():
+@pytest.mark.parametrize("name", templating.template_names())
+def test_every_template_fills_with_its_defaults_into_a_valid_spec(name):
     """The defaults of each shipped template give a spec without problems."""
-    for name in templating.template_names():
-        spec = templating.fill(templating.load(name), {})
-        assert gm.plants.validate(spec) == [], name
+    spec = templating.fill(templating.load(name), {})
+    assert gm.plants.validate(spec) == []
 
 
 def test_default_sizes_build_the_shipped_plants():
@@ -117,3 +117,73 @@ def test_a_template_value_of_the_wrong_unit_is_a_problem_of_the_spec(monkeypatch
     with pytest.raises(gm.errors.ValidationError, match="expected true or false"):
         templating.from_template("Chain", {"middle.enabled": "no"})
     assert templating.from_template("Chain", {"middle.enabled": False}).name == "Chain"
+
+
+def test_neighbouring_units_leave_together_and_a_group_leaves_with_its_members():
+    """Each unit closes its own gap in turn, so a run of optional units can all leave."""
+    template = _chain_template()
+    template["optional"]["last"] = {"bypass": [{"source": "last.inlet", "target": "last.outlet"}]}
+    template["optional"]["tail"] = {"modules": ["middle", "last"]}
+    template["parameters"]["tail.enabled"] = {"default": True, "unit": None, "description": "Tail."}
+    spec = templating.fill(template, {"tail.enabled": False})
+    assert list(spec["modules"]) == ["first"]
+    assert spec["connections"] == [] and spec["outlets"] == {}
+    separate = templating.fill(template, {"middle.enabled": False, "last.enabled": False})
+    assert separate["modules"].keys() == spec["modules"].keys()
+
+
+def test_a_bypass_joins_what_fed_the_inlet_to_what_the_outlet_fed():
+    """Removing the middle of three filters joins the first outlet to the last inlet."""
+    spec = templating.fill(_chain_template(), {"middle.enabled": False})
+    assert spec["connections"] == [{"source": "first.outlet", "target": "last.inlet"}]
+
+
+HEATING_COOLING_PRESETS = {
+    "heating_only": {
+        "heat_pump.enabled": False,
+        "absorption_chiller.enabled": False,
+        "adsorption_chiller.enabled": False,
+        "compression_chiller.enabled": False,
+        "cooling_loop.enabled": False,
+    },
+    "heating_absorption_cooling": {
+        "heat_pump.enabled": False,
+        "adsorption_chiller.enabled": False,
+        "compression_chiller.enabled": False,
+    },
+    "heating_heat_pump_compression_cooling": {
+        "absorption_chiller.enabled": False,
+        "adsorption_chiller.enabled": False,
+    },
+    "heating_full_cooling": {"heat_pump.enabled": False},
+}
+
+
+@pytest.mark.parametrize("name", HEATING_COOLING_PRESETS)
+def test_a_preset_is_the_heating_cooling_template_with_units_switched_off(name):
+    """The preset spec equals the base template filled with the switches that name it."""
+    preset = templating.fill(templating.load(name), {})
+    base = templating.fill(templating.load("heating_cooling"), HEATING_COOLING_PRESETS[name])
+    assert preset | {"name": base["name"]} == base
+    assert gm.plants.from_spec(preset).to_spec() == preset
+    kept = {key for key in templating.load(name)["parameters"]}
+    assert kept <= set(templating.load("heating_cooling")["parameters"])
+
+
+@pytest.mark.parametrize("name", templating.template_names())
+def test_every_switch_and_parameter_of_a_template_names_something_in_its_spec(name):
+    """Switches name optional entries, parameters name modules, bypasses name ports that exist."""
+    template = templating.load(name)
+    if "spec" not in template:
+        return
+    modules = set(template["spec"]["modules"])
+    for parameter in template["parameters"]:
+        unit, _, local = parameter.partition(".")
+        if local == "enabled":
+            assert unit in template["optional"]
+        else:
+            assert unit in modules
+    for unit, entry in template["optional"].items():
+        assert set(entry.get("modules", [unit])) <= modules
+        for item in entry.get("bypass", []):
+            assert item["source"].partition(".")[0] == item["target"].partition(".")[0] == unit

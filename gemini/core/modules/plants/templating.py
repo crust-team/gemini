@@ -2,14 +2,21 @@
 
 A template file in ``templates/`` holds ``title``, ``description``, ``purpose`` (``heating``,
 ``cooling`` or ``both``), ``parameters`` (name to ``default``, ``unit`` and ``description``),
-``optional`` (unit id to the ``bypass`` connections that close the gap when the unit is left out)
-and either a ``spec`` or the name of a ``generator`` in ``generators.py``.
+``optional`` (unit id to ``bypass`` and ``modules``) and either a ``spec`` or the name of a
+``generator`` in ``generators.py``.
 
 A parameter of a ``spec`` template is named ``"<module id>.<parameter>"``, with a dotted
 parameter path for a nested child, or ``"<module id>.enabled"``. Filling the template sets the
 parameters in the spec and removes every disabled unit with its connections, ports and outputs, so
 the result is a plain spec with no switch left. A ``generator`` template passes its parameters to
 the generator as arguments.
+
+An optional unit is a module id, or a group of ``modules`` that one switch removes together. Its
+``bypass`` lists ``{"source": "<id>.<inlet>", "target": "<id>.<outlet>"}``, one per circuit that
+runs through the unit: when the unit leaves, what fed that inlet is connected to what that outlet
+fed, so the gap closes and neighbouring units can leave together. A port of a removed unit that
+has no such partner is dropped, and so is a plant port or output that named the unit; keep plant
+ports on modules that stay.
 """
 
 from copy import deepcopy
@@ -29,6 +36,7 @@ GENERATORS = {
 }
 ENABLED = "enabled"
 SUMMARY_KEYS = ("title", "description", "purpose")
+SECTIONS = ("fluids", "boundary", "bindings", "param_history")
 
 
 def template_names():
@@ -106,21 +114,37 @@ def _touches(end, gone):
     return end.partition(".")[0] in gone
 
 
-def _remove_connections(spec, template, disabled):
-    gone = set(disabled)
-    kept = [
-        item
-        for item in spec["connections"]
-        if not (_touches(item["source"], gone) or _touches(item["target"], gone))
-    ]
+def _expanded(template, disabled):
+    """Return the module ids of the disabled switches, groups opened, each once."""
+    members = []
     for unit in disabled:
+        for module in template["optional"].get(unit, {}).get("modules", [unit]):
+            if module not in members:
+                members.append(module)
+    return members
+
+
+def _bridge(connections, item):
+    """Return the connection that joins what feeds ``item["source"]`` to what its target feeds."""
+    feeding = [entry for entry in connections if entry["target"] == item["source"]]
+    leaving = [entry for entry in connections if entry["source"] == item["target"]]
+    if not (feeding and leaving):
+        return []
+    return [{"source": feeding[0]["source"], "target": leaving[0]["target"]}]
+
+
+def _remove_connections(spec, template, members):
+    """Remove each module in turn from the connections, closing the gap with its bypass."""
+    connections = spec["connections"]
+    for unit in members:
         bypass = template["optional"].get(unit, {}).get("bypass", [])
-        kept += [
-            dict(item)
-            for item in bypass
-            if not (_touches(item["source"], gone) or _touches(item["target"], gone))
-        ]
-    spec["connections"] = kept
+        joined = [entry for item in bypass for entry in _bridge(connections, item)]
+        connections = [
+            entry
+            for entry in connections
+            if not (_touches(entry["source"], {unit}) or _touches(entry["target"], {unit}))
+        ] + joined
+    spec["connections"] = connections
 
 
 def _remove_ports(spec, gone):
@@ -130,23 +154,27 @@ def _remove_ports(spec, gone):
 
 
 def _remove_outputs(spec, gone):
-    outputs = spec.get("outputs", {})
+    if "outputs" not in spec:
+        return
+    outputs = spec["outputs"]
     dropped = {name for name, item in outputs.items() if _touches(item.get("of", ""), gone)}
     dropped |= {name for name, item in outputs.items() if dropped & set(item.get("ratio", ()))}
     spec["outputs"] = {name: item for name, item in outputs.items() if name not in dropped}
 
 
 def _remove_units(spec, template, disabled):
-    gone = set(disabled)
-    for unit in disabled:
+    members = _expanded(template, disabled)
+    gone = set(members)
+    for unit in members:
         del spec["modules"][unit]
-    _remove_connections(spec, template, disabled)
+    _remove_connections(spec, template, members)
     _remove_ports(spec, gone)
     _remove_outputs(spec, gone)
-    for section in ("fluids", "boundary", "bindings", "param_history"):
-        spec[section] = {
-            path: item for path, item in spec.get(section, {}).items() if not _touches(path, gone)
-        }
+    for section in SECTIONS:
+        if section in spec:
+            spec[section] = {
+                path: item for path, item in spec[section].items() if not _touches(path, gone)
+            }
 
 
 def fill(template, given):

@@ -429,10 +429,13 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   the shipped file of the default size equals its output. `templates/` holds template files and
   `templating.py` fills them: `from_template(name, parameters)` sets `"<module>.<parameter>"`
   values, removes every unit whose `"<module>.enabled"` is false with its connections, ports and
-  outputs (the template's `bypass` connections close the gap), validates the plain spec and builds
-  the plant. `catalogue.py` has `names()`, `get(name)` (a new plant, parameters unset),
-  `example(name)` (a plant with real values from `specs/examples/`: the `doublet_heat` values for
-  `Doublet` and `DoubletHeatPlant`, the values of the unit tests for the others, design parameters
-  only; `NotImplementedYet` naming a plant that has none) and `templates()`. The special cases
-  (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) stay classes, because a loop closed by
-  `loops.close_loop` inside one call or a `mode` that chooses which children run is not wiring.
+  outputs, validates the plain spec and builds the plant. An optional unit is a module id, or a
+  group of `modules` one switch removes together; its `bypass` items `{source: "<id>.<inlet>",
+  target: "<id>.<outlet>"}` join what fed the inlet to what the outlet fed, one unit at a time, so
+  neighbouring units can leave together. `catalogue.py` has `names()`, `get(name)` (a new plant,
+  parameters unset), `example(name)` (a plant with real values from `specs/examples/`: the
+  `doublet_heat` values for `Doublet` and `DoubletHeatPlant`, the values of the unit tests for the
+  others, design parameters only; `NotImplementedYet` naming a plant that has none) and
+  `templates()`. The special cases (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) stay
+  classes, because a loop closed by `loops.close_loop` inside one call or a `mode` that chooses
+  which children run is not wiring.
