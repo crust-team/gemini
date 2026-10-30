@@ -49,7 +49,7 @@ CALLS = {
     "results.to_dict": lambda plant, results: results.to_dict(),
     "results.end_state": lambda plant, results: results.end_state,
     "evaluate": lambda plant, results: gm.evaluate("Valve", {}, {}, {}, on_error="record"),
-    "kpi": lambda plant, results: gm.kpi(plant, results),
+    "kpi": lambda plant, results: gm.kpi.compute(plant, results),
     "kpi.names": lambda plant, results: gm.kpi.names(),
     "checks.run_all": lambda plant, results: gm.checks.run_all(plant, results),
     "economics.capex": lambda plant, results: gm.economics.capex(plant, on_error="record"),

@@ -1,7 +1,7 @@
 """GEMINI: load a plant, choose a dataset, and simulate, replay or run live."""
 
 from gemini import analysis, checks, economics, errors, modules, optim, profiles, testing
-from gemini.analysis.kpi import kpi
+from gemini.analysis import kpi
 from gemini.backends import runtime
 from gemini.engine.clock import Clock
 from gemini.engine.engine import Engine

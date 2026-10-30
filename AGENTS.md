@@ -62,7 +62,7 @@ gemini/
 ├── modules/          # Module base class, registry, containers; one folder per category, plants/ too
 ├── engine/           # Clock, run functions, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay
-├── analysis/         # well performance and integrity, fits, gm.kpi
+├── analysis/         # well performance and integrity, fits; kpi.py is the gm.kpi namespace
 ├── economics/        # capex, opex, levelised cost, CO2, cash flow
 ├── checks/           # balances and bounds over a finished run
 ├── testing/          # check_module for a new module class

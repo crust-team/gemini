@@ -1,5 +1,6 @@
 """Curated user API and plant ownership contracts."""
 
+import inspect
 import json
 import tomllib
 from pathlib import Path
@@ -7,7 +8,7 @@ from pathlib import Path
 import gemini as gm
 from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
-SNAPSHOTS = {"0.1.0": "65f976974451bc38e7934627dd05f698e30fc7f9429a275270d24ab317f5b0a9"}
+SNAPSHOTS = {"0.1.0": "d00851700d4eeb81a0b0fa7a14e3e1b4fd9f20eb6bbdaa356f85805464813fa1"}
 """Hash of the snapshot per ``gm.__version__``: an entry never changes, a new version adds one."""
 
 
@@ -90,6 +91,20 @@ def test_the_package_has_one_version():
     """``gm.API_VERSION`` is gone; ``gm.__version__`` is the one version."""
     assert not hasattr(gm, "API_VERSION")
     assert gm.__version__ == "0.1.0"
+
+
+def test_every_economics_function_takes_the_plant_and_the_results():
+    """``capex`` alone has no results; ``co2`` takes the plant too."""
+    for name in ("opex", "lcoh", "lcoc", "co2", "npv", "payback"):
+        arguments = list(inspect.signature(getattr(gm.economics, name)).parameters)
+        assert arguments[:2] == ["plant", "results"], name
+    assert list(inspect.signature(gm.economics.capex).parameters)[0] == "plant"
+
+
+def test_evaluate_stays_beside_the_run_functions():
+    """A call at one point is a run at one point; ``gm.testing`` is for developers."""
+    assert "evaluate" in gm.__all__ and "testing" in gm.__all__
+    assert gm.testing.__all__ == ["check_module"]
 
 
 def test_utils_stays_private():

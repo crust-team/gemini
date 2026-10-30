@@ -204,10 +204,10 @@ modules declare `capex()`.
 | `gm.economics.opex(plant, results, assumptions=None)` | real |
 | `gm.economics.lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | real |
 | `gm.economics.lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | real |
-| `gm.economics.co2(results, assumptions=None)` | real |
+| `gm.economics.co2(plant, results, assumptions=None)` | real |
 | `gm.economics.npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | real |
 | `gm.economics.payback(plant, results, assumptions=None)` | real |
-| `gm.kpi(plant, results)`, `gm.kpi.names()` | real: `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
+| `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
 | `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)`, `run_all(plant, results)` | real, each `{name, passed, value, tolerance}`; they are ledger checks, see [economics.md](economics.md) |
 | `gm.testing.check_module(cls, example=None)` | real; a report, never raises |
 | `gm.optim.calibrate(plant, dataset, params, start=None, end=None, backend="numpy", apply=True)`, `CalibrationResult` | real |

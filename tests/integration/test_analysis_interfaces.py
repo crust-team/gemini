@@ -43,7 +43,7 @@ def real_calls(example_run):
         ("analysis.nodal", gm.analysis.nodal(plant, "doublet", CASE)),
         ("analysis.pump_curve", gm.analysis.pump_curve(plant, "doublet.esp")),
         ("analysis.corrosion_forecast", gm.analysis.corrosion_forecast(CORROSION, "2026-01-01")),
-        ("kpi", gm.kpi(plant, replay)),
+        ("kpi", gm.kpi.compute(plant, replay)),
         ("kpi.names", gm.kpi.names()),
         ("economics.capex", gm.economics.capex(costed)),
         ("economics.opex", gm.economics.opex(costed, run, VALUES)),

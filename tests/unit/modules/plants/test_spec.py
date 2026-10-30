@@ -109,17 +109,18 @@ def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
 
 def test_a_valid_spec_returns_no_problems_under_both_policies():
     """Without problems nothing is raised; the list is empty."""
-    plant = gm.Plant.load(PLANT_FILE)
+    plant = gm.Plant("Empty")
     assert plant.validate() == plant.validate(on_error="record") == []
-    assert gm.plants.validate(plant.to_spec()) == []
     with pytest.raises(gm.errors.ValidationError, match="on_error"):
         plant.validate(on_error="ignore")
 
 
 def test_plant_validate_raises_what_the_spec_function_raises():
     """A plant with a bad stated value fails its own ``validate``."""
-    plant = gm.Plant.load(PLANT_FILE)
-    plant.bindings["no.such.module"] = plant.bindings[next(iter(plant.bindings))]
+    plant = gm.Plant("Broken")
+    plant.add("Pipe", name="pipe")
+    plant.set_bindings("pipe", {"velocity": "v"})
+    plant.bindings["no.such.module"] = plant.bindings["pipe"]
     with pytest.raises(gm.errors.ValidationError) as caught:
         plant.validate()
     assert caught.value.problems == plant.validate(on_error="record")

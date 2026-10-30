@@ -37,7 +37,7 @@ Every function returns `{value, unit, reason, ...}`; `unit` is the currency (`EU
 | `opex(plant, results, assumptions=None)` | fixed + variable cost per year + yearly bill of grid electricity and fuel; `components` lists the parts |
 | `lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `(capex + opex A) / (heat A)` in currency/J, `A` the annuity factor |
 | `lcoc(...)` | the same with the cold delivered |
-| `co2(results, assumptions=None)` | kg over the window, from `balance.emissions`; no plant needed |
+| `co2(plant, results, assumptions=None)` | kg over the window, from `balance.emissions` |
 | `npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `-capex + (revenue - opex) A` |
 | `payback(plant, results, assumptions=None)` | `capex / (revenue - opex)` in years, undiscounted |
 
@@ -74,7 +74,8 @@ Convert at the boundary: EUR/MWh divided by 3.6e9 is EUR/J, kg/GJ divided by 1e9
 
 ## `gm.kpi`
 
-`gm.kpi(plant, results)` returns `{name: {value, unit, reason}}` for `gm.kpi.names()`; with
+`gm.kpi.compute(plant, results)` returns `{name: {value, unit}}` for `gm.kpi.names()`; a KPI the run
+cannot give is `null` with a `reason`. With
 E(x) the sum over ticks of x times the tick duration:
 
 | Name | Unit | Definition |

@@ -1,4 +1,4 @@
-"""The plant KPIs under fixed names.
+"""The plant KPIs under fixed names: ``gm.kpi.compute`` and ``gm.kpi.names``.
 
 Every KPI is read from the leaf columns of a finished run (``results.to_frame()``) through the
 declared outputs of the plant's leaves, so it needs no extra recording. A tick where a needed
@@ -89,6 +89,8 @@ def _cop(series):
     return energy(series.heat.where(series.electricity.notna()), series.seconds) / consumed, None
 
 
+__all__ = ["compute", "names"]
+
 _KPIS = {
     "heating_coverage": ("-", _heating_coverage),
     "cooling_coverage": ("-", _cooling_coverage),
@@ -100,11 +102,11 @@ _KPIS = {
 
 
 def names():
-    """Return the fixed KPI names, in the order ``kpi`` reports them."""
+    """Return the fixed KPI names, in the order ``compute`` reports them."""
     return list(_KPIS)
 
 
-def kpi(plant, results):
+def compute(plant, results):
     """Return the KPIs of a finished run as ``{name: {value, unit}}``, plain JSON.
 
     Parameters
@@ -117,7 +119,7 @@ def kpi(plant, results):
     Returns
     -------
     dict
-        One entry per name of ``kpi.names()``. ``value`` is a number in ``unit``, or ``None``
+        One entry per name of ``names()``. ``value`` is a number in ``unit``, or ``None``
         with the ``reason`` text when the run cannot give it (never a guess). The definitions,
         with E(x) = sum over ticks of x * tick duration [J]:
 
@@ -141,6 +143,3 @@ def kpi(plant, results):
         number, reason = compute(series)
         values[name] = value(number, unit, reason)
     return values
-
-
-kpi.names = names

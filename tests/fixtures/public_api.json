@@ -196,19 +196,13 @@
   "controls",
   "on_error"
  ],
- "kpi": {
-  "call": [
-   "plant",
-   "results"
-  ],
-  "names": [
-   "heating_coverage",
-   "cooling_coverage",
-   "cop",
-   "peak_heat",
-   "peak_cold"
-  ]
- },
+ "kpi_names": [
+  "heating_coverage",
+  "cooling_coverage",
+  "cop",
+  "peak_heat",
+  "peak_cold"
+ ],
  "modules": {
   "ATESPlant": "class",
   "AbsorptionUnit": "class",
@@ -412,6 +406,13 @@
     "assumptions",
     "on_error"
    ]
+  },
+  "kpi": {
+   "compute": [
+    "plant",
+    "results"
+   ],
+   "names": []
   },
   "optim": {
    "CalibrationResult": "class",
