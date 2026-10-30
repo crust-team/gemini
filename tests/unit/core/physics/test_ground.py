@@ -133,3 +133,53 @@ def test_doublet_cold_fraction_on_a_dense_grid():
 def test_doublet_cold_fraction_rows_raise_the_error_of_the_float_path(rows):
     """A negative or NaN ratio raises the same class and message on arrays."""
     assert_same_error(ground.doublet_cold_fraction, rows, PhysicsRangeError)
+
+
+def test_aquifer_and_breakthrough_match_on_arrays():
+    """The mixing rule and the breakthrough volume agree on arrays; bad inputs raise alike."""
+    rows = [(0.2, 4.2e6, 2.5e6), (0.0, 4.2e6, 2.5e6), (1.0, 3e6, 2e6)]
+    assert_function_matches(ground.aquifer_volumetric_heat_capacity, rows)
+    assert_same_error(
+        ground.aquifer_volumetric_heat_capacity, rows + [(1.5, 4.2e6, 2.5e6)], PhysicsRangeError
+    )
+    assert_same_error(
+        ground.aquifer_volumetric_heat_capacity, rows + [(0.2, 0.0, 2.5e6)], PhysicsRangeError
+    )
+    rows = [(1000.0, 50.0, 3.0e6, 4.2e6), (500.0, 20.0, 2.8e6, 4.0e6)]
+    assert_function_matches(ground.doublet_breakthrough_volume, rows)
+    assert_same_error(
+        ground.doublet_breakthrough_volume, rows + [(0.0, 50.0, 3.0e6, 4.2e6)], PhysicsRangeError
+    )
+
+
+def test_store_and_field_conductances_match_on_arrays():
+    """Store, vertical cylinder and borehole cell relations agree on arrays and raise alike."""
+    rows = [(2.0, 1e-6, 5e4, 40.0, 1.5e7), (1.5, 8e-7, 0.0, 20.0, 3e7)]
+    assert_function_matches(ground.cylinder_store_conductance, rows)
+    assert_same_error(
+        ground.cylinder_store_conductance,
+        rows + [(2.0, 1e-6, -1.0, 40.0, 1.5e7)],
+        PhysicsRangeError,
+    )
+    rows = [(2.0, 100.0, 0.15), (1.7, 50.0, 0.3)]
+    assert_function_matches(ground.vertical_cylinder_conductance, rows)
+    assert_same_error(
+        ground.vertical_cylinder_conductance, rows + [(2.0, 0.1, 0.15)], PhysicsRangeError
+    )
+    rows = [(2.0, 0.075, 3.0), (1.5, 0.05, 0.2)]
+    assert_function_matches(ground.steady_flux_resistance, rows)
+    assert_same_error(ground.steady_flux_resistance, rows + [(2.0, 0.075, 0.05)], PhysicsRangeError)
+
+
+def test_ramey_relations_match_on_arrays():
+    """Ramey's time function and fluid profile agree on arrays and raise alike."""
+    rows = [(3e7, 1e-6, 0.1), (1e9, 1.2e-6, 0.15)]
+    assert_function_matches(ground.ramey_time_function, rows)
+    assert_same_error(ground.ramey_time_function, rows + [(10.0, 1e-6, 0.1)], PhysicsRangeError)
+    rows = [(300.0, 283.0, 0.03, 1500.0, 800.0), (320.0, 283.0, -0.01, 0.0, 400.0)]
+    assert_function_matches(ground.ramey_fluid_temperature, rows)
+    assert_same_error(
+        ground.ramey_fluid_temperature,
+        rows + [(300.0, 283.0, 0.03, -1.0, 800.0)],
+        PhysicsRangeError,
+    )

@@ -11,12 +11,17 @@ import math
 
 from gemini import ops
 from gemini.errors import PhysicsRangeError
+from gemini.ops import Constant
 
 EULER_GAMMA = 0.5772156649015329
 """Euler-Mascheroni constant [-] of the line-source long-time asymptote."""
 
-MIN_RAMEY_FOURIER = 25.0
-"""Smallest dimensionless time alpha*t/r**2 [-] for which the Ramey asymptote is within 1 %."""
+MIN_RAMEY_FOURIER = Constant(
+    "MIN_RAMEY_FOURIER",
+    25.0,
+    "-",
+    "smallest dimensionless time alpha*t/r**2 for which the Ramey asymptote is within 1 %",
+)
 
 _SMALL_ANGLE = 0.1
 """Streamline angle [rad] below which ``sin - theta*cos`` uses its Taylor series."""
@@ -45,10 +50,12 @@ def aquifer_volumetric_heat_capacity(
     """
     _require_positive("aquifer_volumetric_heat_capacity", fluid=fluid_heat_capacity)
     _require_positive("aquifer_volumetric_heat_capacity", rock=rock_heat_capacity)
-    if not 0 <= porosity <= 1:
-        raise PhysicsRangeError(
-            f"aquifer_volumetric_heat_capacity: porosity = {porosity}; expected a value in [0, 1]"
-        )
+    ops.check(
+        ops.logical_and(porosity >= 0, porosity <= 1),
+        PhysicsRangeError,
+        "aquifer_volumetric_heat_capacity: porosity = {porosity}; expected a value in [0, 1]",
+        porosity=porosity,
+    )
     return porosity * fluid_heat_capacity + (1 - porosity) * rock_heat_capacity
 
 
@@ -166,11 +173,15 @@ def cylinder_store_conductance(
     _require_positive("cylinder_store_conductance", diffusivity=diffusivity)
     _require_positive("cylinder_store_conductance", height=height)
     _require_positive("cylinder_store_conductance", period=period)
-    if math.isnan(volume) or volume < 0:
-        raise PhysicsRangeError(f"cylinder_store_conductance: volume = {volume} m3; expected >= 0")
-    radius = math.sqrt(volume / (math.pi * height))
+    ops.check(
+        ops.logical_not(ops.logical_or(ops.isnan(volume), volume < 0)),
+        PhysicsRangeError,
+        "cylinder_store_conductance: volume = {volume} m3; expected >= 0",
+        volume=volume,
+    )
+    radius = ops.sqrt(volume / (math.pi * height))
     area = 2 * math.pi * radius * (radius + height)
-    return 2 * conductivity * area / math.sqrt(math.pi * diffusivity * period)
+    return 2 * conductivity * area / ops.sqrt(math.pi * diffusivity * period)
 
 
 def vertical_cylinder_conductance(conductivity: float, length: float, diameter: float) -> float:
@@ -197,12 +208,16 @@ def vertical_cylinder_conductance(conductivity: float, length: float, diameter: 
     _require_positive("vertical_cylinder_conductance", conductivity=conductivity)
     _require_positive("vertical_cylinder_conductance", length=length)
     _require_positive("vertical_cylinder_conductance", diameter=diameter)
-    logarithm = math.log(4 * length / diameter)
-    if logarithm < 1:
-        raise PhysicsRangeError(
-            f"vertical_cylinder_conductance: length = {length} m, diameter = {diameter} m; "
-            "expected ln(4 length / diameter) >= 1"
-        )
+    logarithm = ops.log(4 * length / diameter)
+    ops.check(
+        ops.logical_not(logarithm < 1),
+        PhysicsRangeError,
+        "vertical_cylinder_conductance: length = {length} m, diameter = {diameter} m; "
+        "expected ln(4 length / diameter) >= 1",
+        length=length,
+        diameter=diameter,
+        logarithm=logarithm,
+    )
     return conductivity * 2 * math.pi * length / logarithm
 
 
@@ -234,13 +249,16 @@ def steady_flux_resistance(
     """
     _require_positive("steady_flux_resistance", conductivity=conductivity)
     _require_positive("steady_flux_resistance", borehole_radius=borehole_radius)
-    if cell_radius <= borehole_radius:
-        raise PhysicsRangeError(
-            f"steady_flux_resistance: cell_radius = {cell_radius} m; expected more than "
-            f"borehole_radius = {borehole_radius} m"
-        )
+    ops.check(
+        ops.logical_not(cell_radius <= borehole_radius),
+        PhysicsRangeError,
+        "steady_flux_resistance: cell_radius = {cell_radius} m; expected more than "
+        "borehole_radius = {borehole_radius} m",
+        cell_radius=cell_radius,
+        borehole_radius=borehole_radius,
+    )
     x = (borehole_radius / cell_radius) ** 2
-    shape = math.log(cell_radius / borehole_radius) / (1 - x) ** 2 - 1 / (2 * (1 - x)) - 0.25
+    shape = ops.log(cell_radius / borehole_radius) / (1 - x) ** 2 - 1 / (2 * (1 - x)) - 0.25
     return shape / (2 * math.pi * conductivity)
 
 
@@ -274,11 +292,14 @@ def ramey_time_function(time: float, diffusivity: float, radius: float) -> float
     _require_positive("ramey_time_function", diffusivity=diffusivity)
     _require_positive("ramey_time_function", radius=radius)
     fourier = diffusivity * time / radius**2
-    if fourier < MIN_RAMEY_FOURIER:
-        raise PhysicsRangeError(
-            f"ramey_time_function: alpha t / r**2 = {fourier}; expected >= {MIN_RAMEY_FOURIER}"
-        )
-    return math.log(2 * math.sqrt(fourier)) - EULER_GAMMA / 2
+    ops.check(
+        ops.logical_not(fourier < MIN_RAMEY_FOURIER),
+        PhysicsRangeError,
+        "ramey_time_function: alpha t / r**2 = {fourier}; expected >= {minimum}",
+        fourier=fourier,
+        minimum=MIN_RAMEY_FOURIER,
+    )
+    return ops.log(2 * ops.sqrt(fourier)) - EULER_GAMMA / 2
 
 
 def ramey_fluid_temperature(
@@ -316,10 +337,14 @@ def ramey_fluid_temperature(
     neglected.
     """
     _require_positive("ramey_fluid_temperature", relaxation_length=relaxation_length)
-    if length < 0:
-        raise PhysicsRangeError(f"ramey_fluid_temperature: length = {length} m; expected >= 0")
+    ops.check(
+        ops.logical_not(length < 0),
+        PhysicsRangeError,
+        "ramey_fluid_temperature: length = {length} m; expected >= 0",
+        length=length,
+    )
     offset = gradient * relaxation_length
-    decay = math.exp(-length / relaxation_length)
+    decay = ops.exp(-length / relaxation_length)
     rock = top_temperature + gradient * length
     return rock - offset + (inlet_temperature - top_temperature + offset) * decay
 
@@ -346,5 +371,11 @@ def _dipole_travel_time(theta):
 def _require_positive(function, **values):
     """Raise ``PhysicsRangeError`` unless every value is a positive number."""
     for name, value in values.items():
-        if math.isnan(value) or value <= 0:
-            raise PhysicsRangeError(f"{function}: {name} = {value}; expected a positive value")
+        ops.check(
+            ops.logical_not(ops.logical_or(ops.isnan(value), value <= 0)),
+            PhysicsRangeError,
+            "{function}: {name} = {value}; expected a positive value",
+            function=function,
+            name=name,
+            value=value,
+        )
