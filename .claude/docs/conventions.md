@@ -256,7 +256,7 @@ reason it is needed:
   arguments leave the scope unwrapped. `Module._scalar_mode()` (`WRAP` by default) lets a module
   ask for `PLAIN`: the ESP does under `precision="float32"`, the one module that honours it,
   because an `np.float64` scalar would promote the float32 coefficients; its
-  `efficiency_function` keeps `ops.truediv` for that reason. A nested scope costs a
+  `pumps.esp_efficiency` keeps `ops.truediv` for that reason. A nested scope costs a
   context-variable read.
   A failing `ops.check` on concrete scalars raises the real error marked as coming from a check;
   `@ops.physics` returns it as a `Failed` value at the function boundary, so
