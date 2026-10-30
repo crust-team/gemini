@@ -16,6 +16,7 @@ BASES = {
     "OutputError": (RuntimeError,),
     "FormulaError": (TypeError, ValueError),
     "ConfigurationError": (ValueError,),
+    "TraceError": (TypeError,),
 }
 
 

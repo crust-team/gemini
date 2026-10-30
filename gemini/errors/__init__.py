@@ -25,6 +25,7 @@ from gemini.errors.module import (
     MissingValueError,
     OutletError,
     OutputError,
+    TraceError,
     UnknownNameError,
     UnknownPortError,
 )
@@ -47,6 +48,7 @@ __all__ = [
     "MissingValueError",
     "OutputError",
     "FormulaError",
+    "TraceError",
     "ConfigurationError",
     "DatasetError",
     "ClockError",

@@ -148,6 +148,8 @@ class _Call:
     ``outputs`` is ``None`` when outputs are disabled. ``call_records`` collects the results of
     every child call made during this call, in call order. ``parent`` is the enclosing call.
     ``states`` holds the module's own state values and ``step`` the running ``_Step``, if any.
+    A traced call (``gemini.graph``) sets ``parameters`` to the traced parameter values that
+    replace the stored ones, and records outputs without validating them.
     """
 
     module: "Module"
@@ -157,6 +159,7 @@ class _Call:
     states: dict | None = None
     step: _Step | None = None
     call_records: list = field(default_factory=list)
+    parameters: dict | None = None
 
     def owned_by(self, module):
         """Return the innermost call of ``module`` in this chain, or ``None``."""
@@ -326,6 +329,9 @@ class Module:
             raise OutputError(
                 f"{self.path}.{name}: outputs may only be assigned while computing outputs"
             )
+        if call.parameters is not None:
+            call.outputs[name] = value
+            return
         call.outputs[name] = self._outputs[name].validate(value)
 
     def add_module(self, name, module):
@@ -368,6 +374,9 @@ class Module:
         """
         registries = self.__dict__
         if name in registries.get("_parameters", {}):
+            call = _active_call(self)
+            if call is not None and call.parameters is not None:
+                return call.parameters[name]
             return self._parameter_value(name)
         if name in registries.get("_controls", {}) or name in registries.get("_boundaries", {}):
             return self._input_value(name)
@@ -749,7 +758,8 @@ class Module:
                 ) from exc
         return validated
 
-    def _check_outlets(self, returned):
+    def _check_outlet_names(self, returned):
+        """Reject a ``forward`` result that is not a dict of exactly the declared outlets."""
         if not isinstance(returned, dict):
             raise OutletError(f"{self.path}: forward must return an outlet dict")
         missing = self._outlets.keys() - returned.keys()
@@ -759,6 +769,9 @@ class Module:
                 f"{self.path}: outlet names missing={sorted(missing)}, extra={sorted(extra)}; "
                 f"valid names: {join_names(self._outlets)}"
             )
+
+    def _check_outlets(self, returned):
+        self._check_outlet_names(returned)
         validated = []
         for name, declaration in self._outlets.items():
             try:

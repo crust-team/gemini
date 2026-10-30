@@ -36,6 +36,10 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
   or an `Output.of` descendant not called exactly once.
 - `FormulaError(TypeError, ValueError)`: an `Output.of`, `Output.ratio` or automatic-sum formula
   cannot be resolved.
+- `TraceError(TypeError)`: a module cannot be traced into a computation graph: Python control
+  flow or a conversion on a traced value (`if`, `and`, `float()`, formatting), a stateful or
+  composite module, float32 precision or a pre-hook. The graph runner catches it and runs that
+  module untraced (a graph break, `gemini/graph/runner.py`).
 - `ConfigurationError(ValueError)`: equipment design data missing or inconsistent at call time,
   including calibration requests that do not fit the plant (`module.py`, equipment,
   `optim/calibrate.py`).

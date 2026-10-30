@@ -37,3 +37,7 @@ class FormulaError(GeminiError, TypeError, ValueError):
 
 class ConfigurationError(GeminiError, ValueError):
     """Equipment design data needed for this call is missing or inconsistent."""
+
+
+class TraceError(GeminiError, TypeError):
+    """A module cannot be traced into a computation graph, so it runs untraced (graph break)."""

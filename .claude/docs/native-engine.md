@@ -1,7 +1,8 @@
 # Native engine: computation graph design
 
-Status: agreed design (2026-10-29). Nothing is implemented yet. First step is the ESP prototype
-(`native-engine-start.md`).
+Status: agreed design (2026-10-29). The ESP prototype is implemented (section 12); the engine
+does not use graphs yet. Sections 1 to 11 are the design as agreed; section 12 records where the
+prototype differs and why.
 
 ## 1. Why
 
@@ -190,3 +191,64 @@ macOS, Windows; OpenMP `parallel_for` with bundled libomp; `Vectorized<T>`-style
 runtime CPU dispatch and Sleef; `ops.yaml` + codegen; googletest, per-op automatic tests, Google
 Benchmark, sanitizers; lintrunner. Precompiled kernels first, code generation later as another
 backend. Solvers as dedicated ops with per-element stopping.
+
+## 12. Prototype status (ESP)
+
+Implemented for one leaf module, the ESP, and everything its call needs:
+
+- `gemini/backends`: `Backend`, `register`, `get`, `settings(backend=...)`, `select` (NumPy for
+  array operands, Python for scalars) and `implementation` (NumPy fallback for a missing op);
+  `python.py` and `numpy.py` with the ops the ESP uses plus `where` and `check`.
+- `gemini/ops`: the registry (name, kind, arity), `dispatch`, `Operators`, `Constant`,
+  `where`, `check`, `logical_and`, comparisons, arithmetic, `getitem` and the `scan` definition.
+- `gemini/graph`: `Node` (op, kind, operands, name, role, unit, shape, source line, guards),
+  `Graph` (inputs by role, outputs, checks, constants, outlet fluids, observers,
+  `describe()`), `Proxy`, `Tracer` (one leaf module), `Interpreter` (value pass, then error
+  pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
+  row on a graph break, then observer replay).
+- `core/modules/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
+  ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `StreamState` is the
+  pydantic-free stream of traced calls.
+- The traced ESP on NumPy equals the untraced ESP exactly on the July data (tolerance 1e-12,
+  `tests/integration/test_graph_esp.py`).
+
+Where the prototype differs from sections 1 to 11, and why:
+
+- **Names are not public.** The ops are `gemini.ops.where`, `gemini.ops.check`, ... and the
+  backend setting is `gemini.backends.settings(backend=...)`, not `gm.where` or
+  `gm.runtime.settings(backend=...)`: the curated `gm` names are pinned and the public API is
+  unchanged, and `core.runtime` sits above the backends in the dependency order.
+- **`where` branches may be callables.** Evaluating both branches eagerly is fine on arrays,
+  but on Python floats the branch that is not selected can raise (`ZeroDivisionError` for the
+  ESP efficiency, whose example power curve is zero on every row). `where(c, a, lambda: b)`
+  evaluates only the selected branch on the Python backend; a trace and NumPy evaluate both.
+  In a graph the Python backend's division returns the IEEE `inf`/`nan` instead of raising.
+- **A check's error travels with the values passed to it.** `check(condition, error, message,
+  **values)` attaches its error code to the traced `values` (or to the condition when none is
+  traced); codes then flow along data dependencies and `where` keeps the selected branch's
+  code. A check inside a branch must therefore name a value of that branch; a check on a value
+  shared by both branches reaches the output whichever branch is selected. The message is a
+  `str.format` template filled with the failing row's values, so it equals the former
+  f-string; the error carries a note with the check's source line.
+- **`Constant` lives in `gemini.ops`**, because physics (below `core.modules`) uses it;
+  `parameter.py` re-exports it. It is not a `float` subclass: NumPy 2 does not treat float
+  subclasses as weak scalars, which would change the float32 golden path. Only the ESP
+  constants are `Constant`s so far.
+- **An `index` op kind** (`getitem`) selects one item of a vector parameter such as a curve
+  coefficient, on the last axis so a scenario axis can lead.
+- **No `named_constants` or `named_states`.** A module's constants are known only by tracing
+  its physics (`graph.by_role("constant")`); `states()` already lists states.
+- **`FluidProperties` and `Stream` stay pydantic** (the physics tests rely on `model_dump` and
+  `ValidationError`); the traced path uses `StreamState` and the fluid properties `rho_l`,
+  `rho_g` and `gmf` as inlet inputs. `StreamState.with_` raises `PhysicsRangeError` where a
+  `Stream` raises pydantic's `ValidationError`. Output declaration bounds are not checked on
+  the traced path (for the ESP they follow from the other checks).
+- **Units** are recorded on graph inputs only; the unit-check pass is not implemented.
+- **Graph breaks** are composites, stateful modules (no `scan` yet), modules with pre-hooks and
+  float32 precision, besides any `TraceError` from Python control flow or conversions.
+- **Observer hooks run once during the trace** on traced values (that is how a reading hook is
+  told from a writing one), so anything an observer stores then is a `Proxy`; afterwards they
+  are replayed per row. A hook that raises `TraceError` is a graph break even when it would
+  only have read, because the trace cannot tell.
+- **No common-subexpression elimination**: `forward` and `_compute_outputs` both compute head
+  and power, so the ESP graph holds four polynomials (141 nodes).

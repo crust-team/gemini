@@ -1,0 +1,49 @@
+"""Graphs record ops, lift constants to named inputs and attach checks to traced values."""
+
+import pytest
+
+from gemini import ops
+from gemini.errors import PhysicsRangeError, TraceError
+from gemini.graph import Graph
+from gemini.ops import Constant
+
+LIMIT = Constant("LIMIT", 5.0, "Pa", "test limit")
+
+
+def test_ops_on_inputs_become_nodes_and_constants_one_named_input():
+    """Every op is one node; a constant used twice is one input named after it."""
+    graph = Graph("test")
+    pressure = graph.input("p", "inlet", "Pa")
+    rise = pressure * LIMIT + LIMIT
+    graph.output("outputs.rise", rise)
+    assert [node.op for node in graph.nodes] == ["input", "input", "mul", "add"]
+    assert graph.by_role("constant") == {"LIMIT": graph.inputs["LIMIT"]}
+    assert graph.constants == {"LIMIT": LIMIT}
+    assert graph.outputs["outputs.rise"] is rise.node
+    assert (
+        "%1<LIMIT> constant [Pa]" in graph.describe() and "add(%2, %1<LIMIT>)" in graph.describe()
+    )
+
+
+def test_check_errors_travel_with_the_traced_message_values():
+    """A check gets the next code and guards the traced values of its message."""
+    graph = Graph("test")
+    pressure = graph.input("p", "inlet", "Pa")
+    flow = graph.input("flow", "inlet", "m3/s")
+    ops.check(flow >= 0, PhysicsRangeError, "flow = {flow}", flow=flow)
+    ops.check(pressure >= 0, PhysicsRangeError, "negative pressure")
+    first, second = graph.checks
+    assert (first.code, second.code) == (1, 2)
+    assert flow.node.guards == [first]
+    assert graph.nodes[second.operands[0].index].guards == [second]
+    assert "code 1: PhysicsRangeError" in graph.describe()
+
+
+def test_operands_that_are_not_numbers_cannot_be_traced():
+    """Text, other graphs' values and None are refused."""
+    graph, other = Graph("test"), Graph("other")
+    value = graph.input("x", "inlet")
+    with pytest.raises(TraceError, match="operand 'a' of type str"):
+        value + "a"
+    with pytest.raises(TraceError, match="another graph"):
+        value + other.input("y", "inlet")
