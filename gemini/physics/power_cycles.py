@@ -163,6 +163,9 @@ def plant_balance(
     -----
     First law: Q = gross + condenser duty = net + heat_loss (DiPippo 2016, chapter 8). The
     parasitic power ends as heat in the air.
+
+    Validity: heat_input nonnegative, cycle_efficiency in [0, 1], parasitic_fraction in [0, 1);
+    ``thermal_efficiency`` is ``None`` for heat_input <= 0, so no division by zero occurs.
     """
     gross_power = cycle_efficiency * heat_input
     parasitic_power = parasitic_fraction * gross_power

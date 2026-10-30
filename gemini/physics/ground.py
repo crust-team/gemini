@@ -554,6 +554,10 @@ def mix_store(
     -----
     Energy balance of an ideal mixture of one liquid at constant volumetric heat capacity,
     so the volumes weight the temperatures.
+
+    Validity: volume and added_volume nonnegative, and their sum positive (the code divides by it,
+    also for added_volume = 0); changes are real [K].
+    Source: A first-law mixing balance; no published source is needed.
     """
     mixed = volume + added_volume
     blended = (volume * change + added_volume * added_change) / mixed
@@ -628,6 +632,10 @@ def stored_heat(water_volumetric_heat_capacity: float, volume: float, change: fl
     Notes
     -----
     Sensible heat of a liquid at constant volumetric heat capacity.
+
+    Validity: water_volumetric_heat_capacity positive, volume nonnegative, change real; no division
+    occurs. One uniform temperature change over the volume.
+    Source: A first-law sensible-heat balance; no published source is needed.
     """
     return water_volumetric_heat_capacity * volume * change
 
@@ -659,6 +667,10 @@ def aquifer_stored_energy(
     Notes
     -----
     Sum of the sensible excess heats of the two stores at one volumetric heat capacity.
+
+    Validity: water_volumetric_heat_capacity positive, both volumes nonnegative, changes real (the
+    cold store is negative); no division occurs.
+    Source: A first-law sensible-heat sum; no published source is needed.
     """
     return water_volumetric_heat_capacity * (warm_volume * warm_change + cold_volume * cold_change)
 
@@ -682,6 +694,10 @@ def thermal_recovery(recovered_heat: float, charged_heat: float) -> float | None
     -----
     Reference: Bloemendal and Hartog (2018, Geothermics 71, 306-319), definition of the
     thermal recovery efficiency of ATES.
+
+    Validity: recovered_heat and charged_heat real; the value is ``None`` for charged_heat <= 0, so
+    no division by zero occurs. The efficiency lies in [0, 1] for recovered_heat between 0 and
+    charged_heat.
     """
     return ops.where(charged_heat > 0, recovered_heat / charged_heat, None)
 
@@ -799,6 +815,10 @@ def borehole_field_capacity(
     Notes
     -----
     Volume of the field: one ``s`` by ``s`` cell of depth ``H`` per borehole.
+
+    Validity: volumetric_heat_capacity, count, spacing and depth positive; no division occurs. A
+    lumped field with a regular spacing.
+    Source: A plain heat capacity of a volume; no published source is needed.
     """
     volume = count * spacing**2 * depth
     return volumetric_heat_capacity * volume
@@ -838,6 +858,8 @@ def borehole_field_temperature_change(
     -----
     Exact solution of ``C dtheta/dt = -Q - UA_s theta`` for a constant inlet over the step
     (Incropera et al., lumped capacitance method).
+
+    Source: Incropera et al., Fundamentals of Heat and Mass Transfer, lumped capacitance method.
     """
     total = exchange + surroundings
     equilibrium = exchange * (inlet_temperature - undisturbed_temperature) / total

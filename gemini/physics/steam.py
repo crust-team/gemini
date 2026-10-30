@@ -398,6 +398,13 @@ def b23_pressure(temperature: float) -> float:
     -------
     float
         Boundary pressure [Pa], p / 1 MPa = n1 + n2 T + n3 T^2 with the coefficients of table 1.
+
+    Notes
+    -----
+    Validity: temperature from 623.15 K to 863.15 K; other values raise PhysicsRangeError. No
+    division occurs.
+    Source: IAPWS (2007), Revised Release on the IAPWS Industrial Formulation 1997
+    (IAPWS-R7-97(2012)), eq. 5 and table 1.
     """
     _check_range(
         "b23_pressure",
@@ -582,6 +589,9 @@ def turbine_balance(
     -----
     Steady-flow first law of the turbine and the condenser (DiPippo, R. (2016), Geothermal
     Power Plants, 4th ed., section 5.5): m h_in = electricity + heat_loss + m h_f.
+
+    Validity: mass_flow nonnegative; inlet_enthalpy >= outlet_enthalpy >= condensate_enthalpy;
+    generator_efficiency in (0, 1]; no division occurs.
     """
     gross_power = mass_flow * (inlet_enthalpy - outlet_enthalpy)
     electricity_generated = gross_power * generator_efficiency

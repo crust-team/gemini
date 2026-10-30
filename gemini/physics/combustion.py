@@ -76,6 +76,12 @@ def engine_energy_flows(
     Notes
     -----
     Constant thermal efficiency on the fuel basis (manufacturer data of gas engines).
+
+    Validity: fuel, electric_capacity nonnegative; load and thermal_efficiency in [0, 1]; the
+    electric output must not exceed the fuel minus the recovered heat, or the heat loss is negative.
+    No division occurs.
+    Source: Constant thermal efficiency is a manufacturer-data convention; the rest is a first-law
+    balance, and no published source is needed.
     """
     return thermal_efficiency * fuel, load * electric_capacity
 
@@ -113,6 +119,12 @@ def flare_emissions(
     Stoichiometry CH4 + 2 O2 -> CO2 + 2 H2O; destruction efficiency from US EPA AP-42, section
     13.5 "Industrial Flares"; heating value from the NIST Chemistry WebBook. Other combustibles
     and H2S are not modelled.
+
+    Validity: gas_flow nonnegative; co2_fraction and methane_fraction in [0, 1] with a sum of at
+    most one; combustion_efficiency in [0, 1]; heating_value positive. No division occurs.
+    Source: Destruction efficiency from US EPA AP-42, section 13.5 and heating value from the NIST
+    Chemistry WebBook, as cited for FLARE_EFFICIENCY and METHANE_HEATING_VALUE; the balance is
+    stoichiometry.
     """
     methane = methane_fraction * gas_flow
     burnt = combustion_efficiency * methane

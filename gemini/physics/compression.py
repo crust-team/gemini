@@ -72,6 +72,10 @@ def stage_outlet_temperature(
     -----
     Reference: GPSA Engineering Data Book, 14th ed. (2017), Section 13, actual discharge
     temperature from the isentropic efficiency.
+
+    Validity: inlet_temperature positive, pressure_ratio at least one, heat_capacity_ratio greater
+    than one, isentropic_efficiency in (0, 1]; other values raise PhysicsRangeError. Ideal gas with
+    Z = 1 and constant k.
     """
     ops.check(
         ops.logical_and(isentropic_efficiency > 0, isentropic_efficiency <= 1),
@@ -204,6 +208,9 @@ def shaft_power(mass_flow: float, specific_work: float) -> float:
     Notes
     -----
     Reference: GPSA Engineering Data Book, 14th ed. (2017), Section 13, gas horsepower.
+
+    Validity: mass_flow nonnegative and specific_work real; no division occurs. Ideal gas, Z = 1, as
+    for the work from ``specific_compression_work``.
     """
     return mass_flow * specific_work
 
@@ -232,6 +239,9 @@ def heat_rejected(electricity: float, shaft_power: float, stages: float) -> floa
     Each of the N equal stages does ``P_shaft / N``; the intercoolers return the gas to the
     suction temperature, so only the last stage heat stays in the gas (GPSA Engineering Data
     Book, 14th ed. (2017), Section 13, intercooling).
+
+    Validity: stages at least one (the code divides by it); electricity and shaft_power nonnegative
+    with electricity at least shaft_power / stages.
     """
     return electricity - shaft_power / stages
 

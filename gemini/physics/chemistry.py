@@ -25,6 +25,9 @@ def henry_constant(temperature: float) -> float:
     0.0385 mol/l/bar at 293.15 K and the 2400 K temperature coefficient are the retained GEMINI
     water-analysis values (co2_partial_pressure_model.henry_constant), not a published fit;
     the exponential is a van 't Hoff form with a constant enthalpy of solution.
+
+    Validity: T must be positive (the code divides by T). The coefficients are anchored at 293.15 K;
+    no wider range of the fit is established in the code base.
     """
     return units.mol_l_bar_to_mol_m3_pa(0.0385 * ops.exp(2400 * (1 / temperature - 1 / 293.15)))
 
@@ -114,6 +117,10 @@ def co2_partial_pressure(
     sample conditions and c_gas from ``co2_solubility_gas``: total sampled gas plus dissolved
     CO2 is repartitioned using Henry's law at the system temperature. Retained GEMINI
     water-analysis formulation (co2_partial_pressure_model).
+
+    Validity: Both temperatures must be positive and gas_molecular_weight positive; co2_fraction is
+    in [0, 1] and gas_pressure, gas_water_ratio and gas_density are nonnegative. Ideal-gas, dilute-
+    solution Henry law only.
     """
     total = co2_solubility_liquid(co2_fraction, temperature_sample, gas_pressure)
     total += co2_solubility_gas(co2_fraction, gas_water_ratio, gas_density, gas_molecular_weight)

@@ -49,6 +49,8 @@ def net_exchange(
     -----
     Net metering at one connection point with one tariff per direction, without reactive power,
     losses or demand charges.
+
+    Source: A plain power balance at the connection point; no published source is needed.
     """
     demand = ops.maximum(0.0, consumption - generation)
     surplus = ops.maximum(0.0, generation - consumption)

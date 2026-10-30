@@ -176,6 +176,10 @@ def humidity_ratio(temperature: float, relative_humidity: float, pressure: float
     ASHRAE Handbook - Fundamentals (2017), chapter 1, equations 20 and 22, for an ideal mixture.
     The enhancement factor (about 1.004 at sea level) is neglected, so the saturated values are
     about 0.4 % below the ASHRAE table column W_s.
+
+    Validity: temperature from 173.15 K to 473.15 K, relative_humidity in [0, 1] and pressure above
+    the vapour pressure relative_humidity * saturation_pressure(T), so the divisor is positive;
+    other values raise PhysicsRangeError.
     """
     _check_temperature("humidity_ratio", temperature)
     _check_relative_humidity("humidity_ratio", relative_humidity, minimum_included=True)

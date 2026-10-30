@@ -37,6 +37,10 @@ def relative_drift(measured: float, predicted: float) -> float:
     Notes
     -----
     Plain relative error; the floor ``DRIFT_FLOOR`` only avoids a division by zero.
+
+    Validity: Valid for any real measured and predicted values in one unit; the divisor is at least
+    DRIFT_FLOOR, so it is never zero.
+    Source: A plain definition, no published source.
     """
     return (measured - predicted) / ops.maximum(ops.abs(predicted), DRIFT_FLOOR)
 
@@ -58,6 +62,8 @@ def bounded_score(ratio: float) -> float:
     Notes
     -----
     One is a healthy unit, zero a failed one; no published source, a scoring convention.
+
+    Validity: Valid for any real ratio; the result is in [0, 1] by construction. No division occurs.
     """
     return ops.minimum(1, ops.maximum(0, ratio))
 
@@ -79,6 +85,9 @@ def remaining_margin(ratio: float) -> float:
     Notes
     -----
     Scoring convention without a published source.
+
+    Validity: Valid for any real ratio, normally nonnegative; the result is in [0, 1] for ratio >=
+    0. No division occurs.
     """
     return ops.maximum(0, 1 - ratio)
 
@@ -102,6 +111,9 @@ def below_limit(ratio: float, threshold: float) -> bool:
     Notes
     -----
     Alarm convention for a decline or fouling test, without a published source.
+
+    Validity: ratio is real, normally nonnegative; threshold in (0, 1] (a value outside this range
+    is not checked). No division occurs.
     """
     return ratio < 1 - threshold
 

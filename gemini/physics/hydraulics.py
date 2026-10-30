@@ -289,6 +289,9 @@ def affine_correction(pressure: float, slope: float, offset: float) -> float:
     -----
     Calibration convention of the GEMINI well models, fitted to measured pressures; no
     published source.
+
+    Validity: Valid for any real pressure and offset; slope is positive in practice. No division
+    occurs.
     """
     return slope * pressure + offset
 
@@ -365,6 +368,10 @@ def productivity_index(flow: float, reservoir_pressure: float, bottomhole_pressu
     -----
     Inverse of ``productivity_pressure``. Reference: Economides et al., Petroleum Production
     Systems.
+
+    Validity: reservoir_pressure and bottomhole_pressure must differ (the code divides by the
+    difference); the index is positive for a producer with bottomhole_pressure below
+    reservoir_pressure. A constant index holds for single-phase, pseudo-steady Darcy flow.
     """
     return flow / (reservoir_pressure - bottomhole_pressure)
 
@@ -389,6 +396,10 @@ def injectivity_index(flow: float, reservoir_pressure: float, bottomhole_pressur
     -----
     Inverse of ``injectivity_pressure``. Reference: Economides et al., Petroleum Production
     Systems.
+
+    Validity: reservoir_pressure and bottomhole_pressure must differ (the code divides by the
+    difference); the index is positive for an injector with bottomhole_pressure above
+    reservoir_pressure. A constant index holds for single-phase, pseudo-steady Darcy flow.
     """
     return flow / (bottomhole_pressure - reservoir_pressure)
 

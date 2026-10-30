@@ -156,6 +156,8 @@ def best_efficiency_ratio(flow, speed, best_efficiency_flow):
     Notes
     -----
     The best-efficiency flow scales with speed (affinity law Q ~ s).
+
+    Source: The affinity laws, Karassik et al., Pump Handbook, 4th ed., chapter 2.
     """
     return flow / (speed * best_efficiency_flow)
 
@@ -182,6 +184,9 @@ def parabolic_efficiency(best_efficiency, load):
     Speed-scaled quadratic efficiency curve of Ulanicki, Kahler and Coulbeck (2008), Modeling the
     efficiency and power characteristics of a pump group, J. Water Resour. Plann. Manage.
     134(1), 88-93. The 2 is the shape of the parabola (zero slope at x = 1).
+
+    Validity: best_efficiency in (0, 1] and load in [0, 2), where the curve is nonnegative; no
+    division occurs.
     """
     return best_efficiency * load * (2 - load)
 
@@ -205,6 +210,8 @@ def hydraulic_power(flow, head):
     Notes
     -----
     Karassik et al., Pump Handbook, 4th ed., chapter 2 (water horsepower).
+
+    Validity: flow and head nonnegative for a pump; no division occurs. Incompressible liquid.
     """
     return flow * head
 
@@ -231,6 +238,10 @@ def pump_efficiency(flow, head, power):
     -----
     Karassik et al., Pump Handbook, 4th ed., chapter 2. Not bitwise the same expression as
     ``esp_efficiency``, which keeps the US-basis factors of the retained ESP model.
+
+    Validity: flow and head nonnegative; power at least LINE_SHAFT_MIN_EFFICIENCY_POWER (below it
+    the result is zero), which keeps the divisor positive. The efficiency is in [0, 1] for a
+    physical pump.
     """
     return ops.where(power >= LINE_SHAFT_MIN_EFFICIENCY_POWER, flow * head / power, 0.0)
 
@@ -259,6 +270,10 @@ def esp_efficiency(flow, head, power):
     the result is the SI ``Q H / P`` up to that factor. ``ops.truediv`` keeps the legacy float32
     arithmetic of the ESP: a plain ``/`` by a zero power raises in the plain scalar mode, where
     this function must return the discarded branch of ``ops.where`` instead.
+
+    Validity: flow and head nonnegative; power at least ESP_MIN_EFFICIENCY_POWER (below it the
+    result is zero), which keeps the divisor positive. The polynomial pump model can give a value
+    above one.
     """
     return ops.where(
         power < ESP_MIN_EFFICIENCY_POWER,
@@ -319,5 +334,10 @@ def line_shaft_friction_power(friction_loss, depth, speed):
     Friction grows in proportion to speed (constant bearing friction torque), the form of the
     manufacturer tables of line-shaft friction in ANSI/HI 2.3, Rotodynamic Vertical Pumps for
     Design and Application.
+
+    Validity: friction_loss, depth and speed nonnegative; no division occurs. Friction in proportion
+    to speed holds for constant bearing friction torque.
+    Source: The form of the manufacturer line-shaft friction tables cited in ANSI/HI 2.3,
+    Rotodynamic Vertical Pumps for Design and Application, as cited for the line-shaft pump model.
     """
     return friction_loss * depth * speed

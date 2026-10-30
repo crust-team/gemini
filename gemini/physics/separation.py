@@ -37,6 +37,8 @@ def split_flow(mass_flow: float, fraction: float) -> tuple[float, float]:
     -----
     Ideal tee or bleed with a commanded share and no pressure loss; the sum closes to rounding.
     Valid for any real flow, a reverse flow scales both parts.
+
+    Source: A plain mass balance; no published source is needed.
     """
     branch = fraction * mass_flow
     return mass_flow - branch, branch
@@ -69,6 +71,9 @@ def degasser_split(
     -----
     Lumped vessel performance: no residence time, level or solubility (Henry's law); dissolved
     gas stays in the liquid. Retained GEMINI formulation of an ideal split of the free gas.
+
+    Validity: mass_flow nonnegative; gas_mass_fraction and efficiency in [0, 1], not both equal to
+    one (the code divides by 1 - eta x).
     """
     liquid, gas = split_flow(mass_flow, efficiency * gas_mass_fraction)
     remaining = (1 - efficiency) * gas_mass_fraction / (1 - efficiency * gas_mass_fraction)
@@ -102,6 +107,9 @@ def cyclone_sand(
     The grade-efficiency curve is lumped into one constant efficiency, so the cut size does not
     follow the flow. Reference: Svarovsky (2000), Solid-Liquid Separation, 4th ed., chapter
     "Hydrocyclones"; retained GEMINI formulation.
+
+    Validity: efficiency in [0, 1]; sand_concentration and liquid_flow nonnegative; no division
+    occurs.
     """
     return efficiency * sand_concentration * liquid_flow, (1 - efficiency) * sand_concentration
 
@@ -132,6 +140,8 @@ def dosing_flows(
     -----
     Mass-proportional dosing as in inhibitor programmes (Gallup, 2009, Geothermics 38,
     326-334); the dosed mass is not added to the stream.
+
+    Validity: dose and mass_flow nonnegative; product_concentration in [0, 1]; no division occurs.
     """
     product = dose * mass_flow
     return product, product_concentration * product

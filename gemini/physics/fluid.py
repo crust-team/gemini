@@ -132,6 +132,8 @@ def liquid_volume_flow(mass_flow: float, gas_mass_fraction: float, liquid_densit
     Notes
     -----
     The liquid mass flow is ``m (1 - x)``; its volume follows from the liquid density.
+
+    Source: A plain mass balance of the liquid fraction; no published source is needed.
     """
     return mass_flow * (1 - gas_mass_fraction) / liquid_density
 
@@ -155,5 +157,8 @@ def heat_capacity_rate(mass_flow: float, heat_capacity: float) -> float:
     -----
     Reference: Incropera and DeWitt, Fundamentals of Heat and Mass Transfer, the capacity
     rate ``C = m cp`` of the effectiveness-NTU method.
+
+    Validity: Valid for any real mass flow and heat capacity; the effectiveness-NTU relations need a
+    positive rate, a negative one only marks a reversed stream. No division occurs.
     """
     return mass_flow * heat_capacity

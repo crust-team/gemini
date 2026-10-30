@@ -77,6 +77,9 @@ def tank_capacity(volumetric_heat_capacity: float, volume: float) -> float:
     Notes
     -----
     Reference: Duffie and Beckman (2013), section 8.3, fully mixed storage.
+
+    Validity: volumetric_heat_capacity and volume positive; no division occurs. A uniform tank
+    temperature.
     """
     return volumetric_heat_capacity * volume
 
@@ -196,6 +199,9 @@ def ice_stored_cold(water_mass: float, latent_heat: float, fraction: float) -> f
     Notes
     -----
     Latent heat of fusion released when the frozen fraction melts.
+
+    Validity: water_mass nonnegative, latent_heat positive, fraction in [0, 1]; no division occurs.
+    Source: A first-law latent-heat balance; no published source is needed.
     """
     return water_mass * latent_heat * fraction
 
@@ -297,6 +303,10 @@ def ice_step(
     -----
     Liquid segment (T above freezing, or x = 0 with a warm inlet) and solid segment relax
     sensibly; otherwise the latent segment runs at the constant duty ``G (T_in - T_f)``.
+
+    Source: Incropera et al., Fundamentals of Heat and Mass Transfer, lumped capacitance method, as
+    for ``ice_advance``. Valid for conductance positive (the code divides by it), water_mass and
+    latent_heat positive, duration nonnegative.
     """
     freezing = freezing_temperature
     liquid = ops.logical_or(

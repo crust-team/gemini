@@ -15,7 +15,7 @@ def pid_error(setpoint: float, measurement: float, reverse: bool) -> float:
     Parameters
     ----------
     setpoint, measurement : float
-        Target and measured value of the controlled variable, in one unit.
+        Target and measured value of the controlled variable [U], both in one unit U.
     reverse : bool
         True for a reverse-acting controller (command rises when the measurement falls, a
         heating valve), false for a direct-acting one (a cooling valve).
@@ -24,12 +24,15 @@ def pid_error(setpoint: float, measurement: float, reverse: bool) -> float:
     -------
     float
         ``e = setpoint - measurement`` for reverse action, ``measurement - setpoint`` for
-        direct action, in the unit of the inputs.
+        direct action [U], the unit of the inputs.
 
     Notes
     -----
     Reference: Astrom and Hagglund 2006, Advanced PID Control, chapter 3 (sign of the error
     for direct and reverse action).
+
+    Validity: Valid for any real setpoint and measurement in one common unit; reverse is a static
+    Python bool or a boolean array. No division occurs.
     """
     return ops.where(reverse, setpoint - measurement, measurement - setpoint)
 
@@ -84,6 +87,9 @@ def pid_command(gain: float, error: float, integral: float, derivative: float) -
     -----
     Reference: Astrom and Hagglund 2006, Advanced PID Control, chapter 3, ideal (ISA) form
     with the integral kept as a state in command units.
+
+    Validity: Valid for any real gain, error, integral and derivative; no division occurs. A
+    positive gain is the usual case, the direction is carried by pid_error.
     """
     return gain * error + integral + derivative
 
@@ -127,22 +133,25 @@ def anti_windup_increment(
     Parameters
     ----------
     increment : float
-        Candidate integral increment, in command units.
+        Candidate integral increment [u], in command units u.
     unclamped : float
-        Command before the output limits, in command units.
+        Command before the output limits [u].
     minimum_output, maximum_output : float
-        Output limits, in command units.
+        Output limits [u].
 
     Returns
     -------
     float
         ``0`` if ``unclamped >= maximum_output`` and ``increment > 0``, or ``unclamped <=
-        minimum_output`` and ``increment < 0``; otherwise ``increment``.
+        minimum_output`` and ``increment < 0``; otherwise ``increment`` [u].
 
     Notes
     -----
     Reference: Astrom and Hagglund 2006, Advanced PID Control, section on anti-windup:
     clamping (conditional integration).
+
+    Validity: Valid for any real values with minimum_output <= maximum_output, all in one command
+    unit [u]. No division occurs.
     """
     winding_up = ops.logical_and(unclamped >= maximum_output, increment > 0)
     winding_down = ops.logical_and(unclamped <= minimum_output, increment < 0)

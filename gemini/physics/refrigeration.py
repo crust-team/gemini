@@ -95,6 +95,9 @@ def carnot_cop_cooling(
     -----
     Reference: Carnot efficiency of a reversible refrigerator, for example Moran and Shapiro,
     Fundamentals of Engineering Thermodynamics, chapter 5. COP_c = COP_h - 1 for the same lift.
+
+    Validity: Both temperatures positive and minimum_lift >= 0; the floored lift must be positive
+    (it is the divisor). The sink is normally warmer than the source.
     """
     lift = _lift("carnot_cop_cooling", sink_temperature, source_temperature, minimum_lift)
     return source_temperature / lift
@@ -473,6 +476,9 @@ def sorption_delivered_duty(
     -----
     Retained GEMINI throttling: the machine follows the request at an unchanged COP until the
     characteristic equation or the capacity limits it.
+
+    Validity: useful_ratio positive (the code divides by it); requested, available and capacity
+    nonnegative.
     """
     wanted = requested / useful_ratio
     delivered = ops.minimum(ops.minimum(wanted, available), capacity / useful_ratio)
@@ -527,6 +533,9 @@ def sorption_duties(
     Notes
     -----
     Constant thermal COP with the first-law closure of ``sorption_rejection_ratio``.
+
+    Source: First-law closure of Herold, Radermacher and Klein (2016), Absorption Chillers and Heat
+    Pumps, 2nd ed.
     """
     generator = evaporator_duty / thermal_cop
     electricity = evaporator_duty * auxiliary_power_ratio
@@ -652,6 +661,9 @@ def carnot_fraction_cop_heating(
     -----
     Same signature as ``carnot_fraction_cop_cooling`` and ``lorenz_fraction_cop_heating``, so a
     module picks the COP model structurally. Carnot fraction: Arpagaus et al. (2018).
+
+    Validity: efficiency in (0, 1]; outlet temperatures positive and minimum_lift >= 0 with a
+    positive floored lift (the divisor of the Carnot COP). The inlets are not used.
     """
     return efficiency * carnot_cop_heating(sink_outlet, source_outlet, minimum_lift)
 
@@ -684,6 +696,9 @@ def carnot_fraction_cop_cooling(
     Notes
     -----
     See ``carnot_fraction_cop_heating``.
+
+    Validity: efficiency in (0, 1]; outlet temperatures positive and minimum_lift >= 0 with a
+    positive floored lift (the divisor of the Carnot COP). The inlets are not used.
     """
     return efficiency * carnot_cop_cooling(sink_outlet, source_outlet, minimum_lift)
 
@@ -716,6 +731,9 @@ def lorenz_fraction_cop_heating(
     Notes
     -----
     See ``carnot_fraction_cop_heating`` and ``lorenz_cop_heating`` (Lorenz 1894).
+
+    Validity: efficiency in (0, 1]; all four temperatures positive, minimum_lift >= 0, and the
+    floored log-mean lift positive (the divisor of the Lorenz COP).
     """
     cop = lorenz_cop_heating(sink_inlet, sink_outlet, source_inlet, source_outlet, minimum_lift)
     return efficiency * cop
@@ -741,6 +759,11 @@ def heating_evaporator_duty(condenser_duty: float, cop: float) -> float:
     -----
     First law of a steady vapour-compression cycle, Moran and Shapiro, Fundamentals of
     Engineering Thermodynamics, chapter 10.
+
+    Validity: cop nonzero (the code divides by it) and above one for a heat pump, so that Q_E is
+    nonnegative; condenser_duty nonnegative.
+    Source: First law of a steady vapour-compression cycle, Moran and Shapiro, Fundamentals of
+    Engineering Thermodynamics, chapter 10.
     """
     return condenser_duty - condenser_duty / cop
 
@@ -764,6 +787,10 @@ def cooling_condenser_duty(evaporator_duty: float, cop: float) -> float:
     Notes
     -----
     First law of a steady vapour-compression cycle, Moran and Shapiro, Fundamentals of
+    Engineering Thermodynamics, chapter 10.
+
+    Validity: cop positive (the code divides by it); evaporator_duty nonnegative.
+    Source: First law of a steady vapour-compression cycle, Moran and Shapiro, Fundamentals of
     Engineering Thermodynamics, chapter 10.
     """
     return evaporator_duty + evaporator_duty / cop
@@ -938,6 +965,9 @@ def lorenz_source_surplus(
     Notes
     -----
     A root-finding function of ``ops.brentq``; ``lorenz_fraction_cop_heating`` gives the COP.
+
+    Validity: efficiency positive and the COP nonzero (the code divides by it); source_rate and duty
+    nonnegative; all temperatures positive and minimum_lift >= 0 with a positive floored lift.
     """
     cop = lorenz_fraction_cop_heating(
         efficiency, minimum_lift, sink_inlet, sink_outlet, source_inlet, source_outlet
@@ -986,6 +1016,10 @@ def source_limit_shortfall(
     Notes
     -----
     A root-finding function of ``ops.brentq``, bound with ``functools.partial``.
+
+    Validity: efficiency positive and the COP nonzero (the code divides by it); useful_duty and
+    available nonnegative; sink_rate nonnegative, a zero rate gives a zero sink temperature rise;
+    temperatures positive and minimum_lift >= 0 with a positive floored lift.
     """
     sink_outlet = sink_inlet + heat_transfer.temperature_change(useful_duty, sink_rate)
     cop = cop_function(

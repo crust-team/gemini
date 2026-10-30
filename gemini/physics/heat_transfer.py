@@ -240,6 +240,8 @@ def signed_parts(value):
     Notes
     -----
     Pure bookkeeping split of a signed flow into the two directions; valid for any real value.
+
+    Source: A plain definition of the positive and negative part, no published source.
     """
     return ops.maximum(value, 0), ops.maximum(-value, 0)
 
@@ -264,6 +266,9 @@ def heat_rate(capacity_rate: float, temperature_difference: float) -> float:
     -----
     Reference: Incropera et al., Fundamentals of Heat and Mass Transfer, steady-flow energy
     balance of a single-phase stream with constant heat capacity.
+
+    Validity: capacity_rate nonnegative, temperature_difference real; no division occurs. Single
+    phase with a constant heat capacity.
     """
     return capacity_rate * temperature_difference
 
@@ -419,6 +424,9 @@ def exponential_relaxation(start: float, equilibrium: float, factor: float) -> f
     -----
     Reference: Incropera et al., Fundamentals of Heat and Mass Transfer, lumped capacitance
     method with a constant equilibrium temperature over the step.
+
+    Validity: start and equilibrium real in one unit; factor in [0, 1] (the output of
+    ``relaxation_factor``); no division occurs.
     """
     return equilibrium + (start - equilibrium) * factor
 
@@ -506,6 +514,9 @@ def fan_power(duty: float, specific_fan_power: float) -> float:
     Speed-controlled fans without the cubic fan law: a retained GEMINI simplification (ASHRAE
     Handbook, HVAC Systems and Equipment, chapters on cooling towers and dry coolers, give the
     fan power of a cooler as a fraction of its capacity).
+
+    Validity: duty and specific_fan_power nonnegative; no division occurs. A fan power proportional
+    to the duty is a simplification, not a fan law.
     """
     return specific_fan_power * duty
 
@@ -528,6 +539,8 @@ def mean_temperature(first: float, second: float) -> float:
     -----
     Mean circuit temperature of a characteristic-equation machine (Hellmann, Schweigler and
     Ziegler 1999).
+
+    Validity: Valid for any two real temperatures, positive [K] in practice; no division occurs.
     """
     return (first + second) / 2
 
@@ -656,6 +669,9 @@ def apparent_conductance(
     Heat and Mass Transfer, applied to measurements. A row that is already undetermined gives
     LMTD zero terminal differences, so an invalid temperature of such a row raises nothing, as
     it does not when one row is evaluated alone. Read the result by index.
+
+    Source: Incropera et al., Fundamentals of Heat and Mass Transfer, LMTD method, applied to
+    measurements.
     """
     smallest = ops.minimum(ops.minimum(ops.minimum(m_dot_hot, m_dot_cold), cp_hot), cp_cold)
     qh = heat_rate(m_dot_hot * cp_hot, hot_in_T - hot_out_T)
