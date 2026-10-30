@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import reduce
 from typing import TYPE_CHECKING, Literal
 
 from gemini import ops
@@ -36,6 +37,7 @@ _SEGREGATED_UPHILL = (0.011, -3.768, 3.539, -1.614)
 _INTERMITTENT_UPHILL = (2.96, 0.305, -0.4473, 0.0978)
 
 
+@ops.physics
 def darcy_weisbach_dp(
     velocity: float,
     rho: float,
@@ -67,15 +69,13 @@ def darcy_weisbach_dp(
     combined with Darcy–Weisbach and hydrostatic balance; retained GEMINI formulation.
     """
     reynolds = ops.abs(velocity) * rho * diameter / mu
-    friction_factor = 0.25 / (
-        (ops.log10((roughness / (3.7 * diameter)) + ops.truediv(5.74, ops.pow(reynolds, 0.9))))
-        ** (2)
-    )
+    friction_factor = 0.25 / (ops.log10((roughness / (3.7 * diameter)) + 5.74 / reynolds**0.9)) ** 2
     gravity = rho * G * length * ops.sin(inclination)
     friction = friction_factor * rho * length / diameter * (ops.abs(velocity) * velocity) / 2
     return ops.where(velocity == 0, 0.0, friction), gravity
 
 
+@ops.physics
 def beggs_brill_dp(
     us_g: float,
     us_l: float,
@@ -165,11 +165,10 @@ def _no_slip_friction(velocities, densities, viscosities, diameter, roughness):
     density = (no_slip_holdup * rho_l) + (1 - no_slip_holdup) * rho_g
     viscosity = (no_slip_holdup * mu_l) + (1 - no_slip_holdup) * mu_g
     reynolds = mixture_velocity * density * diameter / viscosity
-    friction_factor = ops.pow(
+    friction_factor = (
         -0.8685
-        * ops.log((1.964 * ops.log(reynolds) - 3.8215) / reynolds + roughness / (diameter * 3.71)),
-        -2,
-    )
+        * ops.log((1.964 * ops.log(reynolds) - 3.8215) / reynolds + roughness / (diameter * 3.71))
+    ) ** -2
     return (0.5 * density * mixture_velocity * ops.abs(mixture_velocity)) * friction_factor
 
 
@@ -215,10 +214,10 @@ def _flow_regime(no_slip_holdup, froude):
     ``_DISTRIBUTED``, chosen by nested ``where`` in the order of the map; a pair outside the
     map raises.
     """
-    l1 = 316 * ops.pow(no_slip_holdup, 0.302)
-    l2 = 0.0009252 * ops.pow(no_slip_holdup, -2.4684)
-    l3 = 0.10 * ops.pow(no_slip_holdup, -1.4516)
-    l4 = 0.5 * ops.pow(no_slip_holdup, -6.738)
+    l1 = 316 * no_slip_holdup**0.302
+    l2 = 0.0009252 * no_slip_holdup**-2.4684
+    l3 = 0.10 * no_slip_holdup**-1.4516
+    l4 = 0.5 * no_slip_holdup**-6.738
     low, high = no_slip_holdup < 0.01, no_slip_holdup >= 0.01
     below, above = no_slip_holdup < 0.4, no_slip_holdup >= 0.4
     segregated = ops.logical_or(
@@ -281,7 +280,7 @@ def _liquid_holdup(no_slip_holdup, liquid_velocity_number, froude, inclination):
     factor = _regime_factor(
         regime, is_downhill, inclination >= 0, downhill, segregated_uphill, intermittent_uphill
     )
-    weight = ops.truediv(l3 - froude, l3 - l2)
+    weight = (l3 - froude) / (l3 - l2)
     segregated = segregated_holdup * ops.where(is_downhill, downhill, segregated_uphill)
     intermittent = intermittent_holdup * ops.where(is_downhill, downhill, intermittent_uphill)
     blended = weight * segregated + (1 - weight) * intermittent
@@ -336,9 +335,7 @@ def _friction_multiplier(no_slip_holdup, holdup):
     s = ops.where(
         ops.logical_and(y > 1, y < 1.2),
         ops.log(2.2 * y - 1.2),
-        ops.truediv(
-            log_y, -0.0523 + 3.182 * log_y - 0.8725 * (log_y) ** 2 + 0.01853 * (log_y) ** 4
-        ),
+        log_y / (-0.0523 + 3.182 * log_y - 0.8725 * (log_y) ** 2 + 0.01853 * (log_y) ** 4),
     )
     return ops.exp(s)
 
@@ -355,6 +352,7 @@ class PathResult:
     section_temperature: list[float]
 
 
+@ops.physics
 def hydrostatic_dp(rho: float, height: float) -> float:
     """Evaluate hydrostatic pressure.
 
@@ -375,6 +373,7 @@ def hydrostatic_dp(rho: float, height: float) -> float:
     return rho * G * height
 
 
+@ops.physics
 def pipe_path_profile(
     path: geometry.PipePath,
     stream: Stream,
@@ -458,9 +457,11 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     The two-phase model is chosen by ``fluid.gas_mass_fraction``, which is fixed in a trace: a
     liquid-only fluid never reaches Beggs–Brill. With free gas the gas mass flow is zero only
     at zero flow, which is the zero-flow case, so the structural test equals the former test of
-    the gas mass flow. At zero flow every branch is still evaluated, so Beggs–Brill and the heat
-    loss receive a harmless liquid velocity, inclination and liquid mass flow there and
-    ``where`` returns the zero drops.
+    the gas mass flow. At zero flow every branch is still evaluated, Beggs–Brill's check on the
+    liquid velocity fails there and ``where`` drops its error for the zero drops; the two drops
+    are read by index because a failed result cannot be unpacked. The heat loss
+    still receives a liquid flow of 1 kg/s at zero flow: ``pipe_temperature_change`` is not a
+    physics function yet, so its failing check would not be dropped.
 
     NOTE(refactor): DPDT's zero-flow branch suppresses gravity as well as friction.
 
@@ -479,17 +480,18 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     if fluid.gas_mass_fraction == 0:
         friction, gravity = darcy_weisbach_dp(us_l, f.rho_l, section.inclination, f.mu_l, *shape)
     else:
-        friction, gravity = beggs_brill_dp(
+        drops = beggs_brill_dp(
             us_g,
-            ops.where(stopped, 1.0, ops.abs(us_l)),
+            ops.abs(us_l),
             f.rho_g,
             f.rho_l,
-            ops.where(stopped, 0.0, section.inclination),
+            section.inclination,
             f.mu_g,
             f.mu_l,
             f.sigma,
             *shape,
         )
+        friction, gravity = drops[0], drops[1]
         friction = ops.where(us_l < 0, -friction, friction)
     delta_T = heat_transfer.pipe_temperature_change(
         T,
@@ -508,6 +510,7 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     )
 
 
+@ops.physics
 def radial_pressure_drops(
     volume_flow: float,
     viscosity: float,
@@ -554,6 +557,7 @@ def radial_pressure_drops(
     )
 
 
+@ops.physics
 def corrosion_profile(
     path: geometry.PipePath,
     stream: Stream,
@@ -614,6 +618,7 @@ def corrosion_profile(
     return rates
 
 
+@ops.physics
 def erosion_check(path: geometry.PipePath, stream: Stream, fluid: Fluid) -> dict:
     """Compare section velocities with the API erosional velocity limit.
 
@@ -638,11 +643,12 @@ def erosion_check(path: geometry.PipePath, stream: Stream, fluid: Fluid) -> dict
     density = fluid.properties(stream.p, stream.T).density
     limit = erosion.api_erosional_velocity(density)
     velocity = [
-        abs(stream.m_dot) / density / geometry.circle_area(s.inner_diameter) for s in path.sections
+        ops.abs(stream.m_dot) / density / geometry.circle_area(s.inner_diameter)
+        for s in path.sections
     ]
     return {
         "velocity": velocity,
         "limit": limit,
         "sections": [erosion.api_velocity_comparison(v, limit) for v in velocity],
-        "alarm": any(v > limit for v in velocity),
+        "alarm": reduce(ops.logical_or, (v > limit for v in velocity), False),
     }

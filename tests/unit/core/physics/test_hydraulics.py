@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from gemini import ops
 from gemini.core.physics import geometry, hydraulics
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import BRINE, Fluid
@@ -263,6 +264,9 @@ def test_radial_drops_and_hydrostatics_match_on_arrays():
 
 
 def _profile(path, fluid, direction):
+    """Return a physics function of the stream fields, so a traced stream is seen as traced."""
+
+    @ops.physics
     def profile(m_dot, p, T):
         stream = Stream(m_dot=m_dot, p=p, T=T, fluid=fluid)
         result = hydraulics.pipe_path_profile(path, stream, fluid, direction, 10, 290)
@@ -301,3 +305,54 @@ def test_two_phase_zero_flow_in_a_steep_downhill_section_returns_zero_drops():
     result = hydraulics.pipe_path_profile(path, stream, GAS, "down", 10, 290)
     assert (result.p_out, result.T_out) == (1e6, 350)
     assert result.dp_friction == result.dp_gravity == 0
+
+
+def test_two_phase_zero_flow_rows_match_on_arrays_in_a_steep_downhill_section():
+    """Stopped rows cross the failing Beggs-Brill checks of a steep section without raising."""
+    path = geometry.PipePath(
+        sections=[
+            geometry.PipeSection(
+                length=100, inclination=-math.pi / 4, inner_diameter=0.1778, roughness=2e-5
+            )
+        ]
+    )
+    profile = _profile(path, GAS, "down")
+    profile.__name__ = "pipe_path_profile"
+    assert_function_matches(profile, [(0, 1e6, 350), (0, 5e5, 330)])
+
+
+def test_erosion_check_matches_on_arrays():
+    """Section velocities, ratios and the alarm over a narrow and a wide section match."""
+
+    @ops.physics
+    def check(m_dot, p, T):
+        result = hydraulics.erosion_check(
+            _path(0.02, 0.3), Stream(m_dot=m_dot, p=p, T=T, fluid=BRINE), BRINE
+        )
+        return dict(
+            limit=result["limit"],
+            alarm=result["alarm"],
+            **{f"velocity{index}": value for index, value in enumerate(result["velocity"])},
+            **{
+                f"ratio{index}": section["velocity_ratio"]
+                for index, section in enumerate(result["sections"])
+            },
+        )
+
+    check.__name__ = "erosion_check"
+    assert_function_matches(check, [(40, 50e5, 350), (0.5, 50e5, 350), (-40, 20e5, 330)])
+
+
+def test_corrosion_profile_matches_on_arrays():
+    """The corrosion rate of every section of the marched profile matches on arrays."""
+
+    @ops.physics
+    def profile(m_dot, p, T):
+        stream = Stream(m_dot=m_dot, p=p, T=T, fluid=BRINE)
+        rates = hydraulics.corrosion_profile(
+            _path(0.1, 0.3), stream, BRINE, "down", 0, 350, {"co2_fraction": 0.05}, "DLD"
+        )
+        return {f"rate{index}": rate for index, rate in enumerate(rates)}
+
+    profile.__name__ = "corrosion_profile"
+    assert_function_matches(profile, [(40, 50e5, 350), (10, 30e5, 340), (-40, 50e5, 350)])
