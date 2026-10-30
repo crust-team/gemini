@@ -1,5 +1,6 @@
 """What a gas burner does with its fuel stream: co-produced gas first, the grid for the rest."""
 
+from gemini import ops
 from gemini.physics import combustion, gas
 
 
@@ -21,7 +22,7 @@ def fuel_split(need, fuel):
 def unburned_gas(need, fuel):
     """Return the stream ``fuel`` less the gas a burner with fuel need ``need`` burns."""
     _, _, burnt = fuel_split(need, fuel)
-    return fuel.with_(m_dot=fuel.m_dot - burnt)
+    return fuel.with_(m_dot=ops.maximum(fuel.m_dot - burnt, 0.0))
 
 
 def _grid_factor(fuel):

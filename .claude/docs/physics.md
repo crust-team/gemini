@@ -511,6 +511,12 @@ Electricity exchange of a plant with a grid connection of limited capacity.
 - `net_exchange(consumption, generation, import_limit, export_limit, import_price, export_price)`:
   import and export of a plant through a limited grid connection.
 
+### `dispatch.py`
+
+The daily energy balance of `gm.schedule`, on arrays over the days: `doublet_flow(heat_need,
+heat_per_flow, minimum_flow, maximum_flow)`, `circuit_flow(heat, specific_heat,
+temperature_difference)` and `flow_share(first, second)`.
+
 ### `energy.py`
 
 Energy conversion through an efficiency, shared by pumps, compressors, motors and burners.

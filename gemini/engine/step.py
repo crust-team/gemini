@@ -10,8 +10,10 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 
 from gemini.errors import ValidationError
+from gemini.modules.design import FIELD_UNITS
 from gemini.types.bindings import Binding, ModuleBindings
 from gemini.types.declarations import UNSET
+from gemini.types.flows import STREAM_FIELDS
 from gemini.utils.data.dataset import bound_unit
 from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path, split_path
 
@@ -146,8 +148,9 @@ class BindingPlan:
         """Add the plant as the one twin, with its leaf inputs read from the data."""
         chained, columns = _simulation_inputs(plant, dataset)
         root = plant.bindings.get("", ModuleBindings())
+        inlets = _named_inlet_fields(plant, dataset) | root.inlets
         entry, entry_columns = _compile_entry(
-            plant, dataset, "simulate", "", ModuleBindings(inlets=root.inlets)
+            plant, dataset, "simulate", "", ModuleBindings(inlets=inlets)
         )
         _, _, bound, defaults = entry
         sources = _inlet_sources(bound.inlets)
@@ -273,6 +276,21 @@ def _input_binding(plant, dataset, input_path, module, declaration):
     binding = binding.model_copy(deep=True)
     binding.unit = bound_unit(dataset, binding)
     return binding
+
+
+def _named_inlet_fields(plant, dataset):
+    """Return the bindings of the root inlet fields that have a column named ``port.field``.
+
+    The rule of a leaf control, whose column is named after its dotted path, for a plant port.
+    """
+    inlets = {}
+    for port in plant.inlets():
+        for name in STREAM_FIELDS:
+            column = f"{port}.{name}"
+            if column in dataset.names:
+                unit = FIELD_UNITS[name][0]
+                inlets.setdefault(port, {})[name] = Binding(column=column, unit=unit)
+    return inlets
 
 
 def _compile_entry(plant, dataset, kind, path, original):

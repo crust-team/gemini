@@ -99,7 +99,11 @@ SAME_FORM = {
         "pumps.py::line_shaft_friction_power",
         "storage.py::ice_stored_cold",
     ): "a product of three: stored heat, shaft friction and latent cold",
-    ("pumps.py::best_efficiency_ratio", "refrigeration.py::cooling_minimum_sink_rate"): "a over a "
+    (
+        "dispatch.py::circuit_flow",
+        "pumps.py::best_efficiency_ratio",
+        "refrigeration.py::cooling_minimum_sink_rate",
+    ): "a over a "
     "product: a pump load ratio and a heat pump's smallest sink capacity rate",
 }
 """Physics functions with one normalised body that are different relations, each with its reason."""

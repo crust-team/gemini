@@ -42,6 +42,36 @@ starts the run and writes it; every later call continues from it and updates it,
 error policy of a call are the caller's, and a call that fails or is cancelled leaves the file as
 it was, so its rows are processed again by the next call.
 
+## Schedule
+
+```python
+plan = gm.schedule(plant, demand, rules={
+    "order": ["geothermal", "heat_pump", "boiler"],
+    "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
+    "max_brine_cooling": "40 K",
+    "operating_days": None})
+results = gm.simulate(plant, plan)
+```
+
+`gm.schedule` (`gemini/analysis/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
+of each day of `demand` from a daily energy balance on the plant's design values, with no simulation
+inside. It reads the `Doublet` children and at most one `HeatPump`, `Boiler`, `AbsorptionUnit`,
+`HeatConsumer` and `CoolingConsumer`. The chiller's heat is the cooling demand over its
+`thermal_cop`. Sources follow `order`: each doublet, in plant order, runs at the flow that gives the
+heat at `max_brine_cooling`, clipped to `doublet_flow`, below the minimum at the minimum with less
+cooling. The heat pump and boiler take the `temperature_setpoint` set on them, the design's supply
+temperatures, and cover what is left in the run. Unmet demand is no error: the run reports
+`unmet_demand`.
+
+The plan needs no bindings and changes nothing on the plant: **its columns are named after what they
+drive**, so `gm.simulate(plant, plan)` binds them by the rule of a run, below. Leaf controls and
+boundaries have a column named after their dotted path (`d0.reservoir.production_rate`,
+`injection.split_fraction`), and a plant inlet field a column named `port.field`
+(`heating_return.m_dot`); ports `heating_return` and `cooling_return` take their temperature from
+`plant.boundary["root_inputs"]`. `boiler_duty`, `<doublet>.flow` and `<doublet>.is_running` are for
+reading. `operating_days` is `None`, every doublet on every day; an integer or a list of outage dates
+raises `NotImplementedYet` until the meaning of the organisers' "330 daily steps" is decided.
+
 ## The engine
 
 `Engine(plant, backend="numpy", callbacks=None, on_error="raise")` runs one plant on a finite clock
@@ -109,7 +139,8 @@ bound to a kg/s input that cannot be converted (a control or boundary on a modul
 dataset metadata replaces the binding's unit.
 
 Simulation binds every leaf control and boundary to its binding's column, or else to a column
-named after its dotted path; an input with neither needs a default or a persisted value. Each
+named after its dotted path; an input with neither needs a default or a persisted value. A root
+inlet field binds the same way, to its binding or to a column named `port.field`. Each
 step applies the values with `plant.set_inputs`, then calls the plant with the root inlets, built
 from root bindings over `plant.boundary["root_inputs"]`. A missing value skips the whole step,
 counted under the root path `""`. Replay applies each bound twin's controls and boundaries with

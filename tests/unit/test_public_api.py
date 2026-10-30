@@ -15,6 +15,7 @@ SNAPSHOTS = {"0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b4
 def test_public_names_and_docs():
     """Interactive completion exposes exactly the documented, individually documented names."""
     expected = {
+        "schedule",
         "simulate",
         "replay",
         "live",

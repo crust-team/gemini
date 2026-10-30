@@ -136,6 +136,32 @@ def liquid_volume_flow(mass_flow: float, gas_mass_fraction: float, liquid_densit
     return mass_flow * (1 - gas_mass_fraction) / liquid_density
 
 
+def mixture_mass_flow(liquid_flow: float, gas_mass_fraction: float, liquid_density: float) -> float:
+    """Return the mixture mass flow [kg/s] of a liquid volume flow, ``m = q_l rho_l / (1 - x)``.
+
+    Parameters
+    ----------
+    liquid_flow : float
+        Signed liquid volume flow [m3/s].
+    gas_mass_fraction : float
+        Gas mass fraction ``x`` [-], in ``[0, 1)``.
+    liquid_density : float
+        Liquid density [kg/m3].
+
+    Returns
+    -------
+    float
+        Signed mixture mass flow [kg/s].
+
+    Notes
+    -----
+    The inverse of ``liquid_volume_flow``.
+
+    Source: A plain mass balance of the liquid fraction; no published source is needed.
+    """
+    return liquid_flow * liquid_density / (1 - gas_mass_fraction)
+
+
 def heat_capacity_rate(mass_flow: float, heat_capacity: float) -> float:
     """Return the heat capacity rate [W/K] of a stream, ``C = m cp``.
 
