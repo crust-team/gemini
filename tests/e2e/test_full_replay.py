@@ -12,6 +12,7 @@ import pytest
 import gemini as gm
 from gemini.core.engine.callbacks import Callback
 from tests.fixtures import OLD_PROJECT
+from tests.fixtures.frames import path_frame
 
 pytestmark = [pytest.mark.e2e, pytest.mark.xdist_group("full_replay")]
 FIRST_WEEK_ROWS = 7 * 96
@@ -105,9 +106,9 @@ def _holdout(plant, dataset, engine, data):
         params=[plant.get_parameter("heat_exchanger.ua")],
         end=data.index[FIRST_WEEK_ROWS - 1],
     )
-    holdout = engine.replay(
-        plant, dataset, start=data.index[FIRST_WEEK_ROWS], only=["heat_exchanger"]
-    ).to_frame()
+    holdout = path_frame(
+        engine.replay(dataset, start=data.index[FIRST_WEEK_ROWS], only=["heat_exchanger"])
+    )
     observed = data.loc[holdout.index]
     errors = {
         "hx_hot_K": abs(
@@ -128,10 +129,10 @@ def _chain(plant, dataset, data):
     audit = BalanceAudit(sampled_steps)
     handle = plant.register_forward_pre_hook(audit.capture)
     try:
-        chain = gm.Engine([audit]).simulate(plant, dataset, gm.Clock.from_data(dataset))
+        chain = gm.Engine(plant, callbacks=[audit]).simulate(dataset, gm.Clock.from_data(dataset))
     finally:
         handle.remove()
-    frame = chain.to_frame()
+    frame = path_frame(chain)
     errors = {
         "chain_wellhead": abs(
             frame["doublet.riser", "wellhead_pressure"] / data["production_wellhead_pressure"] - 1
@@ -154,9 +155,9 @@ def verification(selected_dataset, module_plant):
     data = dataset.to_frame()
     assert len(data) in {2976, 17280}
     normal = (data.filter(like="_status") == "Normal").all(axis=1)
-    engine = gm.Engine(on_error="raise")
-    replay = engine.replay(plant, dataset)
-    frame = replay.to_frame()
+    engine = gm.Engine(plant, on_error="raise")
+    replay = engine.replay(dataset)
+    frame = path_frame(replay)
     report = _twin_health(plant, frame, normal)
     report["median_relative_errors"] = _twin_errors(frame, data, normal)
     measured_electricity = data["doublet.esp.power"] + data["injection_pump.power"]

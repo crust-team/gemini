@@ -5,7 +5,6 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini import backends
 from gemini.core.engine.callbacks import AutoCheckpoint, Callback, EventLog
 from gemini.errors import PhysicsRangeError, StepError
 from tests.fixtures.engine_plants import (
@@ -20,9 +19,8 @@ from tests.fixtures.engine_tank import ROW, TIME, tank
 
 def _run(backend, frame, make=pair_plant, callbacks=(), on_error="record", **kwargs):
     plant = make()
-    engine = gm.Engine([build() for build in callbacks], on_error=on_error)
-    with backends.settings(backend=backend):
-        results = engine.replay(plant, gm.Dataset.from_frame(frame), **kwargs)
+    engine = gm.Engine(plant, backend, [build() for build in callbacks], on_error)
+    results = engine.replay(gm.Dataset.from_frame(frame), **kwargs)
     return engine, results, plant
 
 
@@ -32,9 +30,9 @@ def assert_same(frame, **kwargs):
     _, python, other = _run("python", frame, **kwargs)
     pd.testing.assert_frame_equal(numpy.to_frame(), python.to_frame(), check_exact=True)
     assert numpy.to_frame().dtypes.tolist() == python.to_frame().dtypes.tolist()
-    assert numpy.skip_counts == python.skip_counts and numpy.errors == python.errors
+    assert numpy.skip_counts == python.skip_counts and numpy.errors() == python.errors()
     pd.testing.assert_frame_equal(
-        pd.DataFrame(numpy.summary()), pd.DataFrame(python.summary()), check_exact=True
+        pd.DataFrame(numpy.energy_report()), pd.DataFrame(python.energy_report()), check_exact=True
     )
     assert _persisted(plant) == _persisted(other)
     return engine, numpy
@@ -48,7 +46,7 @@ def test_a_replay_on_arrays_equals_the_replay_row_by_row():
     """Units, volumetric flows, health, soft sensors and None outputs are exact."""
     engine, results = assert_same(pair_frame())
     assert engine.graph_breaks == {"first": [], "second": []}
-    assert ("first", "health_score") in results.to_frame().columns
+    assert "first.health_score" in results.to_frame().columns
 
 
 def test_missing_observations_are_skipped():
@@ -61,8 +59,9 @@ def test_missing_observations_are_skipped():
 def test_rows_with_a_failing_check_are_recorded_with_their_tick_class_and_message():
     """The other rows of the chunk keep their results."""
     _, results = assert_same(pair_frame({("level", 4): -1.0}))
-    assert results.errors[0]["module"] == "first"
-    assert results.errors[0]["type"] == "PhysicsRangeError"
+    assert results.errors()[0]["module"] == "first"
+    assert results.errors()[0]["type"] == "PhysicsRangeError"
+    assert results.errors()[0]["code"] == "physics_range"
     assert results["first"].rise.notna().sum() == len(TICKS) - 1
 
 
@@ -76,9 +75,9 @@ def test_rows_with_a_failing_check_raise_the_step_error_after_the_earlier_rows()
 
     frame = pair_frame({("level", 4): -1.0})
     for backend in ("numpy", "python"):
-        engine = gm.Engine([Watch()], on_error="raise")
-        with backends.settings(backend=backend), pytest.raises(StepError) as raised:
-            engine.replay(pair_plant(), gm.Dataset.from_frame(frame))
+        engine = gm.Engine(pair_plant(), backend, [Watch()], "raise")
+        with pytest.raises(StepError) as raised:
+            engine.replay(gm.Dataset.from_frame(frame))
         assert isinstance(raised.value.__cause__, PhysicsRangeError)
         assert len(engine.results) == 4 and engine.position == TICKS[3]
     assert seen[0] == seen[1]
@@ -149,9 +148,9 @@ def test_a_callback_that_raises_leaves_the_inputs_of_its_tick_persisted():
     persisted = []
     for backend in ("numpy", "python"):
         plant = pair_plant()
-        engine = gm.Engine([Stop()])
-        with backends.settings(backend=backend), pytest.raises(RuntimeError):
-            engine.replay(plant, gm.Dataset.from_frame(pair_frame()))
+        engine = gm.Engine(plant, backend, [Stop()])
+        with pytest.raises(RuntimeError):
+            engine.replay(gm.Dataset.from_frame(pair_frame()))
         persisted.append(_persisted(plant))
     assert persisted[0] == persisted[1] and persisted[0]["first"]["level"] == pytest.approx(
         (0.1 + 4 * 1.2 / 11) * 1e5
@@ -191,8 +190,8 @@ def _tank_run(rows, on_error="record"):
     """Replay the shared tank over rows given as column values."""
     module = tank()
     frame = pd.DataFrame(rows, index=pd.date_range(TIME, periods=len(rows["rate"]), freq="15min"))
-    engine = gm.Engine(on_error=on_error)
-    return engine, engine.replay(module, gm.Dataset.from_frame(frame))
+    engine = gm.Engine(module, on_error=on_error)
+    return engine, engine.replay(gm.Dataset.from_frame(frame))
 
 
 def test_missing_data_is_a_counted_skip_and_failures_are_recorded_or_raised():
@@ -201,10 +200,9 @@ def test_missing_data_is_a_counted_skip_and_failures_are_recorded_or_raised():
     rows["p"][1], rows["rate"][2] = np.nan, -1.0
     _, results = _tank_run(rows)
     assert results.skip_counts == {"": {"p": 1}}
-    assert (
-        results.errors[0]["message"] == "negative flow"
-        and results.errors[0]["type"] == "ValueError"
-    )
+    errors = results.errors()
+    assert [row["code"] for row in errors] == ["missing_value", "module_error"]
+    assert errors[1]["message"] == "negative flow" and errors[1]["type"] == "ValueError"
     assert results[""].flow.tolist()[0] == 2.0
     with pytest.raises(StepError, match="negative flow") as raised:
         _tank_run(rows, on_error="raise")
@@ -220,5 +218,5 @@ def test_a_simulation_skips_the_plant_when_data_is_missing():
     )
     frame.loc[frame.index[1], "rate"] = np.nan
     data = gm.Dataset.from_frame(frame)
-    results = gm.Engine().simulate(module, data, gm.Clock.from_data(data))
+    results = gm.Engine(module).simulate(data, gm.Clock.from_data(data))
     assert results.skip_counts == {"": {"rate": 1}} and results[""].flow.dropna().tolist() == [2.0]

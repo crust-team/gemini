@@ -34,9 +34,9 @@ plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
 frame = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
 
-engine = gm.Engine()
-results = engine.replay(plant, data)
-print(results.summary())
+engine = gm.Engine(plant)
+results = engine.replay(data)
+print(results.energy_report())
 print(results["doublet.esp"].power)
 
 engine.save_checkpoint("runs/replay.ckpt")

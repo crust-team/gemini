@@ -1,20 +1,26 @@
 """One finite execution loop for assumed inputs, measured history and periodic live windows."""
 
+from collections.abc import Mapping
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
+from gemini import backends
 from gemini.core import runtime
+from gemini.core.data.dataset import as_dataset
 from gemini.core.data.loader import Loader
 from gemini.core.engine import checkpoint as storage
 from gemini.core.engine.clock import Clock
-from gemini.core.engine.results import Results
+from gemini.core.engine.results import Results, declared_units
 from gemini.core.engine.runner import Runner
 from gemini.core.engine.step import BindingPlan
-from gemini.core.modules.module import class_path, import_class
-from gemini.errors import CheckpointError, ConfigurationError
+from gemini.core.modules.module import Module, class_path, import_class
+from gemini.errors import CheckpointError, ConfigurationError, ValidationError
 from gemini.graph import GraphCache
+from gemini.utils.jsonable import to_plain
+from gemini.utils.strings import close_matches, did_you_mean
 from gemini.utils.time import parse_duration, to_utc
 
 
@@ -32,17 +38,33 @@ def _live_ticks(position, start, end, step):
 
 
 class Engine:
-    """Run a plant on a finite clock, retaining all state needed for explicit checkpoint/resume."""
+    """Run a plant on a finite clock, retaining all state needed for explicit checkpoint/resume.
 
-    def __init__(self, callbacks=None, on_error="record"):
-        """Configure lifecycle callbacks and either recording or raising ordinary errors."""
+    An engine belongs to one plant and one thread: plants and engines are not shared across
+    threads, so each worker loads its own plant and builds its own engine. ``backend`` names the
+    backend that evaluates the run (``"numpy"`` over arrays, ``"python"`` row by row); every
+    backend gives the same numbers.
+    """
+
+    def __init__(self, plant, backend="numpy", callbacks=None, on_error="record"):
+        """Configure the plant to run, its backend, lifecycle callbacks and the error policy.
+
+        With ``on_error="record"`` an ordinary error becomes a row of ``results.errors()``;
+        with ``"raise"`` it ends the run.
+        """
+        if not isinstance(plant, Module):
+            raise ConfigurationError(
+                f"Engine: plant = {type(plant).__name__}; expected a plant or module"
+            )
         if on_error not in {"record", "raise"}:
             raise ConfigurationError(
                 f"Engine: on_error = {on_error!r}; expected 'record' or 'raise'"
             )
+        backends.get(backend)
+        self.plant = plant
+        self.backend = backend
         self.callbacks = list(callbacks or [])
         self.on_error = on_error
-        self.plant = None
         self.results = None
         self.dataset = None
         self.clock = None
@@ -58,55 +80,77 @@ class Engine:
         self.graph_breaks = {}
         self.step_results = {}
 
-    def simulate(self, plant, dataset, clock):
-        """Evaluate the handwritten plant chain using assumed, root-bound inputs."""
-        return self._run("simulate", plant, dataset, clock)
+    def simulate(self, profile, clock=None):
+        """Evaluate the plant on assumed, root-bound inputs and return ``Results``.
 
-    def replay(self, plant, dataset, clock=None, start=None, end=None, only=None):
-        """Evaluate measured equipment boundaries; infer observation ticks unless supplied."""
+        ``profile`` is a ``Dataset`` or a DataFrame with a timezone-aware UTC index and one
+        column per binding ``column`` (or per input path), in the units of the bindings. Without
+        ``clock`` the ticks are those of the profile.
+        """
+        dataset = as_dataset(profile)
+        clock = clock if clock is not None else Clock.from_data(dataset)
+        return self._run("simulate", dataset, clock)
+
+    def replay(self, data, start=None, end=None, state=None, clock=None, only=None):
+        """Evaluate measured equipment boundaries and return ``Results``.
+
+        ``data`` is a ``Dataset`` or a DataFrame as in ``simulate``; ``start`` and ``end`` select
+        a window. Observation ticks are inferred unless ``clock`` is given. ``state`` is the
+        ``end_state`` of a former run: stateful modules continue from it and ticks up to its
+        position are not evaluated, so two consecutive replays give the numbers of one.
+        ``results.end_state`` holds the state after the last tick.
+        """
+        dataset = as_dataset(data)
         if start is not None or end is not None:
             dataset = dataset.window(start, end)
             if clock is not None:
                 clock = clock.window(start, end)
         if clock is None:
             clock = Clock.from_data(dataset)
-        return self._run("replay", plant, dataset, clock, only=only)
+        return self._run("replay", dataset, clock, only=only, state=state)
 
-    def live(self, plant, dataset, checkpoint, step=None, now=None, sink=None):
+    def live(self, source, checkpoint=None, step=None, now=None, sink=None):
         """Process newly available ticks once, then save; an external scheduler calls again.
 
         Returns only this call's new rows. The engine and checkpoint retain cumulative results.
-        The supplied plant is evaluated; an existing checkpoint contributes the committed
-        position, results, module states, clock step and runtime settings, and must have been
-        saved for a plant of the same class. Without ``step`` the ticks are the new rows; a
-        call with fewer than two rows reuses the checkpointed step for its final interval.
-        The checkpoint commits before sink delivery; external sinks should upsert by timestamp.
+        An existing checkpoint contributes the committed position, results, module states, clock
+        step and runtime settings, and must have been saved for a plant of the same class; without
+        ``checkpoint`` the engine continues from its own committed position. Without ``step`` the
+        ticks are the new rows; a call with fewer than two rows reuses the checkpointed step for
+        its final interval. The checkpoint commits before sink delivery; external sinks should
+        upsert by timestamp.
         """
-        if Path(checkpoint).exists():
-            self._restore_live(checkpoint, plant)
-        else:
-            self.position = None
-            self.results = Results()
-            self.module_states = {}
-            self.clock = None
-            self.runtime_state = runtime.state()
+        dataset = as_dataset(source)
+        if checkpoint is not None and Path(checkpoint).exists():
+            self._restore_live(checkpoint)
+        elif checkpoint is not None or self.run_kind != "live":
+            self._start_live()
         now = to_utc(now) if now is not None else datetime.now(timezone.utc)
         clock = self._live_clock(dataset, step, now)
         offset = len(self.results)
         with self._saved_settings():
-            self._run("live", plant, dataset, clock, continuing=True)
-        self.save_checkpoint(checkpoint)
+            self._run("live", dataset, clock, continuing=True)
+        if checkpoint is not None:
+            self.save_checkpoint(checkpoint)
         fresh = self.results.slice(offset)
         if sink is not None and len(fresh):
             sink(fresh)
         return fresh
 
-    def _restore_live(self, path, plant):
-        """Take the run state of a live checkpoint saved for the supplied plant's class."""
+    def _start_live(self):
+        """Forget any earlier run: the next live call starts from the first row."""
+        self.position = None
+        self.results = Results()
+        self.module_states = {}
+        self.clock = None
+        self.runtime_state = runtime.state()
+
+    def _restore_live(self, path):
+        """Take the run state of a live checkpoint saved for this engine's plant class."""
         checkpoint = storage.load(path)
         if checkpoint.run_kind != "live":
             raise CheckpointError(f"{path}: run_kind = {checkpoint.run_kind!r}; expected 'live'")
-        supplied = class_path(type(plant))
+        supplied = class_path(type(self.plant))
         if checkpoint.plant_class != supplied:
             raise CheckpointError(
                 f"{path}: plant_class = {checkpoint.plant_class!r}; expected the supplied "
@@ -146,17 +190,16 @@ class Engine:
         for callback in self.callbacks:
             getattr(callback, method)(self, *args)
 
-    def _run(self, kind, plant, dataset, clock, only=None, continuing=False, max_gap=None):
+    def _run(self, kind, dataset, clock, only=None, continuing=False, max_gap=None, state=None):
         """Run the unfinished ticks of ``clock``; ``max_gap`` overrides the Loader default."""
+        plant = self.plant
         if not continuing:
             self.runtime_state = runtime.state()
         plan = BindingPlan(plant, dataset, kind, only, self.on_error)
         if not continuing:
-            self.results = Results()
-            self.module_states = {}
-            self.position = None
+            self._begin(state)
+        self.results.units = declared_units(plant)
         self.run_kind = kind
-        self.plant = plant
         self.dataset = dataset
         self.clock = clock
         if not continuing or kind == "live" or self._dataset_fingerprint is None:
@@ -173,21 +216,59 @@ class Engine:
         )
         self._max_gap = loader.max_gap
         try:
-            self._notify("on_run_start")
-            Runner(self, plan, loader.arrays()).run()
-            self._notify("on_run_end")
+            with backends.settings(backend=self.backend):
+                self._notify("on_run_start")
+                Runner(self, plan, loader.arrays()).run()
+                self._notify("on_run_end")
         except BaseException as exc:
             self._in_step = False
             self._notify("on_error", exc)
             raise
+        finally:
+            self.results.end_state = self._end_state()
         return self.results
 
-    def save_checkpoint(self, path):
-        """Save at a step boundary; assign engine.plant to save before the first run."""
-        if self.plant is None:
-            raise CheckpointError(
-                f"{path}: engine.plant = None; expected a plant assigned or a started run"
+    def _begin(self, state):
+        """Start empty results, from the module states and position of ``state`` when given."""
+        self.results = Results()
+        self.module_states, self.position = {}, None
+        if state is None:
+            return
+        self._check_state(state)
+        self.module_states = deepcopy(state["module_states"])
+        position = state["position"]
+        self.position = to_utc(position) if position is not None else None
+
+    def _check_state(self, state):
+        """Require the shape ``end_state`` has: a position and the states of known modules."""
+        if not (
+            isinstance(state, Mapping)
+            and {"position", "module_states"} <= state.keys()
+            and isinstance(state["module_states"], Mapping)
+        ):
+            raise ValidationError(
+                "Engine.replay: state = "
+                f"{type(state).__name__}; expected the end_state of a former run "
+                "({position, module_states})",
+                path="state",
             )
+        known = {path for path, _ in self.plant.named_modules()}
+        unknown = sorted(set(state["module_states"]) - known)
+        if unknown:
+            raise ValidationError(
+                f"Engine.replay: state.module_states = {unknown[0]!r}; expected a module path "
+                f"of this plant{did_you_mean(unknown[0], known)}",
+                path="state.module_states",
+                code="unknown_name",
+                suggestions=close_matches(unknown[0], known),
+            )
+
+    def _end_state(self):
+        """Return the position and module states as plain JSON: the input of ``state=``."""
+        return to_plain({"position": self.position, "module_states": self.module_states})
+
+    def save_checkpoint(self, path):
+        """Save at a step boundary; before the first run the checkpoint holds no results."""
         if self._in_step:
             raise CheckpointError(f"{path}: called inside a step; expected a completed step")
         checkpoint = storage.Checkpoint(
@@ -200,6 +281,7 @@ class Engine:
             dataset_fingerprint=self._dataset_fingerprint,
             only=self.only,
             on_error=self.on_error,
+            backend=self.backend,
             runtime=self.runtime_state,
         )
         storage.save(path, checkpoint, self.results, self._unfinished_rows(), self._max_gap)
@@ -222,9 +304,8 @@ class Engine:
     def load_checkpoint(cls, path, callbacks=None):
         """Restore a plant, dataset handle, finite schedule, states and completed results."""
         checkpoint = storage.load(path)
-        engine = cls(callbacks, checkpoint.on_error)
-        plant_class = import_class(checkpoint.plant_class)
-        engine.plant = plant_class.from_dict(checkpoint.plant)
+        plant = import_class(checkpoint.plant_class).from_dict(checkpoint.plant)
+        engine = cls(plant, checkpoint.backend, callbacks, checkpoint.on_error)
         engine._restore(checkpoint, Path(path).parent)
         return engine
 
@@ -264,7 +345,6 @@ class Engine:
         with self._saved_settings():
             return self._run(
                 self.run_kind,
-                self.plant,
                 self.dataset,
                 self.clock,
                 only=self.only,

@@ -40,7 +40,7 @@ def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
     assert plant.state_dict() == before and not fit.applied
     count = len(plant.heat_exchanger.param_history)
     fitted = gm.optim.calibrate(plant, dataset, params=[plant.get_parameter("heat_exchanger.ua")])
-    gm.Engine().replay(plant, dataset)
+    gm.Engine(plant).replay(dataset)
     assert plant.heat_exchanger.ua == fitted.fitted["ua"]
     assert len(plant.heat_exchanger.param_history) == count
     plant.save(tmp_path / "plant.json")

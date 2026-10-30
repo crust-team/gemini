@@ -29,7 +29,7 @@ def test_legacy_bridge(tmp_path):
     assert (tmp_path / "doublet_2024_15min.csv").read_bytes() == (
         SHARED / "doublet_2024_15min.csv"
     ).read_bytes()
-    results = gm.Engine().replay(plant, data.window(end=data.start))
+    results = gm.Engine(plant).replay(data.window(end=data.start))
     old_results = gm.legacy.results_to_frame(results, project)
     gm.legacy.write_csv(old_results, tmp_path / "results.csv")
     assert len(gm.legacy.read_csv(tmp_path / "results.csv")) == 1

@@ -18,7 +18,7 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
 - `mappings.py`: `AttributeMapping` (base of `Ports` and `Values`), `get_nested`, `set_nested`.
 - `context.py`: `ContextSetting`, a context variable change usable as `with` and as a decorator.
 - `files.py`: `read_json`, `write_json` and the lossless JSON-cell tables (`encode_cell`,
-  `encode_cells`, `decode_cells`) used by checkpoints and results.
+  `encode_cells`, `decode_cells`) used by the rows a checkpoint keeps.
 - `collect_env.py`: `python -m gemini.utils.collect_env` prints the versions a bug report needs.
 
 ## Adding a helper

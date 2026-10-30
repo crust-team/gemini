@@ -1,17 +1,47 @@
 # Engine
 
-`Engine(callbacks=None, on_error="record")` runs a plant on a finite clock.
-`simulate(plant, dataset, clock)` evaluates handwritten plant wiring from root-bound assumptions.
-`replay(plant, dataset, clock=None, start=None, end=None, only=None)` evaluates equipment twins on
-measured boundaries. `live(plant, dataset, checkpoint, step=None, now=None, sink=None)` evaluates
-only newly supplied timestamps. All calls are finite; scheduling, sleeping, and fetching new data
-belong to the caller.
+`Engine(plant, backend="numpy", callbacks=None, on_error="record")` runs one plant on a finite clock.
+`simulate(profile, clock=None)` evaluates the plant from root-bound assumptions.
+`replay(data, start=None, end=None, state=None, clock=None, only=None)` evaluates equipment twins on
+measured boundaries. `live(source, checkpoint=None, step=None, now=None, sink=None)` evaluates only
+newly supplied timestamps. All calls are finite; scheduling, sleeping, and fetching new data
+belong to the caller. Every call returns `Results`.
 
 The pieces fit together as follows: the plant `Module` owns its design and bindings, the
 in-memory `Dataset` holds raw observations, the internal `Loader` aligns rows to the engine
 `Clock`, one private `Engine._run` hands the run to the `Runner`, which evaluates chunks of ticks and replays the callbacks,
 `save_checkpoint`/`load_checkpoint`/`resume` persist and continue a run, and `optim.calibrate`
-fits parameters by calling `Engine.replay`.
+fits parameters by calling `Engine.replay` on a copy of the plant.
+
+## Run input
+
+One format serves `simulate`, `replay` and `live`: a `gm.Dataset`, or a pandas DataFrame with a
+timezone-aware `DatetimeIndex` (any zone; the instants become UTC) and one column per binding
+`column`. A DataFrame is wrapped by `gemini.core.data.dataset.as_dataset`; a naive index, a
+non-time index or any other object raises `DatasetError`. Values have the unit of the binding,
+except that a unit recorded in `Dataset` metadata replaces it (the rule below stays). Without
+`clock`, `simulate` and `replay` use the ticks of the input (`Clock.from_data`).
+
+- **Missing columns.** Every bound column the input lacks is listed in one `BindingError` (a
+  `ValidationError`, code `missing_column`, `suggestions` with the closest column), raised before
+  the first step.
+- **NaN rows.** A tick where a bound value is NaN, absent beyond `max_gap` or a text flag is not an
+  error of the run: that twin is skipped at the tick, counted in `results.skip_counts`, listed in
+  `results.errors()` with the code `missing_value`, and the run continues. A tick where a module
+  raises is a row with the code of the failure (`invalid_inlet`, `out_of_bounds`, `physics_range`,
+  `solver_failed`, `module_error`; the table is `gm.errors.ROW_CODES`), under `on_error="record"`.
+
+## Threads and backends
+
+Plants and engines are not shared across threads. An engine keeps run state (results, position,
+module states, graph cache) and a plant keeps persisted inputs, so a worker loads its own plant
+(`gm.plants.from_dict(...)`) and builds its own engine; settings from `gm.runtime` are
+context-local and a new thread starts from the defaults.
+
+`backend` is applied to every run of the engine with `gemini.backends.settings(backend=...)`:
+`"numpy"` evaluates arrays, `"python"` evaluates row by row, and the numbers are the same (the
+parity suite checks it). The backend is saved in checkpoints. An unknown name raises
+`UnknownNameError` when the engine is built.
 
 ## Clocks
 
@@ -119,13 +149,21 @@ callbacks one tick at a time: `on_run_start(engine)`, `on_step_start(engine, sam
 `on_run_end(engine)`. `on_error(engine, error)` observes only a failure that ends the run (an
 exception in a step under `on_error="raise"`, in a callback or an interrupt), with
 checkpoint-consistent state, before it propagates. Errors recorded under `on_error="record"` are
-results: they are in `engine.results.errors` when `on_step_end` runs. `EventLog(path=None)`
+results: they are in `engine.results.errors()` when `on_step_end` runs. `EventLog(path=None)`
 writes JSON-lines events (in memory without a path); after each tick it logs a `forward` event for
 every module call of `engine.step_results` (the tick's `ModuleResult` tree by twin path, built
 from the arrays when asked), children before the module that called them, with no hook on the
 plant, and records non-finite floats as `NaN`/`Infinity`. A failing composite call logs no event
 for the children that had completed.
 `AutoCheckpoint(path, every=100)` saves every N steps or every elapsed duration such as `"1h"`.
+
+**Progress and cancelling.** When callbacks are registered, `on_progress(engine, done, total)` runs
+after `on_step_end` of every committed tick: `done` ticks of this run are committed out of
+`total` (the ticks the call still has to evaluate). A callback stops a run cleanly by raising
+`gm.errors.Cancelled` (code `cancelled`) from `on_step_end` or `on_progress`. The ticks committed
+before are kept: they stay readable in `engine.results`, `engine.results.end_state` is set, the
+`on_error` callbacks observe the exception and it propagates to the caller. Nothing is evaluated
+after it, and a later `replay(..., state=engine.results.end_state)` continues where it stopped.
 
 ## Results
 
@@ -150,19 +188,58 @@ the columns.
 and an unknown path or field raises `UnknownResultError`. Only leaf results are stored: twins in
 replay and the leaves of the plant call in simulation, not root or composite formula outputs.
 `Results[path].get(field, unit=...)` converts only the six fields of `SERIES_UNITS` (`head`,
-`pressure_drop`, `discharge_pressure`, `power`, `duty`, `thermal_power`), because results store no
-per-field units; other fields raise `ValueError`. `to_frame()` returns a copy with
-`(module_path, field)` MultiIndex columns, `summary()` reports energy per output, peaks, operating
-hours, alarms, skips and errors, `skip_counts` and `errors` hold the diagnostics, and
-`save(path)`/`Results.load(path)` keep every cell exactly: as Parquet when `pyarrow` is installed,
-otherwise as CSV, each with a JSON metadata sidecar.
+`pressure_drop`, `discharge_pressure`, `power`, `duty`, `thermal_power`), because a conversion
+needs the quantity of a difference, which results do not store; other fields raise `ValueError`.
+`SERIES_UNITS` therefore stays; it is not the unit table of the JSON views below.
+
+**Units.** Every field states its SI unit. `results.units` is `{path: {field: unit}}`, taken from
+the plant's output declarations when a run starts (`declared_units`); a field without a declared
+unit (`operating`, the `health_*` fields, text outputs) is dimensionless, `"-"`. The table is saved
+with the results.
+
+**JSON views.** Every public return passes `gemini.utils.jsonable.to_plain`: NaN and infinity
+are `null`, times are ISO 8601 UTC text.
+
+| Call | Returns |
+|---|---|
+| `names()` | `{path: [field, ...]}` of everything `get` reads, in column order |
+| `get(path, field, start=None, end=None)` | `{time: [...], values: [...], unit}`; the window is inclusive |
+| `summary(path=None, start=None, end=None)` | `{path: {field: {min, max, mean, unit}}}` of the numeric fields |
+| `errors()` | rows `{timestamp, module, code, type, message}`, oldest first: failed rows and skipped rows (`missing_value`) |
+| `to_dict()` | `{time, duration, series: {path: {field: {unit, values}}}, errors, skip_counts, end_state}` |
+
+`to_frame()` returns a copy with one column per field, named `path.field` (a field of the root plant
+by its own name; these are the calculated-tag names), and the dtypes a table built row by row
+has. The former energy table is `energy_report()`: energy per output, peaks, operating hours,
+alarms, skips and errors, which `repr(results)` prints. `skip_counts` holds the skips per path and
+reason, and `failures` the rows where a module raised (the part of `errors()` that is not a
+skip; `EventLog` logs these).
+
+**Files.** `save(path)` and `Results.load(path)` write and read one `.npz` file (the suffix is added
+when missing); `to_bytes()` and `Results.from_bytes(data)` do the same without a file path.
+`gemini/core/engine/archive.py` writes a float, integer or boolean column as that array and any
+other column (lists, strings, `None`, mixed cells) as one JSON text with exact floats; the
+metadata (units, durations, skips, failures, energy fields, end state) is one JSON text. Loading
+uses `allow_pickle=False`, so no pickle is read, and gives the same bits, units and end state.
+Anything that is not an archive of this format (including the former Parquet and CSV files)
+raises `ValidationError` with the code `invalid_format`. Checkpoints keep their results in the same
+file.
+
+**End state.** `results.end_state` is plain JSON `{position, module_states}`: the last committed
+tick (ISO text or `null`) and the state tree of each stateful twin (`{path: tree}`; in a
+simulation `{"": tree}`). It is set at the end of every run, also of a cancelled or failed one,
+survives `save` and `to_bytes`, and is the input of `replay(..., state=...)`: stateful modules
+continue from it and ticks up to its position are not evaluated again, so
+`replay(data, end=t)` followed by `replay(data, state=first.end_state)` gives the numbers of one
+`replay(data)`, in any engine built for a plant of the same shape. A state that is not of this
+shape, or names a module the plant lacks, raises `ValidationError`.
 
 ## Checkpoints
 
 The version-1 JSON manifest stores the run kind, the importable plant class, `plant.to_dict()`,
 module states, the finite clock, the completed position, the original dataset fingerprint
 (informational only), selected `only` paths, the error policy, the runtime settings captured at
-run start, the creation time and sibling filenames. Results and unfinished replay/simulation rows
+run start, the backend, the creation time and sibling filenames. Results and unfinished replay/simulation rows
 are written first, then the manifest is atomically replaced. The stored rows start `max_gap`
 before the position, because a held previous row may still supply the next ticks; they use
 JSON-encoded CSV cells to preserve exact float bits, and their JSON sidecar records the column
@@ -170,14 +247,16 @@ units and the run's `max_gap`, which a resumed run reuses. A checkpoint never de
 or service that originally supplied data.
 
 `Engine.load_checkpoint(path, callbacks=None)` rebuilds the plant from the manifest and restores
-the run state with the saved error policy. `resume()` continues strictly after the saved
+the run state with the saved backend and error policy. `save_checkpoint(path)` also works before
+the first run; the checkpoint then holds the plant and no results. `resume()` continues strictly after the saved
 position, or returns the stored results when the clock is finished; a resumed run gives the same
 results as an uninterrupted one. Resume and live calls re-apply the saved precision and display
 units, but not the default fluid, which only seeds newly built modules and streams.
 
 ## Live runs
 
-`live` evaluates the supplied plant. An existing live checkpoint must have been saved for a plant
+`live` evaluates the engine's plant. Without `checkpoint` the engine continues from its own committed
+position, so two calls on one engine process every tick once and write no file. An existing live checkpoint must have been saved for a plant
 of the same class; it contributes the committed position, results, module states, clock step and
 runtime settings, while the engine's callbacks and error policy stay the caller's. Ticks run up
 to `min(now, newest row)`, with `now` defaulting to the current UTC time. Without `step` the

@@ -21,7 +21,12 @@ import numpy as np
 from gemini.core.engine.chunks import ResultChunk
 from gemini.core.engine.columns import read
 from gemini.core.engine.outcome import UNCHANGED, StepResults, evaluate_twin
-from gemini.errors import StepError
+from gemini.errors import (
+    DeclarationError,
+    PhysicsRangeError,
+    SolverError,
+    StepError,
+)
 
 
 class Failure:
@@ -41,6 +46,8 @@ class Runner:
         self.callbacks = engine.callbacks
         changes_run = any(getattr(callback, "changes_run", False) for callback in self.callbacks)
         self.single = plan.one_tick or changes_run
+        self.total = len(aligned.times)
+        self.done = 0
 
     def run(self):
         """Evaluate and commit every tick, stretch by stretch."""
@@ -128,7 +135,7 @@ class Runner:
                 tables[path] = table.sliced(0, count)
             _add_skips(skips, outcome, count)
         errors = sorted(
-            (tick, index, error_record(outcome.twin.path, error))
+            (tick, index, error_record(outcome.twin.path, error, outcome.block.status[tick] < 0))
             for index, outcome in enumerate(outcomes)
             for tick, error in outcome.errors.items()
             if tick < count
@@ -159,6 +166,8 @@ class Runner:
             self._finish(first + tick, outcomes)
             engine.step_results = StepResults(outcomes, tick)
             engine._notify("on_step_end", self.aligned.sample(first + tick))
+            self.done += 1
+            engine._notify("on_progress", self.done, self.total)
 
     def _finish(self, index, outcomes):
         """Move the engine to a committed tick: its position and the states of its twins."""
@@ -207,9 +216,27 @@ class Runner:
         return True
 
 
-def error_record(path, error):
-    """Return the recorded form of the exception of a twin."""
-    return dict(module=path, message=str(error), type=type(error).__name__)
+def row_code(error, inlet=False):
+    """Return the code in ``gm.errors.ROW_CODES`` of the exception that failed a row.
+
+    ``inlet`` tells that the row failed on the limits of an inlet stream.
+    """
+    if inlet:
+        return "invalid_inlet"
+    if isinstance(error, SolverError):
+        return "solver_failed"
+    if isinstance(error, PhysicsRangeError):
+        return "physics_range"
+    if isinstance(error, DeclarationError):
+        return "out_of_bounds"
+    return "module_error"
+
+
+def error_record(path, error, inlet=False):
+    """Return the recorded form of the exception of a twin, with its row code."""
+    return dict(
+        module=path, message=str(error), type=type(error).__name__, code=row_code(error, inlet)
+    )
 
 
 def _add_skips(skips, outcome, count):

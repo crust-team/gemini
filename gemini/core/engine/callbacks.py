@@ -21,7 +21,7 @@ class Callback:
     at once and replays the callbacks from the results.
 
     ``on_error`` observes only a failure that ends the run. Module failures recorded under
-    ``on_error="record"`` are results: they are in ``engine.results.errors`` when
+    ``on_error="record"`` are results: they are in ``engine.results.errors()`` when
     ``on_step_end`` runs.
     """
 
@@ -35,6 +35,12 @@ class Callback:
 
     def on_step_end(self, engine, sample):
         """Observe the completed sample after results and position have committed."""
+
+    def on_progress(self, engine, done, total):
+        """Observe that ``done`` of the ``total`` ticks of this run are committed.
+
+        Raise ``gm.errors.Cancelled`` from ``on_step_end`` or here to stop the run cleanly.
+        """
 
     def on_error(self, engine, error):
         """Observe the failure that ends a run, with checkpoint-consistent state."""
@@ -94,17 +100,17 @@ class EventLog(Callback):
     def on_run_start(self, engine):
         """Record run mode."""
         self.log("run_start", run_kind=engine.run_kind)
-        self._logged_errors = len(engine.results.errors)
+        self._logged_errors = len(engine.results.failures)
 
     def on_step_end(self, engine, sample):
         """Record the tick's module calls, its recorded errors, then the completed tick timing."""
         for path, result in engine.step_results.items():
             self._calls(engine.plant, path, result)
-        for error in engine.results.errors[self._logged_errors :]:
+        for error in engine.results.failures[self._logged_errors :]:
             self.log(
                 "error", module=error["module"], message=error["message"], error_type=error["type"]
             )
-        self._logged_errors = len(engine.results.errors)
+        self._logged_errors = len(engine.results.failures)
         self.log("step_end", time=sample.t.isoformat(), dt=sample.dt)
 
     def on_error(self, engine, error):

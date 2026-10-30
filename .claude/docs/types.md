@@ -203,7 +203,7 @@ before the first sample raise `DatasetError`. `resample(step, how)` supports mea
 rejects empty bins with `DatasetError`. Sum is a sum of sample values, not time integration.
 
 Simulate profiles by combining them into a dataset keyed by dotted control or boundary paths:
-`gm.Engine().simulate(plant, gm.Dataset.from_profiles(profiles), clock)`. Profiles combined into a
+`gm.Engine(plant).simulate(gm.Dataset.from_profiles(profiles), clock)`. Profiles combined into a
 dataset must share one index; resample explicitly.
 
 `Cost` stores investment, annual fixed cost and variable currency/J of useful output, together

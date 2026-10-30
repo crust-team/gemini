@@ -1,10 +1,12 @@
-"""Per-module series, energy integration and lossless result persistence."""
+"""Per-module series, energy integration, JSON views and lossless result persistence."""
 
+import io
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from gemini.core.engine import archive
 from gemini.core.engine.chunks import (
     PathColumns,
     ResultChunk,
@@ -14,8 +16,9 @@ from gemini.core.engine.chunks import (
 )
 from gemini.core.physics import units
 from gemini.errors import UnitError, UnknownResultError
-from gemini.utils.files import read_cells, write_cells
-from gemini.utils.strings import did_you_mean, join_names
+from gemini.utils.jsonable import to_plain
+from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
+from gemini.utils.time import to_utc
 
 ENERGY_FIELDS = ("electricity", "fuel", "heat_loss")
 """Leaf outputs integrated over time into energy totals."""
@@ -28,7 +31,11 @@ SERIES_UNITS = {
     "duty": ("W", "power"),
     "thermal_power": ("W", "power"),
 }
-"""Stored SI unit and quantity of the result fields that ``ModuleSeries.get`` can convert."""
+"""Stored SI unit and quantity of the result fields that ``ModuleSeries.get`` can convert.
+
+``Results.units`` states the unit of every field for the JSON views; ``ModuleSeries.get`` keeps
+converting only these six, because it needs the quantity of a difference, which is not stored.
+"""
 
 
 class Summary(pd.DataFrame):
@@ -100,17 +107,27 @@ class Results:
     """Collect finite timestep outputs, energy totals, health, errors and explicit skips.
 
     Results are columnar. ``commit(chunk)`` is the one way in: a ``ResultChunk`` of any length,
-    one tick included. Chunks concatenate lazily in ``to_frame``.
+    one tick included. Chunks concatenate lazily in ``to_frame``. ``units`` maps
+    ``{path: {field: unit}}`` to the SI unit of each output field, as the plant declares it
+    (a field without an entry is dimensionless, ``"-"``), and ``end_state`` is the plain JSON
+    state a following replay starts from (``replay(..., state=results.end_state)``).
     """
 
-    def __init__(self):
+    def __init__(self, units=None):
         """Start an independent result table."""
         self._chunks, self._order = [], {}
         self._times, self._dt = [], []
-        self.skip_counts, self.errors = {}, []
+        self.skip_counts, self._failures = {}, []
         self._energy = set()
         self._skips = []
         self._frame = None
+        self.units = dict(units or {})
+        self.end_state = None
+
+    @property
+    def failures(self):
+        """The rows where a module raised, oldest first; skipped rows are not among them."""
+        return self._failures
 
     def commit(self, chunk):
         """Commit a chunk of ticks: its columns, durations, skips and errors."""
@@ -125,7 +142,7 @@ class Results:
         for skipped in skips or ():
             _add_skips(self.skip_counts, skipped)
         for row, error in errors:
-            self.errors.append(dict(error, timestamp=times[row].isoformat()))
+            self._failures.append(dict(error, timestamp=times[row].isoformat()))
         self._frame = None
 
     def _register(self, chunk):
@@ -146,10 +163,7 @@ class Results:
         frame = self._cached_frame()
         paths = list(frame.columns.get_level_values(0).unique())
         if path not in paths:
-            raise UnknownResultError(
-                f"Results: module path = {path!r}; expected one of "
-                f"{join_names(paths)}{did_you_mean(path, paths)}"
-            )
+            raise _unknown_path(path, paths)
         return ModuleSeries(frame[path].copy(), path)
 
     def _cached_frame(self):
@@ -161,16 +175,107 @@ class Results:
         return self._frame
 
     def to_frame(self):
-        """Return a copy with (module_path, field) MultiIndex columns."""
-        return self._cached_frame().copy()
+        """Return a copy with one column per field, named ``path.field`` (a root field by name)."""
+        frame = self._cached_frame().copy()
+        frame.columns = [join_path(path, field) for path, field in frame.columns]
+        return frame
 
-    def summary(self):
-        """Report energy per port (J/MWh), peaks, evaluated hours, alarms and skip reasons."""
-        frame = self.to_frame()
-        recorded = set(frame.columns.get_level_values(0))
-        paths = sorted(
-            recorded | self.skip_counts.keys() | {error["module"] for error in self.errors}
+    def unit(self, path, field):
+        """Return the SI unit of a field; a field the plant gives no unit is ``"-"``."""
+        return self.units.get(path, {}).get(field, "-")
+
+    def names(self):
+        """Return ``{path: [field, ...]}`` of everything ``get`` can read, in column order."""
+        names = {}
+        for path, field in self._order:
+            names.setdefault(path, []).append(field)
+        return names
+
+    def get(self, path, field, start=None, end=None):
+        """Return ``{time, values, unit}`` of one field, from ``start`` to ``end`` inclusive.
+
+        ``time`` is ISO 8601 UTC text, ``values`` has ``None`` for a missing value and ``unit``
+        is the SI unit of the field. An unknown path or field raises ``UnknownResultError``.
+        """
+        series = getattr(self[path], field)
+        series = _window(series, start, end)
+        return to_plain({"time": series.index, "values": series, "unit": self.unit(path, field)})
+
+    def summary(self, path=None, start=None, end=None):
+        """Return ``{path: {field: {min, max, mean, unit}}}`` of the numeric fields.
+
+        ``path`` selects one module and ``start`` and ``end`` (inclusive) a window; values are
+        ``None`` where a field has no finite value.
+        """
+        frame = _window(self._cached_frame(), start, end)
+        paths = list(dict.fromkeys(frame.columns.get_level_values(0)))
+        if path is not None:
+            if path not in paths:
+                raise _unknown_path(path, paths)
+            paths = [path]
+        return to_plain({name: self._field_summary(name, frame[name]) for name in paths})
+
+    def _field_summary(self, path, fields):
+        """Return the minimum, maximum, mean and unit of each numeric field of one path."""
+        return {
+            field: {
+                "min": fields[field].min(),
+                "max": fields[field].max(),
+                "mean": fields[field].mean(),
+                "unit": self.unit(path, field),
+            }
+            for field in fields
+            if pd.api.types.is_numeric_dtype(fields[field])
+            and not pd.api.types.is_bool_dtype(fields[field])
+        }
+
+    def errors(self):
+        """Return the rows that did not give a result, oldest first, as plain JSON.
+
+        Each row is ``{timestamp, module, code, type, message}``. A tick where a module raised
+        has its error code from ``gm.errors.ROW_CODES`` and the exception's type and message; a
+        tick skipped for a missing bound value has the code ``missing_value`` and the missing
+        column as message. The run continues after every such row.
+        """
+        failed = {}
+        for row in self._failures:
+            failed.setdefault(row["timestamp"], []).append(row)
+        rows = []
+        for time, skipped in zip(self._times, self._skips):
+            stamp = time.isoformat()
+            rows.extend(failed.get(stamp, ()))
+            rows.extend(_skip_rows(stamp, skipped))
+        return to_plain([_ordered(row) for row in rows])
+
+    def to_dict(self):
+        """Return everything as plain JSON: ``{time, duration, series, errors, ...}``.
+
+        ``series`` is ``{path: {field: {unit, values}}}`` with one value per entry of ``time``.
+        """
+        frame = self._cached_frame()
+        series = {}
+        for path, field in frame.columns:
+            series.setdefault(path, {})[field] = {
+                "unit": self.unit(path, field),
+                "values": frame[(path, field)],
+            }
+        return to_plain(
+            {
+                "time": frame.index,
+                "duration": self._dt,
+                "series": series,
+                "errors": self.errors(),
+                "skip_counts": self.skip_counts,
+                "end_state": self.end_state,
+            }
         )
+
+    def energy_report(self):
+        """Report energy per port (J/MWh), peaks, evaluated hours, alarms and skip reasons."""
+        frame = self._cached_frame().copy()
+        recorded = set(frame.columns.get_level_values(0))
+        failed = {error["module"] for error in self._failures}
+        paths = sorted(recorded | self.skip_counts.keys() | failed)
         dt = pd.Series(self._dt, index=frame.index, dtype=float)
         rows = []
         for path in paths:
@@ -186,7 +291,7 @@ class Results:
             module=path,
             hours=float(dt[active].sum() / 3600),
             operating_hours=float(dt[fields.get("operating", active).eq(True)].sum() / 3600),
-            errors=sum(error["module"] == path for error in self.errors),
+            errors=sum(error["module"] == path for error in self._failures),
             peaks={
                 field: float(fields[field].max())
                 for field in fields
@@ -225,76 +330,76 @@ class Results:
         return rows
 
     def __repr__(self):
-        """Print a compact human-readable summary."""
-        return str(self.summary())
+        """Print the compact energy report."""
+        return str(self.energy_report())
 
-    def save(self, path):
-        """Save exact cell values plus metadata; use Parquet when installed, otherwise CSV.
-
-        Cells are JSON-encoded to retain lists, flags, full float precision and missing values.
-        The format depends on whether ``pyarrow`` imports: a path without a ``.csv``/``.parquet``
-        suffix gets the available one, and a ``.parquet`` path becomes ``.csv`` without it. A
-        Parquet file, including one written for a checkpoint, therefore needs ``pyarrow`` to
-        load. Returns the actual data filename; load accepts that filename or the original
-        basename.
-        """
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            import pyarrow  # noqa: F401
-
-            suffix = ".parquet"
-        except ImportError:
-            suffix = ".csv"
-        if path.suffix not in {".parquet", ".csv"}:
-            path = Path(str(path) + suffix)
-        elif path.suffix == ".parquet" and suffix == ".csv":
-            path = path.with_suffix(".csv")
-        frame = self.to_frame()
+    def _archive(self):
+        """Return the table and the metadata that ``save`` and ``to_bytes`` write."""
         metadata = dict(
-            columns=list(frame.columns),
             dt=self._dt,
             skip_counts=self.skip_counts,
-            errors=self.errors,
+            failures=self._failures,
             skips=self._skips,
             energy=sorted(self._energy),
+            units=self.units,
+            end_state=self.end_state,
         )
-        write_cells(
-            path, frame.set_axis([str(i) for i in range(len(frame.columns))], axis=1), metadata
-        )
+        return self._cached_frame(), metadata
+
+    def save(self, path):
+        """Save every cell exactly as one ``.npz`` file and return its path.
+
+        A path without the ``.npz`` suffix gets it. Numeric columns are stored as arrays and
+        other columns as JSON text, so loading needs no pickle and gives the same bits.
+        """
+        path = Path(path)
+        if path.suffix != ".npz":
+            path = Path(str(path) + ".npz")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        archive.write(path, *self._archive())
         return path
+
+    def to_bytes(self):
+        """Return the ``.npz`` archive of ``save`` as bytes, for storage without a file."""
+        return archive.to_bytes(*self._archive())
 
     @classmethod
     def load(cls, path):
-        """Restore result cells and integration metadata without re-running equipment."""
+        """Restore results saved by ``save``, with identical cells, units and end state."""
         path = Path(path)
-        if not path.exists():
-            path = next(
-                (
-                    Path(str(path) + ext)
-                    for ext in (".parquet", ".csv")
-                    if Path(str(path) + ext).exists()
-                ),
-                path,
-            )
-        frame, metadata = read_cells(path)
-        frame.columns = pd.MultiIndex.from_tuples(
-            metadata["columns"], names=["module_path", "field"]
-        )
+        if not path.exists() and Path(str(path) + ".npz").exists():
+            path = Path(str(path) + ".npz")
+        return cls._restored(*archive.read(path))
+
+    @classmethod
+    def from_bytes(cls, data):
+        """Restore results from the bytes of ``to_bytes``."""
+        return cls._restored(*archive.read(io.BytesIO(data)))
+
+    @classmethod
+    def _restored(cls, times, columns, metadata):
+        """Build results from the parts of an archive without re-running equipment."""
         result = cls()
-        times = pd.to_datetime(frame.index, utc=True).to_pydatetime().tolist()
-        result._chunks = [_stored_chunk(frame, times, metadata)]
-        result._order = dict.fromkeys(frame.columns)
-        result._times = times
-        result._dt, result.skip_counts = metadata["dt"], metadata["skip_counts"]
-        result.errors = metadata["errors"]
+        present = np.ones(len(times), dtype=bool)
+        tables = {}
+        for path, field, values in columns:
+            tables.setdefault(path, PathColumns(present, {})).columns[field] = values
+        result._times = list(times)
+        result._dt = metadata["dt"]
+        result._chunks = [ResultChunk(list(result._times), list(result._dt), tables)]
+        result._order = dict.fromkeys((path, field) for path, field, _ in columns)
+        result.skip_counts = metadata["skip_counts"]
+        result._failures = metadata["failures"]
         result._skips = metadata["skips"]
         result._energy = {tuple(key) for key in metadata["energy"]}
+        result.units = metadata["units"]
+        result.end_state = metadata["end_state"]
         return result
 
     def slice(self, start):
         """Return the new rows of a live call, with matching durations and diagnostics."""
-        result = Results()
+        result = Results(self.units)
+        result.end_state = self.end_state
         if self._chunks:
             self._chunks = [merge(self._chunks)]
             chunk = self._chunks[0].sliced(start)
@@ -306,8 +411,58 @@ class Results:
         for skipped in result._skips:
             _add_skips(result.skip_counts, skipped)
         times = {t.isoformat() for t in result._times}
-        result.errors = [error for error in self.errors if error["timestamp"] in times]
+        result._failures = [error for error in self._failures if error["timestamp"] in times]
         return result
+
+
+def declared_units(plant):
+    """Return ``{path: {field: unit}}``: the SI unit each module of a plant declares per output."""
+    return {
+        path: {
+            name: declaration.unit or "-"
+            for name, declaration in module.outputs(recurse=False).items()
+        }
+        for path, module in plant.named_modules()
+    }
+
+
+def _unknown_path(path, paths):
+    """Return the error for a results path that does not exist."""
+    return UnknownResultError(
+        f"Results: module path = {path!r}; expected one of "
+        f"{join_names(paths)}{did_you_mean(path, paths)}",
+        path=path,
+        suggestions=close_matches(path, paths),
+    )
+
+
+def _window(table, start, end):
+    """Return the rows of a time-indexed table from ``start`` to ``end``, both inclusive."""
+    if start is None and end is None:
+        return table
+    lower = to_utc(start) if start is not None else None
+    upper = to_utc(end) if end is not None else None
+    return table.loc[lower:upper]
+
+
+def _skip_rows(stamp, skipped):
+    """Return the rows of the reasons a tick skipped each path."""
+    return [
+        dict(
+            timestamp=stamp,
+            module=path,
+            code="missing_value",
+            type="MissingMeasurementError",
+            message=reason,
+        )
+        for path, reasons in skipped.items()
+        for reason in reasons
+    ]
+
+
+def _ordered(row):
+    """Return an error row with its keys in the documented order."""
+    return {key: row[key] for key in ("timestamp", "module", "code", "type", "message")}
 
 
 def _sliced_order(order, chunk):
@@ -315,12 +470,3 @@ def _sliced_order(order, chunk):
     first = {path: first_present(table) for path, table in chunk.tables.items()}
     kept = [key for key in order if first.get(key[0]) is not None]
     return dict.fromkeys(sorted(kept, key=lambda key: first[key[0]]))
-
-
-def _stored_chunk(frame, times, metadata):
-    """Return the whole loaded table as one chunk: every cell present, one list per column."""
-    tables = {}
-    for position, (path, name) in enumerate(frame.columns):
-        table = tables.setdefault(path, PathColumns(np.ones(len(times), dtype=bool), {}))
-        table.columns[name] = frame.iloc[:, position].tolist()
-    return ResultChunk(list(times), list(metadata["dt"]), tables)

@@ -43,17 +43,19 @@ def setup():
 
 
 def test_arguments_and_checkpoint_states_are_validated(setup, tmp_path):
-    """Bad policies, saving without a plant and unresumable checkpoints fail explicitly."""
+    """Bad policies, a missing plant and unresumable checkpoints fail explicitly."""
     plant, data = setup
     with pytest.raises(ValueError, match="on_error = 'ignore'"):
-        gm.Engine(on_error="ignore")
-    with pytest.raises(gm.errors.CheckpointError, match="engine.plant = None"):
-        gm.Engine().save_checkpoint(tmp_path / "none.ckpt")
-    engine = gm.Engine()
-    engine.replay(plant, data)
+        gm.Engine(plant, on_error="ignore")
+    with pytest.raises(gm.errors.ConfigurationError, match="plant = NoneType"):
+        gm.Engine(None)
+    with pytest.raises(gm.errors.UnknownNameError, match="did you mean 'numpy'"):
+        gm.Engine(plant, backend="nunpy")
+    engine = gm.Engine(plant)
+    engine.replay(data)
     engine.save_checkpoint(tmp_path / "replay.ckpt")
     with pytest.raises(gm.errors.CheckpointError, match="run_kind = 'replay'; expected 'live'"):
-        gm.Engine().live(plant, data, tmp_path / "replay.ckpt")
+        gm.Engine(plant).live(data, tmp_path / "replay.ckpt")
     loaded = gm.Engine.load_checkpoint(tmp_path / "replay.ckpt")
     loaded.position = None
     with pytest.raises(gm.errors.CheckpointError, match="no stored rows"):
@@ -67,7 +69,7 @@ def test_replay_windows_data_and_an_explicit_clock(setup):
     """Start and end bound both the rows and an explicit clock inclusively."""
     plant, data = setup
     clock = gm.Clock.from_data(data)
-    result = gm.Engine().replay(plant, data, clock=clock, start=data.start, end=clock.ticks[1])
+    result = gm.Engine(plant).replay(data, clock=clock, start=data.start, end=clock.ticks[1])
     assert len(result) == 2
 
 
@@ -76,7 +78,7 @@ def test_resume_and_live_apply_the_saved_runtime_settings(setup, tmp_path):
     plant, data = setup
     path = tmp_path / "live.ckpt"
     with runtime.settings(precision="float32"):
-        gm.Engine().live(plant, data.window(end=data.start), path, now=data.start)
-    fresh = gm.Engine().live(plant, data, path, now=data.end)
+        gm.Engine(plant).live(data.window(end=data.start), path, now=data.start)
+    fresh = gm.Engine(plant).live(data, path, now=data.end)
     assert fresh[""].float32.tolist() == [1.0, 1.0, 1.0]
     assert runtime.get_precision() == "float64"

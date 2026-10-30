@@ -1,7 +1,6 @@
 """Engine parity, state, callbacks, energy and restart guarantees."""
 
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -9,11 +8,13 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini import backends
 from gemini.core.engine import checkpoint
 from gemini.core.engine.callbacks import AutoCheckpoint, Callback, EventLog
 from gemini.core.engine.results import Results
 from gemini.core.types import Control, Output
 from gemini.core.types.bindings import Binding, DatedParams, ModuleBindings
+from tests.fixtures.frames import path_frame
 
 ROOT = Path(__file__).parents[2]
 REFERENCE = ROOT / "tests/fixtures/engine_reference"
@@ -85,14 +86,14 @@ def test_reference_replay_and_simulate(setup):
     ~1e-15 relative to the old raw-unit CSV conversion path, hence the simulate tolerance.
     """
     plant, data = setup
-    actual = gm.Engine(on_error="raise").replay(plant, data).to_frame()
+    actual = path_frame(gm.Engine(plant, on_error="raise").replay(data))
     old = _reference("replay.pkl", actual)
     pd.testing.assert_frame_equal(actual[old.columns], old, check_names=False)
     clock = gm.Clock.days(2024, 6, 7)
     raw = data.read(data.start, data.start)
     assumed = pd.DataFrame([raw.iloc[0].to_dict()] * 24, index=list(clock))
-    result = gm.Engine(on_error="raise").simulate(plant, gm.Dataset.from_frame(assumed), clock)
-    actual = result.to_frame()
+    result = gm.Engine(plant, on_error="raise").simulate(gm.Dataset.from_frame(assumed), clock)
+    actual = path_frame(result)
     old = _reference("simulate.pkl", actual)
     pd.testing.assert_frame_equal(
         actual[old.columns].reset_index(drop=True),
@@ -104,7 +105,7 @@ def test_reference_replay_and_simulate(setup):
     assert len(result) == 24
     for path, field in result._energy:
         total = (actual[path, field] * 3600).sum()
-        assert result.summary().loc[(path, field), "energy_J"] == pytest.approx(total)
+        assert result.energy_report().loc[(path, field), "energy_J"] == pytest.approx(total)
 
 
 def test_replay_can_skip_outputs(setup):
@@ -112,9 +113,9 @@ def test_replay_can_skip_outputs(setup):
     plant, data = setup
     first = data.window(end=data.start)
     with gm.no_outputs():
-        result = gm.Engine(on_error="raise").replay(plant, first)
+        result = gm.Engine(plant, on_error="raise").replay(first)
     assert len(result) == 1
-    fields = set(result.to_frame().columns.get_level_values("field"))
+    fields = set(path_frame(result).columns.get_level_values("field"))
     assert "operating" in fields
     assert "power" not in fields
 
@@ -131,7 +132,7 @@ def test_replay_of_example_data_skips_nothing_at_any_timestamp_resolution(
     frame = fast_frame.iloc[:96].copy()
     frame["time"] = frame["time"].dt.as_unit(unit)
     data = gm.Dataset.from_frame(frame, time_column="time")
-    result = gm.Engine(on_error="raise").replay(fresh_plant, data)
+    result = gm.Engine(fresh_plant, on_error="raise").replay(data)
     assert len(result) == 96
     assert result.skip_counts == {}
     assert result["doublet.esp"].head.notna().all()
@@ -164,10 +165,10 @@ def test_interrupt_resume(setup, tmp_path, kind):
     plant, data = setup
     data = data.window(end=data.start + pd.Timedelta(hours=2, minutes=45))
     clock = gm.Clock.from_data(data)
-    args = [plant, data] + ([clock] if kind == "simulate" else [])
-    expected = getattr(gm.Engine(on_error="raise"), kind)(*args)
+    args = [data] + ([clock] if kind == "simulate" else [])
+    expected = getattr(gm.Engine(plant, on_error="raise"), kind)(*args)
     path = tmp_path / "run.ckpt"
-    engine = gm.Engine([StopAndSave(path, 5)], on_error="raise")
+    engine = gm.Engine(plant, callbacks=[StopAndSave(path, 5)], on_error="raise")
     with pytest.raises(Interrupted):
         getattr(engine, kind)(*args)
     checkpoint = json.loads(path.read_text())
@@ -176,7 +177,9 @@ def test_interrupt_resume(setup, tmp_path, kind):
     assert loaded.plant.state_dict() == plant.state_dict()
     actual = loaded.resume()
     pd.testing.assert_frame_equal(actual.to_frame(), expected.to_frame(), check_exact=True)
-    pd.testing.assert_frame_equal(actual.summary(), expected.summary(), check_exact=True)
+    pd.testing.assert_frame_equal(
+        actual.energy_report(), expected.energy_report(), check_exact=True
+    )
     assert loaded.resume() is actual
 
 
@@ -192,13 +195,13 @@ def test_live_idempotency(tmp_path):
     path = tmp_path / "live.ckpt"
     first_now = data.start
     second_now = data.start + pd.Timedelta(minutes=15)
-    out = gm.Engine().live(plant, data, path, now=first_now)
+    out = gm.Engine(plant).live(data, path, now=first_now)
     assert len(out) == 1
-    second = gm.Engine().live(plant, data, path, now=second_now)
+    second = gm.Engine(plant).live(data, path, now=second_now)
     assert len(second) == 1
     assert not set(out.to_frame().index) & set(second.to_frame().index)
-    engine = gm.Engine()
-    assert len(engine.live(plant, data, path, now=second_now)) == 0
+    engine = gm.Engine(plant)
+    assert len(engine.live(data, path, now=second_now)) == 0
     assert len(engine.results) == 2
     assert len(gm.Engine.load_checkpoint(path).resume()) == 2
 
@@ -213,7 +216,9 @@ def test_missing_data_dates_events_and_export(setup, tmp_path):
         DatedParams(valid_from=frame.index[1], params=module.params_at(None) | {"dp_nominal": 3200})
     )
     events = EventLog(tmp_path / "events.jsonl")
-    result = gm.Engine([events], on_error="raise").replay(plant, gm.Dataset.from_frame(frame))
+    result = gm.Engine(plant, callbacks=[events], on_error="raise").replay(
+        gm.Dataset.from_frame(frame)
+    )
     assert result["doublet.esp"].head.notna().sum() == 11
     assert (
         result["filters.hot"].pressure_drop.iloc[1]
@@ -224,11 +229,13 @@ def test_missing_data_dates_events_and_export(setup, tmp_path):
     assert (
         json.loads((tmp_path / "events.jsonl").read_text().splitlines()[0])["kind"] == "run_start"
     )
-    for extension in ("csv", "parquet"):
-        path = result.save(tmp_path / ("results." + extension))
-        loaded = Results.load(path)
-        pd.testing.assert_frame_equal(loaded.to_frame(), result.to_frame())
-        pd.testing.assert_frame_equal(loaded.summary(), result.summary())
+    path = result.save(tmp_path / "results.npz")
+    loaded = Results.load(path)
+    pd.testing.assert_frame_equal(loaded.to_frame(), result.to_frame())
+    pd.testing.assert_frame_equal(loaded.energy_report(), result.energy_report())
+    assert loaded.errors() == result.errors()
+    assert [row["code"] for row in result.errors()] == ["missing_value"]
+    assert result.errors()[0]["module"] == "doublet.esp"
 
 
 def test_autocheckpoint_and_callback_order(setup, tmp_path):
@@ -257,8 +264,8 @@ def test_autocheckpoint_and_callback_order(setup, tmp_path):
             calls.append("end")
 
     path = tmp_path / "automatic.ckpt"
-    engine = gm.Engine([Observe(), AutoCheckpoint(path, every="1h")])
-    actual = engine.replay(plant, data.window(end="2024-06-07T01:00:00Z"))
+    engine = gm.Engine(plant, callbacks=[Observe(), AutoCheckpoint(path, every="1h")])
+    actual = engine.replay(data.window(end="2024-06-07T01:00:00Z"))
     assert calls == ["start"] + ["before", "after"] * 5 + ["end"]
     loaded = gm.Engine.load_checkpoint(path)
     assert len(loaded.results) == 4
@@ -270,28 +277,28 @@ def test_error_policies_and_missing_columns(setup):
     plant, data = setup
     frame = data.read(data.start, data.end).iloc[:2]
     frame.loc[frame.index[0], "doublet.esp.suction.p"] = -100
-    result = gm.Engine().replay(plant, gm.Dataset.from_frame(frame))
-    assert result.errors[0]["module"] == "doublet.esp"
+    result = gm.Engine(plant).replay(gm.Dataset.from_frame(frame))
+    assert result.errors()[0]["module"] == "doublet.esp"
+    assert result.errors()[0]["code"] == "invalid_inlet"
     assert result["filters.hot"].pressure_drop.notna().all()
     with pytest.raises(gm.errors.StepError, match="doublet.esp"):
-        gm.Engine(on_error="raise").replay(plant, gm.Dataset.from_frame(frame))
+        gm.Engine(plant, on_error="raise").replay(gm.Dataset.from_frame(frame))
     with pytest.raises(
         gm.errors.BindingError, match="suction.p, doublet.reservoir.production_rate"
-    ):
-        gm.Engine().replay(
-            plant,
+    ) as caught:
+        gm.Engine(plant).replay(
             gm.Dataset.from_frame(
                 frame.drop(columns=["doublet.esp.suction.p", "doublet.reservoir.production_rate"])
-            ),
+            )
         )
+    assert caught.value.code == "missing_column"
 
 
 def test_plant_only_checkpoint(setup, tmp_path):
     """A configured engine can save before its first run, including fitted design overrides."""
     plant, _ = setup
     plant.heat_exchanger.update_params(ua=123456)
-    engine = gm.Engine()
-    engine.plant = plant
+    engine = gm.Engine(plant)
     path = tmp_path / "design.ckpt"
     engine.save_checkpoint(path)
     other = gm.Engine.load_checkpoint(path)
@@ -309,29 +316,28 @@ def test_stateful_measured_and_integrated(tmp_path):
         index=pd.date_range("2024-01-01", periods=3, freq="1s", tz="UTC"),
     )
     data = gm.Dataset.from_frame(frame)
-    engine = gm.Engine(on_error="raise")
-    assert engine.replay(plant, data)[""].value.tolist() == [1, 2, 3]
+    engine = gm.Engine(plant, on_error="raise")
+    assert engine.replay(data)[""].value.tolist() == [1, 2, 3]
     path = tmp_path / "state.ckpt"
     with pytest.raises(Interrupted):
-        gm.Engine([StopAndSave(path, 1)]).replay(plant, data)
+        gm.Engine(plant, callbacks=[StopAndSave(path, 1)]).replay(data)
     assert gm.Engine.load_checkpoint(path).resume()[""].value.tolist() == [1, 2, 3]
     plant.bindings[""].state = {"value": Binding(column="observed", unit="-")}
-    assert engine.replay(plant, data)[""].value.tolist() == [11, 21, 31]
+    assert engine.replay(data)[""].value.tolist() == [11, 21, 31]
     assert engine.module_states[""] == {"value": 30}
 
 
-def test_empty_live_and_fallback_storage(setup, tmp_path, monkeypatch):
-    """An empty live window is resumable and CSV fallback retains exact cells."""
+def test_empty_live_and_checkpoint_results_file(setup, tmp_path):
+    """An empty live window is resumable and the results file is an .npz with exact cells."""
     plant, data = setup
-    monkeypatch.setitem(sys.modules, "pyarrow", None)
     path = tmp_path / "empty.ckpt"
-    assert len(gm.Engine().live(plant, data, path, now="2024-01-01")) == 0
+    assert len(gm.Engine(plant).live(data, path, now="2024-01-01")) == 0
     assert len(gm.Engine.load_checkpoint(path).resume()) == 0
-    engine = gm.Engine()
-    expected = engine.replay(plant, data.window(end=data.start))
+    engine = gm.Engine(plant)
+    expected = engine.replay(data.window(end=data.start))
     path = tmp_path / "fallback.ckpt"
     engine.save_checkpoint(path)
-    assert json.loads(path.read_text())["results_file"].endswith(".csv")
+    assert json.loads(path.read_text())["results_file"].endswith(".npz")
     pd.testing.assert_frame_equal(
         gm.Engine.load_checkpoint(path).resume().to_frame(), expected.to_frame()
     )
@@ -340,8 +346,8 @@ def test_empty_live_and_fallback_storage(setup, tmp_path, monkeypatch):
 def test_failed_checkpoint_publication_keeps_previous(setup, tmp_path, monkeypatch):
     """Failure before the manifest rename leaves a fully readable previous generation."""
     plant, data = setup
-    engine = gm.Engine()
-    engine.replay(plant, data.window(end=data.start))
+    engine = gm.Engine(plant)
+    engine.replay(data.window(end=data.start))
     path = tmp_path / "atomic.ckpt"
     engine.save_checkpoint(path)
     previous = path.read_bytes()
@@ -351,7 +357,7 @@ def test_failed_checkpoint_publication_keeps_previous(setup, tmp_path, monkeypat
         raise OSError("simulated rename failure")
 
     monkeypatch.setattr(checkpoint.os, "replace", fail)
-    engine.replay(plant, data)
+    engine.replay(data)
     with pytest.raises(OSError, match="rename"):
         engine.save_checkpoint(path)
     assert path.read_bytes() == previous
@@ -371,10 +377,12 @@ def test_resume_keeps_held_rows_when_the_clock_is_finer_than_the_data(tmp_path, 
     index = pd.date_range("2024-01-01", periods=4, freq="1h", tz="UTC")
     plant, data = accumulator(pd.DataFrame({"rate": [1.0, 2.0, 3.0, 4.0]}, index=index))
     clock = gm.Clock.range("2024-01-01T00:00Z", "2024-01-01T04:00Z", "15min")
-    expected = gm.Engine(on_error="raise").simulate(plant, data, clock)
+    expected = gm.Engine(plant, on_error="raise").simulate(data, clock)
     path = tmp_path / "run.ckpt"
     with pytest.raises(Interrupted):
-        gm.Engine([StopAndSave(path, count)], on_error="raise").simulate(plant, data, clock)
+        gm.Engine(plant, callbacks=[StopAndSave(path, count)], on_error="raise").simulate(
+            data, clock
+        )
     actual = gm.Engine.load_checkpoint(path).resume()
     pd.testing.assert_frame_equal(actual.to_frame(), expected.to_frame(), check_exact=True)
 
@@ -387,13 +395,13 @@ def test_live_step_grid_stays_anchored_between_calls(tmp_path):
         index=pd.DatetimeIndex(["2024-01-01 00:00", "2024-01-01 00:15"], tz="UTC"),
     )
     plant, data = accumulator(first)
-    gm.Engine().live(plant, data, path, step="15min", now="2024-01-01T00:15Z")
+    gm.Engine(plant).live(data, path, step="15min", now="2024-01-01T00:15Z")
     second = pd.DataFrame(
         {"rate": [2.0, 2.0]},
         index=pd.DatetimeIndex(["2024-01-01 00:22", "2024-01-01 00:37"], tz="UTC"),
     )
-    fresh = gm.Engine().live(
-        plant, gm.Dataset.from_frame(second), path, step="15min", now="2024-01-01T01:00Z"
+    fresh = gm.Engine(plant).live(
+        gm.Dataset.from_frame(second), path, step="15min", now="2024-01-01T01:00Z"
     )
     assert [t.strftime("%H:%M") for t in fresh.to_frame().index] == ["00:30"]
 
@@ -403,8 +411,8 @@ def test_live_single_row_call_reuses_the_checkpointed_step(tmp_path):
     path = tmp_path / "live.ckpt"
     index = pd.date_range("2024-01-01", periods=3, freq="15min", tz="UTC")
     plant, data = accumulator(pd.DataFrame({"rate": [1.0, 1.0, 1.0]}, index=index))
-    gm.Engine().live(plant, data.window(end=index[1]), path, now=index[1])
-    fresh = gm.Engine().live(plant, data.window(start=index[2]), path, now=index[2])
+    gm.Engine(plant).live(data.window(end=index[1]), path, now=index[1])
+    fresh = gm.Engine(plant).live(data.window(start=index[2]), path, now=index[2])
     assert fresh[""].value.tolist() == [2700.0]
 
 
@@ -413,13 +421,13 @@ def test_live_keeps_the_callers_error_policy_and_plant(tmp_path):
     path = tmp_path / "live.ckpt"
     index = pd.date_range("2024-01-01", periods=2, freq="15min", tz="UTC")
     plant, data = accumulator(pd.DataFrame({"rate": [1.0, 1.0]}, index=index))
-    gm.Engine().live(plant, data, path, now=index[0])
-    engine = gm.Engine(on_error="raise")
-    engine.live(plant, data, path, now=index[1])
+    gm.Engine(plant).live(data, path, now=index[0])
+    engine = gm.Engine(plant, on_error="raise")
+    engine.live(data, path, now=index[1])
     assert engine.on_error == "raise"
     assert engine.plant is plant
     with pytest.raises(gm.errors.CheckpointError, match="plant_class = .*Accumulator"):
-        gm.Engine().live(NotANumber(), data, path, now=index[1])
+        gm.Engine(NotANumber()).live(data, path, now=index[1])
 
 
 class NotANumber(gm.modules.Module):
@@ -460,10 +468,151 @@ def test_event_log_never_changes_results_and_always_detaches(tmp_path):
     index = pd.date_range("2024-01-01", periods=2, freq="15min", tz="UTC")
     data = gm.Dataset.from_frame(pd.DataFrame({"rate": [1.0, 1.0]}, index=index))
     for events in (EventLog(), EventLog(tmp_path / "events.jsonl")):
-        result = gm.Engine([events]).replay(plant, data)
-        assert result.errors == []
+        result = gm.Engine(plant, callbacks=[events]).replay(data)
+        assert result.errors() == []
         assert result[""].value.isna().all()
     assert "NaN" in (tmp_path / "events.jsonl").read_text()
     with pytest.raises(ValueError, match="boom"):
-        gm.Engine([EventLog(), Boom()]).replay(plant, data)
+        gm.Engine(plant, callbacks=[EventLog(), Boom()]).replay(data)
     assert not plant._hooks and not plant._pre_hooks
+
+
+def accumulated(rows=6):
+    """Return an accumulator with a constant rate and that many 15-minute rows."""
+    index = pd.date_range("2024-01-01", periods=rows, freq="15min", tz="UTC")
+    return accumulator(pd.DataFrame({"rate": [1.0] * rows}, index=index))
+
+
+def test_a_dataframe_runs_like_a_dataset():
+    """A DataFrame with a timezone-aware index is the run input of simulate and replay."""
+    plant, data = accumulated()
+    frame = data.to_frame()
+    replayed = gm.Engine(plant).replay(frame)
+    pd.testing.assert_frame_equal(replayed.to_frame(), gm.Engine(plant).replay(data).to_frame())
+    simulated = gm.Engine(plant).simulate(frame)
+    assert simulated[""].value.tolist() == replayed[""].value.tolist()
+    with pytest.raises(gm.errors.DatasetError, match="timezone-aware"):
+        gm.Engine(plant).replay(frame.tz_localize(None))
+
+
+def test_a_run_input_without_the_bound_columns_lists_them_all():
+    """The error names every missing column, carries a close match and the code missing_column."""
+    plant, data = accumulated()
+    plant.bindings[""].controls["speed"] = Binding(column="speed", unit="-")
+    plant.bindings[""].controls["rat"] = Binding(column="rat", unit="-")
+    with pytest.raises(gm.errors.ValidationError, match="rat, speed") as caught:
+        gm.Engine(plant).replay(data)
+    assert isinstance(caught.value, gm.errors.BindingError)
+    assert caught.value.code == "missing_column"
+    assert caught.value.to_dict()["suggestions"] == ["rate"]
+
+
+def test_nan_rows_are_row_errors_and_the_run_continues():
+    """A NaN in a bound column skips that tick with the code missing_value; later ticks run."""
+    plant, data = accumulated(4)
+    frame = data.to_frame()
+    frame.loc[frame.index[1], "rate"] = np.nan
+    results = gm.Engine(plant).replay(frame)
+    assert len(results) == 4 and results[""].value.isna().tolist() == [False, True, False, False]
+    (row,) = results.errors()
+    assert row["code"] == "missing_value" and row["module"] == ""
+    assert row["timestamp"] == "2024-01-01T00:15:00+00:00"
+    assert row["code"] in gm.errors.ROW_CODES
+
+
+def test_two_consecutive_replays_give_the_numbers_of_one(tmp_path):
+    """Starting a replay from a former end_state continues the integration exactly."""
+    plant, data = accumulated(8)
+    whole = gm.Engine(plant).replay(data)
+    first = gm.Engine(plant).replay(data, end=data.start + pd.Timedelta(minutes=45))
+    assert len(first) == 4 and first.end_state["position"] == "2024-01-01T00:45:00+00:00"
+    state = Results.from_bytes(first.to_bytes()).end_state
+    second = gm.Engine(accumulator(data.to_frame())[0]).replay(data, state=state)
+    assert len(second) == 4
+    both = pd.concat([first.to_frame(), second.to_frame()])
+    pd.testing.assert_frame_equal(both, whole.to_frame(), check_exact=True)
+    assert second.end_state == whole.end_state
+    json.dumps(whole.end_state, allow_nan=False)
+    path = first.save(tmp_path / "first")
+    windowed = gm.Engine(plant).replay(
+        data, start=data.start + pd.Timedelta(minutes=60), state=Results.load(path).end_state
+    )
+    pd.testing.assert_frame_equal(windowed.to_frame(), second.to_frame(), check_exact=True)
+
+
+def test_a_state_of_another_plant_or_shape_is_refused():
+    """end_state needs its two keys and module paths of this plant."""
+    plant, data = accumulated()
+    with pytest.raises(gm.errors.ValidationError, match="end_state of a former run"):
+        gm.Engine(plant).replay(data, state={"position": None})
+    state = {"position": None, "module_states": {"doublet.esp": {"value": 1.0}}}
+    with pytest.raises(gm.errors.ValidationError, match="doublet.esp") as caught:
+        gm.Engine(plant).replay(data, state=state)
+    assert caught.value.code == "unknown_name"
+
+
+class Progress(Callback):
+    """Record the progress of a run and cancel it at a given number of ticks."""
+
+    def __init__(self, cancel_at=None):
+        """Remember when to cancel, if ever."""
+        self.cancel_at = cancel_at
+        self.seen = []
+
+    def on_progress(self, engine, done, total):
+        """Record the counts."""
+        self.seen.append((done, total))
+
+    def on_step_end(self, engine, sample):
+        """Cancel once the requested number of ticks is committed."""
+        if len(engine.results) == self.cancel_at:
+            raise gm.errors.Cancelled(f"stopped after {self.cancel_at} ticks")
+
+
+def test_progress_counts_the_ticks_of_the_run():
+    """on_progress gets (done, total) after each committed tick."""
+    plant, data = accumulated(5)
+    progress = Progress()
+    gm.Engine(plant, callbacks=[progress]).replay(data)
+    assert progress.seen == [(done, 5) for done in range(1, 6)]
+
+
+def test_cancelling_keeps_the_committed_ticks_readable():
+    """A callback that raises Cancelled stops the run cleanly; its ticks and end state stay."""
+    plant, data = accumulated()
+    progress = Progress(cancel_at=3)
+    engine = gm.Engine(plant, callbacks=[progress])
+    with pytest.raises(gm.errors.Cancelled, match="stopped after 3 ticks") as caught:
+        engine.replay(data)
+    assert caught.value.code == "cancelled"
+    assert len(engine.results) == 3 and progress.seen[-1] == (2, 6)
+    assert engine.results[""].value.tolist() == [900.0, 1800.0, 2700.0]
+    assert engine.results.end_state["position"] == "2024-01-01T00:30:00+00:00"
+    rest = gm.Engine(plant).replay(data, state=engine.results.end_state)
+    assert rest[""].value.tolist() == [3600.0, 4500.0, 5400.0]
+
+
+def test_live_continues_in_memory_without_a_checkpoint():
+    """Two live calls on one engine process each tick once, with no file written."""
+    plant, data = accumulated()
+    engine = gm.Engine(plant)
+    first = engine.live(data.window(end=data.start + pd.Timedelta(minutes=30)), now=data.end)
+    second = engine.live(data, now=data.end)
+    assert len(first) == 3 and len(second) == 3 and len(engine.results) == 6
+    whole = gm.Engine(plant).live(data, now=data.end)
+    assert second[""].value.tolist() == whole[""].value.tolist()[3:]
+
+
+def test_the_engine_applies_its_own_backend_to_the_run():
+    """The backend named in the constructor is the one in force while the run executes."""
+    seen = []
+
+    class Watch(Callback):
+        def on_step_start(self, engine, sample):
+            seen.append(backends.forced_name())
+
+    plant, data = accumulated(2)
+    for backend in ("python", "numpy"):
+        with backends.settings(backend="numpy" if backend == "python" else "python"):
+            gm.Engine(plant, backend, [Watch()]).replay(data)
+    assert seen == ["python", "python", "numpy", "numpy"]

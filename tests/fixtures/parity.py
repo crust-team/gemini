@@ -123,7 +123,7 @@ class Recorder(Callback):
                 "position": engine.position.isoformat(),
                 "states": copy.deepcopy(engine.module_states),
                 "results": len(engine.results),
-                "errors": len(engine.results.errors),
+                "errors": len(engine.results.failures),
             }
         )
 
@@ -174,8 +174,8 @@ def snapshot(engine, plant, recorder, log, failure=None):
     return Snapshot(
         frame=results.to_frame(),
         skips=copy.deepcopy(results.skip_counts),
-        errors=copy.deepcopy(results.errors),
-        summary=pd.DataFrame(results.summary()),
+        errors=copy.deepcopy(results.failures),
+        summary=pd.DataFrame(results.energy_report()),
         inputs={path: dict(module._input_values) for path, module in plant.named_modules()},
         states=copy.deepcopy(engine.module_states),
         position=engine.position,
@@ -194,10 +194,11 @@ def run_engine(plant, dataset, mode="replay", *args, callbacks=(), on_error="rec
     ``Recorder`` and the ``EventLog``, which the snapshot reads.
     """
     recorder, log = Recorder(), EventLog()
-    engine = gm.Engine([log, recorder, *callbacks], on_error=on_error)
+    backend = backends.forced_name() or "numpy"
+    engine = gm.Engine(plant, backend, [log, recorder, *callbacks], on_error)
     failure = None
     try:
-        getattr(engine, mode)(plant, dataset, *args, **kwargs)
+        getattr(engine, mode)(dataset, *args, **kwargs)
     except Exception as error:
         failure = _failure(error)
     return snapshot(engine, plant, recorder, log, failure)

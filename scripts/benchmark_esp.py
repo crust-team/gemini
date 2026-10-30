@@ -100,28 +100,28 @@ def benchmark_esp(repeat):
 
 def replay(dataset):
     """Replay a freshly loaded plant over ``dataset`` and return the engine."""
-    plant, engine = DoubletHeatPlant.load(PLANT), gm.Engine()
-    engine.replay(plant, dataset)
+    engine = gm.Engine(DoubletHeatPlant.load(PLANT))
+    engine.replay(dataset)
     return engine
 
 
 def simulate(dataset):
     """Simulate a freshly loaded plant over ``dataset`` and return the engine."""
-    plant, engine = DoubletHeatPlant.load(PLANT), gm.Engine()
-    engine.simulate(plant, dataset, gm.Clock.from_data(dataset))
+    engine = gm.Engine(DoubletHeatPlant.load(PLANT))
+    engine.simulate(dataset, gm.Clock.from_data(dataset))
     return engine
 
 
 def live(frame):
     """Evaluate ``frame`` one new row at a time through ``Engine.live``; return the engine."""
-    plant, engine = DoubletHeatPlant.load(PLANT), gm.Engine()
+    engine = gm.Engine(DoubletHeatPlant.load(PLANT))
     views = [
         gm.Dataset.from_frame(frame.iloc[: row + 1], time_column="time")
         for row in range(len(frame))
     ]
     with tempfile.TemporaryDirectory() as folder:
         for view in views:
-            engine.live(plant, view, Path(folder) / "live.json")
+            engine.live(view, Path(folder) / "live.json")
     return engine
 
 

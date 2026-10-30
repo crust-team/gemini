@@ -26,9 +26,9 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     df = pd.read_csv(dataset_path, parse_dates=["time"])
     data = gm.Dataset.from_frame(df, time_column="time")
 
-    engine = gm.Engine()
-    res = engine.replay(plant, data)
-    print(res.summary())
+    engine = gm.Engine(plant)
+    res = engine.replay(data)
+    print(res.energy_report())
     esp_power = res["doublet.esp"].power
     assert len(esp_power) == len(df)
 
@@ -47,8 +47,8 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
         "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
-    sim = engine.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
-    print(sim.summary())
+    sim = engine.simulate(gm.Dataset.from_profiles(profiles), clock=clock)
+    print(sim.energy_report())
 
     start = df["time"].iloc[0]
     second = start + pd.Timedelta(days=1)
@@ -56,13 +56,11 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     day1 = df[df["time"] < second]
     day2 = df[(df["time"] >= second) & (df["time"] < third)]
     out1 = engine.live(
-        plant,
         gm.Dataset.from_frame(day1, time_column="time"),
         checkpoint="runs/live.ckpt",
         now=second,
     )
     out2 = engine.live(
-        plant,
         gm.Dataset.from_frame(day2, time_column="time"),
         checkpoint="runs/live.ckpt",
         now=third,

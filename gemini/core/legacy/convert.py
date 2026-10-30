@@ -217,9 +217,10 @@ def results_to_frame(results, project):
     output = pd.DataFrame({"Timestamp": frame.index.tz_convert("UTC").tz_localize(None)})
     for path, bound in design.bindings.items():
         for field, binding in bound.measured.items():
-            if (path, field) in frame:
+            name = join_path(path, field)
+            if name in frame:
                 output[binding.column] = (
-                    frame[path, field].map(lambda value: _from_si(value, binding.unit)).to_numpy()
+                    frame[name].map(lambda value: _from_si(value, binding.unit)).to_numpy()
                 )
     return output
 

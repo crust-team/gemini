@@ -195,6 +195,6 @@ def test_engine_replay_integrates_declared_states():
         {"rate": [1.0, 1.0, 1.0]},
         index=pd.date_range("2024-01-01", periods=3, freq="1s", tz="UTC"),
     )
-    engine = gm.Engine(on_error="raise")
-    assert engine.replay(plant, gm.Dataset.from_frame(frame))[""].value.tolist() == [0, 1, 2]
+    engine = gm.Engine(plant, on_error="raise")
+    assert engine.replay(gm.Dataset.from_frame(frame))[""].value.tolist() == [0, 1, 2]
     assert engine.module_states[""] == {"total": 3}

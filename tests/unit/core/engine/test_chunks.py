@@ -11,6 +11,7 @@ from gemini.core.engine.chunks import PathColumns, ResultChunk
 from gemini.core.engine.results import Results
 from gemini.core.modules import Module
 from gemini.core.types import Health, ModuleResult, Output, Ports, Ratio, Stream, Values
+from tests.fixtures.frames import path_frame
 
 SIZE = 8
 START = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -61,7 +62,7 @@ HEALTH = {
     "tank": None,
 }
 SKIPS = [{}, {}, {}, {}, {"pump": {"pump.suction.p": 1}}, {}, {}, {}]
-ERRORS = [(3, dict(module="pump", message="boom", type="ValueError"))]
+ERRORS = [(3, dict(module="pump", message="boom", type="ValueError", code="module_error"))]
 CUTS = [[8], [1] * 8, [3, 5], [2, 2, 4], [4, 1, 3], [7, 1]]
 
 
@@ -168,7 +169,7 @@ def reference_rows():
 
 def test_a_tick_by_tick_build_equals_the_former_row_dict_storage():
     """One-tick commits give the frame of the former row-dict storage."""
-    frame = build_by_rows().to_frame()
+    frame = path_frame(build_by_rows())
     pd.testing.assert_frame_equal(frame, reference_frame(reference_rows(), TIMES))
     assert frame[("pump", "flag")].dtype == object
     assert frame[("pump", "count")].dtype == np.float64
@@ -184,8 +185,8 @@ def test_chunks_equal_the_tick_by_tick_build(cuts):
     """One chunk or several give the same table, column order, dtypes and diagnostics."""
     expected, built = build_by_rows(), build_by_chunks(cuts)
     pd.testing.assert_frame_equal(built.to_frame(), expected.to_frame())
-    pd.testing.assert_frame_equal(built.summary(), expected.summary())
-    assert built.skip_counts == expected.skip_counts and built.errors == expected.errors
+    pd.testing.assert_frame_equal(built.energy_report(), expected.energy_report())
+    assert built.skip_counts == expected.skip_counts and built.errors() == expected.errors()
     assert len(built) == SIZE and built._energy == expected._energy
     pd.testing.assert_series_equal(built["pump"].head, expected["pump"].head)
 
@@ -196,15 +197,15 @@ def test_save_load_and_slice_equal_the_row_by_row_build(tmp_path):
     A loaded result takes further commits like any other.
     """
     expected, built = build_by_rows(), build_by_chunks([3, 5])
-    loaded = Results.load(built.save(tmp_path / "chunks.csv"))
+    loaded = Results.load(built.save(tmp_path / "chunks.npz"))
     pd.testing.assert_frame_equal(loaded.to_frame(), expected.to_frame())
     loaded.commit(ResultChunk([START + timedelta(hours=SIZE)], [3600.0], {}))
     assert len(loaded) == SIZE + 1 and len(loaded.to_frame()) == SIZE + 1
     for start in (2, 5):
         tail, reference = built.slice(start), expected.slice(start)
         pd.testing.assert_frame_equal(tail.to_frame(), reference.to_frame())
-        assert tail.skip_counts == reference.skip_counts and tail.errors == reference.errors
-        pd.testing.assert_frame_equal(tail.summary(), reference.summary())
+        assert tail.skip_counts == reference.skip_counts and tail.errors() == reference.errors()
+        pd.testing.assert_frame_equal(tail.energy_report(), reference.energy_report())
 
 
 def test_list_columns_and_none_cells_follow_the_row_rules():
@@ -224,7 +225,7 @@ def test_list_columns_and_none_cells_follow_the_row_rules():
     results.commit(second)
     rows = [{("a", "x"): 1.0, ("a", "y"): None}, {("a", "x"): None, ("a", "y"): None}]
     rows += [{("a", "x"): 3.0, ("a", "y"): None}, {}]
-    pd.testing.assert_frame_equal(results.to_frame(), reference_frame(rows, TIMES[:4]))
+    pd.testing.assert_frame_equal(path_frame(results), reference_frame(rows, TIMES[:4]))
 
 
 def test_a_column_present_in_one_chunk_only_is_nan_in_the_others():
@@ -245,8 +246,8 @@ def test_a_column_present_in_one_chunk_only_is_nan_in_the_others():
     results.commit(second)
     rows = [{("a", "x"): 1.0}, {("b", "z"): 2, ("a", "x"): 3.0, ("a", "y"): 4.0}]
     expected = reference_frame(rows, TIMES[:2])
-    pd.testing.assert_frame_equal(results.to_frame(), expected)
-    assert list(results.to_frame().columns) == [("a", "x"), ("b", "z"), ("a", "y")]
+    pd.testing.assert_frame_equal(path_frame(results), expected)
+    assert list(path_frame(results).columns) == [("a", "x"), ("b", "z"), ("a", "y")]
 
 
 def test_an_empty_chunk_and_an_all_skipped_chunk():
@@ -306,8 +307,8 @@ def test_rows_with_different_fields_fill_the_missing_cells_with_nan():
         table = PathColumns.of(result, None, np.ones(1, dtype=bool))
         results.commit(ResultChunk(TIMES[row : row + 1], [3600.0], {"p": table}))
         rows.append({("p", name): float(row) for name in names} | {("p", "operating"): True})
-    pd.testing.assert_frame_equal(results.to_frame(), reference_frame(rows, TIMES[:3]))
-    assert results.to_frame()[("p", "a")].isna().tolist() == [False, False, True]
+    pd.testing.assert_frame_equal(path_frame(results), reference_frame(rows, TIMES[:3]))
+    assert path_frame(results)[("p", "a")].isna().tolist() == [False, False, True]
 
 
 def test_spread_puts_the_evaluated_rows_at_their_ticks():

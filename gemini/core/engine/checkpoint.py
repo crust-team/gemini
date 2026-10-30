@@ -31,6 +31,7 @@ class Checkpoint(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     only: list[str] | None = None
     on_error: Literal["record", "raise"] = "record"
+    backend: str = "numpy"
     runtime: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -82,7 +83,7 @@ def save(path, checkpoint, results, remaining_data=None, max_gap=None):
     if results is not None:
         result_path = results.save(path.with_name(path.name + ".results." + generation))
         checkpoint.results_file = result_path.name
-        _fsync(result_path, Path(str(result_path) + ".json"))
+        _fsync(result_path)
     if remaining_data is not None and len(remaining_data):
         data_path = path.with_name(path.name + ".data." + generation + ".csv")
         _write_dataset(data_path, remaining_data, max_gap)

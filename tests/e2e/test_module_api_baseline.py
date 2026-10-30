@@ -26,6 +26,7 @@ import pytest
 
 import gemini as gm
 from tests.fixtures import FIXTURES
+from tests.fixtures.frames import path_frame
 
 pytestmark = pytest.mark.e2e
 BASELINE = FIXTURES / "module_api_baseline"
@@ -121,7 +122,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
         assert old["fluid"] == new["fluid"]
 
     started = perf_counter()
-    replay = gm.Engine().replay(plant, selected_dataset).to_frame()
+    replay = path_frame(gm.Engine(plant).replay(selected_dataset))
     elapsed = perf_counter() - started
     assert elapsed < 60
     baseline = BASELINE if dataset_name == "slow" else FAST_BASELINE
@@ -134,8 +135,8 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
         "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
-    simulation = (
-        gm.Engine().simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock).to_frame()
+    simulation = path_frame(
+        gm.Engine(plant).simulate(gm.Dataset.from_profiles(profiles), clock=clock)
     )
     _assert_values_identical(
         simulation, _baseline_frame(BASELINE, "simulate.csv.gz"), SIMULATE_RTOL

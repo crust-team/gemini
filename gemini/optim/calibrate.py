@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.optimize import least_squares
 
-from gemini.core.data.dataset import bound_unit
+from gemini.core.data.dataset import as_dataset, bound_unit
 from gemini.core.engine.engine import Engine
 from gemini.core.modules.heat import HeatExchanger
 from gemini.core.modules.pumps import ESP
@@ -245,16 +245,17 @@ def _initial_guess(module, path, fields, observed, measured, valid):
     return None
 
 
-def _predictor(runner, trial, dataset, index, path, targets, coordinates):
+def _predictor(engine, trial, dataset, index, path, targets, coordinates):
     """Return ``predict(x)``: replayed targets [SI] for coordinates ``x``, one row per tick."""
     target = trial.get_submodule(path)
+    columns = [join_path(path, name) for name in targets]
 
     def predict(x):
         target.update_params(**coordinates.unpack(x))
-        predictions = runner.replay(trial, dataset, only=[path]).to_frame()
-        if path not in predictions.columns.get_level_values(0):
+        results = engine.replay(dataset, only=[path])
+        if path not in results.names():
             raise InsufficientDataError(f"{path}: module was skipped on every calibration row")
-        return predictions[path].reindex(index)[targets].to_numpy(dtype=float)
+        return results.to_frame()[columns].reindex(index).to_numpy(dtype=float)
 
     return predict
 
@@ -302,17 +303,18 @@ def _result(fitted, values, initial, targets, errors_before, errors_after, appli
     )
 
 
-def calibrate(plant, dataset, params, start=None, end=None, engine=None, apply=True):
+def calibrate(plant, dataset, params, start=None, end=None, backend="numpy", apply=True):
     """Fit measured outputs with bounded least squares through the public replay API.
 
     With apply=True, successful fits replace current parameters and persist as explicit
     overrides. No dated history entry is added. apply=False leaves the plant unchanged.
     Windows must lie in one design snapshot; holdout observations never enter the objective.
     The rows fitted are those where every target is measured and predicted at the initial
-    values; equipment-specific starting guesses use the same rows.
+    values; equipment-specific starting guesses use the same rows. ``backend`` is the engine
+    backend that evaluates the replays; the fit does not depend on it.
     """
     original, path, fields = _owner(plant, params)
-    dataset = dataset.window(start, end)
+    dataset = as_dataset(dataset).window(start, end)
     data = dataset.read()
     if not len(data):
         raise InsufficientDataError(f"{path}: calibration window {start} to {end} has no rows")
@@ -327,8 +329,8 @@ def calibrate(plant, dataset, params, start=None, end=None, engine=None, apply=T
     scales = np.maximum(np.nanmedian(abs(matrix), axis=0), 1e-12)
     initial = {field: getattr(target, field) for field in fields}
     coordinates = _coordinates(target, path, fields)
-    runner = engine if engine is not None else Engine(on_error="raise")
-    predict = _predictor(runner, trial, dataset, data.index, path, targets, coordinates)
+    engine = Engine(trial, backend=backend, on_error="raise")
+    predict = _predictor(engine, trial, dataset, data.index, path, targets, coordinates)
     before = predict(coordinates.initial)
     valid = _valid_rows(before, matrix, path)
 

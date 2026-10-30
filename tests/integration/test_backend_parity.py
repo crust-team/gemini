@@ -95,10 +95,10 @@ def test_a_run_with_the_backend_forced_explicitly_works_on_every_backend():
     )
 
     def replay(backend):
-        return gm.Engine().replay(tank(), gm.Dataset.from_frame(frame)).to_frame()
+        return gm.Engine(tank(), backend).replay(gm.Dataset.from_frame(frame)).to_frame()
 
     for backend, frame_of in on_each_backend(replay).items():
-        assert frame_of[("", "flow")].tolist() == [2.0, 2.0], backend
+        assert frame_of["flow"].tolist() == [2.0, 2.0], backend
 
 
 def test_replay_of_doublet_heat_is_the_same_run_on_every_backend(clean):
@@ -107,6 +107,27 @@ def test_replay_of_doublet_heat_is_the_same_run_on_every_backend(clean):
     reference = clean[REFERENCE]
     assert len(reference.frame) == ROWS and not reference.errors
     assert all(reasons == [] for reasons in reference.breaks.values())
+
+
+@pytest.fixture(scope="module")
+def repeated(shared_plant, faulted_window):
+    """Return, per backend, two runs of the same faulted input on fresh plants."""
+    return on_each_backend(
+        lambda backend: [
+            run_engine(copy.deepcopy(shared_plant), _dataset(faulted_window)) for _ in range(2)
+        ]
+    )
+
+
+def test_the_same_input_gives_the_same_numbers_on_every_backend(repeated):
+    """Two runs of one input are bit-identical on a backend, and the backends agree."""
+    for backend, (first, second) in repeated.items():
+        pd.testing.assert_frame_equal(first.frame, second.frame, check_exact=True)
+        assert first.skips == second.skips and first.errors == second.errors, backend
+        assert first.states == second.states and first.events == second.events, backend
+    reference = repeated[REFERENCE][0]
+    for name, (first, _) in others(repeated):
+        assert_frames_match(first.frame, reference.frame)
 
 
 def test_faulted_rows_give_the_same_errors_and_skips(faulty):
@@ -196,13 +217,9 @@ def lived(shared_plant, window, tmp_path_factory):
     times = window.time
 
     def live(backend):
-        engine, path = gm.Engine(), folder / f"{backend}.json"
-        first = engine.live(
-            copy.deepcopy(shared_plant), _dataset(window.iloc[:10]), path, now=times.iloc[9]
-        )
-        second = engine.live(
-            copy.deepcopy(shared_plant), _dataset(window.iloc[5:20]), path, now=times.iloc[19]
-        )
+        engine, path = gm.Engine(copy.deepcopy(shared_plant), backend), folder / f"{backend}.json"
+        first = engine.live(_dataset(window.iloc[:10]), path, now=times.iloc[9])
+        second = engine.live(_dataset(window.iloc[5:20]), path, now=times.iloc[19])
         return first.to_frame(), second.to_frame(), engine.results.to_frame(), engine.position
 
     return on_each_backend(live)
@@ -257,9 +274,11 @@ def resumed(shared_plant, window, tmp_path_factory):
 
     def interrupted(backend):
         path = folder / f"{backend}.json"
-        engine = gm.Engine([AutoCheckpoint(path, every=5), Stop(12)])
+        engine = gm.Engine(
+            copy.deepcopy(shared_plant), backend, [AutoCheckpoint(path, every=5), Stop(12)]
+        )
         with pytest.raises(KeyboardInterrupt):
-            engine.replay(copy.deepcopy(shared_plant), short)
+            engine.replay(short)
         engine = gm.Engine.load_checkpoint(path)
         return engine.resume().to_frame(), engine.position, engine.module_states
 
@@ -283,8 +302,8 @@ def test_autocheckpoint_and_resume_equal_an_uninterrupted_run_on_every_backend(r
 def test_health_columns_are_the_same(faulty, clean):
     """Score, alarm, message and assessed flags of every twin are equal, with failing rows."""
     for outcomes in (clean, faulty):
-        columns = [c for c in outcomes[REFERENCE].frame.columns if "health" in c[1]]
-        assert any(field == "health_score" for _, field in columns)
+        columns = [c for c in outcomes[REFERENCE].frame.columns if ".health" in c]
+        assert any(name.endswith(".health_score") for name in columns)
         for name, outcome in others(outcomes):
             assert_frames_match(outcome.frame[columns], outcomes[REFERENCE].frame[columns])
 
@@ -378,7 +397,7 @@ def test_health_score_columns_are_float_on_every_backend_for_scores_of_exactly_0
     exact = {("rise", row): 2 * (0.1 + 1.2 * row / 11) for row in range(0, 12, 2)}
     outcomes = on_each_backend(lambda backend: run_engine(pair_plant(), pair_frame_dataset(exact)))
     for outcome in outcomes.values():
-        scores = outcome.frame[("first", "health_score")]
+        scores = outcome.frame["first.health_score"]
         assert scores.dtype == "float64" and set(scores) == {0.0, 1.0}
     assert_runs_match(outcomes)
 

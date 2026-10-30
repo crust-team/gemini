@@ -94,10 +94,10 @@ def test_old_units_from_si():
 def test_results_to_frame_uses_old_columns_and_units(project, converted, fast_dataset):
     """Predicted measured outputs return as old tag columns in old units."""
     plant = gm.legacy.to_plant(project, DoubletHeatPlant())
-    results = gm.Engine().replay(plant, fast_dataset.window(end=fast_dataset.start))
+    results = gm.Engine(plant).replay(fast_dataset.window(end=fast_dataset.start))
     frame = gm.legacy.results_to_frame(results, project)
     assert list(frame.columns[:2]) == ["Timestamp", "ESP_Head"]
-    predicted = results.to_frame()["doublet.esp", "head"].iloc[0]
+    predicted = results.to_frame()["doublet.esp.head"].iloc[0]
     assert frame["ESP_Head"].iloc[0] == pytest.approx(predicted / 1e5)
     assert frame["Timestamp"].dt.tz is None
 

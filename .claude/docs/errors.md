@@ -65,10 +65,12 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
 
 - `DatasetError(TypeError, ValueError)`: a dataset or profile cannot be built or read.
 - `ClockError(KeyError, ValueError)`: an invalid clock, or a timestamp that is not a tick.
-- `BindingError(ValueError)`: bindings that do not match the plant or the dataset, checked when
-  the run is planned (`step.py`, `optim/calibrate.py`).
+- `BindingError(ValidationError)`: bindings that do not match the plant or the dataset, checked
+  when the run is planned (`step.py`, `optim/calibrate.py`). Bound columns that the run input lacks
+  are listed together with the code `missing_column` and a close-match suggestion.
 - `MissingMeasurementError(ValueError)`: a bound observation is missing at one tick; the engine
-  catches it and counts the skip, and `str(error)` is the reason in `Results.skip_counts`.
+  catches it and counts the skip, and `str(error)` is the reason in `Results.skip_counts` and the message of its `missing_value` row
+  in `Results.errors()`.
 - `StepError(ValueError)`: a replayed twin failed under `on_error="raise"`; the cause is chained.
 - `CheckpointError(RuntimeError, ValueError)`: a checkpoint cannot be saved, loaded or resumed
   (`checkpoint.py`, `engine.py`, `clock.py`).

@@ -60,13 +60,12 @@ def test_profiles_drive_scenario():
         )
     }
     boiler.boundary = {"stream_defaults": {"": {"inlet": inlet}}}
-    result = gm.Engine(on_error="raise").simulate(
-        boiler,
+    result = gm.Engine(boiler, on_error="raise").simulate(
         gm.Dataset.from_profiles({"temperature_setpoint": target}),
         gm.Clock.from_data(gm.Dataset.from_profiles({"temperature_setpoint": target})),
     )
     assert len(result) == 3
-    assert result.to_frame()["", "outlet_T"].tolist() == [320] * 3
+    assert result.to_frame()["outlet_T"].tolist() == [320] * 3
 
 
 def test_units_come_from_the_unit_table():
