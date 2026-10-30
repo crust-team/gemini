@@ -19,6 +19,8 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
 - `context.py`: `ContextSetting`, a context variable change usable as `with` and as a decorator.
 - `files.py`: `read_json`, `write_json` and the lossless JSON-cell tables (`encode_cell`,
   `encode_cells`, `decode_cells`) used by the rows a checkpoint keeps.
+- `version.py`: `package_version`, read from `pyproject.toml` or the package metadata, and
+  `is_older`, the rule that refuses files written before `OLDEST_READABLE`.
 - `collect_env.py`: `python -m gemini.utils.collect_env` prints the versions a bug report needs.
 
 Two folders live here without being leaf helpers, and the topic files never import them:

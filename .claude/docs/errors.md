@@ -97,7 +97,7 @@ exceptions are the topic files of `gemini.utils`, which cannot import them, pyda
 ## Codes
 
 `gm.errors.CODES` is the fixed tuple of `code` values; the backend puts them into `422` details,
-so a code is never renamed without raising `gm.API_VERSION`. `gm.errors.ROW_CODES` maps every row
+so a code is never renamed without raising the minor number of `gm.__version__`. `gm.errors.ROW_CODES` maps every row
 code of `Results.errors()` to its meaning.
 
 | Code | Meaning |

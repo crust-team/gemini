@@ -1,6 +1,6 @@
 # Public API
 
-Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.API_VERSION = 5`,
+Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.__version__ = "0.1.0"`,
 and is the page the other repositories build against. Names not listed here (a helper method such
 as `Results.commit`, anything in `gm.utils`, any import of an internal path such as
 `gemini.engine.results`) are internal and may change. `tests/unit/test_public_api.py` pins the names, their parameter names and the schema files.
@@ -20,16 +20,18 @@ Conventions on every entry:
 
 ## Freeze rule
 
-Changing, renaming or removing a public name or a return field raises `gm.API_VERSION` in the same
-commit, with a line in the change log below. Adding a new optional return field does not. The
-public-API test compares against a stored snapshot (`tests/fixtures/public_api.json`) that may
-only change together with `API_VERSION`; its hash per version is held in the test.
+`gm.__version__` is the one version of the package, read from `version` in `pyproject.toml`.
+Semantic versioning, below 1.0: a breaking change to a public name or return field raises the
+minor number (`0.2.0`); an addition or a fix raises the patch number (`0.1.1`). Every change has a
+line in the change log below, in the same commit. The public-API test compares against a stored
+snapshot (`tests/fixtures/public_api.json`) that records the version and may only change together
+with it; its hash per version is held in the test.
 
 ## Package
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.__version__`, `gm.API_VERSION` | text, integer | real |
+| `gm.__version__` | text, the version in `pyproject.toml` | real |
 | `gm.Stream`, `gm.Ports`, `gm.Fluid`, `gm.BRINE`, `gm.WATER`, `gm.Quantity`, `gm.Profile`, `gm.Clock`, `gm.Dataset` | see [types.md](types.md), [data.md](data.md), [engine.md](engine.md) | real |
 | `gm.no_outputs()`, `gm.runtime` | see [modules.md](modules.md), [runtime.md](runtime.md) | real |
 
@@ -226,10 +228,12 @@ Pass parameter objects declared `calibratable=True`, such as
 
 ## Change log
 
-| API_VERSION | Date | Change |
+| Version | Date | Change |
 | --- | --- | --- |
-| 1 | 2026-10-30 | First frozen list. |
-| 2 | 2026-10-30 | One classification: `category` is the module's folder. `gm.modules.categories()` and `describe()["category"]` change: `heat_exchange` → `exchangers`, `heat_pump` and `boiler` → `heating`, `chiller` → `cooling`, `network` → `piping`, `well` → `wells`, `pump` → `pumps`, `separation` → `treatment`, `consumer` → `demand`, `plant` → `plants`; `subsurface` and `storage` stay; `power` and `control` are new. Exceptions to that mapping: `ORC`, `FlashTurbine` (`heat_exchange`), `GridConnection` (`network`) and `Separator` (`separation`) are `power`; `PIDController` (`network`) is `control`. |
-| 3 | 2026-10-30 | `gm.legacy` is removed: the bridge moved to the internal `gemini.utils.legacy`. The old-project import stays public through `gm.plants.convert_legacy(folder)` only. Checkpoints written before version 3 do not load. |
-| 4 | 2026-10-30 | The fits move out of the modules into `gm.analysis`: `fit_head_coefficients`, `fit_head_correction`, `estimate_reservoir_pressure`, `estimate_conductance` (they were `ESP.fit_head_coefficients`, `ESP.fit_head_correction`, `ProductionReservoir.estimate_pressure` and `HeatExchanger.ua_from_measurements`, and those are gone with `ESP.head_curve` and `ESP.efficiency_function`). One name per concept ([glossary.md](glossary.md)): `approach_T` → `approach_temperature`, `bep_flow` → `best_efficiency_flow`, `bep_ratio` → `best_efficiency_ratio`, `building_return_T` → `building_return_temperature`, `building_supply_T` → `building_supply_temperature`, `capped` → `is_capped`, `carnot_efficiency` → `carnot_fraction`, `clogging_dp` → `clogging_pressure_drop`, `correction_factor` → `correction_factors`, `depth` → `borehole_depth`, `dp` → `nominal_pressure_drop`, `dp_cold` → `cold_pressure_drop`, `dp_cold_nominal` → `cold_nominal_pressure_drop`, `dp_friction` → `friction_pressure_drop`, `dp_gravity` → `gravity_pressure_drop`, `dp_hot` → `hot_pressure_drop`, `dp_hot_nominal` → `hot_nominal_pressure_drop`, `dp_nominal` → `nominal_pressure_drop`, `flow_dp` → `flow_pressure_drop`, `fluid_mean_T` → `fluid_mean_temperature`, `fraction_of_carnot` → `carnot_fraction`, `friction_correlation_2p` → `two_phase_friction_correlation`, `ground_T` → `ground_temperature`, `head_coeff` → `head_coefficients`, `heat_loss_coefficient` → `heat_loss_conductance`, `heat_transfer_coeff` → `heat_transfer_coefficient`, `hydrostatic_dp` → `hydrostatic_pressure_drop`, `ice_heat_capacity` → `ice_specific_heat`, `in_operating_window` → `is_in_operating_window`, `lmtd` → `log_mean_temperature_difference`, `lorenz_efficiency` → `lorenz_fraction`, `m_dot_cold_nominal` → `cold_nominal_mass_flow`, `m_dot_hot_nominal` → `hot_nominal_mass_flow`, `m_dot_nominal` → `nominal_mass_flow`, `max_flow` → `maximum_flow`, `min_flow` → `minimum_flow`, `no_stages` → `stage_count`, `ntu` → `transfer_units`, `output_max` → `maximum_output`, `output_min` → `minimum_output`, `p_out` → `outlet_pressure`, `power_coeff` → `power_coefficients`, `production_T` → `production_out_T`, `rock_conductivity` → `ground_conductivity`, `rock_diffusivity` → `ground_diffusivity`, `skin_dp` → `skin_pressure_drop`, `thickness` → `aquifer_thickness`, `u_value` → `heat_transfer_coefficient`, `ua` → `thermal_conductance`, `water_heat_capacity` → `water_specific_heat`. `ProductionWell`, `InjectionWell`, `Pipe` and `ESP` names change in result columns and `measured` bindings with them; `thickness` is the reservoirs' and `depth` is `DownholeHeatExchanger`'s. A stored format 1 file migrates through `gm.plants.migrate`; a stored format 2 file with an old name raises `unknown_name` and must be rewritten. |
-| 5 | 2026-10-30 | Run functions over the public `gm.Engine`: `gm.simulate`, `gm.replay`, `gm.live`, `gm.resume` are new, with the `checkpoint` and `checkpoint_every` arguments on `simulate` and `replay`. `p.simulate(profile)` is removed: use `gm.simulate(plant, profile)`. |
+| 0.1.0 | 2026-10-30 | First consistent API. |
+
+Before 0.1.0 the API counted integer versions 1 to 5: the first frozen list, `category` as the
+folder of a module, `gm.legacy` moved behind `gm.plants.convert_legacy`, the fits moved to
+`gm.analysis` with one name per concept ([glossary.md](glossary.md)), and the run functions over
+`gm.Engine`. Checkpoints and results files written before 0.1.0 do not load: they raise
+`ValidationError` with code `old_format`.

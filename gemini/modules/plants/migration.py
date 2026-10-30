@@ -62,7 +62,7 @@ RENAMED_NAMES = {
     "ua": "thermal_conductance",
     "water_heat_capacity": "water_specific_heat",
 }
-"""Parameter and output names of ``API_VERSION`` 3 and their current names."""
+"""Parameter and output names of the first frozen API and their current names."""
 
 
 def _failed(message, path=None):

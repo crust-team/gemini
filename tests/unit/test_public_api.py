@@ -7,14 +7,8 @@ from pathlib import Path
 import gemini as gm
 from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
-SNAPSHOTS = {
-    1: "7d24bb659c94ff3f5717c4eb116a7c44ca2eb77972f96e6515a52350c28a07b0",
-    2: "91dce79b8d07942960e637da063bbbac465426e883ba15cc172c9f76b6ccc15d",
-    3: "1c47ff0cb57d8ef77cc41816ec42a140a304965686a577c82b2af664c8817cc9",
-    4: "ab0daaad0daa4fd0692f97507e808292f7d9c544c82cd2e14a1c04c8e26f88e8",
-    5: "40b06447d90c1bdd37bd236c9e33c074510bde2cf561aa7246d9f6ec88dbd83a",
-}
-"""Hash of the snapshot per ``API_VERSION``: an entry never changes, a new version adds one."""
+SNAPSHOTS = {"0.1.0": "031f05106283e44ea2a521f5f825c7ed7be16ecf068cbfc9e974cb01551a2974"}
+"""Hash of the snapshot per ``gm.__version__``: an entry never changes, a new version adds one."""
 
 
 def test_public_names_and_docs():
@@ -52,7 +46,6 @@ def test_public_names_and_docs():
         "errors",
         "no_outputs",
         "__version__",
-        "API_VERSION",
     }
     assert set(dir(gm)) == expected == set(gm.__all__)
     assert all(getattr(gm, name).__doc__ for name in expected)
@@ -80,17 +73,23 @@ def test_the_public_api_equals_the_stored_snapshot():
     assert capture() == json.loads(SNAPSHOT.read_text())
 
 
-def test_the_snapshot_changes_only_with_the_api_version():
-    """A stored snapshot belongs to one ``API_VERSION``; changing it means raising the version."""
+def test_the_snapshot_changes_only_with_the_version():
+    """A stored snapshot belongs to one version; changing it means raising the version."""
     stored = json.loads(SNAPSHOT.read_text())
-    assert stored["api_version"] == gm.API_VERSION
-    assert fingerprint(stored) == SNAPSHOTS[gm.API_VERSION]
+    assert stored["version"] == gm.__version__
+    assert fingerprint(stored) == SNAPSHOTS[gm.__version__]
 
 
-def test_the_change_log_lists_the_api_version():
+def test_the_change_log_lists_the_version():
     """Each version has a line in the change log of the API page."""
     page = (Path(__file__).parents[2] / ".claude/docs/api.md").read_text()
-    assert f"| {gm.API_VERSION} |" in page.split("## Change log")[1]
+    assert f"| {gm.__version__} |" in page.split("## Change log")[1]
+
+
+def test_the_package_has_one_version():
+    """``gm.API_VERSION`` is gone; ``gm.__version__`` is the one version."""
+    assert not hasattr(gm, "API_VERSION")
+    assert gm.__version__ == "0.1.0"
 
 
 def test_utils_stays_private():

@@ -208,7 +208,7 @@ framework name (see [conventions.md](conventions.md#code-quality)); flake8 enfor
 The same file fails on a formula in a module and on two physics functions with one normalised body;
 `tests/unit/modules/test_glossary.py` checks every declared name against the glossary.
 `tests/unit/test_public_api.py` compares every public name, its parameter names and the schema
-files with `tests/fixtures/public_api.json`, which may only change together with `gm.API_VERSION`
+files with `tests/fixtures/public_api.json`, which may only change together with `gm.__version__`
 (see [conventions.md](conventions.md#public-api-freeze)).
 `tests/integration/test_public_contracts.py` checks that every public function that returns data
 gives plain JSON on the example plant, and `tests/unit/scripts/test_write_schemas.py` that the

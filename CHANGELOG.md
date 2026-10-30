@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-30
+
+First consistent API: see the change log of [api.md](.claude/docs/api.md). The version restarts at
+0.1.0 from one source, `pyproject.toml`, and `gm.API_VERSION` is removed; the integer versions
+below are the history before it. Checkpoints and results files written before 0.1.0 do not load.
+
 The package was rebuilt as composable modules with handwritten plants, in-memory data and one
 finite engine, and then cleaned up. Old import paths are not retained.
 

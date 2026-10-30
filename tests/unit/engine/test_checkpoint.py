@@ -36,12 +36,27 @@ def test_save_publishes_generations_and_removes_the_previous_one(tmp_path):
 
 
 def test_load_rejects_escaping_sibling_paths_and_invalid_manifests(tmp_path):
-    """Sibling names must stay in the folder; other versions fail as CheckpointError."""
+    """Sibling names must stay in the folder; another manifest fails as CheckpointError."""
     path = tmp_path / "bad.ckpt"
     path.write_text(manifest(results_file="../outside.csv").model_dump_json())
     with pytest.raises(gm.errors.CheckpointError, match="results_file = '../outside.csv'"):
         storage.load(path)
-    data = json.loads(manifest().model_dump_json()) | {"version": 2}
+    data = json.loads(manifest().model_dump_json()) | {"backend": 2}
     path.write_text(json.dumps(data))
     with pytest.raises(gm.errors.CheckpointError, match="manifest is invalid"):
         storage.load(path)
+
+
+@pytest.mark.parametrize("version", [1, 2, None, "0.0.9"])
+def test_a_checkpoint_written_before_the_oldest_version_does_not_load(tmp_path, version):
+    """The former integer versions and anything before 0.1.0 raise with the code old_format."""
+    path = tmp_path / "old.ckpt"
+    path.write_text(json.dumps(json.loads(manifest().model_dump_json()) | {"version": version}))
+    with pytest.raises(gm.errors.ValidationError, match="version = ") as caught:
+        storage.load(path)
+    assert caught.value.code == "old_format"
+
+
+def test_a_checkpoint_records_the_package_version():
+    """The manifest holds ``gm.__version__``."""
+    assert manifest().version == gm.__version__

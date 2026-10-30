@@ -36,8 +36,8 @@ Read every file in `.claude/docs/` before changing the repository:
 - [Utilities](.claude/docs/utils.md): the `gemini.utils` helpers and how to add one.
 
 When a commit changes behaviour, structure or conventions, update the relevant document in the
-same commit. The public API is frozen: a change to a public name or return field raises
-`gm.API_VERSION` ([freeze rule](.claude/docs/conventions.md#public-api-freeze)).
+same commit. The public API is frozen: a breaking change to a public name or return field raises the minor
+number of `gm.__version__` ([freeze rule](.claude/docs/conventions.md#public-api-freeze)).
 
 ## Branching
 

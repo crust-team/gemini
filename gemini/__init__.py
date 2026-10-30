@@ -14,9 +14,9 @@ from gemini.modules.plants import Plant
 from gemini.physics import units
 from gemini.types import BRINE, WATER, Fluid, Ports, Profile, Quantity, Stream, streams
 from gemini.utils.data.dataset import Dataset
+from gemini.utils.version import package_version
 
-__version__ = "1.0.3"
-API_VERSION = 5
+__version__ = package_version()
 __all__ = [
     "simulate",
     "replay",
@@ -50,7 +50,6 @@ __all__ = [
     "errors",
     "no_outputs",
     "__version__",
-    "API_VERSION",
 ]
 
 

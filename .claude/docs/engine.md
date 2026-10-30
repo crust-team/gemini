@@ -264,8 +264,9 @@ other column (lists, strings, `None`, mixed cells) as one JSON text with exact f
 metadata (units, durations, skips, failures, energy fields, end state) is one JSON text. Loading
 uses `allow_pickle=False`, so no pickle is read, and gives the same bits, units and end state.
 Anything that is not an archive of this format (including the former Parquet and CSV files)
-raises `ValidationError` with the code `invalid_format`. Checkpoints keep their results in the same
-file.
+raises `ValidationError` with the code `invalid_format`. The metadata records `gm.__version__`, and a
+file written before 0.1.0 raises `ValidationError` with the code `old_format`, as a checkpoint does.
+Checkpoints keep their results in the same file.
 
 **End state.** `results.end_state` is plain JSON `{position, module_states}`: the last committed
 tick (ISO text or `null`) and the state tree of each stateful twin (`{path: tree}`; in a
@@ -278,7 +279,7 @@ shape, or names a module the plant lacks, raises `ValidationError`.
 
 ## Checkpoints
 
-The version-1 JSON manifest stores the run kind, the importable plant class, `plant.to_dict()`,
+The JSON manifest stores the `gm.__version__` that wrote it, the run kind, the importable plant class, `plant.to_dict()`,
 module states, the finite clock, the completed position, the original dataset fingerprint
 (informational only), selected `only` paths, the error policy, the runtime settings captured at
 run start, the backend, the creation time and sibling filenames. Results and unfinished replay/simulation rows

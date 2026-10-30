@@ -14,9 +14,7 @@ import numpy as np
 import pandas as pd
 
 from gemini.errors import ValidationError
-
-FORMAT = 1
-"""The archive layout version, written in the metadata."""
+from gemini.utils.version import OLDEST_READABLE, is_older, package_version
 
 TIME_NAME = "time"
 METADATA_NAME = "metadata"
@@ -49,7 +47,9 @@ def pack(frame, metadata):
         else:
             arrays[name] = np.array(json.dumps(series.tolist(), default=_plain_cell))
         columns.append([path, field, name])
-    described = dict(metadata, format=FORMAT, time_unit=frame.index.unit, columns=columns)
+    described = dict(
+        metadata, version=package_version(), time_unit=frame.index.unit, columns=columns
+    )
     arrays[METADATA_NAME] = np.array(json.dumps(described))
     return arrays
 
@@ -81,17 +81,20 @@ def read(file):
             f"results archive: {error}; expected a .npz written by Results.save",
             code="invalid_format",
         ) from error
-    _check_format(metadata)
+    _check_version(metadata)
     times = _times(stored[TIME_NAME], metadata["time_unit"])
     columns = [(path, field, _cells(stored[name])) for path, field, name in metadata["columns"]]
     return times, columns, metadata
 
 
-def _check_format(metadata):
-    if metadata.get("format") != FORMAT:
+def _check_version(metadata):
+    """Refuse an archive written before the oldest readable version."""
+    if is_older(metadata.get("version")):
         raise ValidationError(
-            f"results archive: format = {metadata.get('format')!r}; expected {FORMAT}",
-            code="invalid_format",
+            f"results archive: version = {metadata.get('version')!r}; expected a file written "
+            f"by gemini {OLDEST_READABLE} or later",
+            path="version",
+            code="old_format",
         )
 
 

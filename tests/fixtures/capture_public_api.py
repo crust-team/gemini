@@ -1,7 +1,7 @@
 """The frozen public API as data: every name, its parameter names and the schema hashes.
 
 Regenerate with ``PYTHONPATH=. python tests/fixtures/capture_public_api.py`` only together with a
-raised ``gm.API_VERSION`` and a line in the change log of ``.claude/docs/api.md``.
+raised ``gm.__version__`` and a line in the change log of ``.claude/docs/api.md``.
 """
 
 import hashlib
@@ -111,7 +111,7 @@ def capture():
     errors = {name: getattr(gm.errors, name) for name in gm.errors.__all__}
     classes = {name: value for name, value in errors.items() if isinstance(value, type)}
     return {
-        "api_version": gm.API_VERSION,
+        "version": gm.__version__,
         "top_level": sorted(gm.__all__),
         "namespaces": {name: _namespace(getattr(gm, name)) for name in NAMESPACES},
         "modules": _namespace(gm.modules),
@@ -134,7 +134,7 @@ def capture():
 
 
 def fingerprint(snapshot):
-    """Return the hash of a snapshot, which a test holds per ``API_VERSION``."""
+    """Return the hash of a snapshot, which a test holds per version."""
     text = json.dumps(snapshot, sort_keys=True)
     return hashlib.sha256(text.encode()).hexdigest()
 

@@ -1,5 +1,4 @@
 {
- "api_version": 5,
  "categories": [
   "subsurface",
   "wells",
@@ -597,7 +596,6 @@
   "fuel"
  ],
  "top_level": [
-  "API_VERSION",
   "BRINE",
   "Clock",
   "Dataset",
@@ -630,5 +628,6 @@
   "streams",
   "testing",
   "units"
- ]
+ ],
+ "version": "0.1.0"
 }

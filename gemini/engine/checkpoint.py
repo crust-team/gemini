@@ -10,15 +10,17 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from gemini.errors import CheckpointError
+from gemini.errors import ValidationError as GeminiValidationError
 from gemini.utils.data.dataset import Dataset
 from gemini.utils.files import read_cells, read_json, write_cells
+from gemini.utils.version import OLDEST_READABLE, is_older, package_version
 
 
 class Checkpoint(BaseModel):
     """Portable engine state; the manifest points to an immutable sibling result generation."""
 
     model_config = ConfigDict(extra="forbid")
-    version: Literal[1] = 1
+    version: str = Field(default_factory=package_version)
     run_kind: Literal["simulate", "replay", "live"] | None = None
     plant_class: str
     plant: dict
@@ -116,14 +118,26 @@ def _remove_unreferenced(folder, old, checkpoint):
             (folder / (previous + ".json")).unlink(missing_ok=True)
 
 
+def _check_version(path, manifest):
+    """Refuse a manifest written before the oldest readable version."""
+    version = manifest.get("version") if isinstance(manifest, dict) else None
+    if isinstance(manifest, dict) and is_older(version):
+        raise GeminiValidationError(
+            f"{path}: version = {version!r}; expected a checkpoint written by gemini "
+            f"{OLDEST_READABLE} or later",
+            path="version",
+            code="old_format",
+        )
+
+
 def load(path):
     """Validate the version and prevent sibling result paths from escaping the checkpoint folder."""
+    manifest = read_json(path)
+    _check_version(path, manifest)
     try:
-        checkpoint = Checkpoint.model_validate(read_json(path))
+        checkpoint = Checkpoint.model_validate(manifest)
     except ValidationError as exc:
-        raise CheckpointError(
-            f"{path}: manifest is invalid; expected a version-1 checkpoint\n{exc}"
-        ) from exc
+        raise CheckpointError(f"{path}: manifest is invalid; expected a checkpoint\n{exc}") from exc
     for field in ("results_file", "remaining_data_file"):
         value = getattr(checkpoint, field)
         if value and Path(value).name != value:

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import gemini as gm
 from gemini.engine import archive
 from gemini.errors import ValidationError
 
@@ -57,9 +58,16 @@ def test_the_time_resolution_survives():
     assert times.equals(frame.index.rename("timestamp")) and metadata["time_unit"] == "ns"
 
 
-def test_a_foreign_format_is_refused():
-    """A version other than the current one is not read."""
-    buffer = io.BytesIO()
-    np.savez(buffer, metadata=np.array('{"format": 99}'))
-    with pytest.raises(ValidationError, match="format = 99"):
-        archive.read(io.BytesIO(buffer.getvalue()))
+def test_a_file_written_before_the_oldest_version_is_refused():
+    """A former layout has no version, or one before 0.1.0: the code is old_format."""
+    for metadata in ('{"format": 99}', '{"version": "0.0.9"}'):
+        buffer = io.BytesIO()
+        np.savez(buffer, metadata=np.array(metadata))
+        with pytest.raises(ValidationError, match="version = ") as caught:
+            archive.read(io.BytesIO(buffer.getvalue()))
+        assert caught.value.code == "old_format"
+
+
+def test_an_archive_records_the_package_version():
+    """The metadata holds the version that wrote it."""
+    assert round_trip(frame_of({("a", "x"): [1.0, 2.0, 3.0]}))[2]["version"] == gm.__version__

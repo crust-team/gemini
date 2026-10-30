@@ -10,9 +10,11 @@ Version format: `MAJOR.MINOR.PATCH`
 - **MINOR**: backward-compatible feature additions.
 - **PATCH**: backward-compatible bug fixes and small improvements.
 
-The current version is defined twice and the two must agree: `version` in the `[project]` section
-of `pyproject.toml` and `__version__` in `gemini/__init__.py`;
-`tests/unit/test_public_api.py` checks that they are equal.
+While the version is below 1.0, a breaking change to a public name or return field raises MINOR
+(`0.2.0`) and an addition or a fix raises PATCH (`0.1.1`).
+
+The version has one source: `version` in the `[project]` section of `pyproject.toml`.
+`gm.__version__` reads it, and the public-API snapshot, checkpoints and saved results record it.
 
 ## Release notes source of truth
 
@@ -24,7 +26,7 @@ of `pyproject.toml` and `__version__` in `gemini/__init__.py`;
 
 1. Ensure `CHANGELOG.md` (`Unreleased`) is up to date.
 2. Choose next SemVer number (`MAJOR.MINOR.PATCH`).
-3. Update the version in `pyproject.toml` and `__version__` in `gemini/__init__.py`.
+3. Update the version in `pyproject.toml`.
 4. Create a new section in `CHANGELOG.md`:
    - `## [X.Y.Z] - YYYY-MM-DD`
 5. Commit the version/changelog changes.

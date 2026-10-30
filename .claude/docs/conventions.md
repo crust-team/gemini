@@ -46,12 +46,13 @@ documented special cases (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`)
 
 ## Public API freeze
 
-The public API is frozen: [api.md](api.md) lists it. Changing, renaming or removing a public name or
-a return field raises `gm.API_VERSION` in the same commit, with a line in the change log of
-[api.md](api.md). Adding a new optional return field does not. `tests/unit/test_public_api.py`
-compares against the stored snapshot `tests/fixtures/public_api.json`, which may only change
-together with `API_VERSION`: regenerate it with `tests/fixtures/capture_public_api.py` and add its
-hash to `SNAPSHOTS` for the new version; never edit the hash of an existing version.
+The public API is frozen: [api.md](api.md) lists it. `gm.__version__` is the one version, read from
+`version` in `pyproject.toml`. Below 1.0 a breaking change to a public name or a return field raises
+the minor number (`0.2.0`) and an addition or a fix raises the patch number (`0.1.1`), in the same
+commit, with a line in the change log of [api.md](api.md). `tests/unit/test_public_api.py` compares
+against the stored snapshot `tests/fixtures/public_api.json`, which records the version and may only
+change together with it: regenerate it with `tests/fixtures/capture_public_api.py` and add its hash
+to `SNAPSHOTS` for the new version; never edit the hash of a released version.
 
 ## Module rules
 
