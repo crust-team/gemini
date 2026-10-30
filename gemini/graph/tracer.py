@@ -1,14 +1,14 @@
 """``Tracer``: run one module call on traced values and record it as a ``Graph``.
 
 The module is a leaf or a composite: child calls are recorded by ``Trace`` into the same graph
-(see there). The trace follows the fixed order of ``Module._evaluate``: ``forward``, then (unless
-``no_outputs()`` is active) ``_compute_outputs``, formula outputs, forward hooks and
-``_check_outputs``, which runs once here. Inlet stream fields (a ``Stream`` of traced values
-whose ``Fluid`` is the concrete, static one), controls, boundaries, numeric parameters and the
-constants the physics uses become named graph inputs; non-numeric and structural parameter
-values are trace guards (see ``cache``). A forward hook that writes an
-output is part of the graph; one that only reads, and any pre-hook, is a graph break: it is
-called on the module's real values, row by row.
+(see there). The trace runs ``Module._evaluate``, the one sequence of a call: ``forward``, then
+(unless ``no_outputs()`` is active) ``_compute_outputs``, formula outputs, forward hooks and
+``_check_outputs``, which runs once here; outlets of a trace are not validated. Inlet stream
+fields (a ``Stream`` of traced values whose ``Fluid`` is the concrete, static one), controls,
+boundaries, numeric parameters and the constants the physics uses become named graph inputs;
+non-numeric and structural parameter values are trace guards (see ``cache``). A forward hook
+that writes an output is part of the graph; one that only reads, and any pre-hook, is a graph
+break: it is called on the module's real values, row by row.
 Anything the trace cannot follow raises ``TraceError`` inside the trace; a root that cannot be
 traced is never an error: ``Tracer.trace`` returns a graph with one **root break** (see
 ``rootbreak``) whose reason is in ``graph.breaks``. So is a root that holds a stateful module
@@ -23,7 +23,7 @@ from gemini.core.modules.module import _Call, _current_call, outputs_enabled
 from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult
-from gemini.errors import MissingValueError, TraceError
+from gemini.errors import TraceError
 from gemini.graph.breaks import record_break
 from gemini.graph.graph import Graph
 from gemini.graph.limits import certain, check_declared_limits
@@ -42,13 +42,9 @@ class Tracer:
         module in the tree then makes the root a break, stepped by ``Module.step``. A root that
         cannot be traced gives a root break graph; nothing is raised for it.
         """
-        missing = module.missing_parameters()
-        if missing:
-            raise MissingValueError(
-                f"{module.path}: uninitialized parameters: {', '.join(missing)}"
-            )
-        module._resolve_formula_outputs()
-        reason = _untraceable(module, stepped)
+        module._prepare()
+        reasons = _untraceable(module, stepped)
+        reason = f"{module.path}: cannot be traced: {'; '.join(reasons)}" if reasons else None
         if reason is None:
             try:
                 return self._traced(module, fluids)
@@ -113,11 +109,11 @@ class Trace:
         break node and the rest of the graph is kept; a composite child that cannot be
         recorded raises ``TraceError`` instead.
         """
-        reason = _unrecordable(module)
+        reasons = _untraceable(module, False)
         mark = self._mark()
         try:
-            if reason is not None:
-                raise TraceError(f"{module.path}: {reason}")
+            if reasons:
+                raise TraceError(f"{module.path}: {reasons[0]}")
             outlets, call = self.run(module, inlets, supplied, parent)
             outputs, inputs, records = call.outputs or {}, call.inputs, call.call_records
         except TraceError as error:
@@ -151,9 +147,7 @@ class Trace:
         )
         token = _current_call.set(call)
         try:
-            outlets = Ports(_forward(module, inlets), path=module.path)
-            if call.outputs is not None:
-                module._output_step(inlets, inlets, outlets, call)
+            outlets = module._evaluate(inlets, inlets, call)
             before = len(self.graph.checks)
             check_declared_limits(module, call)
             self.limit_checks.extend(self.graph.checks[before:])
@@ -202,7 +196,7 @@ class Trace:
 
 
 def _untraceable(module, stepped):
-    """Return why the root of a trace must be a break, or ``None``."""
+    """Return the reasons a call of ``module`` cannot be traced, empty when it can."""
     reasons = []
     if stepped and any(member.stateful for member in module.modules()):
         reasons.append("stateful (stepped, needs scan)")
@@ -212,18 +206,7 @@ def _untraceable(module, stepped):
         reasons.append("has forward pre-hooks")
     if runtime.get_precision() != "float64":
         reasons.append("runtime precision is not float64")
-    if reasons:
-        return f"{module.path}: cannot be traced: {'; '.join(reasons)}"
-    return None
-
-
-def _unrecordable(module):
-    """Return why a child call cannot be recorded in the graph, or ``None``."""
-    if module.stateful:
-        return "stateful (needs scan)"
-    if module._pre_hooks:
-        return "has forward pre-hooks"
-    return None
+    return reasons
 
 
 def _inlet(graph, name, fluid):
@@ -268,10 +251,3 @@ def parameter_shape(value):
 
 def _is_number(value):
     return isinstance(value, numbers.Real) and not isinstance(value, bool)
-
-
-def _forward(module, inlets):
-    """Run ``forward`` and check its outlet names; values are traced, so not validated."""
-    returned = module.forward(inlets)
-    module._check_outlet_names(returned)
-    return {name: returned[name] for name in module._outlets}

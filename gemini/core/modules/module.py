@@ -635,6 +635,13 @@ class Module:
         """Return dotted paths of all uninitialized parameters."""
         return [name for name, value in self.named_parameters() if not value.initialized]
 
+    def _prepare(self):
+        """Reject uninitialized parameters and resolve the formula outputs, before any call."""
+        missing = self.missing_parameters()
+        if missing:
+            raise MissingValueError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
+        self._resolve_formula_outputs()
+
     @property
     def is_initialized(self):
         """Whether every parameter in this module tree has a value."""
@@ -702,10 +709,7 @@ class Module:
 
     def _run(self, args, kwargs, step):
         """Evaluate one call; inside a step a stateful module also advances its states."""
-        missing = self.missing_parameters()
-        if missing:
-            raise MissingValueError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
-        self._resolve_formula_outputs()
+        self._prepare()
         inlets, supplied = self._split_call_args(args, kwargs)
         parent = _current_call.get()
         if parent is not None and parent.trace is not None:
@@ -770,7 +774,12 @@ class Module:
         """
         for hook in tuple(self._pre_hooks.values()):
             hook(self, inlets)
-        outlets = self._check_outlets(_restored(self.forward(scoped), scoped, inlets))
+        returned = self.forward(scoped)
+        if call.trace is None:
+            outlets = self._check_outlets(_restored(returned, scoped, inlets))
+        else:
+            self._check_outlet_names(returned)
+            outlets = Ports({name: returned[name] for name in self._outlets}, path=self.path)
         if call.outputs is not None:
             self._output_step(scoped, inlets, outlets, call)
         return outlets
