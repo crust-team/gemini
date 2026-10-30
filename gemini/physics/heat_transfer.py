@@ -453,6 +453,61 @@ def mixed_temperature(
 
 
 @ops.physics
+def sensible_latent_loads(
+    available: float, sensible_demand: float, latent_demand: float, is_dry: bool
+) -> tuple:
+    """Return the sensible and latent loads a cooling circuit takes up, sensible served first.
+
+    Parameters
+    ----------
+    available : float
+        Heat the circuit can absorb [W], nonnegative.
+    sensible_demand, latent_demand : float
+        Sensible and latent cooling demands [W], nonnegative.
+    is_dry : bool
+        True when the coil is above the dew point, so nothing condenses.
+
+    Returns
+    -------
+    tuple of float
+        ``(min(S, A), min(L, A - Q_s))`` [W], with the latent load zero when ``is_dry``.
+
+    Notes
+    -----
+    Retained GEMINI priority: thermostats control the dry-bulb temperature and humidity drifts
+    when capacity is short (ASHRAE Handbook, HVAC Systems and Equipment, chapter 23).
+    """
+    sensible = ops.minimum(sensible_demand, available)
+    latent = ops.minimum(latent_demand, available - sensible)
+    return sensible, ops.where(is_dry, 0.0, latent)
+
+
+@ops.physics
+def fan_power(duty: float, specific_fan_power: float) -> float:
+    """Return the fan electricity of a cooler that is proportional to its duty.
+
+    Parameters
+    ----------
+    duty : float
+        Heat rejected [W].
+    specific_fan_power : float
+        Fan electricity per unit of rejected heat [-].
+
+    Returns
+    -------
+    float
+        ``P = specific_fan_power * Q`` [W].
+
+    Notes
+    -----
+    Speed-controlled fans without the cubic fan law: a retained GEMINI simplification (ASHRAE
+    Handbook, HVAC Systems and Equipment, chapters on cooling towers and dry coolers, give the
+    fan power of a cooler as a fraction of its capacity).
+    """
+    return specific_fan_power * duty
+
+
+@ops.physics
 def mean_temperature(first: float, second: float) -> float:
     """Return the arithmetic mean of two temperatures.
 

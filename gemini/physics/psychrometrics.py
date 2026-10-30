@@ -19,6 +19,9 @@ MAXIMUM_TEMPERATURE = 473.15
 MOLAR_MASS_RATIO = 0.621945
 """Ratio of the molar masses of water vapour and dry air [-] (ASHRAE Fundamentals, eq. 20)."""
 
+DEFAULT_LATENT_HEAT = 2.43e6
+"""Latent heat of vaporisation of water [J/kg] at about 30 degC (IAPWS-IF97 saturation tables)."""
+
 _ICE = (-5.6745359e3, 6.3925247, -9.6778430e-3, 6.2215701e-7, 2.0747825e-9, -9.4840240e-13)
 _ICE_LOG = 4.1635019
 _WATER = (-5.8002206e3, 1.3914993, -4.8640239e-2, 4.1764768e-5, -1.4452093e-8)
@@ -112,6 +115,31 @@ def dew_point(temperature: float, relative_humidity: float) -> float:
         xtol=1e-9,
     )
     return ops.where(relative_humidity == 1, temperature, point)
+
+
+@ops.physics
+def evaporation_rate(duty: float, latent_heat: float) -> float:
+    """Return the water evaporated when a duty is rejected as latent heat.
+
+    Parameters
+    ----------
+    duty : float
+        Heat rejected by evaporation [W].
+    latent_heat : float
+        Latent heat of vaporisation [J/kg], positive.
+
+    Returns
+    -------
+    float
+        ``m = Q / h_fg`` [kg/s].
+
+    Notes
+    -----
+    Reference: ASHRAE Handbook, HVAC Systems and Equipment, chapter on cooling towers. Taking all
+    rejected heat as latent is an upper bound (about 80 to 90 % of the heat evaporates in
+    practice); drift and blowdown are not included.
+    """
+    return duty / latent_heat
 
 
 def _saturation_residual(point, vapour_pressure):

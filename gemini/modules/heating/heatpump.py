@@ -62,8 +62,8 @@ class HeatPump(Module):
     Every branch of the operating point is evaluated and selected with ``where``; a stopped
     circuit has a zero capacity rate, whose temperature change ``heat_transfer.temperature_change``
     takes as zero. The two ``ops.brentq`` solves (the Lorenz source outlet and the source-limited
-    duty) are functions of ``refrigeration`` called through their ``args``; a solve that fails gives NaN and raises ``PhysicsRangeError``
-    where its row is selected.
+    duty) are functions of ``refrigeration`` called through their ``args``; a
+    solve that fails gives NaN and raises ``PhysicsRangeError`` where its row is selected.
     """
 
     def __init__(self):

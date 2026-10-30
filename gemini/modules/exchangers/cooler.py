@@ -5,6 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import heat_transfer, psychrometrics
 from gemini.types import (
     Boundary,
     Control,
@@ -58,7 +59,9 @@ class Cooler(Module):
         self.capacity = Parameter(Power, gt=0)
         self.approach = Parameter(TemperatureDifference, ge=0)
         self.specific_fan_power = Parameter(Ratio)
-        self.latent_heat = Parameter(SpecificEnthalpy, default=2.43e6, gt=0)
+        self.latent_heat = Parameter(
+            SpecificEnthalpy, default=psychrometrics.DEFAULT_LATENT_HEAT, gt=0
+        )
 
         # Inlets
         self.inlet = Inlet(Stream, stream="hot_water")
@@ -87,7 +90,7 @@ class Cooler(Module):
         # Outlets
         inlet = inlets.inlet
         duty, rate, _ = self._duty(inlet)
-        outlet = inlet.with_(T=ops.where(duty == 0, inlet.T, inlet.T - duty / rate))
+        outlet = inlet.with_(T=inlet.T - heat_transfer.temperature_change(duty, rate))
 
         outlets = dict(outlet=outlet)
         return outlets
@@ -96,9 +99,13 @@ class Cooler(Module):
         duty, _, requested = self._duty(inlets.inlet)
         self.duty = duty
         self.outlet_T = outlets.outlet.T
-        self.electricity = self.specific_fan_power * duty
+        self.electricity = heat_transfer.fan_power(duty, self.specific_fan_power)
         self.heat_loss = duty + self.electricity
-        self.evaporation_rate = duty / self.latent_heat if self.cooler_type == "wet" else 0.0
+        self.evaporation_rate = (
+            psychrometrics.evaporation_rate(duty, self.latent_heat)
+            if self.cooler_type == "wet"
+            else 0.0
+        )
         self.is_capped = requested > self.capacity
 
     def _duty(self, inlet):
@@ -112,7 +119,7 @@ class Cooler(Module):
         )
         target = ops.maximum(self.temperature_setpoint, self._air_temperature() + self.approach)
         rate = inlet.heat_capacity_rate()
-        requested = rate * ops.maximum(0, inlet.T - target)
+        requested = heat_transfer.setpoint_duty(rate, inlet.T - target)
         return ops.minimum(requested, self.capacity), rate, requested
 
     def _air_temperature(self):

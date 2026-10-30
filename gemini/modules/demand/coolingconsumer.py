@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import psychrometrics
+from gemini.physics import heat_transfer, psychrometrics
 from gemini.types import (
     Boundary,
     Fraction,
@@ -91,7 +91,9 @@ class CoolingConsumer(Module):
         sensible, latent = self._met_loads(supply_in)
         absorbed = sensible + latent
         warmed = ops.minimum(
-            self._return_limit(), supply_in.T + absorbed / supply_in.heat_capacity_rate()
+            self._return_limit(),
+            supply_in.T
+            + heat_transfer.temperature_change(absorbed, supply_in.heat_capacity_rate()),
         )
         return_T = ops.where(absorbed == 0, supply_in.T, warmed)
         return_out = supply_in.with_(T=return_T)
@@ -104,7 +106,9 @@ class CoolingConsumer(Module):
         self.heat_absorbed = sensible + latent
         self.unmet_sensible = self.sensible_cooling_demand - sensible
         self.unmet_latent = self.latent_cooling_demand - latent
-        self.dew_point = self._dew_point()
+        self.dew_point = psychrometrics.dew_point(
+            self.indoor_temperature, self.indoor_relative_humidity
+        )
         self.return_out_T = outlets.return_out.T
         self.is_unmet = ops.logical_or(self.unmet_sensible > 0, self.unmet_latent > 0)
 
@@ -117,18 +121,15 @@ class CoolingConsumer(Module):
             path=self.path,
             m_dot=supply_in.m_dot,
         )
-        available = supply_in.heat_capacity_rate() * ops.maximum(
-            0, self._return_limit() - supply_in.T
+        available = heat_transfer.setpoint_duty(
+            supply_in.heat_capacity_rate(), self._return_limit() - supply_in.T
         )
-        sensible = ops.minimum(self.sensible_cooling_demand, available)
-        latent = ops.minimum(self.latent_cooling_demand, available - sensible)
-        dry = supply_in.T > self._dew_point() - self.dew_point_margin
-        return sensible, ops.where(dry, 0.0, latent)
+        dew_point = psychrometrics.dew_point(self.indoor_temperature, self.indoor_relative_humidity)
+        dry = supply_in.T > dew_point - self.dew_point_margin
+        return heat_transfer.sensible_latent_loads(
+            available, self.sensible_cooling_demand, self.latent_cooling_demand, dry
+        )
 
     def _return_limit(self):
         """Return the warmest return temperature [K]: the parameter or the indoor air."""
         return ops.minimum(self.maximum_return_temperature, self.indoor_temperature)
-
-    def _dew_point(self):
-        """Return the indoor-air dew point [K]."""
-        return psychrometrics.dew_point(self.indoor_temperature, self.indoor_relative_humidity)
