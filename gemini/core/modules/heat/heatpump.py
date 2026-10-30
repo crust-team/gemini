@@ -411,7 +411,7 @@ def _load(duty, rate):
 
     A stopped circuit carries no duty, so its zero rate has no change to divide.
     """
-    return ops.where(rate == 0, 0.0, duty / rate)
+    return ops.where(rate == 0, 0.0, ops.truediv(duty, rate))
 
 
 def _carnot_heating_cop(efficiency, lift, sink_inlet, sink_outlet, source_inlet, source_outlet):

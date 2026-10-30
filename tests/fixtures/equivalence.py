@@ -22,6 +22,7 @@ from gemini.core.types.flows import STREAM_FIELDS
 from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult, Values
 from gemini.graph import run, run_function
+from tests.fixtures.parity import REFERENCE, others, on_each_backend
 
 RTOL = 1e-12
 
@@ -119,9 +120,12 @@ def _stacked_stream(streams):
 
 
 def assert_module_matches(module, rows, breaks=False):
-    """Assert one traced call of ``module`` equals one call per row.
+    """Assert one traced call of ``module`` on every backend equals one call per row.
 
     Each row maps inlet names to ``Stream`` objects and control or boundary names to numbers.
+    The graph runs once on each backend of ``tests.fixtures.parity.BACKENDS``, forced for the
+    whole call, tracing included; each is compared with the eager calls and the others with the
+    reference backend, so every module test is a backend parity test.
     ``breaks=True`` accepts a graph break, for a module documented as one.
     """
     calls = [module(**row) for row in rows]
@@ -133,12 +137,31 @@ def assert_module_matches(module, rows, breaks=False):
         for name in rows[0]
         if name not in inlets
     }
-    traced = run(module, inlets, inputs)
-    assert breaks or traced.breaks == [], traced.breaks
+    traced = on_each_backend(lambda backend: run(module, inlets, inputs, backend=backend))
+    for backend, outcome in traced.items():
+        assert breaks or outcome.breaks == [], outcome.breaks
+        _assert_matches_calls(module, calls, outcome, backend)
+    reference = traced[REFERENCE]
+    for backend, outcome in others(traced):
+        _assert_matches_run(module, reference, outcome, backend)
+
+
+def _assert_matches_calls(module, calls, outcome, backend):
     for name in calls[0].outputs:
         values = [call.outputs[name] for call in calls]
-        assert_close(traced.outputs[name], values, f"{module.path}.{name}")
+        assert_close(outcome.outputs[name], values, f"{backend}: {module.path}.{name}")
     for port in module.outlets():
         for field in STREAM_FIELDS:
             values = [getattr(call.outlets[port], field) for call in calls]
-            assert_close(traced.outlets[port][field], values, f"{module.path}.{port}.{field}")
+            label = f"{backend}: {module.path}.{port}.{field}"
+            assert_close(outcome.outlets[port][field], values, label)
+
+
+def _assert_matches_run(module, reference, outcome, backend):
+    assert outcome.outputs.keys() == reference.outputs.keys()
+    for name, values in reference.outputs.items():
+        assert_close(outcome.outputs[name], values, f"{backend} against reference: {name}")
+    for port in module.outlets():
+        for field in STREAM_FIELDS:
+            label = f"{backend} against reference: {port}.{field}"
+            assert_close(outcome.outlets[port][field], reference.outlets[port][field], label)
