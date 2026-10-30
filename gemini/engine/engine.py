@@ -46,11 +46,11 @@ class Engine:
     backend gives the same numbers.
     """
 
-    def __init__(self, plant, backend="numpy", callbacks=None, on_error="record"):
+    def __init__(self, plant, backend="numpy", callbacks=None, on_error="raise"):
         """Configure the plant to run, its backend, lifecycle callbacks and the error policy.
 
-        With ``on_error="record"`` an ordinary error becomes a row of ``results.errors()``;
-        with ``"raise"`` it ends the run.
+        With the default ``on_error="raise"`` an ordinary error ends the run; with ``"record"``
+        it becomes a row of ``results.errors()`` and the run continues.
         """
         if not isinstance(plant, Module):
             raise ConfigurationError(

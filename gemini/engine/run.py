@@ -47,7 +47,7 @@ def simulate(
     checkpoint_every=None,
     backend="numpy",
     callbacks=None,
-    on_error="record",
+    on_error="raise",
 ):
     """Run ``Engine.simulate`` once and return its ``Results``.
 
@@ -75,7 +75,7 @@ def replay(
     checkpoint_every=None,
     backend="numpy",
     callbacks=None,
-    on_error="record",
+    on_error="raise",
 ):
     """Run ``Engine.replay`` once and return its ``Results``.
 
@@ -98,7 +98,7 @@ def live(
     sink=None,
     backend="numpy",
     callbacks=None,
-    on_error="record",
+    on_error="raise",
 ):
     """Run ``Engine.live`` once and return the ``Results`` of the new rows.
 

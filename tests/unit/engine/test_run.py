@@ -59,9 +59,19 @@ def test_a_function_returns_what_its_engine_method_returns(backend):
     )
     window = dict(end=TICKS[8], clock=clock, only=["first"])
     _same(
-        gm.replay(pair_plant(True), data, backend=backend, **window),
-        gm.Engine(pair_plant(True), backend).replay(data, **window),
+        gm.replay(pair_plant(True), data, backend=backend, on_error="record", **window),
+        gm.Engine(pair_plant(True), backend, on_error="record").replay(data, **window),
     )
+
+
+def test_every_run_raises_by_default():
+    """The default of the functions and of the engine is ``on_error="raise"``."""
+    data = _pairs({("level", 4): -1.0})
+    with pytest.raises(StepError):
+        gm.replay(pair_plant(), data)
+    with pytest.raises(StepError):
+        gm.Engine(pair_plant()).replay(data)
+    assert gm.replay(pair_plant(), data, on_error="record").errors()
 
 
 def test_the_error_policy_and_callbacks_reach_the_engine():

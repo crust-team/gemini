@@ -27,6 +27,8 @@ early (a `gm.errors.Cancelled` or a failure under `on_error="raise"`), replacing
 a run that never started (a binding error) writes nothing. `checkpoint_every` also writes it during
 the run through `AutoCheckpoint` and needs `checkpoint`, or raises `ValidationError`.
 
+The on_error default is `"raise"`, on the functions and on `gm.Engine`.
+
 `gm.resume(checkpoint, callbacks=None)` is `Engine.load_checkpoint(path, callbacks).resume()`, and
 it writes to the same file when the run ends or stops early. `checkpoint_every` is not stored in
 the file: pass `callbacks=[AutoCheckpoint(path, every)]` for periodic saves on a resumed run. A
@@ -42,7 +44,7 @@ it was, so its rows are processed again by the next call.
 
 ## The engine
 
-`Engine(plant, backend="numpy", callbacks=None, on_error="record")` runs one plant on a finite clock.
+`Engine(plant, backend="numpy", callbacks=None, on_error="raise")` runs one plant on a finite clock.
 `simulate(profile, clock=None)` evaluates the plant from root-bound assumptions.
 `replay(data, start=None, end=None, state=None, clock=None, only=None)` evaluates equipment twins on
 measured boundaries. `live(source, checkpoint=None, step=None, now=None, sink=None)` evaluates only
@@ -122,7 +124,7 @@ previous state. A twin skipped for missing data keeps its previous state, and th
 measured)` for each replayed twin (once on the arrays of a chunk); a module without a diagnostic
 is recorded as `assessed=False`.
 
-Under `on_error="record"` an ordinary exception becomes a recorded error: per twin when a replayed
+A run raises by default. Under `on_error="record"` an ordinary exception becomes a recorded error and the run continues: per twin when a replayed
 twin fails, otherwise (always in simulation) for the whole step with module path `""`, in which
 case the module states are also restored to their value before the step. Under
 `on_error="raise"` a failing replay twin raises `StepError` with the cause chained, and a failing

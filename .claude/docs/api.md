@@ -139,11 +139,11 @@ returns its `Results`, so the numbers are the same on every backend; see
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="record")` | `Results` | real |
-| `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="record")` | `Results`; `results.end_state` is the `state=` of the next call | real |
-| `gm.live(plant, source, checkpoint, step=None, now=None, sink=None, backend="numpy", callbacks=None, on_error="record")` | `Results` of the new rows; `checkpoint` is a required path | real |
+| `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` | real |
+| `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results`; `results.end_state` is the `state=` of the next call | real |
+| `gm.live(plant, source, checkpoint, step=None, now=None, sink=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` of the new rows; `checkpoint` is a required path | real |
 | `gm.resume(checkpoint, callbacks=None)` | `Results` of an interrupted `simulate` or `replay`; `CheckpointError` on a live checkpoint | real |
-| `gm.Engine(plant, backend="numpy", callbacks=None, on_error="record")` | one runner, for complex tasks | real |
+| `gm.Engine(plant, backend="numpy", callbacks=None, on_error="raise")` | one runner, for complex tasks | real |
 | `engine.simulate(profile, clock=None)` | `Results` | real |
 | `engine.replay(data, start=None, end=None, state=None, clock=None, only=None)` | `Results`; `results.end_state` is the `state=` of the next call | real |
 | `engine.live(source, checkpoint=None, step=None, now=None, sink=None)` | `Results` of the new rows | real |

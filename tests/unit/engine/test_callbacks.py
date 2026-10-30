@@ -45,7 +45,7 @@ def run(levels, *callbacks):
     plant.bindings = {"": ModuleBindings(controls={"level": Binding(column="level", unit="-")})}
     index = pd.date_range("2024-01-01", periods=len(levels), freq="15min", tz="UTC")
     data = gm.Dataset.from_frame(pd.DataFrame({"level": levels}, index=index))
-    return plant, gm.Engine(plant, callbacks=list(callbacks)).replay(data)
+    return plant, gm.Engine(plant, callbacks=list(callbacks), on_error="record").replay(data)
 
 
 def test_event_log_records_calls_in_order_without_hooks():

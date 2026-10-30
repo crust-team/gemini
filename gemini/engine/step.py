@@ -114,7 +114,7 @@ class BindingPlan:
     module is stepped, or a twin sits below another twin and reads what that twin persisted.
     """
 
-    def __init__(self, plant, dataset, kind, only=None, on_error="record"):
+    def __init__(self, plant, dataset, kind, only=None, on_error="raise"):
         """Compile declarations and dataset bindings for repeated evaluations."""
         _check_only(plant, only)
         self.kind = kind

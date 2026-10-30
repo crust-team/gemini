@@ -282,7 +282,7 @@ def test_error_policies_and_missing_columns(setup):
     plant, data = setup
     frame = data.read(data.start, data.end).iloc[:2]
     frame.loc[frame.index[0], "doublet.esp.suction.p"] = -100
-    result = gm.Engine(plant).replay(gm.Dataset.from_frame(frame))
+    result = gm.Engine(plant, on_error="record").replay(gm.Dataset.from_frame(frame))
     assert result.errors()[0]["module"] == "doublet.esp"
     assert result.errors()[0]["code"] == "invalid_inlet"
     assert result["filters.hot"].pressure_drop.notna().all()

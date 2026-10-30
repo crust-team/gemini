@@ -32,7 +32,7 @@ class Checkpoint(BaseModel):
     results_file: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     only: list[str] | None = None
-    on_error: Literal["record", "raise"] = "record"
+    on_error: Literal["record", "raise"] = "raise"
     backend: str = "numpy"
     runtime: dict[str, Any] = Field(default_factory=dict)
 
