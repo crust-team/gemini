@@ -63,7 +63,7 @@ workflow (`workflow_dispatch`) runs the release profile on any branch.
 
 The Test workflow runs its profile on every supported Python, 3.11 to 3.14, with the newest
 dependencies, and on 3.11 and 3.14 with the lowest versions `pyproject.toml` declares
-(`uv pip install --resolution lowest-direct -e ".[parquet]" --group test`), which proves the
+(`uv pip install --resolution lowest-direct -e . --group test`), which proves the
 ranges. Free-threaded 3.14t and the 3.15 beta run with `continue-on-error`, so their failures are
 reported without failing the build. Locally, `uv venv -p 3.11` and the same install reproduce
 any job. Raise a lower bound in `pyproject.toml` when code needs a newer API, and add an upper
@@ -204,7 +204,13 @@ mirrors still holding only a docstring is empty and must never grow.
 nothing else from `gemini`. `tests/unit/test_code_quality.py` enforces the comment rule, the
 nesting limit, the function-length limit with its `LONG_FUNCTIONS` exceptions and the ban on the
 framework name (see [conventions.md](conventions.md#code-quality)); flake8 enforces complexity.
-`tests/unit/test_public_api.py` pins the curated `gm` names and the version.
+`tests/unit/test_public_api.py` compares every public name, its parameter names and the schema
+files with `tests/fixtures/public_api.json`, which may only change together with `gm.API_VERSION`
+(see [conventions.md](conventions.md#public-api-freeze)).
+`tests/integration/test_public_contracts.py` checks that every public function that returns data
+gives plain JSON on the example plant, and `tests/unit/scripts/test_write_schemas.py` that the
+files of `gemini/schemas/` are up to date and each sample fits its schema, with the small checker
+in `tests/fixtures/json_schema.py`.
 
 ## Old formats, examples and e2e coverage
 

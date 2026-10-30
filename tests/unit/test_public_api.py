@@ -1,9 +1,14 @@
 """Curated user API and plant ownership contracts."""
 
+import json
 import tomllib
 from pathlib import Path
 
 import gemini as gm
+from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
+
+SNAPSHOTS = {1: "7d24bb659c94ff3f5717c4eb116a7c44ca2eb77972f96e6515a52350c28a07b0"}
+"""Hash of the snapshot per ``API_VERSION``: an entry never changes, a new version adds one."""
 
 
 def test_public_names_and_docs():
@@ -59,3 +64,26 @@ def test_version_matches_the_package_metadata():
     """The version literal in ``gemini/__init__.py`` is the one in ``pyproject.toml``."""
     project = tomllib.loads((Path(__file__).parents[2] / "pyproject.toml").read_text())
     assert gm.__version__ == project["project"]["version"]
+
+
+def test_the_public_api_equals_the_stored_snapshot():
+    """Every name, its parameter names and the schema files are as frozen."""
+    assert capture() == json.loads(SNAPSHOT.read_text())
+
+
+def test_the_snapshot_changes_only_with_the_api_version():
+    """A stored snapshot belongs to one ``API_VERSION``; changing it means raising the version."""
+    stored = json.loads(SNAPSHOT.read_text())
+    assert stored["api_version"] == gm.API_VERSION
+    assert fingerprint(stored) == SNAPSHOTS[gm.API_VERSION]
+
+
+def test_the_change_log_lists_the_api_version():
+    """Each version has a line in the change log of the API page."""
+    page = (Path(__file__).parents[2] / ".claude/docs/api.md").read_text()
+    assert f"| {gm.API_VERSION} |" in page.split("## Change log")[1]
+
+
+def test_utils_stays_private():
+    """Helpers are not part of the public API."""
+    assert "utils" not in gm.__all__

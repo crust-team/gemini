@@ -1,0 +1,366 @@
+{
+  "boundaries": {},
+  "category": "plant",
+  "children": {
+    "esp": "ESP",
+    "injector": "InjectionWell",
+    "reservoir": "ProductionReservoir",
+    "riser": "ProductionWell",
+    "sink": "InjectionReservoir",
+    "well": "ProductionWell"
+  },
+  "connections": [
+    {
+      "kind": null,
+      "source": "injector.bottom",
+      "stream": "brine",
+      "target": "sink.sandface"
+    },
+    {
+      "kind": null,
+      "source": "reservoir.sandface",
+      "stream": "brine",
+      "target": "well.bottom"
+    },
+    {
+      "kind": null,
+      "source": "well.wellhead",
+      "stream": "brine",
+      "target": "esp.suction"
+    },
+    {
+      "kind": null,
+      "source": "esp.discharge",
+      "stream": "brine",
+      "target": "riser.bottom"
+    }
+  ],
+  "controls": {},
+  "doc": "A plant built from named modules and connections, a normal composite ``Module``.\n\n    ``add`` registers a module, ``connect`` wires an outlet to an inlet and ``to_spec`` writes the\n    plant file. Free ports of the children are the plant's own ports. ``name`` is the name given.",
+  "inlets": {
+    "return_in": {
+      "fields": {
+        "T": {
+          "unit": "K"
+        },
+        "m_dot": {
+          "unit": "kg/s"
+        },
+        "p": {
+          "unit": "Pa"
+        }
+      },
+      "stream": "brine"
+    }
+  },
+  "measured": {
+    "electricity": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": null,
+      "quantity": "electricity",
+      "section": "output",
+      "type": "number",
+      "unit": "W"
+    },
+    "heat_loss": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": null,
+      "quantity": "heat_loss",
+      "section": "output",
+      "type": "number",
+      "unit": "W"
+    }
+  },
+  "name": "doublet",
+  "outlets": {
+    "supply_out": {
+      "fields": {
+        "T": {
+          "unit": "K"
+        },
+        "m_dot": {
+          "unit": "kg/s"
+        },
+        "p": {
+          "unit": "Pa"
+        }
+      },
+      "stream": "brine"
+    }
+  },
+  "outputs": {
+    "electricity": {
+      "kind": "electricity",
+      "soft_sensor": false,
+      "unit": "W"
+    },
+    "heat_loss": {
+      "kind": "heat_loss",
+      "soft_sensor": false,
+      "unit": "W"
+    }
+  },
+  "parameters": {},
+  "state": {},
+  "summary": "A plant built from named modules and connections, a normal composite ``Module``.",
+  "type": "Doublet",
+  "values": {
+    "boundaries": {},
+    "controls": {},
+    "parameters": {
+      "esp.bep_flow": 0.03610555555555555,
+      "esp.correction_factor": [
+        1.0,
+        0.0
+      ],
+      "esp.drift_threshold": 0.1,
+      "esp.head_coeff": [
+        125.518426,
+        -0.0020852856,
+        2.28955651e-07,
+        -1.45640214e-11,
+        2.37859645e-16,
+        -1.18258356e-21
+      ],
+      "esp.max_flow": 0.049444444444444444,
+      "esp.min_flow": 0.02277777777777778,
+      "esp.motor_efficiency": 1.0,
+      "esp.no_stages": 15,
+      "esp.power_coeff": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "esp.pump_type": "DEFAULT-PUMP",
+      "esp.setting_depth": 600.0,
+      "esp.tubing": 0.1778,
+      "injector.correction_factors": [
+        1.0,
+        0.0
+      ],
+      "injector.friction_correlation": "darcy_weisbach",
+      "injector.friction_correlation_2p": "BeggsBrill",
+      "injector.pipe_path": {
+        "sections": [
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.1778,
+            "length": 500.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.1778,
+            "length": 500.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.1778,
+            "length": 1000.0,
+            "roughness": 2e-05
+          }
+        ]
+      },
+      "injector.soil_temperature": 288.15,
+      "injector.u_value": 10.0,
+      "reservoir.decline_threshold": 0.15,
+      "reservoir.drainage_radius": 1000.0,
+      "reservoir.injectivity_index": null,
+      "reservoir.liquid_density": 1068.0,
+      "reservoir.liquid_viscosity": 0.00065,
+      "reservoir.permeability": 9.869233e-12,
+      "reservoir.pressure": 22000000.0,
+      "reservoir.productivity_index": 5.833333333333333e-08,
+      "reservoir.role": "production",
+      "reservoir.skin": 0.0,
+      "reservoir.temperature": 353.15,
+      "reservoir.thickness": 45.0,
+      "reservoir.top_depth": 1800.0,
+      "reservoir.wellbore_radius": 0.0765,
+      "riser.correction_factors": [
+        1.0,
+        0.0
+      ],
+      "riser.esp_depth": 600.0,
+      "riser.friction_correlation": "darcy_weisbach",
+      "riser.friction_correlation_2p": "BeggsBrill",
+      "riser.pipe_path": {
+        "sections": [
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.1778,
+            "length": 400.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.1778,
+            "length": 150.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.273,
+            "length": 150.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.312662130424935,
+            "inner_diameter": 0.273,
+            "length": 362.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.9238027730805987,
+            "inner_diameter": 0.273,
+            "length": 188.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.273,
+            "length": 100.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.9272934315845873,
+            "inner_diameter": 0.273,
+            "length": 250.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.814370628980554,
+            "inner_diameter": 0.273,
+            "length": 550.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.9272934315845873,
+            "inner_diameter": 0.273,
+            "length": 250.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.5235987755982988,
+            "inner_diameter": 0.1778,
+            "length": 100.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.5235987755982988,
+            "inner_diameter": 0.1778,
+            "length": 300.0,
+            "roughness": 2e-05
+          }
+        ]
+      },
+      "riser.segment": "above_esp",
+      "riser.soil_temperature": 288.15,
+      "riser.u_value": 10.0,
+      "sink.decline_threshold": 0.15,
+      "sink.drainage_radius": 0.0,
+      "sink.injectivity_index": 5.5555555555555555e-08,
+      "sink.liquid_density": 1068.0,
+      "sink.liquid_viscosity": 0.00065,
+      "sink.permeability": 9.869233e-12,
+      "sink.pressure": 22000000.0,
+      "sink.productivity_index": null,
+      "sink.role": "injection",
+      "sink.skin": 0.0,
+      "sink.temperature": 353.15,
+      "sink.thickness": 45.0,
+      "sink.top_depth": 0.0,
+      "sink.wellbore_radius": 0.0765,
+      "well.correction_factors": [
+        1.0,
+        0.0
+      ],
+      "well.esp_depth": 600.0,
+      "well.friction_correlation": "darcy_weisbach",
+      "well.friction_correlation_2p": "BeggsBrill",
+      "well.pipe_path": {
+        "sections": [
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.1778,
+            "length": 400.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.1778,
+            "length": 150.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.273,
+            "length": 150.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.312662130424935,
+            "inner_diameter": 0.273,
+            "length": 362.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.9238027730805987,
+            "inner_diameter": 0.273,
+            "length": 188.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 1.5707963267948966,
+            "inner_diameter": 0.273,
+            "length": 100.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.9272934315845873,
+            "inner_diameter": 0.273,
+            "length": 250.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.814370628980554,
+            "inner_diameter": 0.273,
+            "length": 550.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.9272934315845873,
+            "inner_diameter": 0.273,
+            "length": 250.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.5235987755982988,
+            "inner_diameter": 0.1778,
+            "length": 100.0,
+            "roughness": 2e-05
+          },
+          {
+            "inclination": 0.5235987755982988,
+            "inner_diameter": 0.1778,
+            "length": 300.0,
+            "roughness": 2e-05
+          }
+        ]
+      },
+      "well.segment": "below_esp",
+      "well.soil_temperature": 288.15,
+      "well.u_value": 10.0
+    }
+  }
+}

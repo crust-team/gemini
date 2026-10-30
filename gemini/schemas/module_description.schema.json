@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GEMINI module description",
+  "type": "object",
+  "required": ["name", "type", "category", "summary", "doc", "parameters", "controls", "boundaries", "measured", "state", "inlets", "outlets", "outputs", "children", "connections"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {"type": "string"},
+    "type": {"type": "string"},
+    "category": {"type": ["string", "null"]},
+    "summary": {"type": "string"},
+    "doc": {"type": "string"},
+    "parameters": {"$ref": "#/$defs/entries"},
+    "controls": {"$ref": "#/$defs/entries"},
+    "boundaries": {"$ref": "#/$defs/entries"},
+    "measured": {"$ref": "#/$defs/entries"},
+    "state": {"$ref": "#/$defs/entries"},
+    "inlets": {"$ref": "#/$defs/ports"},
+    "outlets": {"$ref": "#/$defs/ports"},
+    "outputs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["unit", "kind", "soft_sensor"],
+        "additionalProperties": false,
+        "properties": {
+          "unit": {"type": ["string", "null"]},
+          "kind": {"type": ["string", "null"]},
+          "soft_sensor": {"type": "boolean"}
+        }
+      }
+    },
+    "children": {"type": "object", "additionalProperties": {"type": "string"}},
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "target", "stream", "kind"],
+        "additionalProperties": false,
+        "properties": {
+          "source": {"type": "string"},
+          "target": {"type": "string"},
+          "stream": {"type": ["string", "null"]},
+          "kind": {"enum": ["state", null]}
+        }
+      }
+    },
+    "values": {
+      "type": "object",
+      "required": ["parameters", "controls", "boundaries"],
+      "additionalProperties": false,
+      "properties": {
+        "parameters": {"type": "object"},
+        "controls": {"type": "object"},
+        "boundaries": {"type": "object"}
+      }
+    }
+  },
+  "$defs": {
+    "entries": {"type": "object", "additionalProperties": {"$ref": "#/$defs/entry"}},
+    "entry": {
+      "type": "object",
+      "required": ["type", "unit", "quantity", "default", "minimum", "maximum", "enum", "description", "section"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"type": ["string", "null"]},
+        "unit": {"type": ["string", "null"]},
+        "quantity": {"type": ["string", "null"]},
+        "default": {},
+        "minimum": {"type": ["number", "null"]},
+        "maximum": {"type": ["number", "null"]},
+        "enum": {"type": ["array", "null"]},
+        "description": {"type": ["string", "null"]},
+        "section": {"type": "string"}
+      }
+    },
+    "ports": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["stream", "fields"],
+        "additionalProperties": false,
+        "properties": {
+          "stream": {"type": ["string", "null"]},
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["unit"],
+              "additionalProperties": false,
+              "properties": {"unit": {"type": "string"}}
+            }
+          }
+        }
+      }
+    }
+  }
+}

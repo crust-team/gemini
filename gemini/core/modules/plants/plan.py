@@ -19,7 +19,7 @@ STATE = "state"
 
 def is_plant(module):
     """Return whether ``module`` is a plant, which wires its own children."""
-    return hasattr(type(module), "port_map")
+    return hasattr(type(module), "_port_map")
 
 
 def is_group(module):
@@ -79,7 +79,7 @@ def leaf_end(root, end, side):
     path, port = end
     module = root.get_module(path)
     while is_plant(module):
-        inner, port = module.port_map(side)[port]
+        inner, port = module._port_map(side)[port]
         path = join_path(path, inner)
         module = root.get_module(path)
     return path, port
@@ -144,7 +144,7 @@ def node_end(root, end, side, nodes):
     """Follow plant ports of opened plants from ``end`` until it is the port of a step."""
     path, port = end
     while path not in nodes:
-        inner, port = root.get_module(path).port_map(side)[port]
+        inner, port = root.get_module(path)._port_map(side)[port]
         path = join_path(path, inner)
     return path, port
 
@@ -236,12 +236,12 @@ def compile_plan(root):
     arguments = {path: {} for path in nodes}
     for source, target in ends:
         arguments[target[0]][target[1]] = ("step", *source)
-    for name, end in root.port_map("inlets").items():
+    for name, end in root._port_map("inlets").items():
         path, port = node_end(root, end, "inlets", nodes)
         arguments[path][port] = ("inlet", name)
     outlets = {
         name: node_end(root, end, "outlets", nodes)
-        for name, end in root.port_map("outlets").items()
+        for name, end in root._port_map("outlets").items()
     }
     steps = [Step(path, nodes[path], arguments[path]) for path in _topological(nodes, ends)]
     return Plan(steps, outlets)

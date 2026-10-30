@@ -22,7 +22,7 @@ def baseline_of(module):
 
 def type_name(module):
     """Return the registry name that rebuilds ``module``."""
-    return module.name if hasattr(type(module), "port_map") else type(module).__name__
+    return module.name if hasattr(type(module), "_port_map") else type(module).__name__
 
 
 def _same(module, name, stated, current):

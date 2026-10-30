@@ -38,6 +38,15 @@ spec (`gm.plants.from_spec`), and the spec file is the stored plant file. Only l
 documented special cases (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) are handwritten
 `Module` subclasses; a handwritten root is written to the same format with its class as `type`.
 
+## Public API freeze
+
+The public API is frozen: [api.md](api.md) lists it. Changing, renaming or removing a public name or
+a return field raises `gm.API_VERSION` in the same commit, with a line in the change log of
+[api.md](api.md). Adding a new optional return field does not. `tests/unit/test_public_api.py`
+compares against the stored snapshot `tests/fixtures/public_api.json`, which may only change
+together with `API_VERSION`: regenerate it with `tests/fixtures/capture_public_api.py` and add its
+hash to `SNAPSHOTS` for the new version; never edit the hash of an existing version.
+
 ## Module rules
 
 1. Assign declarations and children only in `__init__`, after `super().__init__()`.

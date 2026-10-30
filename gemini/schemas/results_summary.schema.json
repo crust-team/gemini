@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GEMINI results summary",
+  "description": "Results.summary(path=None, start=None, end=None): minimum, maximum, mean and unit per numeric field of each module path. A field with no finite value has nulls.",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "object",
+      "required": ["min", "max", "mean", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "min": {"type": ["number", "null"]},
+        "max": {"type": ["number", "null"]},
+        "mean": {"type": ["number", "null"]},
+        "unit": {"type": "string"}
+      }
+    }
+  }
+}

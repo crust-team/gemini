@@ -19,8 +19,8 @@ def plant():
 def test_ends_can_be_modules_declarations_or_text(plant):
     """Handles, port declarations and ``path.port`` name the same connection."""
     plant.connect(plant.filter.outlet, plant.pipe)
-    assert plant.connection_list()[0]["source"] == "filter.outlet"
-    assert plant.connection_list()[0]["target"] == "pipe.inlet"
+    assert plant._connection_list()[0]["source"] == "filter.outlet"
+    assert plant._connection_list()[0]["target"] == "pipe.inlet"
 
 
 def test_a_module_with_no_free_port_is_in_use(plant):
@@ -43,11 +43,11 @@ def test_a_port_name_that_is_taken_is_refused(plant):
 def test_port_map_lists_named_then_free_ports(plant):
     """Named ports first, then every free port named from its path."""
     plant.connect("feed", "filter.inlet")
-    assert plant.port_map("inlets") == {
+    assert plant._port_map("inlets") == {
         "feed": ("filter", "inlet"),
         "pipe_inlet": ("pipe", "inlet"),
     }
-    assert list(plant.port_map("outlets")) == ["filter_outlet", "pipe_outlet"]
+    assert list(plant._port_map("outlets")) == ["filter_outlet", "pipe_outlet"]
 
 
 def test_bad_ends_raise_validation_errors(plant):

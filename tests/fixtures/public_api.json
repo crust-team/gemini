@@ -1,0 +1,604 @@
+{
+ "api_version": 1,
+ "categories": [
+  "subsurface",
+  "well",
+  "pump",
+  "separation",
+  "heat_exchange",
+  "heat_pump",
+  "chiller",
+  "boiler",
+  "storage",
+  "network",
+  "consumer",
+  "plant"
+ ],
+ "classes": {
+  "Engine": {
+   "__init__": [
+    "plant",
+    "backend",
+    "callbacks",
+    "on_error"
+   ],
+   "live": [
+    "source",
+    "checkpoint",
+    "step",
+    "now",
+    "sink"
+   ],
+   "load_checkpoint": [
+    "path",
+    "callbacks"
+   ],
+   "replay": [
+    "data",
+    "start",
+    "end",
+    "state",
+    "clock",
+    "only"
+   ],
+   "resume": [],
+   "save_checkpoint": [
+    "path"
+   ],
+   "simulate": [
+    "profile",
+    "clock"
+   ]
+  },
+  "Module": {
+   "bindable": [
+    "path"
+   ],
+   "describe": [
+    "values"
+   ],
+   "from_dict": [
+    "data"
+   ],
+   "get_module": [
+    "path"
+   ],
+   "help": [],
+   "load": [
+    "path"
+   ],
+   "named_modules": [
+    "prefix"
+   ],
+   "param_history": [
+    "path"
+   ],
+   "parameter_schema": [],
+   "params_at": [
+    "path",
+    "time"
+   ],
+   "save": [
+    "path"
+   ],
+   "set_bindings": [
+    "path",
+    "bindings"
+   ],
+   "set_params": [
+    "path",
+    "params",
+    "valid_from"
+   ],
+   "to_dict": [],
+   "to_spec": [],
+   "validate_params": [
+    "params"
+   ]
+  },
+  "Plant": {
+   "__init__": [
+    "name"
+   ],
+   "add": [
+    "kind",
+    "name",
+    "params"
+   ],
+   "connect": [
+    "source",
+    "target",
+    "kind"
+   ],
+   "simulate": [
+    "profile"
+   ],
+   "summary": [],
+   "validate": []
+  },
+  "Results": {
+   "energy_report": [],
+   "errors": [],
+   "from_bytes": [
+    "data"
+   ],
+   "get": [
+    "path",
+    "field",
+    "start",
+    "end"
+   ],
+   "load": [
+    "path"
+   ],
+   "names": [],
+   "save": [
+    "path"
+   ],
+   "summary": [
+    "path",
+    "start",
+    "end"
+   ],
+   "to_bytes": [],
+   "to_dict": [],
+   "to_frame": []
+  }
+ },
+ "codes": [
+  "error",
+  "invalid_value",
+  "out_of_bounds",
+  "missing_value",
+  "invalid_unit",
+  "unknown_name",
+  "unknown_port",
+  "invalid_call",
+  "invalid_format",
+  "old_format",
+  "migration_failed",
+  "invalid_connection",
+  "stream_mismatch",
+  "ambiguous_port",
+  "port_in_use",
+  "loop_without_state",
+  "invalid_binding",
+  "missing_column",
+  "invalid_data",
+  "physics_range",
+  "solver_failed",
+  "cancelled",
+  "not_implemented"
+ ],
+ "errors": {
+  "BindingError": "invalid_binding",
+  "CallError": "invalid_call",
+  "Cancelled": "cancelled",
+  "CheckpointError": "error",
+  "ClockError": "invalid_data",
+  "ConfigurationError": "invalid_value",
+  "DatasetError": "invalid_data",
+  "DeclarationError": "invalid_value",
+  "FormulaError": "invalid_format",
+  "GeminiError": "error",
+  "InsufficientDataError": "invalid_data",
+  "LegacyFormatError": "invalid_format",
+  "MissingChemistryError": "missing_value",
+  "MissingMeasurementError": "missing_value",
+  "MissingValueError": "missing_value",
+  "NotImplementedYet": "not_implemented",
+  "OutletError": "invalid_call",
+  "OutputError": "error",
+  "PhysicsRangeError": "physics_range",
+  "PlantFormatError": "invalid_format",
+  "SolverError": "solver_failed",
+  "StepError": "error",
+  "TraceError": "error",
+  "UnitError": "invalid_unit",
+  "UnknownCorrelationError": "unknown_name",
+  "UnknownMemberError": "unknown_name",
+  "UnknownNameError": "unknown_name",
+  "UnknownPortError": "unknown_port",
+  "UnknownResultError": "unknown_name",
+  "ValidationError": "invalid_value"
+ },
+ "evaluate": [
+  "module",
+  "parameters",
+  "inlets",
+  "controls"
+ ],
+ "kpi": {
+  "call": [
+   "plant",
+   "results"
+  ],
+  "names": [
+   "heating_coverage",
+   "cooling_coverage",
+   "cop",
+   "peak_heat",
+   "peak_cold"
+  ]
+ },
+ "modules": {
+  "ATESPlant": "class",
+  "AbsorptionUnit": "class",
+  "AdsorptionChiller": "class",
+  "AquiferStorage": "class",
+  "Blowdown": "class",
+  "Boiler": "class",
+  "BoreholeField": "class",
+  "CHP": "class",
+  "CentrifugalPump": "class",
+  "Cooler": "class",
+  "CoolingConsumer": "class",
+  "CoolingSubstation": "class",
+  "Degasser": "class",
+  "Desander": "class",
+  "DownholeHeatExchanger": "class",
+  "ESP": "class",
+  "Filter": "class",
+  "FlashTurbine": "class",
+  "GasCompressor": "class",
+  "GridConnection": "class",
+  "HeatConsumer": "class",
+  "HeatExchanger": "class",
+  "HeatPump": "class",
+  "HeatingSubstation": "class",
+  "IceStorage": "class",
+  "InhibitorDosing": "class",
+  "InjectionPump": "class",
+  "InjectionReservoir": "class",
+  "InjectionWell": "class",
+  "LineShaftPump": "class",
+  "Mixer": "class",
+  "Module": "class",
+  "ModuleDict": "class",
+  "ModuleList": "class",
+  "ORC": "class",
+  "PIDController": "class",
+  "Pipe": "class",
+  "PressurizationTank": "class",
+  "ProductionReservoir": "class",
+  "ProductionWell": "class",
+  "Separator": "class",
+  "Splitter": "class",
+  "ThermalDecline": "class",
+  "ThermalStorage": "class",
+  "Valve": "class",
+  "Vent": "class",
+  "categories": [],
+  "collect_flows": [
+   "result_tree"
+  ],
+  "emissions": [
+   "result_tree",
+   "fuel_factor",
+   "electricity_factor"
+  ],
+  "energy_balance": [
+   "module",
+   "result"
+  ],
+  "get": [
+   "name"
+  ],
+  "load_file": [
+   "path"
+  ],
+  "mass_balance": [
+   "module",
+   "result"
+  ],
+  "names": [
+   "category"
+  ],
+  "register": [],
+  "trace_wiring": [
+   "plant",
+   "inputs"
+  ]
+ },
+ "namespaces": {
+  "analysis": {
+   "calibrate_corrosion": [
+    "logs"
+   ],
+   "calibrate_pump": [
+    "plant",
+    "pump",
+    "measured"
+   ],
+   "corrosion_forecast": [
+    "model",
+    "until"
+   ],
+   "erosion": [
+    "plant",
+    "well"
+   ],
+   "injectivity": [
+    "data",
+    "well"
+   ],
+   "nodal": [
+    "plant",
+    "well",
+    "conditions"
+   ],
+   "pump_curve": [
+    "plant",
+    "pump",
+    "measured"
+   ]
+  },
+  "checks": {
+   "bounds": [
+    "plant",
+    "results"
+   ],
+   "energy_balance": [
+    "results"
+   ],
+   "mass_balance": [
+    "results"
+   ],
+   "run_all": [
+    "plant",
+    "results"
+   ]
+  },
+  "economics": {
+   "Assumptions": "class",
+   "capex": [
+    "plant",
+    "assumptions"
+   ],
+   "co2": [
+    "results",
+    "assumptions"
+   ],
+   "lcoc": [
+    "plant",
+    "results",
+    "discount_rate",
+    "lifetime",
+    "assumptions"
+   ],
+   "lcoh": [
+    "plant",
+    "results",
+    "discount_rate",
+    "lifetime",
+    "assumptions"
+   ],
+   "npv": [
+    "plant",
+    "results",
+    "discount_rate",
+    "lifetime",
+    "assumptions"
+   ],
+   "opex": [
+    "plant",
+    "results",
+    "assumptions"
+   ],
+   "payback": [
+    "plant",
+    "results",
+    "assumptions"
+   ]
+  },
+  "legacy": {
+   "GeminiProject": "class",
+   "check_wiring": [
+    "plant",
+    "project"
+   ],
+   "from_plant": [
+    "plant",
+    "template"
+   ],
+   "read_csv": [
+    "path"
+   ],
+   "read_project": [
+    "folder"
+   ],
+   "results_to_frame": [
+    "results",
+    "project"
+   ],
+   "to_dataset": [
+    "project",
+    "frame"
+   ],
+   "to_plant": [
+    "project",
+    "plant"
+   ],
+   "write_csv": [
+    "frame",
+    "path"
+   ],
+   "write_project": [
+    "project",
+    "folder"
+   ]
+  },
+  "optim": {
+   "CalibrationResult": "class",
+   "calibrate": [
+    "plant",
+    "dataset",
+    "params",
+    "start",
+    "end",
+    "backend",
+    "apply"
+   ],
+   "minimize": [
+    "plant",
+    "profile",
+    "variables",
+    "objective",
+    "constraints",
+    "evaluations"
+   ],
+   "sample": [
+    "plant",
+    "profile",
+    "distributions",
+    "metrics",
+    "count",
+    "seed"
+   ]
+  },
+  "plants": {
+   "ATESPlant": "class",
+   "CoolingSubstation": "class",
+   "HeatingSubstation": "class",
+   "Plant": "class",
+   "convert_legacy": [
+    "folder"
+   ],
+   "example": [
+    "name"
+   ],
+   "from_dict": [
+    "spec"
+   ],
+   "from_spec": [
+    "spec"
+   ],
+   "from_template": [
+    "name",
+    "parameters"
+   ],
+   "get": [
+    "name"
+   ],
+   "migrate": [
+    "old"
+   ],
+   "names": [],
+   "spec_schema": [],
+   "templates": [],
+   "validate": [
+    "spec"
+   ]
+  },
+  "profiles": {
+   "get": [
+    "name"
+   ],
+   "names": [],
+   "profile_schema": []
+  },
+  "runtime": {
+   "get_default_fluid": [],
+   "get_display_units": [],
+   "get_precision": [],
+   "load_state": [
+    "values"
+   ],
+   "set_default_fluid": [
+    "fluid"
+   ],
+   "set_display_units": [
+    "display_units"
+   ],
+   "set_precision": [
+    "precision"
+   ],
+   "settings": [
+    "changes"
+   ],
+   "state": []
+  },
+  "streams": {
+   "names": []
+  },
+  "testing": {
+   "check_module": [
+    "example"
+   ]
+  },
+  "units": {
+   "Quantity": "class",
+   "convert": [
+    "value",
+    "from_unit",
+    "to_unit",
+    "quantity"
+   ],
+   "fits": [
+    "unit",
+    "quantity"
+   ],
+   "names": [
+    "quantity"
+   ],
+   "parse": [
+    "text"
+   ]
+  }
+ },
+ "row_codes": [
+  "invalid_inlet",
+  "missing_value",
+  "module_error",
+  "out_of_bounds",
+  "physics_range",
+  "solver_failed"
+ ],
+ "schemas": {
+  "error.schema.json": "86c70a1f0ffb4f65371e401e7a4a571c246c455a54438381edc92189bd24d7f1",
+  "module_description.schema.json": "1162b599326e224813c700484e8ca41bba0596fd9d0eced4be43ce8edee48a86",
+  "plant_spec.schema.json": "b404fceb9c4124b68b96894ec446f2e73285424de87697d33857c0b7d8aa644e",
+  "profile.schema.json": "1d516189feaf3a16f2ef7090defeebcde7adfa7b0b509e50fdb577db138531ce",
+  "results_summary.schema.json": "40041f2a8dd9d374a37286a3014c3bb1b3bd28665bc65ec4e3087e4c999d37d8"
+ },
+ "streams": [
+  "brine",
+  "hot_water",
+  "chilled_water",
+  "gas",
+  "electricity",
+  "fuel"
+ ],
+ "top_level": [
+  "API_VERSION",
+  "BRINE",
+  "Clock",
+  "Dataset",
+  "Engine",
+  "Fluid",
+  "Plant",
+  "Ports",
+  "Profile",
+  "Quantity",
+  "Results",
+  "Stream",
+  "WATER",
+  "__version__",
+  "analysis",
+  "checks",
+  "economics",
+  "errors",
+  "evaluate",
+  "kpi",
+  "legacy",
+  "modules",
+  "no_outputs",
+  "optim",
+  "plants",
+  "profiles",
+  "runtime",
+  "streams",
+  "testing",
+  "units"
+ ]
+}

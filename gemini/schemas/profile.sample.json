@@ -1,0 +1,25 @@
+{
+  "columns": {
+    "heating_demand": {
+      "quantity": "power",
+      "unit": "W"
+    }
+  },
+  "description": "Shape of a demand profile file.",
+  "name": "format_sample",
+  "source": "Format sample, not demand data: the replayed heat exchanger duty of the example plant.",
+  "time": [
+    "2024-07-01T00:00:00+00:00",
+    "2024-07-01T00:15:00+00:00",
+    "2024-07-01T00:30:00+00:00",
+    "2024-07-01T00:45:00+00:00"
+  ],
+  "values": {
+    "heating_demand": [
+      3800759.1528178146,
+      3800759.1528178146,
+      3800759.1528178146,
+      3800759.1528178146
+    ]
+  }
+}

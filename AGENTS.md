@@ -9,10 +9,13 @@ Test with the development profile (`make test`); see
 
 Read every file in `.claude/docs/` before changing the repository:
 
-- [Public API](.claude/docs/api.md): curated imports and supported user workflows.
+- [Public API](.claude/docs/api.md): every frozen public name, its return shape and status; start
+  here to use the package.
+- [Plants](.claude/docs/plants.md): the builder, the spec, templates, dates and bindings.
 - [Conventions](.claude/docs/conventions.md): dependencies, naming, comments and code quality.
 - [Data](.claude/docs/data.md): in-memory datasets, sampling and gaps.
 - [Engine](.claude/docs/engine.md): clocks, runs, callbacks, results, checkpoints and live.
+- [Economics](.claude/docs/economics.md): economics, KPIs, checks and well analysis.
 - [Equipment](.claude/docs/equipment.md): every shipped module, its model and energy audit.
 - [Errors](.claude/docs/errors.md): the `gm.errors` classes and when each is raised.
 - [Legacy](.claude/docs/legacy.md): the old-format boundary and conversion rules.
@@ -26,7 +29,8 @@ Read every file in `.claude/docs/` before changing the repository:
 - [Utilities](.claude/docs/utils.md): the `gemini.utils` helpers and how to add one.
 
 When a commit changes behaviour, structure or conventions, update the relevant document in the
-same commit.
+same commit. The public API is frozen: a change to a public name or return field raises
+`gm.API_VERSION` ([freeze rule](.claude/docs/conventions.md#public-api-freeze)).
 
 ## Branching
 
@@ -47,13 +51,19 @@ gemini/
 │   ├── physics/      # SI correlations and unit conversions
 │   ├── types/        # quantities, streams, fluids, declarations, profiles, bindings, costs
 │   ├── runtime.py    # context-local precision, display units and default fluid
-│   ├── modules/      # Module base class, equipment, containers and the Doublet plant
+│   ├── modules/      # Module base class, registry, equipment, containers and plants/ (builder, specs)
 │   ├── data/         # in-memory Dataset and Loader only
 │   ├── engine/       # Clock, Engine, steps, Results, callbacks, checkpoints
 │   └── legacy/       # all old-format I/O, tables and conversion
-└── optim/            # calibration through Engine.replay
+├── optim/            # calibration through Engine.replay
+├── analysis/         # well performance and integrity, gm.kpi
+├── economics/        # capex, opex, levelised cost, CO2, cash flow
+├── checks/           # balances and bounds over a finished run
+├── testing/          # check_module for a new module class
+├── profiles/         # demand profiles
+└── schemas/          # JSON Schemas and samples of the exchanged documents
 examples/             # area/category/NN_name.py; shared plant and data in examples/shared/
-scripts/              # test_changed.py, the development test profile
+scripts/              # test_changed.py, write_schemas.py, migrate_plants.py
 tests/                # unit mirror, integration, e2e and immutable fixtures
 ```
 
@@ -61,7 +71,7 @@ Modules declare parameters and ports in `__init__`; `forward(self, inlets)` rece
 immutable `Ports` mapping while controls and boundaries are pre-applied and read from `self`. It
 returns a fluid-outlet dictionary; leaf `_compute_outputs(self, inlets, outlets)` methods and
 composite output formulas run automatically afterward. Pre-hooks receive `(module, inlets)` and
-forward hooks receive `(module, inlets, outlets)`. Plants own persistence, bindings, and dated
-design. Core data is in-memory only. No engine loop sleeps or schedules itself. Keep the public
+forward hooks receive `(module, inlets, outlets)`. Plants are built from data
+([plants.md](.claude/docs/plants.md)) and own persistence, bindings, and dated design. Core data is in-memory only. No engine loop sleeps or schedules itself. Keep the public
 API small and examples outside the package. Details are in
 [conventions.md](.claude/docs/conventions.md) and [modules.md](.claude/docs/modules.md).

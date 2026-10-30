@@ -68,10 +68,10 @@ class Plant(PortResolver, Module):
         key = self._free_name(name, type_name)
         baseline = writer.baseline_of(module)
         module.set_params("", params)
-        self.attach(key, module, dict(params), baseline)
+        self._attach(key, module, dict(params), baseline)
         return module
 
-    def attach(self, key, module, stated, baseline):
+    def _attach(self, key, module, stated, baseline):
         """Register ``module`` under the (possibly dotted) ``key`` with the params as stated."""
         parent_path, _, local = key.rpartition(".")
         parent = self.get_module(parent_path)
@@ -103,9 +103,9 @@ class Plant(PortResolver, Module):
         A bare word that names no module is a plant port: ``connect("secondary_in",
         "heat_exchanger.cold_in")`` names a plant inlet.
         """
-        self.link(source, target, kind, explicit=False)
+        self._link(source, target, kind, explicit=False)
 
-    def link(self, source, target, kind, explicit):
+    def _link(self, source, target, kind, explicit):
         """Add one connection or name one plant port; ``explicit`` requires ``path.port`` ends."""
         if kind not in (None, STATE):
             raise ValidationError(
@@ -141,7 +141,7 @@ class Plant(PortResolver, Module):
         for declarations in (self._inlets, self._outlets, self._outputs):
             declarations.clear()
         for side, declare in (("inlets", Inlet), ("outlets", Outlet)):
-            for name, (path, port) in self.port_map(side).items():
+            for name, (path, port) in self._port_map(side).items():
                 end = getattr(self.get_module(path), side)()[port]
                 self._register_declaration(name, declare(end.kind, stream=end.stream))
         if self._output_specs is None:
@@ -150,7 +150,7 @@ class Plant(PortResolver, Module):
         for name, spec in self._output_specs.items():
             outputs.declare_output(self, name, spec)
 
-    def connection_list(self):
+    def _connection_list(self):
         """Return the plant's connections as ``[{source, target, stream, kind}]``.
 
         ``stream`` is the stream type of the typed end, ``None`` when both ends take anything.

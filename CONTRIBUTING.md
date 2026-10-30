@@ -1,9 +1,8 @@
 # Contributing
 
 GEMINI supports Python 3.11, 3.12, 3.13 and 3.14. Install the package with its development
-dependency groups with `poetry install` (add `--extras parquet` for Parquet results) or with
-`uv pip install -e ".[parquet]" --group dev`. Read [AGENTS.md](AGENTS.md) and the documents it links
-before changing equipment or physics; the implementation rules are in
+dependency groups with `poetry install` or with `uv pip install -e . --group dev`. Read
+[AGENTS.md](AGENTS.md) and the documents it links before changing equipment or physics; the implementation rules are in
 [.claude/docs/conventions.md](.claude/docs/conventions.md).
 
 ## Bug reports

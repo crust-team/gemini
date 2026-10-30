@@ -81,7 +81,7 @@ measured, state, inlets, outlets, outputs, children, connections, values}`:
 - `outputs` maps a name to `{unit, kind, soft_sensor}`; `kind` is the additive quantity name
   (one of the nine) or `null`.
 - `children` is `{name: type}` and `connections` is `[{source, target, stream, kind}]`, both empty
-  for a leaf. A plant exposes its wiring through `connection_list()`; a handwritten composite has
+  for a leaf. A plant exposes its wiring through `_connection_list()`; a handwritten composite has
   none, because its wiring is code.
 - `values` holds the current `parameters`, `controls` and `boundaries`; unset ones are left out
   and a child's values are keyed by dotted path. On a class they are the defaults of a new

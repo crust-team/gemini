@@ -249,16 +249,22 @@ def _active_call(module):
 
 
 class _ClassOrInstance:
-    """Method that runs on the instance, or on a new instance when called on the class."""
+    """Method that runs on the instance, or on a new instance when called on the class.
 
-    def __init__(self, function):
+    ``on_class`` holds the keywords of a call on the class, where no values are stored.
+    """
+
+    def __init__(self, function, **on_class):
         """Wrap ``function(module, ...)``."""
         self.function = function
+        self.on_class = on_class
         self.__doc__ = function.__doc__
 
     def __get__(self, instance, owner):
         """Bind to ``instance``, or to a new ``owner()``."""
-        return partial(self.function, instance if instance is not None else owner())
+        if instance is not None:
+            return partial(self.function, instance)
+        return partial(self.function, owner(), **self.on_class)
 
 
 class Module:
@@ -271,7 +277,7 @@ class Module:
 
     repr_fields = ()
     category = None
-    describe = _ClassOrInstance(description.describe)
+    describe = _ClassOrInstance(description.describe, values=False)
     parameter_schema = _ClassOrInstance(description.parameter_schema)
     validate_params = _ClassOrInstance(description.validate_params)
 

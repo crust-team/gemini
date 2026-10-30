@@ -41,13 +41,6 @@ dependencies = [
     "pydantic>=2.12.0; python_version >= '3.14'",
 ]
 
-[project.optional-dependencies]
-parquet = [
-    "pyarrow>=16.0.0",
-    "pyarrow>=18.0.0; python_version >= '3.13'",
-    "pyarrow>=22.0.0; python_version >= '3.14'",
-]
-
 [project.urls]
 homepage = "https://nwn.nu/projecten/innovaties/datagedreven-optimalisatie-aardwarmte-systemen/"
 documentation = "https://github.com/GEMINI-Digital-Twin/gemini-geothermal-suite-open"

@@ -149,7 +149,7 @@ class PortResolver:
             suggestions=listed,
         )
 
-    def port_map(self, side):
+    def _port_map(self, side):
         """Return the plant's ``inlets`` or ``outlets`` as ``{name: (path, port)}``.
 
         Ports named in the plant come first, then every free port of a child, named

@@ -15,7 +15,7 @@ from gemini.core.physics import units
 from gemini.core.types import streams
 from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import Ratio
-from gemini.errors import DeclarationError
+from gemini.errors import DeclarationError, UnitError
 from gemini.utils.strings import did_you_mean, join_names
 
 
@@ -110,6 +110,20 @@ def _quick_check(schema, limits):
         return partial(_bounded_float, *bounds, optional)
     exact = {"number": float, "boolean": bool, "string": str}.get(kind)
     return partial(_exact, exact, optional) if exact else _miss
+
+
+_BOUND_FAILURES = {"greater_than", "greater_than_equal", "less_than", "less_than_equal"}
+
+
+def _failure_code(cause):
+    """Return the ``gm.errors.CODES`` entry of a failed validation: unit, bound or other value."""
+    if isinstance(cause, UnitError):
+        return "invalid_unit"
+    if isinstance(cause, ValidationError) and any(
+        item["type"] in _BOUND_FAILURES for item in cause.errors()
+    ):
+        return "out_of_bounds"
+    return "invalid_value"
 
 
 def _adapter(kind, bounds):
@@ -227,7 +241,8 @@ class Declaration:
             raise DeclarationError(
                 f"{self.path}: invalid {self.section} value {value!r}"
                 + (f"; expected {self.unit}" if self.unit else "")
-                + f" ({exc})"
+                + f" ({exc})",
+                code=_failure_code(exc),
             ) from exc
 
 

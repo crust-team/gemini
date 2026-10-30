@@ -64,7 +64,7 @@ def test_a_bare_word_names_a_plant_port(chain):
 
 def test_connection_list_gives_streams_and_kind(chain):
     """The typed end names the stream; both ends untyped give null."""
-    assert chain.connection_list() == [
+    assert chain._connection_list() == [
         {"source": "degasser.liquid", "target": "first.inlet", "stream": "brine", "kind": None},
         {"source": "first.outlet", "target": "second.inlet", "stream": "brine", "kind": None},
     ]
@@ -72,7 +72,7 @@ def test_connection_list_gives_streams_and_kind(chain):
     plant.add("Pipe", "one")
     plant.add("Pipe", "two")
     plant.connect("one.outlet", "two.inlet", kind="state")
-    assert plant.connection_list() == [
+    assert plant._connection_list() == [
         {"source": "one.outlet", "target": "two.inlet", "stream": None, "kind": "state"}
     ]
 
@@ -122,7 +122,7 @@ def test_a_loop_needs_a_state_connection(chain):
     with pytest.raises(ValidationError) as caught:
         chain.connect("second.outlet", "degasser.inlet")
     assert caught.value.code == "loop_without_state"
-    assert len(chain.connection_list()) == 2
+    assert len(chain._connection_list()) == 2
     chain.connect("second.outlet", "degasser.inlet", kind="state")
     with pytest.raises(NotImplementedYet):
         chain(**{name: stream() for name in chain.inlets()})

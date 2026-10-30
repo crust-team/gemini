@@ -1,6 +1,6 @@
 # GEMINI geothermal suite
 
-Composable geothermal equipment, handwritten plants, in-memory data, and one finite engine for
+Composable geothermal equipment, plants built from data, in-memory data, and one finite engine for
 simulation, historical replay, and externally scheduled live updates.
 
 ## Quickstart

@@ -56,7 +56,7 @@ jobs:
     - name: Install Python ${{ matrix.python }} and the ${{ matrix.resolution }} dependencies
       run: |
         uv venv --python "${{ matrix.python }}"
-        uv pip install --resolution "${{ matrix.resolution }}" -e ".[parquet]" --group test
+        uv pip install --resolution "${{ matrix.resolution }}" -e . --group test
         echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
     - name: Report the environment
       run: python -m gemini.utils.collect_env

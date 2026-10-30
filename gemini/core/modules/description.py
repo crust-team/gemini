@@ -6,8 +6,6 @@ its public methods only.
 
 from copy import deepcopy
 
-from pydantic import ValidationError as PydanticValidationError
-
 from gemini.core.types.declarations import UNSET
 from gemini.errors import DeclarationError, MissingValueError, UnitError
 from gemini.utils.jsonable import to_plain
@@ -18,7 +16,6 @@ STREAM_FIELDS = {"m_dot": {"unit": "kg/s"}, "T": {"unit": "K"}, "p": {"unit": "P
 
 SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 
-_BOUND_CODES = {"greater_than", "greater_than_equal", "less_than", "less_than_equal"}
 _NUMBER_TYPES = ("number", "integer")
 _MINIMUM_KEYS = ("ge", "gt")
 _MAXIMUM_KEYS = ("le", "lt")
@@ -100,17 +97,17 @@ def _outputs(declarations):
 
 
 def _connections(module):
-    """Return the wiring a plant exposes through ``connection_list()``; handwritten ones have none.
+    """Return the wiring a plant exposes through ``_connection_list()``; handwritten ones have none.
 
     Wiring of a handwritten composite is code, so it cannot be listed.
     """
-    listing = getattr(type(module), "connection_list", None)
+    listing = getattr(type(module), "_connection_list", None)
     return to_plain(listing(module)) if listing is not None else []
 
 
 def _type_name(module):
     """Return the class name; a plant (it lists connections) shows its given name."""
-    if hasattr(type(module), "connection_list"):
+    if hasattr(type(module), "_connection_list"):
         return module.name
     return type(module).__name__
 
@@ -142,14 +139,14 @@ def _values(module):
     }
 
 
-def describe(module):
+def describe(module, values=True):
     """Return the description of a module as plain JSON.
 
     The keys are ``name``, ``type``, ``category``, ``summary`` (first paragraph of the docstring),
     ``doc``, ``parameters``, ``controls``, ``boundaries``, ``measured``, ``state``, ``inlets``,
-    ``outlets``, ``outputs``, ``children``, ``connections`` and ``values``. Each entry of the
-    first five has ``type``, ``unit``, ``quantity``, ``default``, ``minimum``, ``maximum``,
-    ``enum``, ``description`` and ``section``.
+    ``outlets``, ``outputs``, ``children`` and ``connections``, and ``values`` on an instance.
+    Each entry of the first five has ``type``, ``unit``, ``quantity``, ``default``, ``minimum``,
+    ``maximum``, ``enum``, ``description`` and ``section``.
 
     - ``measured`` lists the outputs of the module itself: replay accepts a measured binding for
       any of them and compares it with the output of the same name.
@@ -158,12 +155,12 @@ def describe(module):
     - ``kind`` of an output is its additive quantity name, else ``None``.
     - ``children`` maps a child name to its type; ``connections`` lists
       ``{source, target, stream, kind}`` for a plant and is empty for a handwritten composite.
-    - ``values`` holds the current parameter, control and boundary values; a class gives the
-      defaults of a new instance.
+    - ``values`` holds the current parameter, control and boundary values. It is only on an
+      instance: a class stores no values.
     """
     doc = type(module).__doc__ or ""
     outputs = module.outputs(recurse=False)
-    return {
+    description = {
         "name": module.path,
         "type": _type_name(module),
         "category": module.category,
@@ -179,8 +176,10 @@ def describe(module):
         "outputs": _outputs(outputs),
         "children": {name: _type_name(child) for name, child in module.named_children()},
         "connections": _connections(module),
-        "values": _values(module),
     }
+    if values:
+        description["values"] = _values(module)
+    return description
 
 
 def _property_bounds(declaration):
@@ -267,22 +266,11 @@ def _problem(path, message, code, suggestions=()):
     return problem
 
 
-def _error_code(error):
-    """Tell the classes of failure apart: a unit, a bound, or any other value."""
-    cause = error.__cause__
-    if isinstance(error, UnitError) or isinstance(cause, UnitError):
-        return "invalid_unit"
-    if isinstance(cause, PydanticValidationError):
-        if any(item["type"] in _BOUND_CODES for item in cause.errors()):
-            return "out_of_bounds"
-    return "invalid_value"
-
-
 def _check_value(name, declaration, value):
     try:
         declaration.validate(value)
     except (DeclarationError, UnitError) as error:
-        return _problem(name, str(error), _error_code(error))
+        return _problem(name, str(error), error.code)
     return None
 
 

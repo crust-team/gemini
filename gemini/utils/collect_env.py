@@ -7,7 +7,7 @@ from importlib import metadata
 from pathlib import Path
 
 DISTRIBUTION = "gemini-geothermal-suite-open"
-DEPENDENCIES = ("numpy", "pandas", "scipy", "pydantic", "pyarrow", "pytest")
+DEPENDENCIES = ("numpy", "pandas", "scipy", "pydantic", "pytest")
 
 
 def version(name):

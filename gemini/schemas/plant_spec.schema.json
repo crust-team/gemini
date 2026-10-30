@@ -1,0 +1,199 @@
+{
+  "$defs": {
+    "module": {
+      "additionalProperties": false,
+      "properties": {
+        "modules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/module"
+          },
+          "type": "object"
+        },
+        "params": {
+          "type": "object"
+        },
+        "type": {
+          "enum": [
+            "ATESPlant",
+            "AbsorptionUnit",
+            "AdsorptionChiller",
+            "AquiferStorage",
+            "Blowdown",
+            "Boiler",
+            "BoreholeField",
+            "CHP",
+            "CentrifugalPump",
+            "Cooler",
+            "CoolingConsumer",
+            "CoolingSubstation",
+            "Degasser",
+            "Desander",
+            "DistrictNetwork",
+            "Doublet",
+            "DoubletHeatPlant",
+            "DownholeHeatExchanger",
+            "ESP",
+            "Filter",
+            "FlashTurbine",
+            "GasCompressor",
+            "GridConnection",
+            "HeatConsumer",
+            "HeatExchanger",
+            "HeatPump",
+            "HeatingSubstation",
+            "IceStorage",
+            "InhibitorDosing",
+            "InjectionPump",
+            "InjectionReservoir",
+            "InjectionWell",
+            "LineShaftPump",
+            "Mixer",
+            "MultiWellPlant",
+            "ORC",
+            "PIDController",
+            "Pipe",
+            "PressurizationTank",
+            "ProductionReservoir",
+            "ProductionWell",
+            "Separator",
+            "Splitter",
+            "ThermalDecline",
+            "ThermalStorage",
+            "Valve",
+            "Vent",
+            "ModuleDict",
+            "ModuleList"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bindings": {
+      "additionalProperties": {
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "boundary": {
+      "additionalProperties": {
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "connections": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "state",
+              null
+            ]
+          },
+          "source": {
+            "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+            "type": "string"
+          },
+          "target": {
+            "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "fluids": {
+      "additionalProperties": {
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "format": {
+      "const": 2
+    },
+    "inlets": {
+      "additionalProperties": {
+        "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "modules": {
+      "additionalProperties": {
+        "$ref": "#/$defs/module"
+      },
+      "type": "object"
+    },
+    "name": {
+      "type": "string"
+    },
+    "outlets": {
+      "additionalProperties": {
+        "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "outputs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "maxProperties": 2,
+        "minProperties": 1,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "of": {
+            "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+            "type": "string"
+          },
+          "ratio": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "sum": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "param_history": {
+      "additionalProperties": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "format",
+    "name",
+    "modules",
+    "connections",
+    "bindings",
+    "param_history"
+  ],
+  "title": "GEMINI plant spec",
+  "type": "object"
+}

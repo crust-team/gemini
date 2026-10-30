@@ -12,6 +12,18 @@ from gemini.errors import UnknownNameError
 from gemini.utils.context import ContextSetting
 from gemini.utils.strings import did_you_mean, join_names
 
+__all__ = [
+    "settings",
+    "state",
+    "load_state",
+    "get_default_fluid",
+    "set_default_fluid",
+    "get_precision",
+    "set_precision",
+    "get_display_units",
+    "set_display_units",
+]
+
 _DEFAULTS = {"precision": "float64", "display_units": "si", "default_fluid": BRINE}
 _CHOICES = {"precision": ("float64", "float32"), "display_units": ("si", "field")}
 

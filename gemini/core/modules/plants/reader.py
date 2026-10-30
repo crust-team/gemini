@@ -72,7 +72,7 @@ def _entry(plant, prefix, name, entry, report, path):
             report.broken.add(key)
             raise
         if is_group(module):
-            plant.attach(key, module, None, {})
+            plant._attach(key, module, None, {})
             for child, item in entry.get("modules", {}).items():
                 _entry(plant, key, child, item, report, f"{path}.modules.{child}")
             return
@@ -80,7 +80,7 @@ def _entry(plant, prefix, name, entry, report, path):
         for pname, value in entry.get("params", {}).items():
             with report.guard(f"{path}.params.{pname}"):
                 module.set_params("", {pname: value})
-        plant.attach(key, module, deepcopy(entry.get("params")), baseline)
+        plant._attach(key, module, deepcopy(entry.get("params")), baseline)
 
 
 def _connection(plant, item, report):
@@ -88,8 +88,12 @@ def _connection(plant, item, report):
         isinstance(item.get(k), str) for k in ("source", "target")
     ):
         raise ValidationError("expected {source, target, kind?}", path="", code="invalid_format")
-    if not any(report.skips(item[end]) for end in ("source", "target")):
-        plant.link(item["source"], item["target"], item.get("kind"), explicit=True)
+    usable = [end for end in ("source", "target") if not report.skips(item[end])]
+    if len(usable) == 2:
+        plant._link(item["source"], item["target"], item.get("kind"), explicit=True)
+        return
+    for end in usable:
+        plant._candidates(item[end], end, explicit=True)
 
 
 def _port(plant, side, name, end, report):
@@ -98,9 +102,9 @@ def _port(plant, side, name, end, report):
     if report.skips(end):
         return
     if side == "inlets":
-        plant.link(name, end, None, explicit=True)
+        plant._link(name, end, None, explicit=True)
     else:
-        plant.link(end, name, None, explicit=True)
+        plant._link(end, name, None, explicit=True)
 
 
 def _outputs(plant, specs, report):

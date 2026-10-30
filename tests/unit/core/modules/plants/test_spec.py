@@ -87,3 +87,24 @@ def test_params_set_since_and_validation_agree_with_the_builder():
     assert plant.validate() == gm.plants.validate(plant.to_spec()) == []
     with pytest.raises(gm.errors.ValidationError):
         plant.add("Pipe", "bad", length="5 bar")
+
+
+def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
+    """Every problem comes at once, also on a connection with one good end."""
+    spec = {
+        "format": 2,
+        "name": "broken",
+        "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe"}},
+        "connections": [
+            {"source": "a.outlet", "target": "b.inlet"},
+            {"source": "a.outlet", "target": "pipe.inlt"},
+        ],
+        "bindings": {},
+        "param_history": {},
+    }
+    problems = gm.plants.validate(spec)
+    assert {item["path"] for item in problems} == {
+        "modules.a.type",
+        "connections[0].target",
+        "connections[1].target",
+    }

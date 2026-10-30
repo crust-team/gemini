@@ -11,6 +11,12 @@ The package was rebuilt as composable modules with handwritten plants, in-memory
 finite engine, and then cleaned up. Old import paths are not retained.
 
 ### Added
+- The public API is frozen at `gm.API_VERSION = 1` ([api.md](.claude/docs/api.md)). New: the plant
+  builder `gm.Plant` and the JSON plant spec (format 2, `gm.plants.from_spec`, `validate`,
+  `spec_schema`, `migrate`, `from_template`, `example`); `describe`, `parameter_schema`,
+  `validate_params`; one registry with categories and stream types; `gm.evaluate`; `gm.analysis`,
+  `gm.economics`, `gm.kpi`, `gm.checks`, `gm.testing`, `gm.profiles`; `gm.errors` codes and
+  `to_dict`; JSON Schemas and samples in `gemini/schemas/`.
 - Physics and leaf modules are written with `gemini.ops`, so one source runs on floats, arrays and
   traced graphs, and `Engine.replay` evaluates each twin as one traced call with identical results.
   `gemini.graph.settings(traced=False)` selects the old tick-by-tick path.
@@ -64,6 +70,11 @@ finite engine, and then cleaned up. Old import paths are not retained.
   branch. CI installs with uv; `poetry install` still works.
 
 ### Changed
+- `gm.Engine(plant, ...)` owns its plant: `engine.simulate(profile)`, `engine.replay(data)`,
+  `engine.live(source)`. `Results` are JSON views and `.npz` files, `to_frame()` has `path.field`
+  columns, the old `summary()` is `energy_report()`, and the `parquet` extra is gone. Plant files are
+  format 2; `gm.plants.migrate` converts older ones. `Doublet`, `MultiWellPlant`, `DistrictNetwork`
+  and `DoubletHeatPlant` are specs, no longer classes.
 - The `Module` base class is explicit: modules are built without arguments and configured with
   `update_params`, which returns the module; there is no class registry or `__init__` wrapping;
   the values of one call live in a single `_Call` context record; `fluid` is a validated

@@ -18,7 +18,6 @@ from gemini.core.types.fluid import Fluid
 from gemini.errors import (
     GeminiError,
     PlantFormatError,
-    UnitError,
     UnknownNameError,
     ValidationError,
 )
@@ -53,21 +52,6 @@ class Report:
             self.items.append(problem(path, error))
 
 
-BOUND_TYPES = {"greater_than", "greater_than_equal", "less_than", "less_than_equal"}
-
-
-def _code(error):
-    """Return the error code, refined to ``invalid_unit`` or ``out_of_bounds`` from the cause."""
-    cause = error.__cause__
-    if isinstance(cause, UnitError):
-        return "invalid_unit"
-    if isinstance(cause, PydanticError) and any(
-        item["type"] in BOUND_TYPES for item in cause.errors()
-    ):
-        return "out_of_bounds"
-    return error.code
-
-
 def problem(path, error):
     """Return ``{path, message, code, suggestions}`` for an error raised at spec ``path``."""
     inner = getattr(error, "path", None)
@@ -75,7 +59,7 @@ def problem(path, error):
     return {
         "path": full,
         "message": str(error),
-        "code": _code(error),
+        "code": error.code,
         "suggestions": list(error.suggestions),
     }
 

@@ -20,7 +20,6 @@ DESCRIPTION_KEYS = {
     "outputs",
     "children",
     "connections",
-    "values",
 }
 ENTRY_KEYS = {
     "type",
@@ -93,7 +92,7 @@ def assert_valid_schema(schema):
 def test_leaf_description_shape():
     """A leaf has the documented keys, entries, ports and outputs."""
     description = gm.modules.ESP.describe()
-    assert set(description) == DESCRIPTION_KEYS
+    assert set(description) - {"values"} == DESCRIPTION_KEYS
     assert description["name"] == "esp" and description["type"] == "ESP"
     assert description["category"] == "pump"
     assert description["summary"] == description["doc"].split("\n\n")[0]
@@ -212,3 +211,9 @@ def test_the_example_plant_describes_itself_with_its_values(shared_plant):
     description = shared_plant.describe()
     assert json.dumps(description, allow_nan=False)
     assert "doublet.esp.no_stages" in description["values"]["parameters"]
+
+
+def test_values_are_only_on_an_instance():
+    """A class stores no values; an instance does."""
+    assert "values" not in gm.modules.Valve.describe()
+    assert "values" in gm.modules.Valve().describe()

@@ -61,7 +61,7 @@ def test_evaluate_accepts_si_numbers_as_well_as_unit_strings():
         ({"parameters": {}}, "missing_value"),
         ({"parameters": {"no_stages": "many"}}, "invalid_value"),
         ({"inlets": {}}, "invalid_call"),
-        ({"controls": {"frequency": "50 bar"}}, "invalid_value"),
+        ({"controls": {"frequency": "50 bar"}}, "invalid_unit"),
         ({"inlets": {"suction": {"flow": "1 m3/h", "T": "-5 K", "p": "1 bar"}}}, "invalid_call"),
     ],
 )

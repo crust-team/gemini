@@ -1,0 +1,9 @@
+{
+  "class": "UnknownNameError",
+  "code": "unknown_name",
+  "message": "modules: unknown module type 'Boilr'; did you mean 'Boiler'?",
+  "path": "Boilr",
+  "suggestions": [
+    "Boiler"
+  ]
+}
