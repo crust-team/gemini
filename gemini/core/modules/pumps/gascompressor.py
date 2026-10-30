@@ -52,8 +52,6 @@ class GasCompressor(Module):
     temperature is the one the gas would have.
     """
 
-    category = "pump"
-
     repr_fields = ("stage_count", "isentropic_efficiency", "heat_capacity_ratio")
 
     def __init__(self):

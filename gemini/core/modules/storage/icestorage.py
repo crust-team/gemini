@@ -75,8 +75,6 @@ class IceStorage(Module):
     its state.
     """
 
-    category = "storage"
-
     def __init__(self):
         """Declare store design data, the glycol circuit, the phase state and its energies."""
         super().__init__()

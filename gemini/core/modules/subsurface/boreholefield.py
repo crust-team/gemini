@@ -63,8 +63,6 @@ class BoreholeField(Module):
     ground temperature change is a state.
     """
 
-    category = "subsurface"
-
     def __init__(self):
         """Declare field geometry, ground properties and the ground temperature state."""
         super().__init__()

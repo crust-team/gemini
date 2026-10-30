@@ -6,7 +6,7 @@ from gemini.core.modules.plants import library
 
 def test_shipped_specs_are_registered_as_plants():
     """The registry builds a new plant for each shipped name."""
-    assert {"Doublet", "DoubletHeatPlant"} <= set(gm.modules.names("plant"))
+    assert {"Doublet", "DoubletHeatPlant"} <= set(gm.modules.names("plants"))
     assert gm.modules.get("Doublet") is not gm.modules.get("Doublet")
     assert library.has("Doublet") and not library.has("Nothing")
 

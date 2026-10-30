@@ -66,8 +66,6 @@ class HeatPump(Module):
     where its row is selected.
     """
 
-    category = "heat_pump"
-
     def __init__(self):
         """Declare heat pump design data, both circuits and computed performance."""
         super().__init__()

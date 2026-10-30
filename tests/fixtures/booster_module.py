@@ -7,7 +7,7 @@ from gemini.core.types import Inlet, Outlet, Output, Parameter, Pressure, Pressu
 class Booster(Module):
     """Raise the stream pressure by a fixed gain."""
 
-    category = "pump"
+    category = "pumps"
 
     def __init__(self):
         """Declare the gain, the suction and discharge ports and the head."""

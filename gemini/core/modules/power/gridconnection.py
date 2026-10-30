@@ -23,8 +23,6 @@ class GridConnection(Module):
     power, losses or demand charges.
     """
 
-    category = "network"
-
     def __init__(self):
         """Declare connection limits, tariffs, plant electricity boundaries and exchange."""
         super().__init__()

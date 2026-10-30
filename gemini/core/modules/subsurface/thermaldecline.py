@@ -58,8 +58,6 @@ class ThermalDecline(Module):
     injected volume is a state.
     """
 
-    category = "subsurface"
-
     def __init__(self):
         """Declare doublet geometry, rock data, the injection boundary and the volume state."""
         super().__init__()

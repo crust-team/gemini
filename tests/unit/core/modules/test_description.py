@@ -94,7 +94,7 @@ def test_leaf_description_shape():
     description = gm.modules.ESP.describe()
     assert set(description) - {"values"} == DESCRIPTION_KEYS
     assert description["name"] == "esp" and description["type"] == "ESP"
-    assert description["category"] == "pump"
+    assert description["category"] == "pumps"
     assert description["summary"] == description["doc"].split("\n\n")[0]
     assert set(description["parameters"]["setting_depth"]) == ENTRY_KEYS
     efficiency = description["parameters"]["motor_efficiency"]

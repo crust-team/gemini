@@ -56,8 +56,6 @@ class LineShaftPump(Module):
     polynomial curve) raise ``PhysicsRangeError``; at zero flow the pump runs at shutoff.
     """
 
-    category = "pump"
-
     repr_fields = ("no_stages", "setting_depth", "motor_efficiency")
 
     def __init__(self):

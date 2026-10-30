@@ -25,8 +25,6 @@ from gemini.errors import PhysicsRangeError
 class Boiler(Module):
     """Auxiliary gas or electric boiler with a thermal capacity limit."""
 
-    category = "boiler"
-
     def __init__(self):
         """Declare boiler design data, ports and computed performance."""
         super().__init__()

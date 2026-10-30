@@ -52,8 +52,6 @@ class DownholeHeatExchanger(Module):
     inlet unchanged.
     """
 
-    category = "subsurface"
-
     def __init__(self):
         """Declare the well geometry, the geothermal profile and the rock properties."""
         super().__init__()

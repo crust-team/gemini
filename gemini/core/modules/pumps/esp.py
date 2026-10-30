@@ -57,8 +57,6 @@ def _float32():
 class ESP(Module):
     """Electrical submersible pump installed inside a production well."""
 
-    category = "pump"
-
     repr_fields = ("no_stages", "setting_depth", "motor_efficiency", "bep_flow")
 
     def __init__(self):

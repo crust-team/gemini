@@ -43,8 +43,6 @@ class Separator(Module):
     m_in h_in = m_gas h_g + m_liquid h_f, which the unit tests check.
     """
 
-    category = "separation"
-
     def __init__(self):
         """Declare the separator inlet, pressure control, outputs and phase outlets."""
         super().__init__()

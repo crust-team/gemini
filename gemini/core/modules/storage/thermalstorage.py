@@ -67,8 +67,6 @@ class ThermalStorage(Module):
     ``scan`` exists; its arithmetic is written with ops all the same.
     """
 
-    category = "storage"
-
     def __init__(self):
         """Declare tank design data, circuits, the tank temperature and its energies."""
         super().__init__()

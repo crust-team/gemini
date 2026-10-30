@@ -30,8 +30,6 @@ class Filter(Module):
     Solids removal itself is not modelled.
     """
 
-    category = "separation"
-
     def __init__(self):
         """Declare filter design data, inlet and computed pressure drop."""
         super().__init__()

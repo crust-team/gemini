@@ -27,8 +27,6 @@ class Blowdown(Module):
     flow through a blowdown is not defined and raises ``PhysicsRangeError``.
     """
 
-    category = "separation"
-
     def __init__(self):
         """Declare the feed, the bleed command and both outlets."""
         super().__init__()

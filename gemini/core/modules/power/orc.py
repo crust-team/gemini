@@ -52,8 +52,6 @@ class ORC(Module):
     input (DiPippo 2016), ``None`` without heat input. Valid for a single-phase liquid brine.
     """
 
-    category = "heat_exchange"
-
     def __init__(self):
         """Declare ORC design data, brine ports, ambient boundary and computed performance."""
         super().__init__()

@@ -47,8 +47,6 @@ class FlashTurbine(Module):
     611.213 Pa, with a wet exhaust.
     """
 
-    category = "heat_exchange"
-
     def __init__(self):
         """Declare turbine and generator design data, ports and computed performance."""
         super().__init__()

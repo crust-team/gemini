@@ -98,8 +98,6 @@ class AquiferStorage(Module):
     store volumes, temperature changes and heat totals are states.
     """
 
-    category = "storage"
-
     def __init__(self):
         """Declare aquifer data, the operating mode and the two store states."""
         super().__init__()

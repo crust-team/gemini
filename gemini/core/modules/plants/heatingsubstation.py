@@ -47,8 +47,6 @@ class HeatingSubstation(Module):
     least as warm as the building return.
     """
 
-    category = "plant"
-
     def __init__(self):
         """Declare the substation children, the building circuit and the delivered heat."""
         super().__init__()

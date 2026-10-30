@@ -1,6 +1,6 @@
 # Public API
 
-Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.API_VERSION = 1`,
+Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.API_VERSION = 2`,
 and is the page the other repositories build against. Names not listed here (a helper method such
 as `Results.commit`, anything in `gm.utils`, anything under `gemini.core`) are internal and may
 change. `tests/unit/test_public_api.py` pins the names, their parameter names and the schema files.
@@ -38,11 +38,11 @@ only change together with `API_VERSION`; its hash per version is held in the tes
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.modules.names(category=None)` | sorted registry names; spec plants have category `plant` | real |
+| `gm.modules.names(category=None)` | sorted registry names; spec plants have category `plants` | real |
 | `gm.modules.get(name)` | the class; a spec plant gives a new plant. Unknown: `UnknownNameError` with `suggestions` | real |
-| `gm.modules.categories()` | `subsurface`, `well`, `pump`, `separation`, `heat_exchange`, `heat_pump`, `chiller`, `boiler`, `storage`, `network`, `consumer`, `plant` | real |
-| `gm.modules.register(cls)` | `cls`, now in the registry; a taken name is refused | real |
-| `gm.modules.load_file(path)` | names of the `Module` classes of a Python file, registered | real |
+| `gm.modules.categories()` | `subsurface`, `wells`, `pumps`, `treatment`, `exchangers`, `heating`, `cooling`, `power`, `storage`, `piping`, `demand`, `control`, `plants`, in display order; each is the folder that holds the module | real |
+| `gm.modules.register(cls)` | `cls`, now in the registry; it states `category = "<one of the list>"`; a taken name is refused | real |
+| `gm.modules.load_file(path)` | names of the `Module` classes of a Python file that state a `category`, registered | real |
 | `gm.modules.<Equipment>`, `Module`, `ModuleList`, `ModuleDict`, `collect_flows`, `emissions`, `energy_balance`, `mass_balance`, `trace_wiring` | classes and one-call audits, see [equipment.md](equipment.md) | real |
 | `gm.streams.names()` | `brine`, `hot_water`, `chilled_water`, `gas`, `electricity`, `fuel` | real |
 
@@ -88,7 +88,7 @@ Three levels and one representation: see [plants.md](plants.md). The spec schema
 | `gm.plants.validate(spec)` | `[{path, message, code, suggestions}]`, paths such as `connections[1].target`; never raises | real |
 | `gm.plants.spec_schema()` | JSON Schema | real |
 | `gm.plants.migrate(old)` | spec; every older stored format to format 2 | real |
-| `gm.plants.names()` | plant names, the `plant` category | real |
+| `gm.plants.names()` | plant names, the `plants` category | real |
 | `gm.plants.get(name)` | a new plant without values | real |
 | `gm.plants.example(name)` | a plant with real values | real |
 | `gm.plants.templates()` | `[{name, title, description, purpose}]`, purpose `heating`, `cooling`, `both` | real |
@@ -210,3 +210,4 @@ Pass parameter objects declared `calibratable=True`, such as
 | API_VERSION | Date | Change |
 | --- | --- | --- |
 | 1 | 2026-10-30 | First frozen list. |
+| 2 | 2026-10-30 | One classification: `category` is the module's folder. `gm.modules.categories()` and `describe()["category"]` change: `heat_exchange` → `exchangers`, `heat_pump` and `boiler` → `heating`, `chiller` → `cooling`, `network` → `piping`, `well` → `wells`, `pump` → `pumps`, `separation` → `treatment`, `consumer` → `demand`, `plant` → `plants`; `subsurface` and `storage` stay; `power` and `control` are new. Exceptions to that mapping: `ORC`, `FlashTurbine` (`heat_exchange`), `GridConnection` (`network`) and `Separator` (`separation`) are `power`; `PIDController` (`network`) is `control`. |

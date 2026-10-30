@@ -29,7 +29,7 @@ def stream():
 def test_a_plant_is_a_module_in_the_plant_category():
     """A built plant is a normal composite."""
     assert isinstance(gm.Plant("doublet"), gm.modules.Module)
-    assert gm.Plant.category == "plant"
+    assert gm.Plant.category == "plants"
     assert gm.Plant().name == "plant"
 
 

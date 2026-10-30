@@ -1,8 +1,9 @@
 """The one registry of module and plant types: stable names, categories and how to get each.
 
-A module class registers under its class name and its ``category``. A plant that exists as a spec
-registers under its name with a ``build`` function that returns a new plant. Both kinds share one
-table, so a plant spec can name any of them as the ``type`` of a child.
+A module class registers under its class name and its ``category``: for a shipped class the folder
+that holds it (``Module.category``), for a class from outside the value it states. A plant that
+exists as a spec registers under its name with a ``build`` function that returns a new plant. Both
+kinds share one table, so a plant spec can name any of them as the ``type`` of a child.
 """
 
 import importlib.util
@@ -17,19 +18,20 @@ from gemini.utils.strings import close_matches, did_you_mean, join_names
 
 CATEGORIES = (
     "subsurface",
-    "well",
-    "pump",
-    "separation",
-    "heat_exchange",
-    "heat_pump",
-    "chiller",
-    "boiler",
+    "wells",
+    "pumps",
+    "treatment",
+    "exchangers",
+    "heating",
+    "cooling",
+    "power",
     "storage",
-    "network",
-    "consumer",
-    "plant",
+    "piping",
+    "demand",
+    "control",
+    "plants",
 )
-"""Every module category, in display order."""
+"""Every module category, in display order: the folders of ``gemini/core/modules``."""
 
 
 @dataclass(frozen=True)
@@ -57,7 +59,8 @@ def _check_category(name, category):
 def register(cls):
     """Add a ``Module`` class under its class name and return it, so it can join a plant.
 
-    Registering the same class again does nothing; another class of that name is refused.
+    A class from outside states ``category``, one of the fixed list. Registering the same class
+    again does nothing; another class of that name is refused.
     """
     if not (isinstance(cls, type) and issubclass(cls, Module)):
         raise ValidationError(f"modules.register: cls = {cls!r}; expected a Module class")
@@ -74,7 +77,7 @@ def register_plant(name, build):
     """Add a spec plant under ``name``; ``build()`` returns a new plant without values."""
     if name in _entries:
         raise ValidationError(f"plants.register: name {name!r} is already taken", path=name)
-    _entries[name] = _Entry("plant", build=build)
+    _entries[name] = _Entry("plants", build=build)
 
 
 def names(category=None):
@@ -140,7 +143,7 @@ def load_file(path):
     """Import the Python file at ``path``, register its ``Module`` classes and return their names.
 
     The file is executed, so load only code that is meant to run. Every class the file defines
-    that derives from ``Module`` and has a ``category`` is registered with ``register``, in the
+    that derives from ``Module`` and states a ``category`` is registered with ``register``, in the
     order of definition, so a plant spec can name it as a ``type``; a base class without a
     category is left out. A name is registered once per process: loading another class of an
     already registered name raises ``ValidationError``.
@@ -159,8 +162,8 @@ def load_file(path):
     ------
     ValidationError
         The path is not a file (code ``invalid_value``), executing it raised an error (code
-        ``invalid_format``, the message names the error), or it defines no module class with a
-        category.
+        ``invalid_format``, the message names the error), or it defines no module class that
+        states a category.
     """
     module = _import_file(path)
     classes = [
@@ -174,7 +177,7 @@ def load_file(path):
     if not classes:
         raise ValidationError(
             f"modules.load_file: path = {str(path)!r}; expected the file to define a Module "
-            "class with a category",
+            "class that states a category",
             path=str(path),
         )
     return [register(item).__name__ for item in classes]

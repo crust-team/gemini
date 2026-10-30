@@ -24,8 +24,6 @@ class Plant(PortResolver, Module):
     plant file. Free ports of the children are the plant's own ports. ``name`` is the name given.
     """
 
-    category = "plant"
-
     def __init__(self, name="plant"):
         """Start an empty plant called ``name``."""
         object.__setattr__(self, "_name", name)

@@ -24,8 +24,6 @@ class PressurizationTank(Module):
     operation), so mass and sensible energy pass unchanged. Any flow direction is accepted.
     """
 
-    category = "network"
-
     def __init__(self):
         """Declare the circuit ports, the pressure command and the correction output."""
         super().__init__()

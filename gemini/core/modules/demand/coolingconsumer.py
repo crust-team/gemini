@@ -55,8 +55,6 @@ class CoolingConsumer(Module):
     with a relative humidity in (0, 1].
     """
 
-    category = "consumer"
-
     def __init__(self):
         """Declare the consumer's limits, indoor conditions, loads and absorbed heat."""
         super().__init__()

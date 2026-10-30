@@ -192,6 +192,9 @@ reason it is needed:
 - `describe`, `parameter_schema` and `validate_params` work on a class and on an instance through
   `_ClassOrInstance` in `gemini/core/modules/module.py`: on a class they run on a new instance,
   because a module's declarations exist only once `__init__` has run.
+- `Module.category` is `_FolderCategory` in `gemini/core/modules/module.py`, a descriptor that reads
+  the folder from the import path of the class, so the folder is the one source of a module's
+  category. A class from outside assigns `category` itself, which replaces the descriptor.
 - `class_path`/`import_class` in `gemini/core/modules/module.py` are the only import-by-string.
   Only checkpoints use them: a checkpoint names the plant class (`Plant`, or a handwritten root)
   whose `from_dict` rebuilds the tree from the spec it stores. A plant file names registry types.

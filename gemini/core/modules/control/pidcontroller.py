@@ -53,8 +53,6 @@ class PIDController(Module):
     graph break until ``scan`` exists; its arithmetic is written with ops all the same.
     """
 
-    category = "network"
-
     def __init__(self):
         """Declare the tuning, the limits, the controller memory and the command."""
         super().__init__()

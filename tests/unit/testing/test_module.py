@@ -11,7 +11,7 @@ from tests.fixtures.booster_module import EXAMPLE, Booster
 class Unitless(Module):
     """A module with a number declared without a unit."""
 
-    category = "pump"
+    category = "pumps"
 
     def __init__(self):
         """Declare a plain float parameter."""

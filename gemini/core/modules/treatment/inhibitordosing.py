@@ -26,8 +26,6 @@ class InhibitorDosing(Module):
     Reverse flow raises ``PhysicsRangeError``.
     """
 
-    category = "separation"
-
     def __init__(self):
         """Declare the product strength, ports, dose command and dosing rates."""
         super().__init__()

@@ -34,7 +34,7 @@ def test_an_unregistered_class_is_refused():
     """A class must be registered so the spec can name it."""
 
     class Mine(gm.modules.Module):
-        category = "pump"
+        category = "pumps"
 
     with pytest.raises(UnknownNameError):
         make_module(Mine)

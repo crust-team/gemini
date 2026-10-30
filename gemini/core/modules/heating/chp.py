@@ -45,8 +45,6 @@ class CHP(Module):
     0.40 to 0.50 thermal, from manufacturer data).
     """
 
-    category = "boiler"
-
     def __init__(self):
         """Declare engine design data, the heated water circuit and energy flows."""
         super().__init__()

@@ -40,8 +40,6 @@ class Desander(Module):
     flow with a loss below the inlet pressure; otherwise ``PhysicsRangeError`` is raised.
     """
 
-    category = "separation"
-
     def __init__(self):
         """Declare desander design data, ports, sand boundary and outputs."""
         super().__init__()

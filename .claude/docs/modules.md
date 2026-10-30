@@ -32,7 +32,7 @@ registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `ge
 `suggestions`.
 
 `gm.modules.load_file(path)` imports a Python file, registers every `Module` class it defines that
-has a `category` (a base class without one is skipped) and returns their names, so a new module
+states a `category` (a base class without one is skipped) and returns their names, so a new module
 can join a plant spec by `type`. It executes the file; a file that does not import, or defines no
 such class, raises `ValidationError` (code `invalid_format` or `invalid_value`), and a name that is
 already taken by another class is refused.
@@ -47,10 +47,14 @@ that has a unit; coefficient arrays are exempt), `describe` (plain JSON) and `ca
 `call` until `example` gives them in the shape of `gm.evaluate`:
 `{"parameters": {...}, "inlets": {...}, "controls": {...}}`.
 
-Each class sets the class attribute `category` to one of the fixed `registry.CATEGORIES`. Three
-groups have no category of their own and take the nearest one, so these are the places to look if
-the list grows: `ORC` and `FlashTurbine` are `heat_exchange`; `GridConnection` and `PIDController`
-are `network`; `InhibitorDosing` and `Vent` are `separation`.
+There is one classification: a shipped module's category is the name of the folder of
+`gemini/core/modules/` that holds its file, and a new module goes in the folder of what it does.
+`registry.CATEGORIES` is the fixed list of those folders, one word each, in display order;
+[equipment.md](equipment.md#overview) lists the modules of each. `Module.category` reads the folder
+from the import path of the class, so a shipped class never declares it and the two cannot disagree
+(`tests/unit/core/modules/test_registry.py` checks the folders, the list and every class). A class
+from outside (`register`, `load_file`) has no folder: it states the class attribute `category`, one
+of the list, and a subclass of a shipped class states its own.
 
 A port declares its stream type: `Inlet(Stream, stream="brine")`, one of `gm.streams.names()`.
 A port without one, `stream=None`, takes whatever flows through it: piping, `CentrifugalPump`,

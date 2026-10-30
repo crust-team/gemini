@@ -24,8 +24,6 @@ from gemini.errors import ConfigurationError, PhysicsRangeError
 class InjectionPump(Module):
     """Raise brine pressure with a simple hydraulic-power estimate."""
 
-    category = "pump"
-
     repr_fields = ("no_stages", "efficiency", "pump_type")
 
     def __init__(self):

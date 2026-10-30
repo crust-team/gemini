@@ -39,52 +39,52 @@ Shared conventions, stated once here and not repeated per module:
 
 | Category | Class | Ports (in -> out) | State | Model |
 | --- | --- | --- | --- | --- |
+| Subsurface | `ProductionReservoir` | none -> `sandface` | no | linear IPR, radial diagnostics |
+| Subsurface | `InjectionReservoir` | `sandface` -> none | no | linear injectivity |
+| Subsurface | `ThermalDecline` | `inlet` -> `outlet` | yes | Gringarten–Sauty breakthrough |
+| Subsurface | `BoreholeField` | `inlet` -> `outlet` | yes | lumped ground, steady-flux cell |
+| Subsurface | `DownholeHeatExchanger` | `inlet` -> `outlet` | no | Ramey profile, coaxial |
+| Wells | `ProductionWell` | `bottom` -> `wellhead` | no | DPDT path traversal upward |
+| Wells | `InjectionWell` | `wellhead` -> `bottom` | no | DPDT path traversal downward |
 | Pumps | `ESP` | `suction` -> `discharge` | no | TNO polynomial head and power, isothermal |
 | Pumps | `InjectionPump` | `suction` -> `discharge` | no | setpoint or curve head, `Q dp / eta` |
 | Pumps | `CentrifugalPump` | `suction` -> `discharge` | no | quadratic head, affinity laws |
 | Pumps | `LineShaftPump` | `suction` -> `discharge` | no | ESP curves plus shaft friction |
 | Pumps | `GasCompressor` | `suction` -> `discharge` | no | ideal-gas intercooled stages |
-| Piping | `Pipe` | `inlet` -> `outlet` | no | Darcy–Weisbach, static head, exponential loss |
-| Piping | `Valve` | `inlet` -> `outlet` | no | IEC 60534 liquid sizing, inherent curve |
-| Piping | `Splitter` | `feed_in` -> `first_out`, `second_out` | no | commanded mass split |
-| Piping | `Mixer` | `first_in`, `second_in` -> `mixed_out` | no | adiabatic, lower pressure |
-| Piping | `PressurizationTank` | `inlet` -> `outlet` | no | outlet at the pressure setpoint |
 | Treatment | `Filter` | `inlet` -> `outlet` | no | quadratic clean loss, clogging health |
 | Treatment | `Degasser` | `inlet` -> `liquid`, `gas` | no | free-gas split and vessel pressure |
 | Treatment | `Blowdown` | `feed_in` -> `retained_out`, `blowdown_out` | no | commanded bleed |
 | Treatment | `Desander` | `inlet` -> `outlet` | no | constant removal share, quadratic loss |
 | Treatment | `InhibitorDosing` | `inlet` -> `outlet` | no | dose proportional to flow |
 | Treatment | `Vent` | `inlet` -> `outlet` | no | vent or flare emissions |
-| Heat | `HeatExchanger` | `hot_in`, `cold_in` -> `hot_out`, `cold_out` | no | effectiveness-NTU |
-| Heat | `Boiler` | `inlet` -> `outlet` | no | setpoint duty, capacity, efficiency |
-| Heat | `HeatPump` | `source_in`, `sink_in` -> `source_out`, `sink_out` | no | Carnot or Lorenz COP |
-| Heat | `AbsorptionUnit` | three `*_in` -> `*_out` circuits | no | characteristic equation |
-| Heat | `AdsorptionChiller` | three `*_in` -> `*_out` circuits | no | characteristic equation |
-| Heat | `CHP` | `inlet` -> `outlet` | no | Willans line, dump cooler |
-| Heat | `Cooler` | `inlet` -> `outlet` | no | dry or wet approach, fan power |
-| Subsurface | `ProductionReservoir` | none -> `sandface` | no | linear IPR, radial diagnostics |
-| Subsurface | `InjectionReservoir` | `sandface` -> none | no | linear injectivity |
-| Subsurface | `ProductionWell` | `bottom` -> `wellhead` | no | DPDT path traversal upward |
-| Subsurface | `InjectionWell` | `wellhead` -> `bottom` | no | DPDT path traversal downward |
-| Subsurface | `ThermalDecline` | `inlet` -> `outlet` | yes | Gringarten–Sauty breakthrough |
-| Subsurface | `AquiferStorage` | `injection_in` -> `production_out` | yes | warm and cold stores |
-| Subsurface | `BoreholeField` | `inlet` -> `outlet` | yes | lumped ground, steady-flux cell |
-| Subsurface | `DownholeHeatExchanger` | `inlet` -> `outlet` | no | Ramey profile, coaxial |
-| Storage | `ThermalStorage` | `charge_*`, `discharge_*` | yes | fully mixed tank |
-| Storage | `IceStorage` | `inlet` -> `outlet` | yes | lumped ice store, piecewise exact |
-| Control | `PIDController` | none | yes | discrete PID, clamping anti-windup |
+| Exchangers | `HeatExchanger` | `hot_in`, `cold_in` -> `hot_out`, `cold_out` | no | effectiveness-NTU |
+| Exchangers | `Cooler` | `inlet` -> `outlet` | no | dry or wet approach, fan power |
+| Heating | `Boiler` | `inlet` -> `outlet` | no | setpoint duty, capacity, efficiency |
+| Heating | `HeatPump` | `source_in`, `sink_in` -> `source_out`, `sink_out` | no | Carnot or Lorenz COP |
+| Heating | `CHP` | `inlet` -> `outlet` | no | Willans line, dump cooler |
+| Cooling | `AbsorptionUnit` | three `*_in` -> `*_out` circuits | no | characteristic equation |
+| Cooling | `AdsorptionChiller` | three `*_in` -> `*_out` circuits | no | characteristic equation |
 | Power | `ORC` | `brine_in` -> `brine_out` | no | Lorenz-cycle fraction, bypass cap |
 | Power | `Separator` | `inlet` -> `liquid`, `gas` | no | IF97 flash |
 | Power | `FlashTurbine` | `inlet` -> `outlet` | no | Baumann wet expansion, condenser |
 | Power | `GridConnection` | none | no | net import/export, limits, tariff |
+| Storage | `AquiferStorage` | `injection_in` -> `production_out` | yes | warm and cold stores |
+| Storage | `ThermalStorage` | `charge_*`, `discharge_*` | yes | fully mixed tank |
+| Storage | `IceStorage` | `inlet` -> `outlet` | yes | lumped ice store, piecewise exact |
+| Piping | `Pipe` | `inlet` -> `outlet` | no | Darcy–Weisbach, static head, exponential loss |
+| Piping | `Valve` | `inlet` -> `outlet` | no | IEC 60534 liquid sizing, inherent curve |
+| Piping | `Splitter` | `feed_in` -> `first_out`, `second_out` | no | commanded mass split |
+| Piping | `Mixer` | `first_in`, `second_in` -> `mixed_out` | no | adiabatic, lower pressure |
+| Piping | `PressurizationTank` | `inlet` -> `outlet` | no | outlet at the pressure setpoint |
 | Demand | `HeatConsumer` | `supply_in` -> `return_out` | no | demand capped by return floor |
 | Demand | `CoolingConsumer` | `supply_in` -> `return_out` | no | sensible, latent, dew point |
-| Plant (spec) | `Doublet` | `return_in` -> `supply_out` | no | reservoir, wells, ESP, injector, sink |
-| Plant (spec) | `MultiWellPlant` | `return_in` -> `supply_out` | no | N producers, M injectors |
-| Composite | `HeatingSubstation` | `network_in` -> `network_out` | no | valve, HX, heat consumer |
-| Composite | `CoolingSubstation` | `network_in` -> `network_out` | no | valve, HX, cooler |
-| Plant (spec) | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
-| Composite | `ATESPlant` | `building_in` -> `building_out` | child | ATES, pump, HX, heat pump |
+| Control | `PIDController` | none | yes | discrete PID, clamping anti-windup |
+| Plants | `Doublet` | `return_in` -> `supply_out` | no | reservoir, wells, ESP, injector, sink |
+| Plants | `MultiWellPlant` | `return_in` -> `supply_out` | no | N producers, M injectors |
+| Plants | `HeatingSubstation` | `network_in` -> `network_out` | no | valve, HX, heat consumer |
+| Plants | `CoolingSubstation` | `network_in` -> `network_out` | no | valve, HX, cooler |
+| Plants | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
+| Plants | `ATESPlant` | `building_in` -> `building_out` | child | ATES, pump, HX, heat pump |
 
 ## Pumps
 
@@ -632,7 +632,7 @@ assert round(flared.outputs.co2_emission, 6) == 0.085032
 assert round(flared.outputs.get("heat_loss", unit="kW"), 1) == 372.4
 ```
 
-## Heat
+## Exchangers
 
 ### HeatExchanger
 
@@ -670,29 +670,46 @@ assert round(result.outputs.effectiveness, 4) == 0.7477
 assert round(result.outputs.dp_hot, 6) == 20000
 ```
 
-### Boiler
+### Cooler
 
-Auxiliary gas or electric boiler heating a stream to a setpoint.
+Dry or wet (evaporative) closed-circuit cooler rejecting heat to ambient air.
 
 - **Ports**: `inlet` -> `outlet`.
-- **Parameters** (all required): `fuel_type` (`"gas"` or `"electric"`), `capacity` (`Power`,
-  > 0), `efficiency` (`Efficiency`).
-- **Controls**: `temperature_setpoint` (`Temperature`).
-- **Outputs**: `duty`, `fuel_or_power`, `outlet_T`, `capped`, `electricity`, `fuel` (the unused
-  one is zero), `heat_loss` (conversion loss).
-- **Model**: `duty = min(m_dot cp max(0, T_set - T_in), capacity)`, `fuel_or_power = duty /
-  efficiency`, `heat_loss = fuel_or_power - duty`.
-- **Validity**: negative flow raises `PhysicsRangeError`.
+- **Parameters**: `cooler_type` (`"dry"` or `"wet"`), `capacity` (`Power`, > 0), `approach`
+  (`TemperatureDifference`, >= 0; typically 5 to 15 K dry and 3 to 8 K wet, ASHRAE Handbook,
+  HVAC Systems and Equipment), `specific_fan_power` (`Ratio`, W of fan per W rejected), all
+  required; `latent_heat` (default 2.43 MJ/kg, water at about 30 degC, IAPWS-IF97).
+- **Controls**: `temperature_setpoint` (outlet).
+- **Boundaries**: `ambient_temperature` (dry bulb, required), `wet_bulb_temperature`
+  (`Temperature | None`, default `None`).
+- **Outputs**: `duty`, `outlet_T`, `electricity` (fan), `heat_loss`, `evaporation_rate`
+  (0 for dry), `is_capped`.
+- **Model**: target `max(T_set, T_ref + approach)` with `T_ref` the dry bulb (dry) or wet bulb
+  (wet); `duty = min(m_dot cp max(0, T_in - target), capacity)`; `electricity = sfp duty`;
+  `heat_loss = duty + electricity`; `evaporation_rate = duty / latent_heat` (wet).
+- **Assumptions**: closed circuit (the process stream keeps its mass); the evaporation rate is
+  an upper bound (all heat taken as latent; 80 to 90 % in practice); fixed approach at every
+  load; fan power proportional to duty; ambient about -20 to 45 degC.
+- **Validity**: a wet cooler without a wet bulb raises `ConfigurationError`; a wet bulb above
+  the dry bulb raises `PhysicsRangeError`.
 - **Energy audit**: closed.
 
 ```python
 import gemini as gm
-from gemini.core.modules import Boiler
+from gemini.core.modules import Cooler
 
-boiler = Boiler().update_params(fuel_type="gas", capacity="1 MW", efficiency=0.9)
-result = boiler(inlet=gm.Stream(flow="10 kg/s", T="60 C", p="3 bar"), temperature_setpoint="80 C")
-assert round(result.outputs.duty) == 843480 and round(result.outputs.fuel) == 937200
+cooler = Cooler().update_params(
+    cooler_type="wet", capacity="2 MW", approach=4, specific_fan_power=0.01
+)
+result = cooler(
+    inlet=gm.Stream(flow="20 kg/s", T="40 C", p="3 bar"), temperature_setpoint="20 C",
+    ambient_temperature="30 C", wet_bulb_temperature="22 C",
+)
+assert round(result.outputs.outlet_T - 273.15, 9) == 26.0
+assert round(result.outputs.evaporation_rate, 3) == 0.486
 ```
+
+## Heating
 
 ### HeatPump
 
@@ -762,6 +779,64 @@ result = lorenz(
 )
 assert round(result.outputs.cop, 4) == 6.531 and round(result.outputs.electricity) == 88913
 ```
+
+### Boiler
+
+Auxiliary gas or electric boiler heating a stream to a setpoint.
+
+- **Ports**: `inlet` -> `outlet`.
+- **Parameters** (all required): `fuel_type` (`"gas"` or `"electric"`), `capacity` (`Power`,
+  > 0), `efficiency` (`Efficiency`).
+- **Controls**: `temperature_setpoint` (`Temperature`).
+- **Outputs**: `duty`, `fuel_or_power`, `outlet_T`, `capped`, `electricity`, `fuel` (the unused
+  one is zero), `heat_loss` (conversion loss).
+- **Model**: `duty = min(m_dot cp max(0, T_set - T_in), capacity)`, `fuel_or_power = duty /
+  efficiency`, `heat_loss = fuel_or_power - duty`.
+- **Validity**: negative flow raises `PhysicsRangeError`.
+- **Energy audit**: closed.
+
+```python
+import gemini as gm
+from gemini.core.modules import Boiler
+
+boiler = Boiler().update_params(fuel_type="gas", capacity="1 MW", efficiency=0.9)
+result = boiler(inlet=gm.Stream(flow="10 kg/s", T="60 C", p="3 bar"), temperature_setpoint="80 C")
+assert round(result.outputs.duty) == 843480 and round(result.outputs.fuel) == 937200
+```
+
+### CHP
+
+Gas-engine combined heat and power unit heating a water circuit.
+
+- **Ports**: `inlet` -> `outlet`.
+- **Parameters**: `electric_capacity` (`Power`, > 0), `electric_efficiency`,
+  `thermal_efficiency` (`Efficiency`, full load, LHV; typical gas engines 0.35 to 0.44 and 0.40
+  to 0.50), `maximum_outlet_temperature` (`Temperature`), all required;
+  `no_load_fuel_fraction` (`Fraction`, < 1, default 0; 0.05 to 0.15 reproduces the half-load
+  efficiency drop of a lean-burn engine).
+- **Controls**: `load_fraction` (`Fraction`, 0 is off).
+- **Outputs**: `fuel`, `electricity_generated`, `heat_recovered`, `dumped_heat`, `heat_loss`,
+  `outlet_T`.
+- **Model**: Willans line (Heywood 1988) `F = (P_cap / eta_el) (f0 + (1 - f0) L)` for L > 0;
+  `P = L P_cap`; `heat_recovered = min(eta_th F, m_dot cp (T_max - T_in))`; the rest of the
+  engine heat is `dumped_heat`; `heat_loss = F - P - heat_recovered`.
+- **Validity**: `electric_efficiency + thermal_efficiency > 1` raises `ConfigurationError`. No
+  minimum stable load or start-up losses; with no water flow all engine heat is dumped.
+- **Energy audit**: closed.
+
+```python
+import gemini as gm
+from gemini.core.modules import CHP
+
+chp = CHP().update_params(
+    electric_capacity="1 MW", electric_efficiency=0.4, thermal_efficiency=0.45,
+    no_load_fuel_fraction=0.1, maximum_outlet_temperature="90 C",
+)
+result = chp(inlet=gm.Stream(flow="20 kg/s", T="60 C", p="3 bar"), load_fraction=0.5)
+assert round(result.outputs.fuel) == 1375000 and round(result.outputs.heat_recovered) == 618750
+```
+
+## Cooling
 
 ### AbsorptionUnit
 
@@ -852,77 +927,6 @@ result = chiller(
 assert round(result.outputs.evaporator_duty) == 45733 and round(result.outputs.cop, 9) == 0.55
 ```
 
-### CHP
-
-Gas-engine combined heat and power unit heating a water circuit.
-
-- **Ports**: `inlet` -> `outlet`.
-- **Parameters**: `electric_capacity` (`Power`, > 0), `electric_efficiency`,
-  `thermal_efficiency` (`Efficiency`, full load, LHV; typical gas engines 0.35 to 0.44 and 0.40
-  to 0.50), `maximum_outlet_temperature` (`Temperature`), all required;
-  `no_load_fuel_fraction` (`Fraction`, < 1, default 0; 0.05 to 0.15 reproduces the half-load
-  efficiency drop of a lean-burn engine).
-- **Controls**: `load_fraction` (`Fraction`, 0 is off).
-- **Outputs**: `fuel`, `electricity_generated`, `heat_recovered`, `dumped_heat`, `heat_loss`,
-  `outlet_T`.
-- **Model**: Willans line (Heywood 1988) `F = (P_cap / eta_el) (f0 + (1 - f0) L)` for L > 0;
-  `P = L P_cap`; `heat_recovered = min(eta_th F, m_dot cp (T_max - T_in))`; the rest of the
-  engine heat is `dumped_heat`; `heat_loss = F - P - heat_recovered`.
-- **Validity**: `electric_efficiency + thermal_efficiency > 1` raises `ConfigurationError`. No
-  minimum stable load or start-up losses; with no water flow all engine heat is dumped.
-- **Energy audit**: closed.
-
-```python
-import gemini as gm
-from gemini.core.modules import CHP
-
-chp = CHP().update_params(
-    electric_capacity="1 MW", electric_efficiency=0.4, thermal_efficiency=0.45,
-    no_load_fuel_fraction=0.1, maximum_outlet_temperature="90 C",
-)
-result = chp(inlet=gm.Stream(flow="20 kg/s", T="60 C", p="3 bar"), load_fraction=0.5)
-assert round(result.outputs.fuel) == 1375000 and round(result.outputs.heat_recovered) == 618750
-```
-
-### Cooler
-
-Dry or wet (evaporative) closed-circuit cooler rejecting heat to ambient air.
-
-- **Ports**: `inlet` -> `outlet`.
-- **Parameters**: `cooler_type` (`"dry"` or `"wet"`), `capacity` (`Power`, > 0), `approach`
-  (`TemperatureDifference`, >= 0; typically 5 to 15 K dry and 3 to 8 K wet, ASHRAE Handbook,
-  HVAC Systems and Equipment), `specific_fan_power` (`Ratio`, W of fan per W rejected), all
-  required; `latent_heat` (default 2.43 MJ/kg, water at about 30 degC, IAPWS-IF97).
-- **Controls**: `temperature_setpoint` (outlet).
-- **Boundaries**: `ambient_temperature` (dry bulb, required), `wet_bulb_temperature`
-  (`Temperature | None`, default `None`).
-- **Outputs**: `duty`, `outlet_T`, `electricity` (fan), `heat_loss`, `evaporation_rate`
-  (0 for dry), `is_capped`.
-- **Model**: target `max(T_set, T_ref + approach)` with `T_ref` the dry bulb (dry) or wet bulb
-  (wet); `duty = min(m_dot cp max(0, T_in - target), capacity)`; `electricity = sfp duty`;
-  `heat_loss = duty + electricity`; `evaporation_rate = duty / latent_heat` (wet).
-- **Assumptions**: closed circuit (the process stream keeps its mass); the evaporation rate is
-  an upper bound (all heat taken as latent; 80 to 90 % in practice); fixed approach at every
-  load; fan power proportional to duty; ambient about -20 to 45 degC.
-- **Validity**: a wet cooler without a wet bulb raises `ConfigurationError`; a wet bulb above
-  the dry bulb raises `PhysicsRangeError`.
-- **Energy audit**: closed.
-
-```python
-import gemini as gm
-from gemini.core.modules import Cooler
-
-cooler = Cooler().update_params(
-    cooler_type="wet", capacity="2 MW", approach=4, specific_fan_power=0.01
-)
-result = cooler(
-    inlet=gm.Stream(flow="20 kg/s", T="40 C", p="3 bar"), temperature_setpoint="20 C",
-    ambient_temperature="30 C", wet_bulb_temperature="22 C",
-)
-assert round(result.outputs.outlet_T - 273.15, 9) == 26.0
-assert round(result.outputs.evaporation_rate, 3) == 0.486
-```
-
 ## Subsurface
 
 Ground and aquifer heat that enters a circuit is `heat_absorbed` and heat given to them is
@@ -967,41 +971,6 @@ source = reservoir(production_rate="40 kg/s")
 assert round(source.outputs.drawdown / 1e5, 6) == 7.2
 ```
 
-### ProductionWell and InjectionWell
-
-Wells traversing a geothermal `PipePath` with the original GEMINI DPDT equations,
-Swamee–Jain friction, Beggs–Brill two-phase flow and explicit heat loss
-(`hydraulics.pipe_path_profile`).
-
-- **Ports**: `ProductionWell` `bottom` -> `wellhead`; `InjectionWell` `wellhead` -> `bottom`.
-- **Parameters**: `pipe_path` (`geometry.PipePath`, required), `soil_temperature` (required),
-  `u_value` (default 10 W/m2/K, calibratable), `correction_factors` (affine pressure
-  correction, default `(1, 0)`, calibratable), `friction_correlation` (`"darcy_weisbach"`),
-  `friction_correlation_2p` (`"BeggsBrill"`). The production well adds `segment` (`"full"`,
-  `"below_esp"`, `"above_esp"`, default full) and `esp_depth` (default `None`).
-- **Outputs**: wellhead (production) or bottomhole (injection) pressure and temperature,
-  `dp_friction`, `dp_gravity`, `section_pressure`, `section_temperature`, `heat_loss`.
-- **Model**: see [physics.md](physics.md) and [refactor-notes.md](refactor-notes.md); the
-  injection traversal uses the legacy negative flow internally, while its ports keep the
-  incoming sign. Helpers: `intake_conditions`, `wellhead_from_discharge`,
-  `discharge_from_wellhead`, `corrosion_profile` (mm/year), `erosion_check`.
-- **Energy audit**: closed; `heat_loss` is signed here (negative when the soil heats the brine).
-
-```python
-import math
-
-import gemini as gm
-from gemini.core.modules import ProductionWell
-from gemini.core.physics.geometry import PipePath, PipeSection
-
-vertical = PipeSection(length=1500, inclination=math.pi / 2, inner_diameter=0.2, roughness=2e-5)
-path = PipePath(sections=[vertical])
-well = ProductionWell().update_params(pipe_path=path, soil_temperature="40 C")
-result = well(bottom=gm.Stream(m_dot=40, T="80 C", p="180 bar"))
-assert round(result.outputs.dp_gravity / 1e5, 2) == 147.15
-assert round(result.outputs.heat_loss) == 376991
-```
-
 ### ThermalDecline
 
 Production temperature decline of a balanced doublet once the cooled region around the
@@ -1040,51 +1009,6 @@ produced = gm.Stream(flow="180 m3/h", T="80 C", p="200 bar")
 state, result = decline.step({"injected_volume": 1.2e8}, 3600, {"inlet": produced})
 assert round(result.outputs.breakthrough_time / (365.25 * 86400), 2) == 22.37
 assert round(result.outputs.temperature_drop, 2) == 20.98
-```
-
-### AquiferStorage
-
-Aquifer thermal energy storage (ATES) well pair with a warm and a cold store.
-
-- **Ports**: `injection_in` -> `production_out`: the balanced pair produces the injected mass
-  flow, pressure and fluid at the temperature of the store produced from (the aquifer
-  temperature when idle). Well hydraulics belong to well modules.
-- **Parameters**: `aquifer_temperature`, `aquifer_thickness` (H), `porosity`,
-  `rock_volumetric_heat_capacity`, `ground_conductivity` (calibratable as an effective value),
-  all required; `storage_period` (`Duration`, default 182.625 days, one season).
-- **Controls**: `mode`: `"charge"` (produce from cold, inject into warm), `"discharge"`
-  (produce from warm, inject into cold), `"idle"` (requires zero flow).
-- **States** (all default 0): `warm_volume`, `cold_volume`, `warm_temperature_change`,
-  `cold_temperature_change` (theta = T - T_aq), `charged_heat`, `recovered_heat`.
-- **Outputs**: `stored_energy` (cold store counts negative), `production_T`,
-  `recovery_efficiency` (`None` until heat was charged), `warm_temperature`,
-  `cold_temperature`, `heat_loss`, `heat_absorbed`.
-- **Model**: fully mixed stores of excess heat `(rho c)_w V theta` in a cylinder of height H;
-  losses `UA = 2 k A / sqrt(pi alpha t_p)` over the envelope `A = 2 pi R (R + H)`
-  (`ground.cylinder_store_conductance`, Carslaw and Jaeger 1959; Bloemendal and Hartog 2018,
-  Geothermics 71, 306-319). A step mixes the injected volume, removes the produced volume
-  (an empty store produces native water), then decays each store exactly at its end volume
-  (operator splitting, first order in `dt` with flow).
-- **Assumptions and validity**: no regional flow, dispersion or buoyancy (stores below about
-  30 degC), no well interaction, a mixed store instead of a thermal fringe, a conduction layer
-  thin against R and H. Negative flow, or flow in idle mode, raise `PhysicsRangeError`.
-- **Energy audit**: deliberately not closed per call: the residual equals the rate of change of
-  `stored_energy`. Mass closes.
-
-```python
-import gemini as gm
-from gemini.core.modules import AquiferStorage
-
-ates = AquiferStorage().update_params(
-    aquifer_temperature="11 degC", aquifer_thickness="30 m", porosity=0.3,
-    rock_volumetric_heat_capacity="2 MJ/m3/K", ground_conductivity=2.5,
-)
-ates.mode = "charge"
-state = None
-for hour in range(24 * 90):
-    inlets = {"injection_in": gm.Stream(flow="100 m3/h", T="18 C", p="3 bar")}
-    state, result = ates.step(state, 3600, inlets)
-assert round(result.outputs.get("stored_energy", unit="kWh") / 1e6, 2) == 1.58
 ```
 
 ### BoreholeField
@@ -1156,6 +1080,43 @@ exchanger = DownholeHeatExchanger().update_params(
 )
 result = exchanger(inlet=gm.Stream(m_dot=5, T="30 C", p="3 bar"))
 assert round(result.outputs.outlet_T - 273.15, 2) == 35.92
+```
+
+## Wells
+
+### ProductionWell and InjectionWell
+
+Wells traversing a geothermal `PipePath` with the original GEMINI DPDT equations,
+Swamee–Jain friction, Beggs–Brill two-phase flow and explicit heat loss
+(`hydraulics.pipe_path_profile`).
+
+- **Ports**: `ProductionWell` `bottom` -> `wellhead`; `InjectionWell` `wellhead` -> `bottom`.
+- **Parameters**: `pipe_path` (`geometry.PipePath`, required), `soil_temperature` (required),
+  `u_value` (default 10 W/m2/K, calibratable), `correction_factors` (affine pressure
+  correction, default `(1, 0)`, calibratable), `friction_correlation` (`"darcy_weisbach"`),
+  `friction_correlation_2p` (`"BeggsBrill"`). The production well adds `segment` (`"full"`,
+  `"below_esp"`, `"above_esp"`, default full) and `esp_depth` (default `None`).
+- **Outputs**: wellhead (production) or bottomhole (injection) pressure and temperature,
+  `dp_friction`, `dp_gravity`, `section_pressure`, `section_temperature`, `heat_loss`.
+- **Model**: see [physics.md](physics.md) and [refactor-notes.md](refactor-notes.md); the
+  injection traversal uses the legacy negative flow internally, while its ports keep the
+  incoming sign. Helpers: `intake_conditions`, `wellhead_from_discharge`,
+  `discharge_from_wellhead`, `corrosion_profile` (mm/year), `erosion_check`.
+- **Energy audit**: closed; `heat_loss` is signed here (negative when the soil heats the brine).
+
+```python
+import math
+
+import gemini as gm
+from gemini.core.modules import ProductionWell
+from gemini.core.physics.geometry import PipePath, PipeSection
+
+vertical = PipeSection(length=1500, inclination=math.pi / 2, inner_diameter=0.2, roughness=2e-5)
+path = PipePath(sections=[vertical])
+well = ProductionWell().update_params(pipe_path=path, soil_temperature="40 C")
+result = well(bottom=gm.Stream(m_dot=40, T="80 C", p="180 bar"))
+assert round(result.outputs.dp_gravity / 1e5, 2) == 147.15
+assert round(result.outputs.heat_loss) == 376991
 ```
 
 ## Storage
@@ -1233,6 +1194,52 @@ state = None
 for _ in range(8):
     state, result = store.step(state, 3600, {"inlet": glycol})
 assert round(state["ice_fraction"], 4) == 0.1269 and not result.outputs.is_full
+```
+
+### AquiferStorage
+
+Aquifer thermal energy storage (ATES) well pair with a warm and a cold store. Ground heat is counted
+as in [Subsurface](#subsurface).
+
+- **Ports**: `injection_in` -> `production_out`: the balanced pair produces the injected mass
+  flow, pressure and fluid at the temperature of the store produced from (the aquifer
+  temperature when idle). Well hydraulics belong to well modules.
+- **Parameters**: `aquifer_temperature`, `aquifer_thickness` (H), `porosity`,
+  `rock_volumetric_heat_capacity`, `ground_conductivity` (calibratable as an effective value),
+  all required; `storage_period` (`Duration`, default 182.625 days, one season).
+- **Controls**: `mode`: `"charge"` (produce from cold, inject into warm), `"discharge"`
+  (produce from warm, inject into cold), `"idle"` (requires zero flow).
+- **States** (all default 0): `warm_volume`, `cold_volume`, `warm_temperature_change`,
+  `cold_temperature_change` (theta = T - T_aq), `charged_heat`, `recovered_heat`.
+- **Outputs**: `stored_energy` (cold store counts negative), `production_T`,
+  `recovery_efficiency` (`None` until heat was charged), `warm_temperature`,
+  `cold_temperature`, `heat_loss`, `heat_absorbed`.
+- **Model**: fully mixed stores of excess heat `(rho c)_w V theta` in a cylinder of height H;
+  losses `UA = 2 k A / sqrt(pi alpha t_p)` over the envelope `A = 2 pi R (R + H)`
+  (`ground.cylinder_store_conductance`, Carslaw and Jaeger 1959; Bloemendal and Hartog 2018,
+  Geothermics 71, 306-319). A step mixes the injected volume, removes the produced volume
+  (an empty store produces native water), then decays each store exactly at its end volume
+  (operator splitting, first order in `dt` with flow).
+- **Assumptions and validity**: no regional flow, dispersion or buoyancy (stores below about
+  30 degC), no well interaction, a mixed store instead of a thermal fringe, a conduction layer
+  thin against R and H. Negative flow, or flow in idle mode, raise `PhysicsRangeError`.
+- **Energy audit**: deliberately not closed per call: the residual equals the rate of change of
+  `stored_energy`. Mass closes.
+
+```python
+import gemini as gm
+from gemini.core.modules import AquiferStorage
+
+ates = AquiferStorage().update_params(
+    aquifer_temperature="11 degC", aquifer_thickness="30 m", porosity=0.3,
+    rock_volumetric_heat_capacity="2 MJ/m3/K", ground_conductivity=2.5,
+)
+ates.mode = "charge"
+state = None
+for hour in range(24 * 90):
+    inlets = {"injection_in": gm.Stream(flow="100 m3/h", T="18 C", p="3 bar")}
+    state, result = ates.step(state, 3600, inlets)
+assert round(result.outputs.get("stored_energy", unit="kWh") / 1e6, 2) == 1.58
 ```
 
 ## Control
@@ -1462,7 +1469,7 @@ assert round(result.outputs.get("dew_point", unit="degC"), 2) == 12.95
 assert result.outputs.heat_absorbed == 60000 and not result.outputs.is_unmet
 ```
 
-## Composite plants
+## Plants
 
 `Doublet`, `DoubletHeatPlant`, `MultiWellPlant` and `DistrictNetwork` are plants built from a spec
 (`gm.plants.names()` lists them with the others); `HeatingSubstation`, `CoolingSubstation` and

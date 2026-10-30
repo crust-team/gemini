@@ -36,8 +36,6 @@ DEFAULT_CP = 4217.4
 class HeatExchanger(Module):
     """Two-stream heat exchanger with thermal and fouling diagnostics."""
 
-    category = "heat_exchange"
-
     repr_fields = ("ua", "arrangement", "dp_hot_nominal", "dp_cold_nominal")
 
     def __init__(self):

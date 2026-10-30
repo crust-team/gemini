@@ -267,16 +267,33 @@ class _ClassOrInstance:
         return partial(self.function, owner(), **self.on_class)
 
 
+class _FolderCategory:
+    """The ``category`` of a class: the folder of this package that holds its file.
+
+    ``gemini/core/modules/pumps/esp.py`` gives ``pumps``, so a shipped class never declares it. A
+    class from outside has no such folder and is ``None`` until it assigns ``category`` itself,
+    which replaces this descriptor; a subclass of a shipped class states its own too.
+    """
+
+    def __get__(self, instance, owner):
+        """Return the folder of ``owner``, or ``None`` for a file outside the folders."""
+        if not owner.__module__.startswith(f"{__package__}."):
+            return None
+        folder, _, file = owner.__module__.removeprefix(f"{__package__}.").partition(".")
+        return folder if file else None
+
+
 class Module:
     """Base class discovering declarations and child modules assigned in ``__init__``.
 
     Subclasses call ``super().__init__()`` first, then assign declarations and children in the
     documented section order. ``name`` is the snake_case class name; ``path`` is the dotted
-    position in the tree, or the name for a standalone module.
+    position in the tree, or the name for a standalone module; ``category`` is the folder of the
+    class.
     """
 
     repr_fields = ()
-    category = None
+    category = _FolderCategory()
     describe = _ClassOrInstance(description.describe, values=False)
     parameter_schema = _ClassOrInstance(description.parameter_schema)
     validate_params = _ClassOrInstance(description.validate_params)

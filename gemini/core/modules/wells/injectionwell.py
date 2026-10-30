@@ -24,8 +24,6 @@ class InjectionWell(_Well):
     outputs of the graph, one item per section.
     """
 
-    category = "well"
-
     flow_direction = "down"
 
     def __init__(self):

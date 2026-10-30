@@ -55,8 +55,6 @@ class AbsorptionUnit(Module):
     above 4 degC. Crystallisation limits are not modelled.
     """
 
-    category = "chiller"
-
     def __init__(self):
         """Declare absorption machine design data, its three circuits and performance."""
         super().__init__()

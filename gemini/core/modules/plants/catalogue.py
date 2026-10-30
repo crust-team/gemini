@@ -12,7 +12,7 @@ EXAMPLES = library.SPECS / "examples"
 
 def names():
     """Return the registry names of the plants, sorted: the spec plants and the special cases."""
-    return registry.names("plant")
+    return registry.names("plants")
 
 
 def _check(function, name):

@@ -47,8 +47,6 @@ class Degasser(Module):
     no industry-typical value; set it from design data or a measured gas flow.
     """
 
-    category = "separation"
-
     def __init__(self):
         """Declare degasser design data, inlet and split outlets."""
         super().__init__()

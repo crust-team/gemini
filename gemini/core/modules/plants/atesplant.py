@@ -58,8 +58,6 @@ class ATESPlant(Module):
     through its storage; ``Module.step`` steps it.
     """
 
-    category = "plant"
-
     def __init__(self):
         """Declare the ATES children, the groundwater circuit and the plant totals."""
         super().__init__()

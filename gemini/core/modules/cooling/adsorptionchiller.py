@@ -53,8 +53,6 @@ class AdsorptionChiller(Module):
     flows near the rated flows of the fit.
     """
 
-    category = "chiller"
-
     def __init__(self):
         """Declare adsorption chiller design data, its three circuits and performance."""
         super().__init__()

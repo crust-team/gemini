@@ -17,8 +17,6 @@ class Splitter(Module):
     raises ``PhysicsRangeError``: a reversed splitter is a ``Mixer``.
     """
 
-    category = "network"
-
     def __init__(self):
         """Declare the feed, the split command and both branch outlets."""
         super().__init__()

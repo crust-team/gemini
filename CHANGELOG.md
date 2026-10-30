@@ -70,6 +70,10 @@ finite engine, and then cleaned up. Old import paths are not retained.
   branch. CI installs with uv; `poetry install` still works.
 
 ### Changed
+- `gm.API_VERSION = 2`: one classification. A module's `category` is the folder that holds it, the
+  class attribute is gone, `heat/` became `exchangers/`, `heating/` and `cooling/`, the wells moved
+  to `wells/` and `AquiferStorage` to `storage/`. The old to new names are in the change log of
+  [api.md](.claude/docs/api.md).
 - `gm.Engine(plant, ...)` owns its plant: `engine.simulate(profile)`, `engine.replay(data)`,
   `engine.live(source)`. `Results` are JSON views and `.npz` files, `to_frame()` has `path.field`
   columns, the old `summary()` is `energy_report()`, and the `parquet` extra is gone. Plant files are

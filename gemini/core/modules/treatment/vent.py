@@ -62,8 +62,6 @@ class Vent(Module):
     ``PhysicsRangeError``.
     """
 
-    category = "separation"
-
     def __init__(self):
         """Declare gas composition, disposal mode, ports and emissions."""
         super().__init__()

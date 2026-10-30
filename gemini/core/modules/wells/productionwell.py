@@ -29,8 +29,6 @@ class ProductionWell(_Well):
     section.
     """
 
-    category = "well"
-
     repr_fields = ("segment", "esp_depth", "soil_temperature", "u_value")
 
     def __init__(self):

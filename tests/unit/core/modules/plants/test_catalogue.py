@@ -11,7 +11,7 @@ from tests.fixtures import SHARED
 
 def test_names_are_the_registered_plants():
     """Spec plants and the special cases are listed, sorted, and nothing else."""
-    assert catalogue.names() == gm.modules.names("plant")
+    assert catalogue.names() == gm.modules.names("plants")
     assert {"Doublet", "DoubletHeatPlant", "MultiWellPlant", "DistrictNetwork"} <= set(
         catalogue.names()
     )
@@ -69,7 +69,7 @@ def test_the_other_examples_carry_the_values_of_their_tests(plants):
 
 def test_a_registered_plant_without_values_names_itself(monkeypatch):
     """Only a plant with no sourced values raises, and the message names it."""
-    entry = registry._Entry("plant", build=lambda: gm.Plant("Unsourced"))
+    entry = registry._Entry("plants", build=lambda: gm.Plant("Unsourced"))
     monkeypatch.setitem(registry._entries, "Unsourced", entry)
     with pytest.raises(gm.errors.NotImplementedYet, match="Unsourced"):
         catalogue.example("Unsourced")

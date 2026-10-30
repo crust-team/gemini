@@ -49,8 +49,6 @@ class Cooler(Module):
     Handbook, HVAC Systems and Equipment, chapters on cooling towers and dry coolers).
     """
 
-    category = "heat_exchange"
-
     def __init__(self):
         """Declare cooler design data, the cooled stream, ambient air and energy flows."""
         super().__init__()

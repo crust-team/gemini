@@ -15,7 +15,7 @@ from gemini.core.physics import units
 from gemini.core.types import BRINE, WATER, Fluid, Ports, Profile, Quantity, Stream, streams
 
 __version__ = "1.0.3"
-API_VERSION = 1
+API_VERSION = 2
 __all__ = [
     "Engine",
     "Plant",

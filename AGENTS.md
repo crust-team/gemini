@@ -51,7 +51,7 @@ gemini/
 │   ├── physics/      # SI correlations and unit conversions
 │   ├── types/        # quantities, streams, fluids, declarations, profiles, bindings, costs
 │   ├── runtime.py    # context-local precision, display units and default fluid
-│   ├── modules/      # Module base class, registry, equipment, containers and plants/ (builder, specs)
+│   ├── modules/      # Module base class, registry, containers; one folder per category, plants/ too
 │   ├── data/         # in-memory Dataset and Loader only
 │   ├── engine/       # Clock, Engine, steps, Results, callbacks, checkpoints
 │   └── legacy/       # all old-format I/O, tables and conversion

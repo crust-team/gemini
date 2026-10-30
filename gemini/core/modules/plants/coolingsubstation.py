@@ -53,8 +53,6 @@ class CoolingSubstation(Module):
     most as warm as the building return.
     """
 
-    category = "plant"
-
     def __init__(self):
         """Declare the substation children, the building circuit and the absorbed heat."""
         super().__init__()

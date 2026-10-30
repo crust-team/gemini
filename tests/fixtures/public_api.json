@@ -1,18 +1,19 @@
 {
- "api_version": 1,
+ "api_version": 2,
  "categories": [
   "subsurface",
-  "well",
-  "pump",
-  "separation",
-  "heat_exchange",
-  "heat_pump",
-  "chiller",
-  "boiler",
+  "wells",
+  "pumps",
+  "treatment",
+  "exchangers",
+  "heating",
+  "cooling",
+  "power",
   "storage",
-  "network",
-  "consumer",
-  "plant"
+  "piping",
+  "demand",
+  "control",
+  "plants"
  ],
  "classes": {
   "Engine": {
