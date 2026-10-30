@@ -52,7 +52,7 @@ def test_ice_sensible_segment_relaxes_and_stops_at_freezing():
     fraction, temperature = ice(0.0, 283.15, 100.0, 293.15, 2000.0)
     assert fraction == 0
     assert temperature == pytest.approx(293.15 - 10 * math.exp(-100 / constant))
-    fraction, temperature = ice(0.0, 275.15, 1e6, 268.15, 2000.0)
+    fraction, temperature = ice(0.0, 275.15, 1e4, 268.15, 2000.0)
     assert 0 < fraction < 1 and temperature == 273.15
     fraction, temperature = ice(0.0, 275.15, 1e9, 268.15, 2000.0)
     assert fraction == 1 and temperature < 273.15
