@@ -11,10 +11,10 @@ class GridConnection(Module):
     A parent plant passes its electricity ``consumption`` and ``generation`` as call keywords
     (for example sums of its children's ``electricity`` and ``electricity_generated``). The
     balance consumption - generation is imported when positive and exported when negative,
-    each up to its connection limit (``None`` means unlimited; ``physics.electricity.net_exchange``).
-    Consumption above the import limit is reported as ``unserved_consumption`` (load to shed)
-    and surplus generation above the export limit as ``curtailed_generation``. ``cost_rate`` is import_price * net_import -
-    export_price * net_export in currency per second; negative values are revenue. Integrating
+    each up to its connection limit (``None`` means unlimited;
+    ``physics.electricity.net_exchange``). Consumption above the import limit is reported as ``unserved_consumption`` (load to shed)
+    and surplus generation above the export limit as ``curtailed_generation``. ``cost_rate`` is import_price * net_import - export_price *
+    net_export in currency per second; negative values are revenue. Integrating
     it over a step gives the step's electricity cost.
 
     The module has no ports and deliberately declares none of the seven energy outputs audited by

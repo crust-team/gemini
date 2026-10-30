@@ -41,8 +41,8 @@ class FlashTurbine(Module):
 
     Defaults: ``isentropic_efficiency`` (``steam.DEFAULT_TURBINE_EFFICIENCY``, 0.85) is the dry
     turbine efficiency DiPippo assumes for geothermal steam turbines and ``baumann_factor`` 1 is
-    the classical Baumann rule (DiPippo, R. (2016), Geothermal Power Plants, 4th ed., section 5.5). Assumptions: no
-    non-condensable gases, steam ejector or gland losses; condenser at a fixed pressure.
+    the classical Baumann rule (DiPippo, R. (2016), Geothermal Power Plants, 4th ed., section
+    5.5). Assumptions: no non-condensable gases, steam ejector or gland losses; condenser at a fixed pressure.
     Valid for inlet pressures up to 16.529 MPa above a condenser pressure of at least
     611.213 Pa, with a wet exhaust.
     """
