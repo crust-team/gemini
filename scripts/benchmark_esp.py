@@ -1,14 +1,15 @@
-"""Benchmark the ESP and the full doublet_heat replay over the July dataset.
+"""Benchmark the ESP, the doublet_heat replay, live ticks and a simulation over the July dataset.
 
 Run ``PYTHONPATH=. python scripts/benchmark_esp.py`` from the repository root. On the committed
-2,976-row July 2024 dataset it evaluates the ESP of the shared doublet plant once per row (the
-untraced path) and as one traced graph on the NumPy backend, with and without
-common-subexpression elimination, then replays the whole plant through the graph and with
-``gemini.graph.settings(traced=False)``. It checks that the results agree and prints the best of
-``--repeat`` timings and the speedups. It is a benchmark, not a test.
+2,976-row July 2024 dataset it evaluates the ESP of the shared doublet plant by a direct call per
+row and as one graph on the NumPy backend, with and without common-subexpression elimination,
+then runs the whole plant on each backend: the month replay, live one tick at a time, and a
+one-day simulation. It checks that the results agree and prints the best of ``--repeat`` CPU
+times. It is a benchmark, not a test.
 """
 
 import argparse
+import tempfile
 import time
 from pathlib import Path
 
@@ -17,7 +18,7 @@ import pandas as pd
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
-from gemini import graph
+from gemini import backends
 from gemini.core.types.flows import Stream
 from gemini.graph import GraphCache, run
 
@@ -38,7 +39,7 @@ def load():
     return esp, rows
 
 
-def untraced(esp, rows):
+def direct_calls(esp, rows):
     """Call the ESP once per row and return the results."""
     return [
         esp(
@@ -56,12 +57,12 @@ def traced(esp, rows, cache):
 
 
 def best_time(function, repeat):
-    """Return the shortest wall time [s] of ``repeat`` calls and the last result."""
+    """Return the shortest CPU time [s] of ``repeat`` calls and the last result."""
     times, result = [], None
     for _ in range(repeat):
-        start = time.perf_counter()
+        start = time.process_time()
         result = function()
-        times.append(time.perf_counter() - start)
+        times.append(time.process_time() - start)
     return min(times), result
 
 
@@ -85,7 +86,7 @@ def benchmark_esp(repeat):
     merged, unmerged = GraphCache(), GraphCache(optimize=False)
     traced(esp, rows, merged)
     traced(esp, rows, unmerged)
-    tick_time, results = best_time(lambda: untraced(esp, rows), repeat)
+    tick_time, results = best_time(lambda: direct_calls(esp, rows), repeat)
     plain_time, plain_run = best_time(lambda: traced(esp, rows, unmerged), repeat)
     graph_time, graph_run = best_time(lambda: traced(esp, rows, merged), repeat)
     worst = max(check_agreement(results, plain_run), check_agreement(results, graph_run))
@@ -104,18 +105,49 @@ def replay(dataset):
     return engine
 
 
-def benchmark_replay(repeat):
-    """Print the plant replay on the old path and through the graph; the frames must be equal."""
+def simulate(dataset):
+    """Simulate a freshly loaded plant over ``dataset`` and return the engine."""
+    plant, engine = DoubletHeatPlant.load(PLANT), gm.Engine()
+    engine.simulate(plant, dataset, gm.Clock.from_data(dataset))
+    return engine
+
+
+def live(dataset, folder):
+    """Evaluate ``dataset`` one new row at a time through ``Engine.live`` and return the engine."""
+    plant, engine = DoubletHeatPlant.load(PLANT), gm.Engine()
+    checkpoint = Path(folder) / "live.json"
+    for row in range(len(dataset)):
+        engine.live(plant, dataset.window(end=dataset.frame.index[row]), checkpoint)
+    return engine
+
+
+def benchmark_plant(repeat):
+    """Print the replay, live and simulate on each backend; their frames must be equal."""
     frame = pd.read_csv(DATASET, parse_dates=["time"])
-    dataset = gm.Dataset.from_frame(frame, time_column="time")
-    with graph.settings(traced=False):
-        old_time, old = best_time(lambda: replay(dataset), repeat)
-    new_time, new = best_time(lambda: replay(dataset), repeat)
-    pd.testing.assert_frame_equal(new.results.to_frame(), old.results.to_frame(), check_exact=True)
-    print(f"replay, old path:            {old_time:9.3f} s")
-    print(f"replay, through the graph:   {new_time:9.3f} s")
-    print(f"replay speedup: {old_time / new_time:.1f}x; frames identical; ", end="")
-    print(f"twins not traced: {new.batch.reasons or 'none'}")
+    month = gm.Dataset.from_frame(frame, time_column="time")
+    day = gm.Dataset.from_frame(frame.iloc[:96], time_column="time")
+    ticks = gm.Dataset.from_frame(frame.iloc[:48], time_column="time")
+    with tempfile.TemporaryDirectory() as folder:
+        cases = (
+            ("replay month", lambda: replay(month), len(month)),
+            ("simulate day", lambda: simulate(day), len(day)),
+            ("live, per tick", lambda: live(ticks, folder), len(ticks)),
+        )
+        for name, function, rows in cases:
+            run_case(name, function, rows, repeat)
+
+
+def run_case(name, function, rows, repeat):
+    """Print one case on every backend, checking that the result frames are equal."""
+    expected = None
+    for backend in ("numpy", "python"):
+        with backends.settings(backend=backend):
+            seconds, engine = best_time(function, repeat)
+        results = engine.results.to_frame()
+        if expected is not None:
+            pd.testing.assert_frame_equal(results, expected, check_exact=False, rtol=RTOL)
+        expected = results
+        print(f"{name}, {backend}: {seconds:9.3f} s, {seconds / rows * 1e3:9.3f} ms per tick")
 
 
 def main():
@@ -124,7 +156,7 @@ def main():
     parser.add_argument("--repeat", type=int, default=5, help="timed repetitions per path")
     repeat = parser.parse_args().repeat
     benchmark_esp(repeat)
-    benchmark_replay(repeat)
+    benchmark_plant(repeat)
 
 
 if __name__ == "__main__":
