@@ -44,6 +44,18 @@ class AttributeMapping(Mapping):
         """Return whether ``name`` is a key, without building an unknown-key message."""
         return name in self._values
 
+    def keys(self):
+        """Return the keys, without going through ``__iter__`` and ``__getitem__`` per item."""
+        return self._values.keys()
+
+    def values(self):
+        """Return the values in insertion order."""
+        return self._values.values()
+
+    def items(self):
+        """Return the ``(key, value)`` pairs in insertion order."""
+        return self._values.items()
+
     def __iter__(self) -> Iterator[str]:
         """Iterate keys in insertion order."""
         return iter(self._values)

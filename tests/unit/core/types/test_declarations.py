@@ -234,3 +234,16 @@ def test_the_quick_check_gives_the_result_or_error_of_the_full_path(module_class
                     declaration.path,
                     value,
                 )
+
+
+def test_a_default_is_validated_once_and_mutable_defaults_stay_fresh():
+    """``default_value`` converts once, and no caller can change the next caller's default."""
+    scalar = Control(Pressure, default="2 bar")
+    assert scalar.default_value() == 2e5 == scalar.default_value()
+    series = Control(list[float], default=[1, 2])
+    first = series.default_value()
+    first.append(9.0)
+    assert series.default_value() == [1.0, 2.0]
+    assert (
+        copy.deepcopy(series).default_value() == pickle.loads(pickle.dumps(series)).default_value()
+    )

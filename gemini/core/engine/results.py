@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 
 from gemini.core.physics import units
-from gemini.core.types.flows import Stream
 from gemini.errors import UnitError, UnknownResultError
 from gemini.utils.files import decode_cells, encode_cells, read_json
 from gemini.utils.strings import did_you_mean, join_names
@@ -91,6 +90,12 @@ def _add_skips(skip_counts, skips):
             target[reason] = target.get(reason, 0) + count
 
 
+def _operating(result):
+    """Return whether any port of a result carries flow; a module without ports is operating."""
+    flows = [*result.inlets.values(), *result.outlets.values()]
+    return any(flow.m_dot != 0 for flow in flows) if flows else True
+
+
 class Results:
     """Collect finite timestep outputs, energy totals, health, errors and explicit skips."""
 
@@ -108,19 +113,14 @@ class Results:
         for path, (result, health) in results.items():
             row.update({(path, key): value for key, value in result.outputs.items()})
             self._energy.update((path, key) for key in ENERGY_FIELDS if key in result.outputs)
-            streams = [
-                flow
-                for flow in (dict(result.inlets) | dict(result.outlets)).values()
-                if isinstance(flow, Stream)
-            ]
-            row[path, "operating"] = any(flow.m_dot != 0 for flow in streams) if streams else True
+            row[path, "operating"] = _operating(result)
             if health is not None:
-                values = health.model_dump()
-                metrics = values.pop("metrics")
-                row.update({(path, "health_" + key): value for key, value in values.items()})
-                row.update(
-                    {(path, "health_metric_" + key): value for key, value in metrics.items()}
-                )
+                row[path, "health_assessed"] = health.assessed
+                row[path, "health_score"] = health.score
+                row[path, "health_alarm"] = health.alarm
+                row[path, "health_message"] = health.message
+                for key, value in health.metrics.items():
+                    row[path, "health_metric_" + key] = value
         self._times.append(at)
         self._dt.append(dt)
         self._rows.append(row)

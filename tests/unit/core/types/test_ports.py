@@ -73,3 +73,13 @@ def test_ports_accept_streams_of_arrays():
     """Batched calls pass ``Stream`` values of arrays through the same mapping."""
     state = Stream(m_dot=np.array([1.0, 2.0]), T=300.0, p=1e5, fluid=BRINE)
     assert Ports({"inlet": state}).inlet is state
+
+
+def test_trusted_ports_equal_checked_ports_and_stay_immutable(streams):
+    """The unchecked constructor of the engine gives the same mapping, read-only."""
+    values = {"suction": streams[0], "return_stream": streams[1]}
+    trusted = Ports._trusted(dict(values), "plant.pump")
+    assert dict(trusted) == dict(Ports(values, path="plant.pump")) == values
+    assert trusted._unknown("suction") == Ports(values, path="plant.pump")._unknown("suction")
+    with pytest.raises(AttributeError, match="immutable"):
+        trusted.suction = streams[1]

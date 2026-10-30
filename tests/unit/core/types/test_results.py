@@ -57,3 +57,11 @@ def test_health_bounds():
     assert Health(score=1, alarm=False, message="ok").assessed
     with pytest.raises(ValueError):
         Health(score=1.5, alarm=False, message="bad")
+
+
+def test_trusted_values_equal_checked_values_and_convert_units():
+    """The unchecked constructor of the engine keeps the declarations for unit conversion."""
+    declarations = {"power": Output(Power)}
+    trusted = Values._trusted({"power": 2000.0}, declarations)
+    assert dict(trusted) == dict(Values({"power": 2000.0}, declarations))
+    assert trusted.get("power", unit="kW") == 2.0

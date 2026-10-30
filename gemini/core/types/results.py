@@ -35,6 +35,14 @@ class Values(AttributeMapping):
         super().__init__(values)
         object.__setattr__(self, "_declarations", dict(declarations or {}))
 
+    @classmethod
+    def _trusted(cls, values, declarations):
+        """Return values over ``values``, a dict this call owns, sharing ``declarations``."""
+        mapping = object.__new__(cls)
+        object.__setattr__(mapping, "_values", values)
+        object.__setattr__(mapping, "_declarations", declarations)
+        return mapping
+
     def _unknown(self, name):
         """Name the unknown value, the valid names and the closest match."""
         return (

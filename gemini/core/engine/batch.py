@@ -88,7 +88,7 @@ class Batch:
             module.set_inputs(applied)
         else:
             self.pending[path] = applied
-        return claims.result(index), claims.measured(index)
+        return claims.result(index, applied), claims.measured(index)
 
     def persisted(self, path):
         """Forget the inputs a claimed row left pending: a later plain tick persisted its own."""
@@ -134,43 +134,60 @@ class Claims:
     applied_names: list = field(default_factory=list)
     measured_names: list = field(default_factory=list)
 
+    def __post_init__(self):
+        """Group the columns by row once, so that a claimed row is a tuple lookup."""
+        size = len(self.claimed)
+        columns = self.columns
+        self._outputs = _rows([columns["outputs", name] for name in self.outputs], size)
+        self._applied = _rows([columns["applied", name] for name in self.applied_names], size)
+        self._measured = _rows([columns["measured", name] for name in self.measured_names], size)
+        outlet_fluids = self.graph.outlet_fluids if self.graph is not None else {}
+        self._streams = {
+            (section, port): _rows([columns[section, port, name] for name in FIELDS], size)
+            for section, ports in (("inlets", self.fluids), ("outlets", outlet_fluids))
+            for port in ports
+        }
+        template = dict.fromkeys(self.module._controls | self.module._boundaries)
+        self._inputs = template | self.base_inputs
+        self._declarations = dict(self.module._outputs)
+
     def applied(self, index):
         """Return the controls and boundaries the data set on this tick."""
-        return {name: self.columns["applied", name][index] for name in self.applied_names}
+        return dict(zip(self.applied_names, self._applied[index]))
 
     def measured(self, index):
         """Return the measured values of this tick, in SI."""
-        return {name: self.columns["measured", name][index] for name in self.measured_names}
+        return dict(zip(self.measured_names, self._measured[index]))
 
-    def result(self, index):
+    def result(self, index, applied):
         """Return the ``ModuleResult`` of a claimed row and replay the twin's observer hooks."""
         module = self.module
-        outputs = {name: self.columns["outputs", name][index] for name in self.outputs}
-        inlets = Ports(self._streams("inlets", self.fluids, index), path=module.path)
-        outlets = Ports(self._streams("outlets", self.graph.outlet_fluids, index), path=module.path)
-        applied = self.applied(index)
-        inputs = {
-            name: applied[name] if name in applied else self.base_inputs[name]
-            for name in module._controls | module._boundaries
-        }
+        outputs = dict(zip(self.outputs, self._outputs[index]))
+        inlets = self._ports("inlets", self.fluids, index)
+        outlets = self._ports("outlets", self.graph.outlet_fluids, index)
+        inputs = self._inputs.copy()
+        inputs.update(applied)
         if self.graph.observers or self.graph.pre_observers:
             replay_row(self.graph, module, inlets, outlets, inputs, outputs)
         return ModuleResult(
-            outputs=Values(outputs, module._outputs),
+            outputs=Values._trusted(outputs, self._declarations),
             outlets=outlets,
             inlets=inlets,
             inputs=inputs,
             is_leaf=module.is_leaf,
         )
 
-    def _streams(self, section, fluids, index):
-        return {
-            port: Stream._trusted(
-                fluid=fluid,
-                **{name: self.columns[section, port, name][index] for name in FIELDS},
-            )
+    def _ports(self, section, fluids, index):
+        streams = {
+            port: Stream._trusted(*self._streams[section, port][index], fluid)
             for port, fluid in fluids.items()
         }
+        return Ports._trusted(streams, self.module.path)
+
+
+def _rows(columns, size):
+    """Return one tuple per row of the given columns; no column gives empty tuples."""
+    return list(zip(*columns)) if columns else [()] * size
 
 
 class _Table:

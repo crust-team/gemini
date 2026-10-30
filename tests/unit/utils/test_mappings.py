@@ -71,3 +71,13 @@ def test_subclasses_choose_the_error_classes():
         Strict({})["x"]
     with pytest.raises(Missing):
         Strict({}).x
+
+
+def test_attribute_mapping_views_follow_insertion_order():
+    """Keys, values and items equal the standard mapping views and compare to a dict's."""
+    values = AttributeMapping({"b": 2, "a": 1})
+    assert list(values.keys()) == ["b", "a"]
+    assert list(values.values()) == [2, 1]
+    assert list(values.items()) == [("b", 2), ("a", 1)]
+    assert values.keys() == {"a", "b"}
+    assert dict(values) == {"b": 2, "a": 1}

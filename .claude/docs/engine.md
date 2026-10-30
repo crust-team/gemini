@@ -66,7 +66,8 @@ and runs the cached graph (`gemini.graph`) over the rows that can be evaluated. 
 break node reaches an output, and every output and outlet value is finite (NaN only for a
 declared `X | None` output, read back as `None`). The **commit phase** is the unchanged tick loop:
 a twin takes a claimed row from the batch (a `ModuleResult` of plain Python floats, bools and
-`None`, without `children` or `call_records`) and runs `health` on it; every other row, of every
+`None`, without `children` or `call_records`, built from per-row tuples prepared once and
+unchecked `Ports` and `Values`) and runs `health` on it; every other row, of every
 twin, is evaluated at its own tick on the plain path, which raises the exact error, `StepError`
 chain, skip or result an untraced replay gives. Results, skips, errors, callbacks and checkpoints
 therefore come from one code path.

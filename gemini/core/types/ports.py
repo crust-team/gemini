@@ -18,17 +18,26 @@ class Ports(AttributeMapping):
     def __init__(self, values=None, *, path="module"):
         """Retain one private copy and the module path used in access errors."""
         super().__init__(values)
-        valid = join_names(self._values)
         for name, value in self._values.items():
             if not isinstance(name, str):
                 raise CallError(
-                    f"{path}: port name = {name!r}; expected a string; valid names: {valid}"
+                    f"{path}: port name = {name!r}; expected a string; "
+                    f"valid names: {join_names(self._values)}"
                 )
             if not isinstance(value, Stream):
                 raise CallError(
-                    f"{path}: port {name!r} = {value!r}; expected a Stream; valid names: {valid}"
+                    f"{path}: port {name!r} = {value!r}; expected a Stream; "
+                    f"valid names: {join_names(self._values)}"
                 )
         object.__setattr__(self, "_path", path)
+
+    @classmethod
+    def _trusted(cls, values, path):
+        """Return ports over ``values``, a dict of streams this call owns, without checking them."""
+        ports = object.__new__(cls)
+        object.__setattr__(ports, "_values", values)
+        object.__setattr__(ports, "_path", path)
+        return ports
 
     def _unknown(self, name):
         """Name the module, the valid ports and the closest match."""
