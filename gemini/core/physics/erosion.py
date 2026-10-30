@@ -7,6 +7,7 @@ SI boundary and returns mm/year, the explicit literature-unit exception of the p
 
 import math
 
+from gemini import ops
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
 from gemini.utils.strings import did_you_mean, join_names
 
@@ -31,8 +32,8 @@ be true.
 """
 
 _OKA_PARTICLES = {
-    "SIO2": (104, 326, -0.12, lambda hardness: 2.3 * hardness**0.038, 0.19, 65),
-    "SIC": (99, 326, -0.05, lambda hardness: 3 * hardness**0.085, 0.19, 45),
+    "SIO2": (104, 326, -0.12, lambda hardness: 2.3 * ops.pow(hardness, 0.038), 0.19, 65),
+    "SIC": (99, 326, -0.05, lambda hardness: 3 * ops.pow(hardness, 0.085), 0.19, 45),
     "GLASS": (100, 200, -0.16, lambda hardness: 2.1, 0.19, 27),
 }
 """OKA particle constants: reference velocity [m/s], reference diameter, k1, k2(Hv), k3, K.
@@ -93,12 +94,12 @@ def _dnv_rate(alpha_deg, material, rho_fluid, diameter, flow_rate_m3h):
             )
         )
     )
-    impact_area = area / math.sin(angle)
+    impact_area = area / ops.sin(angle)
     return (
         units.ms_to_mm_year(1)
         * mass_flow
         * constant
-        * velocity**exponent
+        * ops.pow(velocity, exponent)
         * angle_function
         / (rho_pipe * impact_area)
     )
@@ -129,12 +130,12 @@ def _oka_rate(
     reference_velocity, reference_diameter, k1, k2, k3, constant = _OKA_PARTICLES[key]
     mass_flow, velocity, area = _particle_flow(flow_rate_m3h, rho_fluid, diameter)
     angle = units.deg_to_rad(alpha_deg)
-    impact_area = units.m2_to_mm2(area) / math.sin(angle)
+    impact_area = units.m2_to_mm2(area) / ops.sin(angle)
     erosion_per_mass = (
         constant
-        * hardness_gpa**k1
-        * (velocity / reference_velocity) ** k2(hardness_gpa)
-        * (particle_diameter_mm / reference_diameter) ** k3
+        * ops.pow(hardness_gpa, k1)
+        * ops.pow(velocity / reference_velocity, k2(hardness_gpa))
+        * ops.pow(particle_diameter_mm / reference_diameter, k3)
     )
     return units.SECONDS_PER_YEAR * mass_flow / impact_area * erosion_per_mass
 
@@ -152,9 +153,11 @@ def _tulsa_rate(
     angle_function = (
         5.4 * angle - 10.11 * angle**2 + 10.93 * angle**3 - 6.33 * angle**4 + 1.42 * angle**5
     )
-    impact_area = area / math.sin(angle)
+    impact_area = area / ops.sin(angle)
     brinell = hardness_gpa / _GPA_PER_HV * 0.95057 - 0.03743
-    erosion_per_mass = 2.17e-7 * brinell ** (-0.59) * shape_factor * velocity**2.41 * angle_function
+    erosion_per_mass = (
+        2.17e-7 * ops.pow(brinell, -0.59) * shape_factor * ops.pow(velocity, 2.41) * angle_function
+    )
     return units.ms_to_mm_year(1) * erosion_per_mass * mass_flow / (rho_pipe * impact_area)
 
 
@@ -204,8 +207,12 @@ def erosion_rate(
             f"erosion_rate: model = {model!r}; expected DNV, OKA or TULSA"
             + ("; API is a velocity limit, use api_erosional_velocity" if name else "")
         )
-    if alpha == 0:
-        raise PhysicsRangeError(f"erosion_rate: alpha = {alpha} rad; expected a nonzero angle")
+    ops.check(
+        ops.ne(alpha, 0),
+        PhysicsRangeError,
+        "erosion_rate: alpha = {alpha} rad; expected a nonzero angle",
+        alpha=alpha,
+    )
     flow_rate_m3h, alpha_deg = units.m3s_to_m3h(flow_rate), units.rad_to_deg(alpha)
     if name == "DNV":
         rate = _dnv_rate(alpha_deg, material, rho_fluid, diameter, flow_rate_m3h)
@@ -229,12 +236,15 @@ def erosion_rate(
             diameter,
             flow_rate_m3h,
         )
-    if isinstance(rate, complex):
-        raise PhysicsRangeError(
-            f"erosion_rate {name}: flow_rate = {flow_rate} m3/s gives a complex rate; "
-            "expected a nonnegative flow"
-        )
-    return float(rate)
+    ops.check(
+        ops.logical_not(ops.isnan(rate)),
+        PhysicsRangeError,
+        "erosion_rate {name}: flow_rate = {flow_rate} m3/s gives a complex rate; "
+        "expected a nonnegative flow",
+        name=name,
+        flow_rate=flow_rate,
+    )
+    return rate
 
 
 def api_erosional_velocity(rho_fluid: float) -> float:
@@ -254,11 +264,13 @@ def api_erosional_velocity(rho_fluid: float) -> float:
     -----
     Reference: API RP 14E; GEMINI uses C=125 with historical imperial conversions.
     """
-    if rho_fluid <= 0:
-        raise PhysicsRangeError(
-            f"api_erosional_velocity: rho_fluid = {rho_fluid} kg/m3; expected a positive density"
-        )
-    return units.API_VELOCITY_FACTOR * _API_C_FACTOR / math.sqrt(rho_fluid)
+    ops.check(
+        rho_fluid > 0,
+        PhysicsRangeError,
+        "api_erosional_velocity: rho_fluid = {rho_fluid} kg/m3; expected a positive density",
+        rho_fluid=rho_fluid,
+    )
+    return units.API_VELOCITY_FACTOR * _API_C_FACTOR / ops.sqrt(rho_fluid)
 
 
 def api_velocity_comparison(actual: float, limit: float) -> dict:
@@ -278,10 +290,12 @@ def api_velocity_comparison(actual: float, limit: float) -> dict:
     -----
     Reference: GEMINI WIMS API velocity comparison; margin = limit - actual.
     """
-    if limit <= 0:
-        raise PhysicsRangeError(
-            f"api_velocity_comparison: limit = {limit} m/s; expected a positive velocity limit"
-        )
+    ops.check(
+        limit > 0,
+        PhysicsRangeError,
+        "api_velocity_comparison: limit = {limit} m/s; expected a positive velocity limit",
+        limit=limit,
+    )
     return {
         "velocity_ratio": actual / limit,
         "velocity_margin_ms": limit - actual,

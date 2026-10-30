@@ -8,6 +8,7 @@ import pytest
 
 from gemini.core.physics import erosion, units
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 GOLDEN = json.loads((Path(__file__).parents[3] / "fixtures/golden_values.json").read_text())
 FLOW = dict(flow_rate=units.m3h_to_m3s(150), rho_fluid=1068, diameter=0.1778)
@@ -108,3 +109,61 @@ def test_dnv_year_constant_converts_metres_per_second_to_millimetres_per_year():
     penetration = mass_flow * 2e-9 * velocity**2.6 * angle_function / (7800 * area)
     assert rate == pytest.approx(penetration * 3.15576e10, rel=1e-9)
     assert rate / (penetration * 31.5576e6) == pytest.approx(1000, rel=1e-9)
+
+
+ROWS = [
+    (0.0, 1068, 0.1778, math.pi / 2),
+    (units.m3h_to_m3s(150), 1068, 0.1778, math.pi / 2),
+    (units.m3h_to_m3s(300), 900, 0.1, 0.5),
+    (0.02, 1200, 0.2, 1.2),
+]
+
+
+def _rate(model, **fixed):
+    def rate(flow_rate, rho_fluid, diameter, alpha):
+        return erosion.erosion_rate(
+            model,
+            flow_rate=flow_rate,
+            rho_fluid=rho_fluid,
+            diameter=diameter,
+            alpha=alpha,
+            **fixed,
+        )
+
+    return rate
+
+
+@pytest.mark.parametrize(
+    "model, fixed",
+    [
+        ("DNV", {}),
+        ("DNV", {"material": "grp/epoxy"}),
+        ("OKA", {}),
+        ("OKA", {"particle_material": "glass", "hardness": 2e9}),
+        ("OKA", {"particle_material": "SiC"}),
+        ("TULSA", {}),
+        ("TULSA", {"shape_factor": 1.0, "rho_pipe": 8000}),
+    ],
+)
+def test_erosion_rate_matches_arrays(model, fixed):
+    """Each correlation gives the same numbers on arrays as per row."""
+    rate = _rate(model, **fixed)
+    assert_function_matches(rate, ROWS)
+
+
+def test_erosion_rate_errors_match_arrays():
+    """Negative flow and zero angle raise the same message on arrays as on floats."""
+    bad_flow = ROWS[:2] + [(-0.04, 1068, 0.1778, math.pi / 2)]
+    bad_angle = ROWS[:2] + [(0.04, 1068, 0.1778, 0.0)]
+    for model in ("DNV", "OKA", "TULSA"):
+        assert_same_error(_rate(model), bad_flow, PhysicsRangeError)
+        assert_same_error(_rate(model), bad_angle, PhysicsRangeError)
+
+
+def test_api_functions_match_arrays():
+    """The API limit and the comparison match on arrays, including the exceedance flag."""
+    assert_function_matches(erosion.api_erosional_velocity, [(1.0,), (1068.0,), (250.0,)])
+    assert_same_error(erosion.api_erosional_velocity, [(1068.0,), (0.0,)], PhysicsRangeError)
+    comparison = [(1.0, 2.0), (3.0, 2.0), (2.0, 2.0)]
+    assert_function_matches(erosion.api_velocity_comparison, comparison)
+    assert_same_error(erosion.api_velocity_comparison, [(1.0, 2.0), (1.0, 0.0)], PhysicsRangeError)
