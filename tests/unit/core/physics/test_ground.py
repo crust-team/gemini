@@ -8,6 +8,7 @@ from scipy.special import exp1
 
 from gemini.core.physics import ground
 from gemini.errors import PhysicsRangeError
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 
 def test_aquifer_heat_capacity_and_breakthrough_volume():
@@ -110,3 +111,25 @@ def test_ramey_fluid_temperature_solves_the_energy_balance():
         ground.ramey_fluid_temperature(length=-1, **args)
     with pytest.raises(PhysicsRangeError, match="relaxation_length = 0"):
         ground.ramey_fluid_temperature(**(args | {"relaxation_length": 0}), length=10)
+
+
+COLD_FRACTION_RATIOS = [(0.0,), (0.5,), (1.0,), (1.0000001,), (1.01,), (3.0,), (100.0,), (1e8,)]
+
+
+def test_doublet_cold_fraction_on_arrays_matches_floats_on_every_branch():
+    """Before breakthrough, on the decline and past the last streamline agree on arrays."""
+    assert_function_matches(ground.doublet_cold_fraction, COLD_FRACTION_RATIOS)
+    assert_function_matches(ground.doublet_cold_fraction, [(1e300,), (math.inf,), (2.0,)])
+
+
+def test_doublet_cold_fraction_on_a_dense_grid():
+    """The angle solve matches the scalar one over six decades of the volume ratio."""
+    ratios = np.concatenate([np.linspace(1.0, 5.0, 400), np.geomspace(1.0001, 1e6, 400)])
+    expected = [ground.doublet_cold_fraction(ratio) for ratio in ratios.tolist()]
+    np.testing.assert_allclose(ground.doublet_cold_fraction(ratios), expected, rtol=1e-12, atol=0)
+
+
+@pytest.mark.parametrize("rows", [[(2.0,), (-1.0,)], [(math.nan,)]])
+def test_doublet_cold_fraction_rows_raise_the_error_of_the_float_path(rows):
+    """A negative or NaN ratio raises the same class and message on arrays."""
+    assert_same_error(ground.doublet_cold_fraction, rows, PhysicsRangeError)

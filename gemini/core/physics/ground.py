@@ -9,8 +9,7 @@ temperature profile of a well in a linear geothermal gradient (Ramey 1962).
 
 import math
 
-from scipy.optimize import brentq
-
+from gemini import ops
 from gemini.errors import PhysicsRangeError
 
 EULER_GAMMA = 0.5772156649015329
@@ -114,22 +113,21 @@ def doublet_cold_fraction(volume_ratio: float) -> float:
     is T_res - (theta / pi) (T_res - T_inj). The decline starts with a square-root shape,
     theta ~ sqrt(5 (V / V_B - 1) / 2), and tends to one as V / V_B grows without bound.
     """
-    if math.isnan(volume_ratio) or volume_ratio < 0:
-        raise PhysicsRangeError(
-            f"doublet_cold_fraction: volume_ratio = {volume_ratio}; expected a value >= 0"
-        )
-    if volume_ratio <= 1:
-        return 0.0
-    upper = math.pi * (1 - _ANGLE_MARGIN)
-    if _dipole_travel_time(upper) <= volume_ratio:
-        return 1.0
-    angle = brentq(
-        lambda theta: _dipole_travel_time(theta) - volume_ratio,
-        _ANGLE_MARGIN,
-        upper,
-        xtol=1e-14,
+    ops.check(
+        volume_ratio >= 0,
+        PhysicsRangeError,
+        "doublet_cold_fraction: volume_ratio = {volume_ratio}; expected a value >= 0",
+        volume_ratio=volume_ratio,
     )
-    return angle / math.pi
+    upper = math.pi * (1 - _ANGLE_MARGIN)
+    angle = ops.brentq(
+        _travel_time_residual, _ANGLE_MARGIN, upper, args=(volume_ratio,), xtol=1e-14
+    )
+    return ops.where(
+        volume_ratio <= 1,
+        0.0,
+        ops.where(_dipole_travel_time(upper) <= volume_ratio, 1.0, angle / math.pi),
+    )
 
 
 def cylinder_store_conductance(
@@ -326,18 +324,23 @@ def ramey_fluid_temperature(
     return rock - offset + (inlet_temperature - top_temperature + offset) * decay
 
 
+def _travel_time_residual(theta, volume_ratio):
+    """Return the dipole travel time at ``theta`` minus ``volume_ratio`` [-]."""
+    return _dipole_travel_time(theta) - volume_ratio
+
+
 def _dipole_travel_time(theta):
     """Return t(theta) / t_B = 3 (sin theta - theta cos theta) / sin(theta)**3 [-].
 
     Below ``_SMALL_ANGLE`` the difference uses its Taylor series
-    theta**3/3 - theta**5/30 + theta**7/840 - theta**9/45360 to avoid cancellation.
+    theta**3/3 - theta**5/30 + theta**7/840 - theta**9/45360 to avoid cancellation. Both
+    forms are evaluated and ``where`` selects one.
     """
-    if theta < _SMALL_ANGLE:
-        square = theta * theta
-        difference = theta**3 * (1 / 3 - square / 30 + square**2 / 840 - square**3 / 45360)
-    else:
-        difference = math.sin(theta) - theta * math.cos(theta)
-    return 3 * difference / math.sin(theta) ** 3
+    square = theta * theta
+    series = theta**3 * (1 / 3 - square / 30 + square**2 / 840 - square**3 / 45360)
+    direct = ops.sin(theta) - theta * ops.cos(theta)
+    difference = ops.where(theta < _SMALL_ANGLE, series, direct)
+    return 3 * difference / ops.sin(theta) ** 3
 
 
 def _require_positive(function, **values):
