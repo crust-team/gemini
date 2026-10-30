@@ -27,10 +27,10 @@ def test_pipe_temperature_change_golden_and_balance():
 
 def test_lmtd_and_ntu():
     """LMTD handles equal and pinched terminals; NTU is UA over C_min."""
-    assert heat_transfer.lmtd(10.0, 10.0) == 10
-    assert heat_transfer.lmtd(10.0, 0.0) == 0
-    assert heat_transfer.lmtd(20.0, 10.0) == pytest.approx(10 / 0.6931471805599453)
-    assert heat_transfer.ntu(1000.0, 500.0) == 2
+    assert heat_transfer.lmtd(10, 10) == 10
+    assert heat_transfer.lmtd(10, 0) == 0
+    assert heat_transfer.lmtd(20, 10) == pytest.approx(10 / 0.6931471805599453)
+    assert heat_transfer.ntu(1000, 500) == 2
     with pytest.raises(PhysicsRangeError, match="dt2 = -1"):
         heat_transfer.lmtd(10, -1)
     with pytest.raises(PhysicsRangeError, match="c_min = 0"):
@@ -40,10 +40,10 @@ def test_lmtd_and_ntu():
 def test_effectiveness_limits():
     """Counterflow and parallel effectiveness respect their limiting cases."""
     assert heat_transfer.effectiveness_counterflow(1e6, 0.5) == 1
-    assert heat_transfer.effectiveness_counterflow(1.0, 1.0) == 0.5
-    assert heat_transfer.effectiveness_counterflow(float("inf"), 1.0) == 1
-    assert heat_transfer.effectiveness_counterflow(0.0, 0.5) == 0
-    assert heat_transfer.effectiveness_parallel(1e6, 1.0) == 0.5
+    assert heat_transfer.effectiveness_counterflow(1, 1) == 0.5
+    assert heat_transfer.effectiveness_counterflow(float("inf"), 1) == 1
+    assert heat_transfer.effectiveness_counterflow(0, 0.5) == 0
+    assert heat_transfer.effectiveness_parallel(1e6, 1) == 0.5
     with pytest.raises(PhysicsRangeError, match="c_ratio = 2"):
         heat_transfer.effectiveness_parallel(1, 2)
 

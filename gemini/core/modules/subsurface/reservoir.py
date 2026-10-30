@@ -169,13 +169,14 @@ class _Reservoir(Module):
         )
         return flow / (self.pressure - p_bh)
 
+    @ops.physics
     def health(self, result, measured):
         """Alarm on declining measured PI or II relative to design.
 
         Returns ``None`` (not assessed) without both measurements or without a nonzero design
         index. Where the measured bottomhole pressure equals the reservoir pressure the row is
         not assessed: ``assessed`` is false, the score is one, no alarm, the message is
-        ``NOT_ASSESSED`` and the metrics hold the design index and a ratio of one.
+        ``NOT_ASSESSED`` and the metrics are NaN, a row without metrics in the results.
         """
         production = self.role == "production"
         nominal = self.productivity_index if production else self.injectivity_index
@@ -184,12 +185,12 @@ class _Reservoir(Module):
         pressure = measured["bottomhole_pressure"]
         assessed = pressure != self.pressure
         differential = self.pressure - pressure if production else pressure - self.pressure
-        actual = ops.where(assessed, ops.truediv(measured["flow"], differential), nominal)
+        actual = ops.where(assessed, measured["flow"] / differential, float("nan"))
         ratio = actual / nominal
         return Health(
             assessed=assessed,
-            score=ops.minimum(1, ops.maximum(0, ratio)),
-            alarm=ratio < 1 - self.decline_threshold,
+            score=ops.where(assessed, ops.minimum(1, ops.maximum(0, ratio)), 1.0),
+            alarm=ops.logical_and(assessed, ratio < 1 - self.decline_threshold),
             message=ops.where(
                 assessed,
                 ("Productivity" if production else "Injectivity") + " index comparison",

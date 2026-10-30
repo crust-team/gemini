@@ -12,9 +12,9 @@ import numpy as np
 from gemini import backends
 from gemini.ops import registry
 
-SCALARS = frozenset({float, int, bool, type(None), np.float64, np.bool_})
+SCALARS = frozenset({float, int, bool, type(None), np.float64, np.int64, np.bool_})
 """Exact types of the scalars of the fast path: Python numbers, ``None`` (a ``where`` branch)
-and the NumPy ``float64`` and ``bool_`` that arithmetic on rows of a dataset produces."""
+and the NumPy scalars of the eager scope and of arithmetic on rows of a dataset."""
 
 _PYTHON = backends.get("python")
 _forced_name = backends.forced_name

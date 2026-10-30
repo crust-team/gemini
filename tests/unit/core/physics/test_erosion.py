@@ -200,3 +200,9 @@ def test_a_stopped_row_drops_the_complex_rate_error():
     rows = [(0.04, 0.0), (-0.04, 1.0), (0.01, 0.0), (float("nan"), 0.0)]
     assert_function_matches(guarded, rows)
     assert_same_error(guarded, [(0.04, 0.0), (-0.04, 0.0)], PhysicsRangeError)
+
+
+def test_a_negative_integer_flow_is_the_complex_rate_error():
+    """An integer argument behaves like its float: the complex rate raises the proper class."""
+    with pytest.raises(PhysicsRangeError, match="complex rate"):
+        erosion.erosion_rate("DNV", flow_rate=-1, rho_fluid=1000, diameter=1)

@@ -7,6 +7,10 @@ import numpy as np
 import pytest
 
 from gemini import backends, ops
+from gemini.core.types.flows import Stream
+from gemini.core.types.fluid import BRINE
+from gemini.errors import PhysicsRangeError
+from gemini.graph import run_function
 from gemini.ops import Constant
 
 LIMIT = Constant("LIMIT", 2.0, "-", "a test constant")
@@ -62,9 +66,9 @@ def test_a_nested_call_wraps_its_own_literal_floats():
     assert outer(1.0) == math.inf
 
 
-def test_only_exact_floats_are_wrapped_and_results_leave_plain():
-    """Ints, None, strings and arrays pass through; scalars leave as float, bool and containers."""
-    assert kinds(1.0, 2, None, "s", True) == ("float64", "int", "NoneType", "str", "bool")
+def test_only_exact_numbers_are_wrapped_and_results_leave_plain():
+    """None, strings and bools pass through; scalars leave as float, bool and containers."""
+    assert kinds(1.0, 2, None, "s", True) == ("float64", "int64", "NoneType", "str", "bool")
     value = results(1.5)
     assert type(value["tuple"][0]) is float and type(value["tuple"][1]) is bool
     assert type(value["list"][0]) is float and type(value["pair"].second) is float
@@ -117,3 +121,33 @@ def test_the_scope_restores_the_mode_and_errstate_after_an_error():
     assert backends.scope_mode() is None
     with pytest.warns(RuntimeWarning):
         np.float64(1.0) / np.float64(0.0)
+
+
+def test_integer_arguments_divide_silently_and_stay_integers():
+    """An int is an ``np.int64``: ``/`` by zero is silent, it prints and indexes as an int."""
+
+    @ops.physics
+    def ratio(left, right):
+        ops.check(left >= 0, PhysicsRangeError, "ratio: left = {left}", left=left)
+        return [left / right, list(range(right + 2))]
+
+    assert ratio(1, 0) == [math.inf, [0, 1]]
+    with pytest.raises(PhysicsRangeError, match="ratio: left = -1$"):
+        ratio(-1, 1)
+
+
+def test_a_stream_of_traced_values_keeps_the_frames_of_nested_functions():
+    """A check in a nested function guards its result though the argument hides its proxies."""
+
+    @ops.physics
+    def checked(stream):
+        ops.check(stream.p > 0, PhysicsRangeError, "checked: p = {p}", p=stream.p)
+        return stream.p
+
+    @ops.physics
+    def outer(pressure):
+        stream = Stream._trusted(m_dot=1.0, T=300.0, p=pressure, fluid=BRINE)
+        return ops.where(pressure > 0, checked(stream), 0.0)
+
+    values = run_function(outer, np.array([1.0, -1.0]))
+    assert values.tolist() == [1.0, 0.0]

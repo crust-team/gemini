@@ -12,7 +12,7 @@ a public function of ``core/physics`` so plain operators are safe in an eager ca
 """
 
 from gemini.ops import control, scope
-from gemini.ops.check import check, check_numbers
+from gemini.ops.check import any_nan, check, check_numbers
 from gemini.ops.dispatch import Constant, Operators, Symbolic, dispatch
 from gemini.ops.elementwise import (
     abs,
@@ -59,6 +59,7 @@ __all__ = [
     "abs",
     "acos",
     "add",
+    "any_nan",
     "asin",
     "atan",
     "atan2",

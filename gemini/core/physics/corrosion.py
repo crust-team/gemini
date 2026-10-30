@@ -192,8 +192,9 @@ def co2_corrosion_rate(
         ionic_strength=ionic_strength,
     )
     rate = _RATES[model](conditions, coefficients)
+    nan_input = ops.any_nan(temperature, pressure, water_flow_rate, water_density, water_viscosity)
     ops.check(
-        ops.logical_not(ops.isnan(rate)),
+        ops.logical_or(ops.logical_not(ops.isnan(rate)), nan_input),
         PhysicsRangeError,
         "co2_corrosion_rate {model}: water_flow_rate = {water_flow_rate} m3/s gives a "
         "complex rate; expected a nonnegative flow",

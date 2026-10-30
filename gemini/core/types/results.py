@@ -22,9 +22,10 @@ class Health:
     Every field is a scalar for one call or an array over a chunk of ticks (``message`` an array
     of strings). ``score`` is a fraction, one is nominal [-]; ``assessed`` tells that a
     diagnostic model was evaluated; ``alarm`` that a monitoring limit is exceeded; ``metrics``
-    maps names to finite values. Validation is ``ops.check``, so it holds for scalars, arrays
-    (the first failing row raises) and traced values alike: a score outside ``[0, 1]`` or a
-    non-finite metric raises ``PhysicsRangeError``. Plain integers become ``float``.
+    maps names to values, finite where assessed and NaN where a row has no metric. Validation
+    is ``ops.check``, so it holds for scalars, arrays (the first failing row raises) and traced
+    values alike: a score outside ``[0, 1]`` or a non-finite metric of an assessed row raises
+    ``PhysicsRangeError``. Plain integers become ``float``.
     """
 
     assessed: Any = True
@@ -45,7 +46,7 @@ class Health:
         self.metrics = {name: _number(value) for name, value in self.metrics.items()}
         for name, value in self.metrics.items():
             ops.check(
-                ops.isfinite(value),
+                ops.logical_or(ops.logical_not(self.assessed), ops.isfinite(value)),
                 PhysicsRangeError,
                 "Health.metrics[{name}]: value = {value}; expected a finite number",
                 name=name,

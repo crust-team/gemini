@@ -460,8 +460,8 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     the gas mass flow. At zero flow every branch is still evaluated, Beggs–Brill's check on the
     liquid velocity fails there and ``where`` drops its error for the zero drops; the two drops
     are read by index because a failed result cannot be unpacked. The heat loss
-    still receives a liquid flow of 1 kg/s at zero flow: ``pipe_temperature_change`` is not a
-    physics function yet, so its failing check would not be dropped.
+    still receives a liquid flow of 1 kg/s at zero flow, because a direct call on arrays raises
+    a failing check at once and this function is called that way.
 
     NOTE(refactor): DPDT's zero-flow branch suppresses gravity as well as friction.
 

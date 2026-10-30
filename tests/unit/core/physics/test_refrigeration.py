@@ -41,22 +41,22 @@ def test_log_mean_temperature_and_lorenz_cop():
     mean = refrigeration.log_mean_temperature(353.15, 303.15)
     assert mean == pytest.approx(50 / math.log(353.15 / 303.15))
     assert 303.15 < mean < (353.15 + 303.15) / 2
-    assert refrigeration.log_mean_temperature(300.0, 300.0) == 300
+    assert refrigeration.log_mean_temperature(300, 300) == 300
     lorenz = refrigeration.lorenz_cop_heating(303.15, 353.15, 313.15, 290)
     sink = refrigeration.log_mean_temperature(303.15, 353.15)
     source = refrigeration.log_mean_temperature(313.15, 290)
     assert lorenz == pytest.approx(sink / (sink - source))
-    flat = refrigeration.lorenz_cop_heating(330.0, 330.0, 290.0, 290.0)
+    flat = refrigeration.lorenz_cop_heating(330, 330, 290, 290)
     assert flat == refrigeration.carnot_cop_heating(330, 290)
-    assert refrigeration.lorenz_cop_heating(330.0, 330.0, 325.0, 325.0, 10.0) == pytest.approx(33)
+    assert refrigeration.lorenz_cop_heating(330, 330, 325, 325, 10) == pytest.approx(33)
 
 
 @pytest.mark.parametrize(
     "call, match",
     [
-        (lambda: refrigeration.log_mean_temperature(0.0, 300.0), "inlet_temperature = 0"),
+        (lambda: refrigeration.log_mean_temperature(0, 300), "inlet_temperature = 0"),
         (lambda: refrigeration.log_mean_temperature(300, float("nan")), "nan"),
-        (lambda: refrigeration.lorenz_cop_heating(300.0, 300.0, 300.0, 300.0), "lift = 0"),
+        (lambda: refrigeration.lorenz_cop_heating(300, 300, 300, 300), "lift = 0"),
     ],
 )
 def test_lorenz_relations_reject_invalid_inputs(call, match):
@@ -116,7 +116,7 @@ def test_characteristic_sensitivity_and_mean_temperature_consistency():
     assert duty == pytest.approx(slope * (mean - 10), rel=1e-12)
     sensitivity = refrigeration.characteristic_sensitivity(1, 1, 1, 2, 3, 2, 1)
     assert sensitivity == pytest.approx(2 / 2 + 2 * 3 / 2 + 1 / 2)
-    assert refrigeration.characteristic_sensitivity(0.0, 1.0, 1.0, 2.0, 3.0, 2.0, 1.0) == math.inf
+    assert refrigeration.characteristic_sensitivity(0, 1, 1, 2, 3, 2, 1) == math.inf
     with pytest.raises(PhysicsRangeError, match="expected all >= 0"):
         refrigeration.characteristic_sensitivity(-1, 1, 1, 2, 3, 2, 1)
 

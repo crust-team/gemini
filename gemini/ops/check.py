@@ -22,7 +22,7 @@ import numpy as np
 
 from gemini.errors import PhysicsRangeError
 from gemini.ops.dispatch import Constant, Symbolic
-from gemini.ops.elementwise import isnan, logical_not
+from gemini.ops.elementwise import isnan, logical_not, logical_or
 from gemini.ops.failed import mark
 from gemini.ops.registry import get, register
 
@@ -87,3 +87,15 @@ def _row_value(value, row):
     if isinstance(value, np.ndarray) and value.ndim:
         return value[row].item()
     return value
+
+
+def any_nan(*values):
+    """Return whether any of ``values`` is NaN, per row.
+
+    A NaN result from a NaN input is passed through; a NaN result from finite inputs is a negative
+    base of a fractional power, which was a complex number in Python.
+    """
+    missing = isnan(values[0])
+    for value in values[1:]:
+        missing = logical_or(missing, isnan(value))
+    return missing

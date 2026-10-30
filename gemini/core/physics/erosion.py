@@ -159,18 +159,6 @@ def _tulsa_rate(
     return units.ms_to_mm_year(1) * erosion_per_mass * mass_flow / (rho_pipe * impact_area)
 
 
-def _any_nan(*values):
-    """Return whether any of the numeric ``values`` is NaN.
-
-    A NaN rate from a NaN input is passed through; a NaN rate from finite inputs is a negative
-    base of a fractional power, which was a complex number.
-    """
-    missing = ops.isnan(values[0])
-    for value in values[1:]:
-        missing = ops.logical_or(missing, ops.isnan(value))
-    return missing
-
-
 def _particle_model_rate(name, alpha_deg, hardness_gpa, particle, pipe, flow):
     """Return the OKA or Tulsa rate [mm/year] for the shared ``erosion_rate`` conditions."""
     particle_material, particle_diameter = particle
@@ -247,7 +235,7 @@ def erosion_rate(
             (shape_factor, rho_pipe),
             (rho_fluid, diameter, flow_rate_m3h),
         )
-    nan_input = _any_nan(
+    nan_input = ops.any_nan(
         flow_rate, rho_fluid, diameter, alpha, hardness, particle_diameter, rho_pipe, shape_factor
     )
     ops.check(

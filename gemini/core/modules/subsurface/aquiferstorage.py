@@ -158,9 +158,7 @@ class AquiferStorage(Module):
         self.stored_energy = fluid * stored
         self.production_T = outlets.production_out.T
         charged = self.charged_heat
-        self.recovery_efficiency = ops.where(
-            charged > 0, ops.truediv(self.recovered_heat, charged), None
-        )
+        self.recovery_efficiency = ops.where(charged > 0, self.recovered_heat / charged, None)
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
         self.heat_loss = sum(ops.maximum(loss, 0) for loss in losses)

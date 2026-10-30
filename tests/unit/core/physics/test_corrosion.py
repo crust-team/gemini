@@ -367,3 +367,12 @@ def test_time_to_minimum_wall_divides_by_a_zero_rate_silently():
     """A zero rate gives infinity for floats, ints and the traced run alike."""
     assert corrosion.time_to_minimum_wall(1.0, 0.5, 0.0) == math.inf
     assert corrosion.time_to_minimum_wall(1.0, 0.5, 0) == math.inf
+
+
+def test_nan_input_passes_through_and_a_negative_flow_is_complex():
+    """A NaN input gives a NaN rate, as before; a finite negative flow gives the complex error."""
+    arguments = dict(temperature=333.15, pressure=1e7, co2_fraction=0.01)
+    rate = corrosion.co2_corrosion_rate("DLD", water_flow_rate=float("nan"), **arguments)
+    assert math.isnan(rate)
+    with pytest.raises(PhysicsRangeError, match="complex"):
+        corrosion.co2_corrosion_rate("DLD", water_flow_rate=-1, **arguments)

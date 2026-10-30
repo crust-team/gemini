@@ -4,13 +4,14 @@ A direct call of a module or a physics function is eager: the same ``forward`` a
 as the graph, evaluated on the Python backend. One mechanism makes plain operators safe there:
 
 - **Entering the outermost scope** enters ``np.errstate(all="ignore")`` and gives a function called
-  on plain Python floats its arguments as ``np.float64`` (exact ``float`` only: ints, ``None``,
-  strings, arrays and traced values pass through). ``np.float64`` has the arithmetic of ``float``
+  on plain Python numbers its arguments as NumPy scalars: an exact ``float`` as ``np.float64``, an
+  exact ``int`` as ``np.int64``, which prints, indexes and loops as an int (``bool``, ``None``,
+  strings, arrays and traced values pass through). They have the arithmetic of Python numbers
   but ``/`` by zero, an invalid ``**`` and an overflow give ``inf`` or ``nan`` silently, like the
   NumPy and graph backends. Arrays or traced values among the arguments leave the scope unwrapped
   (an ``np.float64`` scalar would promote a float32 array), and so does a module whose
   ``Module._scalar_mode`` is ``PLAIN`` (the ESP under float32 precision, the one quirk).
-- **Nested scopes** only wrap the exact floats among their own arguments (a literal ``0.0``) and
+- **Nested scopes** only wrap the exact numbers among their own arguments (a literal ``0.0``) and
   catch a failing check; the cost is a ``ContextVar`` read and a scan of the arguments.
 - **Leaving the outermost scope** returns plain Python scalars on every backend: ``float`` for
   ``np.float64``, ``bool`` for ``np.bool_``, recursively through tuples, lists, dicts and frozen
@@ -42,9 +43,11 @@ from gemini.ops.dispatch import Symbolic
 from gemini.ops.failed import Failed, is_marked
 from gemini.utils.context import ContextSetting
 
-_PASS = frozenset({np.float64, int, bool, str, type(None), np.bool_})
+_NUMBERS = frozenset({float, int})
+_PASS = frozenset({np.float64, np.int64, bool, str, type(None), np.bool_})
 _ATOMIC = frozenset({float, int, bool, str, type(None), np.ndarray})
-_CONVERT = {np.float64: float, np.bool_: bool}
+_CONVERT = {np.float64: float, np.int64: int, np.bool_: bool}
+_LARGEST_INT = 2**63 - 1
 
 
 _traced = ContextVar("gemini_traced_graph", default=None)
@@ -56,24 +59,32 @@ def tracing(graph):
 
 
 def _scalar(value):
-    return np.float64(value) if type(value) is float else value
+    """Return an exact ``float`` or ``int`` as its NumPy scalar; an int beyond 64 bits stays."""
+    kind = type(value)
+    if kind is float:
+        return np.float64(value)
+    if kind is int and abs(value) <= _LARGEST_INT:
+        return np.int64(value)
+    return value
 
 
 def _wrapped_keywords(kwargs):
-    """Return ``kwargs`` with exact floats as ``np.float64``, itself when it holds none."""
+    """Return ``kwargs`` with exact numbers as NumPy scalars, itself when it holds none."""
     for value in kwargs.values():
-        if type(value) is float:
+        if type(value) in _NUMBERS:
             return {name: _scalar(item) for name, item in kwargs.items()}
     return kwargs
 
 
 def wrap(value):
-    """Return ``value`` for the scope: an exact ``float`` as ``np.float64``; lists, tuples too."""
+    """Return ``value`` for the scope: numbers as NumPy scalars; lists, tuples and dicts too."""
     kind = type(value)
-    if kind is float:
-        return np.float64(value)
+    if kind in _NUMBERS:
+        return _scalar(value)
     if kind is list or kind is tuple:
         return kind(wrap(item) for item in value)
+    if kind is dict:
+        return {key: wrap(item) for key, item in value.items()}
     return value
 
 
@@ -108,15 +119,15 @@ def _plain_dataclass(value):
 
 
 def _wrapped(values):
-    """Return ``values`` with exact floats as ``np.float64``; ``None`` if any is array or traced.
+    """Return ``values`` with exact numbers as NumPy scalars; ``None`` if any is array or traced.
 
     ``values`` is a sequence; ``None`` also stands for "leave the call unwrapped".
     """
     converted = []
     for value in values:
         kind = type(value)
-        if kind is float:
-            converted.append(np.float64(value))
+        if kind in _NUMBERS or kind is dict:
+            converted.append(wrap(value))
             continue
         if kind not in _PASS and (kind is np.ndarray or isinstance(value, Symbolic)):
             return None
@@ -125,7 +136,7 @@ def _wrapped(values):
 
 
 def _wrapped_call(args, kwargs):
-    """Return ``(args, kwargs, wrapped)`` with exact floats wrapped; unchanged for arrays."""
+    """Return ``(args, kwargs, wrapped)`` with exact numbers wrapped; unchanged for arrays."""
     positional = _wrapped(args)
     named = _wrapped(kwargs.values())
     if positional is None or named is None:
@@ -172,7 +183,8 @@ def physics(function):
 
     The outermost call opens the scope (silent NumPy arithmetic, ``np.float64`` arguments, plain
     scalars and ``Failed`` handling on return); a nested call wraps its own exact floats and
-    returns ``Failed`` where a ``check`` failed.
+    returns ``Failed`` where a ``check`` failed. In a trace, whatever the mode, the checks of the
+    function guard its results.
     """
 
     @wraps(function)
@@ -186,7 +198,7 @@ def physics(function):
         if mode is WRAP:
             args, kwargs = _wrapped_nested(args, kwargs)
         try:
-            return function(*args, **kwargs) if mode is WRAP else _framed(function, args, kwargs)
+            return _framed(function, args, kwargs)
         except Exception as error:
             if not is_marked(error):
                 raise
@@ -196,9 +208,9 @@ def physics(function):
 
 
 def _wrapped_nested(args, kwargs):
-    """Return the arguments of a nested call with their exact floats as ``np.float64``."""
+    """Return the arguments of a nested call with their exact numbers as NumPy scalars."""
     for value in args:
-        if type(value) is float:
+        if type(value) in _NUMBERS:
             args = tuple([_scalar(item) for item in args])
             break
     return args, _wrapped_keywords(kwargs) if kwargs else kwargs
