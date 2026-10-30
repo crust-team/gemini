@@ -5,7 +5,11 @@ from typing import Literal
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,
+    Duty,
     Efficiency,
+    Electricity,
+    Fuel,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -36,13 +40,13 @@ class Boiler(Module):
         self.temperature_setpoint = Control(Temperature)
 
         # Outputs
-        self.duty = Output(Power)
+        self.duty = Output(Duty)
         self.fuel_or_power = Output(Power)
         self.outlet_T = Output(Temperature)
         self.capped = Output(bool)
-        self.electricity = Output(Power)
-        self.fuel = Output(Power)
-        self.heat_loss = Output(Power)
+        self.electricity = Output(Electricity)
+        self.fuel = Output(Fuel)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.outlet = Outlet(Stream)

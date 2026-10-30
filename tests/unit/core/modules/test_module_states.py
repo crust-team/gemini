@@ -7,12 +7,12 @@ import gemini as gm
 from gemini.core.modules import Module
 from gemini.core.types import (
     Control,
+    Duty,
     Energy,
     Inlet,
     Outlet,
     Output,
     Parameter,
-    Power,
     State,
     Stream,
     Temperature,
@@ -39,7 +39,7 @@ class Tank(Module):
         self.temperature = State(Temperature, default=300)
 
         # Outputs
-        self.duty = Output(Power)
+        self.duty = Output(Duty)
 
         # Outlets
         self.outlet = Outlet(Stream)

@@ -45,8 +45,8 @@ Leaves declare ordinary `Output(kind)` values and implement
 from gemini.core.modules import Module
 from gemini.core.physics import pumps
 from gemini.core.types import (
-    Control, Count, Frequency, Inlet, Outlet, Output, Parameter, Power, PressureDifference,
-    Stream, VolumeFlow,
+    Control, Count, Electricity, Frequency, Inlet, Outlet, Output, Parameter, Power,
+    PressureDifference, Stream, VolumeFlow,
 )
 
 
@@ -71,7 +71,7 @@ class Pump(Module):
         self.flow = Output(VolumeFlow)
         self.head = Output(PressureDifference)
         self.power = Output(Power)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
 
         # Outlets
         self.discharge = Outlet(Stream)
@@ -379,7 +379,7 @@ helpers. Signatures are always
 ports; parameters have no defaults or variadic forms.
 
 Inlets and outlets accept `Stream` types only. Electricity, fuel use and heat exchanged with the
-environment or a consumer are `Power` outputs with the fixed names of
+environment or a consumer are additive outputs with the fixed names and quantities of
 [types.md](types.md#energy-outputs-and-balances). Results keep the same dotted
 `<module path>.<name>` addressing scheme. Port, control and output names follow the naming rule
 in [conventions.md](conventions.md#naming).

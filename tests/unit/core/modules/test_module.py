@@ -9,6 +9,7 @@ from gemini.core.modules import Module, ModuleDict
 from gemini.core.types import (
     Boundary,
     Control,
+    Electricity,
     Frequency,
     Inlet,
     MassFlow,
@@ -461,7 +462,7 @@ class EnergyLeaf(Module):
         """Declare one stream path and an electricity output."""
         super().__init__()
         self.inlet = Inlet(Stream)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
         self.outlet = Outlet(Stream)
 
     def forward(self, inlets):

@@ -5,7 +5,9 @@ from gemini.core.physics import steam
 from gemini.core.types import (
     WATER,
     Efficiency,
+    ElectricityGenerated,
     Fraction,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -59,9 +61,9 @@ class FlashTurbine(Module):
 
         # Outputs
         self.gross_power = Output(Power)
-        self.electricity_generated = Output(Power)
+        self.electricity_generated = Output(ElectricityGenerated)
         self.condenser_duty = Output(Power)
-        self.heat_loss = Output(Power)
+        self.heat_loss = Output(HeatLoss)
         self.exhaust_quality = Output(Fraction)
 
         # Outlets

@@ -41,7 +41,7 @@ def _adapter(kind, bounds):
 
 
 def _schema_metadata(adapter):
-    """Return the JSON schema of ``adapter`` and the quantity and unit of its value.
+    """Return the JSON schema of ``adapter`` and the quantity, unit and additivity of its value.
 
     Optional kinds describe the non-null variant, and lists describe their items.
     """
@@ -49,7 +49,8 @@ def _schema_metadata(adapter):
     variants = schema.get("anyOf", [schema])
     value_schema = next((value for value in variants if value.get("type") != "null"), schema)
     value_schema = value_schema.get("items", value_schema)
-    return schema, value_schema.get("quantity"), value_schema.get("unit")
+    quantity = value_schema.get("quantity")
+    return schema, quantity, value_schema.get("unit"), value_schema.get("additive", False)
 
 
 class Declaration:
@@ -66,7 +67,7 @@ class Declaration:
         self.name = None
         self.owner = None
         self._adapter = _adapter(kind, bounds)
-        self.schema, self.quantity, self.unit = _schema_metadata(self._adapter)
+        self.schema, self.quantity, self.unit, self.additive = _schema_metadata(self._adapter)
 
     @property
     def path(self):
@@ -226,10 +227,10 @@ class Output(Declaration):
     def total(cls, name, kind=None, **kwargs):
         """Declare the sum of one additive output over descendant leaf calls."""
         output = cls._from_formula(("total", name), kind, **kwargs)
-        if kind is not None and output.quantity not in {"power", "mass_flow"}:
+        if kind is not None and not output.additive:
             raise DeclarationError(
                 f"Output.total({name!r}): quantity = {output.quantity or kind!r}; "
-                "expected an additive power or mass_flow quantity"
+                "expected an additive quantity"
             )
         return output
 
@@ -244,7 +245,7 @@ class Output(Declaration):
             return
         self.kind = declaration.kind
         self._adapter = _adapter(self.kind, {})
-        self.schema, self.quantity, self.unit = _schema_metadata(self._adapter)
+        self.schema, self.quantity, self.unit, self.additive = _schema_metadata(self._adapter)
 
 
 class Outlet(_StreamPort):

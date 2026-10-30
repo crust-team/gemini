@@ -11,12 +11,14 @@ from gemini.core.types import (
     Duration,
     Energy,
     Fraction,
+    HeatAbsorbed,
+    HeatAccumulation,
+    HeatLoss,
     Inlet,
     Length,
     Outlet,
     Output,
     Parameter,
-    Power,
     State,
     Stream,
     Temperature,
@@ -125,9 +127,9 @@ class AquiferStorage(Module):
         self.recovery_efficiency = Output(Dimensionless | None)
         self.warm_temperature = Output(Temperature)
         self.cold_temperature = Output(Temperature)
-        self.heat_loss = Output(Power)
-        self.heat_absorbed = Output(Power)
-        self.heat_accumulation = Output(Power)
+        self.heat_loss = Output(HeatLoss)
+        self.heat_absorbed = Output(HeatAbsorbed)
+        self.heat_accumulation = Output(HeatAccumulation)
 
         # Outlets
         self.production_out = Outlet(Stream)

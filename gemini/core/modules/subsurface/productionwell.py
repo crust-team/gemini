@@ -4,12 +4,12 @@ from typing import Literal
 
 from gemini.core.modules.subsurface.well import _Well
 from gemini.core.types import (
+    HeatLoss,
     Inlet,
     Length,
     Outlet,
     Output,
     Parameter,
-    Power,
     Pressure,
     PressureDifference,
     Stream,
@@ -45,7 +45,7 @@ class ProductionWell(_Well):
         self.dp_gravity = Output(PressureDifference)
         self.section_pressure = Output(list[Pressure])
         self.section_temperature = Output(list[Temperature])
-        self.heat_loss = Output(Power)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.wellhead = Outlet(Stream)

@@ -7,6 +7,7 @@ from gemini.core.types import (
     Count,
     Dimensionless,
     Efficiency,
+    Electricity,
     Frequency,
     Inlet,
     Length,
@@ -76,7 +77,7 @@ class LineShaftPump(Module):
         self.shaft_friction_power = Output(Power)
         self.shaft_power = Output(Power, soft_sensor=True)
         self.efficiency = Output(Dimensionless)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
 
         # Outlets
         self.discharge = Outlet(Stream)

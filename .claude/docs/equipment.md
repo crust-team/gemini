@@ -20,7 +20,7 @@ Shared conventions, stated once here and not repeated per module:
 - Bad design data found at call time (inconsistent parameters, a geometry outside a relation's
   range) raises `ConfigurationError`; inputs outside a model's domain raise
   `PhysicsRangeError`.
-- Energy that leaves or enters a leaf outside its streams uses the fixed `Power` outputs of
+- Energy that leaves or enters a leaf outside its streams uses the fixed additive outputs of
   [types.md](types.md#energy-outputs-and-balances): `electricity`, `fuel`, `heat_absorbed`,
   `heat_loss`, `heat_supplied`, `electricity_generated` and the signed `heat_accumulation`.
 - **Energy audit** below states what `energy_balance(module, result)` shows for one call.

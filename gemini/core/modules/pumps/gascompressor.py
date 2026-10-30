@@ -6,6 +6,8 @@ from gemini.core.types import (
     Control,
     Count,
     Efficiency,
+    Electricity,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -71,9 +73,9 @@ class GasCompressor(Module):
         # Outputs
         self.pressure_ratio = Output(Ratio)
         self.shaft_power = Output(Power, soft_sensor=True)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
         self.discharge_T = Output(Temperature, soft_sensor=True)
-        self.heat_loss = Output(Power)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.discharge = Outlet(Stream)

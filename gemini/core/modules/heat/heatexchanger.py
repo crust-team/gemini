@@ -5,6 +5,7 @@ from typing import Literal
 from gemini.core.modules.module import Module
 from gemini.core.physics import heat_transfer
 from gemini.core.types import (
+    Duty,
     Fraction,
     Health,
     Inlet,
@@ -12,7 +13,6 @@ from gemini.core.types import (
     Outlet,
     Output,
     Parameter,
-    Power,
     PressureDifference,
     Ratio,
     Stream,
@@ -49,7 +49,7 @@ class HeatExchanger(Module):
         self.cold_in = Inlet(Stream)
 
         # Outputs
-        self.duty = Output(Power, soft_sensor=True)
+        self.duty = Output(Duty, soft_sensor=True)
         self.effectiveness = Output(Fraction, soft_sensor=True)
         self.ntu = Output(Ratio)
         self.lmtd = Output(TemperatureDifference)

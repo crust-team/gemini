@@ -6,7 +6,9 @@ from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
     Efficiency,
+    ElectricityGenerated,
     Fraction,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -73,9 +75,9 @@ class ORC(Module):
         self.heat_input = Output(Power)
         self.gross_power = Output(Power)
         self.parasitic_power = Output(Power)
-        self.electricity_generated = Output(Power)
+        self.electricity_generated = Output(ElectricityGenerated)
         self.condenser_duty = Output(Power)
-        self.heat_loss = Output(Power)
+        self.heat_loss = Output(HeatLoss)
         self.thermal_efficiency = Output(Fraction | None)
         self.condensing_temperature = Output(Temperature)
         self.brine_out_T = Output(Temperature)

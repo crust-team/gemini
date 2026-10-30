@@ -6,6 +6,9 @@ from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
     Control,
+    Duty,
+    Electricity,
+    HeatLoss,
     Inlet,
     MassFlow,
     Outlet,
@@ -67,10 +70,10 @@ class Cooler(Module):
         self.wet_bulb_temperature = Boundary(Temperature | None, default=None)
 
         # Outputs
-        self.duty = Output(Power)
+        self.duty = Output(Duty)
         self.outlet_T = Output(Temperature)
-        self.electricity = Output(Power)
-        self.heat_loss = Output(Power)
+        self.electricity = Output(Electricity)
+        self.heat_loss = Output(HeatLoss)
         self.evaporation_rate = Output(MassFlow)
         self.is_capped = Output(bool)
 

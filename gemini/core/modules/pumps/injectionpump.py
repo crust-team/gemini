@@ -6,6 +6,7 @@ from gemini.core.types import (
     Control,
     Count,
     Efficiency,
+    Electricity,
     Frequency,
     Inlet,
     Outlet,
@@ -46,7 +47,7 @@ class InjectionPump(Module):
         self.head = Output(PressureDifference, soft_sensor=True)
         self.power = Output(Power, soft_sensor=True)
         self.discharge_pressure = Output(Pressure, soft_sensor=True)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
 
         # Outlets
         self.discharge = Outlet(Stream)

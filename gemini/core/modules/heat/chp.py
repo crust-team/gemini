@@ -4,7 +4,10 @@ from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,
     Efficiency,
+    ElectricityGenerated,
     Fraction,
+    Fuel,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -59,11 +62,11 @@ class CHP(Module):
         self.load_fraction = Control(Fraction)
 
         # Outputs
-        self.fuel = Output(Power)
-        self.electricity_generated = Output(Power)
+        self.fuel = Output(Fuel)
+        self.electricity_generated = Output(ElectricityGenerated)
         self.heat_recovered = Output(Power)
         self.dumped_heat = Output(Power)
-        self.heat_loss = Output(Power)
+        self.heat_loss = Output(HeatLoss)
         self.outlet_T = Output(Temperature)
 
         # Outlets

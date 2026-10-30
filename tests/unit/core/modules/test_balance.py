@@ -6,7 +6,14 @@ from gemini.core.modules import Module
 from gemini.core.modules.balance import collect_flows, emissions, energy_balance, mass_balance
 from gemini.core.modules.heat import CHP, Boiler
 from gemini.core.modules.pumps import ESP, InjectionPump
-from gemini.core.types import Inlet, Outlet, Output, Power, Stream
+from gemini.core.types import (
+    HeatLoss,
+    HeatSupplied,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 
 
 class Radiator(Module):
@@ -20,8 +27,8 @@ class Radiator(Module):
         self.supply_in = Inlet(Stream)
 
         # Outputs
-        self.heat_supplied = Output(Power)
-        self.heat_loss = Output(Power)
+        self.heat_supplied = Output(HeatSupplied)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.return_out = Outlet(Stream)

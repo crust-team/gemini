@@ -39,7 +39,11 @@ SI unit and then validates it with a Pydantic `TypeAdapter`; a failure raises
 optional kind describes its non-null variant and a list describes its items.
 
 Use `Annotated[float, quantity(...)]` aliases for physical numeric declarations, including list
-items. Integer stage counts use `Count`. Every quantity's unit is its own SI unit in the unit
+items. `quantity(name, unit, additive=True)` marks a quantity that composites sum over their
+descendant leaf calls; the additive quantities are `MassFlow`, the seven energy outputs below,
+`Duty` (a heat-transfer rate such as a heat exchanger's) and `HydraulicPower`, all in W except
+mass flow, and each has its own quantity name. Plain `Power` is not additive. A declaration's
+`additive` attribute reads the flag. Integer stage counts use `Count`. Every quantity's unit is its own SI unit in the unit
 table of `core/physics/units.py` (`test_every_quantity_unit_is_a_known_si_unit`); add the unit
 there together with a new quantity. Use signed pressure/temperature *differences* separately
 from nonnegative absolute pressure and strictly positive absolute temperature. A difference
@@ -119,8 +123,10 @@ claim absence of other corrosion mechanisms.
 
 ## Energy outputs and balances
 
-Energy that crosses a leaf other than in its streams is reported as `Power` outputs with fixed
-names; they are not flow ports. Six are nonnegative: the inflows `electricity` and `fuel` consumed
+Energy that crosses a leaf other than in its streams is reported as outputs with fixed names,
+each declared with its own additive quantity in W (`Electricity`, `Fuel`, `HeatAbsorbed`,
+`HeatLoss`, `HeatSupplied`, `ElectricityGenerated`, `HeatAccumulation`); they are not flow
+ports. Six are nonnegative: the inflows `electricity` and `fuel` consumed
 and `heat_absorbed` from outside the plant (ambient air, the ground, a cooled building), and the
 outflows `heat_loss` to the environment, `heat_supplied` to a consumer and `electricity_generated`.
 `ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `core/modules/balance.py` list them. The seventh,

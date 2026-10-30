@@ -5,6 +5,7 @@ from gemini.core.physics import psychrometrics
 from gemini.core.types import (
     Boundary,
     Fraction,
+    HeatAbsorbed,
     Inlet,
     Outlet,
     Output,
@@ -71,7 +72,7 @@ class CoolingConsumer(Module):
         self.indoor_relative_humidity = Boundary(Fraction, gt=0)
 
         # Outputs
-        self.heat_absorbed = Output(Power)
+        self.heat_absorbed = Output(HeatAbsorbed)
         self.unmet_sensible = Output(Power)
         self.unmet_latent = Output(Power)
         self.dew_point = Output(Temperature)

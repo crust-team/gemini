@@ -6,6 +6,8 @@ from gemini.core.modules.module import Module
 from gemini.core.physics import ground
 from gemini.core.types import (
     Count,
+    HeatAbsorbed,
+    HeatLoss,
     Inlet,
     Length,
     LinearThermalResistance,
@@ -82,8 +84,8 @@ class BoreholeField(Module):
         self.fluid_mean_T = Output(Temperature)
         self.ground_T = Output(Temperature)
         self.outlet_T = Output(Temperature)
-        self.heat_absorbed = Output(Power)
-        self.heat_loss = Output(Power)
+        self.heat_absorbed = Output(HeatAbsorbed)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.outlet = Outlet(Stream)

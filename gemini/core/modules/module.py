@@ -67,7 +67,6 @@ from gemini.utils.time import to_utc
 _current_call = ContextVar("module_call", default=None)
 _outputs_enabled = ContextVar("module_outputs_enabled", default=True)
 _EARLIEST = to_utc("0001-01-01")
-_ADDITIVE_QUANTITIES = {"power", "mass_flow"}
 _FIELD_DISPLAY_UNITS = {"Pa": "bar", "K": "°C", "m3/s": "m3/h", "W": "kW"}
 _REGISTRIES = (
     (Parameter, "_parameters"),
@@ -823,10 +822,9 @@ class Module:
                 f"{self.path}.{name}: Output.total({target!r}) has differing units "
                 f"{sorted(str(unit) for unit in found)}"
             )
-        if any(declaration.quantity not in _ADDITIVE_QUANTITIES for declaration in declarations):
+        if not all(declaration.additive for declaration in declarations):
             raise FormulaError(
-                f"{self.path}.{name}: Output.total({target!r}) requires an additive "
-                "power or mass-flow quantity"
+                f"{self.path}.{name}: Output.total({target!r}) requires an additive quantity"
             )
         return declarations[0]
 

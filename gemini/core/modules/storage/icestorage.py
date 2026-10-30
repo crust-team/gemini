@@ -5,14 +5,15 @@ import math
 from gemini.core.modules.module import Module
 from gemini.core.physics import heat_transfer
 from gemini.core.types import (
+    Duty,
     Energy,
     Fraction,
+    HeatAccumulation,
     Inlet,
     Mass,
     Outlet,
     Output,
     Parameter,
-    Power,
     SpecificEnthalpy,
     SpecificHeat,
     State,
@@ -91,8 +92,8 @@ class IceStorage(Module):
 
         # Outputs
         self.stored_cold = Output(Energy)
-        self.duty = Output(Power)
-        self.heat_accumulation = Output(Power)
+        self.duty = Output(Duty)
+        self.heat_accumulation = Output(HeatAccumulation)
         self.outlet_T = Output(Temperature)
         self.is_full = Output(bool)
         self.is_empty = Output(bool)

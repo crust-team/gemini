@@ -7,12 +7,13 @@ from gemini.core.physics import constants
 from gemini.core.types import (
     Efficiency,
     Fraction,
+    Fuel,
+    HeatLoss,
     Inlet,
     MassFlow,
     Outlet,
     Output,
     Parameter,
-    Power,
     SpecificEnthalpy,
     Stream,
 )
@@ -73,8 +74,8 @@ class Vent(Module):
         self.vented_mass_flow = Output(MassFlow)
         self.co2_emission = Output(MassFlow)
         self.methane_emission = Output(MassFlow)
-        self.fuel = Output(Power)
-        self.heat_loss = Output(Power)
+        self.fuel = Output(Fuel)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.outlet = Outlet(Stream)

@@ -3,6 +3,7 @@
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
+    HeatSupplied,
     Inlet,
     Outlet,
     Output,
@@ -58,7 +59,7 @@ class HeatConsumer(Module):
         self.heat_demand = Boundary(Power, ge=0)
 
         # Outputs
-        self.heat_supplied = Output(Power)
+        self.heat_supplied = Output(HeatSupplied)
         self.unmet_demand = Output(Power)
         self.return_out_T = Output(Temperature)
         self.temperature_difference = Output(TemperatureDifference)

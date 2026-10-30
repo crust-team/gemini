@@ -7,13 +7,14 @@ from gemini.core.physics import geometry, heat_transfer, hydraulics
 from gemini.core.types import (
     Boundary,
     Elevation,
+    HeatAbsorbed,
+    HeatLoss,
     HeatTransferCoefficient,
     Inlet,
     Length,
     Outlet,
     Output,
     Parameter,
-    Power,
     PressureDifference,
     Speed,
     Stream,
@@ -86,8 +87,8 @@ class Pipe(Module):
         self.pressure_drop = Output(PressureDifference)
         self.velocity = Output(Speed)
         self.outlet_T = Output(Temperature)
-        self.heat_loss = Output(Power)
-        self.heat_absorbed = Output(Power)
+        self.heat_loss = Output(HeatLoss)
+        self.heat_absorbed = Output(HeatAbsorbed)
 
         # Outlets
         self.outlet = Outlet(Stream)

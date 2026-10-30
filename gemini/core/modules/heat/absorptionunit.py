@@ -7,6 +7,7 @@ from gemini.core.physics import refrigeration
 from gemini.core.types import (
     Control,
     Dimensionless,
+    Electricity,
     Inlet,
     Outlet,
     Output,
@@ -83,7 +84,7 @@ class AbsorptionUnit(Module):
         self.generator_duty = Output(Power)
         self.evaporator_duty = Output(Power)
         self.absorber_condenser_duty = Output(Power)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
         self.driving_temperature_difference = Output(TemperatureDifference)
         self.is_capped = Output(bool)
         self.generator_out_T = Output(Temperature)

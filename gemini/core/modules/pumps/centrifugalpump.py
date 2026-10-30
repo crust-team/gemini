@@ -4,8 +4,11 @@ from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,
     Efficiency,
+    Electricity,
     Fraction,
     Frequency,
+    HeatLoss,
+    HydraulicPower,
     Inlet,
     Outlet,
     Output,
@@ -69,11 +72,11 @@ class CentrifugalPump(Module):
         # Outputs
         self.flow = Output(VolumeFlow)
         self.head = Output(PressureDifference, soft_sensor=True)
-        self.hydraulic_power = Output(Power)
+        self.hydraulic_power = Output(HydraulicPower)
         self.shaft_power = Output(Power, soft_sensor=True)
         self.efficiency = Output(Fraction)
-        self.electricity = Output(Power)
-        self.heat_loss = Output(Power)
+        self.electricity = Output(Electricity)
+        self.heat_loss = Output(HeatLoss)
         self.discharge_T = Output(Temperature)
 
         # Outlets

@@ -10,6 +10,7 @@ from gemini.core.types import (
     Count,
     Dimensionless,
     Efficiency,
+    Electricity,
     Fraction,
     Frequency,
     Health,
@@ -71,7 +72,7 @@ class ESP(Module):
         self.flow = Output(VolumeFlow)
         self.in_operating_window = Output(bool)
         self.bep_ratio = Output(Ratio)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
 
         # Outlets
         self.discharge = Outlet(Stream)

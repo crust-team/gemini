@@ -8,6 +8,9 @@ from gemini.core.types import (
     Boundary,
     Energy,
     Fraction,
+    HeatAbsorbed,
+    HeatAccumulation,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -88,9 +91,9 @@ class ThermalStorage(Module):
         self.stored_energy = Output(Energy)
         self.charge_duty = Output(Power)
         self.discharge_duty = Output(Power)
-        self.heat_accumulation = Output(Power)
-        self.heat_loss = Output(Power)
-        self.heat_absorbed = Output(Power)
+        self.heat_accumulation = Output(HeatAccumulation)
+        self.heat_loss = Output(HeatLoss)
+        self.heat_absorbed = Output(HeatAbsorbed)
 
         # Outlets
         self.charge_out = Outlet(Stream)

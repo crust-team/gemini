@@ -9,6 +9,7 @@ from gemini.core.physics import refrigeration
 from gemini.core.types import (
     Control,
     Efficiency,
+    Electricity,
     Fraction,
     Inlet,
     Outlet,
@@ -85,7 +86,7 @@ class HeatPump(Module):
         self.useful_duty = Output(Power)
         self.evaporator_duty = Output(Power)
         self.condenser_duty = Output(Power)
-        self.electricity = Output(Power)
+        self.electricity = Output(Electricity)
         self.temperature_lift = Output(TemperatureDifference)
         self.is_capped = Output(bool)
         self.is_running = Output(bool)
