@@ -5,7 +5,16 @@ from gemini.core.modules.heat import HeatExchanger
 from gemini.core.modules.module import Module
 from gemini.core.modules.piping import Valve
 from gemini.core.modules.plants import loops
-from gemini.core.types import Inlet, MassFlow, Outlet, Output, Parameter, Pressure, Stream
+from gemini.core.types import (
+    HeatAbsorbed,
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Parameter,
+    Pressure,
+    Stream,
+)
 
 
 class CoolingSubstation(Module):
@@ -61,16 +70,16 @@ class CoolingSubstation(Module):
         self.network_in = Inlet(Stream)
 
         # Outputs
-        self.duty = Output.of("heat_exchanger.duty")
-        self.heat_absorbed = Output.total("heat_absorbed")
-        self.unmet_sensible = Output.of("consumer.unmet_sensible")
-        self.unmet_latent = Output.of("consumer.unmet_latent")
-        self.is_unmet = Output.of("consumer.is_unmet")
-        self.dew_point = Output.of("consumer.dew_point")
-        self.building_supply_T = Output.of("heat_exchanger.hot_out_T")
-        self.building_return_T = Output.of("consumer.return_out_T")
-        self.network_out_T = Output.of("heat_exchanger.cold_out_T")
-        self.valve_pressure_drop = Output.of("valve.pressure_drop")
+        self.duty = Output.of(self.heat_exchanger.duty)
+        self.heat_absorbed = Output(HeatAbsorbed)
+        self.unmet_sensible = Output.of(self.consumer.unmet_sensible)
+        self.unmet_latent = Output.of(self.consumer.unmet_latent)
+        self.is_unmet = Output.of(self.consumer.is_unmet)
+        self.dew_point = Output.of(self.consumer.dew_point)
+        self.building_supply_T = Output.of(self.heat_exchanger.hot_out_T)
+        self.building_return_T = Output.of(self.consumer.return_out_T)
+        self.network_out_T = Output.of(self.heat_exchanger.cold_out_T)
+        self.valve_pressure_drop = Output.of(self.valve.pressure_drop)
 
         # Outlets
         self.network_out = Outlet(Stream)

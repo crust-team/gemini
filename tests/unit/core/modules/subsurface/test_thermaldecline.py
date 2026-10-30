@@ -40,7 +40,7 @@ class Producer(Module):
         self.sandface = Inlet(Stream)
 
         # Outputs
-        self.temperature_drop = Output.of("decline.temperature_drop")
+        self.temperature_drop = Output.of(self.decline.temperature_drop)
 
         # Outlets
         self.outlet = Outlet(Stream)

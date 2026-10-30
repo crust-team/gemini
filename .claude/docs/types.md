@@ -27,10 +27,11 @@ constructors. Output kinds may be quantity aliases or Python types; inlet and ou
 be `Stream` types. `Parameter(kind, default=, shape=, calibratable=, description=, **bounds)`
 holds design data; `Control` and `Boundary` take `kind`, `default`, `description` and bounds;
 `State(kind, default=)` declares a stepped value (see [modules.md](modules.md#state-and-health));
-`Output(kind, soft_sensor=, description=)` and the formulas `Output.of`, `Output.total` and
-`Output.ratio` are described in [modules.md](modules.md#composite-modules). `UNSET` denotes an
-uninitialized parameter and stays the same object under copy, deep copy and pickling. `shape=`
-checks fixed vectors; bounds can tighten quantity defaults.
+`Output(kind, soft_sensor=, description=)`, the formulas `Output.of` and `Output.ratio` and the
+automatic sums of additive outputs are described in
+[modules.md](modules.md#composite-modules). `UNSET` denotes an uninitialized parameter and stays
+the same object under copy, deep copy and pickling. `shape=` checks fixed vectors; bounds can
+tighten quantity defaults.
 
 `declaration.validate(value)` converts a unit string or `gm.Quantity(value, unit)` to the declared
 SI unit and then validates it with a Pydantic `TypeAdapter`; a failure raises

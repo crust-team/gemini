@@ -60,7 +60,7 @@ class Twice(Module):
         self.inlet = Inlet(Stream)
 
         # Outputs
-        self.rise = Output.of("heater.rise")
+        self.rise = Output.of(self.heater.rise)
 
         # Outlets
         self.outlet = Outlet(Stream)

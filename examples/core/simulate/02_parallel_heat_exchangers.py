@@ -28,7 +28,14 @@ from examples.shared.nodal_doublet import NodalDoublet
 from gemini.core.modules import HeatExchanger, Mixer, ModuleList, Splitter, energy_balance
 from gemini.core.modules.treatment import Degasser, Filter
 from gemini.core.physics.geometry import build_path
-from gemini.core.types import Inlet, Outlet, Output, Stream
+from gemini.core.types import (
+    Duty,
+    Electricity,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 
 SHARES = (0.5, 0.3, 0.2)
 """Shares of the primary and the secondary flow sent to each heat exchanger."""
@@ -89,12 +96,12 @@ class ParallelExchangerPlant(gm.modules.Module):
         self.secondary_in = Inlet(Stream)
 
         # Outputs
-        self.production_rate = Output.of("doublet.riser.wellhead.m_dot")
-        self.injection_pressure = Output.of("doublet.injection_pump.discharge_pressure")
-        self.injection_pump_electricity = Output.of("doublet.injection_pump.electricity")
-        self.duty = Output.total("duty")
-        self.electricity = Output.total("electricity")
-        self.secondary_out_T = Output.of(f"secondary_mixers.{len(SHARES) - 2}.mixed_out_T")
+        self.production_rate = Output.of(self.doublet.riser.wellhead.field("m_dot"))
+        self.injection_pressure = Output.of(self.doublet.injection_pump.discharge_pressure)
+        self.injection_pump_electricity = Output.of(self.doublet.injection_pump.electricity)
+        self.duty = Output(Duty)
+        self.electricity = Output(Electricity)
+        self.secondary_out_T = Output.of(self.secondary_mixers[len(SHARES) - 2].mixed_out_T)
 
         # Outlets
         self.secondary_out = Outlet(Stream)

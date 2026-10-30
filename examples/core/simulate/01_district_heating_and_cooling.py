@@ -13,7 +13,16 @@ PYTHONPATH=. python examples/core/simulate/01_district_heating_and_cooling.py
 
 import gemini as gm
 from gemini.core.modules import ATESPlant, DistrictNetwork, energy_balance
-from gemini.core.types import Inlet, Outlet, Output, Stream
+from gemini.core.types import (
+    Electricity,
+    HeatAbsorbed,
+    HeatSupplied,
+    HydraulicPower,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 
 HOUR = 3600.0
 GEOTHERMAL_SUPPLY = Stream(flow="18 t/h", T="75 degC", p="6 bar")
@@ -37,11 +46,11 @@ class DistrictEnergyPlant(gm.modules.Module):
         self.cooling_return_in = Inlet(Stream)
 
         # Outputs
-        self.heat_supplied = Output.total("heat_supplied")
-        self.heat_absorbed = Output.total("heat_absorbed")
-        self.electricity = Output.total("electricity")
-        self.hydraulic_power = Output.total("hydraulic_power")
-        self.stored_energy = Output.of("ates.stored_energy")
+        self.heat_supplied = Output(HeatSupplied)
+        self.heat_absorbed = Output(HeatAbsorbed)
+        self.electricity = Output(Electricity)
+        self.hydraulic_power = Output(HydraulicPower)
+        self.stored_energy = Output.of(self.ates.stored_energy)
 
         # Outlets
         self.heat_return_out = Outlet(Stream)

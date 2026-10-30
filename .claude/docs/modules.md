@@ -108,27 +108,29 @@ output-enabled call.
 Composites declare formula outputs in declaration order and override `_compute_outputs` only to
 record their own value for an additive output:
 
-- `Output.of("child.path.output")` copies one descendant output from this call. Outlet fields,
-  such as `Output.of("degasser.gas.m_dot")`, are also supported. The descendant must be called
-  exactly once.
-- `Output.total("electricity")` sums that output over all descendant leaf calls. A leaf called
-  twice contributes twice. The summed declarations must share one unit and an additive power or
-  mass-flow quantity.
-- `Output.ratio("thermal_power", "electricity_use")` divides earlier outputs on the same module
-  and records `None` when either value is `None` or the denominator is zero.
-- `Output.of` and `Output.ratio` also take declaration references instead of path strings:
-  `Output.of(self.heat_exchanger.duty)`, `Output.of(self.degasser.gas.field("m_dot"))` (an
-  `Outlet.field(name)` reference) and `Output.ratio(self.thermal_power, self.electricity)`.
-  Children are assigned first (`# Modules`), so the references exist; a reference outside the
-  descendant tree, or a ratio operand that is not an earlier output of the module, raises
-  `FormulaError` while the class is built. `Output.of(reference)` adopts the target's kind.
+- `Output.of(self.child.output)` copies one descendant output from this call, for example
+  `Output.of(self.heat_exchanger.duty)` or
+  `Output.of(self.producers[0].riser.wellhead_temperature)`. An outlet field is referenced with
+  `Outlet.field(name)`: `Output.of(self.degasser.gas.field("m_dot"))`. The descendant must be
+  called exactly once, and the output adopts the target's kind.
 - An output of an additive quantity declared without a formula, such as
   `self.electricity = Output(Electricity)`, is the automatic sum of the descendant leaf outputs
-  with the same name over this call; a leaf called twice counts twice and the sums of nested
+  with the same name over this call. A leaf called twice contributes twice; the sums of nested
   composites are not counted again. Every descendant leaf output of that name must have the same
   quantity and unit, and at least one must exist; otherwise the first call raises `FormulaError`
   (with a close-match suggestion for a name no leaf declares). A composite that records its own
-  value for the output in `_compute_outputs` replaces the sum.
+  value for the output in `_compute_outputs` replaces the sum. The additive quantities are listed
+  in [types.md](types.md#quantities-and-declarations).
+- `Output.ratio(self.thermal_power, self.electricity)` divides two earlier outputs of the same
+  module and records `None` when either value is `None` or the denominator is zero.
+
+Formulas take declaration references, not path strings. Children are assigned first
+(`# Modules`), so the references exist when the outputs are declared. Assigning a formula checks
+it while the class is built: an `Output.of` target outside the descendant tree (or a string), or a
+ratio operand that is not an earlier output of the module, raises `FormulaError`, an unknown
+outlet field raises `DeclarationError` with a close-match suggestion, and a misspelled reference
+fails as an ordinary `AttributeError`. The first call resolves each reference to its descendant
+path by identity, so deep copies and nested trees resolve to their own children.
 
 ```python
 from gemini.core.modules import HeatExchanger
@@ -149,9 +151,9 @@ class HeatPlant(Module):
         self.secondary_in = Inlet(Stream)
 
         # Outputs
-        self.thermal_power = Output.of("heat_exchanger.duty")
-        self.electricity_use = Output.total("electricity")
-        self.cop = Output.ratio("thermal_power", "electricity_use")
+        self.thermal_power = Output.of(self.heat_exchanger.duty)
+        self.electricity = Output(Electricity)
+        self.cop = Output.ratio(self.thermal_power, self.electricity)
 
         # Outlets
         self.secondary_out = Outlet(Stream)
@@ -172,8 +174,7 @@ class HeatPlant(Module):
         return outlets
 ```
 
-Formula paths are checked on the first call, when the tree is complete, and typo errors include a
-close-match suggestion. `module.is_leaf` is true exactly when the module has no registered
+`module.is_leaf` is true exactly when the module has no registered
 children. Composites built from a variable number of children use the containers
 `ModuleList(modules)` (children named `"0"`, `"1"`, ...; inserting or removing renumbers the later
 children) and `ModuleDict(mapping)` (caller-chosen keys that must not shadow module or mapping

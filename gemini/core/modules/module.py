@@ -273,7 +273,10 @@ class Module:
 
     def _check_of_target(self, name, target):
         if not isinstance(target, (Output, PortField)):
-            return
+            raise FormulaError(
+                f"{self.path}.{name}: Output.of target = {target!r}; expected a descendant output "
+                "declaration or an outlet field reference such as self.child.outlet.field('T')"
+            )
         owner = target.port.owner if isinstance(target, PortField) else target.owner
         if owner is None or owner is self or self._descendant_path(owner) is None:
             raise FormulaError(
@@ -283,9 +286,10 @@ class Module:
 
     def _check_ratio_operands(self, name, operands):
         for operand in operands:
-            if isinstance(operand, Output) and self._outputs.get(operand.name) is not operand:
+            if not isinstance(operand, Output) or self._outputs.get(operand.name) is not operand:
+                described = operand.path if isinstance(operand, Output) else repr(operand)
                 raise FormulaError(
-                    f"{self.path}.{name}: Output.ratio operand {operand.path} is not an "
+                    f"{self.path}.{name}: Output.ratio operand {described} is not an "
                     f"earlier output of this module; valid: {join_names(self._outputs)}"
                 )
 
@@ -777,85 +781,27 @@ class Module:
             for name, declaration in (self._controls | self._boundaries).items()
         }
 
-    def _formula_candidates(self):
-        candidates = []
-        for path, module in self.named_modules():
-            if not path:
-                continue
-            candidates.extend(join_path(path, name) for name in module._outputs)
-            for name, outlet in module._outlets.items():
-                fields = getattr(outlet.kind, "model_fields", {})
-                candidates.extend(f"{path}.{name}.{field}" for field in fields)
-        return candidates
-
-    def _split_formula_target(self, target):
-        """Split ``a.b.c`` into the longest descendant module path and the remaining names."""
-        parts = target.split(".")
-        for size in range(len(parts) - 1, 0, -1):
-            module_path = ".".join(parts[:size])
-            module = self._find_submodule(module_path)
-            if module is not None:
-                return module, module_path, parts[size:]
-        return None, "", []
-
-    def _resolve_of(self, target):
-        module, module_path, remainder = self._split_formula_target(target)
-        if module is not None and len(remainder) == 1 and remainder[0] in module._outputs:
-            return module_path, ("output", remainder[0], None), module._outputs[remainder[0]]
-        if module is not None and len(remainder) == 2 and remainder[0] in module._outlets:
-            outlet = module._outlets[remainder[0]]
-            field_info = getattr(outlet.kind, "model_fields", {}).get(remainder[1])
-            if field_info is not None:
-                access = ("outlet", remainder[0], remainder[1])
-                return module_path, access, Output(field_info.annotation)
-        raise FormulaError(
-            f"{self.path}: unknown output formula path {target!r}"
-            f"{did_you_mean(target, self._formula_candidates())}"
-        )
-
     def _resolve_formula_outputs(self):
-        """Check every formula and automatic-sum output once and remember how to compute it."""
-        seen = set()
+        """Resolve every formula and automatic-sum output once and remember how to compute it."""
         for name, output in self._outputs.items():
             if output._resolved_formula is not None:
-                seen.add(name)
                 continue
             if output.formula is not None:
-                resolved, declaration = self._resolve_formula(name, output, seen)
-                if declaration is not None:
-                    output.infer_kind(declaration)
-                output._resolved_formula = resolved
+                output._resolved_formula = self._resolve_formula(output.formula)
             elif output.additive and not self.is_leaf:
                 self._check_summed(name, output)
                 output._resolved_formula = ("sum", name)
-            seen.add(name)
 
-    def _resolve_formula(self, name, output, seen):
-        """Return the resolved formula and the declaration whose kind the output takes."""
-        kind, *arguments = output.formula
-        if kind == "of" and isinstance(arguments[0], (Output, PortField)):
-            return (kind, *self._reference_access(arguments[0])), None
-        if kind == "of":
-            module_path, access, declaration = self._resolve_of(arguments[0])
-            return (kind, module_path, access), declaration
-        if kind == "ratio" and all(isinstance(item, Output) for item in arguments):
-            return (kind, *(item.name for item in arguments)), None
-        if kind == "total":
-            return (kind, arguments[0]), self._resolve_total(name, arguments[0])
-        for reference in arguments:
-            if reference not in seen:
-                raise FormulaError(
-                    f"{self.path}.{name}: ratio references unavailable earlier output "
-                    f"{reference!r}{did_you_mean(reference, seen)}"
-                )
-        return (kind, *arguments), None
-
-    def _reference_access(self, target):
-        """Return the descendant path and access tuple of an ``Output.of`` reference."""
+    def _resolve_formula(self, formula):
+        """Return the descendant path and access of ``Output.of``, or the ratio operand names."""
+        kind, *references = formula
+        if kind == "ratio":
+            return (kind, *(reference.name for reference in references))
+        target = references[0]
         if isinstance(target, PortField):
-            port = target.port
-            return self._descendant_path(port.owner), ("outlet", port.name, target.name)
-        return self._descendant_path(target.owner), ("output", target.name, None)
+            access = ("outlet", target.port.name, target.name)
+            return kind, self._descendant_path(target.port.owner), access
+        return kind, self._descendant_path(target.owner), ("output", target.name, None)
 
     def _descendant_leaves(self):
         """Return every leaf module below this one."""
@@ -882,28 +828,6 @@ class Module:
                     f"[{declaration.unit}]; expected {output.quantity} [{output.unit}] to sum it"
                 )
 
-    def _resolve_total(self, name, target):
-        """Return the declaration that ``Output.total(target)`` sums, after checking it."""
-        leaves = self._descendant_leaves()
-        declarations = [leaf._outputs[target] for leaf in leaves if target in leaf._outputs]
-        if not declarations:
-            names = sorted({output for leaf in leaves for output in leaf._outputs})
-            raise FormulaError(
-                f"{self.path}: no descendant leaf declares output {target!r}"
-                f"{did_you_mean(target, names)}"
-            )
-        found = {declaration.unit for declaration in declarations}
-        if len(found) != 1:
-            raise FormulaError(
-                f"{self.path}.{name}: Output.total({target!r}) has differing units "
-                f"{sorted(str(unit) for unit in found)}"
-            )
-        if not all(declaration.additive for declaration in declarations):
-            raise FormulaError(
-                f"{self.path}.{name}: Output.total({target!r}) requires an additive quantity"
-            )
-        return declarations[0]
-
     @staticmethod
     def _recorded_calls(call_records, prefix=""):
         for path, result in call_records:
@@ -923,8 +847,8 @@ class Module:
             kind, *arguments = output._resolved_formula
             if kind == "of":
                 setattr(self, name, self._output_of(name, calls, *arguments))
-            elif kind in ("total", "sum") and not (kind == "sum" and name in call.outputs):
-                setattr(self, name, self._output_total(calls, *arguments))
+            elif kind == "sum" and name not in call.outputs:
+                setattr(self, name, self._output_sum(calls, *arguments))
             elif kind == "ratio":
                 setattr(self, name, self._output_ratio(*arguments))
 
@@ -941,7 +865,7 @@ class Module:
         return getattr(value, field_name) if field_name is not None else value
 
     @staticmethod
-    def _output_total(calls, target):
+    def _output_sum(calls, target):
         return sum(
             result.outputs[target]
             for _, result in calls

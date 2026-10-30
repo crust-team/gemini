@@ -6,6 +6,8 @@ from gemini.core.modules.plants import Doublet
 from gemini.core.modules.pumps import InjectionPump
 from gemini.core.modules.treatment import Degasser, Filter
 from gemini.core.types import (
+    Electricity,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -31,10 +33,10 @@ class DoubletHeatPlant(Module):
         self.secondary_in = Inlet(Stream)
 
         # Outputs
-        self.thermal_power = Output.of("heat_exchanger.duty")
-        self.electricity_use = Output.total("electricity")
-        self.cop = Output.ratio("thermal_power", "electricity_use")
-        self.heat_loss = Output.total("heat_loss")
+        self.thermal_power = Output.of(self.heat_exchanger.duty)
+        self.electricity = Output(Electricity)
+        self.cop = Output.ratio(self.thermal_power, self.electricity)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.secondary_out = Outlet(Stream)

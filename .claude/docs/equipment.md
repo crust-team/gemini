@@ -384,7 +384,7 @@ Ideal tee that divides a feed into two branches.
 - **Ports**: `feed_in` -> `first_out`, `second_out`.
 - **Controls**: `split_fraction` (`Fraction`): share of the mass flow sent to `second_out`.
 - **Parameters, boundaries, states, outputs**: none; read the branch flows from the outlets,
-  for example `Output.of("splitter.second_out.m_dot")` in a composite.
+  for example `Output.of(self.splitter.second_out.field("m_dot"))` in a composite.
 - **Model**: `m_second = x m_feed`, `m_first = m_feed - m_second`, both at feed T, p and fluid.
 - **Assumptions**: no tee loss or heat exchange; the commanded split stands for the balancing
   valves or branch resistances that set it; no hydraulic network solution.
@@ -1466,7 +1466,7 @@ Reusable production and reinjection limbs of a geothermal doublet (`gm.plants.Do
   `esp` (`ESP`), `riser` (`ProductionWell` above the ESP), `injector` (`InjectionWell`),
   `sink` (`InjectionReservoir`).
 - **Ports**: `return_in` -> `supply_out`.
-- **Outputs**: `electricity` and `heat_loss` (`Output.total` over the leaves).
+- **Outputs**: `electricity` and `heat_loss` (automatic sums over the leaves).
 - **Model**: `forward` injects `return_in` through injector and sink, then produces through
   reservoir, lower well, ESP and riser; `produce()` and `inject(stream)` are the two limbs,
   which a parent plant can connect separately (see [refactor-notes.md](refactor-notes.md)).
@@ -1497,8 +1497,8 @@ limbs fed from one return.
 - Ports: `return_in` -> `supply_out`.
 - Parameters, controls, boundaries, states: none of its own (children's: `production_rate` per
   reservoir, `frequency` per ESP, `split_fraction` per splitter).
-- Outputs: `electricity`, `heat_loss` (totals), `supply_out_T` (`Output.of` the last mixer's
-  `mixed_out_T`, or the single riser's `wellhead_temperature`).
+- Outputs: `electricity`, `heat_loss` (automatic sums), `supply_out_T` (`Output.of` the last
+  mixer's `mixed_out_T`, or the single riser's `wellhead_temperature`).
 - Model: each limb is traversed like `Doublet.produce`. N-way mixing is a cascade of two-way
   mixers, the running mix entering `first_in`; capacity-rate weighting is associative, so the
   cascade gives `sum(m_i cp_i T_i) / sum(m_i cp_i)` at the lowest wellhead pressure. The return

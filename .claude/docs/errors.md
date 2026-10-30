@@ -34,7 +34,7 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
 - `MissingValueError(RuntimeError, TypeError)`: a parameter, control or boundary has no value.
 - `OutputError(RuntimeError)`: an output assigned outside output computation or left unassigned,
   or an `Output.of` descendant not called exactly once.
-- `FormulaError(TypeError, ValueError)`: an `Output.of`, `Output.total` or `Output.ratio` formula
+- `FormulaError(TypeError, ValueError)`: an `Output.of`, `Output.ratio` or automatic-sum formula
   cannot be resolved.
 - `ConfigurationError(ValueError)`: equipment design data missing or inconsistent at call time,
   including calibration requests that do not fit the plant (`module.py`, equipment,

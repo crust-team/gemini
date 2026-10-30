@@ -9,6 +9,8 @@ from gemini.core.modules.subsurface import (
     ProductionWell,
 )
 from gemini.core.types import (
+    Electricity,
+    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -35,8 +37,8 @@ class Doublet(Module):
         self.return_in = Inlet(Stream)
 
         # Outputs
-        self.electricity = Output.total("electricity")
-        self.heat_loss = Output.total("heat_loss")
+        self.electricity = Output(Electricity)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.supply_out = Outlet(Stream)

@@ -10,7 +10,14 @@ from gemini.core.modules.subsurface import (
     ProductionReservoir,
     ProductionWell,
 )
-from gemini.core.types import Inlet, Outlet, Output, Stream
+from gemini.core.types import (
+    Electricity,
+    HeatLoss,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 from gemini.errors import ConfigurationError
 
 
@@ -59,12 +66,12 @@ class MultiWellPlant(Module):
         self.return_in = Inlet(Stream)
 
         # Outputs
-        self.electricity = Output.total("electricity")
-        self.heat_loss = Output.total("heat_loss")
+        self.electricity = Output(Electricity)
+        self.heat_loss = Output(HeatLoss)
         if producers > 1:
-            self.supply_out_T = Output.of(f"mixers.{producers - 2}.mixed_out_T")
+            self.supply_out_T = Output.of(self.mixers[producers - 2].mixed_out_T)
         else:
-            self.supply_out_T = Output.of("producers.0.riser.wellhead_temperature")
+            self.supply_out_T = Output.of(self.producers[0].riser.wellhead_temperature)
 
         # Outlets
         self.supply_out = Outlet(Stream)

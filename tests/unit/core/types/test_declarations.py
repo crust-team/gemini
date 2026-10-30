@@ -145,5 +145,5 @@ def test_invalid_values_raise_declaration_errors():
         parameter.validate("12 bar")
     with pytest.raises(DeclarationError, match="coefficients: shape = \\(1,\\); expected \\(2,\\)"):
         Parameter(list[float], shape=(2,)).bind(None, "coefficients").validate([1])
-    with pytest.raises(DeclarationError, match="Output.total"):
-        Output.total("electricity", Length)
+    with pytest.raises(DeclarationError, match="outlet.mdot: unknown stream field.*'m_dot'"):
+        Outlet(Stream).bind(None, "outlet").field("mdot")

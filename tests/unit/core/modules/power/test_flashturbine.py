@@ -69,7 +69,7 @@ class SingleFlash(Module):
         self.geofluid_in = Inlet(Stream)
 
         # Outputs
-        self.net_power = Output.of("turbine.electricity_generated")
+        self.net_power = Output.of(self.turbine.electricity_generated)
 
         # Outlets
         self.brine_out = Outlet(Stream)

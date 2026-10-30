@@ -7,7 +7,13 @@ import pytest
 import gemini as gm
 from gemini.core.modules import Boiler, Module, energy_balance, mass_balance
 from gemini.core.modules.storage import ThermalStorage
-from gemini.core.types import Inlet, Outlet, Output, Stream
+from gemini.core.types import (
+    Fuel,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 
 CP = 4217.4
 """Default fluid heat capacity [J/kg/K]."""
@@ -149,7 +155,7 @@ class BoilerCharging(Module):
         self.discharge_in = Inlet(Stream)
 
         # Outputs
-        self.fuel = Output.total("fuel")
+        self.fuel = Output(Fuel)
 
         # Outlets
         self.charge_out = Outlet(Stream)

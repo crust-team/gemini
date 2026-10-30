@@ -53,7 +53,7 @@ class Plant(Module):
         self.supply_in = Inlet(Stream)
 
         # Outputs
-        self.stored_energy = Output.of("storage.stored_energy")
+        self.stored_energy = Output.of(self.storage.stored_energy)
 
         # Outlets
         self.return_out = Outlet(Stream)

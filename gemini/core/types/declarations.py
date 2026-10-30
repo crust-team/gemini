@@ -209,52 +209,26 @@ class Output(Declaration):
         super().__init__(kind, description=description)
         self.soft_sensor = soft_sensor
         self.formula = None
-        self._formula_kind_given = True
         self._resolved_formula = None
 
     @classmethod
-    def _from_formula(cls, formula, kind, **kwargs):
-        """Declare a formula output; without ``kind`` the target's kind is adopted later."""
-        output = cls(kind or Any, **kwargs)
-        output.formula = formula
-        output._formula_kind_given = kind is not None
-        return output
-
-    @classmethod
-    def of(cls, target, kind=None, **kwargs):
+    def of(cls, target, **kwargs):
         """Declare an output copied from one exactly-once descendant call.
 
-        ``target`` is a descendant's output declaration, such as
-        ``self.heat_exchanger.duty``, or an outlet field, such as
-        ``self.degasser.gas.field("m_dot")``; the output takes the target's kind.
+        ``target`` is a descendant's output declaration, such as ``self.heat_exchanger.duty``,
+        or an outlet field, such as ``self.degasser.gas.field("m_dot")``; the output takes the
+        target's kind. The owning module checks the reference when the output is assigned.
         """
-        if isinstance(target, (Output, PortField)):
-            kind = target.kind
-        return cls._from_formula(("of", target), kind, **kwargs)
-
-    @classmethod
-    def total(cls, name, kind=None, **kwargs):
-        """Declare the sum of one additive output over descendant leaf calls."""
-        output = cls._from_formula(("total", name), kind, **kwargs)
-        if kind is not None and not output.additive:
-            raise DeclarationError(
-                f"Output.total({name!r}): quantity = {output.quantity or kind!r}; "
-                "expected an additive quantity"
-            )
+        output = cls(getattr(target, "kind", Any), **kwargs)
+        output.formula = ("of", target)
         return output
 
     @classmethod
-    def ratio(cls, numerator, denominator, kind=None, **kwargs):
-        """Declare the ratio of two earlier outputs on the same module."""
-        return cls._from_formula(("ratio", numerator, denominator), kind or Ratio | None, **kwargs)
-
-    def infer_kind(self, declaration):
-        """Adopt an inferred formula target kind while preserving output metadata."""
-        if self._formula_kind_given:
-            return
-        self.kind = declaration.kind
-        self._adapter = _adapter(self.kind, {})
-        self.schema, self.quantity, self.unit, self.additive = _schema_metadata(self._adapter)
+    def ratio(cls, numerator, denominator, **kwargs):
+        """Declare the ratio of two earlier outputs of the same module, given as declarations."""
+        output = cls(Ratio | None, **kwargs)
+        output.formula = ("ratio", numerator, denominator)
+        return output
 
 
 class Outlet(_StreamPort):

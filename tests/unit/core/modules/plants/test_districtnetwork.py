@@ -44,6 +44,18 @@ def test_heating_network_serves_both_substations(plants):
     assert mass_balance(network, result)["residual"] == 0
 
 
+def test_network_sums_leaf_outputs_by_type_through_nested_substations(plants):
+    """The network sums the consumers inside its substations once, not the substation sums."""
+    network = plants["network"](DistrictNetwork(consumers=3), plants["heating_substation"])
+    result = network(supply_in=HOT.with_(m_dot=4.5))
+    substation_sums = [
+        result.children[f"substations.{index}"].outputs.heat_supplied for index in range(3)
+    ]
+    assert network.outputs(recurse=False)["heat_supplied"].quantity == "heat_supplied"
+    assert result.outputs.heat_supplied == pytest.approx(sum(substation_sums), rel=1e-15)
+    assert result.outputs.heat_supplied == _leaf_sum(result, "heat_supplied")
+
+
 def test_three_way_split_and_mix(plants):
     """The cascades give every substation a third and mix three returns."""
     network = plants["network"](DistrictNetwork(consumers=3), plants["heating_substation"])

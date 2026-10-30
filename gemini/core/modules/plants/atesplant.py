@@ -4,7 +4,20 @@ from gemini.core.modules.heat import HeatExchanger, HeatPump
 from gemini.core.modules.module import Module
 from gemini.core.modules.pumps import CentrifugalPump
 from gemini.core.modules.subsurface import AquiferStorage
-from gemini.core.types import Control, Inlet, MassFlow, Outlet, Output, Parameter, Pressure, Stream
+from gemini.core.types import (
+    Control,
+    Electricity,
+    HeatAbsorbed,
+    HeatAccumulation,
+    HeatLoss,
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Parameter,
+    Pressure,
+    Stream,
+)
 
 
 class ATESPlant(Module):
@@ -64,13 +77,13 @@ class ATESPlant(Module):
         self.groundwater_flow = Control(MassFlow, ge=0)
 
         # Outputs
-        self.electricity = Output.total("electricity")
-        self.heat_loss = Output.total("heat_loss")
-        self.heat_absorbed = Output.total("heat_absorbed")
-        self.heat_accumulation = Output.total("heat_accumulation")
-        self.stored_energy = Output.of("storage.stored_energy")
-        self.production_T = Output.of("storage.production_T")
-        self.recovery_efficiency = Output.of("storage.recovery_efficiency")
+        self.electricity = Output(Electricity)
+        self.heat_loss = Output(HeatLoss)
+        self.heat_absorbed = Output(HeatAbsorbed)
+        self.heat_accumulation = Output(HeatAccumulation)
+        self.stored_energy = Output.of(self.storage.stored_energy)
+        self.production_T = Output.of(self.storage.production_T)
+        self.recovery_efficiency = Output.of(self.storage.recovery_efficiency)
 
         # Outlets
         self.building_out = Outlet(Stream)

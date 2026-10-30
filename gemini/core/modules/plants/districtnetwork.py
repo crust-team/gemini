@@ -6,7 +6,16 @@ from gemini.core.modules.piping import Mixer, Pipe, Splitter
 from gemini.core.modules.plants.coolingsubstation import CoolingSubstation
 from gemini.core.modules.plants.heatingsubstation import HeatingSubstation
 from gemini.core.modules.pumps import CentrifugalPump
-from gemini.core.types import Inlet, Outlet, Output, Stream
+from gemini.core.types import (
+    Electricity,
+    HeatAbsorbed,
+    HeatLoss,
+    HeatSupplied,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 from gemini.errors import ConfigurationError
 
 SUBSTATIONS = {"heating": HeatingSubstation, "cooling": CoolingSubstation}
@@ -63,11 +72,11 @@ class DistrictNetwork(Module):
 
         # Outputs
         if service == "heating":
-            self.heat_supplied = Output.total("heat_supplied")
-        self.heat_absorbed = Output.total("heat_absorbed")
-        self.heat_loss = Output.total("heat_loss")
-        self.electricity = Output.total("electricity")
-        self.return_out_T = Output.of("return_pipe.outlet_T")
+            self.heat_supplied = Output(HeatSupplied)
+        self.heat_absorbed = Output(HeatAbsorbed)
+        self.heat_loss = Output(HeatLoss)
+        self.electricity = Output(Electricity)
+        self.return_out_T = Output.of(self.return_pipe.outlet_T)
 
         # Outlets
         self.return_out = Outlet(Stream)

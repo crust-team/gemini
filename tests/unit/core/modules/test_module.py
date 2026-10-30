@@ -152,7 +152,7 @@ class NestedParent(Module):
         self.inlet = Inlet(Stream)
 
         # Outputs
-        self.child_value = Output.of("children_by_name.child.result")
+        self.child_value = Output.of(self.children_by_name.child.result)
 
         # Outlets
         self.outlet = Outlet(Stream)
@@ -476,7 +476,7 @@ class EnergyLeaf(Module):
 
 
 class FormulaParent(Module):
-    """Exercise copy, total, ratio and outlet-field formulas."""
+    """Exercise copy, automatic-sum, ratio and outlet-field formulas."""
 
     calls = 1
 
@@ -485,10 +485,10 @@ class FormulaParent(Module):
         super().__init__()
         self.child = EnergyLeaf()
         self.inlet = Inlet(Stream)
-        self.copied = Output.of("child.electricity")
-        self.total = Output.total("electricity")
-        self.ratio = Output.ratio("copied", "total")
-        self.mass = Output.of("child.outlet.m_dot")
+        self.copied = Output.of(self.child.electricity)
+        self.electricity = Output(Electricity)
+        self.ratio = Output.ratio(self.copied, self.electricity)
+        self.mass = Output.of(self.child.outlet.field("m_dot"))
         self.outlet = Outlet(Stream)
 
     def forward(self, inlets):
@@ -507,18 +507,20 @@ class RepeatedParent(FormulaParent):
 
 def test_formula_outputs_copy_sum_divide_and_read_outlet_fields():
     """Formula outputs use this call's exact descendant records in declaration order."""
-    result = FormulaParent()(inlet=STREAM)
-    assert dict(result.outputs) == {"copied": 2, "total": 2, "ratio": 1, "mass": 1}
+    module = FormulaParent()
+    result = module(inlet=STREAM)
+    assert dict(result.outputs) == {"copied": 2, "electricity": 2, "ratio": 1, "mass": 1}
+    assert module.outputs()["copied"].quantity == "electricity"
 
 
 class RepeatedTotal(Module):
     """Sum the output of one leaf called twice."""
 
     def __init__(self):
-        """Declare one child and a total."""
+        """Declare one child and a summed output."""
         super().__init__()
         self.child = EnergyLeaf()
-        self.total = Output.total("electricity")
+        self.electricity = Output(Electricity)
 
     def forward(self, inlets):
         """Call the child twice."""
@@ -528,57 +530,10 @@ class RepeatedTotal(Module):
         return outlets
 
 
-class ReferenceParent(Module):
-    """Exercise copy, sum, ratio and outlet-field formulas written with direct references."""
-
-    def __init__(self):
-        """Declare one child and every formula kind by reference."""
-        super().__init__()
-
-        # Modules
-        self.child = EnergyLeaf()
-
-        # Inlets
-        self.inlet = Inlet(Stream)
-
-        # Outputs
-        self.copied = Output.of(self.child.electricity)
-        self.electricity = Output(Electricity)
-        self.ratio = Output.ratio(self.copied, self.electricity)
-        self.mass = Output.of(self.child.outlet.field("m_dot"))
-
-        # Outlets
-        self.outlet = Outlet(Stream)
-
-    def forward(self, inlets):
-        """Call the child once."""
-
-        # Modules
-        child = self.child(inlet=inlets.inlet)
-
-        # Outlets
-        outlet = child.outlets.outlet
-
-        outlets = dict(outlet=outlet)
-        return outlets
-
-
-def test_reference_formulas_copy_sum_divide_and_read_outlet_fields():
-    """Reference formulas resolve to this call's descendant records and adopt the target kind."""
-    module = ReferenceParent()
-    assert dict(module(inlet=STREAM).outputs) == {
-        "copied": 2,
-        "electricity": 2,
-        "ratio": 1,
-        "mass": 1,
-    }
-    assert module.outputs()["copied"].quantity == "electricity"
-
-
 def test_reference_formulas_survive_deep_copy_and_nesting():
     """A copied or nested composite resolves its references to its own descendants."""
-    copy = deepcopy(ReferenceParent())
-    holder = ModuleDict({"inner": ReferenceParent()})
+    copy = deepcopy(FormulaParent())
+    holder = ModuleDict({"inner": FormulaParent()})
     assert copy(inlet=STREAM).outputs.copied == 2
     assert holder.inner(inlet=STREAM).outputs.mass == 1
 
@@ -618,7 +573,7 @@ def test_wrong_references_fail_when_the_class_is_built():
 
 def test_total_counts_every_call():
     """A leaf called twice contributes twice to a total."""
-    assert RepeatedTotal()().outputs.total == 4
+    assert RepeatedTotal()().outputs.electricity == 4
 
 
 class SummedParent(Module):
@@ -777,12 +732,17 @@ class MassUse(PowerUse):
 class FormulaOf(Module):
     """Composite over power and mass leaves with one configurable formula output."""
 
-    def __init__(self, formula):
-        """Declare both leaves and the formula under test."""
+    def __init__(self, build):
+        """Declare both leaves, then the outputs that ``build(self)`` returns by name."""
         super().__init__()
+
+        # Modules
         self.power = PowerUse()
         self.mass = MassUse()
-        self.value = formula
+
+        # Outputs
+        for name, declaration in build(self).items():
+            setattr(self, name, declaration)
 
     def forward(self, inlets):
         """Call both leaves once."""
@@ -792,23 +752,32 @@ class FormulaOf(Module):
         return outlets
 
 
-def test_total_requires_one_unit():
+def test_sum_requires_one_unit():
     """Summing power and mass flow is rejected."""
-    with pytest.raises(gm.errors.FormulaError, match="differing units"):
-        FormulaOf(Output.total("use"))()
+    with pytest.raises(gm.errors.FormulaError, match="power.use = power \\[W\\]; expected mass"):
+        FormulaOf(lambda module: {"use": Output(MassFlow)})()
 
 
 def test_zero_denominator_ratio_is_none():
     """A ratio with a zero divisor records ``None``."""
-    module = FormulaOf(Output.of("power.use"))
-    module.ratio = Output.ratio("value", "value")
+    module = FormulaOf(lambda module: {"value": Output.of(module.power.use)})
+    module.ratio = Output.ratio(module.value, module.value)
     assert module().outputs.ratio is None
 
 
-def test_formula_typo_suggests_the_close_path():
-    """A misspelled formula path names the closest valid one."""
-    with pytest.raises(gm.errors.FormulaError, match="did you mean 'power.use'"):
-        FormulaOf(Output.of("power.ues"))()
+def test_formula_typo_fails_when_the_class_is_built():
+    """A misspelled reference fails in ``__init__``, before any call."""
+    with pytest.raises(AttributeError, match="ues"):
+        FormulaOf(lambda module: {"value": Output.of(module.power.ues)})
+
+
+def test_formula_strings_are_rejected():
+    """Formulas take declaration references; path strings and ``Output.total`` are gone."""
+    assert not hasattr(Output, "total")
+    with pytest.raises(gm.errors.FormulaError, match="expected a descendant output declaration"):
+        FormulaOf(lambda module: {"value": Output.of("power.use")})
+    with pytest.raises(gm.errors.FormulaError, match="'value' is not an earlier output"):
+        FormulaOf(lambda module: {"value": Output.ratio("value", "value")})
 
 
 def test_listings_recurse_by_default_and_ports_stay_local(fresh_plant):

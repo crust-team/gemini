@@ -142,7 +142,7 @@ def _chain(plant, dataset, data):
 
 
 def _total_electricity(frame):
-    """Sum leaf electricity per row in result order, as the plant's ``Output.total`` does."""
+    """Sum leaf electricity per row in result order, as the plant's summed output does."""
     electricity = frame.xs("electricity", axis=1, level="field")
     return np.array([sum(row) for row in electricity.itertuples(index=False)])
 

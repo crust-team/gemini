@@ -198,9 +198,9 @@ class Share(Module):
         self.meter = Meter()
 
         # Outputs
-        self.reading = Output.of("meter.reading")
-        self.power = Output.of("meter.power")
-        self.share = Output.ratio("reading", "power")
+        self.reading = Output.of(self.meter.reading)
+        self.power = Output.of(self.meter.power)
+        self.share = Output.ratio(self.reading, self.power)
 
     def forward(self, inlets):
         """Call the meter once."""

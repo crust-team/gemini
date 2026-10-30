@@ -134,7 +134,7 @@ class Campus(Module):
         self.return_in = Inlet(Stream)
 
         # Outputs
-        self.stored_energy = Output.of("ates.stored_energy")
+        self.stored_energy = Output.of(self.ates.stored_energy)
 
         # Outlets
         self.supply_out = Outlet(Stream)

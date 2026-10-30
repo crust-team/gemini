@@ -80,7 +80,7 @@ class Line(Module):
         self.inlet = Inlet(Stream)
 
         # Outputs
-        self.duty = Output.total("duty")
+        self.duty = Output(Duty)
 
         # Outlets
         self.outlet = Outlet(Stream)

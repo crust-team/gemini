@@ -58,7 +58,7 @@ class HeatPumpLoop(Module):
         self.inlet = Inlet(Stream)
 
         # Outputs
-        self.heat_extraction_rate = Output.of("field.heat_extraction_rate")
+        self.heat_extraction_rate = Output.of(self.field.heat_extraction_rate)
 
         # Outlets
         self.outlet = Outlet(Stream)

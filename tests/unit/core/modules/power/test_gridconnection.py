@@ -61,7 +61,7 @@ class GridPlant(Module):
         self.water_in = Inlet(Stream)
 
         # Outputs
-        self.net_export = Output.of("grid.net_export")
+        self.net_export = Output.of(self.grid.net_export)
 
         # Outlets
         self.brine_out = Outlet(Stream)

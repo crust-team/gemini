@@ -110,7 +110,7 @@ class ControlledTank(Module):
         self.measured_temperature = Boundary(Temperature)
 
         # Outputs
-        self.command = Output.of("controller.command")
+        self.command = Output.of(self.controller.command)
 
         # Outlets
         self.charge_out = Outlet(Stream)

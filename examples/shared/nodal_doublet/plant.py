@@ -9,7 +9,18 @@ from gemini.core.modules.subsurface import (
     ProductionReservoir,
     ProductionWell,
 )
-from gemini.core.types import Boundary, Inlet, MassFlow, Outlet, Output, Parameter, Pressure, Stream
+from gemini.core.types import (
+    Boundary,
+    Electricity,
+    HeatLoss,
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Parameter,
+    Pressure,
+    Stream,
+)
 
 
 class NodalDoublet(Module):
@@ -53,8 +64,8 @@ class NodalDoublet(Module):
         self.wellhead_pressure = Boundary(Pressure)
 
         # Outputs
-        self.electricity = Output.total("electricity")
-        self.heat_loss = Output.total("heat_loss")
+        self.electricity = Output(Electricity)
+        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.supply_out = Outlet(Stream)

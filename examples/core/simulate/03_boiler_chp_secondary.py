@@ -23,7 +23,15 @@ from examples.shared.nodal_doublet import NodalDoublet
 from gemini.core.modules import CHP, Boiler, HeatExchanger, Mixer, Splitter, emissions
 from gemini.core.modules.treatment import Degasser, Filter
 from gemini.core.physics.geometry import build_path
-from gemini.core.types import Inlet, Outlet, Output, Stream
+from gemini.core.types import (
+    Electricity,
+    ElectricityGenerated,
+    Fuel,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 
 GAS_FACTOR = 56.6 / 1e9
 """CO2 emitted per joule of natural gas [kg/J]: 56.6 kg/GJ."""
@@ -59,13 +67,13 @@ class BoilerChpPlant(gm.modules.Module):
         self.secondary_in = Inlet(Stream)
 
         # Outputs
-        self.production_rate = Output.of("doublet.riser.wellhead.m_dot")
-        self.exchanger_duty = Output.of("heat_exchanger.duty")
-        self.injection_pump_electricity = Output.of("doublet.injection_pump.electricity")
-        self.electricity = Output.total("electricity")
-        self.electricity_generated = Output.total("electricity_generated")
-        self.fuel = Output.total("fuel")
-        self.secondary_out_T = Output.of("mixer.mixed_out_T")
+        self.production_rate = Output.of(self.doublet.riser.wellhead.field("m_dot"))
+        self.exchanger_duty = Output.of(self.heat_exchanger.duty)
+        self.injection_pump_electricity = Output.of(self.doublet.injection_pump.electricity)
+        self.electricity = Output(Electricity)
+        self.electricity_generated = Output(ElectricityGenerated)
+        self.fuel = Output(Fuel)
+        self.secondary_out_T = Output.of(self.mixer.mixed_out_T)
 
         # Outlets
         self.secondary_out = Outlet(Stream)

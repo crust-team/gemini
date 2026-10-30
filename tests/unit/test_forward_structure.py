@@ -162,7 +162,7 @@ def test_registered_forward_structure(module_class):
 
 
 def test_leaf_and_composite_output_conventions(module_class):
-    """Leaves compute plain outputs; composites declare formulas only."""
+    """Leaves compute plain outputs; composites declare formulas and automatic sums only."""
     cls = module_class
     module = cls()
     outputs = list(module.outputs(recurse=False).values())
@@ -171,7 +171,7 @@ def test_leaf_and_composite_output_conventions(module_class):
         if outputs:
             assert type(module)._compute_outputs is not Module._compute_outputs
     else:
-        assert all(output.formula is not None for output in outputs)
+        assert all(output.formula is not None or output.additive for output in outputs)
         assert type(module)._compute_outputs is Module._compute_outputs
 
 

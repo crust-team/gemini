@@ -7,7 +7,14 @@ import pytest
 import gemini as gm
 from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.storage import IceStorage
-from gemini.core.types import GLYCOL_30, Inlet, Outlet, Output, Stream
+from gemini.core.types import (
+    GLYCOL_30,
+    Duty,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+)
 
 MASS = 1000.0
 UA = 2000.0
@@ -125,7 +132,7 @@ class StoreLine(Module):
         self.inlet = Inlet(Stream)
 
         # Outputs
-        self.duty = Output.total("duty")
+        self.duty = Output(Duty)
 
         # Outlets
         self.outlet = Outlet(Stream)

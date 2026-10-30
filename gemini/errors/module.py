@@ -32,7 +32,7 @@ class OutputError(GeminiError, RuntimeError):
 
 
 class FormulaError(GeminiError, TypeError, ValueError):
-    """An ``Output.of``, ``Output.total`` or ``Output.ratio`` formula cannot be resolved."""
+    """An ``Output.of``, ``Output.ratio`` or automatic-sum formula cannot be resolved."""
 
 
 class ConfigurationError(GeminiError, ValueError):

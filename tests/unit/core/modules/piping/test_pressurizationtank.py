@@ -5,7 +5,15 @@ import pytest
 import gemini as gm
 from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
-from gemini.core.types import Boundary, Inlet, Outlet, Output, Stream, Temperature
+from gemini.core.types import (
+    Boundary,
+    HeatLoss,
+    Inlet,
+    Outlet,
+    Output,
+    Stream,
+    Temperature,
+)
 
 RETURN = Stream(m_dot=10, T=323.15, p=1.2e5)
 
@@ -33,8 +41,8 @@ class Network(Module):
         self.ambient_temperature = Boundary(Temperature)
 
         # Outputs
-        self.heat_loss = Output.total("heat_loss")
-        self.pressure_correction = Output.of("tank.pressure_correction")
+        self.heat_loss = Output(HeatLoss)
+        self.pressure_correction = Output.of(self.tank.pressure_correction)
 
         # Outlets
         self.outlet = Outlet(Stream)

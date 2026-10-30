@@ -44,14 +44,14 @@ def test_handwritten_wiring_and_split_helpers(example):
     assert well.intake_conditions(bottom) == leaves["doublet.well"].outlets["wellhead"]
     discharge = leaves["doublet.esp"].outlets["discharge"]
     assert well.wellhead_from_discharge(discharge) == leaves["doublet.riser"].outlets["wellhead"]
-    assert result.outputs.electricity_use == collect_flows(result)["electricity"]
+    assert result.outputs.electricity == collect_flows(result)["electricity"]
     assert result.outputs.cop == pytest.approx(
-        result.outputs.thermal_power / result.outputs.electricity_use
+        result.outputs.thermal_power / result.outputs.electricity
     )
     assert mass_balance(plant, result)["relative_residual"] < 1e-12
     balance = energy_balance(plant, result)
     assert balance["relative_thermal_residual"] < 1e-12
-    assert balance["residual"] == pytest.approx(result.outputs.electricity_use)
+    assert balance["residual"] == pytest.approx(result.outputs.electricity)
 
 
 def test_trace_hooks_are_removed_after_failure(example):
