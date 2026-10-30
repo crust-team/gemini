@@ -6,8 +6,6 @@ without the enhancement factor, which ASHRAE Fundamentals includes in its tabula
 humidity ratios (about 0.4 % at sea level); see ``humidity_ratio``.
 """
 
-import math
-
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 
@@ -150,11 +148,14 @@ def humidity_ratio(temperature: float, relative_humidity: float, pressure: float
     _check_temperature("humidity_ratio", temperature)
     _check_relative_humidity("humidity_ratio", relative_humidity, minimum_included=True)
     vapour_pressure = relative_humidity * saturation_pressure(temperature)
-    if math.isnan(pressure) or pressure <= vapour_pressure:
-        raise PhysicsRangeError(
-            f"humidity_ratio: pressure = {pressure} Pa; expected more than the vapour pressure "
-            f"{vapour_pressure} Pa"
-        )
+    ops.check(
+        pressure > vapour_pressure,
+        PhysicsRangeError,
+        "humidity_ratio: pressure = {pressure} Pa; expected more than the vapour pressure "
+        "{vapour_pressure} Pa",
+        pressure=pressure,
+        vapour_pressure=vapour_pressure,
+    )
     return MOLAR_MASS_RATIO * vapour_pressure / (pressure - vapour_pressure)
 
 
@@ -188,18 +189,24 @@ def wet_bulb_temperature(temperature: float, relative_humidity: float) -> float:
     """
     _check_number("wet_bulb_temperature", temperature=temperature)
     _check_number("wet_bulb_temperature", relative_humidity=relative_humidity)
-    if not 253.15 <= temperature <= 323.15 or not 0.05 <= relative_humidity <= 0.99:
-        raise PhysicsRangeError(
-            f"wet_bulb_temperature: temperature = {temperature} K, relative_humidity = "
-            f"{relative_humidity}; expected 253.15 K to 323.15 K and 0.05 to 0.99"
-        )
+    ops.check(
+        ops.logical_and(
+            ops.logical_and(temperature >= 253.15, temperature <= 323.15),
+            ops.logical_and(relative_humidity >= 0.05, relative_humidity <= 0.99),
+        ),
+        PhysicsRangeError,
+        "wet_bulb_temperature: temperature = {temperature} K, relative_humidity = "
+        "{relative_humidity}; expected 253.15 K to 323.15 K and 0.05 to 0.99",
+        temperature=temperature,
+        relative_humidity=relative_humidity,
+    )
     celsius = temperature - 273.15
     percent = 100 * relative_humidity
     wet_bulb = (
-        celsius * math.atan(0.151977 * math.sqrt(percent + 8.313659))
-        + math.atan(celsius + percent)
-        - math.atan(percent - 1.676331)
-        + 0.00391838 * percent**1.5 * math.atan(0.023101 * percent)
+        celsius * ops.atan(0.151977 * ops.sqrt(percent + 8.313659))
+        + ops.atan(celsius + percent)
+        - ops.atan(percent - 1.676331)
+        + 0.00391838 * percent**1.5 * ops.atan(0.023101 * percent)
         - 4.686035
     )
     return wet_bulb + 273.15

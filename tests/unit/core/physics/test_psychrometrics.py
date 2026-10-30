@@ -164,3 +164,17 @@ def test_dew_point_in_a_graph_runs_the_solver_and_raises_the_check_error():
     np.testing.assert_allclose(run(columns)["dew"], expected, rtol=1e-12, atol=0)
     with pytest.raises(PhysicsRangeError, match="expected a dew point above"):
         run({"temperature": np.array([300.0, 300.0]), "humidity": np.array([0.5, 1e-9])})
+
+
+def test_humidity_ratio_and_wet_bulb_on_arrays_match_floats():
+    """Dry, ice, water and saturated air agree on arrays and floats, errors included."""
+    rows = [(300.0, 0.5, 101325.0), (250.0, 0.0, 101325.0), (280.0, 1.0, 101325.0)]
+    assert_function_matches(psychrometrics.humidity_ratio, rows)
+    for bad in [(300.0, 0.5, 100.0), (300.0, 0.5, math.nan), (300.0, 1.5, 101325.0)]:
+        assert_same_error(psychrometrics.humidity_ratio, [rows[0], bad], PhysicsRangeError)
+    wet_rows = [(300.0, 0.5), (260.0, 0.06), (323.15, 0.99), (253.15, 0.05)]
+    assert_function_matches(psychrometrics.wet_bulb_temperature, wet_rows)
+    for bad in [(330.0, 0.5), (300.0, 0.01), (300.0, math.nan)]:
+        assert_same_error(
+            psychrometrics.wet_bulb_temperature, [wet_rows[0], bad], PhysicsRangeError
+        )
