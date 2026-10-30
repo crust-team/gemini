@@ -61,6 +61,7 @@ def _guards(module, fluids):
         tuple(module._pre_hooks.values()),
         outputs_enabled(),
         runtime.get_precision(),
+        module.fluid,
         tuple(fluids[name] for name in module._inlets),
     )
 

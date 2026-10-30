@@ -24,6 +24,15 @@ def test_numeric_parameter_values_do_not_retrace_but_guards_do(gain):
     assert cache.traces == 4
 
 
+def test_a_changed_module_fluid_retraces(gain):
+    """The module's own fluid is baked into a trace, so changing it makes a new graph."""
+    cache = GraphCache()
+    fluids = {"inlet": gain.fluid}
+    first = cache.graph(gain, fluids)
+    gain.fluid = gm.WATER
+    assert cache.graph(gain, fluids) is not first and cache.traces == 2
+
+
 def test_graph_breaks_are_remembered(gain):
     """A module that cannot be traced raises its cached ``TraceError`` without retracing."""
     cache = GraphCache()

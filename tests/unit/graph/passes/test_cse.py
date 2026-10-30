@@ -6,8 +6,8 @@ import math
 import numpy as np
 import pytest
 
+import gemini as gm
 from gemini import backends, ops
-from gemini.core.types.flows import StreamState
 from gemini.errors import PhysicsRangeError
 from gemini.graph import Graph, GraphCache, Interpreter, run
 from gemini.graph.passes import eliminate_common_subexpressions
@@ -60,9 +60,7 @@ def esp(shared_plant):
 
 def _suction(esp, rows):
     density = esp.fluid.properties(None, None).density
-    return StreamState(
-        m_dot=rows[:, 0] * density, T=rows[:, 1], p=rows[:, 2], fluid=esp.fluid, density=None
-    )
+    return gm.Stream(m_dot=rows[:, 0] * density, T=rows[:, 1], p=rows[:, 2], fluid=esp.fluid)
 
 
 def test_esp_graph_shrinks_and_keeps_its_results(esp, week):

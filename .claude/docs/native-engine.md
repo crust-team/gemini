@@ -207,8 +207,8 @@ Implemented for one leaf module, the ESP, and everything its call needs:
   pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
   row on a graph break, then observer replay).
 - `core/modules/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
-  ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `StreamState` is the
-  pydantic-free stream of traced calls.
+  ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `Stream` is one
+  slots dataclass used on every path.
 - The traced ESP on NumPy equals the untraced ESP exactly on the July data (tolerance 1e-12,
   `tests/integration/test_graph_esp.py`) and is about 390 times faster
   (`scripts/benchmark_esp.py`).
@@ -239,11 +239,19 @@ Where the prototype differs from sections 1 to 11, and why:
   coefficient, on the last axis so a scenario axis can lead.
 - **No `named_constants` or `named_states`.** A module's constants are known only by tracing
   its physics (`graph.by_role("constant")`); `states()` already lists states.
-- **`FluidProperties` and `Stream` stay pydantic** (the physics tests rely on `model_dump` and
-  `ValidationError`); the traced path uses `StreamState` and the fluid properties `rho_l`,
-  `rho_g` and `gmf` as inlet inputs. `StreamState.with_` raises `PhysicsRangeError` where a
-  `Stream` raises pydantic's `ValidationError`. Output declaration bounds are not checked on
-  the traced path (for the ESP they follow from the other checks).
+- **`Stream` and `FluidProperties` are plain slots dataclasses.** `StreamState` and the `rho_l`,
+  `rho_g` and `gmf` graph inputs are gone. Validation happens at the boundary and raises
+  `gm.errors`: numbers become `float`; `m_dot` must be finite, `T > 0`, `p >= 0`
+  (`PhysicsRangeError`). When a field is an array or a traced value the same limits are
+  `ops.check` calls, so an invalid row raises the same class. `with_` is a trusted copy
+  (`object.__new__`, same `Fluid`, only changed fields checked), about 5 us against 25 us before.
+  A traced inlet is a `Stream` of `Proxy` fields with the concrete `Fluid`: **a `Fluid` is static
+  during a trace**, its property values are plain floats in the graph, not named inputs, and the
+  module's own fluid and the inlet fluids are cache guards. This departs from section 4 for fluid
+  properties: they are configuration selected by a guard, and it keeps two-phase branching on
+  `gas_mass_fraction` structural. `Parameter(structural=True)` is read as a plain value in a
+  trace and its value is a cache guard (`traced_shape` in `tracer.py`); use it for a numeric value
+  that decides structure. `Declaration.schema` of a port is `{}`.
 - **Units** are recorded on graph inputs only; the unit-check pass is not implemented.
 - **Graph breaks** are composites, stateful modules (no `scan` yet), modules with pre-hooks and
   float32 precision, besides any `TraceError` from Python control flow or conversions.
