@@ -21,7 +21,7 @@ from gemini.core.modules.module import _Call, _current_call
 from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
 from gemini.errors import MissingValueError, TraceError
-from gemini.graph.node import STREAM_FIELDS, row_item
+from gemini.graph.node import STREAM_FIELDS, row_item, row_streams, stack_column
 from gemini.ops import Symbolic, registry
 from gemini.ops.registry import get
 
@@ -141,31 +141,27 @@ def evaluate_break(node, operands):
     arrays = [np.asarray(operand) for operand in operands]
     scalar = all(array.ndim == 0 for array in arrays)
     rows = 1 if scalar else max(array.size for array in arrays)
-    columns = {key: np.full(rows, np.nan) for key in attributes["keys"]}
-    ok = np.ones(rows, dtype=bool)
-    exceptions = {}
+    values, exceptions = {}, {}
     for row in range(rows):
         try:
             with backends.settings(backend=None):
-                values = _call_row(attributes, [row_item(array, row) for array in arrays])
+                values[row] = _call_row(attributes, [row_item(array, row) for array in arrays])
         except Exception as error:
-            ok[row] = False
             exceptions[row] = error
-            continue
-        for key, value in values.items():
-            columns[key][row] = value
+    columns = {
+        key: stack_column([values[row][key] if row in values else None for row in range(rows)])
+        for key in attributes["keys"]
+    }
+    ok = np.array([row in values for row in range(rows)], dtype=bool)
     return BreakResult(columns, ok, exceptions, scalar)
 
 
 def _call_row(attributes, items):
     """Call the module with one row and return its output and outlet values by key."""
     module = attributes["module"]
-    arguments, position = {}, 0
-    for port, fluid in attributes["inlets"]:
-        fields = dict(zip((field for field, _ in STREAM_FIELDS), items[position : position + 3]))
-        arguments[port] = Stream(**fields, fluid=fluid)
-        position += 3
-    arguments.update(zip(attributes["names"], items[position:]))
+    fields = iter(items)
+    arguments = row_streams(dict(attributes["inlets"]), lambda port, field: next(fields))
+    arguments.update(zip(attributes["names"], fields))
     result = module(**arguments)
     values = {}
     for key in attributes["keys"]:

@@ -17,9 +17,8 @@ from contextlib import contextmanager
 import numpy as np
 
 from gemini import backends
-from gemini.core.types.flows import Stream
 from gemini.graph.graph import Graph
-from gemini.graph.node import STREAM_FIELDS, row_item
+from gemini.graph.node import STREAM_FIELDS, row_item, row_streams, stack_column
 
 _ABSENT = object()
 
@@ -68,13 +67,9 @@ def run_rows(graph, feeds, rows, context):
 def _call_row(graph, feeds, row, dt, state):
     """Return the result of one row and the states after it."""
     module = graph.root
-    streams = {
-        port: Stream(
-            **{field: row_item(feeds[f"{port}.{field}"], row) for field, _ in STREAM_FIELDS},
-            fluid=fluid,
-        )
-        for port, fluid in graph.inlet_fluids.items()
-    }
+    streams = row_streams(
+        graph.inlet_fluids, lambda port, field: row_item(feeds[f"{port}.{field}"], row)
+    )
     fields = graph.by_role("inlet")
     inputs = {name: row_item(value, row) for name, value in feeds.items() if name not in fields}
     with backends.settings(backend=None), _applied(module, inputs):
@@ -124,7 +119,9 @@ def stacked(results, rows):
 
     def stack(_):
         index = next(position)
-        return _column([columns[row][index] if row in columns else np.nan for row in range(rows)])
+        return stack_column(
+            [columns[row][index] if row in columns else np.nan for row in range(rows)]
+        )
 
     return first.mapped(stack)
 
@@ -139,8 +136,3 @@ def _flatten(result):
 
     result.mapped(visit)
     return values
-
-
-def _column(values):
-    """Return the values of one tree position over the rows as an array; ``None`` is NaN."""
-    return np.array([np.nan if value is None else value for value in values])

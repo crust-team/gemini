@@ -25,7 +25,7 @@ from gemini import backends
 from gemini.core.types.results import Values
 from gemini.graph.failures import RowView, row_error
 from gemini.graph.interpreter import Interpreter
-from gemini.graph.node import Node
+from gemini.graph.node import Node, stack_column
 from gemini.graph.proxy import Proxy
 from gemini.graph.rootbreak import run_rows, stacked
 from gemini.ops import Constant
@@ -98,7 +98,7 @@ def _python_evaluation(graph, feeds, rows):
     codes = np.array(row_codes, dtype=int)
 
     def column(node):
-        return _stacked([values[node] for values in row_values])
+        return stack_column([values[node] for values in row_values])
 
     def error(row):
         return row_error(graph.checks[codes[row] - 1], RowView(row_values[row], 0, feeds))
@@ -113,11 +113,6 @@ def _row_feeds(graph, feeds, rows, row):
         shape = graph.inputs[name].shape
         values[name] = np.broadcast_to(np.asarray(value), (rows, *shape))[row].tolist()
     return values
-
-
-def _stacked(values):
-    """Return the values of a node over the rows as an array; ``None`` is NaN."""
-    return np.array([np.nan if value is None else value for value in values])
 
 
 def _assembled(graph, rows, codes, column, error):
