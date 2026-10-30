@@ -10,6 +10,7 @@ leading scenario axis.
 import numpy as np
 
 from gemini.backends.base import Backend
+from gemini.backends.solvers import brent_roots, newton_roots
 
 
 def quiet(function, *values):
@@ -238,3 +239,13 @@ class NumpyBackend(Backend):
     def interp(self, x, xp, fp):
         """Return the linear interpolation of ``(xp, fp)`` at ``x``."""
         return np.interp(x, xp, fp)
+
+    def brentq(self, low, high, *args, function, xtol, rtol, maxiter):
+        """Return the root of ``function(x, *args)`` in ``[low, high]`` per row, NaN if none."""
+        with np.errstate(all="ignore"):
+            return brent_roots(function, low, high, args, xtol, rtol, maxiter)
+
+    def newton(self, start, *args, function, derivative, tolerance, max_iterations):
+        """Return the Newton iterate of each row, NaN where the iteration fails."""
+        with np.errstate(all="ignore"):
+            return newton_roots(function, derivative, start, args, tolerance, max_iterations)

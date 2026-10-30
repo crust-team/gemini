@@ -2,9 +2,10 @@
 
 The registry only describes ops; backends implement them (``gemini.backends``) and the graph
 records them. The kind is what graph passes rely on: ``elementwise`` ops apply row by row,
-``index`` selects one item of a vector parameter, ``check`` produces per-row error codes and
-``scan`` carries state from step to step. ``reduction``, ``interp`` and ``solver`` are the kinds
-of the design that no op uses yet.
+``index`` selects one item of a vector parameter, ``check`` produces per-row error codes,
+``solver`` ops (``brentq``, ``newton``) find roots with per-row stopping and keep their function
+and settings in node attributes (the arity counts the fixed operands, ``args`` follow), and
+``scan`` carries state from step to step.
 """
 
 from dataclasses import dataclass

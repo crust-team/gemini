@@ -36,7 +36,8 @@ def dispatch(name, *operands, attributes=None):
     values = tuple(
         operand.value if isinstance(operand, Constant) else operand for operand in operands
     )
-    return backends.implementation(backends.select(values), name)(*values)
+    method = backends.implementation(backends.select(values), name)
+    return method(*values, **(attributes or {}))
 
 
 def elementwise_op(name, arity, summary):

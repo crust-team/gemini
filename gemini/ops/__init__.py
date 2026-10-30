@@ -5,7 +5,7 @@ functions here cover what operators cannot express: ``where`` instead of a value
 ``if``, ``check`` instead of ``if ...: raise``, ``logical_and``, ``logical_or`` and
 ``logical_not`` instead of ``and``, ``or`` and ``not``, ``maximum``, ``minimum`` and ``abs``
 instead of ``max``, ``min`` and ``abs``, and the functions of ``math`` (``log``, ``sqrt``,
-``exp``, ...), reductions and ``interp``.
+``exp``, ...), reductions, ``interp`` and the solvers ``brentq`` and ``newton``.
 ``Constant`` declares a named constant that a trace records as a graph input.
 """
 
@@ -45,6 +45,7 @@ from gemini.ops.elementwise import (
 from gemini.ops.logic import eq, ge, gt, le, logical_and, lt, ne, where
 from gemini.ops.math import add, floordiv, getitem, mod, mul, neg, pow, sub, truediv
 from gemini.ops.reductions import cumsum, interp, mean, sum
+from gemini.ops.solvers import brentq, newton
 
 __all__ = [
     "Constant",
@@ -56,6 +57,7 @@ __all__ = [
     "asin",
     "atan",
     "atan2",
+    "brentq",
     "ceil",
     "check",
     "clip",
@@ -90,6 +92,7 @@ __all__ = [
     "mul",
     "ne",
     "neg",
+    "newton",
     "pow",
     "round",
     "sign",

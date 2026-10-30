@@ -45,6 +45,8 @@ class Interpreter:
         method = backends.implementation(self.backend, node.op)
         if node.op == "check":
             return method(operands[0], node.code)
+        if node.kind == "solver":
+            return method(*operands, **node.attributes)
         return method(*operands)
 
     def _errors(self, values):

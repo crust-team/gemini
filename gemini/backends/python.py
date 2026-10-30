@@ -9,11 +9,13 @@ or overflows give ``inf`` or ``nan`` exactly as NumPy does. The valid operands g
 Python result.
 """
 
+import itertools
 import math
 from bisect import bisect_right
 from itertools import accumulate
 
 import numpy as np
+from scipy import optimize
 
 from gemini.backends.base import Backend
 
@@ -323,3 +325,31 @@ class PythonBackend(Backend):
         if result != result and fp[index] == fp[index + 1]:
             return fp[index]
         return result
+
+    def brentq(self, low, high, *args, function, xtol, rtol, maxiter):
+        """Return the root of ``function(x, *args)`` in ``[low, high]`` by ``scipy`` Brent.
+
+        A bracket without a sign change, or no convergence, gives NaN instead of an error.
+        """
+        try:
+            return optimize.brentq(
+                function, low, high, args=args, xtol=xtol, rtol=rtol, maxiter=maxiter
+            )
+        except (ValueError, RuntimeError):
+            return math.nan
+
+    def newton(self, start, *args, function, derivative, tolerance, max_iterations):
+        """Return the Newton iterate that stops the loop, NaN where the iteration fails.
+
+        The loop stops when a step is below ``tolerance`` times the current value, or at
+        iteration ``max_iterations``, and returns the value before that step without a warning.
+        """
+        value = start
+        for iteration in itertools.count():
+            try:
+                following = value - function(value, *args) / derivative(value, *args)
+            except (ZeroDivisionError, OverflowError):
+                return math.nan
+            if abs(following - value) < tolerance * value or iteration >= max_iterations:
+                return value if math.isfinite(value) else math.nan
+            value = following
