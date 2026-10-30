@@ -5,7 +5,6 @@ from typing import Literal
 from gemini import ops
 from gemini.core.modules.heat import _sorption as sorption
 from gemini.core.modules.module import Module
-from gemini.core.physics import refrigeration
 from gemini.core.types import (
     Control,
     Dimensionless,
@@ -101,10 +100,9 @@ class AbsorptionUnit(Module):
         """Cool the generator and chilled circuits and heat the cooling circuit."""
 
         # Outlets
-        values = self._performance(inlets)
-        generator_out = inlets.generator_in.with_(T=values["generator_out_T"])
-        chilled_out = inlets.chilled_in.with_(T=values["chilled_out_T"])
-        cooling_out = inlets.cooling_in.with_(T=values["cooling_out_T"])
+        generator_out, chilled_out, cooling_out = sorption.outlet_streams(
+            inlets, self._performance(inlets)
+        )
 
         outlets = dict(
             generator_out=generator_out, chilled_out=chilled_out, cooling_out=cooling_out
@@ -112,15 +110,7 @@ class AbsorptionUnit(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        for name, value in self._performance(inlets).items():
-            setattr(self, name, value)
-        self.driving_temperature_difference = refrigeration.characteristic_temperature_difference(
-            (inlets.generator_in.T + outlets.generator_out.T) / 2,
-            (inlets.cooling_in.T + outlets.cooling_out.T) / 2,
-            (inlets.chilled_in.T + outlets.chilled_out.T) / 2,
-            self.rejection_coefficient,
-            self.evaporator_coefficient,
-        )
+        sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
 
     def _performance(self, inlets):
         """Return the duties [W], COP and outlet temperatures [K] of one operating point."""
@@ -164,18 +154,5 @@ class AbsorptionUnit(Module):
 
     def _available_duty(self, inlets, rates):
         """Return the evaporator duty [W] the characteristic equation allows at these inlets."""
-        capacity = refrigeration.sorption_evaporator_capacity(
-            inlets.generator_in.T,
-            inlets.cooling_in.T,
-            inlets.chilled_in.T,
-            rates["generator_in"],
-            rates["cooling_in"],
-            rates["chilled_in"],
-            slope=self.characteristic_slope,
-            minimum_driving_difference=self.minimum_driving_difference,
-            rejection_coefficient=self.rejection_coefficient,
-            evaporator_coefficient=self.evaporator_coefficient,
-            thermal_cop=self.thermal_cop,
-            auxiliary_power_ratio=self.auxiliary_power_ratio,
-        )
+        capacity = sorption.evaporator_capacity(self, inlets, rates)
         return ops.where(inlets.generator_in.T < self.minimum_driving_temperature, 0.0, capacity)

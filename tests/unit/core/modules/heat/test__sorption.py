@@ -1,5 +1,7 @@
 """The circuit rates and outlet temperatures that the two sorption machines share."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from gemini.core.modules.heat import _sorption as sorption
@@ -27,3 +29,16 @@ def test_outlet_temperature_adds_the_duty_over_the_rate():
     stream = Stream(m_dot=1.0, T=350.0, p=1e5)
     assert sorption.outlet_T(stream, 4000.0, 0.0) == 350.0
     assert sorption.outlet_T(stream, 4000.0, -2000.0) == 349.5
+
+
+def test_outlet_streams_keep_each_inlet_and_take_the_new_temperature():
+    """The three streams copy their inlets and change only the temperature."""
+    inlets = SimpleNamespace(
+        generator_in=Stream(m_dot=1.0, T=360.0, p=1e5),
+        chilled_in=Stream(m_dot=2.0, T=290.0, p=2e5),
+        cooling_in=Stream(m_dot=3.0, T=300.0, p=3e5),
+    )
+    values = {"generator_out_T": 350.0, "chilled_out_T": 285.0, "cooling_out_T": 310.0}
+    generator, chilled, cooling = sorption.outlet_streams(inlets, values)
+    assert (generator.T, chilled.T, cooling.T) == (350.0, 285.0, 310.0)
+    assert (generator.m_dot, chilled.p, cooling.m_dot) == (1.0, 2e5, 3.0)
