@@ -28,6 +28,9 @@ _HORIZONTAL_HOLDUP = {
 }
 """Beggs–Brill horizontal holdup ``a * lambda**b / Fr**c`` per flow regime."""
 
+_SEGREGATED, _TRANSITION, _INTERMITTENT, _DISTRIBUTED, _OUTSIDE_MAP = 0, 1, 2, 3, -1
+"""Codes of the Beggs–Brill flow regimes, and of a pair outside the regime map."""
+
 _DOWNHILL = (4.7, -0.3692, 0.1244, -0.5056)
 _SEGREGATED_UPHILL = (0.011, -3.768, 3.539, -1.614)
 _INTERMITTENT_UPHILL = (2.96, 0.305, -0.4473, 0.0978)
@@ -63,15 +66,14 @@ def darcy_weisbach_dp(
     Reference: Swamee and Jain (1976), Explicit Equations for Pipe-Flow Problems,
     combined with Darcy–Weisbach and hydrostatic balance; retained GEMINI formulation.
     """
-    if velocity == 0:
-        return 0.0, rho * G * length * math.sin(inclination)
-    reynolds = abs(velocity) * rho * diameter / mu
+    reynolds = ops.abs(velocity) * rho * diameter / mu
     friction_factor = 0.25 / (
-        (math.log10((roughness / (3.7 * diameter)) + (5.74 / (reynolds ** (0.9))))) ** (2)
+        (ops.log10((roughness / (3.7 * diameter)) + ops.truediv(5.74, ops.pow(reynolds, 0.9))))
+        ** (2)
     )
-    gravity = rho * G * length * math.sin(inclination)
-    friction = friction_factor * rho * length / diameter * (abs(velocity) * velocity) / 2
-    return friction, gravity
+    gravity = rho * G * length * ops.sin(inclination)
+    friction = friction_factor * rho * length / diameter * (ops.abs(velocity) * velocity) / 2
+    return ops.where(velocity == 0, 0.0, friction), gravity
 
 
 def beggs_brill_dp(
@@ -120,6 +122,15 @@ def beggs_brill_dp(
     """
     gas_velocity, liquid_velocity = units.m_to_ft(us_g), units.m_to_ft(us_l)
     diameter_ft = units.m_to_ft(diameter)
+    us_g, us_l = units.ft_to_m(gas_velocity), units.ft_to_m(liquid_velocity)
+    ops.check(
+        ops.logical_and(liquid_velocity != 0, liquid_velocity + gas_velocity != 0),
+        PhysicsRangeError,
+        "beggs_brill_dp: us_l = {us_l} m/s, us_g = {us_g} m/s; expected a nonzero liquid and "
+        "mixture velocity (use darcy_weisbach_dp for single-phase flow)",
+        us_l=us_l,
+        us_g=us_g,
+    )
     holdup, friction_multiplier = _holdup_and_friction_multiplier(
         gas_velocity,
         liquid_velocity,
@@ -128,7 +139,6 @@ def beggs_brill_dp(
         diameter_ft,
         inclination,
     )
-    us_g, us_l = units.ft_to_m(gas_velocity), units.ft_to_m(liquid_velocity)
     rho_g, rho_l = (units.lbmft3_to_kgm3(units.kgm3_to_lbmft3(rho)) for rho in (rho_g, rho_l))
     mu_g, mu_l = (units.cp_to_pas(units.pas_to_cp(mu)) for mu in (mu_g, mu_l))
     diameter = units.ft_to_m(diameter_ft)
@@ -139,19 +149,20 @@ def beggs_brill_dp(
     density = (no_slip_holdup * rho_l) + (1 - no_slip_holdup) * rho_g
     viscosity = (no_slip_holdup * mu_l) + (1 - no_slip_holdup) * mu_g
     reynolds = mixture_velocity * density * diameter / viscosity
-    friction_factor = (
+    friction_factor = ops.pow(
         -0.8685
-        * math.log((1.964 * math.log(reynolds) - 3.8215) / reynolds + roughness / (diameter * 3.71))
-    ) ** (-2)
+        * ops.log((1.964 * ops.log(reynolds) - 3.8215) / reynolds + roughness / (diameter * 3.71)),
+        -2,
+    )
     friction = (
-        (0.5 * density * mixture_velocity * abs(mixture_velocity))
+        (0.5 * density * mixture_velocity * ops.abs(mixture_velocity))
         * friction_factor
         * friction_multiplier
         * length
         / diameter
     )
     slip_density = (holdup * rho_l) + (1 - holdup) * rho_g
-    gravity = slip_density * G * length * math.sin(inclination)
+    gravity = slip_density * G * length * ops.sin(inclination)
     return friction, gravity
 
 
@@ -161,32 +172,30 @@ def _holdup_and_friction_multiplier(
     """Return the Beggs–Brill liquid holdup [-] and two-phase friction multiplier [-].
 
     Inputs are on the US basis: velocities [ft/s], liquid density [lbm/ft3], surface tension
-    [dyne/cm] and diameter [ft]. The holdup is clamped to [0, 1]; a holdup clamped to zero,
-    which a steep downhill inclination factor can produce, has no friction multiplier.
+    [dyne/cm] and diameter [ft], with a nonzero liquid and mixture velocity. The holdup is
+    clamped to [0, 1]; a holdup clamped to zero, which a steep downhill inclination factor can
+    produce, has no friction multiplier.
     """
     mixture_velocity = liquid_velocity + gas_velocity
-    if liquid_velocity == 0 or mixture_velocity == 0:
-        raise PhysicsRangeError(
-            f"beggs_brill_dp: us_l = {units.ft_to_m(liquid_velocity)} m/s, "
-            f"us_g = {units.ft_to_m(gas_velocity)} m/s; expected a nonzero liquid and "
-            "mixture velocity (use darcy_weisbach_dp for single-phase flow)"
-        )
     liquid_velocity_number = 1.938 * liquid_velocity * (liquid_density / surface_tension) ** 0.25
     no_slip_holdup = liquid_velocity / mixture_velocity
     froude = mixture_velocity**2 / (G_FT * diameter)
     holdup = _liquid_holdup(no_slip_holdup, liquid_velocity_number, froude, inclination)
-    holdup = min(holdup, 1)
-    holdup = max(holdup, 0)
-    if holdup == 0:
-        raise PhysicsRangeError(
-            f"beggs_brill_dp: liquid holdup = 0 at inclination = {inclination} rad; expected a "
-            "positive holdup (the downhill inclination factor removed all liquid)"
-        )
+    holdup = ops.minimum(holdup, 1)
+    holdup = ops.maximum(holdup, 0)
+    ops.check(
+        holdup != 0,
+        PhysicsRangeError,
+        "beggs_brill_dp: liquid holdup = 0 at inclination = {inclination} rad; expected a "
+        "positive holdup (the downhill inclination factor removed all liquid)",
+        holdup=holdup,
+        inclination=inclination,
+    )
     return holdup, _friction_multiplier(no_slip_holdup, holdup)
 
 
 def _flow_regime(no_slip_holdup, froude):
-    """Return the Beggs–Brill flow regime and its L2 and L3 transition boundaries.
+    """Return the Beggs–Brill flow regime code and its L2 and L3 transition boundaries.
 
     The regime map follows Beggs and Brill (1973) as revised by Brill and Beggs: segregated
     for lambda < 0.01 and Fr < L1 or lambda >= 0.01 and Fr < L2; transition for
@@ -194,30 +203,49 @@ def _flow_regime(no_slip_holdup, froude):
     L3 < Fr <= L1 or lambda >= 0.4 and L3 < Fr <= L4; distributed for lambda < 0.4 and
     Fr >= L1 or lambda >= 0.4 and Fr > L4. A no-slip holdup of exactly 0.4 therefore takes
     the upper range; it formerly matched no regime and divided by zero.
+
+    The regime is one of ``_SEGREGATED``, ``_TRANSITION``, ``_INTERMITTENT`` and
+    ``_DISTRIBUTED``, chosen by nested ``where`` in the order of the map; a pair outside the
+    map raises.
     """
-    l1 = 316 * no_slip_holdup**0.302
-    l2 = 0.0009252 * no_slip_holdup**-2.4684
-    l3 = 0.10 * no_slip_holdup**-1.4516
-    l4 = 0.5 * no_slip_holdup**-6.738
-    if no_slip_holdup < 0.01 and froude < l1:
-        regime = "segregated"
-    elif no_slip_holdup >= 0.01 and froude < l2:
-        regime = "segregated"
-    elif no_slip_holdup >= 0.01 and l2 <= froude <= l3:
-        regime = "transition"
-    elif 0.01 <= no_slip_holdup < 0.4 and l3 <= froude <= l1:
-        regime = "intermittent"
-    elif no_slip_holdup >= 0.4 and l3 <= froude <= l4:
-        regime = "intermittent"
-    elif no_slip_holdup < 0.4 and froude >= l1:
-        regime = "distributed"
-    elif no_slip_holdup >= 0.4 and froude >= l4:
-        regime = "distributed"
-    else:
-        raise PhysicsRangeError(
-            f"beggs_brill_dp: no-slip holdup = {no_slip_holdup}, Froude number = {froude}; "
-            "expected finite values inside the flow-regime map"
-        )
+    l1 = 316 * ops.pow(no_slip_holdup, 0.302)
+    l2 = 0.0009252 * ops.pow(no_slip_holdup, -2.4684)
+    l3 = 0.10 * ops.pow(no_slip_holdup, -1.4516)
+    l4 = 0.5 * ops.pow(no_slip_holdup, -6.738)
+    low, high = no_slip_holdup < 0.01, no_slip_holdup >= 0.01
+    below, above = no_slip_holdup < 0.4, no_slip_holdup >= 0.4
+    segregated = ops.logical_or(
+        ops.logical_and(low, froude < l1), ops.logical_and(high, froude < l2)
+    )
+    transition = ops.logical_and(high, ops.logical_and(l2 <= froude, froude <= l3))
+    intermittent = ops.logical_or(
+        ops.logical_and(ops.logical_and(high, below), ops.logical_and(l3 <= froude, froude <= l1)),
+        ops.logical_and(above, ops.logical_and(l3 <= froude, froude <= l4)),
+    )
+    distributed = ops.logical_or(
+        ops.logical_and(below, froude >= l1), ops.logical_and(above, froude >= l4)
+    )
+    regime = ops.where(
+        segregated,
+        _SEGREGATED,
+        ops.where(
+            transition,
+            _TRANSITION,
+            ops.where(
+                intermittent,
+                _INTERMITTENT,
+                ops.where(distributed, _DISTRIBUTED, _OUTSIDE_MAP),
+            ),
+        ),
+    )
+    ops.check(
+        regime != _OUTSIDE_MAP,
+        PhysicsRangeError,
+        "beggs_brill_dp: no-slip holdup = {no_slip_holdup}, Froude number = {froude}; "
+        "expected finite values inside the flow-regime map",
+        no_slip_holdup=no_slip_holdup,
+        froude=froude,
+    )
     return regime, l2, l3
 
 
@@ -225,25 +253,32 @@ def _liquid_holdup(no_slip_holdup, liquid_velocity_number, froude, inclination):
     """Return the inclined liquid holdup before clamping.
 
     Transition flow blends the segregated and intermittent holdups with the weight
-    A = (L3 - Fr) / (L3 - L2).
+    A = (L3 - Fr) / (L3 - L2). Every regime's holdup and inclination factors are evaluated and
+    ``where`` selects the regime's, so the expressions equal the former per-regime branches.
     """
     regime, l2, l3 = _flow_regime(no_slip_holdup, froude)
     numbers = (no_slip_holdup, liquid_velocity_number, froude, inclination)
-    if regime != "transition":
-        return _horizontal_holdup(regime, no_slip_holdup, froude) * _regime_factor(regime, *numbers)
-    if inclination < 0:
-        segregated_coefficients = intermittent_coefficients = _DOWNHILL
-    else:
-        segregated_coefficients = _SEGREGATED_UPHILL
-        intermittent_coefficients = _INTERMITTENT_UPHILL
-    weight = (l3 - froude) / (l3 - l2)
-    segregated = _horizontal_holdup("segregated", no_slip_holdup, froude) * _inclination_factor(
-        segregated_coefficients, *numbers
+    segregated_holdup = _horizontal_holdup("segregated", no_slip_holdup, froude)
+    intermittent_holdup = _horizontal_holdup("intermittent", no_slip_holdup, froude)
+    distributed_holdup = _horizontal_holdup("distributed", no_slip_holdup, froude)
+    downhill = _inclination_factor(_DOWNHILL, *numbers)
+    segregated_uphill = _inclination_factor(_SEGREGATED_UPHILL, *numbers)
+    intermittent_uphill = _inclination_factor(_INTERMITTENT_UPHILL, *numbers)
+    is_downhill = inclination < 0
+
+    horizontal = ops.where(
+        regime == _SEGREGATED,
+        segregated_holdup,
+        ops.where(regime == _INTERMITTENT, intermittent_holdup, distributed_holdup),
     )
-    intermittent = _horizontal_holdup("intermittent", no_slip_holdup, froude) * _inclination_factor(
-        intermittent_coefficients, *numbers
+    factor = _regime_factor(
+        regime, is_downhill, inclination >= 0, downhill, segregated_uphill, intermittent_uphill
     )
-    return weight * segregated + (1 - weight) * intermittent
+    weight = ops.truediv(l3 - froude, l3 - l2)
+    segregated = segregated_holdup * ops.where(is_downhill, downhill, segregated_uphill)
+    intermittent = intermittent_holdup * ops.where(is_downhill, downhill, intermittent_uphill)
+    blended = weight * segregated + (1 - weight) * intermittent
+    return ops.where(regime == _TRANSITION, blended, horizontal * factor)
 
 
 def _horizontal_holdup(regime, no_slip_holdup, froude):
@@ -252,45 +287,53 @@ def _horizontal_holdup(regime, no_slip_holdup, froude):
     return a * (no_slip_holdup**b) / (froude**c)
 
 
-def _regime_factor(regime, no_slip_holdup, liquid_velocity_number, froude, inclination):
+def _regime_factor(
+    regime, downhill, uphill, downhill_factor, segregated_factor, intermittent_factor
+):
     """Return the inclination factor psi of a segregated, intermittent or distributed regime.
 
     Downhill flow uses the downhill coefficients in every regime and uphill distributed flow
     has psi = 1. A NaN inclination is neither downhill nor uphill and keeps the original
     fallback to the intermittent coefficients, which gives a NaN factor.
     """
-    numbers = (no_slip_holdup, liquid_velocity_number, froude, inclination)
-    if inclination < 0:
-        return _inclination_factor(_DOWNHILL, *numbers)
-    if inclination >= 0 and regime == "distributed":
-        return 1
-    if inclination >= 0 and regime == "segregated":
-        return _inclination_factor(_SEGREGATED_UPHILL, *numbers)
-    return _inclination_factor(_INTERMITTENT_UPHILL, *numbers)
+    return ops.where(
+        downhill,
+        downhill_factor,
+        ops.where(
+            ops.logical_and(uphill, regime == _DISTRIBUTED),
+            1,
+            ops.where(
+                ops.logical_and(uphill, regime == _SEGREGATED),
+                segregated_factor,
+                intermittent_factor,
+            ),
+        ),
+    )
 
 
 def _inclination_factor(coefficients, no_slip_holdup, liquid_velocity_number, froude, inclination):
     """Return psi = 1 + C (sin 1.8θ - 0.333 sin³ 1.8θ) with C = (1-λ) ln(d λ^e Nlv^f Fr^g)."""
     d, e, f, h = coefficients
-    correction = max(
+    correction = ops.maximum(
         0,
         (1 - no_slip_holdup)
-        * math.log(d * (no_slip_holdup**e) * (liquid_velocity_number**f) * (froude**h)),
+        * ops.log(d * (no_slip_holdup**e) * (liquid_velocity_number**f) * (froude**h)),
     )
-    return 1 + correction * (
-        math.sin(1.8 * inclination) - 0.333 * (math.sin(1.8 * inclination)) ** 3
-    )
+    return 1 + correction * (ops.sin(1.8 * inclination) - 0.333 * (ops.sin(1.8 * inclination)) ** 3)
 
 
 def _friction_multiplier(no_slip_holdup, holdup):
     """Return the two-phase friction multiplier exp(s) with y = lambda / holdup²."""
     y = no_slip_holdup / holdup**2
-    if (y > 1) and (y < 1.2):
-        s = math.log(2.2 * y - 1.2)
-    else:
-        log_y = math.log(y)
-        s = log_y / (-0.0523 + 3.182 * log_y - 0.8725 * (log_y) ** 2 + 0.01853 * (log_y) ** 4)
-    return math.exp(s)
+    log_y = ops.log(y)
+    s = ops.where(
+        ops.logical_and(y > 1, y < 1.2),
+        ops.log(2.2 * y - 1.2),
+        ops.truediv(
+            log_y, -0.0523 + 3.182 * log_y - 0.8725 * (log_y) ** 2 + 0.01853 * (log_y) ** 4
+        ),
+    )
+    return ops.exp(s)
 
 
 @dataclass(frozen=True)
@@ -405,14 +448,20 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     Two-phase reverse flow passes the liquid velocity magnitude to Beggs–Brill and reverses
     the friction sign, as Darcy–Weisbach does through ``abs(velocity) * velocity``.
 
+    The two-phase model is chosen by ``fluid.gas_mass_fraction``, which is fixed in a trace: a
+    liquid-only fluid never reaches Beggs–Brill. With free gas the gas mass flow is zero only
+    at zero flow, which is the zero-flow case, so the structural test equals the former test of
+    the gas mass flow. At zero flow every branch is still evaluated, so Beggs–Brill and the heat
+    loss receive a harmless liquid velocity, inclination and liquid mass flow there and
+    ``where`` returns the zero drops.
+
     NOTE(refactor): DPDT's zero-flow branch suppresses gravity as well as friction.
 
     NOTE(refactor): the gas superficial velocity keeps the original ``gmf / rho_g / area``,
     which does not use the gas mass flow, so two-phase regime and holdup do not follow the
     flow rate; the physical form would be ``m_g / rho_g / area``.
     """
-    if flow == 0:
-        return 0.0, 0.0, 0.0
+    stopped = flow == 0
     f = fluid.properties(p, T)
     mass = flow * f.density
     m_l, m_g = (1 - f.gmf) * mass, f.gmf * mass
@@ -420,25 +469,36 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     us_l = m_l / f.rho_l / area
     us_g = f.gmf / f.rho_g / area
     shape = (section.inner_diameter, section.roughness, section.length)
-    if m_g == 0:
+    if fluid.gas_mass_fraction == 0:
         friction, gravity = darcy_weisbach_dp(us_l, f.rho_l, section.inclination, f.mu_l, *shape)
     else:
         friction, gravity = beggs_brill_dp(
-            us_g, abs(us_l), f.rho_g, f.rho_l, section.inclination, f.mu_g, f.mu_l, f.sigma, *shape
+            us_g,
+            ops.where(stopped, 1.0, ops.abs(us_l)),
+            f.rho_g,
+            f.rho_l,
+            ops.where(stopped, 0.0, section.inclination),
+            f.mu_g,
+            f.mu_l,
+            f.sigma,
+            *shape,
         )
-        if us_l < 0:
-            friction = -friction
+        friction = ops.where(us_l < 0, -friction, friction)
     delta_T = heat_transfer.pipe_temperature_change(
         T,
         u_value,
         math.pi * section.inner_diameter * section.length,
-        m_l,
+        ops.where(stopped, 1.0, m_l),
         m_g,
         f.cp_l,
         f.cp_g,
         ambient_temperature,
     )
-    return friction, gravity, delta_T
+    return (
+        ops.where(stopped, 0.0, friction),
+        ops.where(stopped, 0.0, gravity),
+        ops.where(stopped, 0.0, delta_T),
+    )
 
 
 def radial_pressure_drops(
@@ -466,15 +526,23 @@ def radial_pressure_drops(
     tuple of float
         Flow and skin pressure drops [Pa].
     """
-    if min(permeability, thickness, drainage_radius, wellbore_radius) <= 0:
-        raise PhysicsRangeError(
-            f"radial_pressure_drops: permeability = {permeability} m2, thickness = {thickness} m, "
-            f"drainage_radius = {drainage_radius} m, wellbore_radius = {wellbore_radius} m; "
-            "expected positive values"
-        )
+    smallest = ops.minimum(
+        ops.minimum(ops.minimum(permeability, thickness), drainage_radius), wellbore_radius
+    )
+    ops.check(
+        ops.logical_not(smallest <= 0),
+        PhysicsRangeError,
+        "radial_pressure_drops: permeability = {permeability} m2, thickness = {thickness} m, "
+        "drainage_radius = {drainage_radius} m, wellbore_radius = {wellbore_radius} m; "
+        "expected positive values",
+        permeability=permeability,
+        thickness=thickness,
+        drainage_radius=drainage_radius,
+        wellbore_radius=wellbore_radius,
+    )
     denominator = 2 * math.pi * permeability * thickness
     return (
-        volume_flow * viscosity * math.log(drainage_radius / wellbore_radius) / denominator,
+        volume_flow * viscosity * ops.log(drainage_radius / wellbore_radius) / denominator,
         volume_flow * viscosity * skin / denominator,
     )
 

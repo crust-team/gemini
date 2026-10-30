@@ -11,6 +11,7 @@ from gemini.core.physics import geometry, hydraulics
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import BRINE, Fluid
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 from tests.unit.test_golden import assert_values
 
 GOLDEN = json.loads((Path(__file__).parents[3] / "fixtures/golden_values.json").read_text())
@@ -103,11 +104,11 @@ def test_beggs_brill_pinned_bits_in_every_regime(us_l, inclination, diameter, ex
 
 def test_flow_regime_map_and_exact_boundaries():
     """The exact no-slip holdup 0.4 falls into the upper regime of the map."""
-    assert hydraulics._flow_regime(0.005, 1.0)[0] == "segregated"
-    assert hydraulics._flow_regime(0.2, 1e4)[0] == "distributed"
-    assert hydraulics._flow_regime(0.01, 100.0)[0] == "distributed"
-    assert hydraulics._flow_regime(0.4, 1.0)[0] == "intermittent"
-    assert hydraulics._flow_regime(0.4, 1e4)[0] == "distributed"
+    assert hydraulics._flow_regime(0.005, 1.0)[0] == hydraulics._SEGREGATED
+    assert hydraulics._flow_regime(0.2, 1e4)[0] == hydraulics._DISTRIBUTED
+    assert hydraulics._flow_regime(0.01, 100.0)[0] == hydraulics._DISTRIBUTED
+    assert hydraulics._flow_regime(0.4, 1.0)[0] == hydraulics._INTERMITTENT
+    assert hydraulics._flow_regime(0.4, 1e4)[0] == hydraulics._DISTRIBUTED
     with pytest.raises(PhysicsRangeError, match="flow-regime map"):
         hydraulics._flow_regime(float("nan"), 1.0)
 
@@ -186,3 +187,117 @@ def test_radial_pressure_drops_and_hydrostatics():
     with pytest.raises(PhysicsRangeError, match="thickness = 0"):
         hydraulics.radial_pressure_drops(0.04, 6.5e-4, 1e-11, 0, 1000, 0.0765, 2)
     assert hydraulics.hydrostatic_dp(1000, 10) == pytest.approx(98100)
+
+
+BEGGS_ROWS = [
+    (0.0001, us_l, *FLUID_PROPERTIES, inclination, 21.29e-6, 1e-3, 0.0728, diameter, 2e-5, 100)
+    for us_l, inclination, diameter in (
+        (0.5, -0.1, 0.05),
+        (0.5, 0.1, 0.05),
+        (0.5, -0.1, 0.1778),
+        (0.5, 0.1, 0.1778),
+        (0.0001, -0.1, 0.05),
+        (0.0001, 0.1, 0.05),
+        (0.05, -0.1, 0.05),
+        (0.05, 0.0, 0.05),
+        (0.4, math.pi / 2, 0.2),
+    )
+] + [(0.6, 0.4, *FLUID_PROPERTIES, math.pi / 2, 21.29e-6, 1e-3, 0.0728, 0.2, 2e-5, 100)]
+
+
+def test_darcy_weisbach_matches_on_arrays():
+    """Forward, reverse and zero velocity give the same drops on arrays and floats."""
+    rows = [(velocity, 1000, 0.5, 1e-3, 0.1778, 2e-5, 100) for velocity in (2, -2, 0, 1e-4, 0.3)]
+    assert_function_matches(hydraulics.darcy_weisbach_dp, rows)
+
+
+def test_beggs_brill_matches_on_arrays():
+    """Every regime, both inclination signs and the transition blend match on arrays."""
+    assert_function_matches(hydraulics.beggs_brill_dp, BEGGS_ROWS)
+
+
+def test_beggs_brill_errors_match_on_arrays():
+    """Zero liquid, zero holdup and a pair outside the regime map raise the same messages."""
+    zero_liquid = (0.5, 0, *FLUID_PROPERTIES, 0.7, 21.29e-6, 1e-3, 0.0728, 0.1778, 2e-5, 100)
+    zero_holdup = (
+        0.5,
+        0.05,
+        *FLUID_PROPERTIES,
+        -math.pi / 4,
+        21.29e-6,
+        1e-3,
+        0.0728,
+        0.1778,
+        2e-5,
+        100,
+    )
+    outside = (0.5, math.nan, *FLUID_PROPERTIES, 0.7, 21.29e-6, 1e-3, 0.0728, 0.1778, 2e-5, 100)
+    for row in (zero_liquid, zero_holdup, outside):
+        assert_same_error(hydraulics.beggs_brill_dp, [BEGGS_ROWS[0], row], PhysicsRangeError)
+
+
+def test_flow_regime_and_friction_multiplier_match_on_arrays():
+    """The regime map, its boundaries and both multiplier branches match on arrays."""
+    assert_function_matches(
+        hydraulics._flow_regime,
+        [(0.005, 1.0), (0.2, 1e4), (0.01, 100.0), (0.4, 1.0), (0.4, 1e4), (0.05, 5.0), (0.3, 1.5)],
+    )
+    assert_function_matches(
+        hydraulics._friction_multiplier, [(0.2, 0.5), (0.5, 0.45), (0.3, 0.9), (0.9, 0.95)]
+    )
+
+
+def test_radial_drops_and_hydrostatics_match_on_arrays():
+    """Radial drops, their check and the hydrostatic head match on arrays."""
+    rows = [
+        (0.04, 6.5e-4, 1e-11, 45, 1000, 0.0765, 2),
+        (-0.04, 6.5e-4, 1e-11, 45, 500, 0.1, 0),
+    ]
+    assert_function_matches(hydraulics.radial_pressure_drops, rows)
+    assert_same_error(
+        hydraulics.radial_pressure_drops,
+        rows + [(0.04, 6.5e-4, 1e-11, 0.0, 1000.0, 0.0765, 2)],
+        PhysicsRangeError,
+    )
+    assert_function_matches(hydraulics.hydrostatic_dp, [(1000, 10), (1020, -5)])
+
+
+def _profile(path, fluid, direction):
+    def profile(m_dot, p, T):
+        stream = Stream(m_dot=m_dot, p=p, T=T, fluid=fluid)
+        result = hydraulics.pipe_path_profile(path, stream, fluid, direction, 10, 290)
+        return dict(
+            p_out=result.p_out,
+            T_out=result.T_out,
+            dp_friction=result.dp_friction,
+            dp_gravity=result.dp_gravity,
+            **{f"p{i}": value for i, value in enumerate(result.section_pressure)},
+            **{f"T{i}": value for i, value in enumerate(result.section_temperature)},
+        )
+
+    return profile
+
+
+@pytest.mark.parametrize("direction", ["up", "down"])
+@pytest.mark.parametrize("fluid", [BRINE, GAS], ids=["liquid", "two_phase"])
+def test_pipe_path_profile_matches_on_arrays(fluid, direction):
+    """Forward, reverse and zero flow match on arrays, for liquid and two-phase fluids."""
+    rows = [(40, 20e5, 350), (-40, 20e5, 350), (0, 20e5, 350), (5, 1e5, 330), (400, 1e5, 330)]
+    profile = _profile(_path(0.18, 0.1), fluid, direction)
+    profile.__name__ = "pipe_path_profile"
+    assert_function_matches(profile, rows)
+
+
+def test_two_phase_zero_flow_in_a_steep_downhill_section_returns_zero_drops():
+    """Zero flow with free gas leaves pressure and temperature, even where Beggs-Brill fails."""
+    path = geometry.PipePath(
+        sections=[
+            geometry.PipeSection(
+                length=100, inclination=-math.pi / 4, inner_diameter=0.1778, roughness=2e-5
+            )
+        ]
+    )
+    stream = Stream(m_dot=0, p=1e6, T=350, fluid=GAS)
+    result = hydraulics.pipe_path_profile(path, stream, GAS, "down", 10, 290)
+    assert (result.p_out, result.T_out) == (1e6, 350)
+    assert result.dp_friction == result.dp_gravity == 0
