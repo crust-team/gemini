@@ -304,6 +304,8 @@ class Module:
         object.__setattr__(self, "boundary", {})
         object.__setattr__(self, "_param_history", [DatedParams(params={})])
         object.__setattr__(self, "_param_overrides", {})
+        object.__setattr__(self, "_derived_params", set())
+        object.__setattr__(self, "_stated_child_params", set())
         object.__setattr__(self, "_graph_cache", None)
 
     @property
@@ -413,7 +415,7 @@ class Module:
 
     def _assign_value(self, name, value):
         if name in self._parameters:
-            self._parameters[name].set(value)
+            self._parameters[name].owner._set_parameter(name, value)
             return
         inputs = self._controls | self._boundaries
         if name in inputs:
@@ -701,8 +703,47 @@ class Module:
         Returns the module, so ``ESP().update_params(stage_count=12)`` builds a configured module.
         """
         for name, value in changes.items():
-            self.get_parameter(name).set(value)
+            parameter = self.get_parameter(name)
+            parameter.owner._set_parameter(parameter.name, value)
         return self
+
+    def _set_parameter(self, name, value):
+        """Set one own parameter as an explicit override; a deriving module derives from it."""
+        if self._derives_params():
+            self.set_params("", {name: value})
+            return
+        self._parameters[name].set(value)
+
+    def _derives_params(self):
+        """Return whether this class overrides ``set_params`` to derive its children's values."""
+        return type(self).set_params is not Module.set_params
+
+    def _own_values(self, params, valid_from=None):
+        """Return the own parameters in force at ``valid_from`` with those of ``params``, in SI."""
+        given = {name: value for name, value in params.items() if name in self._parameters}
+        checked = {name: self._parameters[name].validate(value) for name, value in given.items()}
+        return self._params_at(valid_from) | checked
+
+    def _keep_derived(self, derived, params):
+        """Return the ``derived`` child values that no explicit value replaces, and record them.
+
+        A deriving ``set_params`` calls this with its derived values and the ``params`` of the
+        call. A dotted name in ``params`` is an explicit child value, now and in later calls, and
+        so is a child value set through ``update_params``. The names kept are the ones
+        ``to_dict`` leaves out.
+        """
+        self._stated_child_params |= {name for name in params if "." in name}
+        kept = {
+            name: value
+            for name, value in derived.items()
+            if name not in self._stated_child_params and not self._is_overridden(name)
+        }
+        self._derived_params = (self._derived_params | kept.keys()) - self._stated_child_params
+        return kept
+
+    def _is_overridden(self, name):
+        parameter = design.parameter(self, name)
+        return parameter.name in parameter.owner._param_overrides
 
     def _params_at(self, at):
         """Return the complete validated parameter mapping active at an instant.
@@ -1259,6 +1300,10 @@ class Module:
         The snapshot is the values in force at ``valid_from`` merged with ``params``; without a
         date the undated base entry and the current values change. Names may be dotted and
         values unit strings. Returns the module.
+
+        Every route that sets parameters comes here. A composite that derives its children's
+        values overrides this method (see ``modules.md``); a value for it, at any depth, reaches
+        that override.
         """
         return design.set_params(self, path, params, valid_from)
 

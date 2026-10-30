@@ -40,12 +40,13 @@ def params_spec(plant, key, module):
     """Return the ``params`` of one module: stated values while true, others that changed."""
     stated = plant._stated.get(key) or {}
     baseline = plant._baselines.get(key, {})
+    derived = design.derived_names(module)
     result = {}
     for name, value in tree_params(module).items():
         if name in stated:
             kept = _same(module, name, stated[name], value)
             result[name] = kept if kept is not None else value
-        elif name not in baseline or baseline[name] != value:
+        elif name not in derived and (name not in baseline or baseline[name] != value):
             result[name] = value
     return result
 

@@ -19,7 +19,7 @@ from gemini.types.bindings import DatedParams
 from gemini.types.fluid import Fluid
 from gemini.types.shapes import problem
 from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean
+from gemini.utils.strings import close_matches, did_you_mean, join_path
 
 FORMAT = 2
 SECTIONS = ("fluids", "boundary", "bindings", "param_history")
@@ -134,14 +134,31 @@ def _parse_history(entries):
     return [DatedParams.model_validate(item) for item in entries]
 
 
+def _own_history(path, module, derived):
+    """Return the dated entries of ``module`` without the values a deriving module computed.
+
+    A module whose entries then all say the same has no history of its own: the deriving module
+    writes the history and rebuilds these dates when it is read. ``None`` then.
+    """
+    names = {name for name in module._parameters if join_path(path, name) in derived}
+    entries = [item.model_dump(mode="json") for item in module._param_history]
+    for entry in entries:
+        entry["params"] = {key: value for key, value in entry["params"].items() if key not in names}
+    same = all(entry["params"] == entries[0]["params"] for entry in entries)
+    return None if names and same else entries
+
+
 def _history(root, stated):
+    derived = design.derived_names(root)
     result = {}
     for path, module in root.named_modules():
         current = module._param_history
         if len(current) == 1 and current[0].valid_from is None:
             continue
         kept = keep_stated(stated.get(path), current, _parse_history)
-        result[path] = kept if kept is not None else [i.model_dump(mode="json") for i in current]
+        written = kept if kept is not None else _own_history(path, module, derived)
+        if written is not None:
+            result[path] = written
     return to_plain(result)
 
 
@@ -179,7 +196,7 @@ def _module_at(root, path):
 
 def _read_fluid(module, value):
     try:
-        object.__setattr__(module, "_fluid", Fluid.model_validate(value))
+        module.fluid = value
     except PydanticError as error:
         raise ValidationError(f"fluid: {error}", code="invalid_value") from error
 
@@ -203,10 +220,20 @@ def _read_history(module, entries):
             design.parameter(module, name).validate(value)
         snapshots.append(snapshot)
     module._param_history = snapshots
+    if module._derives_params():
+        for snapshot in snapshots:
+            module.set_params("", snapshot.params, snapshot.valid_from)
 
 
 def _read_bindings(root, path, value):
     design.set_bindings(root, path, value)
+
+
+def _read_order(section, entries):
+    """Return the items of a section; the history of a child before its deriving parent's."""
+    if section == "param_history":
+        return sorted(entries.items(), key=lambda item: item[0].count("."), reverse=True)
+    return entries.items()
 
 
 def read_sections(root, spec, report):
@@ -218,7 +245,7 @@ def read_sections(root, spec, report):
         "bindings": lambda path, value: _read_bindings(root, path, value),
     }
     for section, read in readers.items():
-        for path, value in spec.get(section, {}).items():
+        for path, value in _read_order(section, spec.get(section, {})):
             if report.skips(path):
                 continue
             with report.guard(f"{section}.{path}"):
@@ -229,14 +256,20 @@ def read_params(root, params, report, prefix="params"):
     """Set flat dotted ``params`` on the tree as undated design values."""
     for name, value in params.items():
         with report.guard(f"{prefix}.{name}"):
-            design.set_params(root, "", {name: value})
+            root.set_params("", {name: value})
+
+
+def written_params(module):
+    """Return the parameters of a tree a file stores: not what a deriving module computed."""
+    derived = design.derived_names(module)
+    return {name: value for name, value in tree_params(module).items() if name not in derived}
 
 
 def module_spec(module):
     """Return the format 2 spec of a handwritten module tree."""
     kind = type(module).__name__
     spec = {"format": FORMAT, "name": kind, "type": kind, "modules": {}, "connections": []}
-    spec["params"] = tree_params(module)
+    spec["params"] = written_params(module)
     return spec | write_sections(module)
 
 

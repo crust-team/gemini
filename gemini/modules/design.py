@@ -17,7 +17,7 @@ from gemini.physics import units
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from gemini.types.flows import STREAM_FIELDS
 from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean, join_names
+from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
 from gemini.utils.time import EARLIEST, to_utc
 
 FIELD_UNITS = {"m_dot": ("kg/s", "m3/s"), "T": ("K",), "p": ("Pa",)}
@@ -102,21 +102,51 @@ def _store_snapshot(owner, values, when):
     history.sort(key=_date)
 
 
+def _deriving_owner(module, name):
+    """Return ``(module, name below it)`` of the first module on ``name`` that derives, or None."""
+    parts = name.split(".")
+    for index in range(1, len(parts)):
+        child = module._find_submodule(".".join(parts[:index]))
+        if child is not None and child._derives_params():
+            return child, ".".join(parts[index:])
+    return None
+
+
 def set_params(module, path, params, valid_from=None):
     """Store a validated, complete snapshot for the module at ``path`` and return ``module``.
 
     Each snapshot is the values in force at ``valid_from`` merged with ``params``. Without a
-    date the undated base entry changes, and so do the current values.
+    date the undated base entry changes, and so do the current values. A value on the way to a
+    module that overrides ``set_params`` goes through that method.
     """
     when = None if valid_from is None else to_utc(valid_from)
-    changes = _validated_changes(module.get_module(path), params)
+    target = module.get_module(path)
+    changes = _validated_changes(target, params)
+    routed = {}
+    for name, value in params.items():
+        found = _deriving_owner(module, join_path(path, name))
+        if found is not None:
+            routed.setdefault(found[0], {})[found[1]] = value
+            declaration = parameter(target, name)
+            del changes[declaration.owner][declaration.name]
     for owner, values in changes.items():
         _store_snapshot(owner, values, when)
         if when is None:
             for name, value in values.items():
                 owner._parameters[name].set(value, explicit=False)
                 owner._param_overrides.pop(name, None)
+    for owner, values in routed.items():
+        owner.set_params("", values, valid_from)
     return module
+
+
+def derived_names(module):
+    """Return the dotted names below ``module`` whose values a deriving module computed."""
+    return {
+        join_path(path, name)
+        for path, item in module.named_modules()
+        for name in item._derived_params
+    }
 
 
 def bindable(module, path):

@@ -268,6 +268,60 @@ children. Composites built from a variable number of children use the containers
 children) and `ModuleDict(mapping)` (caller-chosen keys that must not shadow module or mapping
 attributes). Containers compare and hash by identity like every module.
 
+### A composite that sets its children's values
+
+A composite may derive its children's parameters from its own. It overrides `set_params`, computes
+the child values with functions from `gemini/physics/` and calls `super().set_params` with them:
+
+```python
+from gemini.modules import Module, ProductionReservoir
+from gemini.physics import hydraulics
+from gemini.types import Density, Length, Parameter
+
+
+class Column(Module):
+    """A reservoir whose pressure comes from the height of its water column."""
+
+    def __init__(self):
+        super().__init__()
+
+        # Modules
+        self.reservoir = ProductionReservoir()
+
+        # Parameters
+        self.height = Parameter(Length | None, default=None)
+        self.density = Parameter(Density | None, default=None)
+
+    def set_params(self, path, params, valid_from=None):
+        """Derive the reservoir pressure, unless the same call states it."""
+        if path:
+            return super().set_params(path, params, valid_from)
+        values = self._own_values(params, valid_from)
+        derived = {}
+        if values["height"] is not None and values["density"] is not None:
+            pressure = hydraulics.hydrostatic_dp(values["density"], values["height"])
+            derived["reservoir.pressure"] = pressure
+        return super().set_params("", self._keep_derived(derived, params) | params, valid_from)
+```
+
+`_own_values(params, valid_from)` gives the module's own values in force at that date with the ones
+of this call, in SI, so a dated call derives from the design of its date. A value that has not been
+given yet derives nothing: the values may arrive one call at a time. `_keep_derived(derived, params)`
+does the bookkeeping: an explicit child value in the call wins, now and in later calls
+(`{"depth": "3000 m", "well.pipe_path": [...]}` keeps the given pipe path), and it records the names
+it keeps.
+
+Every route that sets parameters reaches this method: `add(..., params=)`, `from_dict`,
+`set_params(path, ...)` at any depth, a dated `set_params(..., valid_from=)`, a `param_history`
+section, `update_params` of an own parameter and attribute assignment. A fluid section is set
+through the `fluid` property, which a composite that derives from its fluid overrides.
+
+`to_dict` stores the module's own parameters and the explicit child values, never a derived value:
+`from_dict(p.to_dict())` derives them again and rebuilds the same numbers. Dated entries of a child
+that only hold derived values are left out in the same way.
+
+### A composite with a closed circuit
+
 A composite with a closed circuit inside one call (a substation's building loop) needs the
 circulated temperature before its first child call. It iterates with trial passes:
 `child.trial_outlets(inlets)` returns the outlets of a call that no running call records, with
