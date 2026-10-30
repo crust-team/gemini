@@ -104,8 +104,8 @@ class Batch:
         path, module = entry[0], entry[1]
         try:
             claims = _Twin(entry, plan, plant, aligned, cache).claims()
-        except Exception as error:
-            self.reasons[path] = f"{type(error).__name__}: {error}"
+        except TraceError as error:
+            self.reasons[path] = str(error)
             return
         self.claims[path] = claims
         self.modules[path] = module

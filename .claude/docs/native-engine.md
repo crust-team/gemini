@@ -1,8 +1,8 @@
 # Native engine: computation graph design
 
-Status: agreed design (2026-10-29). The ESP prototype is implemented (section 12); the engine
-does not use graphs yet. Sections 1 to 11 are the design as agreed; section 12 records where the
-prototype differs and why.
+Status: agreed design (2026-10-29). All physics and leaves are written with ops and replay runs
+through the graph by default. Sections 1 to 11 are the design as agreed; section 12 records where
+the implementation differs and why, and section 13 how composites and replay work.
 
 ## 1. Why
 
@@ -307,3 +307,41 @@ Where the prototype differs from sections 1 to 11, and why:
   codes are renumbered in creation order so the lowest code still wins, and the `Proxy` message
   values follow the merged nodes. Cost is linear in the node count. Not done: commutative
   operands, `reduction`/`interp`/`solver`/`scan` nodes, and guarded twins inside one branch.
+
+## 13. Composites and replay through the graph
+
+- **Composites.** `Module._run` hands a call made while a trace runs (`_Call.trace`) to
+  `Trace.child`. A child's controls, boundaries and numeric parameters are graph inputs named
+  `<relative path>.<name>` (the root keeps plain names); a child called twice reuses them; supplied
+  keywords win without validation. The `ModuleResult` of traced values joins the parent's
+  `call_records`, so `Output.of`, automatic sums, `Output.ratio` (now `where(bottom == 0, None,
+  truediv(top, bottom))`) and helpers such as `Doublet.produce()` work unchanged. Guards cover every
+  module of the tree. This replaces section 2's "each Module is traced on its own".
+- **Breaks.** A stateful, pre-hooked or untraceable *leaf* child becomes one `break` node after the
+  graph is rolled back (`Graph.mark`, `Graph.rollback`). It runs `module(**row)` on the plain path
+  per row; a stateful child starts from its initial states, as a call outside `Module.step` does.
+  Outputs and outlet fields are `break_output` nodes; a failing row is NaN with an error code, and
+  `run` re-raises the child's exception. Outlet fluids come from a probe of `forward`; a row with
+  another fluid fails. A composite child that cannot be traced, or any child with a marked
+  observer, breaks the whole root: its leaves' call records feed the parent, and observers replay
+  for the root only. A list of traced values is a vector output, recorded as `name[i]` items.
+- **Observers.** `gemini.utils.hooks.observer(fn)` marks a read-only hook. It is never called on
+  traced values; on the root it goes to `graph.pre_observers` or `graph.observers` and `replay_row`
+  replays it per row. `EventLog` marks both of its hooks.
+- **Limits.** `Declaration.limits()` gives an `ops.check(..., DeclarationError)` for every traced
+  control, boundary and output, attached to every output so a violated bound always fails the
+  row, and the root inlets carry the `Stream` limits.
+- **Engine: batch, then the tick loop commits.** `Engine._run` builds a `Batch` after `on_run_start`
+  for `kind == "replay"` unless `gemini.graph.settings(traced=False)` is active. For each twin and
+  each stretch of ticks with one parameter snapshot, `Loader.arrays()` gives the columns, converted
+  with `units.si_conversion` and run through the cached graph (one `GraphCache` per `Engine`). A row
+  is **claimed** when everything is present, finite (NaN only for declared `X | None`) and no check
+  or break reaches an output; `Interpreter.evaluate` returns a failed-row mask. The unchanged tick
+  loop then commits: a claimed row gives a `ModuleResult` of Python scalars and `health`; every
+  other row runs `_evaluate_twin` at its tick. So there is one error path: skips, exact error
+  messages, `StepError`, callbacks, `AutoCheckpoint` and `resume` come from the old code, and the
+  batch can only ever skip work it is sure of. Stateful twins, float32, untraceable twins and runs
+  with a twin below another twin are not batched (`engine.batch.reasons`). This replaces section
+  9's chunked engine callbacks: nothing needs to declare it changes the run.
+- **Not done.** `scan`, float32, `trial_outlets` and `close_loop` in a graph, the unit-check pass,
+  `gm.explain`. `simulate` and `live` stay tick by tick.
