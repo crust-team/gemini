@@ -11,7 +11,7 @@ from gemini.graph.graph import Graph
 from gemini.graph.interpreter import Interpreter
 from gemini.graph.node import Node
 from gemini.graph.proxy import Proxy
-from gemini.graph.runner import Run, run
+from gemini.graph.runner import Run, run, run_function
 from gemini.graph.setting import settings, traced_enabled
 from gemini.graph.tracer import Tracer
 
@@ -24,6 +24,7 @@ __all__ = [
     "Run",
     "Tracer",
     "run",
+    "run_function",
     "settings",
     "traced_enabled",
 ]

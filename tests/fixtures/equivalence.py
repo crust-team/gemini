@@ -1,10 +1,13 @@
 """Check that one source gives the same numbers on floats, arrays and traced graphs.
 
 ``assert_function_matches`` compares a physics function called once per row on Python floats
-with one call on NumPy arrays. ``assert_module_matches`` compares a module called once per row
+with one traced run on the stacked columns (``gemini.graph.run_function``), so an array row can
+cross a ``where`` around a ``check`` as it does in the engine; a direct call on arrays raises at
+the first failing row. ``assert_module_matches`` compares a module called once per row
 with one traced call. ``RTOL`` is the documented tolerance of the NumPy backend against the
 Python path; a ``None`` on the Python path is NaN on arrays. ``assert_same_error`` checks that a
-failing row raises the same class and message on both paths.
+failing row raises the same class and message on both paths, the graph's error being the first
+failing row that reaches the result.
 """
 
 import dataclasses
@@ -15,7 +18,7 @@ import numpy as np
 import pytest
 
 from gemini.core.types import Stream
-from gemini.graph import run
+from gemini.graph import run, run_function
 
 RTOL = 1e-12
 STREAM_FIELDS = ("m_dot", "T", "p")
@@ -44,19 +47,19 @@ def assert_close(actual, expected, label):
 
 
 def assert_function_matches(function, rows, **fixed):
-    """Assert ``function(*row, **fixed)`` per row equals one call on the stacked columns."""
+    """Assert ``function(*row, **fixed)`` per row equals one traced run on the stacked columns."""
     expected = [flatten(function(*row, **fixed)) for row in rows]
     columns = [np.array(column, dtype=float) for column in zip(*rows)]
-    actual = flatten(function(*columns, **fixed))
+    actual = flatten(run_function(function, *columns, **fixed))
     assert actual.keys() == expected[0].keys()
     for name, value in actual.items():
         assert_close(value, [row[name] for row in expected], f"{function.__name__}: {name}")
 
 
 def assert_same_error(function, rows, error, **fixed):
-    """Assert the first failing row raises the same ``error`` and message as the array call."""
+    """Assert the first failing row raises the same ``error`` and message as the traced run."""
     with pytest.raises(error) as on_arrays:
-        function(*(np.array(column, dtype=float) for column in zip(*rows)), **fixed)
+        run_function(function, *(np.array(c, dtype=float) for c in zip(*rows)), **fixed)
     for row in rows:
         try:
             function(*row, **fixed)

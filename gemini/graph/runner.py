@@ -7,19 +7,30 @@ values fill the rest. Parameters and constants come from the module and the grap
 that cannot be traced runs untraced, one call per row, with the same results, and the reason
 is reported in ``Run.breaks``. Observer hooks are replayed per row after a traced run, pre-hooks
 first. The row count is the longest array among the inlet fields and inputs, one without arrays.
+
+``run_function(function, *args, **fixed)`` does the same for a plain function (a physics
+function, a module's helper): the numeric positional arguments become graph inputs, the
+function is traced once on them, and the graph is evaluated on the arguments, so an array
+argument crosses ``where`` and ``check`` like a column of a run instead of raising at its first
+failing row in the function body.
 """
 
+import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
 
-from gemini import backends
+from gemini import backends, ops
 from gemini.core.modules.module import _Call, _current_call
 from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
 from gemini.errors import TraceError
 from gemini.graph.cache import GraphCache
+from gemini.graph.graph import Graph
 from gemini.graph.interpreter import Interpreter
+from gemini.graph.limits import certain
+from gemini.graph.proxy import Proxy
 from gemini.graph.tracer import STREAM_FIELDS
 
 
@@ -196,3 +207,77 @@ def replay_row(graph, module, inlets, outlets, inputs, outputs):
             hook(module, inlets, outlets)
     finally:
         _current_call.reset(token)
+
+
+def run_function(function, *args, backend="numpy", **fixed):
+    """Trace ``function(*args, **fixed)`` with its numeric arguments as inputs and evaluate it.
+
+    A float, a NumPy float or a float array among ``args`` is a graph input named
+    ``arg<index>``; everything else (integers, flags, text, ``None``, lists, tuples) and every
+    keyword in ``fixed`` is passed as it is, as structure. The result has the structure of
+    what ``function`` returns (a number, tuple, list, dict or frozen dataclass) with arrays of
+    one value per row in place of numbers. A failing ``check`` that reaches the result raises
+    the class and message of the first failing row, and one in a branch ``where`` does not
+    select does not.
+    """
+    graph = Graph(function.__name__)
+    traced = [_input(graph, index, arg) for index, arg in enumerate(args)]
+    with ops.scope.tracing(graph):
+        result = function(*(proxy for proxy, _ in traced), **fixed)
+    leaves = _leaves(result)
+    for name, leaf in leaves.items():
+        graph.output(name, leaf)
+    certain(graph, graph.unframed)
+    feeds = {
+        f"arg{index}": np.asarray(arg)
+        for index, (proxy, arg) in enumerate(traced)
+        if isinstance(proxy, Proxy)
+    }
+    feeds |= {name: constant.value for name, constant in graph.constants.items()}
+    rows = max([np.size(value) for value in feeds.values()], default=1)
+    values = _evaluate(graph, feeds, backend, rows)
+    scalar = all(np.ndim(value) == 0 for value in feeds.values())
+    values = {name: value[0] if scalar else value for name, value in values.items()}
+    return _rebuilt(result, values)
+
+
+def _input(graph, index, arg):
+    """Return ``(traced value, argument)``; a numeric argument becomes a graph input."""
+    numeric = isinstance(arg, (float, np.floating)) or (
+        isinstance(arg, np.ndarray) and arg.dtype.kind == "f"
+    )
+    if not numeric:
+        return arg, arg
+    return graph.input(f"arg{index}", "control"), arg
+
+
+def _leaves(result, prefix="result"):
+    """Return the traced leaves of ``result`` by path name."""
+    if isinstance(result, (tuple, list)):
+        items = enumerate(result)
+    elif isinstance(result, Mapping):
+        items = result.items()
+    elif dataclasses.is_dataclass(result) and not isinstance(result, type):
+        items = ((field.name, getattr(result, field.name)) for field in dataclasses.fields(result))
+    else:
+        return {prefix: result}
+    leaves = {}
+    for key, item in items:
+        leaves |= _leaves(item, f"{prefix}.{key}")
+    return leaves
+
+
+def _rebuilt(result, values, prefix="result"):
+    """Return ``result`` with each leaf replaced by its evaluated value."""
+    if isinstance(result, (tuple, list)):
+        items = [_rebuilt(item, values, f"{prefix}.{index}") for index, item in enumerate(result)]
+        return type(result)(items)
+    if isinstance(result, Mapping):
+        return {key: _rebuilt(item, values, f"{prefix}.{key}") for key, item in result.items()}
+    if dataclasses.is_dataclass(result) and not isinstance(result, type):
+        changes = {
+            field.name: _rebuilt(getattr(result, field.name), values, f"{prefix}.{field.name}")
+            for field in dataclasses.fields(result)
+        }
+        return dataclasses.replace(result, **changes)
+    return values[prefix]

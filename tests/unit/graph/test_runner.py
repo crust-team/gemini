@@ -4,8 +4,10 @@ import numpy as np
 import pytest
 
 import gemini as gm
+from gemini import ops
 from gemini.errors import PhysicsRangeError, TraceError
-from gemini.graph import GraphCache, Proxy, run
+from gemini.graph import GraphCache, Proxy, run, run_function
+from gemini.ops import Constant
 from gemini.utils.hooks import observer
 
 from .conftest import Chain, Gain, Opaque, Stubborn, Switcher, Tank, Vectored
@@ -238,3 +240,146 @@ def test_a_control_without_a_value_is_nan_in_the_graph(optional):
         4.0,
     ]
     assert run(optional, {}, {}).outputs["double"].tolist() == [-1.0]
+
+
+MESSAGE = "pipe: x = {x} m; expected x >= 0"
+
+
+@ops.physics
+def doubled(x):
+    """Double ``x``, which must not be negative."""
+    ops.check(x >= 0, PhysicsRangeError, MESSAGE, x=x)
+    return x * 2.0
+
+
+@ops.physics
+def gated(x, gate):
+    """Return zero where ``gate`` is positive, else the checked value."""
+    return ops.where(gate > 0.0, 0.0, doubled(x))
+
+
+@ops.physics
+def branched(x):
+    """Branch on a checked value."""
+    return ops.where(doubled(x) > 1.0, 1.0, 2.0)
+
+
+@ops.physics
+def combined(x, y):
+    """Mix a checked value with floats, constants, abs and a nested physics function."""
+    return abs(doubled(x)) / (y + 1.0) + SCALE * doubled(y) + sum([doubled(x), 1.0])
+
+
+@ops.physics
+def pair(x, y):
+    """Return a tuple, a dict and a list of results."""
+    return (gated(x, y), {"double": doubled(y)}, [doubled(y) + 1.0])
+
+
+@ops.physics
+def checked_pass_through(x):
+    """Check ``x`` and return the argument itself."""
+    ops.check(x >= 0, PhysicsRangeError, MESSAGE, x=x)
+    return x
+
+
+@ops.physics
+def no_leak(x, gate):
+    """Another use of the checked argument outside the checked branch stays clean."""
+    return ops.where(gate > 0.0, x + 1.0, checked_pass_through(x))
+
+
+@ops.physics
+def two_failures(x, y):
+    """Fail on both operands: the check that ran first is the error."""
+    return doubled(x) + doubled(y)
+
+
+@ops.physics
+def two_failures_reversed(x, y):
+    """Fail on both operands, the other way round."""
+    return doubled(y) + doubled(x)
+
+
+def inline_check(x, gate):
+    """Raise at once for a check outside any physics function, whatever the gate does."""
+    ops.check(x >= 0, PhysicsRangeError, MESSAGE, x=x)
+    return ops.where(gate > 0.0, 0.0, x * 2.0)
+
+
+SCALE = Constant("SCALE", 2.0, "-", "a test constant")
+OUTCOME_CASES = [
+    (no_leak, (-1.0, 1.0)),
+    (no_leak, (-1.0, -1.0)),
+    (no_leak, (2.0, -1.0)),
+    (two_failures, (-1.0, -2.0)),
+    (two_failures, (1.0, -2.0)),
+    (two_failures_reversed, (-1.0, -2.0)),
+    (two_failures_reversed, (-1.0, 2.0)),
+    (inline_check, (-1.0, 1.0)),
+    (inline_check, (1.0, 1.0)),
+    (gated, (-1.0, 1.0)),
+    (gated, (-1.0, -1.0)),
+    (gated, (2.0, -1.0)),
+    (branched, (-1.0,)),
+    (branched, (0.2,)),
+    (branched, (3.0,)),
+    (combined, (1.0, 2.0)),
+    (combined, (-1.0, 2.0)),
+    (combined, (1.0, -2.0)),
+    (pair, (1.0, 2.0)),
+    (pair, (-1.0, 1.0)),
+    (pair, (1.0, -1.0)),
+]
+
+
+def outcome(call):
+    """Return the value of ``call()``, or the class and message of its error."""
+    try:
+        return call()
+    except PhysicsRangeError as error:
+        return type(error), str(error)
+
+
+@pytest.mark.parametrize(("function", "args"), OUTCOME_CASES)
+def test_run_function_and_an_eager_call_give_the_same_outcome(function, args):
+    """A trace through ``run_function`` and the eager scope drop and keep the same errors."""
+    eager = outcome(lambda: function(*args))
+    traced = outcome(lambda: run_function(function, *args))
+    np.testing.assert_equal(traced, eager)
+
+
+def test_run_function_lets_an_array_row_cross_a_where_around_a_check():
+    """Rows the gate stops do not raise; the first failing selected row does."""
+    x = np.array([-1.0, 2.0, -3.0])
+    assert run_function(gated, x, np.array([1.0, -1.0, 1.0])).tolist() == [0.0, 4.0, 0.0]
+    with pytest.raises(PhysicsRangeError, match=r"x = -2\.0 m"):
+        run_function(gated, np.array([-1.0, -2.0, 3.0]), np.array([1.0, -1.0, -1.0]))
+    with pytest.raises(PhysicsRangeError, match=r"x = -1\.0 m"):
+        doubled(x)
+
+
+def test_run_function_keeps_the_structure_of_the_result():
+    """Tuples, dicts and lists come back with arrays; structural arguments pass unchanged."""
+    first, second, third = run_function(pair, np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+    assert first.tolist() == [0.0, 0.0] and second["double"].tolist() == [6.0, 8.0]
+    assert third[0].tolist() == [7.0, 9.0] and isinstance(third, list)
+
+    def scaled(x, factor, label):
+        assert label == "kg"
+        return x * factor
+
+    assert run_function(scaled, np.array([1.0, 2.0]), 3, "kg").tolist() == [3.0, 6.0]
+    assert run_function(scaled, 2.0, 3, "kg") == 6.0
+
+
+def test_a_physics_function_that_failed_on_constants_cannot_be_traced():
+    """A failure that does not depend on any input is a trace error, as eager it raises."""
+
+    def constant_failure(x):
+        return x + doubled(-1.0)
+
+    with pytest.raises(PhysicsRangeError, match="x = -1.0 m"):
+        constant_failure(1.0)
+    with pytest.raises(TraceError, match="check failed on constant values"):
+        run_function(constant_failure, 1.0)
