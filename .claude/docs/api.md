@@ -1,22 +1,56 @@
 # Public API
 
-Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.__version__ = "0.1.0"`,
-and is the page the other repositories build against. Names not listed here (a helper method such
-as `Results.commit`, anything in `gm.utils`, any import of an internal path such as
-`gemini.engine.results`) are internal and may change. `tests/unit/test_public_api.py` pins the names, their parameter names and the schema files.
-Status is **real**, or **later**: the signature is final and the call raises
-`gm.errors.NotImplementedYet`.
+Use `import gemini as gm`. This page lists **every public name** at `gm.__version__ = "0.1.0"`, and
+is the page the other repositories build against. Names not listed here (a helper method such as
+`Results.commit`, anything in `gm.utils`, any import of an internal path such as
+`gemini.engine.results`) are internal and may change. `tests/unit/test_public_api.py` pins the
+names, their parameter names and the schema files, and `tests/integration/test_return_shapes.py`
+walks the returns of this page against their schemas. Status is **real**, or **later**: the signature
+is final and the call raises `gm.errors.NotImplementedYet`.
 
 Conventions on every entry:
 
-- Data returns are plain JSON: no NumPy types, NaN and infinity are `null`
-  (`gemini.utils.jsonable.to_plain`), and `json.dumps(result, allow_nan=False)` works.
 - Results are deterministic: the same input gives the same numbers on every backend.
-- Inputs take a number in SI or a string such as `"150 m3/h"`. Every output is in SI and says its unit.
+- Inputs take a number in SI or a string such as `"150 m3/h"`. Outputs are in SI by default.
 - A plant and an engine are not shared across threads: each worker loads its own.
 - The documents exchanged between repositories have a JSON Schema and a sample in `docs/schemas/`:
-  `module_description`, `plant_spec`, `results_summary`, `error`, `profile` (`<name>.schema.json`,
-  `<name>.sample.json`). Regenerate with `python scripts/write_schemas.py`.
+  `value`, `problem`, `check`, `module_description`, `plant_spec`, `results_summary`, `profile`
+  (`<name>.schema.json`, `<name>.sample.json`). Regenerate with `python scripts/write_schemas.py`.
+
+## Return shapes
+
+Every public return that carries data uses only three shapes, defined once in `gemini/types/shapes.py`
+and built by one helper each, so no module assembles them by hand. Returns are plain JSON: no NumPy
+types, NaN and infinity are `null` (`gemini.utils.jsonable.to_plain`), and
+`json.dumps(result, allow_nan=False)` works.
+
+1. **Value** `{value, unit}`. `value` is a number, an array or `null`; when it is `null`, a `reason`
+   key says why. The key is `value` for arrays too. A time series is a value with a `time` key
+   beside it: `{time, value, unit}`. Statistics are `{min, max, mean}`, each a value. An output that
+   is a flag or a text keeps its boolean or string. An economics value adds the parts of its result
+   as more keys, each a value or a text.
+2. **Problem** `{path, code, message, suggestions}`, for every error, validation result and failed
+   run row. A run row adds `time`. There is no `class` key: `code` is the stable key for machines.
+3. **Check** `{name, passed, value, limit}`, where `value` and `limit` are values. A failed check is
+   an answer, not an error. `passed` is `null`, with the reason in `value`, when there is nothing to
+   judge.
+
+A number always travels with its unit in the same dict: there is no separate `units` map. Counts of
+skips by reason (`skip_counts`, `reasons`) and the state trees of `end_state` are the input of a next
+call or plain tallies, not values. Public returns are plain dicts: a DataFrame comes only from a
+method named `to_frame`, the one exception being run input (`gm.profiles.get`), because the run-input
+format is a DataFrame. Text comes only from `help()` and `summary()` of a plant, meant for people.
+
+## Output units
+
+Outputs stay SI by default. Every call marked *units* below takes an optional `units` argument, a map
+from quantity to unit: `results.get("hx", "duty", units={"power": "MW"})`. Conversion uses `gm.units`
+only, on the way out; nothing inside the run changes, and the returned `unit` keys say the unit
+actually used (`frame.attrs["units"]` on a table). A key reaches the quantities of its family, the
+first quantity defined with the same SI unit leading it: `power` reaches `duty`, `electricity` and
+`heat_loss`, `pressure` a pressure difference, `temperature` a temperature difference. A key of the
+quantity itself wins. A difference converts by scale only. An unknown quantity, or a unit that does
+not fit it, raises `ValidationError` with suggestions.
 
 ## Freeze rule
 
@@ -53,7 +87,7 @@ On a class or an instance of `Module` (and on what `gm.modules.get` returns):
 | --- | --- | --- |
 | `describe()` | see below; schema `module_description` | real |
 | `parameter_schema()` | JSON Schema draft 2020-12; each property has `unit`, `quantity`; dotted child names | real |
-| `validate_params(params)` | `[{path, message, code, suggestions?}]`, never raises | real |
+| `validate_params(params, on_error="raise")` | `[]`, or raises every problem; with `"record"` the list of problems | real |
 | `help()` | text | real |
 
 ```text
@@ -82,10 +116,10 @@ Three levels and one representation: see [plants.md](plants.md). The spec schema
 | `p.add(kind, name=None, params=None)` | the added module; `kind` is a registry name or a class, `params` the dict `set_params` takes | real |
 | `p.connect(source, target, kind=None)` | nothing; `ValidationError` with candidates, see [plants.md](plants.md) | real |
 | `p.summary()` | text table | real |
-| `p.validate()` | `[{path, message, code, suggestions}]` | real |
+| `p.validate(on_error="raise")` | as `gm.plants.validate` | real |
 | `p.to_spec()`, `p.to_dict()` | the spec (one function) | real |
-| `gm.plants.from_spec(spec)`, `from_dict(spec)` | a plant (one function); one `ValidationError` lists every problem | real |
-| `gm.plants.validate(spec)` | `[{path, message, code, suggestions}]`, paths such as `connections[1].target`; never raises | real |
+| `gm.plants.from_spec(spec)`, `from_dict(spec)` | a plant (one function); one `ValidationError` carries every problem in `problems` | real |
+| `gm.plants.validate(spec, on_error="raise")` | `[]`, or raises every problem; with `"record"` the list of problems, paths such as `connections[1].target` | real |
 | `gm.plants.spec_schema()` | JSON Schema | real |
 | `gm.plants.migrate(old)` | spec; every older stored format to format 2 | real |
 | `gm.plants.names()` | plant names, the `plants` category | real |
@@ -119,22 +153,22 @@ On any plant, `path` being a dotted module path (`""` is the root):
 
 ## Running
 
-Run input is one format: a pandas DataFrame or a `gm.Dataset` with a timezone-aware UTC index,
-columns named by binding `column`, units from the binding. A missing bound column raises
-`ValidationError` (a `ValidationError`, code `missing_column`) listing them all. A NaN row is a row
-code and the run continues.
+Run input is one format: a pandas DataFrame or a `gm.Dataset` with a timezone-aware UTC index, columns
+named by binding `column`, units from the binding. A missing bound column raises `ValidationError`
+(code `missing_column`) listing them all. A NaN row is a row code and the run continues.
 
 ```python
 import gemini as gm
 
 plant = gm.plants.example("DoubletHeatPlant")
 results = gm.simulate(plant, profile)
+print(results.summary(units={"power": "MW", "temperature": "degC"}))
 ```
 
 Use the functions for a run that is one call (agents, backend workers, examples, scripts) and
-`gm.Engine` for what must live across calls: a run held in memory, a callback that reads the
-engine, a manual checkpoint. Each function builds an `Engine`, calls the matching method and
-returns its `Results`, so the numbers are the same on every backend; see
+`gm.Engine` for what must live across calls: a run held in memory, a callback that reads the engine,
+a manual checkpoint. Each function builds an `Engine`, calls the matching method and returns its
+`Results`, so the numbers are the same on every backend; see
 [engine.md](engine.md#functions-or-engine).
 
 | Name | Returns | Status |
@@ -142,27 +176,28 @@ returns its `Results`, so the numbers are the same on every backend; see
 | `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` | real |
 | `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results`; `results.end_state` is the `state=` of the next call | real |
 | `gm.live(plant, source, checkpoint, step=None, now=None, sink=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` of the new rows; `checkpoint` is a required path | real |
-| `gm.resume(checkpoint, callbacks=None)` | `Results` of an interrupted `simulate` or `replay`; `RunError` on a live checkpoint | real |
+| `gm.resume(checkpoint, callbacks=None)` | `Results` of an interrupted `simulate` or `replay`; `RunError` (code `checkpoint`) on a live checkpoint | real |
 | `gm.Engine(plant, backend="numpy", callbacks=None, on_error="raise")` | one runner, for complex tasks | real |
 | `engine.simulate(profile, clock=None)` | `Results` | real |
 | `engine.replay(data, start=None, end=None, state=None, clock=None, only=None)` | `Results`; `results.end_state` is the `state=` of the next call | real |
 | `engine.live(source, checkpoint=None, step=None, now=None, sink=None)` | `Results` of the new rows | real |
 | `engine.save_checkpoint(path)`, `gm.Engine.load_checkpoint(path, callbacks=None)`, `engine.resume()` | see [engine.md](engine.md) | real |
+| `AutoCheckpoint(path, every=100)` | a callback that saves every N steps or every duration | real |
 | Callback `on_progress(engine, done, total)` | a callback may raise `gm.errors.Cancelled`; committed ticks stay in `engine.results` | real |
-| `gm.evaluate(module, parameters, inlets, controls)` | `{outlets: {port: {field: {value, unit}}}, outputs: {name: {value, unit}}, errors: [error]}`, never raises for a failing call | real |
+| `gm.evaluate(module, parameters, inlets, controls, on_error="raise", units=None)` | `{outlets: {port: {field: value}}, outputs: {name: value}, errors: [problem]}`; *units*; a run at one point | real |
 
 | `Results` | Returns | Status |
 | --- | --- | --- |
 | `names()` | `{path: [field]}` | real |
-| `get(path, field, start=None, end=None)` | `{time, values, unit}` | real |
-| `summary(path=None, start=None, end=None)` | `{path: {field: {min, max, mean, unit}}}`; schema `results_summary` | real |
-| `errors()` | `[{timestamp, module, code, type, message}]`, `code` from `gm.errors.ROW_CODES` | real |
-| `to_frame()` | DataFrame, columns `path.field`, the calculated-tag names | real |
-| `to_dict()` | `{time, duration, series: {path: {field: {unit, values}}}, errors, skip_counts, end_state}` | real |
+| `get(path, field, start=None, end=None, units=None)` | the time series `{time, value, unit}`; *units* | real |
+| `summary(path=None, start=None, end=None, units=None)` | `{path: {field: {min, max, mean}}}`, each a value; *units*; schema `results_summary` | real |
+| `errors()` | `[{path, code, message, suggestions, time}]`, `code` from `gm.errors.ROW_CODES` | real |
+| `to_frame(units=None, table="series")` | DataFrame. `"series"`: columns `path.field`, the calculated-tag names, *units*, with `attrs["units"]`. `"energy"`: the table of `energy_report`, one row per module and energy output | real |
+| `to_dict(units=None)` | `{time, duration, series: {path: {field: value}}, errors, skip_counts, end_state}`, `duration` a value; *units* | real |
 | `save(path)`, `gm.Results.load(path)` | `.npz` | real |
 | `to_bytes()`, `gm.Results.from_bytes(data)` | `.npz` bytes | real |
 | `end_state` | `{position, module_states}` | real |
-| `energy_report()` | DataFrame of energy, peaks, hours, alarms and skips | real |
+| `energy_report(units=None)` | `{path: {output: {energy, peak, hours, operating_hours, alarms, alarm_rate, skipped, errors, peaks, reasons}}}`, every number a value; *units*. A path without an energy output has the entry `""` | real |
 | `results[path].field`, `skip_counts` | a pandas Series, `{path: {reason: count}}` | real |
 
 ## Demand profiles
@@ -170,46 +205,50 @@ returns its `Results`, so the numbers are the same on every backend; see
 | Name | Returns | Status |
 | --- | --- | --- |
 | `gm.profiles.names()` | `heating_demand`, `cooling_demand` | real |
-| `gm.profiles.get(name)` | run input, a UTC DataFrame with units in `attrs["units"]` | later: no demand data ships yet |
+| `gm.profiles.get(name)` | run input, a UTC DataFrame with units in `attrs["units"]`, the one DataFrame outside `to_frame` | later: no demand data ships yet |
 | `gm.profiles.profile_schema()` | JSON Schema of a profile file | real |
 
 ## Analysis
 
-Details, inputs and units are in the docstrings and [economics.md](economics.md).
+Details and inputs are in the docstrings and [economics.md](economics.md). Every number of these
+returns is a value; every entry here takes *units*, except where a coefficient has no quantity.
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.analysis.nodal(plant, well, conditions)` | `{well, units, cases: [{conditions, ipr, vlp, operating_point, error}]}` | real for production wells; later for injection |
-| `gm.analysis.pump_curve(plant, pump, measured=None)` | manufacturer curve and measured points, head in Pa | real |
-| `gm.analysis.corrosion_forecast(model, until)` | wall thickness over time, years left | real |
-| `gm.analysis.injectivity(data, well)` | Hall integral, derivative, skin lines | later |
+| `gm.analysis.nodal(plant, well, conditions, on_error="raise", units=None)` | `{well, cases: [{conditions, ipr: {rate, pressure}, vlp: {rate, pressure}, operating_point: {rate, wellhead_pressure, sandface_pressure}, error}]}`; with `"record"` a failed case has its problem in `error` | real for production wells; later for injection |
+| `gm.analysis.pump_curve(plant, pump, measured=None, units=None)` | `{pump, frequency, curve: {flow, head}, measured: [{flow, frequency, head, theoretical_head}], correction: {slope, offset}}`, or `correction` a null value with its reason | real |
+| `gm.analysis.corrosion_forecast(model, until, units=None)` | `{correlation, rate, thickness, minimum_thickness, years_left}`; `thickness` a time series, `rate` stays in mm/year | real |
+| `gm.analysis.injectivity(data, well, units=None)` | Hall integral, derivative, skin lines | later |
 | `gm.analysis.calibrate_pump(plant, pump, measured)` | correction factors for `set_params` | later |
 | `gm.analysis.calibrate_corrosion(logs)` | a model for `corrosion_forecast` | later |
-| `gm.analysis.erosion(plant, well)` | wear of pump and tubing | later |
-| `gm.analysis.fit_head_coefficients(flows, frequencies, heads, stage_count)` | six ESP head coefficients | real |
-| `gm.analysis.fit_head_correction(measured, theoretical)` | `(slope, offset)` of the head correction | real |
-| `gm.analysis.estimate_reservoir_pressure(flows, bottomhole_pressures)` | `(pressure, r_squared)` | real |
-| `gm.analysis.estimate_conductance(hot_in_T, hot_out_T, cold_in_T, cold_out_T, m_dot_hot, m_dot_cold, *, cp_hot, cp_cold, arrangement)` | apparent UA of an exchanger | real |
+| `gm.analysis.erosion(plant, well, units=None)` | wear of pump and tubing | later |
+| `gm.analysis.fit_head_coefficients(flows, frequencies, heads, stage_count, units=None)` | a value of six ESP head coefficients, on their own basis | real |
+| `gm.analysis.fit_head_correction(measured, theoretical, units=None)` | `{slope, offset}` of the head correction | real |
+| `gm.analysis.estimate_reservoir_pressure(flows, bottomhole_pressures, units=None)` | `{pressure, r_squared}` | real |
+| `gm.analysis.estimate_conductance(hot_in_T, hot_out_T, cold_in_T, cold_out_T, m_dot_hot, m_dot_cold, *, cp_hot, cp_cold, arrangement, units=None)` | a value of the apparent UA of an exchanger | real |
 
 ## Economics, KPIs and checks
 
-Every economics return is `{value, unit, reason, ...}`; a value the inputs cannot give is `null`
-with a `reason`. No shipped module declares a cost yet, so a shipped plant gives `null` until
-modules declare `capex()`.
+Every economics function takes `(plant, results, ...)`, only `capex` has no results, and returns a
+value with the parts of the result as more keys. A value the inputs cannot give raises
+`ValidationError` (code `no_value`, or `missing_value` for an assumption nobody gave); with
+`on_error="record"` it is `{value: null, unit, reason}`. No shipped module declares a cost yet, so a
+shipped plant has no value until modules declare `capex()`.
 
 | Name | Status |
 | --- | --- |
 | `gm.economics.Assumptions` | real; sourced defaults in [economics.md](economics.md), others `None` |
-| `gm.economics.capex(plant, assumptions=None)` | real |
-| `gm.economics.opex(plant, results, assumptions=None)` | real |
-| `gm.economics.lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | real |
-| `gm.economics.lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | real |
-| `gm.economics.co2(plant, results, assumptions=None)` | real |
-| `gm.economics.npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | real |
-| `gm.economics.payback(plant, results, assumptions=None)` | real |
-| `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
-| `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)`, `run_all(plant, results)` | real, each `{name, passed, value, tolerance}`; they are ledger checks, see [economics.md](economics.md) |
-| `gm.testing.check_module(cls, example=None)` | real; a report, never raises |
+| `gm.economics.capex(plant, assumptions=None, on_error="raise")` | real |
+| `gm.economics.opex(plant, results, assumptions=None, on_error="raise")` | real |
+| `gm.economics.lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
+| `gm.economics.lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
+| `gm.economics.co2(plant, results, assumptions=None, on_error="raise")` | real |
+| `gm.economics.npv(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
+| `gm.economics.payback(plant, results, assumptions=None, on_error="raise")` | real |
+| `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `{name: value}` of `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
+| `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)` | real, each a check; they are ledger checks, see [economics.md](economics.md) |
+| `gm.checks.run_all(plant, results)` | real: `{passed, checks: [check]}` |
+| `gm.testing.check_module(cls, example=None)` | real; for developers of a new module class only: a report, never raises |
 | `gm.optim.calibrate(plant, dataset, params, start=None, end=None, backend="numpy", apply=True)`, `CalibrationResult` | real |
 | `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100)` | later |
 | `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0)` | later |
@@ -217,15 +256,20 @@ modules declare `capex()`.
 `gm.optim.calibrate` fits only through replay and returns a `CalibrationResult`. With `apply=True` a
 successful fit replaces the current parameter as an explicit override and adds no dated snapshot.
 Pass parameter objects declared `calibratable=True`, such as
-`plant.get_parameter("heat_exchanger.ua")`.
+`plant.get_parameter("heat_exchanger.thermal_conductance")`.
 
 ## Errors
 
-`gm.errors` holds seven public classes, listed with their use in [errors.md](errors.md): `GeminiError`
-with `ValidationError`, `DefinitionError`, `PhysicsError`, `RunError`, `Cancelled` and
+Every public call raises on failure by default. A call that can report instead takes
+`on_error="raise" | "record"`: `validate` functions return the problems, `gm.evaluate` returns them
+under `errors`, a run records them in `results.errors()` and continues, an economics value is
+`{value: null, reason}`. `gm.checks.*` return a check; a violated limit never raises.
+
+`gm.errors` holds seven public classes, listed with their use in [errors.md](errors.md):
+`GeminiError` with `ValidationError`, `DefinitionError`, `PhysicsError`, `RunError`, `Cancelled` and
 `NotImplementedYet`, and `GeminiWarning`. `to_dict()` is the problem
-`{path, code, message, suggestions}` (schema `problem`), `CODES` the fixed `code` list and `ROW_CODES`
-the row codes with their meaning. `error.problems` lists every problem of an error.
+`{path, code, message, suggestions}` (schema `problem`), `error.problems` lists every problem of an
+error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their meaning.
 
 ## Change log
 

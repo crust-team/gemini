@@ -60,7 +60,7 @@ The same plant as JSON. This is the stored plant file, the input of geomind's `b
 ```
 
 ```python
-problems = gm.plants.validate(spec)   # every problem at once, paths such as connections[1].target
+problems = gm.plants.validate(spec, on_error="record")   # every problem at once
 plant = gm.plants.from_spec(spec)
 assert plant.to_spec() == spec
 ```
@@ -153,9 +153,10 @@ plant.set_params("doublet.esp", {"stage_count": 14}, valid_from="2025-01-01")
 plant.params_at("doublet.esp", time="2024-06-01")
 plant.param_history("doublet.esp")
 plant.bindable("doublet.esp")
-plant.set_bindings("doublet.esp", {"frequency": "esp_hz"})
-plant.set_bindings("doublet.esp", {"frequency": {"column": "esp_rpm", "unit": "rpm"}})
-plant.set_bindings("doublet.esp", {"suction.p": {"column": "p_in", "unit": "bar"}})
+plant.set_bindings("doublet.esp", {
+    "frequency": "esp_hz",
+    "suction.p": {"column": "p_in", "unit": "bar"},
+})
 ```
 
 `set_bindings(path, bindings)` replaces the bindings of a module. A key is a declaration name: a

@@ -104,8 +104,9 @@ parameters appear under their dotted path. Each property has the standard keywor
 `description`) plus `unit` and `quantity`. A number with a unit is `anyOf` number and string,
 because inputs accept `"150 m3/h"`.
 
-`validate_params(params)` returns every problem as `[{path, message, code}]` and raises nothing
-for them. `path` is the parameter name; the codes are `unknown_name` (with `suggestions`),
+`validate_params(params, on_error="raise")` checks every entry and raises one `ValidationError` that
+carries every problem; with `on_error="record"` it returns them, each
+`{path, code, message, suggestions}`. `path` is the parameter name; the codes are `unknown_name` (with `suggestions`),
 `invalid_unit`, `out_of_bounds` and `invalid_value`. It runs `declaration.validate` once per entry
 and tells the failures apart by the exception and its cause.
 

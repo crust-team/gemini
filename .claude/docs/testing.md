@@ -168,7 +168,7 @@ backend. **Adding a backend means adding its name to `BACKENDS`** (after registe
   that the mirrored test file calls `assert_module_matches`. Stateful leaves go through the engine
   cases.
 - **Whole runs** (fast tier, a window of 24 to 48 rows, `run_engine` and `assert_runs_match`).
-  A `Snapshot` holds the frame and dtypes, skips, errors (class, message, module, tick), summary,
+  A `Snapshot` holds the frame and dtypes, skips, errors (path, code, message, time), summary,
   persisted inputs, module states, graph breaks, every callback hook with the `ModuleResult` tree
   of each tick (`engine.step_results`: outputs, outlets, inlets, inputs, children, their Python
   types), the `EventLog` events without timestamps and the error that ended the run. The tests
@@ -211,7 +211,9 @@ The same file fails on a formula in a module and on two physics functions with o
 files with `tests/fixtures/public_api.json`, which may only change together with `gm.__version__`
 (see [conventions.md](conventions.md#public-api-freeze)).
 `tests/integration/test_public_contracts.py` checks that every public function that returns data
-gives plain JSON on the example plant, and `tests/unit/scripts/test_write_schemas.py` that the
+gives plain JSON on the example plant, `tests/integration/test_return_shapes.py` walks the entries of
+[api.md](api.md) on the doublet example and validates every return against the schemas of the three
+shapes, and `tests/unit/scripts/test_write_schemas.py` that the
 files of `docs/schemas/` are up to date and each sample fits its schema, with the small checker
 in `tests/fixtures/json_schema.py`.
 

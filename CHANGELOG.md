@@ -13,6 +13,20 @@ First consistent API: see the change log of [api.md](.claude/docs/api.md). The v
 0.1.0 from one source, `pyproject.toml`, and `gm.API_VERSION` is removed; the integer versions
 below are the history before it. Checkpoints and results files written before 0.1.0 do not load.
 
+### Changed
+- Runs: `on_error` is `"raise"` by default, on the run functions and on `gm.Engine`.
+- Returns: every public return is a value, a problem or a check, built by `gemini.types.shapes`,
+  with a JSON Schema each in `docs/schemas/`; a number travels with its unit and `units` maps are
+  gone. `Results.energy_report` is a dict and `to_frame(table="energy")` its table.
+- Errors: seven public classes; what the others meant is a `code`. Every public call raises by
+  default and `on_error="record"` reports instead. `error.problems` carries every problem.
+- Parameters and bindings: `add(kind, name=None, params=None)`, flat `set_bindings` and plant files.
+- `gm.kpi` is a namespace of `compute` and `names`; `gm.economics.co2` takes `(plant, results)`.
+
+### Added
+- `units`, a map from quantity to unit, on every view of `Results`, on `gm.evaluate` and on
+  `gm.analysis`.
+
 The package was rebuilt as composable modules with handwritten plants, in-memory data and one
 finite engine, and then cleaned up. Old import paths are not retained.
 

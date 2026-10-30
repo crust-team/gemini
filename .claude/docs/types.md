@@ -18,7 +18,22 @@ through a function-level import of `gemini.backends.runtime` (see
 | `Health` | Diagnostic comparison of a prediction with measurements |
 | `Profile` | UTC time series in a declared SI unit |
 | `Cost` | Investment and operating cost with currency, price year and source |
+| `value`, `series`, `statistics`, `problem`, `check` | The return shapes, one helper each (`shapes.py`) |
+| `OutputUnits` | The `units` argument of a public return, used on the way out (`shapes.py`) |
 | `Binding`, `ModuleBindings`, `DatedParams` | Data columns of a module and dated parameters |
+
+## Return shapes
+
+`gemini/types/shapes.py` builds the three shapes of every public return, value, problem and check
+([api.md](api.md#return-shapes)), and holds their JSON Schemas, which `scripts/write_schemas.py`
+writes to `docs/schemas/`. `value(number, unit, reason=None, **details)` gives `{value, unit}`, with
+a `reason` when the value is `None`; `series` adds `time` and `statistics` gives `{min, max, mean}`.
+`problem` is defined in `gemini.errors`, a leaf package, because `GeminiError.to_dict` returns one,
+and this module exports it. `check(name, passed, measured, limit)` takes two values.
+
+`OutputUnits(units)` is the `units` argument of a public return. It checks the map at the start of a
+call and has `value`, `series` and `statistics` of its own, which take the quantity of the number and
+give the unit actually used.
 
 ## Quantities and declarations
 

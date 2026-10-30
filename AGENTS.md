@@ -12,6 +12,10 @@ Physics lives only in `gemini/physics/`: a module declares and wires, and calls 
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
 
+Every public return uses one of three shapes, value, problem or check, built by
+`gemini/types/shapes.py` ([return shapes](.claude/docs/api.md#return-shapes)). Every public call
+raises by default; `on_error="record"` reports instead ([errors](.claude/docs/errors.md)).
+
 Read every file in `.claude/docs/` before changing the repository:
 
 - [Public API](.claude/docs/api.md): every frozen public name, its return shape and status; start
@@ -22,7 +26,7 @@ Read every file in `.claude/docs/` before changing the repository:
 - [Engine](.claude/docs/engine.md): clocks, runs, callbacks, results, checkpoints and live.
 - [Economics](.claude/docs/economics.md): economics, KPIs, checks and well analysis.
 - [Equipment](.claude/docs/equipment.md): every shipped module, its model and energy audit.
-- [Errors](.claude/docs/errors.md): the `gm.errors` classes and when each is raised.
+- [Errors](.claude/docs/errors.md): the rule for raising, the seven `gm.errors` classes, the codes.
 - [Glossary](.claude/docs/glossary.md): one name per concept for parameters, outputs and ports.
 - [Legacy](.claude/docs/legacy.md): the old-format boundary and conversion rules.
 - [Modules](.claude/docs/modules.md): declarations, listings, calls, outputs, hooks and state.
@@ -52,13 +56,13 @@ gemini/
 ├── utils/            # general helpers; the topic files are a leaf that imports nothing else from gemini
 │   ├── data/         # in-memory Dataset and Loader only
 │   └── legacy/       # all old-format I/O, tables and conversion
-├── errors/           # every gm.errors class; leaf package that imports nothing else from gemini
+├── errors/           # the gm.errors classes and codes; leaf package that imports nothing else from gemini
 ├── backends/         # python (scalar) and numpy (array) implementations of the ops
 │   └── runtime.py    # context-local precision, display units and default fluid
 ├── ops/              # op registry, dispatch, Constant, where and check used by physics
 ├── graph/            # Node, Graph, Proxy, Tracer, Interpreter, cache and runner
 ├── physics/          # every formula: SI correlations and unit conversions
-├── types/            # quantities, streams, fluids, declarations, profiles, bindings, costs
+├── types/            # quantities, streams, fluids, declarations, profiles, bindings, costs, return shapes
 ├── modules/          # Module base class, registry, containers; one folder per category, plants/ too
 ├── engine/           # Clock, run functions, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay

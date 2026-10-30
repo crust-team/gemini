@@ -13,6 +13,7 @@ import gemini as gm
 
 plant = gm.plants.example("DoubletHeatPlant")
 results = gm.simulate(plant, profile)
+print(results.summary(units={"power": "MW", "temperature": "degC"}))
 ```
 
 No object is kept between calls of the functions, except the traced graphs, which the plant holds
@@ -31,8 +32,7 @@ The on_error default is `"raise"`, on the functions and on `gm.Engine`.
 
 `gm.resume(checkpoint, callbacks=None)` is `Engine.load_checkpoint(path, callbacks).resume()`, and
 it writes to the same file when the run ends or stops early. `checkpoint_every` is not stored in
-the file: pass `callbacks=[AutoCheckpoint(path, every)]` for periodic saves on a resumed run. A
-live checkpoint raises `RunError` naming `gm.live`. The files are the ones `save_checkpoint`
+the file: pass `callbacks=[AutoCheckpoint(path, every)]` for periodic saves on a resumed run. A live checkpoint raises `RunError` (code `checkpoint`) naming `gm.live`. The files are the ones `save_checkpoint`
 writes, so either level resumes the other's.
 
 `gm.live(plant, source, checkpoint, ...)` requires the path, which is all that carries a live run
@@ -44,7 +44,8 @@ it was, so its rows are processed again by the next call.
 
 ## The engine
 
-`Engine(plant, backend="numpy", callbacks=None, on_error="raise")` runs one plant on a finite clock.
+`Engine(plant, backend="numpy", callbacks=None, on_error="raise")` runs one plant on a finite clock
+and raises on a failure, unless `on_error="record"`.
 `simulate(profile, clock=None)` evaluates the plant from root-bound assumptions.
 `replay(data, start=None, end=None, state=None, clock=None, only=None)` evaluates equipment twins on
 measured boundaries. `live(source, checkpoint=None, step=None, now=None, sink=None)` evaluates only
@@ -66,8 +67,8 @@ non-time index or any other object raises `RunError`. Values have the unit of th
 except that a unit recorded in `Dataset` metadata replaces it (the rule below stays). Without
 `clock`, `simulate` and `replay` use the ticks of the input (`Clock.from_data`).
 
-- **Missing columns.** Every bound column the input lacks is listed in one `ValidationError` (a
-  `ValidationError`, code `missing_column`, `suggestions` with the closest column), raised before
+- **Missing columns.** Every bound column the input lacks is listed in one `ValidationError` (code
+  `missing_column`, `suggestions` with the closest column), raised before
   the first step.
 - **NaN rows.** A tick where a bound value is NaN, absent beyond `max_gap` or a text flag is not an
   error of the run: that twin is skipped at the tick, counted in `results.skip_counts`, listed in
@@ -163,8 +164,7 @@ equipment twins of a replay; the plant in simulate) evaluated over **chunks** of
 - **Skips and errors.** A twin is skipped for the first missing column in this order: controls,
   boundaries, inlet fields (each inlet's stream is checked once its fields are read), observations,
   measured states. In simulate the plant is the one twin: root inlets, then the leaf inputs; a skip
-  is counted under `""`. A failing row is recorded as `module=path, message=str(error),
-  type=type(error).__name__`; in simulate, whatever fails is a whole-step error under `""` and the
+  is counted under `""`. A failing row is recorded as the problem `path`, `code`, `message=str(error)`; in simulate, whatever fails is a whole-step error under `""` and the
   states stay as they were.
 - **Inputs.** Each tick sets the module's controls and boundaries on its twin (`set_inputs`)
   before the module is called, so a failing tick has persisted them; the runner sets them at the
@@ -242,7 +242,9 @@ unit (`operating`, the `health_*` fields, text outputs) is dimensionless, `"-"`.
 with the results.
 
 **JSON views.** Every public return passes `gemini.utils.jsonable.to_plain`: NaN and infinity
-are `null`, times are ISO 8601 UTC text.
+are `null`, times are ISO 8601 UTC text. Every view takes `units`, a map from quantity to unit
+([output units](api.md#output-units)), and `results.quantities` is `{path: {field: quantity}}`, saved
+with the results; a field without a quantity is left alone.
 
 | Call | Returns |
 |---|---|
@@ -252,10 +254,11 @@ are `null`, times are ISO 8601 UTC text.
 | `errors()` | rows `{timestamp, module, code, type, message}`, oldest first: failed rows and skipped rows (`missing_value`) |
 | `to_dict()` | `{time, duration, series: {path: {field: {unit, values}}}, errors, skip_counts, end_state}` |
 
-`to_frame()` returns a copy with one column per field, named `path.field` (a field of the root plant
-by its own name; these are the calculated-tag names), and the dtypes a table built row by row
-has. The former energy table is `energy_report()`: energy per output, peaks, operating hours,
-alarms, skips and errors, which `repr(results)` prints. `skip_counts` holds the skips per path and
+`to_frame(units=None, table="series")` is the one route to a DataFrame. `"series"` returns a copy
+with one column per field, named `path.field` (a root field by its own name; these are the
+calculated-tag names), the dtypes a table built row by row has and the unit of each column in
+`attrs["units"]`. `"energy"` returns the table of `energy_report`: energy per output, peaks,
+operating hours, alarms, skips and errors, which `repr(results)` prints. `skip_counts` holds the skips per path and
 reason, and `failures` the rows where a module raised (the part of `errors()` that is not a
 skip; `EventLog` logs these).
 

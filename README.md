@@ -12,6 +12,7 @@ import gemini as gm
 
 plant = gm.plants.example("DoubletHeatPlant")
 results = gm.simulate(plant, profile)
+print(results.summary(units={"power": "MW", "temperature": "degC"}))
 ```
 
 `gm.simulate`, `gm.replay`, `gm.live` and `gm.resume` cover a run in one call; `gm.Engine` is the
@@ -46,7 +47,7 @@ frame = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
 
 results = gm.replay(plant, data, checkpoint="runs/replay.ckpt")
-print(results.energy_report())
+print(results.to_frame(table="energy"))
 print(results["doublet.esp"].power)
 assert len(gm.resume("runs/replay.ckpt")) == len(results)
 
