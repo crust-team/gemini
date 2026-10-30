@@ -13,6 +13,9 @@ import pandas as pd
 DEFAULT_STEP = timedelta(hours=1)
 """Interval assumed after the final tick when fewer than two ticks give no spacing."""
 
+EARLIEST = datetime.min.replace(tzinfo=timezone.utc)
+"""The earliest UTC instant: the sort key of an undated snapshot."""
+
 
 def to_utc(value):
     """Return a timezone-aware UTC ``datetime``; naive values and strings are taken as UTC.

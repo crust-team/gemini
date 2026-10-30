@@ -3,7 +3,6 @@
 import csv
 import io
 from copy import deepcopy
-from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import Field
@@ -12,12 +11,10 @@ from gemini.core.types.bindings import Binding, ConfigModel, DatedParams, Module
 from gemini.core.types.fluid import BRINE, Fluid
 from gemini.errors import LegacyFormatError
 from gemini.utils.mappings import set_nested
-from gemini.utils.time import to_utc
+from gemini.utils.time import EARLIEST, to_utc
 
 from . import tables
 from .files import GeminiTags, parameter_times
-
-_EARLIEST = datetime.min.replace(tzinfo=timezone.utc)
 
 
 class ModuleDesign(ConfigModel):
@@ -164,7 +161,7 @@ def _snapshots(project, node_id, kinds, columns):
         if column in columns:
             params |= supplement
         snapshots.append(DatedParams(valid_from=at, params=_json_params(kind, params)))
-    return sorted(snapshots, key=lambda item: item.valid_from or _EARLIEST)
+    return sorted(snapshots, key=lambda item: item.valid_from or EARLIEST)
 
 
 def _unmapped_properties(project, node_id, kind):

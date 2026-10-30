@@ -67,11 +67,10 @@ from gemini.utils.strings import (
     snake_case,
     split_path,
 )
-from gemini.utils.time import to_utc
+from gemini.utils.time import EARLIEST, to_utc
 
 _current_call = ContextVar("module_call", default=None)
 _outputs_enabled = ContextVar("module_outputs_enabled", default=True)
-_EARLIEST = to_utc("0001-01-01")
 _FIELD_DISPLAY_UNITS = {"Pa": "bar", "K": "°C", "m3/s": "m3/h", "W": "kW"}
 _REGISTRIES = (
     (Parameter, "_parameters"),
@@ -668,7 +667,7 @@ class Module:
         ]
         if not eligible:
             raise ConfigurationError(f"{self.path}: no parameters valid at {at}")
-        selected = max(eligible, key=lambda item: item.valid_from or _EARLIEST)
+        selected = max(eligible, key=lambda item: item.valid_from or EARLIEST)
         values = selected.params | self._param_overrides
         return {name: self._parameters[name].validate(value) for name, value in values.items()}
 
