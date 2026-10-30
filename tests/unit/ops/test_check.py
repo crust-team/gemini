@@ -42,3 +42,17 @@ def test_traced_check_is_recorded_with_its_attributes():
     name, operands, attributes = recorded[0]
     assert (name, operands, attributes["error"]) == ("check", (True,), PhysicsRangeError)
     assert attributes["values"] == {"path": "esp", "flow": flow}
+
+
+def test_check_numbers_rejects_nan_with_the_name_of_the_value():
+    """A NaN value raises ``PhysicsRangeError`` naming the function and the value; others pass."""
+    assert ops.check_numbers("lmtd", dt1=1.0, dt2=2.0) is None
+    with pytest.raises(PhysicsRangeError, match=r"^lmtd: dt2 = nan; expected a number$"):
+        ops.check_numbers("lmtd", dt1=1.0, dt2=float("nan"))
+
+
+def test_check_numbers_on_arrays_names_the_first_failing_row():
+    """On arrays the failing value of the first NaN row is the one reported."""
+    values = np.array([1.0, np.nan, np.nan])
+    with pytest.raises(PhysicsRangeError, match=r"^ntu: ua = nan; expected a number$"):
+        ops.check_numbers("ntu", ua=values)

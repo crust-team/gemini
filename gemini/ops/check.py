@@ -20,7 +20,9 @@ raises at once, for the first failing row, and is not marked.
 
 import numpy as np
 
+from gemini.errors import PhysicsRangeError
 from gemini.ops.dispatch import Constant, Symbolic
+from gemini.ops.elementwise import isnan, logical_not
 from gemini.ops.failed import mark
 from gemini.ops.registry import get, register
 
@@ -45,6 +47,23 @@ def check(condition, error, message, **values):
     if failing.size:
         concrete = {name: _concrete(value) for name, value in values.items()}
         raise failure(error, message, concrete, int(failing[0]))
+
+
+def check_numbers(function, **values):
+    """Raise ``PhysicsRangeError`` where a named value of ``function`` is NaN.
+
+    A NaN input would otherwise return NaN as if it were a valid result. One check per value, in
+    the order given, with the message ``"<function>: <name> = nan; expected a number"``.
+    """
+    for name, value in values.items():
+        check(
+            logical_not(isnan(value)),
+            PhysicsRangeError,
+            "{function}: {name} = nan; expected a number",
+            function=function,
+            name=name,
+            value=value,
+        )
 
 
 def failure(error, message, values, row):
