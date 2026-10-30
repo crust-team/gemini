@@ -8,8 +8,7 @@ compressibility factor Z = 1: the isentropic outlet temperature
 low reduced pressure) with a constant heat capacity ratio ``k = cp / cv`` over the stage.
 """
 
-import math
-
+from gemini import ops
 from gemini.errors import PhysicsRangeError
 
 
@@ -38,12 +37,15 @@ def isentropic_outlet_temperature(
     of an ideal gas (Z = 1, constant k).
     """
     _check_stage("isentropic_outlet_temperature", inlet_temperature, pressure_ratio)
-    if not heat_capacity_ratio > 1:
-        raise PhysicsRangeError(
-            f"isentropic_outlet_temperature: heat_capacity_ratio = {heat_capacity_ratio}; "
-            "expected > 1"
-        )
-    return inlet_temperature * pressure_ratio ** ((heat_capacity_ratio - 1) / heat_capacity_ratio)
+    ops.check(
+        heat_capacity_ratio > 1,
+        PhysicsRangeError,
+        "isentropic_outlet_temperature: heat_capacity_ratio = {heat_capacity_ratio}; expected > 1",
+        heat_capacity_ratio=heat_capacity_ratio,
+    )
+    return inlet_temperature * ops.pow(
+        pressure_ratio, (heat_capacity_ratio - 1) / heat_capacity_ratio
+    )
 
 
 def stage_outlet_temperature(
@@ -71,13 +73,15 @@ def stage_outlet_temperature(
     Reference: GPSA Engineering Data Book, 14th ed. (2017), Section 13, actual discharge
     temperature from the isentropic efficiency.
     """
-    if not 0 < isentropic_efficiency <= 1:
-        raise PhysicsRangeError(
-            f"stage_outlet_temperature: isentropic_efficiency = {isentropic_efficiency}; "
-            "expected in (0, 1]"
-        )
+    ops.check(
+        ops.logical_and(isentropic_efficiency > 0, isentropic_efficiency <= 1),
+        PhysicsRangeError,
+        "stage_outlet_temperature: isentropic_efficiency = {isentropic_efficiency}; "
+        "expected in (0, 1]",
+        isentropic_efficiency=isentropic_efficiency,
+    )
     ideal = isentropic_outlet_temperature(inlet_temperature, pressure_ratio, heat_capacity_ratio)
-    return inlet_temperature + (ideal - inlet_temperature) / isentropic_efficiency
+    return inlet_temperature + ops.truediv(ideal - inlet_temperature, isentropic_efficiency)
 
 
 def specific_compression_work(
@@ -111,15 +115,18 @@ def specific_compression_work(
     minimises the work of an ideal intercooled compressor (GPSA Engineering Data Book, 14th ed.
     (2017), Section 13, multistage compression).
     """
-    if not specific_heat > 0 or stages < 1:
-        raise PhysicsRangeError(
-            f"specific_compression_work: specific_heat = {specific_heat} J/kg/K, stages = "
-            f"{stages}; expected a positive heat capacity and at least one stage"
-        )
+    ops.check(
+        ops.logical_and(specific_heat > 0, stages >= 1),
+        PhysicsRangeError,
+        "specific_compression_work: specific_heat = {specific_heat} J/kg/K, stages = "
+        "{stages}; expected a positive heat capacity and at least one stage",
+        specific_heat=specific_heat,
+        stages=stages,
+    )
     _check_stage("specific_compression_work", inlet_temperature, pressure_ratio)
     outlet = stage_outlet_temperature(
         inlet_temperature,
-        pressure_ratio ** (1 / stages),
+        ops.pow(pressure_ratio, ops.truediv(1, stages)),
         heat_capacity_ratio,
         isentropic_efficiency,
     )
@@ -128,11 +135,17 @@ def specific_compression_work(
 
 def _check_stage(name, inlet_temperature, pressure_ratio):
     """Reject a nonpositive or non-finite temperature and a pressure ratio below one."""
-    if not (math.isfinite(inlet_temperature) and inlet_temperature > 0):
-        raise PhysicsRangeError(
-            f"{name}: inlet_temperature = {inlet_temperature} K; expected a positive temperature"
-        )
-    if not (math.isfinite(pressure_ratio) and pressure_ratio >= 1):
-        raise PhysicsRangeError(
-            f"{name}: pressure_ratio = {pressure_ratio}; expected >= 1 (no expansion)"
-        )
+    ops.check(
+        ops.logical_and(ops.isfinite(inlet_temperature), inlet_temperature > 0),
+        PhysicsRangeError,
+        "{name}: inlet_temperature = {inlet_temperature} K; expected a positive temperature",
+        name=name,
+        inlet_temperature=inlet_temperature,
+    )
+    ops.check(
+        ops.logical_and(ops.isfinite(pressure_ratio), pressure_ratio >= 1),
+        PhysicsRangeError,
+        "{name}: pressure_ratio = {pressure_ratio}; expected >= 1 (no expansion)",
+        name=name,
+        pressure_ratio=pressure_ratio,
+    )
