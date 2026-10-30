@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import combustion, heat_transfer
 from gemini.types import (
     Control,
     Efficiency,
@@ -105,19 +106,22 @@ class CHP(Module):
             m_dot=inlet.m_dot,
         )
         load = self.load_fraction
-        share = self.no_load_fuel_fraction + (1 - self.no_load_fuel_fraction) * load
-        fuel = ops.where(load != 0, share * self.electric_capacity / self.electric_efficiency, 0.0)
-        engine_heat = self.thermal_efficiency * fuel
+        fuel = combustion.willans_fuel_input(
+            load, self.electric_capacity, self.electric_efficiency, self.no_load_fuel_fraction
+        )
+        engine_heat, generated = combustion.engine_energy_flows(
+            fuel, load, self.electric_capacity, self.thermal_efficiency
+        )
         rate = inlet.heat_capacity_rate()
         recovered = ops.minimum(
-            engine_heat, rate * ops.maximum(0, self.maximum_outlet_temperature - inlet.T)
+            engine_heat,
+            heat_transfer.setpoint_duty(rate, self.maximum_outlet_temperature - inlet.T),
         )
-        generated = load * self.electric_capacity
         return {
             "fuel": fuel,
             "electricity_generated": generated,
             "heat_recovered": recovered,
             "dumped_heat": engine_heat - recovered,
             "heat_loss": fuel - generated - recovered,
-            "outlet_T": ops.where(recovered != 0, inlet.T + recovered / rate, inlet.T),
+            "outlet_T": inlet.T + heat_transfer.temperature_change(recovered, rate),
         }

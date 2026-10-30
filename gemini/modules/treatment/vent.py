@@ -5,8 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.ops import Constant
-from gemini.physics import constants
+from gemini.physics import combustion
 from gemini.types import (
     Efficiency,
     Fraction,
@@ -20,19 +19,6 @@ from gemini.types import (
     SpecificEnthalpy,
     Stream,
 )
-
-METHANE_MOLAR_MASS = Constant(
-    "METHANE_MOLAR_MASS",
-    0.016043,
-    "kg/mol",
-    "molar mass of methane (IUPAC 2013 standard atomic weights)",
-)
-
-METHANE_HEATING_VALUE = 50.0e6
-"""Lower heating value of methane [J/kg]: 802.3 kJ/mol (NIST Chemistry WebBook) / 16.043 g/mol."""
-
-FLARE_EFFICIENCY = 0.98
-"""Combustion (destruction) efficiency of a well-operated flare [-] (US EPA AP-42, 13.5)."""
 
 
 class Vent(Module):
@@ -70,8 +56,10 @@ class Vent(Module):
         self.mode = Parameter(Literal["vent", "flare"])
         self.co2_mass_fraction = Parameter(Fraction)
         self.methane_mass_fraction = Parameter(Fraction, default=0)
-        self.heating_value = Parameter(SpecificEnthalpy, default=METHANE_HEATING_VALUE, ge=0)
-        self.combustion_efficiency = Parameter(Efficiency, default=FLARE_EFFICIENCY)
+        self.heating_value = Parameter(
+            SpecificEnthalpy, default=combustion.METHANE_HEATING_VALUE, ge=0
+        )
+        self.combustion_efficiency = Parameter(Efficiency, default=combustion.FLARE_EFFICIENCY)
 
         # Inlets
         self.inlet = Inlet(Stream, stream="gas")
@@ -99,16 +87,19 @@ class Vent(Module):
 
     def _compute_outputs(self, inlets, outlets):
         gas_flow = inlets.inlet.m_dot
-        methane = self.methane_mass_fraction * gas_flow
-        burnt = self.combustion_efficiency * methane if self.mode == "flare" else 0.0
-        self.vented_mass_flow = gas_flow
-        self.co2_emission = (
-            self.co2_mass_fraction * gas_flow
-            + burnt * constants.CO2_MOLAR_MASS / METHANE_MOLAR_MASS
+        efficiency = self.combustion_efficiency if self.mode == "flare" else 0.0
+        co2, methane, fuel = combustion.flare_emissions(
+            gas_flow,
+            self.co2_mass_fraction,
+            self.methane_mass_fraction,
+            efficiency,
+            self.heating_value,
         )
-        self.methane_emission = methane - burnt
-        self.fuel = burnt * self.heating_value
-        self.heat_loss = self.fuel
+        self.vented_mass_flow = gas_flow
+        self.co2_emission = co2
+        self.methane_emission = methane
+        self.fuel = fuel
+        self.heat_loss = fuel
 
     def _check(self, inlet):
         """Reject reverse flow and gas compositions above one."""

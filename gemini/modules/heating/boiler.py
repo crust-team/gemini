@@ -5,6 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import combustion, heat_transfer
 from gemini.types import (
     Control,
     Duty,
@@ -65,8 +66,9 @@ class Boiler(Module):
             m_dot=inlet.m_dot,
         )
         rate = inlet.heat_capacity_rate()
-        duty = ops.minimum(self._requested_duty(inlet, rate), self.capacity)
-        outlet_T = ops.where(inlet.m_dot == 0, inlet.T, inlet.T + duty / rate)
+        requested = heat_transfer.setpoint_duty(rate, self.temperature_setpoint - inlet.T)
+        duty = ops.minimum(requested, self.capacity)
+        outlet_T = inlet.T + heat_transfer.temperature_change(duty, rate)
 
         outlet = inlet.with_(T=outlet_T)
 
@@ -76,15 +78,13 @@ class Boiler(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         outlet = outlets.outlet
-        requested = self._requested_duty(inlet, inlet.heat_capacity_rate())
+        requested = heat_transfer.setpoint_duty(
+            inlet.heat_capacity_rate(), self.temperature_setpoint - inlet.T
+        )
         self.duty = ops.minimum(requested, self.capacity)
-        self.fuel_or_power = self.duty / self.efficiency
+        self.fuel_or_power = combustion.fuel_input(self.duty, self.efficiency)
         self.outlet_T = outlet.T
         self.capped = requested > self.capacity
         self.electricity = self.fuel_or_power if self.fuel_type == "electric" else 0
         self.fuel = self.fuel_or_power if self.fuel_type == "gas" else 0
         self.heat_loss = self.fuel_or_power - self.duty
-
-    def _requested_duty(self, inlet, rate):
-        """Return the heat flow [W] that would lift the inlet to the setpoint, without the cap."""
-        return rate * ops.maximum(0, self.temperature_setpoint - inlet.T)
