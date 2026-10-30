@@ -51,7 +51,8 @@ returns one cached snapshot per complete `Fluid` value.
   `specific_heat` and `thermal_conductivity` override the four liquid values after that.
 - `corrosion_inputs(p, T)` = `co2_partial_pressure = w_CO2 rho_l / M_CO2 / henry_constant(T)`
   [Pa] and `ionic_strength = salinity rho_l` [kg/m3], with `M_CO2` = 0.04401 kg/mol: the
-  dissolved CO2 mass fraction becomes a concentration and the Henry law (Chemistry) is inverted.
+  dissolved CO2 mass fraction becomes a concentration and the Henry law (Chemistry) is inverted;
+  `T` may be an array or a traced value.
 
 Salinity, CO2 and free gas are mass fractions; glycol is a volume fraction. Brine density and
 viscosity are not inferred from salinity: supply the overrides. A `steam` fluid carries the
@@ -165,7 +166,8 @@ do not check it and raise nothing. Any number of coefficients is accepted.
 
 `chemistry.py` holds the Henry-law CO2 partition of GEMINI water-analysis workflows, which
 supplies the CO2 partial pressure for the corrosion correlations. Temperatures are in K,
-pressures in Pa and concentrations in mol/m3:
+pressures in Pa and concentrations in mol/m3. Every function is written with `gemini.ops`, so it
+runs on floats, arrays and traced values with the same results:
 
 - `henry_constant(T)` = `0.01 * 0.0385 exp(2400 (1 / T - 1 / 293.15))` [mol/m3/Pa]: 0.0385
   mol/l/bar at 293.15 K, the factor 0.01 converting to SI.
@@ -203,7 +205,10 @@ Rates are in mm/year, the explicit literature-unit exception of the package.
   10^-2.9 above 20 bar CO2; tolerance 1e-6 relative; at most 100 steps and then the last
   iterate without a warning), with equilibrium constants that depend on degF, psi and mol/l
   (bicarbonate molar mass 61.2 g/mol, NaCl 58.44 g/mol); the pH is rounded to 0.01. A
-  nonpositive root gives pH 99.99.
+  nonpositive root gives pH 99.99. The solve is `ops.newton`; on arrays each row stops by the
+  same rule and returns the same iterate as the scalar loop (SciPy's array `newton` stops on an
+  absolute tolerance after the step and moves a pH across a rounding boundary, so it is not
+  used). A failing iteration gives NaN, which reads as the nonpositive root.
 - `f(pH)` has piecewise formulas only at the exactly tabulated temperatures 5, 15, 20, 40, 60,
   80, 90, 120 and 150 degC and for pH 3.5 to 6.5; elsewhere it is 7, so the rate jumps between
   40.000 and 40.001 degC. The 5 degC first segment keeps `2.0676 + 0.2309 pH` where the other
@@ -342,7 +347,8 @@ the borehole radius, `ln(4L/D) < 1`, Ramey below `alpha t / r^2 = 25`) raise
 - `doublet_cold_fraction(V / V_B)`: the share `theta / pi` of the produced flow already swept by
   cold water, where theta solves `3 (sin theta - theta cos theta) / sin^3 theta = V / V_B`
   (dipole streamline travel times, checked against integrated streamlines); a Taylor series
-  below 0.1 rad avoids cancellation. It is 0 up to breakthrough and 1/2 at `V = 3 V_B`.
+  below 0.1 rad avoids cancellation. It is 0 up to breakthrough and 1/2 at `V = 3 V_B`. The
+  angle is an `ops.brentq` solve (`xtol` 1e-14), and the early returns are `ops.where`.
 - `cylinder_store_conductance(k, alpha, V, H, t_p)` = `2 k A / sqrt(pi alpha t_p)` over the
   envelope of a cylinder of volume V and height H: period-mean semi-infinite conduction
   (Carslaw and Jaeger 1959), valid while `sqrt(alpha t_p)` is small against the store.
@@ -367,7 +373,10 @@ dry air and water vapour without the enhancement factor, used by `CoolingConsume
   3e-4 relative of the ASHRAE table. Outside 173.15 K to 473.15 K or NaN raises.
 - `dew_point(T, relative_humidity)`: inverts `saturation_pressure` with Brent's method (to
   1e-9 K), so the two are consistent by construction; below 0 degC it is the frost point.
-  Relative humidity must be in (0, 1]; a dew point below -100 degC raises.
+  Relative humidity must be in (0, 1]; a dew point below -100 degC raises. The inversion is an
+  `ops.brentq` solve; on arrays it repeats Brent's method step for step (the result carries up
+  to 1.4e-12 relative of the `xtol` error, so a different root finder would differ by more than
+  the `1e-12` tolerance of the array path). The input checks work on arrays.
 - `humidity_ratio(T, relative_humidity, p)` = `0.621945 p_w / (p - p_w)` (ASHRAE equations 20
   and 22); saturated values are about 0.4 % below the ASHRAE `W_s` column. `p <= p_w` raises.
 - `wet_bulb_temperature(T, relative_humidity)`: Stull (2011), J. Appl. Meteor. Climatol. 50,
