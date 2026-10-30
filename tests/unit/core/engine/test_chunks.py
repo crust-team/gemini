@@ -9,7 +9,8 @@ import pytest
 import gemini as gm
 from gemini.core.engine.chunks import PathColumns, ResultChunk
 from gemini.core.engine.results import Results
-from gemini.core.types import Health, ModuleResult, Ports, Stream, Values
+from gemini.core.modules import Module
+from gemini.core.types import Health, ModuleResult, Output, Ports, Ratio, Stream, Values
 
 SIZE = 8
 START = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -307,3 +308,62 @@ def test_rows_with_different_fields_fill_the_missing_cells_with_nan():
         rows.append({("p", name): float(row) for name in names} | {("p", "operating"): True})
     pd.testing.assert_frame_equal(results.to_frame(), reference_frame(rows, TIMES[:3]))
     assert results.to_frame()[("p", "a")].isna().tolist() == [False, False, True]
+
+
+def test_spread_puts_the_evaluated_rows_at_their_ticks():
+    """Columns of the evaluated rows only move to their ticks; floats fill with NaN, lists None."""
+    table = PathColumns(
+        np.ones(2, dtype=bool),
+        {
+            "x": np.array([1.0, 2.0]),
+            "n": np.array([5, 6]),
+            "tags": ["a", "b"],
+            "v": np.ones((2, 3)),
+        },
+    )
+    spread = table.spread(np.array([1, 3]), 4)
+    assert spread.present.tolist() == [False, True, False, True]
+    assert spread.columns["x"][[1, 3]].tolist() == [1.0, 2.0] and np.isnan(spread.columns["x"][0])
+    assert spread.columns["n"].dtype == np.int64 and spread.columns["n"][3] == 6
+    assert spread.columns["tags"] == [None, "a", None, "b"] and spread.columns["v"].shape == (4, 3)
+    assert table.spread(np.array([0, 1]), 2).columns["x"] is table.columns["x"]
+
+
+def test_without_marks_ticks_absent_and_rows_cut_a_chunk():
+    """``without`` keeps the columns; ``rows`` cuts times, columns, skips and errors alike."""
+    chunk = chunk_of(0, SIZE)
+    table = chunk.tables["pump"]
+    assert table.without(np.array([0, 2])).present.tolist()[:3] == [False, True, False]
+    assert table.without(np.array([], dtype=int)) is table
+    cut = chunk.rows(3, 5)
+    assert cut.times == TIMES[3:5] and cut.skips == SKIPS[3:5]
+    assert cut.errors == [(0, ERRORS[0][1])] and len(cut.tables["pump"].present) == 2
+
+
+class Share(Module):
+    """A leaf with an optional ratio output and a plain float output."""
+
+    def __init__(self):
+        """Declare the outputs."""
+        super().__init__()
+
+        # Outputs
+        self.share = Output(Ratio | None)
+        self.plain = Output(float)
+
+    def forward(self, inlets):
+        """Expose no fluid outlets."""
+
+        outlets = dict()
+        return outlets
+
+
+def test_a_declared_optional_float_output_reads_nan_as_none():
+    """An ``X | None`` output with NaN is a list with ``None``, as a direct call's values are."""
+    values = {"share": np.array([0.5, np.nan]), "plain": np.array([1.0, np.nan])}
+    result = ModuleResult(
+        outputs=Values._trusted(values, dict(Share()._outputs)), outlets=Ports({})
+    )
+    table = PathColumns.of(result, None, np.ones(2, dtype=bool))
+    assert table.columns["share"] == [0.5, None]
+    assert np.isnan(table.columns["plain"][1])
