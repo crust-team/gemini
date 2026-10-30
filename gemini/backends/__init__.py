@@ -17,8 +17,20 @@ from gemini.backends.base import (
 )
 from gemini.backends.numpy import NumpyBackend
 from gemini.backends.python import PythonBackend
+from gemini.backends.scalars import PLAIN, WRAP, scope_mode
 
 register(PythonBackend())
 register(NumpyBackend())
 
-__all__ = ["Backend", "forced_name", "get", "implementation", "register", "select", "settings"]
+__all__ = [
+    "Backend",
+    "PLAIN",
+    "WRAP",
+    "forced_name",
+    "get",
+    "implementation",
+    "register",
+    "scope_mode",
+    "select",
+    "settings",
+]

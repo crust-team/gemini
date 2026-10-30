@@ -181,19 +181,25 @@ class Constant:
     ``value`` directly, without ``dispatch``, unless the other operand is ``Symbolic``: then the
     op is recorded and the constant becomes one graph input named ``name``, so a sensitivity
     study can release it without retracing. As with floats, ``/``, ``//``, ``%`` and ``**`` on
-    invalid operands raise; use ``ops.truediv`` and ``ops.pow`` where a ``where`` branch can
-    be invalid.
+    invalid operands raise outside an eager scope; inside one (``gemini.ops.scope``) the operators
+    compute on ``np.float64`` and are silent like the ops. Use ``ops.truediv`` and ``ops.pow``
+    where a ``where`` branch can be invalid outside a scope.
     """
 
-    __slots__ = ("name", "value", "unit", "description")
+    __slots__ = ("name", "value", "unit", "description", "_scalar")
     __array_ufunc__ = None
 
     def __init__(self, name, value, unit, description):
         """Declare a constant with its SI ``value`` and ``unit``."""
         self.name = name
         self.value = float(value)
+        self._scalar = np.float64(value)
         self.unit = unit
         self.description = description
+
+    def _number(self):
+        """Return the value as ``np.float64`` inside a wrapping eager scope, else as ``float``."""
+        return self._scalar if backends.scope_mode() is backends.WRAP else self.value
 
     def __float__(self):
         """Return the value."""
@@ -211,85 +217,85 @@ class Constant:
         """Return ``self + other``."""
         if isinstance(other, Symbolic):
             return dispatch("add", self, other)
-        return self.value + other
+        return self._number() + other
 
     def __radd__(self, other):
         """Return ``other + self``."""
         if isinstance(other, Symbolic):
             return dispatch("add", other, self)
-        return other + self.value
+        return other + self._number()
 
     def __sub__(self, other):
         """Return ``self - other``."""
         if isinstance(other, Symbolic):
             return dispatch("sub", self, other)
-        return self.value - other
+        return self._number() - other
 
     def __rsub__(self, other):
         """Return ``other - self``."""
         if isinstance(other, Symbolic):
             return dispatch("sub", other, self)
-        return other - self.value
+        return other - self._number()
 
     def __mul__(self, other):
         """Return ``self * other``."""
         if isinstance(other, Symbolic):
             return dispatch("mul", self, other)
-        return self.value * other
+        return self._number() * other
 
     def __rmul__(self, other):
         """Return ``other * self``."""
         if isinstance(other, Symbolic):
             return dispatch("mul", other, self)
-        return other * self.value
+        return other * self._number()
 
     def __truediv__(self, other):
         """Return ``self / other``."""
         if isinstance(other, Symbolic):
             return dispatch("truediv", self, other)
-        return self.value / other
+        return self._number() / other
 
     def __rtruediv__(self, other):
         """Return ``other / self``."""
         if isinstance(other, Symbolic):
             return dispatch("truediv", other, self)
-        return other / self.value
+        return other / self._number()
 
     def __pow__(self, other):
         """Return ``self ** other``."""
         if isinstance(other, Symbolic):
             return dispatch("pow", self, other)
-        return self.value**other
+        return self._number() ** other
 
     def __rpow__(self, other):
         """Return ``other ** self``."""
         if isinstance(other, Symbolic):
             return dispatch("pow", other, self)
-        return other**self.value
+        return other ** self._number()
 
     def __mod__(self, other):
         """Return ``self % other``."""
         if isinstance(other, Symbolic):
             return dispatch("mod", self, other)
-        return self.value % other
+        return self._number() % other
 
     def __rmod__(self, other):
         """Return ``other % self``."""
         if isinstance(other, Symbolic):
             return dispatch("mod", other, self)
-        return other % self.value
+        return other % self._number()
 
     def __floordiv__(self, other):
         """Return ``self // other``."""
         if isinstance(other, Symbolic):
             return dispatch("floordiv", self, other)
-        return self.value // other
+        return self._number() // other
 
     def __rfloordiv__(self, other):
         """Return ``other // self``."""
         if isinstance(other, Symbolic):
             return dispatch("floordiv", other, self)
-        return other // self.value
+        return other // self._number()
 
     def __lt__(self, other):
         """Return ``self < other``."""
@@ -317,8 +323,8 @@ class Constant:
 
     def __neg__(self):
         """Return ``-self``."""
-        return -self.value
+        return -self._number()
 
     def __abs__(self):
         """Return ``abs(self)``."""
-        return abs(self.value)
+        return abs(self._number())

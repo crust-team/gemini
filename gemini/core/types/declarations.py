@@ -7,8 +7,10 @@ from datetime import datetime
 from functools import partial
 from typing import Annotated, Any
 
+import numpy as np
 from pydantic import Field, TypeAdapter, ValidationError
 
+from gemini import ops
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import Ratio
@@ -39,6 +41,8 @@ class _Unset:
 UNSET = _Unset()
 
 
+_NUMPY_KINDS = {float: np.float64, bool: np.bool_}
+
 _MISS = object()
 """Result of a quick check that cannot decide; the full validation then runs."""
 
@@ -55,14 +59,21 @@ _PLAIN_KEYS = {
 
 
 def _exact(kind, optional, value):
-    """Return ``value`` when it is exactly a ``kind`` (or ``None`` if optional), else ``_MISS``."""
+    """Return ``value`` when it is exactly a ``kind`` (or ``None`` if optional), else ``_MISS``.
+
+    An ``np.float64`` or ``np.bool_`` of the eager scope converts to its Python kind.
+    """
     if type(value) is kind or (value is None and optional):
         return value
+    if type(value) is _NUMPY_KINDS.get(kind):
+        return kind(value)
     return _MISS
 
 
 def _bounded_float(ge, gt, le, lt, optional, value):
     """Return ``value`` when it is a ``float`` within every bound (NaN never is), else ``_MISS``."""
+    if type(value) is np.float64:
+        value = float(value)
     if type(value) is not float:
         return None if value is None and optional else _MISS
     if (
@@ -201,11 +212,13 @@ class Declaration:
 
         A plain value of the declared kind inside its bounds (an exact ``float``, ``bool`` or
         ``str``, or ``None`` for an optional kind) returns unchanged without units or Pydantic;
-        any other value, and every failure, takes the full path below.
+        any other value, and every failure, takes the full path below. An ``np.float64`` or
+        ``np.bool_`` converts to ``float`` or ``bool`` first, and a ``Failed`` raises its error.
         """
         accepted = self._quick(value)
         if accepted is not _MISS:
             return accepted
+        value = ops.scope.plain(value)
         try:
             value = units.value_in_si(value, self.unit, self.path, self.quantity)
             return self._adapter.validate_python(value)

@@ -1,5 +1,6 @@
 """Registration, calls, state and output-recording contracts."""
 
+import math
 import pickle
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -884,3 +885,60 @@ def test_listings_recurse_by_default_and_ports_stay_local(fresh_plant):
     assert list(doublet.outputs(recurse=False)) == ["electricity", "heat_loss"]
     assert list(doublet.inlets()) == ["return_in"]
     assert list(doublet.outlets()) == ["supply_out"]
+
+
+class Quotient(Module):
+    """Divide a parameter, a control and an inlet field with plain operators."""
+
+    def __init__(self):
+        """Declare the operands of the plain divisions."""
+        super().__init__()
+
+        # Parameters
+        self.numerator = Parameter(float, default=2.0)
+        self.coefficients = Parameter(list[float], default=[1.0, 2.0], shape=(2,))
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.divisor = Control(float, default=0.0)
+
+        # Outputs
+        self.ratio = Output(float)
+        self.finite = Output(bool)
+        self.seen = Output(list[float])
+        self.again = Output(float)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Divide the inlet flow by the control and raise the pressure by one pascal."""
+        stream = inlets.inlet
+        self.kinds = (type(stream.m_dot), type(self.numerator), type(self.divisor))
+        self.quotient = stream.m_dot / self.divisor
+        return dict(outlet=stream.with_(p=stream.p + 1.0))
+
+    def _compute_outputs(self, inlets, outlets):
+        self.ratio = self.numerator / self.divisor
+        self.finite = self.ratio < 1e300
+        self.seen = [coefficient / self.divisor for coefficient in self.coefficients]
+        self.again = self.ratio / self.divisor
+
+
+def test_an_eager_call_divides_silently_and_returns_plain_python_values():
+    """Parameters, controls and inlet fields are NumPy scalars inside; results are Python."""
+    module = Quotient()
+    stream = Stream(m_dot=0.0, T=300.0, p=1e5)
+    result = module(inlet=stream)
+    assert [kind.__name__ for kind in module.kinds] == ["float64"] * 3
+    assert math.isinf(result.outputs.ratio) and type(result.outputs.ratio) is float
+    assert type(result.outputs.finite) is bool and result.outputs.finite is False
+    assert result.outputs.seen == [math.inf, math.inf]
+    assert result.outputs.again == math.inf and type(result.outputs.again) is float
+    assert all(type(item) is float for item in result.outputs.seen)
+    assert math.isnan(module.quotient) and type(result.outlets.outlet.p) is float
+    assert result.inlets.inlet is stream and type(stream.m_dot) is float
+    assert type(result.inputs["divisor"]) is float
+    assert "np.float64" not in str(result.outlets.outlet) and "np.float64" not in str(stream)

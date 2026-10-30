@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+import gemini as gm
+from gemini import backends
 from gemini.core.modules.pumps import ESP
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
@@ -59,3 +61,15 @@ def test_fit_recovers_curve_and_health_threshold():
     assert pump.health(result, {"power": power * 1.11}).alarm
     assert ESP.fit_head_correction([1, 2, 3], [3, 5, 7]) == pytest.approx((2, 1))
     assert len(pump.head_curve(50)) == 50
+
+
+def test_the_esp_alone_asks_for_a_plain_scope_under_float32_precision():
+    """Float32 keeps Python floats next to the float32 coefficients; a stopped pump still runs."""
+    esp = ESP().update_params(**ESP_PARAMS)
+    stopped = dict(frequency=60, suction=Stream(m_dot=0.0, T=300, p=100000))
+    assert esp._scalar_mode() == backends.WRAP
+    reference = esp(**stopped).outputs.efficiency
+    with gm.runtime.settings(precision="float32"):
+        assert esp._scalar_mode() == backends.PLAIN
+        assert esp(**stopped).outputs.efficiency == reference == 0.0
+    assert backends.scope_mode() is None

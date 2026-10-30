@@ -20,9 +20,10 @@ from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass, field
 
+import numpy as np
 from pydantic_core import to_jsonable_python
 
-from gemini import ops
+from gemini import backends, ops
 from gemini.core import runtime
 from gemini.core.physics import units
 from gemini.core.types.bindings import DatedParams, ModuleBindings
@@ -38,6 +39,7 @@ from gemini.core.types.declarations import (
     PortField,
     State,
 )
+from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import Fluid
 from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult, Values
@@ -156,6 +158,54 @@ class _Step:
         set_nested(self.next_states, keys, values)
 
 
+class _ScalarParameters(dict):
+    """Parameter values of an eager call as the scope gives them, wrapped on first read."""
+
+    def __init__(self, module):
+        """Read parameters of ``module``."""
+        super().__init__()
+        self._module = module
+
+    def __missing__(self, name):
+        """Return the stored value of parameter ``name`` wrapped, and keep it for this call."""
+        value = self[name] = ops.scope.wrap(self._module._parameter_value(name))
+        return value
+
+
+def _has_arrays(inlets, inputs):
+    """Return whether a call holds arrays, which leaves its scope unwrapped."""
+    for stream in inlets.values():
+        for value in (stream.m_dot, stream.T, stream.p):
+            if isinstance(value, np.ndarray):
+                return True
+    return any(isinstance(value, np.ndarray) for value in inputs.values())
+
+
+def _numpy_ports(inlets):
+    """Return ``inlets`` with stream fields as ``np.float64`` for the eager scope."""
+    return Ports._trusted({name: stream._numpy() for name, stream in inlets.items()}, inlets._path)
+
+
+def _read(call, value):
+    """Return a recorded output as the call's physics sees it: wrapped in a wrapping call."""
+    if not call.wrapping:
+        return value
+    return np.float64(value) if type(value) is float else ops.scope.wrap(value)
+
+
+def _restored(returned, scoped, inlets):
+    """Return the outlets of ``forward`` with a passed-through scoped inlet restored."""
+    if scoped is inlets or not isinstance(returned, dict):
+        return returned
+    originals = {id(scoped[name]): inlets[name] for name in inlets}
+    return {name: originals.get(id(value), value) for name, value in returned.items()}
+
+
+def _plain_outlet(value):
+    """Return an outlet stream with plain scalar fields; a ``Failed`` field raises its error."""
+    return value._plain() if isinstance(value, Stream) else value
+
+
 @dataclass
 class _Call:
     """Values of one module call in progress.
@@ -166,7 +216,8 @@ class _Call:
     A traced call (``gemini.graph``) sets ``parameters`` to the traced parameter values that
     replace the stored ones, and records outputs without validating them. ``trace`` is the
     running trace of ``gemini.graph``: a call made while it is set is recorded in the graph
-    through ``trace.child`` instead of being evaluated.
+    through ``trace.child`` instead of being evaluated. ``wrapping`` marks an eager call whose
+    physics gets NumPy scalars (``gemini.ops.scope``).
     """
 
     module: "Module"
@@ -178,6 +229,7 @@ class _Call:
     call_records: list = field(default_factory=list)
     parameters: dict | None = None
     trace: object | None = None
+    wrapping: bool = False
 
     def owned_by(self, module):
         """Return the innermost call of ``module`` in this chain, or ``None``."""
@@ -347,7 +399,7 @@ class Module:
             raise OutputError(
                 f"{self.path}.{name}: outputs may only be assigned while computing outputs"
             )
-        if call.parameters is not None:
+        if call.trace is not None:
             call.outputs[name] = value
             return
         call.outputs[name] = self._outputs[name].validate(value)
@@ -406,7 +458,7 @@ class Module:
         if name in registries.get("_outputs", {}):
             call = _active_call(self)
             if call is not None and call.outputs is not None and name in call.outputs:
-                return call.outputs[name]
+                return _read(call, call.outputs[name])
             return self._outputs[name]
         for registry in ("_inlets", "_outlets"):
             if name in registries.get(registry, {}):
@@ -655,26 +707,23 @@ class Module:
         parent = _current_call.get()
         if parent is not None and parent.trace is not None:
             return parent.trace.child(self, inlets, supplied, parent)
-        call = _Call(
-            module=self,
-            inputs=self._resolve_inputs(supplied),
-            outputs={} if outputs_enabled() else None,
-            parent=parent,
-            states=self._call_states(step),
-            step=step,
-        )
-        token = _current_call.set(call)
-        try:
-            outlets = self._evaluate(inlets, call)
-            if step is not None and self._states:
-                step.advance(self._step_keys(step), self._next_states(inlets, outlets, step.dt))
-        finally:
-            _current_call.reset(token)
+        inputs = self._resolve_inputs(supplied)
+        with ops.scope.Scope(self._scalar_mode(), _has_arrays(inlets, inputs)) as scope:
+            call = self._eager_call(inputs, parent, step, scope.wrapping)
+            token = _current_call.set(call)
+            try:
+                scoped = _numpy_ports(inlets) if scope.wrapping else inlets
+                outlets = self._evaluate(inlets, scoped, call)
+                if step is not None and self._states:
+                    values = self._next_states(scoped, outlets, step.dt)
+                    step.advance(self._step_keys(step), values)
+            finally:
+                _current_call.reset(token)
         result = ModuleResult(
             outputs=Values(call.outputs or {}, self._outputs),
             outlets=outlets,
             inlets=inlets,
-            inputs=dict(call.inputs),
+            inputs=ops.scope.plain(dict(call.inputs)),
             children=dict(call.call_records),
             call_records=tuple(call.call_records),
             is_leaf=self.is_leaf,
@@ -683,14 +732,46 @@ class Module:
             parent.call_records.append((self._relative_path(parent.module), result))
         return result
 
-    def _evaluate(self, inlets, call):
-        """Run pre-hooks, ``forward``, output computation and forward hooks of one call."""
+    def _eager_call(self, inputs, parent, step, wrapping):
+        """Return the call record of an eager call; ``wrapping`` gives physics NumPy scalars.
+
+        Wrapped controls, boundaries, states and (read on demand) parameters are what ``forward``
+        sees, so a plain operator on them is silent like the ops; results hold plain values.
+        """
+        states = self._call_states(step)
+        if wrapping:
+            inputs = {name: ops.scope.wrap(value) for name, value in inputs.items()}
+            states = None if states is None else ops.scope.wrap(states)
+        return _Call(
+            module=self,
+            inputs=inputs,
+            outputs={} if outputs_enabled() else None,
+            parent=parent,
+            states=states,
+            step=step,
+            parameters=_ScalarParameters(self) if wrapping else None,
+            wrapping=wrapping,
+        )
+
+    def _scalar_mode(self):
+        """Return ``WRAP`` to give physics NumPy scalars in an eager call, else ``PLAIN``.
+
+        NOTE(refactor): the ESP overrides it for float32 precision, whose arithmetic an
+        ``np.float64`` scalar would change; no other module does.
+        """
+        return backends.WRAP
+
+    def _evaluate(self, inlets, scoped, call):
+        """Run pre-hooks, ``forward``, output computation and forward hooks of one call.
+
+        Hooks see the plain ``inlets``; ``forward`` and the outputs see ``scoped``.
+        """
         for hook in tuple(self._pre_hooks.values()):
             hook(self, inlets)
-        outlets = self._check_outlets(self.forward(inlets))
+        outlets = self._check_outlets(_restored(self.forward(scoped), scoped, inlets))
         if call.outputs is None:
             return outlets
-        self._compute_outputs(inlets, outlets)
+        self._compute_outputs(scoped, outlets)
         self._compute_formula_outputs(call)
         for hook in tuple(self._hooks.values()):
             hook(self, inlets, outlets)
@@ -795,7 +876,7 @@ class Module:
         validated = []
         for name, declaration in self._outlets.items():
             try:
-                validated.append((name, declaration.validate(returned[name])))
+                validated.append((name, declaration.validate(_plain_outlet(returned[name]))))
             except (TypeError, ValueError) as exc:
                 raise OutletError(
                     f"{self.path}: invalid outlet {name!r}; "

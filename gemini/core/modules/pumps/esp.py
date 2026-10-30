@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from gemini import ops
+from gemini import backends, ops
 from gemini.core import runtime
 from gemini.core.modules.module import Module
 from gemini.core.physics import constants, pumps, units
@@ -85,6 +85,16 @@ class ESP(Module):
 
         # Outlets
         self.discharge = Outlet(Stream)
+
+    def _scalar_mode(self):
+        """Return ``PLAIN`` under float32 precision, else ``WRAP``.
+
+        NOTE(refactor): the legacy float32 arithmetic needs Python floats next to float32
+        coefficients, and an ``np.float64`` scalar would promote them. This is the one module that
+        honours float32 precision, so its ``efficiency_function`` keeps ``ops.truediv``: a
+        plain ``/`` by a zero power would raise there.
+        """
+        return backends.PLAIN if runtime.get_precision() == "float32" else backends.WRAP
 
     def forward(self, inlets):
         """Raise the suction-stream pressure by the pump-curve head."""

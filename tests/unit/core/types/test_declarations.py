@@ -247,3 +247,14 @@ def test_a_default_is_validated_once_and_mutable_defaults_stay_fresh():
     assert (
         copy.deepcopy(series).default_value() == pickle.loads(pickle.dumps(series)).default_value()
     )
+
+
+def test_the_quick_check_converts_numpy_scalars_of_the_eager_scope():
+    """An ``np.float64`` or ``np.bool_`` validates to the Python ``float`` or ``bool``."""
+    number = Parameter(float, gt=0)
+    flag = Parameter(bool)
+    checked = number.validate(np.float64(2.5))
+    assert type(checked) is float and checked == 2.5
+    assert flag.validate(np.bool_(True)) is True
+    with pytest.raises(DeclarationError, match=r"invalid parameter value -1\.0"):
+        number.validate(np.float64(-1.0))

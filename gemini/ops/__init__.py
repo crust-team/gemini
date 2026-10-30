@@ -6,10 +6,12 @@ functions here cover what operators cannot express: ``where`` instead of a value
 ``logical_not`` instead of ``and``, ``or`` and ``not``, ``maximum``, ``minimum`` and ``abs``
 instead of ``max``, ``min`` and ``abs``, and the functions of ``math`` (``log``, ``sqrt``,
 ``exp``, ...), reductions, ``interp`` and the solvers ``brentq`` and ``newton``.
-``Constant`` declares a named constant that a trace records as a graph input.
+``Constant`` declares a named constant that a trace records as a graph input. ``physics`` decorates
+a public function of ``core/physics`` so plain operators are safe in an eager call (see
+``gemini.ops.scope``); ``Failed`` is the value of a function whose ``check`` failed there.
 """
 
-from gemini.ops import control
+from gemini.ops import control, scope
 from gemini.ops.check import check
 from gemini.ops.dispatch import Constant, Operators, Symbolic, dispatch
 from gemini.ops.elementwise import (
@@ -42,13 +44,16 @@ from gemini.ops.elementwise import (
     tan,
     tanh,
 )
+from gemini.ops.failed import Failed
 from gemini.ops.logic import eq, ge, gt, le, logical_and, lt, ne, where
 from gemini.ops.math import add, floordiv, getitem, mod, mul, neg, pow, sub, truediv
 from gemini.ops.reductions import cumsum, interp, mean, sum
+from gemini.ops.scope import physics
 from gemini.ops.solvers import brentq, newton
 
 __all__ = [
     "Constant",
+    "Failed",
     "Operators",
     "Symbolic",
     "abs",
@@ -93,8 +98,10 @@ __all__ = [
     "ne",
     "neg",
     "newton",
+    "physics",
     "pow",
     "round",
+    "scope",
     "sign",
     "sin",
     "sinh",

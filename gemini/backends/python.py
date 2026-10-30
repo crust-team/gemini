@@ -73,6 +73,10 @@ class PythonBackend(Backend):
             return math.nan
         return result
 
+    def identity(self, value):
+        """Return ``value`` unchanged."""
+        return value
+
     def neg(self, value):
         """Return ``-value``."""
         return -value
@@ -148,7 +152,12 @@ class PythonBackend(Backend):
         return value
 
     def round(self, value, digits):
-        """Return ``value`` rounded to ``digits`` decimals, ties to even as Python does."""
+        """Return ``value`` rounded to ``digits`` decimals, ties to even as Python does.
+
+        NOTE(refactor): an ``np.float64`` is rounded as a ``float``, not with NumPy's own rounding.
+        """
+        if type(value) is np.float64:
+            value = float(value)
         return round(value, digits)
 
     def maximum(self, left, right):

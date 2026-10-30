@@ -60,7 +60,36 @@ class Stream:
 
     def __str__(self):
         """Return the fields as ``name=value`` pairs."""
-        return f"m_dot={self.m_dot!r} T={self.T!r} p={self.p!r} fluid={self.fluid!r}"
+        m_dot, T, p = (_shown(getattr(self, name)) for name in _FIELDS[:3])
+        return f"m_dot={m_dot!r} T={T!r} p={p!r} fluid={self.fluid!r}"
+
+    def _numpy(self):
+        """Return this stream with exact-float fields as ``np.float64``, itself without any.
+
+        The eager scope gives a module's ``forward`` such a copy, so arithmetic on stream fields
+        is silent on a zero divisor; arrays and traced fields stay as they are.
+        """
+        m_dot, temperature, pressure = self.m_dot, self.T, self.p
+        if (
+            type(m_dot) is not float
+            and type(temperature) is not float
+            and type(pressure) is not float
+        ):
+            return self
+        return type(self)._trusted(
+            ops.scope.wrap(m_dot), ops.scope.wrap(temperature), ops.scope.wrap(pressure), self.fluid
+        )
+
+    def _plain(self):
+        """Return this stream with plain Python scalar fields, raising the error of a ``Failed``.
+
+        Returns the stream itself when nothing needs converting.
+        """
+        fields = [getattr(self, name) for name in _FIELDS[:3]]
+        converted = [ops.scope.plain(value) for value in fields]
+        if all(new is old for new, old in zip(converted, fields)):
+            return self
+        return type(self)._trusted(*converted, self.fluid)
 
     def volumetric_flow(self):
         """Return signed mixture volume flow [m3/s] using the stream fluid."""
@@ -97,6 +126,11 @@ class Stream:
         object.__setattr__(stream, "p", p)
         object.__setattr__(stream, "fluid", fluid)
         return stream
+
+
+def _shown(value):
+    """Return an ``np.float64`` as a ``float``, so ``repr`` shows the number alone."""
+    return float(value) if type(value) is np.float64 else value
 
 
 def _check_arguments(data):
