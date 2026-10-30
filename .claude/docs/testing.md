@@ -85,6 +85,11 @@ thread pool still counts (`thread_time` would miss it and let a heavy test pass)
 and waiting do not count. A worker runs one test at a time, so the process clock belongs to the
 test. The budget stays one second; the failure message shows CPU and elapsed time. Never raise
 the budget, skip a test or mark it flaky to get under it.
+
+To see how close tests are, run `--durations=10` (wall time, serial with `-n 0` for stable
+numbers). Parse-heavy checks cache per process: `functions(path)` in
+`tests/unit/test_code_quality.py` parses each file once, and the long-function exception check
+parses only the files that hold an exception.
 Marking is allowed only when the property inherently needs long elapsed work or a large real-data
 window; add a one-line reason to its docstring. Do not delete, skip or weaken a test to meet the
 budget.

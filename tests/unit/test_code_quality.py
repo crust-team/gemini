@@ -4,6 +4,7 @@ McCabe complexity is checked by flake8 (``max-complexity = 10`` in ``pyproject.t
 """
 
 import ast
+import functools
 import io
 import re
 import subprocess
@@ -60,11 +61,13 @@ def python_files():
     ]
 
 
+@functools.cache
 def functions(path):
-    """Yield every function definition of one file."""
-    for node in ast.walk(ast.parse((ROOT / path).read_text())):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            yield node
+    """Return every function definition of one file, parsed once per process."""
+    tree = ast.parse((ROOT / path).read_text())
+    return tuple(
+        node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    )
 
 
 def body_lines(function):
@@ -132,7 +135,13 @@ def test_functions_are_short_or_documented_exceptions(path):
 
 def test_long_function_exceptions_exist():
     """Every listed long-function exception names an existing function."""
-    names = {f"{path}::{function.name}" for path in PYTHON_FILES for function in functions(path)}
+    listed_paths = {name.partition("::")[0] for name in LONG_FUNCTIONS}
+    names = {
+        f"{path}::{function.name}"
+        for path in PYTHON_FILES
+        if path in listed_paths
+        for function in functions(path)
+    }
     assert set(LONG_FUNCTIONS) <= names
 
 
