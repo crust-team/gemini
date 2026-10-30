@@ -1,5 +1,6 @@
 """Typed energy reporting and conservation diagnostics."""
 
+import numpy as np
 import pytest
 
 from gemini.core.modules import Module
@@ -14,6 +15,9 @@ from gemini.core.types import (
     Output,
     Stream,
 )
+from gemini.core.types.ports import Ports
+from gemini.core.types.results import ModuleResult, Values
+from tests.fixtures.equivalence import STREAM_FIELDS, assert_close
 
 
 class Radiator(Module):
@@ -163,3 +167,61 @@ def test_emissions_without_energy_outputs_are_zero():
         inlet=Stream(m_dot=10, T=350, p=2e5), temperature_setpoint=340
     )
     assert emissions(result, GAS_FACTOR, GRID_FACTOR) == 0
+
+
+def _stack_streams(streams):
+    return Stream(
+        **{field: np.array([getattr(s, field) for s in streams]) for field in STREAM_FIELDS},
+        fluid=streams[0].fluid,
+    )
+
+
+def _stack_results(results):
+    """Return one result whose outputs and streams are arrays over the rows of ``results``."""
+    first = results[0]
+    return ModuleResult(
+        outputs=Values(
+            {name: np.array([r.outputs[name] for r in results]) for name in first.outputs}
+        ),
+        inlets=Ports({n: _stack_streams([r.inlets[n] for r in results]) for n in first.inlets}),
+        outlets=Ports({n: _stack_streams([r.outlets[n] for r in results]) for n in first.outlets}),
+        inputs={name: np.array([r.inputs[name] for r in results]) for name in first.inputs},
+    )
+
+
+def _assert_balances_match(module, results, expected_keys):
+    stacked = _stack_results(results)
+    for audit in (mass_balance, energy_balance):
+        per_row = [audit(module, result) for result in results]
+        together = audit(module, stacked)
+        for key in expected_keys[audit]:
+            assert_close(together[key], [row[key] for row in per_row], f"{audit.__name__}.{key}")
+    flows = [collect_flows(result) for result in results]
+    for key, values in collect_flows(stacked).items():
+        assert_close(values, [row[key] for row in flows], key)
+    per_row = [emissions(result, 0.2, 0.4) for result in results]
+    assert_close(emissions(stacked, 0.2, 0.4), per_row, "emissions")
+
+
+BALANCE_KEYS = {
+    mass_balance: ("in", "out", "residual", "relative_residual"),
+    energy_balance: ("in", "out", "residual", "relative_residual", "thermal_residual", "losses"),
+}
+
+
+@pytest.mark.parametrize("fuel", ["electric", "gas"])
+def test_balances_match_on_stacked_boiler_results(fuel):
+    """Audits and emissions on array-valued results equal the audits per row."""
+    boiler = Boiler().update_params(fuel_type=fuel, capacity=1e6, efficiency=0.9)
+    results = [
+        boiler(inlet=Stream(m_dot=m_dot, T=300, p=1e6), temperature_setpoint=setpoint)
+        for m_dot, setpoint in [(10, 320), (2, 310), (0.5, 300)]
+    ]
+    _assert_balances_match(boiler, results, BALANCE_KEYS)
+
+
+def test_balances_match_on_stacked_radiator_results():
+    """Supplied heat and loss outputs, with a residual of either sign, audit per row."""
+    radiator = Radiator()
+    results = [radiator(supply_in=Stream(m_dot=m_dot, T=350, p=3e5)) for m_dot in (0.0, 1.5, 12.0)]
+    _assert_balances_match(radiator, results, BALANCE_KEYS)

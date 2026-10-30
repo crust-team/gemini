@@ -12,6 +12,7 @@ enthalpy, mechanical work or environmental loss. Report that unresolved energy e
 never manufacture heat loss to force a first-law residual to zero.
 """
 
+from gemini import ops
 from gemini.core.modules.pumps import ESP, InjectionPump, LineShaftPump
 from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.core.types.flows import Stream
@@ -51,8 +52,13 @@ def emissions(result_tree, fuel_factor, electricity_factor):
     ``co2_emission`` output and is not included.
     """
     flows = collect_flows(result_tree)
-    grid = max(0.0, flows["electricity"] - flows["electricity_generated"])
+    grid = ops.maximum(0.0, flows["electricity"] - flows["electricity_generated"])
     return flows["fuel"] * fuel_factor + grid * electricity_factor
+
+
+def _scale(incoming, outgoing):
+    """Return the larger magnitude of the two flows, at least one, to normalise a residual."""
+    return ops.maximum(ops.maximum(ops.abs(incoming), ops.abs(outgoing)), 1)
 
 
 def _streams(ports):
@@ -98,7 +104,7 @@ def mass_balance(module, result):
         "in": incoming,
         "out": outgoing,
         "residual": residual,
-        "relative_residual": abs(residual) / max(abs(incoming), abs(outgoing), 1),
+        "relative_residual": ops.abs(residual) / _scale(incoming, outgoing),
         "modules": children,
     }
 
@@ -130,17 +136,17 @@ def energy_balance(module, result):
     incoming, outgoing, residual, unresolved = (
         totals[key] for key in ("in", "out", "residual", "unresolved_power")
     )
-    scale = max(abs(incoming), abs(outgoing), 1)
+    scale = _scale(incoming, outgoing)
     return flows | {
         "heat_delivered": totals["heat_delivered"],
         "losses": flows["heat_loss"],
         "in": incoming,
         "out": outgoing,
         "residual": residual,
-        "relative_residual": abs(residual) / scale,
+        "relative_residual": ops.abs(residual) / scale,
         "unresolved_power": unresolved,
         "thermal_residual": residual - unresolved,
-        "relative_thermal_residual": abs(residual - unresolved) / scale,
+        "relative_thermal_residual": ops.abs(residual - unresolved) / scale,
         "modules": totals["modules"],
     }
 
