@@ -1,6 +1,7 @@
 """Registration, calls, state and output-recording contracts."""
 
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 
 import pytest
 
@@ -525,6 +526,94 @@ class RepeatedTotal(Module):
         self.child(inlet=STREAM)
         outlets = dict()
         return outlets
+
+
+class ReferenceParent(Module):
+    """Exercise copy, sum, ratio and outlet-field formulas written with direct references."""
+
+    def __init__(self):
+        """Declare one child and every formula kind by reference."""
+        super().__init__()
+
+        # Modules
+        self.child = EnergyLeaf()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outputs
+        self.copied = Output.of(self.child.electricity)
+        self.electricity = Output(Electricity)
+        self.ratio = Output.ratio(self.copied, self.electricity)
+        self.mass = Output.of(self.child.outlet.field("m_dot"))
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Call the child once."""
+
+        # Modules
+        child = self.child(inlet=inlets.inlet)
+
+        # Outlets
+        outlet = child.outlets.outlet
+
+        outlets = dict(outlet=outlet)
+        return outlets
+
+
+def test_reference_formulas_copy_sum_divide_and_read_outlet_fields():
+    """Reference formulas resolve to this call's descendant records and adopt the target kind."""
+    module = ReferenceParent()
+    assert dict(module(inlet=STREAM).outputs) == {
+        "copied": 2,
+        "electricity": 2,
+        "ratio": 1,
+        "mass": 1,
+    }
+    assert module.outputs()["copied"].quantity == "electricity"
+
+
+def test_reference_formulas_survive_deep_copy_and_nesting():
+    """A copied or nested composite resolves its references to its own descendants."""
+    copy = deepcopy(ReferenceParent())
+    holder = ModuleDict({"inner": ReferenceParent()})
+    assert copy(inlet=STREAM).outputs.copied == 2
+    assert holder.inner(inlet=STREAM).outputs.mass == 1
+
+
+def test_wrong_references_fail_when_the_class_is_built():
+    """References outside the descendant tree or to later outputs fail in ``__init__``."""
+    stranger = EnergyLeaf()
+
+    class Foreign(Module):
+        def __init__(self):
+            super().__init__()
+            self.child = EnergyLeaf()
+            self.copied = Output.of(stranger.electricity)
+
+    class OwnOutput(Module):
+        def __init__(self):
+            super().__init__()
+            self.child = EnergyLeaf()
+            self.own = Output.of(self.child.electricity)
+            self.copied = Output.of(self.own)
+
+    class ChildOperand(Module):
+        def __init__(self):
+            super().__init__()
+            self.child = EnergyLeaf()
+            self.copied = Output.of(self.child.electricity)
+            self.ratio = Output.ratio(self.copied, self.child.electricity)
+
+    for cls in (Foreign, OwnOutput):
+        with pytest.raises(gm.errors.FormulaError, match="not an output or outlet field"):
+            cls()
+    with pytest.raises(gm.errors.FormulaError, match="not an earlier output of this module"):
+        ChildOperand()
+    with pytest.raises(gm.errors.DeclarationError, match="did you mean 'm_dot'"):
+        EnergyLeaf().outlet.field("mdot")
 
 
 def test_total_counts_every_call():

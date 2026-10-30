@@ -116,6 +116,12 @@ record their own value for an additive output:
   mass-flow quantity.
 - `Output.ratio("thermal_power", "electricity_use")` divides earlier outputs on the same module
   and records `None` when either value is `None` or the denominator is zero.
+- `Output.of` and `Output.ratio` also take declaration references instead of path strings:
+  `Output.of(self.heat_exchanger.duty)`, `Output.of(self.degasser.gas.field("m_dot"))` (an
+  `Outlet.field(name)` reference) and `Output.ratio(self.thermal_power, self.electricity)`.
+  Children are assigned first (`# Modules`), so the references exist; a reference outside the
+  descendant tree, or a ratio operand that is not an earlier output of the module, raises
+  `FormulaError` while the class is built. `Output.of(reference)` adopts the target's kind.
 - An output of an additive quantity declared without a formula, such as
   `self.electricity = Output(Electricity)`, is the automatic sum of the descendant leaf outputs
   with the same name over this call; a leaf called twice counts twice and the sums of nested

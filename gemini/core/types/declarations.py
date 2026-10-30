@@ -1,6 +1,7 @@
 """Declarations registered by :class:`gemini.core.modules.Module`."""
 
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -10,6 +11,7 @@ from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import Ratio
 from gemini.errors import DeclarationError
+from gemini.utils.strings import did_you_mean, join_names
 
 
 class _Unset:
@@ -219,9 +221,16 @@ class Output(Declaration):
         return output
 
     @classmethod
-    def of(cls, path, kind=None, **kwargs):
-        """Declare an output copied from one exactly-once descendant call."""
-        return cls._from_formula(("of", path), kind, **kwargs)
+    def of(cls, target, kind=None, **kwargs):
+        """Declare an output copied from one exactly-once descendant call.
+
+        ``target`` is a descendant's output declaration, such as
+        ``self.heat_exchanger.duty``, or an outlet field, such as
+        ``self.degasser.gas.field("m_dot")``; the output takes the target's kind.
+        """
+        if isinstance(target, (Output, PortField)):
+            kind = target.kind
+        return cls._from_formula(("of", target), kind, **kwargs)
 
     @classmethod
     def total(cls, name, kind=None, **kwargs):
@@ -252,3 +261,30 @@ class Outlet(_StreamPort):
     """Outgoing fluid stream port."""
 
     section = "outlet"
+
+    def field(self, name):
+        """Return a reference to one ``Stream`` field of this outlet for ``Output.of``."""
+        if name not in self.kind.model_fields:
+            raise DeclarationError(
+                f"{self.path}.{name}: unknown stream field; valid: "
+                f"{join_names(self.kind.model_fields)}{did_you_mean(name, self.kind.model_fields)}"
+            )
+        return PortField(self, name)
+
+
+@dataclass(frozen=True, eq=False)
+class PortField:
+    """One ``Stream`` field of an outlet declaration, the target of an ``Output.of`` formula."""
+
+    port: Outlet
+    name: str
+
+    @property
+    def kind(self):
+        """Return the annotated kind of the stream field."""
+        return self.port.kind.model_fields[self.name].annotation
+
+    @property
+    def path(self):
+        """Return the dotted path of the field, for messages."""
+        return f"{self.port.path}.{self.name}"

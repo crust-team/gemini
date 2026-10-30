@@ -34,6 +34,7 @@ from gemini.core.types.declarations import (
     Outlet,
     Output,
     Parameter,
+    PortField,
     State,
 )
 from gemini.core.types.fluid import Fluid
@@ -250,10 +251,47 @@ class Module:
             for kind, registry in _REGISTRIES
             if isinstance(declaration, kind)
         )
+        if isinstance(declaration, Output) and declaration.formula is not None:
+            self._check_formula_references(name, declaration.formula)
         registry[name] = declaration.bind(self, name)
         if isinstance(declaration, Parameter) and declaration.initialized:
             initial = self.param_history[0].params
             initial[name] = to_jsonable_python(deepcopy(declaration.value))
+
+    def _check_formula_references(self, name, formula):
+        """Reject a formula whose declaration references do not belong to this module tree.
+
+        ``Output.of`` must reference an output or outlet field of a descendant and
+        ``Output.ratio`` two earlier outputs of this module, so a wrong reference fails while
+        the class is built.
+        """
+        kind, *references = formula
+        if kind == "of":
+            self._check_of_target(name, references[0])
+        if kind == "ratio":
+            self._check_ratio_operands(name, references)
+
+    def _check_of_target(self, name, target):
+        if not isinstance(target, (Output, PortField)):
+            return
+        owner = target.port.owner if isinstance(target, PortField) else target.owner
+        if owner is None or owner is self or self._descendant_path(owner) is None:
+            raise FormulaError(
+                f"{self.path}.{name}: Output.of target {target.path} is not an output or "
+                "outlet field of a descendant module"
+            )
+
+    def _check_ratio_operands(self, name, operands):
+        for operand in operands:
+            if isinstance(operand, Output) and self._outputs.get(operand.name) is not operand:
+                raise FormulaError(
+                    f"{self.path}.{name}: Output.ratio operand {operand.path} is not an "
+                    f"earlier output of this module; valid: {join_names(self._outputs)}"
+                )
+
+    def _descendant_path(self, module):
+        """Return the dotted path of ``module`` below this one, or ``None`` outside the tree."""
+        return next((path for path, item in self.named_modules() if item is module), None)
 
     def _assign_value(self, name, value):
         if name in self._parameters:
@@ -795,9 +833,13 @@ class Module:
     def _resolve_formula(self, name, output, seen):
         """Return the resolved formula and the declaration whose kind the output takes."""
         kind, *arguments = output.formula
+        if kind == "of" and isinstance(arguments[0], (Output, PortField)):
+            return (kind, *self._reference_access(arguments[0])), None
         if kind == "of":
             module_path, access, declaration = self._resolve_of(arguments[0])
             return (kind, module_path, access), declaration
+        if kind == "ratio" and all(isinstance(item, Output) for item in arguments):
+            return (kind, *(item.name for item in arguments)), None
         if kind == "total":
             return (kind, arguments[0]), self._resolve_total(name, arguments[0])
         for reference in arguments:
@@ -807,6 +849,13 @@ class Module:
                     f"{reference!r}{did_you_mean(reference, seen)}"
                 )
         return (kind, *arguments), None
+
+    def _reference_access(self, target):
+        """Return the descendant path and access tuple of an ``Output.of`` reference."""
+        if isinstance(target, PortField):
+            port = target.port
+            return self._descendant_path(port.owner), ("outlet", port.name, target.name)
+        return self._descendant_path(target.owner), ("output", target.name, None)
 
     def _descendant_leaves(self):
         """Return every leaf module below this one."""
