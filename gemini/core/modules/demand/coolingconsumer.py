@@ -1,5 +1,6 @@
 """Building or process cooling demand on a chilled-water circuit, with latent load."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import psychrometrics
 from gemini.core.types import (
@@ -89,10 +90,11 @@ class CoolingConsumer(Module):
         supply_in = inlets.supply_in
         sensible, latent = self._met_loads(supply_in)
         absorbed = sensible + latent
-        return_T = supply_in.T
-        if absorbed:
-            cp = supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
-            return_T = min(self._return_limit(), return_T + absorbed / (supply_in.m_dot * cp))
+        cp = supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
+        warmed = ops.minimum(
+            self._return_limit(), supply_in.T + ops.truediv(absorbed, supply_in.m_dot * cp)
+        )
+        return_T = ops.where(absorbed == 0, supply_in.T, warmed)
         return_out = supply_in.with_(T=return_T)
 
         outlets = dict(return_out=return_out)
@@ -105,24 +107,27 @@ class CoolingConsumer(Module):
         self.unmet_latent = self.latent_cooling_demand - latent
         self.dew_point = self._dew_point()
         self.return_out_T = outlets.return_out.T
-        self.is_unmet = self.unmet_sensible > 0 or self.unmet_latent > 0
+        self.is_unmet = ops.logical_or(self.unmet_sensible > 0, self.unmet_latent > 0)
 
     def _met_loads(self, supply_in):
         """Return the met sensible and latent loads [W]."""
-        if supply_in.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: supply_in.m_dot = {supply_in.m_dot} kg/s; expected >= 0"
-            )
+        ops.check(
+            supply_in.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: supply_in.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=supply_in.m_dot,
+        )
         cp = supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
-        available = supply_in.m_dot * cp * max(0, self._return_limit() - supply_in.T)
-        sensible = min(self.sensible_cooling_demand, available)
-        if supply_in.T > self._dew_point() - self.dew_point_margin:
-            return sensible, 0.0
-        return sensible, min(self.latent_cooling_demand, available - sensible)
+        available = supply_in.m_dot * cp * ops.maximum(0, self._return_limit() - supply_in.T)
+        sensible = ops.minimum(self.sensible_cooling_demand, available)
+        latent = ops.minimum(self.latent_cooling_demand, available - sensible)
+        dry = supply_in.T > self._dew_point() - self.dew_point_margin
+        return sensible, ops.where(dry, 0.0, latent)
 
     def _return_limit(self):
         """Return the warmest return temperature [K]: the parameter or the indoor air."""
-        return min(self.maximum_return_temperature, self.indoor_temperature)
+        return ops.minimum(self.maximum_return_temperature, self.indoor_temperature)
 
     def _dew_point(self):
         """Return the indoor-air dew point [K]."""

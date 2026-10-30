@@ -4,6 +4,7 @@ import pytest
 
 from gemini.core.modules import HeatConsumer, energy_balance, mass_balance
 from gemini.core.types import Stream
+from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import DeclarationError, MissingValueError, PhysicsRangeError
 
 CP = 4217.4
@@ -63,3 +64,18 @@ def test_invalid_inputs_raise():
         consumer(supply_in=SUPPLY)
     with pytest.raises(MissingValueError):
         HeatConsumer()(supply_in=SUPPLY, heat_demand=1e4)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Met, short, cold-supply, no-demand and stopped rows trace and equal per-row calls."""
+    rows = [
+        dict(supply_in=Stream(m_dot=m_dot, T=T, p=3e5), heat_demand=demand)
+        for m_dot, T, demand in [
+            (2.0, 343.15, 100e3),
+            (2.0, 343.15, 1e6),
+            (2.0, 300.0, 100e3),
+            (2.0, 343.15, 0.0),
+            (0.0, 343.15, 100e3),
+        ]
+    ]
+    assert_module_matches(_consumer(), rows)

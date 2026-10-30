@@ -1,5 +1,6 @@
 """Space or process heat demand on a hydronic circuit with a steady first-law balance."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
@@ -75,9 +76,10 @@ class HeatConsumer(Module):
         supply_in = inlets.supply_in
         delivered = self._delivered_heat(supply_in)
         capacity_rate = supply_in.m_dot * supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
-        return_T = supply_in.T
-        if delivered:
-            return_T = max(self.minimum_return_temperature, return_T - delivered / capacity_rate)
+        cooled = ops.maximum(
+            self.minimum_return_temperature, supply_in.T - ops.truediv(delivered, capacity_rate)
+        )
+        return_T = ops.where(delivered == 0, supply_in.T, cooled)
         return_out = supply_in.with_(T=return_T)
 
         outlets = dict(return_out=return_out)
@@ -94,10 +96,13 @@ class HeatConsumer(Module):
 
     def _delivered_heat(self, supply_in):
         """Return the delivered heat [W]: the demand, capped by the return-temperature floor."""
-        if supply_in.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: supply_in.m_dot = {supply_in.m_dot} kg/s; expected >= 0"
-            )
+        ops.check(
+            supply_in.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: supply_in.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=supply_in.m_dot,
+        )
         cp = supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
-        drop = max(0, supply_in.T - self.minimum_return_temperature)
-        return min(self.heat_demand, supply_in.m_dot * cp * drop)
+        drop = ops.maximum(0, supply_in.T - self.minimum_return_temperature)
+        return ops.minimum(self.heat_demand, supply_in.m_dot * cp * drop)

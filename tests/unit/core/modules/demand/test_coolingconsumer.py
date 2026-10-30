@@ -5,6 +5,7 @@ import pytest
 from gemini.core.modules import CoolingConsumer, energy_balance, mass_balance
 from gemini.core.physics import psychrometrics
 from gemini.core.types import Stream
+from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import DeclarationError, MissingValueError, PhysicsRangeError
 
 CP = 4217.4
@@ -99,3 +100,26 @@ def test_invalid_inputs_raise():
         consumer.update_params(dew_point_margin=-1)
     with pytest.raises(MissingValueError):
         consumer(supply_in=SUPPLY, sensible_cooling_demand=1e4, latent_cooling_demand=0)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Met, short, humid (no latent), no-demand and stopped rows trace and equal per-row calls."""
+    rows = [
+        dict(
+            supply_in=Stream(m_dot=m_dot, T=T, p=3e5),
+            sensible_cooling_demand=sensible,
+            latent_cooling_demand=latent,
+            indoor_temperature=297.15,
+            indoor_relative_humidity=humidity,
+        )
+        for m_dot, T, sensible, latent, humidity in [
+            (2.0, 280.15, 5e4, 1e4, 0.5),
+            (2.0, 280.15, 7e4, 2e4, 0.5),
+            (2.0, 288.0, 5e4, 1e4, 0.5),
+            (2.0, 280.15, 0.0, 0.0, 0.5),
+            (0.0, 280.15, 5e4, 1e4, 0.5),
+            (2.0, 280.15, 5e4, 1e4, 1.0),
+            (2.0, 295.0, 5e4, 1e4, 0.8),
+        ]
+    ]
+    assert_module_matches(_consumer(), rows)
