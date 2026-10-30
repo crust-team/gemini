@@ -208,6 +208,28 @@ class Dataset:
         return Dataset(frame, units)
 
 
+def as_dataset(data):
+    """Return the run input as a ``Dataset``: a ``Dataset`` as it is, a DataFrame wrapped.
+
+    A DataFrame needs a timezone-aware ``DatetimeIndex`` (any zone; the instants become UTC) and
+    columns named by the binding ``column``. Its values have the units of the bindings. A naive
+    index raises ``DatasetError``, because a local time without a zone is ambiguous.
+    """
+    if isinstance(data, Dataset):
+        return data
+    if not isinstance(data, pd.DataFrame):
+        raise DatasetError(
+            f"run input: type = {type(data).__name__}; expected a Dataset or a pandas DataFrame"
+        )
+    index = data.index
+    if not isinstance(index, pd.DatetimeIndex) or index.tz is None:
+        raise DatasetError(
+            f"run input: index = {type(index).__name__} without a timezone; expected a "
+            "timezone-aware DatetimeIndex (UTC)"
+        )
+    return Dataset(data)
+
+
 def bound_unit(dataset, binding):
     """Return the unit of a bound column: the dataset's metadata beats the binding's own unit."""
     return dataset.unit(binding.column, binding.unit)

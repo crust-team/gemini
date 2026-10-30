@@ -13,7 +13,7 @@ from gemini.core.data.dataset import bound_unit
 from gemini.core.types.bindings import Binding, ModuleBindings
 from gemini.core.types.declarations import UNSET
 from gemini.errors import BindingError
-from gemini.utils.strings import did_you_mean, join_names, join_path, split_path
+from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path, split_path
 
 VOLUMETRIC_UNITS = {"m3/h", "m3/s"}
 """Flow units converted to mass flow with the fluid density at the boundary."""
@@ -133,7 +133,10 @@ class BindingPlan:
         if missing:
             raise BindingError(
                 f"{plant.path}: bound columns = {join_names(missing)}; expected dataset columns"
-                f"{did_you_mean(missing[0], dataset.names)}"
+                f"{did_you_mean(missing[0], dataset.names)}",
+                path=plant.path,
+                code="missing_column",
+                suggestions=close_matches(missing[0], dataset.names),
             )
         paths = [twin.path for twin in self.twins]
         nested = any(_is_below(path, paths) for path in paths)

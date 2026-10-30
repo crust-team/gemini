@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.core.data.dataset import bound_unit
+from gemini.core.data.dataset import as_dataset, bound_unit
 from gemini.core.types.bindings import Binding
 
 
@@ -110,3 +110,28 @@ def test_the_dataset_unit_beats_the_binding_unit():
     data = gm.Dataset.from_dict({"flow": [1, 2], "other": [3, 4]}, time, units={"flow": "m3/h"})
     assert bound_unit(data, Binding(column="flow", unit="kg/s")) == "m3/h"
     assert bound_unit(data, Binding(column="other", unit="kg/s")) == "kg/s"
+
+
+def test_a_dataframe_with_a_utc_index_is_wrapped_and_a_dataset_passes_through():
+    """The run input is a Dataset, or a DataFrame wrapped by ``as_dataset``."""
+    index = pd.date_range("2024-01-01", periods=3, freq="15min", tz="Europe/Amsterdam")
+    frame = pd.DataFrame({"flow": [1.0, 2.0, 3.0]}, index=index)
+    dataset = as_dataset(frame)
+    assert dataset.names == ("flow",) and str(dataset.to_frame().index.tz) == "UTC"
+    assert dataset.start == index[0].to_pydatetime()
+    assert as_dataset(dataset) is dataset
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        pd.DataFrame({"flow": [1.0]}, index=pd.date_range("2024-01-01", periods=1)),
+        pd.DataFrame({"flow": [1.0]}),
+        [1.0, 2.0],
+    ],
+    ids=["naive index", "no time index", "not a table"],
+)
+def test_run_input_needs_a_timezone_aware_index(bad):
+    """A naive index is ambiguous, so it raises DatasetError instead of guessing a zone."""
+    with pytest.raises(gm.errors.DatasetError, match="run input"):
+        as_dataset(bad)

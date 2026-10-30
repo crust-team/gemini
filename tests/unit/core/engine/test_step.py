@@ -28,8 +28,10 @@ def test_plan_rejects_bad_selections_and_missing_columns(fresh_plant, reference_
     """Unknown ``only`` paths and all absent columns fail before the first step."""
     with pytest.raises(gm.errors.BindingError, match="only path = 'doublet'"):
         BindingPlan(fresh_plant, reference_dataset, "replay", only=["doublet"])
-    with pytest.raises(gm.errors.BindingError, match="flow, p"):
+    with pytest.raises(gm.errors.BindingError, match="flow, p") as caught:
         BindingPlan(tank(), dataset(rate=1.0, T=300.0), "replay")
+    assert isinstance(caught.value, gm.errors.ValidationError)
+    assert caught.value.code == "missing_column"
 
 
 def test_plan_rejects_volumetric_flows_it_cannot_convert():
