@@ -32,3 +32,16 @@ def test_graph_breaks_are_remembered(gain):
         with pytest.raises(TraceError, match="pre-hooks"):
             cache.graph(gain, {"inlet": gain.fluid})
     assert cache.traces == 1
+
+
+def test_structural_parameter_values_are_guards(stepper):
+    """A structural value retraces when it changes; a numeric one next to it does not."""
+    module = stepper
+    cache = GraphCache()
+    fluids = {"inlet": module.fluid}
+    first = cache.graph(module, fluids)
+    assert "steps" not in first.inputs and "increment" in first.inputs
+    module.update_params(increment=5.0)
+    assert cache.graph(module, fluids) is first and cache.traces == 1
+    module.update_params(steps=3)
+    assert cache.graph(module, fluids) is not first and cache.traces == 2

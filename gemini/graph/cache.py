@@ -1,12 +1,12 @@
 """``GraphCache``: one traced graph per module, retraced only when a guard changes.
 
 The guards are what the trace bakes in: the module class and its declaration names, the
-values of non-numeric parameters and the shapes of numeric ones, the registered hooks, whether
-outputs are enabled, the runtime precision and the inlet fluids. Numeric parameter values,
-constants and inputs are graph inputs, so changing them never retraces. A module that cannot be
-traced is remembered with its ``TraceError`` until a guard changes. Every graph is traced once
-and then merged by ``eliminate_common_subexpressions``; ``GraphCache(optimize=False)`` keeps the
-traced graph as it is, for benchmarks and debugging.
+values of non-numeric and structural parameters and the shapes of numeric ones, the registered
+hooks, whether outputs are enabled, the runtime precision, the module's own fluid and the inlet
+fluids. Numeric parameter values, constants and inputs are graph inputs, so changing them never
+retraces. A module that cannot be traced is remembered with its ``TraceError`` until a guard
+changes. Every graph is traced once and then merged by ``eliminate_common_subexpressions``;
+``GraphCache(optimize=False)`` keeps the traced graph as it is, for benchmarks and debugging.
 """
 
 import weakref
@@ -15,7 +15,7 @@ from gemini.core import runtime
 from gemini.core.modules.module import outputs_enabled
 from gemini.errors import TraceError
 from gemini.graph.passes import eliminate_common_subexpressions
-from gemini.graph.tracer import Tracer, parameter_shape
+from gemini.graph.tracer import Tracer, traced_shape
 
 
 class GraphCache:
@@ -51,8 +51,7 @@ class GraphCache:
 
 def _guards(module, fluids):
     parameters = tuple(
-        (name, _parameter_guard(declaration.value))
-        for name, declaration in module._parameters.items()
+        (name, _parameter_guard(declaration)) for name, declaration in module._parameters.items()
     )
     return (
         type(module),
@@ -66,8 +65,8 @@ def _guards(module, fluids):
     )
 
 
-def _parameter_guard(value):
-    shape = parameter_shape(value)
+def _parameter_guard(declaration):
+    shape = traced_shape(declaration)
     if shape is None:
-        return ("value", repr(value))
+        return ("value", repr(declaration.value))
     return ("traced", shape)

@@ -106,6 +106,10 @@ limits and raises `CallError` for an unknown field. A traced inlet is a `Stream`
 inputs with the concrete `Fluid`, so `volumetric_flow()` divides by a plain float density.
 `Ports` accept only `Stream`. Ports have no JSON schema, quantity or unit in `Declaration`.
 
+`Parameter(..., structural=True)` marks a parameter that decides the shape of the computation (a
+loop count, a value that changes a `Fluid`): a trace reads it as a plain value and its value is a
+guard of the graph cache; numeric parameters are graph inputs by default.
+
 `BRINE` and `WATER` use the defaults of `core.physics.fluid.FluidProperties` (a frozen slots
 dataclass: numbers become `float`, bounds raise `PhysicsRangeError`), the original
 constant-water numbers. `Fluid` carries salinity, dissolved CO2 and free-gas mass fractions.

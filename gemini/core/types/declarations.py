@@ -109,13 +109,20 @@ class Parameter(Declaration):
         default=UNSET,
         shape=None,
         calibratable=False,
+        structural=False,
         description=None,
         **bounds,
     ):
-        """Create design data with optional shape, bounds and calibration metadata."""
+        """Create design data with optional shape, bounds and calibration metadata.
+
+        A ``structural`` parameter decides the shape of the computation (a loop count, a value
+        that changes a ``Fluid``): a trace reads it as a plain value and its value is a guard of
+        the graph cache, never a graph input.
+        """
         super().__init__(kind, default=default, description=description, **bounds)
         self.shape = shape
         self.calibratable = calibratable
+        self.structural = structural
         self.value = UNSET
         self._history: list[tuple[datetime | None, Any]] = []
         if default is not UNSET:

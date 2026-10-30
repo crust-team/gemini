@@ -73,3 +73,36 @@ def inlet():
         p=np.array([1e5, 2e5, 3e5]),
         fluid=Gain().fluid,
     )
+
+
+class Stepper(Module):
+    """Raise the inlet pressure ``steps`` times by one pascal; ``steps`` is structural."""
+
+    def __init__(self):
+        """Declare a structural count, a numeric increment, an inlet and an outlet."""
+        super().__init__()
+
+        # Parameters
+        self.steps = Parameter(int, default=2, structural=True)
+        self.increment = Parameter(float, default=1.0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Add the increment once per step."""
+
+        # Outlets
+        pressure = inlets.inlet.p
+        for _ in range(self.steps):
+            pressure = pressure + self.increment
+        return dict(outlet=inlets.inlet.with_(p=pressure))
+
+
+@pytest.fixture
+def stepper():
+    """Return a configured ``Stepper`` module."""
+    return Stepper()

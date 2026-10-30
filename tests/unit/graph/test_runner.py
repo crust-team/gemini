@@ -5,7 +5,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import PhysicsRangeError
-from gemini.graph import Proxy, run
+from gemini.graph import GraphCache, Proxy, run
 
 
 def _rows(gain, inlet, frequency):
@@ -52,3 +52,13 @@ def test_errors_raise_after_the_run(gain, inlet):
     """A negative gain raises the untraced error for its first row."""
     with pytest.raises(PhysicsRangeError, match="gain: gain = -1.0"):
         run(gain, {"inlet": inlet}, {"gain": np.array([1.0, -1.0, -2.0])})
+
+
+def test_structural_parameter_decides_the_traced_shape(stepper, inlet):
+    """A structural count unrolls the loop of the trace; the numeric increment stays an input."""
+    cache = GraphCache()
+    for steps, increment in ((2, 1.0), (3, 10.0)):
+        stepper.update_params(steps=steps, increment=increment)
+        result = run(stepper, {"inlet": inlet}, cache=cache)
+        assert result.outlets["outlet"]["p"].tolist() == (inlet.p + steps * increment).tolist()
+    assert cache.traces == 2

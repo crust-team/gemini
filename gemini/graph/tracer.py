@@ -4,8 +4,8 @@ The trace follows the fixed order of ``Module._evaluate``: ``forward``, then (un
 ``no_outputs()`` is active) ``_compute_outputs``, formula outputs, forward hooks and
 ``_check_outputs``, which runs once here. Inlet stream fields (a ``Stream`` of traced values
 whose ``Fluid`` is the concrete, static one), controls, boundaries, numeric parameters and the
-constants the physics uses become named graph inputs; non-numeric parameter values are trace
-guards (see ``cache``). A forward hook that writes an
+constants the physics uses become named graph inputs; non-numeric and structural parameter
+values are trace guards (see ``cache``). A forward hook that writes an
 output is part of the graph; one that only reads is an observer, replayed per row after a run.
 Anything the trace cannot follow raises ``TraceError``, which makes the module a graph break.
 """
@@ -92,12 +92,22 @@ def _parameters(graph, module):
     parameters = {}
     for name, declaration in module._parameters.items():
         value = declaration.value
-        shape = parameter_shape(value)
+        shape = traced_shape(declaration)
         if shape is None:
             parameters[name] = value
             continue
         parameters[name] = graph.input(name, "parameter", declaration.unit, shape)
     return parameters
+
+
+def traced_shape(declaration):
+    """Return the graph-input shape of a parameter, or ``None`` when it is a plain value.
+
+    A structural parameter and a non-numeric one are read as plain values and are cache guards.
+    """
+    if declaration.structural:
+        return None
+    return parameter_shape(declaration.value)
 
 
 def parameter_shape(value):
