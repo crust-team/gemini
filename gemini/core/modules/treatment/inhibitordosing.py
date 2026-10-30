@@ -1,5 +1,6 @@
 """Scale or corrosion inhibitor injection at a commanded mass dose."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Parameter, Stream
 from gemini.errors import PhysicsRangeError
@@ -50,8 +51,13 @@ class InhibitorDosing(Module):
 
         # Outlets
         inlet = inlets.inlet
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         outlet = inlet
 
         outlets = dict(outlet=outlet)

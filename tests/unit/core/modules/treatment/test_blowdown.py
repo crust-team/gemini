@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.treatment import Blowdown
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 FEED = Stream(m_dot=8, T=330, p=3e5)
 
@@ -33,3 +34,12 @@ def test_limits():
         blowdown(feed_in=FEED.with_(m_dot=-1), blowdown_fraction=0.1)
     with pytest.raises(gm.errors.MissingValueError):
         blowdown(feed_in=FEED)
+
+
+def test_blowdown_matches_traced():
+    """The split traces and equals one call per row."""
+    rows = [
+        dict(feed_in=Stream(m_dot=m_dot, T=310, p=2e5), blowdown_fraction=fraction)
+        for m_dot, fraction in [(0, 0.1), (10, 0), (30, 0.05), (30, 1)]
+    ]
+    assert_module_matches(Blowdown(), rows)

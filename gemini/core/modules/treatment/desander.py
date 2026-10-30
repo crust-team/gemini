@@ -1,5 +1,6 @@
 """Hydrocyclone desander with a quadratic pressure loss and a constant sand removal share."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
@@ -84,11 +85,20 @@ class Desander(Module):
 
     def _pressure_drop(self, inlet):
         """Return the cyclone loss [Pa], quadratic in forward mass flow."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         drop = self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
-        if drop > inlet.p:
-            raise PhysicsRangeError(
-                f"{self.path}: pressure_drop = {drop} Pa; expected at most inlet.p = {inlet.p} Pa"
-            )
+        ops.check(
+            drop <= inlet.p,
+            PhysicsRangeError,
+            "{path}: pressure_drop = {drop} Pa; expected at most inlet.p = {pressure} Pa",
+            path=self.path,
+            drop=drop,
+            pressure=inlet.p,
+        )
         return drop

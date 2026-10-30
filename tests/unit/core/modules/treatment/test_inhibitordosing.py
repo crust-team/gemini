@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.treatment import InhibitorDosing
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 INLET = Stream(m_dot=50, T=340, p=8e5)
 
@@ -31,3 +32,13 @@ def test_limits():
         dosing(inlet=INLET)
     with pytest.raises(gm.errors.DeclarationError):
         InhibitorDosing().update_params(product_concentration=0)
+
+
+def test_inhibitordosing_matches_traced():
+    """The dosing rates trace and equal one call per row."""
+    module = InhibitorDosing().update_params(product_concentration=0.4)
+    rows = [
+        dict(inlet=Stream(m_dot=m_dot, T=300, p=1e6), dose=dose)
+        for m_dot, dose in [(0, 1e-5), (10, 0), (50, 2e-5)]
+    ]
+    assert_module_matches(module, rows)

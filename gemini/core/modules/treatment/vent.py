@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import constants
 from gemini.core.types import (
@@ -18,9 +19,14 @@ from gemini.core.types import (
     Stream,
 )
 from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.ops import Constant
 
-METHANE_MOLAR_MASS = 0.016043
-"""Molar mass of methane [kg/mol] (IUPAC 2013 standard atomic weights)."""
+METHANE_MOLAR_MASS = Constant(
+    "METHANE_MOLAR_MASS",
+    0.016043,
+    "kg/mol",
+    "molar mass of methane (IUPAC 2013 standard atomic weights)",
+)
 
 METHANE_HEATING_VALUE = 50.0e6
 """Lower heating value of methane [J/kg]: 802.3 kJ/mol (NIST Chemistry WebBook) / 16.043 g/mol."""
@@ -106,11 +112,18 @@ class Vent(Module):
 
     def _check(self, inlet):
         """Reject reverse flow and gas compositions above one."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         total = self.co2_mass_fraction + self.methane_mass_fraction
-        if total > 1:
-            raise ConfigurationError(
-                f"{self.path}: co2_mass_fraction + methane_mass_fraction = {total}; "
-                "expected at most 1"
-            )
+        ops.check(
+            total <= 1,
+            ConfigurationError,
+            "{path}: co2_mass_fraction + methane_mass_fraction = {total}; expected at most 1",
+            path=self.path,
+            total=total,
+        )

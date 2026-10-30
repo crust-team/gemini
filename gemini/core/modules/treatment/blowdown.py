@@ -1,5 +1,6 @@
 """Continuous blowdown bleeding a commanded share of a circuit's flow to drain."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Stream
 from gemini.errors import PhysicsRangeError
@@ -48,10 +49,13 @@ class Blowdown(Module):
 
         # Outlets
         feed_in = inlets.feed_in
-        if feed_in.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: feed_in.m_dot = {feed_in.m_dot} kg/s; expected >= 0"
-            )
+        ops.check(
+            feed_in.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: feed_in.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=feed_in.m_dot,
+        )
         bleed = self.blowdown_fraction * feed_in.m_dot
         retained_out = feed_in.with_(m_dot=feed_in.m_dot - bleed)
         blowdown_out = feed_in.with_(m_dot=bleed)

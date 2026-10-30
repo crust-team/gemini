@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.treatment import Desander
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 INLET = Stream(m_dot=20, T=350, p=1e6)
 
@@ -41,3 +42,12 @@ def test_limits():
         module(inlet=INLET, sand_concentration=-1)
     with pytest.raises(gm.errors.MissingValueError):
         Desander()(inlet=INLET, sand_concentration=0.05)
+
+
+def test_desander_matches_traced():
+    """The cyclone loss and sand removal trace and equal one call per row."""
+    rows = [
+        dict(inlet=Stream(m_dot=m_dot, T=350, p=1e6), sand_concentration=sand)
+        for m_dot, sand in [(0, 0.05), (20, 0.05), (40, 0.001), (60, 0.2)]
+    ]
+    assert_module_matches(desander(), rows)

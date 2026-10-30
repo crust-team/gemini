@@ -8,6 +8,7 @@ from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.treatment import Degasser, Vent
 from gemini.core.physics import constants
 from gemini.core.types import Fluid, Inlet, Outlet, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 GAS = Stream(m_dot=0.2, T=330, p=1.2e5)
 
@@ -95,3 +96,13 @@ def test_degassed_gas_leaves_the_plant_through_the_vent():
     assert vented.co2_emission == pytest.approx(0.081)
     assert mass_balance(plant, result)["relative_residual"] < 1e-15
     assert energy_balance(plant, result)["relative_residual"] < 1e-12
+
+
+def test_vent_matches_traced():
+    """Vent and flare emissions trace and equal one call per row."""
+    rows = [dict(inlet=Stream(m_dot=m_dot, T=330, p=1.2e5)) for m_dot in (0, 0.2, 1.5)]
+    for mode in ("vent", "flare"):
+        assert_module_matches(
+            Vent().update_params(mode=mode, co2_mass_fraction=0.9, methane_mass_fraction=0.05),
+            rows,
+        )
