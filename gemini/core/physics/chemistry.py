@@ -5,6 +5,7 @@ from gemini import ops
 from . import units
 
 
+@ops.physics
 def henry_constant(temperature: float) -> float:
     """Return the temperature-dependent Henry solubility constant.
 
@@ -26,6 +27,7 @@ def henry_constant(temperature: float) -> float:
     return units.mol_l_bar_to_mol_m3_pa(0.0385 * ops.exp(2400 * (1 / temperature - 1 / 293.15)))
 
 
+@ops.physics
 def co2_solubility_liquid(co2_fraction: float, temperature: float, pressure: float) -> float:
     """Evaluate dissolved CO2 using Henry's law.
 
@@ -49,6 +51,7 @@ def co2_solubility_liquid(co2_fraction: float, temperature: float, pressure: flo
     return co2_fraction * henry_constant(temperature) * pressure
 
 
+@ops.physics
 def co2_solubility_gas(
     co2_fraction: float, gas_water_ratio: float, gas_density: float, gas_molecular_weight: float
 ) -> float:
@@ -73,6 +76,7 @@ def co2_solubility_gas(
     return co2_fraction * gas_water_ratio * gas_density / gas_molecular_weight
 
 
+@ops.physics
 def co2_partial_pressure(
     *,
     co2_fraction: float,
