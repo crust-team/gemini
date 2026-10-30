@@ -210,7 +210,8 @@ Implemented for one leaf module, the ESP, and everything its call needs:
   ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `StreamState` is the
   pydantic-free stream of traced calls.
 - The traced ESP on NumPy equals the untraced ESP exactly on the July data (tolerance 1e-12,
-  `tests/integration/test_graph_esp.py`).
+  `tests/integration/test_graph_esp.py`) and is about 390 times faster
+  (`scripts/benchmark_esp.py`).
 
 Where the prototype differs from sections 1 to 11, and why:
 

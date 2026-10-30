@@ -108,6 +108,9 @@ to absorb a parser difference. Review generated diffs and run e2e
 on both datasets before accepting a golden change. Golden changes are evidence of a numerical
 change and are never a routine speed optimization.
 
+Benchmarks are scripts, not tests: `PYTHONPATH=. python scripts/benchmark_esp.py` times the
+ESP over the July dataset tick by tick and as one traced NumPy call and checks they agree.
+
 ## Shared fixtures
 
 Read-only expensive setup belongs in session or module fixtures. `dataset_path`,
