@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from gemini import ops
 from gemini.core.physics import corrosion, units
 from gemini.errors import MissingChemistryError, PhysicsRangeError, UnknownCorrelationError
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
@@ -328,3 +329,41 @@ def test_wall_loss_and_lifetime_match_traced_semantics():
     assert_function_matches(
         corrosion.remaining_wall_thickness, [(0.1, 0.09, 0.002), (0.1, 0.09, -0.002)]
     )
+
+
+@pytest.mark.parametrize("model", ["NORSOK", "DLM", "DLD"])
+@pytest.mark.parametrize("cast", [float, int, np.float64])
+def test_co2_corrosion_rate_returns_a_float(model, cast):
+    """The outermost call gives a Python float whatever the numeric type of the inputs."""
+    rate = corrosion.co2_corrosion_rate(
+        model,
+        temperature=cast(330),
+        pressure=cast(300000),
+        water_flow_rate=cast(1),
+        co2_fraction=cast(1),
+    )
+    assert type(rate) is float
+
+
+def test_a_stopped_row_drops_the_corrosion_errors():
+    """Zero flow and zero CO2 on a stopped row do not fail the others: one function, one check."""
+
+    @ops.physics
+    def guarded(temperature, pressure, water_flow_rate):
+        rate = corrosion.co2_corrosion_rate(
+            "DLD",
+            temperature=temperature,
+            pressure=pressure,
+            water_flow_rate=water_flow_rate,
+            co2_fraction=0.1,
+        )
+        return ops.where(water_flow_rate == 0, 0.0, rate)
+
+    rows = [(313.15, 3e5, 0.02), (330.0, 3e5, 0.0), (350.0, 3e7, 0.011574)]
+    assert_function_matches(guarded, rows)
+
+
+def test_time_to_minimum_wall_divides_by_a_zero_rate_silently():
+    """A zero rate gives infinity for floats, ints and the traced run alike."""
+    assert corrosion.time_to_minimum_wall(1.0, 0.5, 0.0) == math.inf
+    assert corrosion.time_to_minimum_wall(1.0, 0.5, 0) == math.inf

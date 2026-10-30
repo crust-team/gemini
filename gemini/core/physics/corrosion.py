@@ -115,6 +115,7 @@ class _Conditions:
     ionic_strength: float
 
 
+@ops.physics
 def co2_corrosion_rate(
     model: Literal["NORSOK", "DLM", "DLD"],
     *,
@@ -292,9 +293,7 @@ def _dld_rate(conditions, coefficients):
         + coefficients["C"] * ops.log10(fugacity)
     )
     velocity = conditions.flow_rate / geometry.circle_area(conditions.diameter)
-    mass_transfer = (
-        coefficients["D"] * (ops.pow(velocity, 0.8) / ops.pow(conditions.diameter, 0.2)) * fugacity
-    )
+    mass_transfer = coefficients["D"] * (velocity**0.8 / conditions.diameter**0.2) * fugacity
     rate = 1 / (1 / reaction + 1 / mass_transfer)
     return rate * _scaling_factor(conditions.temperature, fugacity, 0.44)
 
@@ -310,8 +309,8 @@ def _norsok_rate(conditions, coefficients):
     ph = _norsok_ph(conditions)
     ph_factor = _ph_factor(conditions.temperature, ph)
     kt = _kt(conditions.temperature)
-    shear_factor = ops.pow(shear_stress / 19, 0.146 + 0.0324 * ops.log10(fugacity))
-    fugacity_factor = ops.pow(fugacity, 0.62)
+    shear_factor = (shear_stress / 19) ** (0.146 + 0.0324 * ops.log10(fugacity))
+    fugacity_factor = fugacity**0.62
     return coefficients["A"] * kt * fugacity_factor * shear_factor * ph_factor
 
 
@@ -348,11 +347,11 @@ def _norsok_shear_stress(conditions):
     viscosity = units.cp_to_pas((conditions.water_viscosity * flow_rate) / flow_rate)
     friction_factor = 0.001375 * (
         1
-        + ops.pow(
+        + (
             20000 * conditions.roughness / diameter
-            + 10**6 * viscosity / (velocity * diameter * density),
-            0.33,
+            + 10**6 * viscosity / (velocity * diameter * density)
         )
+        ** 0.33
     )
     return 0.5 * density * friction_factor * velocity**2
 
@@ -479,6 +478,7 @@ def _ph_factor(temperature, ph):
 _RATES = {"NORSOK": _norsok_rate, "DLM": _dlm_rate, "DLD": _dld_rate}
 
 
+@ops.physics
 def wall_loss(
     rates_mm_per_year: list[float] | np.ndarray, durations_s: list[float] | np.ndarray
 ) -> np.ndarray:
@@ -524,6 +524,7 @@ def _series(values):
     return np.asarray(values, dtype=float)
 
 
+@ops.physics
 def remaining_wall_thickness(outer_radius: float, inner_radius: float, loss: float) -> float:
     """Predict the remaining wall using WIMS' radial wall-loss convention.
 
@@ -547,6 +548,7 @@ def remaining_wall_thickness(outer_radius: float, inner_radius: float, loss: flo
     return outer_radius - (inner_radius + loss)
 
 
+@ops.physics
 def time_to_minimum_wall(thickness: float, minimum: float, rate: float) -> float:
     """Extrapolate time to a minimum thickness at a constant penetration rate.
 
@@ -568,7 +570,7 @@ def time_to_minimum_wall(thickness: float, minimum: float, rate: float) -> float
     Reference: GEMINI WIMS corrosion_from_logs.get_remaining_days_to_min_thickness.
     The original linear projection and special-value handling are retained in SI units.
     """
-    remaining = ops.truediv(thickness - minimum, rate)
+    remaining = (thickness - minimum) / rate
     remaining = ops.where(
         ops.logical_or(rate <= 0, ops.logical_not(ops.isfinite(rate))), float("inf"), remaining
     )
