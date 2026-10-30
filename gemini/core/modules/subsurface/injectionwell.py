@@ -1,5 +1,6 @@
 """Injection well from the wellhead down to the sandface."""
 
+from gemini import ops
 from gemini.core.modules.subsurface.well import _Well
 from gemini.core.types import (
     HeatLoss,
@@ -18,6 +19,10 @@ class InjectionWell(_Well):
 
     NOTE(refactor): legacy injection DPDT uses negative flow; the traversal retains that sign
     convention internally while the ports preserve the incoming mass-flow sign.
+
+    NOTE(refactor): the physics is written with ops and runs on arrays, but the module is a
+    graph break while the graph cannot carry the ``section_pressure`` and ``section_temperature``
+    list outputs.
     """
 
     flow_direction = "down"
@@ -76,4 +81,4 @@ class InjectionWell(_Well):
 
     def _traversal_stream(self, stream):
         """Return the stream with the negative flow the legacy injection DPDT expects."""
-        return stream.with_(m_dot=-abs(stream.m_dot))
+        return stream.with_(m_dot=-ops.abs(stream.m_dot))

@@ -2,9 +2,13 @@
 
 from pathlib import Path
 
+import numpy as np
+
 from gemini.core.legacy import tables as mapping
 from gemini.core.modules.subsurface import InjectionWell
 from gemini.core.types.flows import Stream
+from gemini.graph import run
+from tests.fixtures.equivalence import assert_function_matches
 
 
 def test_injection_flow_sign_and_pressure():
@@ -35,3 +39,41 @@ def test_corrosion_profile_uses_injection_flow_sign():
     assert well.corrosion_profile(stream, chemistry, "DLM") == well.corrosion_profile(
         stream.with_(m_dot=-40), chemistry, "DLM"
     )
+
+
+def _well():
+    data = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
+    return InjectionWell().update_params(
+        **mapping.injectionwell_params_from_gemini(
+            mapping.read_property(data / "injection_well_a06b.param")
+        )
+    )
+
+
+def test_injection_traversal_matches_on_arrays():
+    """The negative-flow traversal and its corrected bottom stream equal one call per row."""
+    well = _well()
+
+    def traversal(m_dot, T, p):
+        stream = well._traversal_stream(Stream(m_dot=m_dot, T=T, p=p))
+        result = well.traverse(stream, 0, well.pipe_path.total_length, "down")
+        bottom = well.corrected(stream, result)
+        return dict(
+            p=bottom.p,
+            T=bottom.T,
+            dp_friction=result.dp_friction,
+            dp_gravity=result.dp_gravity,
+            first_pressure=result.section_pressure[0],
+        )
+
+    rows = [(40.0, 300.0, 5e6), (-40.0, 300.0, 5e6), (0.0, 300.0, 5e6), (3.0, 280.0, 1e5)]
+    assert_function_matches(traversal, rows)
+
+
+def test_injection_well_is_a_graph_break_only_for_its_section_profiles():
+    """The per-section pressure and temperature lists have no graph form yet."""
+    stream = Stream(
+        m_dot=np.array([40.0, 10.0]), T=np.array([300.0, 310.0]), p=np.array([5e6, 6e6])
+    )
+    reasons = run(_well(), {"wellhead": stream}).breaks
+    assert len(reasons) == 1 and "type list cannot be traced" in reasons[0]

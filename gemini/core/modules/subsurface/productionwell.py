@@ -23,6 +23,10 @@ class ProductionWell(_Well):
 
     ``segment`` selects the traversed interval: the full well, the part below an internal ESP
     (sandface to intake) or the part above it (discharge to wellhead).
+
+    NOTE(refactor): the physics is written with ops and runs on arrays, but the module is a
+    graph break while the graph cannot carry the ``section_pressure`` and ``section_temperature``
+    list outputs. ``esp_depth`` is structural: it cuts the pipe path.
     """
 
     repr_fields = ("segment", "esp_depth", "soil_temperature", "u_value")
@@ -33,7 +37,7 @@ class ProductionWell(_Well):
 
         # Parameters
         self.segment = Parameter(Literal["full", "below_esp", "above_esp"], default="full")
-        self.esp_depth = Parameter(Length | None, default=None)
+        self.esp_depth = Parameter(Length | None, default=None, structural=True)
 
         # Inlets
         self.bottom = Inlet(Stream)

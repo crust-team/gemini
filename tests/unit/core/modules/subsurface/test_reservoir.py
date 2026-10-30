@@ -6,7 +6,10 @@ import pytest
 
 from gemini.core.legacy import tables as mapping
 from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.core.types import Inlet
 from gemini.core.types.flows import Stream
+from gemini.core.types.fluid import Fluid
+from tests.fixtures.equivalence import assert_module_matches
 
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
 
@@ -66,3 +69,73 @@ def test_ipr_helpers_match_the_call_outputs():
     arriving = Stream(m_dot=-40, T=300, p=230e5)
     assert sink.required_pressure(arriving) == sink(sandface=arriving).outputs.bottomhole_pressure
     assert sink.required_pressure(arriving) == pytest.approx(240e5 + 40 / 1000 * 3.6e8 / 10)
+
+
+ROW = Stream(m_dot=1.0, T=300.0, p=1e5)
+
+
+class RowCarrier(ProductionReservoir):
+    """A production reservoir with an unused inlet that carries the number of rows."""
+
+    def __init__(self):
+        """Declare the reservoir and the row-carrying inlet."""
+        super().__init__()
+        self.rows = Inlet(Stream)
+
+
+def _producer(**changes):
+    design = dict(
+        pressure=250e5,
+        temperature=353.15,
+        permeability=1e-12,
+        thickness=100,
+        drainage_radius=1000,
+        top_depth=2400,
+        wellbore_radius=0.1,
+        productivity_index=10 / 3.6e8,
+        skin=2,
+    )
+    return RowCarrier().update_params(**(design | changes))
+
+
+def test_production_reservoir_matches_traced():
+    """Radial diagnostics, fluid overrides and several rates equal one call per row."""
+    rows = [dict(rows=ROW, production_rate=rate) for rate in (0.0, 5.0, 40.0, 120.0)]
+    assert_module_matches(_producer(), rows)
+    assert_module_matches(_producer(liquid_density=990.0, liquid_viscosity=5e-4), rows)
+
+
+def test_reservoir_without_drainage_radius_matches_traced():
+    """An unconfigured drainage radius leaves the radial diagnostics undefined on every row."""
+    producer = _producer(drainage_radius=0)
+    assert_module_matches(producer, [dict(rows=ROW, production_rate=rate) for rate in (5.0, 40.0)])
+
+
+def test_injection_reservoir_matches_traced():
+    """Positive and negative sandface flows equal one call per row."""
+    sink = InjectionReservoir().update_params(
+        pressure=240e5,
+        temperature=353.15,
+        permeability=1e-12,
+        thickness=100,
+        drainage_radius=1000,
+        top_depth=2400,
+        wellbore_radius=0.1,
+        injectivity_index=10 / 3.6e8,
+        skin=1,
+    )
+    rows = [
+        dict(sandface=Stream(m_dot=m_dot, T=300, p=230e5)) for m_dot in (-40.0, -5.0, 0.0, 20.0)
+    ]
+    assert_module_matches(sink, rows)
+
+
+def test_fluid_is_rebuilt_only_when_an_override_changes():
+    """The fluid property returns the same object until the overrides or module fluid change."""
+    producer = _producer(liquid_density=990.0)
+    first = producer.fluid
+    assert producer.fluid is first and first.liquid_density == 990.0
+    producer.update_params(liquid_density=1010.0)
+    assert producer.fluid.liquid_density == 1010.0
+    producer.fluid = Fluid(salinity=0.1)
+    assert producer.fluid.salinity == 0.1 and producer.fluid.liquid_density == 1010.0

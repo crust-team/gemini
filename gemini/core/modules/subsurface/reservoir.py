@@ -4,6 +4,7 @@ from typing import Literal
 
 import numpy as np
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import hydraulics
 from gemini.core.types import (
@@ -45,7 +46,7 @@ class _Reservoir(Module):
         self.temperature = Parameter(Temperature)
         self.permeability = Parameter(Permeability)
         self.thickness = Parameter(Length, gt=0)
-        self.drainage_radius = Parameter(Length)
+        self.drainage_radius = Parameter(Length, structural=True)
         self.top_depth = Parameter(Length)
         self.productivity_index = Parameter(
             ProductivityIndex | None, default=None, calibratable=True
@@ -55,8 +56,8 @@ class _Reservoir(Module):
         )
         self.skin = Parameter(Dimensionless, default=0, calibratable=True)
         self.wellbore_radius = Parameter(Length, gt=0)
-        self.liquid_density = Parameter(Density | None, default=None)
-        self.liquid_viscosity = Parameter(Viscosity | None, default=None)
+        self.liquid_density = Parameter(Density | None, default=None, structural=True)
+        self.liquid_viscosity = Parameter(Viscosity | None, default=None, structural=True)
         self.decline_threshold = Parameter(Fraction, default=0.15, gt=0, le=1)
 
         # Outputs
@@ -68,12 +69,24 @@ class _Reservoir(Module):
         self.hydrostatic_dp = Output(PressureDifference)
         self.radial_bottomhole_pressure = Output(Pressure | None)
 
+        self._fluid_cache = None
+
     @property
     def fluid(self):
-        """Return the module fluid with the reservoir's liquid density and viscosity overrides."""
-        overrides = {name: getattr(self, name) for name in FLUID_OVERRIDES}
+        """Return the module fluid with the reservoir's liquid density and viscosity overrides.
+
+        The overrides decide the fluid, so they are structural parameters, read as plain values
+        in a trace. The fluid is rebuilt only when the module fluid or an override changes.
+        """
+        overrides = {name: self._parameter_value(name) for name in FLUID_OVERRIDES}
+        values = tuple(overrides.values())
+        cache = self._fluid_cache
+        if cache is not None and cache[0] is self._fluid and cache[1] == values:
+            return cache[2]
         set_overrides = {name: value for name, value in overrides.items() if value is not None}
-        return Fluid.model_validate(self._fluid.model_dump() | set_overrides)
+        fluid = Fluid.model_validate(self._fluid.model_dump() | set_overrides)
+        self._fluid_cache = (self._fluid, values, fluid)
+        return fluid
 
     @fluid.setter
     def fluid(self, value):
@@ -235,7 +248,7 @@ class InjectionReservoir(_Reservoir):
     def _compute_outputs(self, inlets, outlets):
         """Calculate the bottomhole pressure the sandface flow requires."""
         sandface = inlets.sandface
-        flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
+        flow = ops.abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
         for name, value in self._calculate_outputs(flow, self.required_pressure(sandface)).items():
             setattr(self, name, value)
 
@@ -249,5 +262,5 @@ class InjectionReservoir(_Reservoir):
         """
         if self.injectivity_index is None:
             raise ConfigurationError(f"{self.path}: injectivity_index is required")
-        flow = abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
+        flow = ops.abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
         return self.pressure + flow / self.injectivity_index

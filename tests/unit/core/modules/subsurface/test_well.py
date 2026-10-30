@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import gemini as gm
@@ -61,3 +62,15 @@ def test_esp_split_needs_a_configured_depth():
     well.esp_depth = None
     with pytest.raises(gm.errors.ConfigurationError, match="esp_depth"):
         well.intake_conditions(Stream(m_dot=40, T=353.15, p=25e6))
+
+
+def test_traversal_direction_check_runs_on_depths_not_flows():
+    """A downward interval is accepted going down and rejected going up, for any flow."""
+    well = production_well()
+    stream = Stream(
+        m_dot=np.array([40.0, 0.0]), T=np.array([353.15, 353.15]), p=np.array([25e6, 25e6])
+    )
+    result = well.traverse(stream, 0, 100, "down")
+    assert result.p_out.shape == (2,)
+    with pytest.raises(gm.errors.PhysicsRangeError, match="conflicts with direction up"):
+        well.traverse(stream, 0, 100, "up")
