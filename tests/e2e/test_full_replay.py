@@ -11,6 +11,7 @@ import pytest
 
 import gemini as gm
 from gemini.engine.callbacks import Callback
+from gemini.utils import legacy
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.frames import path_frame
 
@@ -170,7 +171,7 @@ def verification(selected_dataset, module_plant):
     )
     report["calibration"] = fit.__dict__
     chain, chain_errors, balances = _chain(plant, dataset, data)
-    assert gm.legacy.check_wiring(plant, gm.legacy.read_project(OLD_PROJECT)) == []
+    assert legacy.check_wiring(plant, legacy.read_project(OLD_PROJECT)) == []
     report["electricity_chain_median_relative_error"] = float(
         np.median(abs(_total_electricity(chain) / measured_electricity - 1))
     )

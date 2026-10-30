@@ -96,7 +96,7 @@ def test_invalid_tables_name_the_offending_values():
     assert data.unit("flow", "kg/s") == "m3/h" and data.unit("other", "kg/s") == "kg/s"
 
 
-def test_core_data_has_no_file_or_network_readers():
+def test_utils_data_has_no_file_or_network_readers():
     """The runtime data package stays an in-memory boundary."""
     root = Path(gm.__file__).parent / "utils/data"
     source = "\n".join(path.read_text() for path in root.glob("*.py"))

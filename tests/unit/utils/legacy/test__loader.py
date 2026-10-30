@@ -9,6 +9,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import GeminiWarning, LegacyFormatError
+from gemini.utils import legacy
 from gemini.utils.legacy._loader import load_legacy_design, node_kinds
 
 OLD = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
@@ -17,7 +18,7 @@ OLD = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_pro
 @pytest.fixture(scope="module")
 def project():
     """Parse the example old project once; tests copy it before editing."""
-    return gm.legacy.read_project(OLD)
+    return legacy.read_project(OLD)
 
 
 def _copy(tmp_path):
@@ -36,7 +37,7 @@ def _edit_param(folder, name, edit):
 def test_design_maps_every_node_and_the_riser(project):
     """Every old node becomes one plant path; the buried ESP splits the production well."""
     design = load_legacy_design(project)
-    assert set(design.modules) == set(gm.legacy.tables.NODE_PATHS.values()) | {"doublet.riser"}
+    assert set(design.modules) == set(legacy.tables.NODE_PATHS.values()) | {"doublet.riser"}
     assert design.modules["doublet.riser"].params[0].params["segment"] == "above_esp"
     assert design.modules["doublet.well"].params[0].params["esp_depth"] == 600
     assert design.bindings["filters.hot"].measured["pressure_drop"].column == "FilterA_PDrop"
@@ -60,7 +61,7 @@ def test_neighbour_parameters_compare_parsed_times(tmp_path):
 
     folder = _copy(tmp_path)
     _edit_param(folder, "esp_1ee3", iso_times)
-    design = load_legacy_design(gm.legacy.read_project(folder))
+    design = load_legacy_design(legacy.read_project(folder))
     assert design.modules["doublet.well"].params[0].params["esp_depth"] == 600
 
 
@@ -73,7 +74,7 @@ def test_unmapped_fields_warn_once(tmp_path):
 
     folder = _copy(tmp_path)
     _edit_param(folder, "esp_1ee3", add_unknown)
-    project = gm.legacy.read_project(folder)
+    project = legacy.read_project(folder)
     assert load_legacy_design(project).unmapped == [
         "esp_1ee3.parameters.esp_colour",
         "esp_1ee3.tagnames.measured.esp_noise",
@@ -81,7 +82,7 @@ def test_unmapped_fields_warn_once(tmp_path):
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
+        legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
     assert len(caught) == 1 and issubclass(caught[0].category, GeminiWarning)
     assert "esp_colour" in str(caught[0].message) and "esp_noise" in str(caught[0].message)
 

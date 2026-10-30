@@ -1,9 +1,9 @@
 # Utilities
 
 `gemini/utils/` holds general-purpose helpers that know nothing about geothermal physics, modules
-or the engine. It is a leaf package: it imports only the standard library and installed
-dependencies, never another part of `gemini` (`tests/unit/test_package_boundaries.py` enforces
-this). It therefore cannot raise `gm.errors` classes; its helpers raise built-in exceptions such
+or the engine. Its topic files are a leaf package: they import only the standard library and
+installed dependencies, never another part of `gemini` (`tests/unit/test_package_boundaries.py`
+enforces this). They therefore cannot raise `gm.errors` classes; their helpers raise built-in exceptions such
 as `TypeError` and `ValueError`, and callers that need a GEMINI error convert them. Import helpers
 from their topic module, for example `from gemini.utils.strings import did_you_mean`;
 `gemini/utils/__init__.py` exports nothing.
@@ -21,11 +21,16 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
   `encode_cells`, `decode_cells`) used by the rows a checkpoint keeps.
 - `collect_env.py`: `python -m gemini.utils.collect_env` prints the versions a bug report needs.
 
+Two folders live here without being leaf helpers, and the topic files never import them:
+`data/`, the in-memory `Dataset` and `Loader` ([data.md](data.md)), and `legacy/`, the old-format
+bridge ([legacy.md](legacy.md)). Their place in the dependency order is in
+[conventions.md](conventions.md#dependencies).
+
 ## Adding a helper
 
 Add a helper only when at least two places need it, or when it removes a duplicate. Put it in the
 file of its topic (no `misc.py` or `helpers.py`), give it a docstring, replace every duplicate in
 the same commit and add a test to the mirrored `tests/unit/utils/test_<file>.py`. A new topic file
 needs its own mirror, which `tests/unit/test_mirror.py` requires. Physics, units and quantities
-belong in `core/physics` and `core/types`; code that needs modules or the engine stays in those
+belong in `physics` and `types`; code that needs modules or the engine stays in those
 packages.

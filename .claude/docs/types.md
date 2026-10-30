@@ -1,10 +1,10 @@
-# Core data types
+# Data types
 
-Import public types from `gemini.core.types`; quantity aliases are defined in
-`core/types/quantities.py`. Types depend on the standard library, Pydantic, pandas/NumPy for
-profiles, `core.physics` for property calculations, `gemini.errors` and `gemini.utils`. They never
+Import public types from `gemini.types`; quantity aliases are defined in
+`types/quantities.py`. Types depend on the standard library, Pydantic, pandas/NumPy for
+profiles, `gemini.physics` for property calculations, `gemini.errors` and `gemini.utils`. They never
 import equipment, the engine or plant files. `Stream.__init__` reads the runtime default fluid
-through a function-level import of `core.runtime` (see
+through a function-level import of `gemini.backends.runtime` (see
 [conventions.md](conventions.md#dependencies)).
 
 | GEMINI | Purpose |
@@ -50,7 +50,7 @@ descendant leaf calls; the additive quantities are `MassFlow`, the seven energy 
 `Duty` (a heat-transfer rate such as a heat exchanger's) and `HydraulicPower`, all in W except
 mass flow, and each has its own quantity name. Plain `Power` is not additive. A declaration's
 `additive` attribute reads the flag. Integer stage counts use `Count`. Every quantity's unit is its own SI unit in the unit
-table of `core/physics/units.py` (`test_every_quantity_unit_is_a_known_si_unit`); add the unit
+table of `physics/units.py` (`test_every_quantity_unit_is_a_known_si_unit`); add the unit
 there together with a new quantity. Use signed pressure/temperature *differences* separately
 from nonnegative absolute pressure and strictly positive absolute temperature. A difference
 converts by scale only: `"5 degC"` as a `TemperatureDifference` is 5 K, not 278.15 K.
@@ -76,11 +76,11 @@ keeps `gt=0`). The dimensionless unit `ppm` (1e-6) converts any `-` quantity, fo
 `integral_time="15 min"`), and `ProductivityIndex` accepts `m3/h/bar`.
 
 Add a quantity only when a real field needs a new dimension. Keep local descriptions and
-stricter design limits on fields. `tests/unit/core/modules/test_field_types.py` checks that every
+stricter design limits on fields. `tests/unit/modules/test_field_types.py` checks that every
 numeric declaration whose kind is not plain `float` or `int` carries a unit, and that
 constructor sections are ordered. ESP and injection-pump head/power polynomial coefficients are
 plain `list[float]` because their order-dependent legacy US units differ per item; the degasser
-coefficient has no established dimension. Core physics `PipeSection` keeps plain numeric
+coefficient has no established dimension. Physics `PipeSection` keeps plain numeric
 annotations to avoid importing types upward, but its four fields carry the same quantity/unit
 JSON schema metadata. `Health.metrics` is a heterogeneous diagnostic map, not a single physical
 quantity. Calibration accepts the `Parameter` object directly, so no separate parameter
@@ -99,7 +99,7 @@ SI `m_dot` field remains supported. Without `fluid` the constructor uses the run
 fluid. All public numeric declarations accept a unit string or `gm.Quantity(value, unit)`.
 `gm.units.convert(value, from_unit, to_unit, quantity=None)` handles explicit output conversion.
 
-`gm.units` is the one unit implementation (`core/physics/units.py`, one table). Its public names:
+`gm.units` is the one unit implementation (`physics/units.py`, one table). Its public names:
 `names(quantity=None)` lists every unit, or those of a named quantity such as `"pressure"`;
 `parse("150 m3/h")` returns `(150.0, "m3/h")` (a number, a space and a known unit, else
 `UnitError`); `convert(value, from_unit, to_unit, quantity=None)`; and `fits(unit, quantity)` tells
@@ -108,7 +108,7 @@ whether a unit converts to the quantity's SI unit, which is how bindings and CSV
 `UnknownNameError` with suggestions. The table includes `km`, `mm`, `in`, `kPa`, `MPa`, `rpm`
 (1/60 Hz, since frequency is stored in Hz), `degC`, `m3/h`, `kW`, `MW` and `bar(g)`, the same
 gauge entry as `barg` (offset 101325 Pa). The SI unit of each quantity name comes from
-`quantity(name, unit)` in `core/types/quantities.py`, which calls `units.define_quantity` once per
+`quantity(name, unit)` in `types/quantities.py`, which calls `units.define_quantity` once per
 quantity, so physics needs no upward import and the quantity list has one source.
 
 `Stream` is one frozen slots dataclass (`m_dot`, `T`, `p`, `fluid`) for every path: plain calls,
@@ -127,7 +127,7 @@ inputs with the concrete `Fluid`, so `volumetric_flow()` divides by a plain floa
 loop count, a value that changes a `Fluid`): a trace reads it as a plain value and its value is a
 guard of the graph cache; numeric parameters are graph inputs by default.
 
-`BRINE` and `WATER` use the defaults of `core.physics.fluid.FluidProperties` (a frozen slots
+`BRINE` and `WATER` use the defaults of `gemini.physics.fluid.FluidProperties` (a frozen slots
 dataclass: numbers become `float`, bounds raise `PhysicsRangeError`), the original
 constant-water numbers. `Fluid` carries salinity, dissolved CO2 and free-gas mass fractions.
 Density, viscosity, heat capacity and conductivity overrides are validated and immutable.
@@ -146,7 +146,7 @@ fractions are rejected until a suitable model exists. Default water/brine number
 `Fluid(kind="steam")`, exported as `STEAM`, labels water vapour such as the `gas` outlet of a
 flash `Separator`; `FlashTurbine` requires it. Its constant property snapshot is the unchanged
 liquid-water default and does not describe vapour: steam equipment takes enthalpies and
-entropies from `core.physics.steam`, so do not convert a steam stream's volume flow or audit its
+entropies from `gemini.physics.steam`, so do not convert a steam stream's volume flow or audit its
 latent heat with `cp_l * T`.
 
 Well corrosion helpers accept omitted chemistry: Fluid salt fraction becomes salt concentration
@@ -164,7 +164,7 @@ each declared with its own additive quantity in W (`Electricity`, `Fuel`, `HeatA
 ports. Six are nonnegative: the inflows `electricity` and `fuel` consumed
 and `heat_absorbed` from outside the plant (ambient air, the ground, a cooled building), and the
 outflows `heat_loss` to the environment, `heat_supplied` to a consumer and `electricity_generated`.
-`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `core/modules/balance.py` list them. The seventh,
+`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `modules/balance.py` list them. The seventh,
 `heat_accumulation`, is signed: the rate of increase of the heat a storage leaf holds
 (`ThermalStorage`, `IceStorage`, `AquiferStorage`), counted with the outflows, so a charging store
 (positive) and a discharging one (negative) both close. Declare only the outputs a module has. Fluid
@@ -208,7 +208,7 @@ dataset must share one index; resample explicitly.
 
 `Cost` stores investment, annual fixed cost and variable currency/J of useful output, together
 with currency, price year and a source citation. A module declares its own cost by defining
-`capex()` returning a `Cost`; `gemini.core.types.cost.total_cost(plant)` sums each module's own
+`capex()` returning a `Cost`; `gemini.types.cost.total_cost(plant)` sums each module's own
 contribution once, returns `None` when no module declares a cost and rejects mixed currencies or
 years. Composite `capex` must therefore describe only its own additional cost, not repeat child
 costs. No built-in module declares a cost.

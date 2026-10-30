@@ -12,11 +12,10 @@ from gemini.modules.module import no_outputs
 from gemini.modules.plants import Plant
 from gemini.physics import units
 from gemini.types import BRINE, WATER, Fluid, Ports, Profile, Quantity, Stream, streams
-from gemini.utils import legacy
 from gemini.utils.data.dataset import Dataset
 
 __version__ = "1.0.3"
-API_VERSION = 2
+API_VERSION = 3
 __all__ = [
     "Engine",
     "Plant",
@@ -42,7 +41,6 @@ __all__ = [
     "kpi",
     "checks",
     "testing",
-    "legacy",
     "optim",
     "errors",
     "no_outputs",

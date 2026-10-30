@@ -17,7 +17,7 @@ fits parameters by calling `Engine.replay` on a copy of the plant.
 
 One format serves `simulate`, `replay` and `live`: a `gm.Dataset`, or a pandas DataFrame with a
 timezone-aware `DatetimeIndex` (any zone; the instants become UTC) and one column per binding
-`column`. A DataFrame is wrapped by `gemini.core.data.dataset.as_dataset`; a naive index, a
+`column`. A DataFrame is wrapped by `gemini.utils.data.dataset.as_dataset`; a naive index, a
 non-time index or any other object raises `DatasetError`. Values have the unit of the binding,
 except that a unit recorded in `Dataset` metadata replaces it (the rule below stays). Without
 `clock`, `simulate` and `replay` use the ticks of the input (`Clock.from_data`).
@@ -89,7 +89,7 @@ simulation step raises its exception.
 ## The runner
 
 `Engine.replay`, `live`, `simulate` and `resume` all reach `Engine._run`, which builds the
-`BindingPlan` and the `Loader` arrays and hands them to `Runner` (`gemini/core/engine/runner.py`).
+`BindingPlan` and the `Loader` arrays and hands them to `Runner` (`gemini/engine/runner.py`).
 There is no tick loop and no second path for a failing row: a run is a list of **twins** (the
 equipment twins of a replay; the plant in simulate) evaluated over **chunks** of ticks.
 
@@ -138,7 +138,7 @@ A direct call such as `esp(suction=...)` stays eager: the same `forward` and ops
 
 ## Callbacks
 
-Callbacks derive from `gemini.core.engine.callbacks.Callback` and run in registration order with
+Callbacks derive from `gemini.engine.callbacks.Callback` and run in registration order with
 the engine as first argument. They are **replayed from the results of a chunk**, tick by tick,
 seeing the engine as a tick loop left it (results, position and states of that tick, the plant's
 inputs); a callback that changes the run (the plant, its parameters or inputs, the dataset) sets
@@ -168,7 +168,7 @@ after it, and a later `replay(..., state=engine.results.end_state)` continues wh
 ## Results
 
 `Results` is columnar. `Results.commit(chunk)` is the one way in: a `ResultChunk`
-(`gemini/core/engine/chunks.py`) holds the ticks of one evaluation, whatever their number, one
+(`gemini/engine/chunks.py`) holds the ticks of one evaluation, whatever their number, one
 included: `times`, `durations`, a `PathColumns` per module path and the per-tick `skips` and
 `errors`. `PathColumns(present, columns)` has a boolean mask of the ticks the path was evaluated
 for and one column per field, every column with one entry per tick (entries of absent ticks are
@@ -217,7 +217,7 @@ skip; `EventLog` logs these).
 
 **Files.** `save(path)` and `Results.load(path)` write and read one `.npz` file (the suffix is added
 when missing); `to_bytes()` and `Results.from_bytes(data)` do the same without a file path.
-`gemini/core/engine/archive.py` writes a float, integer or boolean column as that array and any
+`gemini/engine/archive.py` writes a float, integer or boolean column as that array and any
 other column (lists, strings, `None`, mixed cells) as one JSON text with exact floats; the
 metadata (units, durations, skips, failures, energy fields, end state) is one JSON text. Loading
 uses `allow_pickle=False`, so no pickle is read, and gives the same bits, units and end state.

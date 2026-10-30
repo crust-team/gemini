@@ -42,26 +42,25 @@ branch unless the user explicitly asks for one, and open a pull request only whe
 ```text
 gemini/
 ├── __init__.py       # curated import gemini as gm API
-├── utils/            # general helpers; leaf package that imports nothing else from gemini
+├── utils/            # general helpers; the topic files are a leaf that imports nothing else from gemini
+│   ├── data/         # in-memory Dataset and Loader only
+│   └── legacy/       # all old-format I/O, tables and conversion
 ├── errors/           # every gm.errors class; leaf package that imports nothing else from gemini
 ├── backends/         # python (scalar) and numpy (array) implementations of the ops
+│   └── runtime.py    # context-local precision, display units and default fluid
 ├── ops/              # op registry, dispatch, Constant, where and check used by physics
 ├── graph/            # Node, Graph, Proxy, Tracer, Interpreter, cache and runner
-├── core/
-│   ├── physics/      # SI correlations and unit conversions
-│   ├── types/        # quantities, streams, fluids, declarations, profiles, bindings, costs
-│   ├── runtime.py    # context-local precision, display units and default fluid
-│   ├── modules/      # Module base class, registry, containers; one folder per category, plants/ too
-│   ├── data/         # in-memory Dataset and Loader only
-│   ├── engine/       # Clock, Engine, steps, Results, callbacks, checkpoints
-│   └── legacy/       # all old-format I/O, tables and conversion
+├── physics/          # SI correlations and unit conversions
+├── types/            # quantities, streams, fluids, declarations, profiles, bindings, costs
+├── modules/          # Module base class, registry, containers; one folder per category, plants/ too
+├── engine/           # Clock, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay
 ├── analysis/         # well performance and integrity, gm.kpi
 ├── economics/        # capex, opex, levelised cost, CO2, cash flow
 ├── checks/           # balances and bounds over a finished run
 ├── testing/          # check_module for a new module class
-├── profiles/         # demand profiles
-└── schemas/          # JSON Schemas and samples of the exchanged documents
+└── profiles/         # demand profiles
+docs/schemas/         # JSON Schemas and samples of the exchanged documents
 examples/             # area/category/NN_name.py; shared plant and data in examples/shared/
 scripts/              # test_changed.py, write_schemas.py, migrate_plants.py
 tests/                # unit mirror, integration, e2e and immutable fixtures
@@ -72,6 +71,6 @@ immutable `Ports` mapping while controls and boundaries are pre-applied and read
 returns a fluid-outlet dictionary; leaf `_compute_outputs(self, inlets, outlets)` methods and
 composite output formulas run automatically afterward. Pre-hooks receive `(module, inlets)` and
 forward hooks receive `(module, inlets, outlets)`. Plants are built from data
-([plants.md](.claude/docs/plants.md)) and own persistence, bindings, and dated design. Core data is in-memory only. No engine loop sleeps or schedules itself. Keep the public
+([plants.md](.claude/docs/plants.md)) and own persistence, bindings, and dated design. `gemini.utils.data` is in-memory only. No engine loop sleeps or schedules itself. Keep the public
 API small and examples outside the package. Details are in
 [conventions.md](.claude/docs/conventions.md) and [modules.md](.claude/docs/modules.md).

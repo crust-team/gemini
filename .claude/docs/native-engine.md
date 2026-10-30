@@ -70,11 +70,11 @@ engine treats it):
   scenario batches reuse one graph. Giving a parameter a scenario dimension makes Monte Carlo
   over parameters free.
 - Only pure math and unit-conversion numbers (2, 60, pi, bar->Pa) are literals in the graph.
-- Physical constants are defined once as `Constant` in `gemini/core/physics/constants.py` and
+- Physical constants are defined once as `Constant` in `gemini/physics/constants.py` and
   shared; the tracer creates one graph input per constant.
 - Declared in modules by attribute assignment (`self.stages = gm.Parameter("50")`); `Module`
   registers them; `named_parameters`, `named_constants`, `named_states` list them.
-- Defined in `gemini/core/modules/parameter.py`, next to `Module`. Reuse and extend whatever
+- Defined in `gemini/modules/parameter.py`, next to `Module`. Reuse and extend whatever
   parameter mechanism already exists.
 
 ## 5. Units and types
@@ -176,7 +176,7 @@ gemini/
     base.py          Backend, register, settings
     python.py        scalar, math module
     numpy.py         arrays, NumPy and SciPy
-  core/modules/
+  modules/
     parameter.py     Parameter, Constant, State
 native/              C++ sources and ops.yaml, later, outside the Python package
 ```
@@ -206,7 +206,7 @@ Implemented for one leaf module, the ESP, and everything its call needs:
   `describe()`), `Proxy`, `Tracer` (one leaf module), `Interpreter` (value pass, then error
   pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
   row on a graph break).
-- `core/modules/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
+- `modules/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
   ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `Stream` is one
   slots dataclass used on every path.
 - The traced ESP on NumPy equals the untraced ESP exactly on the July data (tolerance 1e-12,
@@ -218,7 +218,8 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Names are not public.** The ops are `gemini.ops.where`, `gemini.ops.check`, ... and the
   backend setting is `gemini.backends.settings(backend=...)`, not `gm.where` or
   `gm.runtime.settings(backend=...)`: the curated `gm` names are pinned and the public API is
-  unchanged, and `core.runtime` sits above the backends in the dependency order.
+  unchanged, and `gemini.backends.runtime` sits above the rest of `gemini.backends` in the
+  dependency order.
 - **`where` branches are plain values** and both are always evaluated. On the Python backend the
   ops return `inf` or `nan` silently, like NumPy, for division by zero, a negative logarithm or
   overflow, and in an eager call plain `/` and `**` do the same (next point). `ops.truediv` stays
@@ -372,7 +373,7 @@ retrace. Named physical constants and module-level model constants are `Constant
 
 ## 14. The plant builder and the plant spec
 
-A plant is a normal composite `Module` built from data (`gemini/core/modules/plants/`). There is
+A plant is a normal composite `Module` built from data (`gemini/modules/plants/`). There is
 one representation: the format 2 spec, which is also the stored plant file. `gm.plants.from_spec`
 and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one method.
 
@@ -387,8 +388,8 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   the steps), `outputs.py` (sum, copy and ratio outputs), `reader.py` and `writer.py` (spec in and
   out), `spec.py`, `schema.py`, `migration.py`, `library.py` (shipped spec files in `specs/`,
   registered with `registry.register_plant`), `factory.py` (a registry type or a group to a module).
-  The dated parameters and bindings of `Module` are `core/modules/design.py`; the sections every
-  tree shares are `core/modules/serialization.py`.
+  The dated parameters and bindings of `Module` are `modules/design.py`; the sections every
+  tree shares are `modules/serialization.py`.
 - **Rules.** Only `connect` wires. An inlet has one source and an outlet one target
   (`port_in_use`); a bare module takes its only fitting free port, several raise `ambiguous_port`
   with the candidates; different stream types raise `stream_mismatch`; a loop of leaves without a

@@ -7,7 +7,7 @@
 Every class derives from `GeminiError` (or `GeminiWarning`) and from the matching built-in
 exception, so `except ValueError` keeps catching `gm.errors.UnitError`. Catch `GeminiError` to
 handle every GEMINI error. New code raises one of these classes for every deliberate error; the
-exceptions are `gemini.utils`, which cannot import them, pydantic validators, which must raise
+exceptions are the topic files of `gemini.utils`, which cannot import them, pydantic validators, which must raise
 `ValueError` (pydantic reports it as a `ValidationError`), and the Python protocol errors
 (`NotImplementedError`, and `AttributeError` from the `__getattr__` of non-module classes).
 `test_package_code_raises_gemini_errors` in `tests/unit/test_code_quality.py` enforces this.

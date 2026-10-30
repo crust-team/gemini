@@ -116,7 +116,7 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   propylene glycol by volume: rho=1029.85, cp=3841, k=0.4622, mu=0.0016295 in SI. See the
   manufacturer citation in [types.md](types.md). It is not temperature-dependent; unsupported
   concentrations are rejected. Brine/water defaults remain exactly the old constant-water values,
-  now the defaults of `core.physics.fluid.FluidProperties`.
+  now the defaults of `gemini.physics.fluid.FluidProperties`.
 - `NOTE(refactor)`: optional Fluid-based corrosion converts dissolved mass fraction through
   molar mass 0.04401 kg/mol and the existing Henry law at inlet temperature. Salt concentration
   is rho*salinity in kg/m3. This is an inlet/dilute approximation, without salting-out; explicit
@@ -167,7 +167,7 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
 - NumPy 2.0 is the lower bound because the float32 ESP golden path relies on its NEP 50 type
   promotion: under NumPy 1.x `np.float32 / float` stays float32 by value-based casting, and the
   captured ESP head becomes 37.05164 bar instead of 37.05164337158203
-  (`tests/unit/core/legacy/test_monitoring_golden.py` fails).
+  (`tests/unit/utils/legacy/test_monitoring_golden.py` fails).
 - `NOTE(refactor)`: pandas 3 parses decimal CSV text correctly rounded, as pandas 2 did only with
   `float_precision="round_trip"`. The pandas 2 default parser reads 44,022 cells of the July CSV
   differently, by up to 2.3e-15 relative, so replay under pandas 3 differs from the committed
@@ -184,7 +184,7 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
   pandas 2.3.3, SciPy 1.13.1) and both the newest and the lowest declared dependencies. Two
   sub-ULP differences remain elsewhere, both far inside every tolerance and left as they are:
   - Python 3.12 sums floats with compensated summation in the built-in `sum()`, which the ESP
-    head and power polynomials use (`core/physics/pumps.py`): ESP head and discharge pressure
+    head and power polynomials use (`physics/pumps.py`): ESP head and discharge pressure
     move by up to 1.4e-15 relative (1.9e-9 Pa) in 28,532 replay cells, and three golden ESP
     values by up to 5.8e-16.
     The eager scope wraps scalars as `np.float64`, for which `sum()` does not compensate, so from

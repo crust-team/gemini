@@ -24,7 +24,6 @@ NAMESPACES = (
     "testing",
     "optim",
     "runtime",
-    "legacy",
 )
 METHODS = {
     "Module": (

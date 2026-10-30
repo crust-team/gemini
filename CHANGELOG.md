@@ -16,13 +16,13 @@ finite engine, and then cleaned up. Old import paths are not retained.
   `spec_schema`, `migrate`, `from_template`, `example`); `describe`, `parameter_schema`,
   `validate_params`; one registry with categories and stream types; `gm.evaluate`; `gm.analysis`,
   `gm.economics`, `gm.kpi`, `gm.checks`, `gm.testing`, `gm.profiles`; `gm.errors` codes and
-  `to_dict`; JSON Schemas and samples in `gemini/schemas/`.
+  `to_dict`; JSON Schemas and samples in `docs/schemas/`.
 - Physics and leaf modules are written with `gemini.ops`, so one source runs on floats, arrays and
   traced graphs, and `Engine.replay` evaluates each twin as one traced call with identical results.
   `gemini.graph.settings(traced=False)` selects the old tick-by-tick path.
 - Composable `Module` equipment with declared parameters, ports, controls, boundaries and
   outputs, the handwritten `Doublet` plant and the example `DoubletHeatPlant`, portable plant
-  JSON with dated parameters and bindings, and the `gm.legacy` bridge to old GEMINI projects.
+  JSON with dated parameters and bindings, and the `gm.plants.convert_legacy` bridge from old GEMINI projects.
 - `Engine.simulate`, `Engine.replay` and `Engine.live` with callbacks, results, checkpoints and
   resume; bounded calibration through replay; quantity declarations, immutable fluids, profiles,
   costs and mass/energy audits. Eight runnable examples under `examples/`.
@@ -47,7 +47,7 @@ finite engine, and then cleaned up. Old import paths are not retained.
   - demand `HeatConsumer`, `CoolingConsumer`.
 - Composite plants in `gm.plants`: `MultiWellPlant`, `HeatingSubstation`, `CoolingSubstation`,
   `DistrictNetwork` (heating or cooling) and `ATESPlant`, with the example
-  `examples/core/simulate/01_district_heating_and_cooling.py`; `Module.trial_outlets` and
+  `examples/plants/simulate/01_district_heating_and_cooling.py`; `Module.trial_outlets` and
   `Module.start_states` for loops closed within one call.
 - Physics modules `compression`, `refrigeration`, `steam` (IAPWS-IF97), `ground` and
   `psychrometrics`.
@@ -56,7 +56,7 @@ finite engine, and then cleaned up. Old import paths are not retained.
   through its own `forward`, without a hand-written step method.
 - Energy-balance terms beyond `electricity`, `fuel` and `heat_loss`: `heat_absorbed`,
   `heat_supplied`, `electricity_generated` and the signed stored-heat rate `heat_accumulation`
-  (`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `gemini/core/modules/balance.py`).
+  (`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `gemini/modules/balance.py`).
 - Quantities `Elevation`, `MassConcentration`, `MoneyRate`, `LinearThermalResistance`,
   `TemperatureGradient`, `Speed`, `Mass`, `SpecificEnthalpy`, `HeatCapacity`,
   `VolumetricHeatCapacity`, `ThermalDiffusivity` and `LinearPower`; units `g/m3`, `mg/l`, `ppm`,
@@ -92,7 +92,7 @@ finite engine, and then cleaned up. Old import paths are not retained.
   `Doublet.return_in`/`supply_out` (were `return_stream`/`supply`) and
   `Boiler.temperature_setpoint` (was `setpoint_T`). `MissingMeasurement` became
   `gm.errors.MissingMeasurementError`, and costs are summed by
-  `gemini.core.types.cost.total_cost(plant)` over modules that define `capex()`.
+  `gemini.types.cost.total_cost(plant)` over modules that define `capex()`.
 - Physics consists of plain functions with one unit table; `ConstantWater` became
   `FluidProperties`, and `Profile.constant(value, unit=, clock=)` is the only constant form.
 - Runtime settings are context-local; ESP efficiency is a fraction; undefined radial

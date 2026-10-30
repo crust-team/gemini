@@ -1,9 +1,9 @@
 # Public API
 
-Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.API_VERSION = 2`,
+Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.API_VERSION = 3`,
 and is the page the other repositories build against. Names not listed here (a helper method such
-as `Results.commit`, anything in `gm.utils`, anything under `gemini.core`) are internal and may
-change. `tests/unit/test_public_api.py` pins the names, their parameter names and the schema files.
+as `Results.commit`, anything in `gm.utils`, any import of an internal path such as
+`gemini.engine.results`) are internal and may change. `tests/unit/test_public_api.py` pins the names, their parameter names and the schema files.
 Status is **real**, or **later**: the signature is final and the call raises
 `gm.errors.NotImplementedYet`.
 
@@ -14,7 +14,7 @@ Conventions on every entry:
 - Results are deterministic: the same input gives the same numbers on every backend.
 - Inputs take a number in SI or a string such as `"150 m3/h"`. Every output is in SI and says its unit.
 - A plant and an engine are not shared across threads: each worker loads its own.
-- The documents exchanged between repositories have a JSON Schema and a sample in `gemini/schemas/`:
+- The documents exchanged between repositories have a JSON Schema and a sample in `docs/schemas/`:
   `module_description`, `plant_spec`, `results_summary`, `error`, `profile` (`<name>.schema.json`,
   `<name>.sample.json`). Regenerate with `python scripts/write_schemas.py`.
 
@@ -32,7 +32,6 @@ only change together with `API_VERSION`; its hash per version is held in the tes
 | `gm.__version__`, `gm.API_VERSION` | text, integer | real |
 | `gm.Stream`, `gm.Ports`, `gm.Fluid`, `gm.BRINE`, `gm.WATER`, `gm.Quantity`, `gm.Profile`, `gm.Clock`, `gm.Dataset` | see [types.md](types.md), [data.md](data.md), [engine.md](engine.md) | real |
 | `gm.no_outputs()`, `gm.runtime` | see [modules.md](modules.md), [runtime.md](runtime.md) | real |
-| `gm.legacy` | old-project bridge, see [legacy.md](legacy.md) | real |
 
 ## Modules and streams
 
@@ -211,3 +210,4 @@ Pass parameter objects declared `calibratable=True`, such as
 | --- | --- | --- |
 | 1 | 2026-10-30 | First frozen list. |
 | 2 | 2026-10-30 | One classification: `category` is the module's folder. `gm.modules.categories()` and `describe()["category"]` change: `heat_exchange` → `exchangers`, `heat_pump` and `boiler` → `heating`, `chiller` → `cooling`, `network` → `piping`, `well` → `wells`, `pump` → `pumps`, `separation` → `treatment`, `consumer` → `demand`, `plant` → `plants`; `subsurface` and `storage` stay; `power` and `control` are new. Exceptions to that mapping: `ORC`, `FlashTurbine` (`heat_exchange`), `GridConnection` (`network`) and `Separator` (`separation`) are `power`; `PIDController` (`network`) is `control`. |
+| 3 | 2026-10-30 | `gm.legacy` is removed: the bridge moved to the internal `gemini.utils.legacy`. The old-project import stays public through `gm.plants.convert_legacy(folder)` only. |

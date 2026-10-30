@@ -91,10 +91,12 @@ def nesting(node, depth=0):
 
 
 PYTHON_FILES = python_files()
+LAYERED_UTILS = ("gemini/utils/data/", "gemini/utils/legacy/")
 PACKAGE_FILES = [
     path
     for path in PYTHON_FILES
-    if path.startswith("gemini/") and not path.startswith("gemini/utils/")
+    if path.startswith("gemini/")
+    and (not path.startswith("gemini/utils/") or path.startswith(LAYERED_UTILS))
 ]
 
 
@@ -172,7 +174,7 @@ def is_validator(function):
 
 @pytest.mark.parametrize("path", PACKAGE_FILES)
 def test_package_code_raises_gemini_errors(path):
-    """Deliberate errors use ``gm.errors``; ``gemini.utils`` and validators are the exceptions."""
+    """Deliberate errors use ``gm.errors``; ``gemini.utils`` topics and validators are exempt."""
     found = [
         f"{path}:{node.lineno} {raised_name(node)}"
         for function in functions(path)

@@ -6,8 +6,8 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-import gemini as gm
 from gemini.errors import LegacyFormatError
+from gemini.utils import legacy
 from gemini.utils.legacy.files import GeminiLink, GeminiNode, GeminiParam, GeminiProject, GeminiTags
 
 
@@ -37,14 +37,14 @@ def test_project_and_csv_round_trip(tmp_path):
     }
     (tmp_path / "diagram.json").write_text(json.dumps(diagram))
     (tmp_path / "pump.param").write_text(json.dumps(parameter))
-    project = gm.legacy.read_project(tmp_path)
+    project = legacy.read_project(tmp_path)
     assert project.nodes[node_id].ports == ["in", "out"]
     out = tmp_path / "out"
-    gm.legacy.write_project(project, out)
-    assert gm.legacy.read_project(out).params == project.params
+    legacy.write_project(project, out)
+    assert legacy.read_project(out).params == project.params
     frame = pd.DataFrame({"Timestamp": pd.to_datetime(["2024-01-01"]), "Q": [1.5]})
-    gm.legacy.write_csv(frame, tmp_path / "old.csv")
-    assert gm.legacy.read_csv(tmp_path / "old.csv").Q.iloc[0] == 1.5
+    legacy.write_csv(frame, tmp_path / "old.csv")
+    assert legacy.read_csv(tmp_path / "old.csv").Q.iloc[0] == 1.5
 
 
 def _write_project(folder, tagnames=None):
@@ -76,7 +76,7 @@ def _write_project(folder, tagnames=None):
 def test_write_csv_applies_the_old_timestamp_format(tmp_path):
     """Midnight timestamps keep their time of day in the old CSV format."""
     frame = pd.DataFrame({"Timestamp": pd.to_datetime(["2024-01-01", "2024-01-02"]), "Q": [1, 2]})
-    gm.legacy.write_csv(frame, tmp_path / "old.csv")
+    legacy.write_csv(frame, tmp_path / "old.csv")
     lines = (tmp_path / "old.csv").read_text(encoding="utf-8").splitlines()
     assert lines == ["Timestamp;Q", "2024-01-01 00:00:00;1", "2024-01-02 00:00:00;2"]
 
@@ -85,26 +85,26 @@ def test_read_csv_rejects_ambiguous_dates(tmp_path):
     """Day-first dates are not silently parsed month-first."""
     (tmp_path / "old.csv").write_text("Timestamp;Q\n07/06/2024;1\n", encoding="utf-8")
     with pytest.raises(LegacyFormatError, match="Timestamp"):
-        gm.legacy.read_csv(tmp_path / "old.csv")
+        legacy.read_csv(tmp_path / "old.csv")
     (tmp_path / "iso.csv").write_text("Timestamp;Q\n2024-06-07T01:00:00;1\n", encoding="utf-8")
-    assert gm.legacy.read_csv(tmp_path / "iso.csv").Timestamp[0] == pd.Timestamp("2024-06-07 01:00")
+    assert legacy.read_csv(tmp_path / "iso.csv").Timestamp[0] == pd.Timestamp("2024-06-07 01:00")
 
 
 def test_read_project_errors_name_the_file(tmp_path):
     """Malformed files and time-varying tags raise LegacyFormatError naming the source."""
     _write_project(tmp_path / "varying", {"measured": {"flow": ["Q", "R"]}})
     with pytest.raises(LegacyFormatError, match="pump.param.*flow"):
-        gm.legacy.read_project(tmp_path / "varying")
+        legacy.read_project(tmp_path / "varying")
     with pytest.raises(LegacyFormatError, match="diagram.json"):
-        gm.legacy.read_project(tmp_path / "missing")
+        legacy.read_project(tmp_path / "missing")
 
 
 def test_write_project_keeps_unknown_tag_kinds_and_text(tmp_path):
     """Tag kinds the typed model does not know survive a round trip, as does UTF-8 text."""
     _write_project(tmp_path / "old", {"measured": {"flow": ["Q"]}, "setpoint": {"s": ["S"]}})
-    project = gm.legacy.read_project(tmp_path / "old")
+    project = legacy.read_project(tmp_path / "old")
     assert project.params["node-1"]["unit"].values == ["°C"]
-    gm.legacy.write_project(project, tmp_path / "out")
+    legacy.write_project(project, tmp_path / "out")
     written = json.loads((tmp_path / "out" / "pump.param").read_text(encoding="utf-8"))
     assert written["tagnames"]["setpoint"] == {"s": ["S"]}
     assert written["tagnames"]["measured"] == {"flow": ["Q"]}
@@ -114,12 +114,12 @@ def test_write_project_keeps_unknown_tag_kinds_and_text(tmp_path):
 def test_write_project_rejects_edited_topology(tmp_path):
     """Nodes or links changed on a parsed project raise instead of being silently dropped."""
     _write_project(tmp_path / "old")
-    project = gm.legacy.read_project(tmp_path / "old")
+    project = legacy.read_project(tmp_path / "old")
     project.links.append(
         GeminiLink(source="node-1", source_port="in", target="node-1", target_port="in")
     )
     with pytest.raises(LegacyFormatError, match="nodes or links"):
-        gm.legacy.write_project(project, tmp_path / "out")
+        legacy.write_project(project, tmp_path / "out")
 
 
 def test_constructed_project_writes_new_files(tmp_path):
@@ -131,8 +131,8 @@ def test_constructed_project_writes_new_files(tmp_path):
         params={"a": {"clogging_dp": GeminiParam(values=[0.5], timestamps=[when])}},
         tags={"a": GeminiTags(measured={"filter_flow": "Qp"})},
     )
-    gm.legacy.write_project(project, tmp_path / "new")
-    reread = gm.legacy.read_project(tmp_path / "new")
+    legacy.write_project(project, tmp_path / "new")
+    reread = legacy.read_project(tmp_path / "new")
     assert reread.params == project.params
     assert reread.tags == project.tags
     assert reread.nodes == project.nodes

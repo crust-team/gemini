@@ -10,6 +10,7 @@ from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 SNAPSHOTS = {
     1: "7d24bb659c94ff3f5717c4eb116a7c44ca2eb77972f96e6515a52350c28a07b0",
     2: "91dce79b8d07942960e637da063bbbac465426e883ba15cc172c9f76b6ccc15d",
+    3: "1c47ff0cb57d8ef77cc41816ec42a140a304965686a577c82b2af664c8817cc9",
 }
 """Hash of the snapshot per ``API_VERSION``: an entry never changes, a new version adds one."""
 
@@ -33,7 +34,6 @@ def test_public_names_and_docs():
         "runtime",
         "units",
         "streams",
-        "legacy",
         "modules",
         "plants",
         "profiles",
@@ -90,3 +90,9 @@ def test_the_change_log_lists_the_api_version():
 def test_utils_stays_private():
     """Helpers are not part of the public API."""
     assert "utils" not in gm.__all__
+
+
+def test_the_old_project_import_is_public_only_through_convert_legacy():
+    """``gm.legacy`` is gone; ``gm.plants.convert_legacy`` is the one public entry."""
+    assert not hasattr(gm, "legacy")
+    assert "convert_legacy" in gm.plants.__all__

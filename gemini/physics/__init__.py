@@ -1,1 +1,1 @@
-"""GEMINI core physics."""
+"""GEMINI physics."""

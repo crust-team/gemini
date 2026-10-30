@@ -12,12 +12,12 @@ def convert_legacy(folder):
     read as-is and not converted. The bridge maps the example project's ten nodes
     (``gemini.utils.legacy.tables.NODE_PATHS``): another node set, a missing ``.param`` file or an
     unit it does not know raises ``LegacyFormatError``. Old fields that have no new counterpart are
-    listed in one ``GeminiWarning``. The data CSV is converted separately with
-    ``gm.legacy.to_dataset``.
+    listed in one ``GeminiWarning``. The data CSV is converted separately, by the
+    internal ``gemini.utils.legacy.to_dataset``.
 
     The result is ``DoubletHeatPlant`` filled with the converted SI parameters, dated histories,
-    fluids, bindings and assumptions, as ``plant.to_spec()`` writes them. ``core.legacy`` sits
-    above this package in the import order, so it is imported inside the function.
+    fluids, bindings and assumptions, as ``plant.to_spec()`` writes them. ``gemini.utils.legacy``
+    sits above this package in the import order, so it is imported inside the function.
     """
     from gemini.utils.legacy import read_project, to_plant
 

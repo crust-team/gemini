@@ -181,7 +181,7 @@ backend. **Adding a backend means adding its name to `BACKENDS`** (after registe
   lines must be equal.
 
 The engine itself is also compared on both backends with synthetic twins in
-`tests/unit/core/engine/test_runner.py` (modules in `tests/fixtures/engine_plants.py`) and on the
+`tests/unit/engine/test_runner.py` (modules in `tests/fixtures/engine_plants.py`) and on the
 doublet heat plant in `tests/integration/test_replay_graph.py`.
 
 ## Parallel-test rules
@@ -200,8 +200,9 @@ The suite must remain safe under `pytest -n auto`:
 `__init__.py`, including `gemini/utils/` and `gemini/errors/`, has a mirrored
 `tests/unit/<path>/test_<name>.py` that defines at least one test. Its `PLACEHOLDERS` set of
 mirrors still holding only a docstring is empty and must never grow.
-`tests/unit/test_package_boundaries.py` checks that `gemini.utils` and `gemini.errors` import
-nothing else from `gemini`. `tests/unit/test_code_quality.py` enforces the comment rule, the
+`tests/unit/test_package_boundaries.py` checks that `gemini.errors` and the topic files of
+`gemini.utils` import nothing else from `gemini`, and that `gemini.utils.data` imports no module
+or engine code and `gemini.utils.legacy` no engine code. `tests/unit/test_code_quality.py` enforces the comment rule, the
 nesting limit, the function-length limit with its `LONG_FUNCTIONS` exceptions and the ban on the
 framework name (see [conventions.md](conventions.md#code-quality)); flake8 enforces complexity.
 `tests/unit/test_public_api.py` compares every public name, its parameter names and the schema
@@ -209,15 +210,15 @@ files with `tests/fixtures/public_api.json`, which may only change together with
 (see [conventions.md](conventions.md#public-api-freeze)).
 `tests/integration/test_public_contracts.py` checks that every public function that returns data
 gives plain JSON on the example plant, and `tests/unit/scripts/test_write_schemas.py` that the
-files of `gemini/schemas/` are up to date and each sample fits its schema, with the small checker
+files of `docs/schemas/` are up to date and each sample fits its schema, with the small checker
 in `tests/fixtures/json_schema.py`.
 
 ## Old formats, examples and e2e coverage
 
-Old-format files are read only by `tests/unit/core/legacy/`, `tests/e2e/test_legacy_bridge.py`,
+Old-format files are read only by `tests/unit/utils/legacy/`, `tests/e2e/test_legacy_bridge.py`,
 the `check_wiring` audit in `tests/e2e/test_full_replay.py`, and the golden reconstructions that
 build equipment from the original `.param` files: the subsurface, wells and exchangers unit tests,
-`tests/unit/core/physics/test_geometry.py`, `tests/integration/test_plant.py` and the historical
+`tests/unit/physics/test_geometry.py`, `tests/integration/test_plant.py` and the historical
 `tests/fixtures/capture_golden.py`. Shared paths live in `tests/fixtures/__init__.py` (`ROOT`,
 `FIXTURES`, `SHARED`, `OLD_PROJECT`).
 

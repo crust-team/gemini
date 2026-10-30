@@ -184,7 +184,7 @@ class Scope:
 
 
 def physics(function):
-    """Decorate a public function of ``core/physics`` so it is safe with plain operators.
+    """Decorate a public function of ``gemini/physics`` so it is safe with plain operators.
 
     The outermost call opens the scope (silent NumPy arithmetic, ``np.float64`` arguments, plain
     scalars and ``Failed`` handling on return); a nested call wraps its own exact floats and

@@ -1,6 +1,6 @@
-# Core physics rules
+# Physics rules
 
-`gemini/core/physics` contains reusable correlations: unit conversions, constants, fluid
+`gemini/physics` contains reusable correlations: unit conversions, constants, fluid
 properties, geometry, hydraulics, heat transfer, pumps, chemistry, corrosion and erosion, and for
 the equipment catalogue ([equipment.md](equipment.md)) gas compression, refrigeration cycles,
 IAPWS-IF97 steam, ground heat transport and psychrometrics (sections below, the original GEMINI
@@ -23,7 +23,7 @@ correlations first).
 - `units._UNITS` is the single table of public data units (SI unit, scale, offset). A declared
   difference quantity converts by scale only, so `"5 degC"` as a temperature difference is 5 K.
 - Do not perform database I/O, logging or mutate global state during calculations.
-- `Fluid` definitions in `core.types.fluid` own immutable overrides and cache their
+- `Fluid` definitions in `gemini.types.fluid` own immutable overrides and cache their
   `FluidProperties` snapshot; physics must not import types at runtime (`hydraulics` imports
   `Stream` and `Fluid` for type checking only).
 - Do not hide undefined diagnostics as valid numbers. The receiving aquifer's unconfigured
@@ -45,7 +45,7 @@ correlations first).
 
 ## Fluid properties
 
-`fluid.py` holds the constant-property snapshot `FluidProperties` and `core/types/fluid.py` the
+`fluid.py` holds the constant-property snapshot `FluidProperties` and `types/fluid.py` the
 immutable `Fluid` that selects it (the inherited GEMINI `PVTConstantSTP` model, property model
 `constant_stp`). Pressure and temperature do not change any property: `Fluid.properties(p, T)`
 returns one cached snapshot per complete `Fluid` value.
@@ -404,7 +404,7 @@ dry air and water vapour without the enhancement factor, used by `CoolingConsume
   (error -1 to +0.65 K); inputs outside raise.
 
 ```python
-from gemini.core.physics import psychrometrics
+from gemini.physics import psychrometrics
 
 assert round(psychrometrics.saturation_pressure(293.15), 1) == 2338.8
 assert round(psychrometrics.dew_point(297.15, 0.5) - 273.15, 2) == 12.95

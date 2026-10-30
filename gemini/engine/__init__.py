@@ -1,1 +1,1 @@
-"""GEMINI core engine."""
+"""GEMINI engine."""

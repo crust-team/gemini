@@ -5,8 +5,8 @@ once in `__init__`. Every `forward` receives the same read-only `Ports` mapping 
 dictionary containing exactly the declared fluid outlets. Controls and boundaries are applied by
 the base class and read from `self`. Outputs are computed only after the fluid step succeeds.
 
-Write a module with `Module` from `gemini.core.modules` (also `gm.modules.Module`) and the
-declarations from `gemini.core.types`. The base class has no string catalogue, sequential
+Write a module with `Module` from `gemini.modules` (also `gm.modules.Module`) and the
+declarations from `gemini.types`. The base class has no string catalogue, sequential
 container, fidelity flag or cost method. The shipped equipment, with each model's ports, parameters, equations and energy-audit status, is
 listed in [equipment.md](equipment.md); its classes are good references for new modules.
 
@@ -25,7 +25,7 @@ and checkpoints store the root class as `module:qualname` through `class_path`/`
 
 ## Registry, categories and streams
 
-`gemini/core/modules/registry.py` is the one registry of module and plant types. A class joins it
+`gemini/modules/registry.py` is the one registry of module and plant types. A class joins it
 under its class name with `gm.modules.register(cls)`, and every shipped equipment class is
 registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `get(name)` and
 `categories()` read it; an unknown name raises `UnknownNameError` with its close matches in
@@ -48,11 +48,11 @@ that has a unit; coefficient arrays are exempt), `describe` (plain JSON) and `ca
 `{"parameters": {...}, "inlets": {...}, "controls": {...}}`.
 
 There is one classification: a shipped module's category is the name of the folder of
-`gemini/core/modules/` that holds its file, and a new module goes in the folder of what it does.
+`gemini/modules/` that holds its file, and a new module goes in the folder of what it does.
 `registry.CATEGORIES` is the fixed list of those folders, one word each, in display order;
 [equipment.md](equipment.md#overview) lists the modules of each. `Module.category` reads the folder
 from the import path of the class, so a shipped class never declares it and the two cannot disagree
-(`tests/unit/core/modules/test_registry.py` checks the folders, the list and every class). A class
+(`tests/unit/modules/test_registry.py` checks the folders, the list and every class). A class
 from outside (`register`, `load_file`) has no folder: it states the class attribute `category`, one
 of the list, and a subclass of a shipped class states its own.
 
@@ -65,7 +65,7 @@ say what may be connected.
 
 `Module.describe()`, `Module.parameter_schema()` and `Module.validate_params(params)` work on a
 class (a new instance answers) or on an instance. They live in
-`gemini/core/modules/description.py`, return plain JSON (`json.dumps(..., allow_nan=False)`) and
+`gemini/modules/description.py`, return plain JSON (`json.dumps(..., allow_nan=False)`) and
 never change the module.
 
 `describe()` returns `{name, type, category, summary, doc, parameters, controls, boundaries,
@@ -121,9 +121,9 @@ Leaves declare ordinary `Output(kind)` values and implement
 `_compute_outputs(self, inlets, outlets)`. It never needs `super()._compute_outputs()`.
 
 ```python
-from gemini.core.modules import Module
-from gemini.core.physics import pumps
-from gemini.core.types import (
+from gemini.modules import Module
+from gemini.physics import pumps
+from gemini.types import (
     Control, Count, Electricity, Frequency, Inlet, Outlet, Output, Parameter, Power,
     PressureDifference, Stream, VolumeFlow,
 )
@@ -214,7 +214,7 @@ so `hasattr` stays false). The first call resolves each reference to its descend
 path by identity, so deep copies and nested trees resolve to their own children.
 
 ```python
-from gemini.core.modules import HeatExchanger
+from gemini.modules import HeatExchanger
 
 
 class HeatPlant(Module):
@@ -265,7 +265,7 @@ A composite with a closed circuit inside one call (a substation's building loop)
 circulated temperature before its first child call. It iterates with trial passes:
 `child.trial_outlets(inlets)` returns the outlets of a call that no running call records, with
 outputs skipped and pre-hooks run, and refuses stateful modules. When the loop has converged
-(`close_loop` in `gemini/core/modules/plants/loops.py`), the composite calls every child once, so
+(`close_loop` in `gemini/modules/plants/loops.py`), the composite calls every child once, so
 formulas and balances see exactly one call each. `child.start_states()` returns the states a call
 of a stateful child would start from (its entry of the running step, else its initial states),
 for a loop through a stateful child whose outlet depends only on its state.
@@ -444,7 +444,7 @@ leaves (`ThermalDecline`, `AquiferStorage`, `BoreholeField`, `ThermalStorage`, `
 [equipment.md](equipment.md).
 
 ```python
-from gemini.core.types import Power, State, Temperature
+from gemini.types import Power, State, Temperature
 
 
 class Tank(Module):

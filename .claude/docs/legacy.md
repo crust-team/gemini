@@ -1,6 +1,8 @@
 # Legacy bridge
 
-`gemini.core.legacy` is the only old-format boundary and is publicly available as `gm.legacy`.
+`gemini.utils.legacy` is the only old-format boundary. It is internal: the one public entry is
+`gm.plants.convert_legacy(folder)`, and everything else on this page is imported from
+`gemini.utils.legacy`.
 `read_project(folder)`/`write_project(project, folder)` handle raw diagram and `.param` files
 through typed `GeminiProject` models; the in-memory project, including edits to it, is what the
 conversion reads. `read_csv`/`write_csv` handle semicolon data and old timestamps
@@ -23,15 +25,15 @@ folder with `read_project`, fills `DoubletHeatPlant` (`gm.plants.get`) with `to_
 `to_spec()`. The folder holds `diagram.json`, one `.param` file per diagram node and any other file
 (the data CSV, `well_trajectory.csv`, `plant.conf`), which is read as-is and not converted; the data
 CSV is converted with `to_dataset`. On the example project the result equals
-`examples/shared/doublet_heat/plant.json` exactly (`tests/unit/core/modules/plants/
-test_legacy_project.py`). The function lives in `core/modules/plants/legacy_project.py` and imports
-`core.legacy` inside the function, because `core.legacy` sits above `core.modules`.
+`examples/shared/doublet_heat/plant.json` exactly (`tests/unit/modules/plants/
+test_legacy_project.py`). The function lives in `modules/plants/legacy_project.py` and imports
+`gemini.utils.legacy` inside the function, because `gemini.utils.legacy` sits above `gemini.modules`.
 
 The bridge maps exactly the example project: its ten old nodes (`tables.NODE_PATHS`), a project
 folder with exactly one data CSV besides trajectory files, and its data columns and assumptions.
 Any other node set is rejected rather than guessed. Type, property, port, tag and old-node path
 tables, the deliberately unbound tags with their reasons (`IGNORED_TAGS`) and the property
-converters live in `core/legacy/tables.py`; `core/legacy/_loader.py` interprets a parsed project
+converters live in `utils/legacy/tables.py`; `utils/legacy/_loader.py` interprets a parsed project
 with them. New engine/modules/examples contain no old naming or conversion logic. The bridge
 example is the only example that reads old files.
 

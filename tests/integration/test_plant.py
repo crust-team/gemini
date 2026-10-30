@@ -7,6 +7,7 @@ import pytest
 import gemini as gm
 from gemini.modules.balance import collect_flows, energy_balance, mass_balance
 from gemini.modules.wiring import trace_wiring
+from gemini.utils import legacy
 
 ROOT = Path(__file__).parents[2]
 OLD = ROOT / "examples/legacy/gemini_project_bridge/old_project"
@@ -37,8 +38,8 @@ def test_handwritten_wiring_and_split_helpers(example):
     }
     traced = trace_wiring(plant, inputs)
     assert len(traced) == 10
-    project = gm.legacy.read_project(OLD)
-    assert gm.legacy.check_wiring(plant, project) == []
+    project = legacy.read_project(OLD)
+    assert legacy.check_wiring(plant, project) == []
     well = plant.doublet.well
     bottom = leaves["doublet.reservoir"].outlets["sandface"]
     assert well.intake_conditions(bottom) == leaves["doublet.well"].outlets["wellhead"]

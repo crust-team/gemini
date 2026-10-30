@@ -1,5 +1,5 @@
 {
- "api_version": 2,
+ "api_version": 3,
  "categories": [
   "subsurface",
   "wells",
@@ -392,43 +392,6 @@
     "assumptions"
    ]
   },
-  "legacy": {
-   "GeminiProject": "class",
-   "check_wiring": [
-    "plant",
-    "project"
-   ],
-   "from_plant": [
-    "plant",
-    "template"
-   ],
-   "read_csv": [
-    "path"
-   ],
-   "read_project": [
-    "folder"
-   ],
-   "results_to_frame": [
-    "results",
-    "project"
-   ],
-   "to_dataset": [
-    "project",
-    "frame"
-   ],
-   "to_plant": [
-    "project",
-    "plant"
-   ],
-   "write_csv": [
-    "frame",
-    "path"
-   ],
-   "write_project": [
-    "project",
-    "folder"
-   ]
-  },
   "optim": {
    "CalibrationResult": "class",
    "calibrate": [
@@ -591,7 +554,6 @@
   "errors",
   "evaluate",
   "kpi",
-  "legacy",
   "modules",
   "no_outputs",
   "optim",

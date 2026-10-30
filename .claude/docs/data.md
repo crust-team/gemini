@@ -1,7 +1,7 @@
 # In-memory data
 
 `gm.Dataset` owns one pandas-backed, sorted, unique, timezone-aware UTC table of raw values; units
-are metadata. Core data code contains no file readers, database clients, network calls, or
+are metadata. The data package contains no file readers, database clients, network calls, or
 source handles. The user or backend reads files/services and passes the resulting in-memory
 values to one of:
 
@@ -34,7 +34,7 @@ columns are reported together, as one `BindingError` (code `missing_column`), be
 **Run input.** `simulate`, `replay` and `live` take one format: a `Dataset`, or a pandas DataFrame
 with a timezone-aware `DatetimeIndex` and columns named by the binding `column`, in the units of
 the bindings (a unit recorded in the `Dataset` metadata replaces the binding's, as above).
-`gemini.core.data.dataset.as_dataset(data)` is the one wrapper: a `Dataset` passes through, a
+`gemini.utils.data.dataset.as_dataset(data)` is the one wrapper: a `Dataset` passes through, a
 DataFrame becomes a `Dataset` (any zone is converted to UTC), and a naive index, a non-time index
 or another type raises `DatasetError`, because a local time without a zone is ambiguous. Rows with
 NaN in a bound column are skipped for the twin that needs them and reported as `missing_value`

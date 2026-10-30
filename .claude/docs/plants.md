@@ -126,7 +126,7 @@ They are in the registry (`gm.plants.names()`), so a spec can use them as a `typ
 ## Registered plants and templates
 
 `gm.plants.names()` lists them, `gm.plants.get(name)` gives a plant without values and
-`gm.plants.example(name)` one with real values. Specs live in `gemini/core/modules/plants/specs/`,
+`gm.plants.example(name)` one with real values. Specs live in `gemini/modules/plants/specs/`,
 example values in `specs/examples/` and templates in `plants/templates/`; a new
 `specs/<Name>.json` is registered by its file name.
 

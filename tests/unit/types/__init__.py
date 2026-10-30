@@ -1,1 +1,1 @@
-"""Core public data type tests."""
+"""Public data type tests."""

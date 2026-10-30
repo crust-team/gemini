@@ -7,7 +7,7 @@ functions here cover what operators cannot express: ``where`` instead of a value
 instead of ``max``, ``min`` and ``abs``, and the functions of ``math`` (``log``, ``sqrt``,
 ``exp``, ...), reductions, ``interp`` and the solvers ``brentq`` and ``newton``.
 ``Constant`` declares a named constant that a trace records as a graph input. ``physics`` decorates
-a public function of ``core/physics`` so plain operators are safe in an eager call (see
+a public function of ``gemini/physics`` so plain operators are safe in an eager call (see
 ``gemini.ops.scope``); ``Failed`` is the value of a function whose ``check`` failed there.
 """
 

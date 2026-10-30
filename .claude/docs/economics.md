@@ -1,7 +1,7 @@
 # Economics, KPIs, checks and well analysis
 
 The packages `gemini.economics`, `gemini.checks`, `gemini.analysis` (with `gm.kpi`), `gemini.testing`
-and `gemini.optim` sit above `core.engine`. They read a plant and a finished run through the public
+and `gemini.optim` sit above `gemini.engine`. They read a plant and a finished run through the public
 API only, and every return is plain JSON (`to_plain`: no NumPy types, `NaN` and infinity are
 `null`). A value the inputs cannot give is `null` with a `reason`, never a guess. Each name is
 `real` or raises `NotImplementedYet` with its final signature and a full docstring.
@@ -15,7 +15,7 @@ the composite outputs. Everything below is therefore built from declared leaf ou
   `heat_absorbed` of the `CoolingConsumer` leaves (`analysis/series.py`: `leaf_total`).
 - Electricity, fuel and generation are the leaf columns of those names, summed over every path
   (`results_total`). Grid electricity per tick is `max(0, electricity - electricity_generated)` and
-  CO2 is `gemini.core.modules.balance.emissions` over those totals: one implementation, the
+  CO2 is `gemini.modules.balance.emissions` over those totals: one implementation, the
   weights are the emission factors (a weight of 1 and 0 gives the fuel energy, 0 and 1 the grid
   energy).
 - A tick with no value (a skipped or failed row) adds no energy and is left out of ratios and peaks.
@@ -41,7 +41,7 @@ Every function returns `{value, unit, reason, ...}`; `unit` is the currency (`EU
 | `npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `-capex + (revenue - opex) A` |
 | `payback(plant, results, assumptions=None)` | `capex / (revenue - opex)` in years, undiscounted |
 
-`Cost` and `total_cost` (`core/types/cost.py`) are the one cost implementation. **No built-in module
+`Cost` and `total_cost` (`types/cost.py`) are the one cost implementation. **No built-in module
 declares a cost**, so for a plant of built-in modules `capex` and `opex` return `value: null` with the
 reason "no module declares a cost" (`opex` still lists the energy bill in `components`), and
 `lcoh`, `lcoc`, `npv` and `payback` follow. A module declares its cost by defining `capex()` that
@@ -89,7 +89,7 @@ E(x) the sum over ticks of x times the tick duration:
 
 Each check returns `{name, passed, value, tolerance}` (`passed` is `None` with a `reason` when the
 results hold nothing the check can judge). Because `Results` has no streams, the enthalpy and mass
-closure of `core/modules/balance.py` (sum in minus sum out per call) cannot be recomputed from
+closure of `modules/balance.py` (sum in minus sum out per call) cannot be recomputed from
 it, and the checks audit what the columns hold:
 
 | Check | Covers | `value`, `tolerance` |
