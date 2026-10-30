@@ -66,7 +66,7 @@ def _streams(ports):
 
 
 def _enthalpy(stream):
-    return stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l * stream.T
+    return stream.heat_capacity_rate() * stream.T
 
 
 def _internal_flux(result, measure):
