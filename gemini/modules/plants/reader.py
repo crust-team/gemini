@@ -159,9 +159,7 @@ def populate(plant, spec, report):
 def _handwritten(spec, report):
     with report.guard("type"):
         found = registry.get(spec["type"])
-        if not isinstance(found, type):
-            return found
-        module = found()
+        module = found() if isinstance(found, type) else found
         read_params(module, spec.get("params", {}), report)
         read_sections(module, spec, report)
         return module

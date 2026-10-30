@@ -1647,6 +1647,31 @@ assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
 assert gm.modules.mass_balance(doublet, result)["residual"] == 0
 ```
 
+#### A doublet from its depth
+
+`gm.modules.get("Doublet")` is the class `gm.plants.Doublet`, the same spec with design parameters.
+
+```python
+plant.add("Doublet", name="d0", params={
+    "depth": "2500 m", "gradient": "30 K/km", "surface_temperature": "12 degC",
+    "permeability": "200 mD", "thickness": "100 m", "well_diameter": "0.244 m"})
+plant.d0.fluid = gm.Fluid(density="1030 kg/m3", viscosity="0.4 mPa*s")
+```
+
+`set_params` derives through the pattern of [modules.md](modules.md#a-composite-that-sets-its-childrens-values):
+
+| From | Derived |
+| --- | --- |
+| `depth`, `gradient`, `surface_temperature` | `temperature` of both reservoirs at the midpoint (`ground.geotherm_temperature`), hydrostatic `pressure` from the fluid density (`hydraulics.hydrostatic_pressure`), `soil_temperature` of the wells at half depth |
+| and `permeability`, `thickness`, `well_diameter` | `productivity_index`, `injectivity_index` (`hydraulics.radial_index`, with the fluid viscosity, `drainage_radius`, the wellbore radius and the reservoir's `skin`), `permeability`, `aquifer_thickness`, `top_depth`, `drainage_radius`, `wellbore_radius`, the vertical `pipe_path` of the wells (`geometry.vertical_path`, commercial steel) |
+| and `nominal_flow`, `pump_efficiency`, `nominal_wellhead_pressure` | `esp.setting_depth`, `esp_depth` and `segment` of `well` and `riser` (`hydraulics.pump_setting_depth`), and a one-stage ESP of constant head (`hydraulics.design_pump_head`, `pumps.constant_head_curves`) |
+
+`drainage_radius` defaults to `ground.DOUBLET_WELL_SPACING`, 1000 m. Every derived value can be
+overridden in the same call, by a child name such as `reservoir.pressure` or `well.pipe_path`, and
+stays explicit. `esp.frequency` remains a control; the pump head is the design head at
+`ESP_REFERENCE_FREQUENCY`. The old way, setting every child value directly, keeps working. Setting
+`fluid` gives it to every child and derives again.
+
 ### MultiWellPlant
 
 Purpose: geothermal well field with N production limbs mixed into one supply and M injection

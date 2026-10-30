@@ -463,3 +463,32 @@ def test_affine_correction_and_inflow_relations_match_on_arrays():
     ):
         assert_function_matches(function, rows)
     assert_function_matches(diagnostics.performance_ratio, [(0.8, 2.0), (3.0, 1.5)])
+
+
+def test_radial_index_inverts_the_radial_drops():
+    """The index times the two drops at a flow gives the flow back."""
+    args = (4e-4, 2e-13, 100.0, 1000.0, 0.122, 1.0)
+    index = hydraulics.radial_index(*args)
+    assert sum(hydraulics.radial_pressure_drops(0.08, *args)) * index == pytest.approx(0.08)
+
+
+def test_hydrostatic_pressure_is_absolute():
+    """A column open to the atmosphere."""
+    assert hydraulics.hydrostatic_pressure(1000.0, 0.0) == 101325
+
+
+def test_pump_setting_depth_keeps_the_intake_pressure():
+    """The column above the depth falls to the intake pressure; never above the surface."""
+    depth = hydraulics.pump_setting_depth(2500.0, 2.5e7, 2.4e6, 1e6, 1030.0)
+    column = hydraulics.hydrostatic_dp(1030.0, 2500.0 - depth)
+    assert 2.5e7 - 2.4e6 - column == pytest.approx(1e6)
+    assert hydraulics.pump_setting_depth(100.0, 2.5e7, 0.0, 1e5, 1000.0) == 0
+
+
+def test_design_pump_head_closes_the_pressure_balance():
+    """Wellhead, column and friction against the flowing bottomhole pressure."""
+    head = hydraulics.design_pump_head(1e6, 2.5e7, 2.4e6, 1030.0, 4e-4, 2500.0, 0.244, 4.5e-5, 0.08)
+    gravity = hydraulics.hydrostatic_dp(1030.0, 2500.0)
+    friction = head - (1e6 + gravity - 2.5e7 + 2.4e6)
+    assert 0 < friction < 1e6
+    assert hydraulics.design_pump_head(0.0, 1e9, 0.0, 1000.0, 1e-3, 10.0, 0.2, 1e-5, 0.01) == 0

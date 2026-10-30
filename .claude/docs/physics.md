@@ -160,6 +160,11 @@ Pipe hydraulics: Darcy–Weisbach with Swamee–Jain, Beggs–Brill, path marchi
 - `erosion_check(path, stream, fluid)`: compare section velocities with the API erosional velocity
   limit.
 
+The doublet design adds `radial_index` (the inverse of `radial_pressure_drops`),
+`hydrostatic_pressure`, `pump_setting_depth` and `design_pump_head` to `hydraulics.py`,
+`geotherm_temperature` and `DOUBLET_WELL_SPACING` to `ground.py`, `vertical_path` to `geometry.py` and
+`constant_head_curves` to `pumps.py`.
+
 ### `heat_transfer.py`
 
 Pipe heat loss and standard heat-exchanger effectiveness relations.

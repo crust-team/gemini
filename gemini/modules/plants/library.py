@@ -27,10 +27,13 @@ def fill(plant, name):
     reader.populate(plant, shipped(name), Report(strict=True))
 
 
-def register_shipped():
-    """Register every shipped spec as a plant under its file name."""
+def register_shipped(classes):
+    """Register every shipped spec as a plant under its file name.
+
+    ``classes`` maps a name to the ``Plant`` subclass that builds that spec itself.
+    """
     for path in sorted(SPECS.glob("*.json")):
-        registry.register_plant(path.stem, partial(build, path.stem))
+        registry.register_plant(path.stem, classes.get(path.stem, partial(build, path.stem)))
 
 
 def has(name):

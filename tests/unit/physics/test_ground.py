@@ -316,3 +316,11 @@ def test_ramey_resistance_and_relaxation_length_by_hand():
         ground.ramey_rock_resistance, [(1e7, 1e-6, 0.1, 2.5), (1e9, 1e-6, 0.1, 3.0)]
     )
     assert_function_matches(ground.ramey_relaxation_length, [(20.0, 0.1, 0.3), (0.0, 0.1, 0.3)])
+
+
+def test_geotherm_temperature_is_linear_in_depth():
+    """12 degC at 30 K/km is 87 degC at 2 500 m."""
+    assert ground.geotherm_temperature(285.15, 0.03, 2500.0) == pytest.approx(360.15)
+    assert_function_matches(
+        ground.geotherm_temperature, [(285.15, 0.03, 2500.0), (280.0, 0.0, 0.0)]
+    )

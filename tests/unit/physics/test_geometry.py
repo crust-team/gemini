@@ -96,3 +96,10 @@ def test_lateral_area_by_hand_and_on_arrays():
     """A 0.1 m by 10 m cylinder wall is pi m2."""
     assert geometry.lateral_area(0.1, 10.0) == pytest.approx(math.pi)
     assert_function_matches(geometry.lateral_area, [(0.1, 10.0), (0.0, 5.0)])
+
+
+def test_a_vertical_path_is_one_section():
+    """The whole depth at one diameter, straight down."""
+    path = geometry.vertical_path(2500.0, 0.244, 4.5e-5)
+    assert path.total_length == 2500 and len(path.sections) == 1
+    assert path.sections[0].inclination == pytest.approx(math.pi / 2)

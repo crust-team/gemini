@@ -4,6 +4,7 @@ from .atesplant import ATESPlant
 from .builder import Plant
 from .catalogue import example, get, names, templates
 from .coolingsubstation import CoolingSubstation
+from .doublet import Doublet
 from .heatingsubstation import HeatingSubstation
 from .legacy_project import convert_legacy
 from .library import register_shipped
@@ -28,6 +29,7 @@ __all__ = [
     "HeatingSubstation",
     "CoolingSubstation",
     "ATESPlant",
+    "Doublet",
 ]
 
-register_shipped()
+register_shipped({"Doublet": Doublet})

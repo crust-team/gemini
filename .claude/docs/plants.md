@@ -124,6 +124,9 @@ old file without it raises `ValidationError` with code `old_format`, naming `gm.
 shipped special cases are those whose forward does more than wiring and cannot become wiring
 without changing numbers:
 
+- `Doublet` (`gm.plants.Doublet`): the shipped spec with a design from its depth, see
+  [equipment.md](equipment.md#a-doublet-from-its-depth). Designed, it writes a file with `type` and
+  flat `params`; without a design it writes the shipped wiring.
 - `HeatingSubstation`, `CoolingSubstation`: a closed building loop solved inside one call by
   `loops.close_loop`, not a previous-step `state` connection.
 - `ATESPlant`: the storage's `mode` selects which children are called, and the plant reads the

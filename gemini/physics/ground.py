@@ -65,6 +65,42 @@ def aquifer_volumetric_heat_capacity(
     return porosity * fluid_heat_capacity + (1 - porosity) * rock_heat_capacity
 
 
+DOUBLET_WELL_SPACING = 1000.0
+"""Distance [m] between the wells of a doublet at reservoir level, as its drainage radius.
+
+The base case of Willems (2016) for the West Netherlands Basin, the lower end of the 1 to 2 km of
+Dutch doublets; the well distance is the length in the radial inflow of DoubletCalc (Mijnlieff et
+al. 2013, EGC, "Geothermal energy and support schemes in the Netherlands", slide 14).
+"""
+
+
+@ops.physics
+def geotherm_temperature(surface_temperature: float, gradient: float, depth: float) -> float:
+    """Return the undisturbed ground temperature [K] at a depth, ``T = T_s + g z``.
+
+    Parameters
+    ----------
+    surface_temperature : float
+        Mean temperature at the surface [K], positive.
+    gradient : float
+        Geothermal gradient [K/m].
+    depth : float
+        True vertical depth [m], nonnegative.
+
+    Returns
+    -------
+    float
+        Temperature [K].
+
+    Notes
+    -----
+    Linear conductive geotherm, the estimate the challenge requirements (section 3.1) prescribe
+    for other depths. Valid where conduction dominates and the gradient is constant with depth.
+    Reference: Turcotte and Schubert, Geodynamics, chapter 4.
+    """
+    return surface_temperature + gradient * depth
+
+
 @ops.physics
 def doublet_breakthrough_volume(
     well_spacing: float,

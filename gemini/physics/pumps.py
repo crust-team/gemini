@@ -85,6 +85,37 @@ def power(volume_flow, frequency, stages, coefficients):
     return units.bhp_to_w(value)
 
 
+def constant_head_curves(design_head, efficiency):
+    """Return the head and power coefficients of a pump with one head at its design efficiency.
+
+    Parameters
+    ----------
+    design_head : float
+        Head the pump adds at any flow [Pa], at the reference frequency.
+    efficiency : float
+        Hydraulic efficiency [-], positive.
+
+    Returns
+    -------
+    tuple of list of float
+        ``(head, power)`` coefficients of ``head`` and ``power`` for one stage: a constant head and
+        a power of ``Q H / eta`` on the US basis.
+
+    Notes
+    -----
+    A pump sized from a design point, without a catalogue curve: the challenge requirements
+    (section 3) give a hydraulic efficiency of 70 % and no pump curve. Hydraulic power is the
+    relation of ``hydraulic_power``.
+
+    Validity: One stage, at the reference frequency of the ESP.
+    Source: The hydraulic power of a pump, Karassik et al., Pump Handbook.
+    """
+    head_curve = [units.pa_to_ft_head(design_head)] + [0.0] * (POLYNOMIAL_COEFFICIENT_COUNT - 1)
+    power_per_flow = units.w_to_bhp(design_head / efficiency) / units.m3s_to_bbl_per_day(1.0)
+    power_curve = [0.0, power_per_flow] + [0.0] * (POLYNOMIAL_COEFFICIENT_COUNT - 2)
+    return head_curve, power_curve
+
+
 @ops.physics
 def speed_ratio(frequency, rated_frequency):
     """Return the speed ratio of a variable-speed pump.

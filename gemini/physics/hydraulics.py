@@ -18,7 +18,7 @@ from gemini.ops import Constant
 
 from . import corrosion, erosion
 from . import fluid as fluid_physics
-from . import geometry, heat_transfer, units
+from . import gas, geometry, heat_transfer, units
 from .constants import G_FT, MIN_PATH_PRESSURE, VALVE_REFERENCE_DENSITY, G
 
 if TYPE_CHECKING:
@@ -975,6 +975,137 @@ def radial_pressure_drops(
         volume_flow * viscosity * ops.log(drainage_radius / wellbore_radius) / denominator,
         volume_flow * viscosity * skin / denominator,
     )
+
+
+def radial_index(
+    viscosity: float,
+    permeability: float,
+    thickness: float,
+    drainage_radius: float,
+    wellbore_radius: float,
+    skin: float,
+) -> float:
+    """Return the productivity or injectivity index [m3/s/Pa] of a well in a radial reservoir.
+
+    Parameters
+    ----------
+    viscosity : float
+        Liquid dynamic viscosity [Pa s].
+    permeability, thickness, drainage_radius, wellbore_radius : float
+        Permeability [m2], reservoir thickness and radii [m].
+    skin : float
+        Skin factor [-].
+
+    Returns
+    -------
+    float
+        ``J = 2 pi k h / (mu (ln(r_e / r_w) + s))``: flow per pressure difference.
+
+    Notes
+    -----
+    The inverse of ``radial_pressure_drops`` at a unit flow, valid as that function is.
+    Source: Darcy (1856) in radial form with the skin of van Everdingen (1953), as cited there.
+    """
+    flow_drop, skin_drop = radial_pressure_drops(
+        1.0, viscosity, permeability, thickness, drainage_radius, wellbore_radius, skin
+    )
+    return 1 / (flow_drop + skin_drop)
+
+
+def hydrostatic_pressure(rho: float, depth: float) -> float:
+    """Return the absolute pressure [Pa] of a liquid column open to the atmosphere at ``depth``.
+
+    Parameters
+    ----------
+    rho : float
+        Liquid density [kg/m3].
+    depth : float
+        True vertical depth [m].
+
+    Returns
+    -------
+    float
+        ``p = p_atm + rho g z`` with the atmosphere of a normal cubic metre.
+
+    Notes
+    -----
+    The reservoir pressure the challenge requirements (section 3.1) prescribe for other depths.
+    Validity: A static column of uniform density.
+    Source: The hydrostatic balance, as in ``hydrostatic_dp``.
+    """
+    return gas.NORMAL_PRESSURE + hydrostatic_dp(rho, depth)
+
+
+def pump_setting_depth(
+    depth: float, reservoir_pressure: float, drawdown: float, intake_pressure: float, rho: float
+) -> float:
+    """Return the shallowest pump depth [m] that keeps ``intake_pressure`` at the intake.
+
+    Parameters
+    ----------
+    depth : float
+        True vertical depth of the reservoir [m].
+    reservoir_pressure, drawdown, intake_pressure : float
+        Reservoir pressure, drawdown at the design flow and pressure wanted at the intake [Pa].
+    rho : float
+        Liquid density [kg/m3].
+
+    Returns
+    -------
+    float
+        ``z = D - (p_r - dp - p_i) / (rho g)``, at least zero.
+
+    Notes
+    -----
+    The flowing bottomhole pressure carries the liquid column up to the depth where it falls to the
+    intake pressure; friction below the pump is neglected against that pressure.
+    Validity: A vertical well and uniform density.
+    Source: The hydrostatic balance, as in ``hydrostatic_dp``; a sizing rule, no published source.
+    """
+    column = (reservoir_pressure - drawdown - intake_pressure) / hydrostatic_dp(rho, 1.0)
+    return max(0.0, depth - column)
+
+
+def design_pump_head(
+    wellhead_pressure: float,
+    reservoir_pressure: float,
+    drawdown: float,
+    rho: float,
+    mu: float,
+    depth: float,
+    diameter: float,
+    roughness: float,
+    flow: float,
+) -> float:
+    """Return the head [Pa] a production pump adds to reach a wellhead pressure at a design flow.
+
+    Parameters
+    ----------
+    wellhead_pressure, reservoir_pressure, drawdown : float
+        Wanted wellhead pressure, reservoir pressure and drawdown at the design flow [Pa].
+    rho, mu : float
+        Liquid density [kg/m3] and viscosity [Pa s].
+    depth, diameter, roughness : float
+        Vertical well depth, internal diameter and roughness [m].
+    flow : float
+        Design volume flow [m3/s].
+
+    Returns
+    -------
+    float
+        ``H = p_wh + rho g D + dp_f - (p_r - dp)``, at least zero.
+
+    Notes
+    -----
+    A pressure balance over the well, with the friction of ``darcy_weisbach_dp``.
+    Validity: The range of ``darcy_weisbach_dp``.
+    Source: A plain pressure balance; no published source is needed.
+    """
+    velocity = geometry.mean_velocity(flow * rho, rho, diameter)
+    friction, gravity = darcy_weisbach_dp(
+        velocity, rho, math.pi / 2, mu, diameter, roughness, depth
+    )
+    return max(0.0, wellhead_pressure + gravity + friction - reservoir_pressure + drawdown)
 
 
 @ops.physics

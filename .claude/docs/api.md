@@ -129,7 +129,7 @@ Three levels and one representation: see [plants.md](plants.md). The spec schema
 | `gm.plants.templates()` | `[{name, title, description, purpose}]`, purpose `heating`, `cooling`, `both` | real |
 | `gm.plants.from_template(name, parameters=None)` | a plant; `parameters` are `{"<id>.<param>": value, "<id>.enabled": bool}`, or sizes such as `{"producers": 3}` | real |
 | `gm.plants.convert_legacy(folder)` | spec; expected files in [legacy.md](legacy.md) | real |
-| `gm.plants.HeatingSubstation`, `CoolingSubstation`, `ATESPlant` | handwritten special cases, see [plants.md](plants.md) | real |
+| `gm.plants.HeatingSubstation`, `CoolingSubstation`, `ATESPlant`, `Doublet` | handwritten special cases, see [plants.md](plants.md); a `Doublet` takes a design from its depth | real |
 
 On any plant, `path` being a dotted module path (`""` is the root):
 

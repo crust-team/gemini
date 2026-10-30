@@ -76,3 +76,11 @@ def test_new_functions_match_on_arrays():
     assert_function_matches(
         pumps.is_in_operating_window, [(0.02, 0.01, 0.04, 0.75), (0.5, 0, 1, 0.1)]
     )
+
+
+def test_constant_head_curves_give_the_design_head_and_power():
+    """Any flow gets the head; the power is Q H / eta on the reference frequency."""
+    head_curve, power_curve = pumps.constant_head_curves(40e5, 0.7)
+    for flow in (0.02, 0.08):
+        assert pumps.head(flow, 60.0, 1, head_curve) == pytest.approx(40e5)
+        assert pumps.power(flow, 60.0, 1, power_curve) == pytest.approx(flow * 40e5 / 0.7)

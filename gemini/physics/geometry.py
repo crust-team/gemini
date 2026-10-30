@@ -156,6 +156,34 @@ class PipePath(BaseModel):
         return PipePath(sections=selected)
 
 
+def vertical_path(depth: float, diameter: float, roughness: float) -> PipePath:
+    """Return the vertical pipe path of a well: one section from the surface to ``depth``.
+
+    Parameters
+    ----------
+    depth : float
+        Well depth [m], nonnegative.
+    diameter : float
+        Internal diameter [m], positive.
+    roughness : float
+        Absolute roughness [m], nonnegative.
+
+    Returns
+    -------
+    PipePath
+        One section at the inclination of a vertical well, ``pi / 2``.
+
+    Notes
+    -----
+    Validity: Any vertical well of one diameter.
+    Source: Geometry; no published source is needed.
+    """
+    section = PipeSection(
+        length=depth, inclination=math.pi / 2, inner_diameter=diameter, roughness=roughness
+    )
+    return PipePath(sections=[section])
+
+
 def build_path(trajectory_table: list[dict], tally_table: list[dict] | None = None) -> PipePath:
     """Build a path from SI trajectory and optional SI tally intervals.
 

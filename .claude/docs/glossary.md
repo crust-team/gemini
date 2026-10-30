@@ -35,6 +35,7 @@ into the vocabulary in the commit that first uses it, only if it is a full word 
 | bulk material around a well | `ground_conductivity`, `ground_diffusivity`, `ground_...` | |
 | solid matrix of a porous layer | `rock_volumetric_heat_capacity` | |
 | depth of a borehole | `borehole_depth` | a bare `depth` |
+| design of a doublet from its depth | `depth`, `thickness`, `gradient`, as the challenge states them, on `Doublet` only | |
 
 Four short forms stay because the full word would be longer and no clearer in this field: `T` (see
 above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersible pump).
@@ -52,7 +53,6 @@ above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersi
 | `carnot_efficiency` | `carnot_fraction` |
 | `clogging_dp` | `clogging_pressure_drop` |
 | `correction_factor` | `correction_factors` |
-| `depth` | `borehole_depth` |
 | `dp` | `nominal_pressure_drop` |
 | `dp_cold` | `cold_pressure_drop` |
 | `dp_cold_nominal` | `cold_nominal_pressure_drop` |
@@ -89,7 +89,6 @@ above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersi
 | `rock_conductivity` | `ground_conductivity` |
 | `rock_diffusivity` | `ground_diffusivity` |
 | `skin_dp` | `skin_pressure_drop` |
-| `thickness` | `aquifer_thickness` |
 | `u_value` | `heat_transfer_coefficient` |
 | `ua` | `thermal_conductance` |
 | `water_heat_capacity` | `water_specific_heat` |
