@@ -58,8 +58,8 @@ class Health:
 
 
 def _number(value):
-    """Return a plain Python number as ``float``; arrays and traced values pass unchanged."""
-    return float(value) if isinstance(value, (int, float)) else value
+    """Return a Python or NumPy scalar number as ``float``; arrays and traced values pass."""
+    return float(value) if isinstance(value, (int, float, np.integer, np.floating)) else value
 
 
 class Values(AttributeMapping):

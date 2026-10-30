@@ -1,0 +1,59 @@
+"""Every numbered example prints the same output on every backend in ``BACKENDS``.
+
+Each example runs once per backend through ``tests/fixtures/run_example.py``, which reads the
+backend from ``GEMINI_EXAMPLE_BACKEND`` and enters ``gemini.backends.settings`` before running the
+script with ``runpy``. Standard output must be equal line by line once the lines that report a
+duration and the temporary working directory are removed. Adding a backend means adding it to
+``tests.fixtures.parity.BACKENDS``.
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+import pytest
+
+from tests.e2e.test_examples import EXAMPLES, TIMEOUT_S
+from tests.fixtures import ROOT
+from tests.fixtures.parity import BACKENDS, REFERENCE, others
+
+pytestmark = [pytest.mark.e2e, pytest.mark.slow]
+WRAPPER = ROOT / "tests/fixtures/run_example.py"
+TIMING = re.compile(r"\b(elapsed|took|duration|wall[- ]?time|runtime)\b|\d\s*(ms|seconds)\b", re.I)
+
+
+def _run(path, backend, dataset_path, folder):
+    """Run one example under ``backend`` in ``folder`` and return its standard output."""
+    folder.mkdir()
+    (folder / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
+    env = os.environ.copy()
+    env["GEMINI_EXAMPLE_DATASET"] = str(dataset_path)
+    env["GEMINI_EXAMPLE_BACKEND"] = backend
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(ROOT), env.get("PYTHONPATH"))))
+    completed = subprocess.run(
+        [sys.executable, str(WRAPPER), str(path)],
+        cwd=folder,
+        capture_output=True,
+        text=True,
+        timeout=TIMEOUT_S,
+        env=env,
+    )
+    assert completed.returncode == 0, f"{backend}: {completed.stderr}"
+    return completed.stdout.replace(str(folder), "<cwd>")
+
+
+def _stable_lines(output):
+    return [line for line in output.splitlines() if not TIMING.search(line)]
+
+
+@pytest.mark.parametrize("path", EXAMPLES, ids=[str(path.relative_to(ROOT)) for path in EXAMPLES])
+def test_example_output_is_the_same_on_every_backend(path, dataset_path, tmp_path):
+    """The printed numbers, tables and messages agree with the reference backend's."""
+    outputs = {
+        backend: _stable_lines(_run(path, backend, dataset_path, tmp_path / backend))
+        for backend in BACKENDS
+    }
+    assert outputs[REFERENCE]
+    for backend, lines in others(outputs):
+        assert lines == outputs[REFERENCE], f"{backend} against {REFERENCE}"

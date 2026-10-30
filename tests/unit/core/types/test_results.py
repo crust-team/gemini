@@ -136,3 +136,10 @@ def test_mapped_applies_a_function_to_every_value_and_keeps_sharing():
     assert leaf.outlets.outlet.m_dot.tolist() == [2.0, 4.0, 6.0]
     assert doubled.call_records[0][1] is leaf and doubled.is_leaf is False
     assert leaf.outlets.outlet.fluid is root.children["leaf"].outlets.outlet.fluid
+
+
+def test_health_numbers_that_are_numpy_scalars_become_floats():
+    """A NumPy integer (an ``int`` literal inside an ops scope) is a ``float`` score and metric."""
+    for zero_or_one in (np.int64(0), np.int64(1), np.float32(1)):
+        health = Health(score=zero_or_one, alarm=False, message="ok", metrics={"m": zero_or_one})
+        assert type(health.score) is float and type(health.metrics["m"]) is float

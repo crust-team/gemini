@@ -49,7 +49,7 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
   cannot be recorded. The graph runner catches it and runs that module untraced (a graph break,
   `gemini/graph/runner.py`); a leaf child of a composite that raises it becomes a break node
   instead. Break nodes also use it for a probe or row that fails to build the traced fluids, and
-  `Engine` keeps the reason of a twin it could not batch in `engine.batch.reasons`.
+  `Engine` keeps the reason of a twin it could not trace in `engine.graph_breaks`.
 - `ConfigurationError(ValueError)`: equipment design data missing or inconsistent at call time,
   including calibration requests that do not fit the plant (`module.py`, equipment,
   `optim/calibrate.py`).

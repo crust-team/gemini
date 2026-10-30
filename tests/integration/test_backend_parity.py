@@ -16,11 +16,13 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini import ops
 from gemini.core.engine.callbacks import AutoCheckpoint, Callback
 from gemini.core.modules import ModuleDict, ModuleList
+from gemini.core.types import Health
 from tests.conftest import shipped_module_classes
 from tests.fixtures import ROOT
-from tests.fixtures.engine_plants import holder_plant, pair_frame, pair_plant
+from tests.fixtures.engine_plants import Booster, holder_plant, pair_frame, pair_plant
 from tests.fixtures.engine_tank import ROW, TIME, tank
 from tests.fixtures.parity import (
     BACKENDS,
@@ -361,3 +363,29 @@ def test_every_shipped_leaf_module_has_a_parity_test(leaves):
     missing = [cls.__name__ for cls in leaves if not _calls_assert_module_matches(_mirror(cls))]
     assert not missing, f"no assert_module_matches test for {missing}"
     assert len(leaves) > 25
+
+
+def test_health_score_columns_are_float_on_every_backend_for_scores_of_exactly_0_and_1(
+    monkeypatch,
+):
+    """A diagnostic returning the literals 1 and 0 gives a float column, like any other score."""
+
+    def health(self, result, measured):
+        error = ops.abs(result.outputs.rise - measured["rise"])
+        return Health(score=ops.where(error < 1.0, 1, 0), alarm=error > 5e4, message="rise")
+
+    monkeypatch.setattr(Booster, "health", health)
+    exact = {("rise", row): 2 * (0.1 + 1.2 * row / 11) for row in range(0, 12, 2)}
+    outcomes = on_each_backend(lambda backend: run_engine(pair_plant(), pair_frame_dataset(exact)))
+    for outcome in outcomes.values():
+        scores = outcome.frame[("first", "health_score")]
+        assert scores.dtype == "float64" and set(scores) == {0.0, 1.0}
+    assert_runs_match(outcomes)
+
+
+def test_column_dtypes_are_the_same_on_every_backend(clean, faulty, simulated, simulated_faulty):
+    """Every column of every whole run has the same dtype as the reference's."""
+    for runs in (clean, faulty, simulated, simulated_faulty):
+        for name, outcome in others(runs):
+            assert outcome.frame.dtypes.tolist() == runs[REFERENCE].frame.dtypes.tolist(), name
+            assert outcome.summary.dtypes.tolist() == runs[REFERENCE].summary.dtypes.tolist()

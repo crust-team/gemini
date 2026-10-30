@@ -147,18 +147,42 @@ per-test budget. Never mutate these objects. Request `fresh_plant` for a functio
 copy or `module_plant` when one workflow shares a copied plant across assertions. Prefer the
 shortest `Dataset.window` that still crosses every boundary relevant to the property.
 
-`tests/fixtures/equivalence.py` compares the paths of one source within `RTOL` (1e-12):
-`assert_function_matches` a physics function on floats against arrays, `assert_same_error` its
-failing row, and `assert_module_matches` a module called per row against one traced call. Every
-physics function and module has such a test, over rows that cross every branch. A module with no
-inlets, and a stateful module's `_advance_states`, are tested on arrays directly. A module with a
-list output (the wells' section profiles) compares each item. The whole engine is compared on the NumPy and Python backends
-(`gemini.backends.settings(backend="python")` evaluates row by row) in
-`tests/unit/core/engine/test_runner.py` (synthetic twins:
-skips, failing checks under `record` and `raise`, dated parameters, `only`, a stateful twin,
-`EventLog`, `AutoCheckpoint` with resume, a raising callback, persisted inputs, health) and in
-`tests/integration/test_replay_graph.py` (the doublet heat plant): frames, dtypes, skips,
-errors and summaries must be exactly equal.
+`tests/fixtures/equivalence.py` compares the paths of one source within `RTOL` (1e-12, defined in
+`tests/fixtures/parity.py`): `assert_function_matches` a physics function on floats against arrays,
+`assert_same_error` its failing row, and `assert_module_matches` a module called per row against
+the graph run on every backend. Every physics function and module has such a test, over rows that
+cross every branch. A module with no inlets, and a stateful module's `_advance_states`, are tested
+on arrays directly. A module with a list output (the wells' section profiles) compares each item.
+
+## Backend parity
+
+`BACKENDS = ("python", "numpy")` in `tests/fixtures/parity.py` is the one list of backends under
+test; the first is the reference, every other one is compared with it, and no test names a
+backend. **Adding a backend means adding its name to `BACKENDS`** (after registering it in
+`gemini.backends`); nothing else changes, and every test below then runs on it.
+
+- **Modules.** `assert_module_matches` runs the graph on every backend, forced around the whole
+  call (tracing included), compares each with the eager calls and each with the reference, so every
+  per-module test is a parity test. `test_every_shipped_leaf_module_has_a_parity_test` in
+  `tests/integration/test_backend_parity.py` lists the shipped stateless leaf classes and checks
+  that the mirrored test file calls `assert_module_matches`. Stateful leaves go through the engine
+  cases.
+- **Whole runs** (fast tier, a window of 24 to 48 rows, `run_engine` and `assert_runs_match`).
+  A `Snapshot` holds the frame and dtypes, skips, errors (class, message, module, tick), summary,
+  persisted inputs, module states, graph breaks, every callback hook with the `ModuleResult` tree
+  of each tick (`engine.step_results`: outputs, outlets, inlets, inputs, children, their Python
+  types), the `EventLog` events without timestamps and the error that ended the run. The tests
+  cover replay, faulted rows, `on_error="raise"`, stateful and composite twins, simulate (clean and
+  faulted), live, `EventLog`, `AutoCheckpoint` with resume, health columns, output types and
+  column dtypes. Floats compare within `RTOL`; structure and types compare exactly.
+- **Examples** (`tests/e2e/test_backend_parity.py`, `slow`). Each numbered example runs under every
+  backend through `tests/fixtures/run_example.py`, which reads `GEMINI_EXAMPLE_BACKEND`, enters
+  `gemini.backends.settings` and runs the script with `runpy`; standard output without timing
+  lines must be equal.
+
+The engine itself is also compared on both backends with synthetic twins in
+`tests/unit/core/engine/test_runner.py` (modules in `tests/fixtures/engine_plants.py`) and on the
+doublet heat plant in `tests/integration/test_replay_graph.py`.
 
 ## Parallel-test rules
 
