@@ -137,5 +137,5 @@ class Valve(Module):
         return ops.where(
             inlet.m_dot == 0,
             0.0,
-            rho / REFERENCE_DENSITY * ops.truediv(inlet.m_dot / rho, coefficient) ** 2,
+            rho / REFERENCE_DENSITY * (inlet.m_dot / rho / coefficient) ** 2,
         )

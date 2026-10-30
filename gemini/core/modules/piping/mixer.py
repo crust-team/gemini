@@ -78,11 +78,11 @@ class Mixer(Module):
 
     def _mixed_temperature(self, first_in, second_in):
         """Return the adiabatic mixing temperature [K] weighted by heat capacity rates."""
-        first_rate = first_in.m_dot * first_in.fluid.properties(first_in.p, first_in.T).cp_l
-        second_rate = second_in.m_dot * second_in.fluid.properties(second_in.p, second_in.T).cp_l
+        first_rate = first_in.heat_capacity_rate()
+        second_rate = second_in.heat_capacity_rate()
         total_rate = first_rate + second_rate
         return ops.where(
             total_rate == 0,
             (first_in.T + second_in.T) / 2,
-            ops.truediv(first_rate * first_in.T + second_rate * second_in.T, total_rate),
+            (first_rate * first_in.T + second_rate * second_in.T) / total_rate,
         )

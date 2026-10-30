@@ -129,8 +129,7 @@ class Pipe(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         outlet = outlets.outlet
-        cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        heat = inlet.m_dot * cp * (inlet.T - outlet.T)
+        heat = inlet.heat_capacity_rate() * (inlet.T - outlet.T)
         self.pressure_drop = inlet.p - outlet.p
         self.velocity = self._velocity(inlet)
         self.outlet_T = outlet.T
@@ -209,10 +208,10 @@ class Pipe(Module):
 
     def _outlet_temperature(self, inlet):
         """Return the outlet temperature [K] of the exponential ambient-exchange profile."""
-        capacity_rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
+        capacity_rate = inlet.heat_capacity_rate()
         conductance = self.u_value * math.pi * self.inner_diameter * self.length
         stopped = inlet.m_dot == 0
-        transfer_units = heat_transfer.ntu(conductance, ops.where(stopped, 1.0, capacity_rate))
+        transfer_units = ops.where(stopped, 0.0, heat_transfer.ntu(conductance, capacity_rate))
         effectiveness = heat_transfer.effectiveness_parallel(transfer_units, 0.0)
         return ops.where(
             stopped,
