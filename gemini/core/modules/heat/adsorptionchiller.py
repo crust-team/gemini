@@ -1,5 +1,6 @@
 """Silica-gel/water adsorption chiller driven by low-temperature hot water."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import refrigeration
 from gemini.core.types import (
@@ -125,13 +126,15 @@ class AdsorptionChiller(Module):
             inlets.cooling_in,
         )
         rates = _rates(self.path, inlets)
-        requested = rates["chilled_in"] * max(0, chilled_in.T - self.temperature_setpoint)
-        evaporator = min(requested, self._available_duty(inlets, rates), self.capacity)
+        requested = rates["chilled_in"] * ops.maximum(0, chilled_in.T - self.temperature_setpoint)
+        evaporator = ops.minimum(
+            ops.minimum(requested, self._available_duty(inlets, rates)), self.capacity
+        )
         generator = evaporator / self.thermal_cop
         electricity = evaporator * self.auxiliary_power_ratio
         rejection = generator + evaporator + electricity
         return {
-            "cop": evaporator / generator if evaporator else None,
+            "cop": ops.where(evaporator != 0, ops.truediv(evaporator, generator), None),
             "generator_duty": generator,
             "evaporator_duty": evaporator,
             "adsorber_condenser_duty": rejection,
@@ -145,20 +148,25 @@ class AdsorptionChiller(Module):
     def _available_duty(self, inlets, rates):
         """Return the evaporator duty [W] the characteristic map allows at these inlets."""
         driving_T = inlets.generator_in.T
-        if self.minimum_driving_temperature >= self.maximum_driving_temperature:
-            raise ConfigurationError(
-                f"{self.path}: minimum_driving_temperature = "
-                f"{self.minimum_driving_temperature} K; expected below "
-                f"maximum_driving_temperature = {self.maximum_driving_temperature} K"
-            )
-        if driving_T > self.maximum_driving_temperature:
-            raise PhysicsRangeError(
-                f"{self.path}: generator_in.T = {driving_T} K; expected at most "
-                f"maximum_driving_temperature = {self.maximum_driving_temperature} K"
-            )
-        if driving_T < self.minimum_driving_temperature:
-            return 0.0
-        return refrigeration.sorption_evaporator_capacity(
+        ops.check(
+            self.minimum_driving_temperature < self.maximum_driving_temperature,
+            ConfigurationError,
+            "{path}: minimum_driving_temperature = {minimum} K; expected below "
+            "maximum_driving_temperature = {maximum} K",
+            path=self.path,
+            minimum=self.minimum_driving_temperature,
+            maximum=self.maximum_driving_temperature,
+        )
+        ops.check(
+            driving_T <= self.maximum_driving_temperature,
+            PhysicsRangeError,
+            "{path}: generator_in.T = {driving_T} K; expected at most "
+            "maximum_driving_temperature = {maximum} K",
+            path=self.path,
+            driving_T=driving_T,
+            maximum=self.maximum_driving_temperature,
+        )
+        capacity = refrigeration.sorption_evaporator_capacity(
             driving_T,
             inlets.cooling_in.T,
             inlets.chilled_in.T,
@@ -172,18 +180,25 @@ class AdsorptionChiller(Module):
             thermal_cop=self.thermal_cop,
             auxiliary_power_ratio=self.auxiliary_power_ratio,
         )
+        return ops.where(driving_T < self.minimum_driving_temperature, 0.0, capacity)
 
 
 def _rates(path, inlets):
     """Return each inlet's heat capacity rate m_dot * cp [W/K]; reject negative flow."""
     rates = {}
     for port, stream in inlets.items():
-        if stream.m_dot < 0:
-            raise PhysicsRangeError(f"{path}: {port}.m_dot = {stream.m_dot} kg/s; expected >= 0")
+        ops.check(
+            stream.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: {port}.m_dot = {m_dot} kg/s; expected >= 0",
+            path=path,
+            port=port,
+            m_dot=stream.m_dot,
+        )
         rates[port] = stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l
     return rates
 
 
 def _outlet_T(stream, rate, duty):
     """Return the outlet temperature [K] after adding ``duty`` [W] at capacity rate ``rate``."""
-    return stream.T + duty / rate if duty else stream.T
+    return ops.where(duty == 0, stream.T, stream.T + ops.truediv(duty, rate))

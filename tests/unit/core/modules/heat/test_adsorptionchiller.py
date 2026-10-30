@@ -5,6 +5,7 @@ import pytest
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.heat import AdsorptionChiller
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import ConfigurationError, PhysicsRangeError
 
 CP = 4217.4
@@ -75,3 +76,25 @@ def test_zero_and_negative_flow():
     assert out.evaporator_duty == 0 and out.electricity == 0
     with pytest.raises(PhysicsRangeError, match="generator_in.m_dot = -2"):
         call(chiller(), 280, generator_in=GENERATOR.with_(m_dot=-2))
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Running, capped, cold-generator and stopped-circuit rows trace and equal per-row calls."""
+    machine = chiller()
+    rows = [
+        dict(
+            generator_in=GENERATOR.with_(T=generator_T, m_dot=generator_flow),
+            chilled_in=CHILLED.with_(m_dot=chilled_flow),
+            cooling_in=COOLING,
+            temperature_setpoint=setpoint,
+        )
+        for generator_T, generator_flow, chilled_flow, setpoint in [
+            (343.15, 5, 5, 278.15),
+            (343.15, 5, 5, 289.0),
+            (343.15, 5, 5, 270.0),
+            (320.0, 5, 5, 278.15),
+            (343.15, 0, 5, 278.15),
+            (343.15, 5, 0, 278.15),
+        ]
+    ]
+    assert_module_matches(machine, rows)

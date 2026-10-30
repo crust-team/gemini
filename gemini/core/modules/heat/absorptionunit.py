@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import refrigeration
 from gemini.core.types import (
@@ -132,13 +133,16 @@ class AbsorptionUnit(Module):
         rejection_ratio = 1 + 1 / self.thermal_cop + self.auxiliary_power_ratio
         if self.mode == "chiller":
             useful_ratio = 1.0
-            requested = rates["chilled_in"] * max(0, chilled_in.T - self.temperature_setpoint)
+            requested = rates["chilled_in"] * ops.maximum(
+                0, chilled_in.T - self.temperature_setpoint
+            )
         else:
             useful_ratio = rejection_ratio
-            requested = rates["cooling_in"] * max(0, self.temperature_setpoint - cooling_in.T)
-        evaporator = min(
-            requested / useful_ratio,
-            self._available_duty(inlets, rates),
+            requested = rates["cooling_in"] * ops.maximum(
+                0, self.temperature_setpoint - cooling_in.T
+            )
+        evaporator = ops.minimum(
+            ops.minimum(requested / useful_ratio, self._available_duty(inlets, rates)),
             self.capacity / useful_ratio,
         )
         generator = evaporator / self.thermal_cop
@@ -146,7 +150,7 @@ class AbsorptionUnit(Module):
         rejection = generator + evaporator + electricity
         useful = evaporator if self.mode == "chiller" else rejection
         return {
-            "cop": useful / generator if evaporator else None,
+            "cop": ops.where(evaporator != 0, ops.truediv(useful, generator), None),
             "useful_duty": useful,
             "generator_duty": generator,
             "evaporator_duty": evaporator,
@@ -160,9 +164,7 @@ class AbsorptionUnit(Module):
 
     def _available_duty(self, inlets, rates):
         """Return the evaporator duty [W] the characteristic equation allows at these inlets."""
-        if inlets.generator_in.T < self.minimum_driving_temperature:
-            return 0.0
-        return refrigeration.sorption_evaporator_capacity(
+        capacity = refrigeration.sorption_evaporator_capacity(
             inlets.generator_in.T,
             inlets.cooling_in.T,
             inlets.chilled_in.T,
@@ -176,18 +178,25 @@ class AbsorptionUnit(Module):
             thermal_cop=self.thermal_cop,
             auxiliary_power_ratio=self.auxiliary_power_ratio,
         )
+        return ops.where(inlets.generator_in.T < self.minimum_driving_temperature, 0.0, capacity)
 
 
 def _rates(path, inlets):
     """Return each inlet's heat capacity rate m_dot * cp [W/K]; reject negative flow."""
     rates = {}
     for port, stream in inlets.items():
-        if stream.m_dot < 0:
-            raise PhysicsRangeError(f"{path}: {port}.m_dot = {stream.m_dot} kg/s; expected >= 0")
+        ops.check(
+            stream.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: {port}.m_dot = {m_dot} kg/s; expected >= 0",
+            path=path,
+            port=port,
+            m_dot=stream.m_dot,
+        )
         rates[port] = stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l
     return rates
 
 
 def _outlet_T(stream, rate, duty):
     """Return the outlet temperature [K] after adding ``duty`` [W] at capacity rate ``rate``."""
-    return stream.T + duty / rate if duty else stream.T
+    return ops.where(duty == 0, stream.T, stream.T + ops.truediv(duty, rate))

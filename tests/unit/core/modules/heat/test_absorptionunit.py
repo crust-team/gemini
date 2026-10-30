@@ -5,6 +5,7 @@ import pytest
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.heat import AbsorptionUnit
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import PhysicsRangeError
 
 CP = 4217.4
@@ -98,3 +99,29 @@ def test_negative_flow_raises():
     """A reversed circuit flow is outside the model."""
     with pytest.raises(PhysicsRangeError, match="chilled_in.m_dot = -1"):
         call(unit(), 280, chilled_in=CHILLED.with_(m_dot=-1))
+
+
+@pytest.mark.parametrize(
+    ("mode", "setpoints"),
+    [("chiller", (278.15, 284.0, 270.0)), ("heat_pump", (320.0, 305.0, 300.0))],
+)
+def test_traced_call_matches_one_call_per_row(mode, setpoints):
+    """Running, capped, cold-generator and stopped-circuit rows trace and equal per-row calls."""
+    machine = unit(mode)
+    rows = [
+        dict(
+            generator_in=GENERATOR.with_(T=generator_T, m_dot=generator_flow),
+            chilled_in=CHILLED.with_(m_dot=chilled_flow),
+            cooling_in=COOLING,
+            temperature_setpoint=setpoint,
+        )
+        for generator_T, generator_flow, chilled_flow, setpoint in [
+            (361.15, 10, 10, setpoints[0]),
+            (361.15, 10, 10, setpoints[1]),
+            (361.15, 10, 10, setpoints[2]),
+            (340.0, 10, 10, setpoints[0]),
+            (361.15, 0, 10, setpoints[0]),
+            (361.15, 10, 0, setpoints[0]),
+        ]
+    ]
+    assert_module_matches(machine, rows)
