@@ -30,6 +30,8 @@ class Filter(Module):
     Solids removal itself is not modelled.
     """
 
+    category = "separation"
+
     def __init__(self):
         """Declare filter design data, inlet and computed pressure drop."""
         super().__init__()
@@ -42,13 +44,13 @@ class Filter(Module):
         )
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="brine")
 
         # Outputs
         self.pressure_drop = Output(PressureDifference, soft_sensor=True)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Apply a quadratic clean-filter pressure loss."""

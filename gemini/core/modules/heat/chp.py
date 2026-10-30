@@ -45,6 +45,8 @@ class CHP(Module):
     0.40 to 0.50 thermal, from manufacturer data).
     """
 
+    category = "boiler"
+
     def __init__(self):
         """Declare engine design data, the heated water circuit and energy flows."""
         super().__init__()
@@ -57,7 +59,7 @@ class CHP(Module):
         self.maximum_outlet_temperature = Parameter(Temperature)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="hot_water")
 
         # Controls
         self.load_fraction = Control(Fraction)
@@ -71,7 +73,7 @@ class CHP(Module):
         self.outlet_T = Output(Temperature)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Heat the water circuit by the recovered engine heat."""

@@ -55,6 +55,8 @@ class AbsorptionUnit(Module):
     above 4 degC. Crystallisation limits are not modelled.
     """
 
+    category = "chiller"
+
     def __init__(self):
         """Declare absorption machine design data, its three circuits and performance."""
         super().__init__()
@@ -71,9 +73,9 @@ class AbsorptionUnit(Module):
         self.minimum_driving_temperature = Parameter(Temperature, default=353.15)
 
         # Inlets
-        self.generator_in = Inlet(Stream)
-        self.chilled_in = Inlet(Stream)
-        self.cooling_in = Inlet(Stream)
+        self.generator_in = Inlet(Stream, stream="hot_water")
+        self.chilled_in = Inlet(Stream, stream="chilled_water")
+        self.cooling_in = Inlet(Stream, stream="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -92,9 +94,9 @@ class AbsorptionUnit(Module):
         self.cooling_out_T = Output(Temperature)
 
         # Outlets
-        self.generator_out = Outlet(Stream)
-        self.chilled_out = Outlet(Stream)
-        self.cooling_out = Outlet(Stream)
+        self.generator_out = Outlet(Stream, stream="hot_water")
+        self.chilled_out = Outlet(Stream, stream="chilled_water")
+        self.cooling_out = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Cool the generator and chilled circuits and heat the cooling circuit."""

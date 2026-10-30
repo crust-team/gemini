@@ -48,6 +48,8 @@ class MultiWellPlant(Module):
     supply temperature.
     """
 
+    category = "plant"
+
     def __init__(self, producers=2, injectors=1):
         """Build ``producers`` production limbs, ``injectors`` injection limbs and the tees."""
         super().__init__()
@@ -63,7 +65,7 @@ class MultiWellPlant(Module):
         self.injectors = ModuleList(_injection_limb() for _ in range(injectors))
 
         # Inlets
-        self.return_in = Inlet(Stream)
+        self.return_in = Inlet(Stream, stream="brine")
 
         # Outputs
         self.electricity = Output(Electricity)
@@ -74,7 +76,7 @@ class MultiWellPlant(Module):
             self.supply_out_T = Output.of(self.producers[0].riser.wellhead_temperature)
 
         # Outlets
-        self.supply_out = Outlet(Stream)
+        self.supply_out = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Produce and mix every production limb, then split the return over the injectors."""

@@ -24,6 +24,8 @@ from gemini.errors import ConfigurationError, PhysicsRangeError
 class InjectionPump(Module):
     """Raise brine pressure with a simple hydraulic-power estimate."""
 
+    category = "pump"
+
     repr_fields = ("no_stages", "efficiency", "pump_type")
 
     def __init__(self):
@@ -38,7 +40,7 @@ class InjectionPump(Module):
         self.power_coeff = Parameter(list[float] | None, default=None, shape=(6,))
 
         # Inlets
-        self.suction = Inlet(Stream)
+        self.suction = Inlet(Stream, stream="brine")
 
         # Controls
         self.pressure_setpoint = Control(Pressure | None, default=None)
@@ -51,7 +53,7 @@ class InjectionPump(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.discharge = Outlet(Stream)
+        self.discharge = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Raise pressure from a supplied curve or discharge-pressure setpoint."""

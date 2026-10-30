@@ -10,6 +10,9 @@ def test_public_names_and_docs():
     """Interactive completion exposes exactly the documented, individually documented names."""
     expected = {
         "Engine",
+        "Plant",
+        "Results",
+        "evaluate",
         "Clock",
         "Dataset",
         "Profile",
@@ -21,13 +24,21 @@ def test_public_names_and_docs():
         "Quantity",
         "runtime",
         "units",
+        "streams",
         "legacy",
         "modules",
         "plants",
+        "profiles",
+        "analysis",
+        "economics",
+        "kpi",
+        "checks",
+        "testing",
         "optim",
         "errors",
         "no_outputs",
         "__version__",
+        "API_VERSION",
     }
     assert set(dir(gm)) == expected == set(gm.__all__)
     assert all(getattr(gm, name).__doc__ for name in expected)

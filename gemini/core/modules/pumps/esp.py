@@ -57,6 +57,8 @@ def _float32():
 class ESP(Module):
     """Electrical submersible pump installed inside a production well."""
 
+    category = "pump"
+
     repr_fields = ("no_stages", "setting_depth", "motor_efficiency", "bep_flow")
 
     def __init__(self):
@@ -78,7 +80,7 @@ class ESP(Module):
         self.drift_threshold = Parameter(Fraction, default=0.10, gt=0, le=1)
 
         # Inlets
-        self.suction = Inlet(Stream)
+        self.suction = Inlet(Stream, stream="brine")
 
         # Controls
         self.frequency = Control(Frequency)
@@ -94,7 +96,7 @@ class ESP(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.discharge = Outlet(Stream)
+        self.discharge = Outlet(Stream, stream="brine")
 
     def _scalar_mode(self):
         """Return ``PLAIN`` under float32 precision, else ``WRAP``.

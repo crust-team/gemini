@@ -21,6 +21,8 @@ from gemini.core.types import (
 class Doublet(Module):
     """Produce hot supply and return cooled brine to the receiving aquifer."""
 
+    category = "plant"
+
     def __init__(self):
         """Build the production-to-injection doublet in flow order."""
         super().__init__()
@@ -34,14 +36,14 @@ class Doublet(Module):
         self.sink = InjectionReservoir()
 
         # Inlets
-        self.return_in = Inlet(Stream)
+        self.return_in = Inlet(Stream, stream="brine")
 
         # Outputs
         self.electricity = Output(Electricity)
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.supply_out = Outlet(Stream)
+        self.supply_out = Outlet(Stream, stream="brine")
 
     def produce(self):
         """Traverse reservoir, lower well, ESP and riser."""

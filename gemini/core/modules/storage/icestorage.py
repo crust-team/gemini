@@ -75,6 +75,8 @@ class IceStorage(Module):
     its state.
     """
 
+    category = "storage"
+
     def __init__(self):
         """Declare store design data, the glycol circuit, the phase state and its energies."""
         super().__init__()
@@ -88,7 +90,7 @@ class IceStorage(Module):
         self.ice_heat_capacity = Parameter(SpecificHeat, default=2096.8)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="chilled_water")
 
         # States
         self.ice_fraction = State(Fraction, default=0)
@@ -103,7 +105,7 @@ class IceStorage(Module):
         self.is_empty = Output(bool)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="chilled_water")
 
     def forward(self, inlets):
         """Return the glycol after exchanging heat with the start-of-step store."""

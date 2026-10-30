@@ -49,6 +49,8 @@ class DistrictNetwork(Module):
     the thermal model is otherwise closed. Mass is conserved.
     """
 
+    category = "plant"
+
     def __init__(self, consumers=2, service="heating"):
         """Build the pump, both pipes, ``consumers`` substations of ``service`` and the tees."""
         super().__init__()

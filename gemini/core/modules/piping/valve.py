@@ -53,6 +53,8 @@ class Valve(Module):
     a closed valve raises ``PhysicsRangeError``.
     """
 
+    category = "network"
+
     def __init__(self):
         """Declare valve capacity, characteristic, opening and hydraulic outputs."""
         super().__init__()

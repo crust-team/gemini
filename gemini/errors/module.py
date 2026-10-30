@@ -1,18 +1,25 @@
 """Errors in defining, configuring and calling modules."""
 
+from gemini.errors import base
 from gemini.errors.base import GeminiError
 
 
-class DeclarationError(GeminiError, TypeError, ValueError):
+class DeclarationError(base.ValidationError, TypeError):
     """A module class or tree is defined wrongly: declarations, children, containers or hooks."""
+
+    code = "invalid_value"
 
 
 class UnknownNameError(GeminiError, ValueError):
     """A module path, parameter, control, boundary or state name does not exist."""
 
+    code = "unknown_name"
+
 
 class UnknownPortError(GeminiError, KeyError, AttributeError):
     """A port or recorded value name does not exist in a ``Ports`` or ``Values`` mapping."""
+
+    code = "unknown_port"
 
 
 def _name_only(name, subject):
@@ -34,6 +41,8 @@ class UnknownMemberError(GeminiError, AttributeError):
     function. Copying or pickling the error stores the finished message instead of the module.
     """
 
+    code = "unknown_name"
+
     def __init__(self, name, subject=None, describe=_name_only):
         """Keep the missing name, the module and the function that describes the miss."""
         super().__init__(name)
@@ -53,13 +62,19 @@ class UnknownMemberError(GeminiError, AttributeError):
 class CallError(GeminiError, TypeError):
     """A module was called with wrong, missing, duplicate or invalid inlet or input arguments."""
 
+    code = "invalid_call"
+
 
 class OutletError(GeminiError, TypeError, ValueError):
     """``forward`` returned something other than a dictionary of the declared outlets."""
 
+    code = "invalid_call"
+
 
 class MissingValueError(GeminiError, RuntimeError, TypeError):
     """A parameter, control or boundary has no value and no default."""
+
+    code = "missing_value"
 
 
 class OutputError(GeminiError, RuntimeError):
@@ -69,9 +84,13 @@ class OutputError(GeminiError, RuntimeError):
 class FormulaError(GeminiError, TypeError, ValueError):
     """An ``Output.of``, ``Output.ratio`` or automatic-sum formula cannot be resolved."""
 
+    code = "invalid_format"
+
 
 class ConfigurationError(GeminiError, ValueError):
     """Equipment design data needed for this call is missing or inconsistent."""
+
+    code = "invalid_value"
 
 
 class TraceError(GeminiError, TypeError):

@@ -26,6 +26,8 @@ class InhibitorDosing(Module):
     Reverse flow raises ``PhysicsRangeError``.
     """
 
+    category = "separation"
+
     def __init__(self):
         """Declare the product strength, ports, dose command and dosing rates."""
         super().__init__()
@@ -34,7 +36,7 @@ class InhibitorDosing(Module):
         self.product_concentration = Parameter(Fraction, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="brine")
 
         # Controls
         self.dose = Control(Fraction)
@@ -44,7 +46,7 @@ class InhibitorDosing(Module):
         self.active_mass_flow = Output(MassFlow)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Pass the treated stream through unchanged."""

@@ -98,6 +98,8 @@ class AquiferStorage(Module):
     store volumes, temperature changes and heat totals are states.
     """
 
+    category = "storage"
+
     def __init__(self):
         """Declare aquifer data, the operating mode and the two store states."""
         super().__init__()
@@ -111,7 +113,7 @@ class AquiferStorage(Module):
         self.storage_period = Parameter(Duration, default=HALF_YEAR, gt=0)
 
         # Inlets
-        self.injection_in = Inlet(Stream)
+        self.injection_in = Inlet(Stream, stream="brine")
 
         # Controls
         self.mode = Control(Literal["charge", "discharge", "idle"])
@@ -135,7 +137,7 @@ class AquiferStorage(Module):
         self.heat_accumulation = Output(HeatAccumulation)
 
         # Outlets
-        self.production_out = Outlet(Stream)
+        self.production_out = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Produce the injected mass flow from the source store of the current mode."""

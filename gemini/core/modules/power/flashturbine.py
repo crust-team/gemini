@@ -47,6 +47,8 @@ class FlashTurbine(Module):
     611.213 Pa, with a wet exhaust.
     """
 
+    category = "heat_exchange"
+
     def __init__(self):
         """Declare turbine and generator design data, ports and computed performance."""
         super().__init__()
@@ -58,7 +60,7 @@ class FlashTurbine(Module):
         self.generator_efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="gas")
 
         # Outputs
         self.gross_power = Output(Power)
@@ -68,7 +70,7 @@ class FlashTurbine(Module):
         self.exhaust_quality = Output(Fraction)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="gas")
 
     def forward(self, inlets):
         """Expand the steam and return the condensate at the condenser saturation state."""

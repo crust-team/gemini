@@ -47,6 +47,8 @@ class Degasser(Module):
     no industry-typical value; set it from design data or a measured gas flow.
     """
 
+    category = "separation"
+
     def __init__(self):
         """Declare degasser design data, inlet and split outlets."""
         super().__init__()
@@ -58,15 +60,15 @@ class Degasser(Module):
         self.separation_efficiency = Parameter(Fraction, default=0, structural=True)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="brine")
 
         # Outputs
         self.gas_mass_flow = Output(MassFlow, soft_sensor=True)
         self.pressure_drop = Output(PressureDifference, soft_sensor=True)
 
         # Outlets
-        self.liquid = Outlet(Stream)
-        self.gas = Outlet(Stream)
+        self.liquid = Outlet(Stream, stream="brine")
+        self.gas = Outlet(Stream, stream="gas")
 
     def forward(self, inlets):
         """Split the separated free gas from the liquid at the vessel pressure."""

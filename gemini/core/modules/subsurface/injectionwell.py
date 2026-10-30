@@ -24,6 +24,8 @@ class InjectionWell(_Well):
     outputs of the graph, one item per section.
     """
 
+    category = "well"
+
     flow_direction = "down"
 
     def __init__(self):
@@ -31,7 +33,7 @@ class InjectionWell(_Well):
         super().__init__()
 
         # Inlets
-        self.wellhead = Inlet(Stream)
+        self.wellhead = Inlet(Stream, stream="brine")
 
         # Outputs
         self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
@@ -43,7 +45,7 @@ class InjectionWell(_Well):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.bottom = Outlet(Stream)
+        self.bottom = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Traverse the injection path with the legacy negative flow convention."""

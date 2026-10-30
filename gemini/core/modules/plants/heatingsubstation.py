@@ -47,6 +47,8 @@ class HeatingSubstation(Module):
     least as warm as the building return.
     """
 
+    category = "plant"
+
     def __init__(self):
         """Declare the substation children, the building circuit and the delivered heat."""
         super().__init__()
@@ -61,7 +63,7 @@ class HeatingSubstation(Module):
         self.building_pressure = Parameter(Pressure, gt=0)
 
         # Inlets
-        self.network_in = Inlet(Stream)
+        self.network_in = Inlet(Stream, stream="hot_water")
 
         # Outputs
         self.duty = Output.of(self.heat_exchanger.duty)
@@ -74,7 +76,7 @@ class HeatingSubstation(Module):
         self.valve_pressure_drop = Output.of(self.valve.pressure_drop)
 
         # Outlets
-        self.network_out = Outlet(Stream)
+        self.network_out = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Throttle the network water, close the building loop and exchange the heat once."""

@@ -51,6 +51,8 @@ class CentrifugalPump(Module):
     whose shaft power would heat a trapped volume without bound, is outside the steady model.
     """
 
+    category = "pump"
+
     repr_fields = ("rated_frequency", "best_efficiency", "best_efficiency_flow")
 
     def __init__(self):

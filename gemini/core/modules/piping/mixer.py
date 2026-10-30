@@ -24,6 +24,8 @@ class Mixer(Module):
     needed); reverse flow in either inlet raises ``PhysicsRangeError``.
     """
 
+    category = "network"
+
     def __init__(self):
         """Declare both inlets, the mixed outlet and the mixing diagnostics."""
         super().__init__()

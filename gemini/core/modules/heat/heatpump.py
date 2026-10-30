@@ -66,6 +66,8 @@ class HeatPump(Module):
     where its row is selected.
     """
 
+    category = "heat_pump"
+
     def __init__(self):
         """Declare heat pump design data, both circuits and computed performance."""
         super().__init__()
@@ -82,7 +84,7 @@ class HeatPump(Module):
 
         # Inlets
         self.source_in = Inlet(Stream)
-        self.sink_in = Inlet(Stream)
+        self.sink_in = Inlet(Stream, stream="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -101,7 +103,7 @@ class HeatPump(Module):
 
         # Outlets
         self.source_out = Outlet(Stream)
-        self.sink_out = Outlet(Stream)
+        self.sink_out = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Cool the source and heat the sink circuit by the solved duties."""

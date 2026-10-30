@@ -201,6 +201,8 @@ class _Reservoir(Module):
 class ProductionReservoir(_Reservoir):
     """Aquifer supplying a production-well sandface stream."""
 
+    category = "subsurface"
+
     def __init__(self):
         """Declare a production reservoir."""
         super().__init__("production")
@@ -209,7 +211,7 @@ class ProductionReservoir(_Reservoir):
         self.production_rate = Control(MassFlow, ge=0)
 
         # Outlets
-        self.sandface = Outlet(Stream)
+        self.sandface = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Apply the linear production IPR and emit the sandface stream."""
@@ -243,12 +245,14 @@ class ProductionReservoir(_Reservoir):
 class InjectionReservoir(_Reservoir):
     """Aquifer receiving the injection-well sandface stream."""
 
+    category = "subsurface"
+
     def __init__(self):
         """Declare an injection reservoir."""
         super().__init__("injection")
 
         # Inlets
-        self.sandface = Inlet(Stream)
+        self.sandface = Inlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Receive the sandface stream; the aquifer has no outlet."""

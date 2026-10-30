@@ -29,6 +29,8 @@ class ProductionWell(_Well):
     section.
     """
 
+    category = "well"
+
     repr_fields = ("segment", "esp_depth", "soil_temperature", "u_value")
 
     def __init__(self):
@@ -40,7 +42,7 @@ class ProductionWell(_Well):
         self.esp_depth = Parameter(Length | None, default=None, structural=True)
 
         # Inlets
-        self.bottom = Inlet(Stream)
+        self.bottom = Inlet(Stream, stream="brine")
 
         # Outputs
         self.wellhead_pressure = Output(Pressure, soft_sensor=True)
@@ -52,7 +54,7 @@ class ProductionWell(_Well):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.wellhead = Outlet(Stream)
+        self.wellhead = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Traverse the selected segment upward and apply the pressure correction."""

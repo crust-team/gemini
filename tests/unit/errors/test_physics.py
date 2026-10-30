@@ -9,6 +9,7 @@ from gemini.errors.base import GeminiError
 BASES = {
     "UnitError": (ValueError,),
     "PhysicsRangeError": (ValueError,),
+    "SolverError": (ValueError,),
     "UnknownCorrelationError": (ValueError,),
     "MissingChemistryError": (ValueError,),
     "InsufficientDataError": (ValueError,),

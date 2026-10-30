@@ -63,6 +63,8 @@ class BoreholeField(Module):
     ground temperature change is a state.
     """
 
+    category = "subsurface"
+
     def __init__(self):
         """Declare field geometry, ground properties and the ground temperature state."""
         super().__init__()
@@ -78,7 +80,7 @@ class BoreholeField(Module):
         self.undisturbed_ground_temperature = Parameter(Temperature)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="hot_water")
 
         # States
         self.ground_temperature_change = State(TemperatureDifference, default=0)
@@ -92,7 +94,7 @@ class BoreholeField(Module):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Exchange heat between the loop fluid and the start-of-step ground temperature."""

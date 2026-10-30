@@ -46,6 +46,8 @@ class HeatConsumer(Module):
     Handbook - HVAC Systems and Equipment (2020), chapter 13, "Hydronic heating and cooling".
     """
 
+    category = "consumer"
+
     def __init__(self):
         """Declare the consumer's return limit, demand boundary and delivered heat."""
         super().__init__()
@@ -54,7 +56,7 @@ class HeatConsumer(Module):
         self.minimum_return_temperature = Parameter(Temperature)
 
         # Inlets
-        self.supply_in = Inlet(Stream)
+        self.supply_in = Inlet(Stream, stream="hot_water")
 
         # Boundaries
         self.heat_demand = Boundary(Power, ge=0)
@@ -67,7 +69,7 @@ class HeatConsumer(Module):
         self.is_unmet = Output(bool)
 
         # Outlets
-        self.return_out = Outlet(Stream)
+        self.return_out = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Return the supply stream cooled by the delivered heat."""

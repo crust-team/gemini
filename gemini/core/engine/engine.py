@@ -190,11 +190,10 @@ class Engine:
             )
         if self._in_step:
             raise CheckpointError(f"{path}: called inside a step; expected a completed step")
-        plant = self.plant.to_dict()
         checkpoint = storage.Checkpoint(
             run_kind=self.run_kind,
-            plant_class=plant["plant_type"],
-            plant=plant,
+            plant_class=class_path(type(self.plant)),
+            plant=self.plant.to_dict(),
             module_states=self.module_states,
             clock=self.clock.describe() if self.clock is not None else None,
             position=self.position,

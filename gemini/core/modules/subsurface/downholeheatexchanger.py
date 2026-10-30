@@ -52,6 +52,8 @@ class DownholeHeatExchanger(Module):
     inlet unchanged.
     """
 
+    category = "subsurface"
+
     def __init__(self):
         """Declare the well geometry, the geothermal profile and the rock properties."""
         super().__init__()
@@ -67,7 +69,7 @@ class DownholeHeatExchanger(Module):
         self.operating_time = Parameter(Duration, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="hot_water")
 
         # Outputs
         self.heat_extraction_rate = Output(Power)
@@ -76,7 +78,7 @@ class DownholeHeatExchanger(Module):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Return the fluid at the temperature it reaches at the bottom of the annulus."""

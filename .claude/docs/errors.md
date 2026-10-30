@@ -16,7 +16,14 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
 
 `base.py`:
 
-- `GeminiError(Exception)`: root of every class below.
+- `GeminiError(Exception)`: root of every class below. It takes `path=`, `code=` and
+  `suggestions=` as keywords and `to_dict()` returns `{class, message, path, code, suggestions}`
+  as plain JSON, the shape of `422` details and tool results. `code` defaults to the class
+  attribute and must be one of `CODES`.
+- `ValidationError(ValueError)`: a value, a spec or a run input breaks a documented rule.
+  `DeclarationError` and `BindingError` derive from it.
+- `Cancelled`: a callback stopped a run; the ticks already committed stay readable.
+- `NotImplementedYet(NotImplementedError)`: the name is final, its work lands in a later step.
 - `GeminiWarning(UserWarning)`: root of warnings; `legacy.to_plant` lists the old fields it cannot
   map in one `GeminiWarning`.
 
@@ -75,6 +82,7 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
   (`units.py`, `flows.py`, `results.py`, `profile.py`).
 - `PhysicsRangeError(ValueError)`: an input outside a correlation's domain, such as zero or NaN
   flow where a correlation divides by it (physics and equipment).
+- `SolverError(PhysicsRangeError)`: an iterative solve did not converge (`loops.close_loop`).
 - `UnknownCorrelationError(ValueError)`: an unsupported correlation, model or material name.
 - `MissingChemistryError(ValueError)`: a correlation needs fluid chemistry that was not given.
 - `InsufficientDataError(ValueError)`: a fit or estimate with too few valid observations.
@@ -83,6 +91,38 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
 
 - `LegacyFormatError(ValueError)`: an old project file that is missing, malformed or describes a
   plant the bridge cannot convert.
+
+## Codes
+
+`gm.errors.CODES` is the fixed tuple of `code` values; the backend puts them into `422` details,
+so a code is never renamed without raising `gm.API_VERSION`. `gm.errors.ROW_CODES` maps every row
+code of `Results.errors()` to its meaning.
+
+| Code | Meaning |
+| --- | --- |
+| `error` | A GEMINI error with no more specific code |
+| `invalid_value` | A value has the wrong type or shape |
+| `out_of_bounds` | A value is outside its declared bounds |
+| `missing_value` | A required value is absent |
+| `invalid_unit` | A unit is unknown or does not fit the quantity |
+| `unknown_name` | A module type, path, parameter, category or field does not exist |
+| `unknown_port` | A port does not exist on that module |
+| `invalid_call` | A module was called with wrong arguments |
+| `invalid_format` | A document has the wrong structure |
+| `old_format` | A plant file is older than the current format; use `gm.plants.migrate` |
+| `migration_failed` | An old plant file cannot be migrated |
+| `invalid_connection` | A connection breaks a wiring rule |
+| `stream_mismatch` | The two ends of a connection carry different stream types |
+| `ambiguous_port` | Automatic port matching found no port or more than one |
+| `port_in_use` | An inlet already has a source, or an outlet already has a target |
+| `loop_without_state` | A cycle has no connection of kind `state` |
+| `invalid_binding` | A binding does not fit the plant or the data |
+| `missing_column` | A bound column is not in the run input |
+| `invalid_data` | Run input or a dataset cannot be read |
+| `physics_range` | An input is outside the domain of a correlation |
+| `solver_failed` | An iterative solve did not converge |
+| `cancelled` | A callback stopped the run |
+| `not_implemented` | The name is final, its work lands later |
 
 ## Message style
 

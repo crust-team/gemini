@@ -62,6 +62,8 @@ class Vent(Module):
     ``PhysicsRangeError``.
     """
 
+    category = "separation"
+
     def __init__(self):
         """Declare gas composition, disposal mode, ports and emissions."""
         super().__init__()
@@ -74,7 +76,7 @@ class Vent(Module):
         self.combustion_efficiency = Parameter(Efficiency, default=FLARE_EFFICIENCY)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="gas")
 
         # Outputs
         self.vented_mass_flow = Output(MassFlow)
@@ -84,7 +86,7 @@ class Vent(Module):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="gas")
 
     def forward(self, inlets):
         """Release the gas from the plant unchanged."""

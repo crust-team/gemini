@@ -2,6 +2,7 @@
 
 from gemini.core.physics.units import Quantity
 
+from . import streams
 from .bindings import Binding, ColumnInfo, DatedParams, ModuleBindings
 from .cost import Cost
 from .declarations import (
@@ -154,6 +155,7 @@ __all__ = [
     "Fluid",
     "Profile",
     "Ports",
+    "streams",
     "Health",
     "ModuleResult",
     "Values",

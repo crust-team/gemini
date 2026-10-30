@@ -52,6 +52,8 @@ class GasCompressor(Module):
     temperature is the one the gas would have.
     """
 
+    category = "pump"
+
     repr_fields = ("stage_count", "isentropic_efficiency", "heat_capacity_ratio")
 
     def __init__(self):
@@ -66,7 +68,7 @@ class GasCompressor(Module):
         self.motor_efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.suction = Inlet(Stream)
+        self.suction = Inlet(Stream, stream="gas")
 
         # Controls
         self.pressure_setpoint = Control(Pressure)
@@ -79,7 +81,7 @@ class GasCompressor(Module):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.discharge = Outlet(Stream)
+        self.discharge = Outlet(Stream, stream="gas")
 
     def forward(self, inlets):
         """Compress the gas to the pressure setpoint and heat it by the last stage."""

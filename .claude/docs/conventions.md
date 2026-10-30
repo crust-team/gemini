@@ -12,7 +12,8 @@ A package may import only the packages to its left:
 
 `gemini.utils`, `gemini.errors` ← `gemini.backends` ← `gemini.ops` ← `core.physics`
 ← `core.types` ← `core.runtime` ← `core.modules` ← `gemini.graph` ← `core.data`
-← `core.engine` ← `core.legacy` ← `optim` ← `gemini/__init__`.
+← `core.engine` ← `core.legacy` ← `optim`, `analysis`, `economics`, `checks`, `testing`,
+`profiles` ← `gemini/__init__`.
 
 `gemini.backends` and `gemini.ops` sit below the physics because physics is written with the
 ops; `gemini.graph` sits above `core.modules` because its tracer runs module calls (see
@@ -173,6 +174,9 @@ reason it is needed:
 - `gm.no_outputs()` and `gm.runtime.settings()` are context settings built on
   `gemini.utils.context.ContextSetting`: a context variable change usable as a `with` block and
   as a decorator, restored on exit.
+- `describe`, `parameter_schema` and `validate_params` work on a class and on an instance through
+  `_ClassOrInstance` in `gemini/core/modules/module.py`: on a class they run on a new instance,
+  because a module's declarations exist only once `__init__` has run.
 - `class_path`/`import_class` in `gemini/core/modules/module.py` are the only import-by-string.
   Plant files and checkpoints must name the handwritten plant class that rebuilds the tree.
 - Attribute access on mappings: `Ports` and `Values` derive from

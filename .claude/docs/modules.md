@@ -6,23 +6,40 @@ dictionary containing exactly the declared fluid outlets. Controls and boundarie
 the base class and read from `self`. Outputs are computed only after the fluid step succeeds.
 
 Write a module with `Module` from `gemini.core.modules` (also `gm.modules.Module`) and the
-declarations from `gemini.core.types`. The base class has no class registry, string catalogue,
-sequential container, fidelity flag or cost method; plants are handwritten classes. The
-shipped equipment, with each model's ports, parameters, equations and energy-audit status, is
+declarations from `gemini.core.types`. The base class has no string catalogue, sequential
+container, fidelity flag or cost method. The shipped equipment, with each model's ports, parameters, equations and energy-audit status, is
 listed in [equipment.md](equipment.md); its classes are good references for new modules.
 
 ## Construction and metadata
 
 Construct a module without arguments and set its values afterwards; `update_params` returns the
 module, so `ESP().update_params(no_stages=12, ...)` builds a configured pump. Only structural
-tree-shape arguments (for example `ModuleList(modules)`) go to `__init__`. There is no class
-registry and no class-creation hook: `module.name` is the snake_case class name computed on access,
+tree-shape arguments (for example `ModuleList(modules)`) go to `__init__`. There is no
+class-creation hook: `module.name` is the snake_case class name computed on access,
 `Module.help()` reads the first paragraph of the class docstring and lists the declarations, and
 any number of classes may share a name. `module.path` is the dotted position in the tree, or the
 name for a standalone module. `module.fluid` is a validated property saved by `state_dict()`;
 reservoirs apply their `liquid_density`/`liquid_viscosity` overrides when it is read. Plant files
 and checkpoints store the root class as `module:qualname` through `class_path`/`import_class` in
 `module.py`, the only import-by-string in the package.
+
+## Registry, categories and streams
+
+`gemini/core/modules/registry.py` is the one registry of module and plant types. A class joins it
+under its class name with `gm.modules.register(cls)`, and every shipped equipment class is
+registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `get(name)` and
+`categories()` read it; an unknown name raises `UnknownNameError` with its close matches in
+`suggestions`.
+
+Each class sets the class attribute `category` to one of the fixed `registry.CATEGORIES`. Three
+groups have no category of their own and take the nearest one, so these are the places to look if
+the list grows: `ORC` and `FlashTurbine` are `heat_exchange`; `GridConnection` and `PIDController`
+are `network`; `InhibitorDosing` and `Vent` are `separation`.
+
+A port declares its stream type: `Inlet(Stream, stream="brine")`, one of `gm.streams.names()`.
+A port without one, `stream=None`, takes whatever flows through it: piping, `CentrifugalPump`,
+`HeatExchanger` and the source side of `HeatPump`. Stream types never change a calculation; they
+say what may be connected.
 
 ## Listing declarations
 

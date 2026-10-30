@@ -9,7 +9,7 @@ once with the converged state.
 
 import math
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import SolverError
 
 TOLERANCE = 1e-9
 """Loop closure tolerance [K]: a pass may change the circulated temperature by at most this."""
@@ -33,7 +33,7 @@ def close_loop(update, start, path, lower=-math.inf, upper=math.inf):
     inlet).
 
     Convergence means ``|update(x) - x| <= TOLERANCE`` (1e-9 K); after ``MAX_ITERATIONS``
-    (50) passes without it a ``PhysicsRangeError`` names ``path`` and the last iterate.
+    (50) passes without it a ``SolverError`` names ``path`` and the last iterate.
     """
     current = min(max(start, lower), upper)
     previous = previous_image = None
@@ -49,7 +49,7 @@ def close_loop(update, start, path, lower=-math.inf, upper=math.inf):
                 proposal = weight * current + (1 - weight) * image
         previous, previous_image = current, image
         current = min(max(proposal, lower), upper)
-    raise PhysicsRangeError(
+    raise SolverError(
         f"{path}: loop temperature = {current} K maps to {update(current)} K after "
         f"{MAX_ITERATIONS} passes; expected a change of at most {TOLERANCE} K (the loop did "
         "not converge)"

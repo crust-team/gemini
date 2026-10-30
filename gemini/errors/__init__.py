@@ -5,7 +5,15 @@ catching, for example, ``gm.errors.UnitError``. Nothing in this package imports 
 of ``gemini``.
 """
 
-from gemini.errors.base import GeminiError, GeminiWarning
+from gemini.errors.base import (
+    CODES,
+    ROW_CODES,
+    Cancelled,
+    GeminiError,
+    GeminiWarning,
+    NotImplementedYet,
+    ValidationError,
+)
 from gemini.errors.engine import (
     BindingError,
     CheckpointError,
@@ -34,13 +42,19 @@ from gemini.errors.physics import (
     InsufficientDataError,
     MissingChemistryError,
     PhysicsRangeError,
+    SolverError,
     UnitError,
     UnknownCorrelationError,
 )
 
 __all__ = [
+    "CODES",
+    "ROW_CODES",
     "GeminiError",
     "GeminiWarning",
+    "ValidationError",
+    "Cancelled",
+    "NotImplementedYet",
     "DeclarationError",
     "UnknownNameError",
     "UnknownPortError",
@@ -62,6 +76,7 @@ __all__ = [
     "UnknownResultError",
     "UnitError",
     "PhysicsRangeError",
+    "SolverError",
     "UnknownCorrelationError",
     "MissingChemistryError",
     "InsufficientDataError",

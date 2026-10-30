@@ -58,6 +58,8 @@ class ThermalDecline(Module):
     injected volume is a state.
     """
 
+    category = "subsurface"
+
     def __init__(self):
         """Declare doublet geometry, rock data, the injection boundary and the volume state."""
         super().__init__()
@@ -69,7 +71,7 @@ class ThermalDecline(Module):
         self.rock_volumetric_heat_capacity = Parameter(VolumetricHeatCapacity)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="brine")
 
         # Boundaries
         self.injection_temperature = Boundary(Temperature)
@@ -83,7 +85,7 @@ class ThermalDecline(Module):
         self.outlet_T = Output(Temperature)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Lower the reservoir temperature by the cold-water share of the produced flow."""

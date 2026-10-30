@@ -25,6 +25,8 @@ from gemini.errors import PhysicsRangeError
 class Boiler(Module):
     """Auxiliary gas or electric boiler with a thermal capacity limit."""
 
+    category = "boiler"
+
     def __init__(self):
         """Declare boiler design data, ports and computed performance."""
         super().__init__()
@@ -35,7 +37,7 @@ class Boiler(Module):
         self.efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -50,7 +52,7 @@ class Boiler(Module):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Heat a forward stream up to its setpoint, conserving energy."""

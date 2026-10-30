@@ -32,7 +32,12 @@ def join_names(names):
     return ", ".join(names) or "<none>"
 
 
+def close_matches(name, candidates, count=3):
+    """Return up to ``count`` of the ``candidates`` closest to ``name``, closest first."""
+    return get_close_matches(str(name), list(candidates), n=count)
+
+
 def did_you_mean(name, candidates):
     """Return ``"; did you mean 'x'?"`` for the closest candidate, or an empty string."""
-    matches = get_close_matches(str(name), list(candidates), n=1)
+    matches = close_matches(name, candidates, 1)
     return f"; did you mean {matches[0]!r}?" if matches else ""

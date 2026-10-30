@@ -12,6 +12,7 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from gemini import ops
 from gemini.core.physics import units
+from gemini.core.types import streams
 from gemini.core.types.flows import Stream
 from gemini.core.types.quantities import Ratio
 from gemini.errors import DeclarationError
@@ -300,15 +301,23 @@ class _StreamPort(Declaration):
 
     A port has no JSON schema, quantity or unit: ``schema`` is empty, ``quantity`` and ``unit``
     are ``None`` and ``additive`` is false. Stream dataclasses do not go through Pydantic.
+    ``stream`` is the stream type of the port, one of ``streams.NAMES``, or ``None`` for a port
+    that takes whatever flows through it (a pipe, a valve, either side of a heat exchanger).
     """
 
-    def __init__(self, kind=Stream, *, description=None):
-        """Declare a fluid port carrying streams of ``kind``."""
+    def __init__(self, kind=Stream, *, stream=None, description=None):
+        """Declare a fluid port carrying streams of ``kind`` and stream type ``stream``."""
+        if stream is not None and stream not in streams.NAMES:
+            raise DeclarationError(
+                f"{type(self).__name__}: stream = {stream!r}; expected one of "
+                f"{join_names(streams.NAMES)}{did_you_mean(stream, streams.NAMES)}"
+            )
         if not isinstance(kind, type) or not issubclass(kind, Stream):
             raise DeclarationError(
                 f"{type(self).__name__}: kind = {kind!r}; expected a fluid Stream type"
             )
         self.kind = kind
+        self.stream = stream
         self.default = UNSET
         self.description = description
         self.bounds = {}

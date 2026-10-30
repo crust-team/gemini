@@ -49,6 +49,8 @@ class Cooler(Module):
     Handbook, HVAC Systems and Equipment, chapters on cooling towers and dry coolers).
     """
 
+    category = "heat_exchange"
+
     def __init__(self):
         """Declare cooler design data, the cooled stream, ambient air and energy flows."""
         super().__init__()
@@ -61,7 +63,7 @@ class Cooler(Module):
         self.latent_heat = Parameter(SpecificEnthalpy, default=2.43e6, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -79,7 +81,7 @@ class Cooler(Module):
         self.is_capped = Output(bool)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Cool the stream by the rejected duty; its mass flow is unchanged."""

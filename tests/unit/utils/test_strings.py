@@ -1,6 +1,7 @@
 """String, dotted-path and message helpers."""
 
 from gemini.utils.strings import (
+    close_matches,
     did_you_mean,
     first_paragraph,
     join_names,
@@ -40,3 +41,9 @@ def test_first_paragraph_is_one_line():
     assert (
         first_paragraph("Pump that\nraises pressure.\n\nDetails.") == "Pump that raises pressure."
     )
+
+
+def test_close_matches_lists_the_closest_first():
+    """Spec problems carry the close names as data."""
+    assert close_matches("Boilr", ["Boiler", "Pipe"]) == ["Boiler"]
+    assert close_matches("xyz", ["Boiler"]) == []

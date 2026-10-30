@@ -67,6 +67,8 @@ class ThermalStorage(Module):
     ``scan`` exists; its arithmetic is written with ops all the same.
     """
 
+    category = "storage"
+
     def __init__(self):
         """Declare tank design data, circuits, the tank temperature and its energies."""
         super().__init__()
@@ -80,8 +82,8 @@ class ThermalStorage(Module):
         self.discharge_effectiveness = Parameter(Fraction, default=1)
 
         # Inlets
-        self.charge_in = Inlet(Stream)
-        self.discharge_in = Inlet(Stream)
+        self.charge_in = Inlet(Stream, stream="hot_water")
+        self.discharge_in = Inlet(Stream, stream="hot_water")
 
         # Boundaries
         self.ambient_temperature = Boundary(Temperature)
@@ -99,8 +101,8 @@ class ThermalStorage(Module):
         self.heat_absorbed = Output(HeatAbsorbed)
 
         # Outlets
-        self.charge_out = Outlet(Stream)
-        self.discharge_out = Outlet(Stream)
+        self.charge_out = Outlet(Stream, stream="hot_water")
+        self.discharge_out = Outlet(Stream, stream="hot_water")
 
     def forward(self, inlets):
         """Return both circuits after exchanging heat with the start-of-step tank."""

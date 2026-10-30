@@ -56,6 +56,8 @@ class LineShaftPump(Module):
     polynomial curve) raise ``PhysicsRangeError``; at zero flow the pump runs at shutoff.
     """
 
+    category = "pump"
+
     repr_fields = ("no_stages", "setting_depth", "motor_efficiency")
 
     def __init__(self):
@@ -71,7 +73,7 @@ class LineShaftPump(Module):
         self.motor_efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.suction = Inlet(Stream)
+        self.suction = Inlet(Stream, stream="brine")
 
         # Controls
         self.frequency = Control(Frequency)
@@ -86,7 +88,7 @@ class LineShaftPump(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.discharge = Outlet(Stream)
+        self.discharge = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Raise the suction pressure by the pump-curve head."""

@@ -40,6 +40,8 @@ class Desander(Module):
     flow with a loss below the inlet pressure; otherwise ``PhysicsRangeError`` is raised.
     """
 
+    category = "separation"
+
     def __init__(self):
         """Declare desander design data, ports, sand boundary and outputs."""
         super().__init__()
@@ -50,7 +52,7 @@ class Desander(Module):
         self.m_dot_nominal = Parameter(MassFlow, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="brine")
 
         # Boundaries
         self.sand_concentration = Boundary(MassConcentration)
@@ -61,7 +63,7 @@ class Desander(Module):
         self.residual_sand_concentration = Output(MassConcentration)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.outlet = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Apply the quadratic cyclone pressure loss."""

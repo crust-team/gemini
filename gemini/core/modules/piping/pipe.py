@@ -76,6 +76,8 @@ class Pipe(Module):
     stream keeps the inlet temperature, which carries no energy.
     """
 
+    category = "network"
+
     def __init__(self):
         """Declare pipe geometry, heat transfer, ports and hydraulic and thermal outputs."""
         super().__init__()

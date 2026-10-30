@@ -52,6 +52,8 @@ class ORC(Module):
     input (DiPippo 2016), ``None`` without heat input. Valid for a single-phase liquid brine.
     """
 
+    category = "heat_exchange"
+
     def __init__(self):
         """Declare ORC design data, brine ports, ambient boundary and computed performance."""
         super().__init__()
@@ -65,7 +67,7 @@ class ORC(Module):
         self.capacity = Parameter(Power, gt=0)
 
         # Inlets
-        self.brine_in = Inlet(Stream)
+        self.brine_in = Inlet(Stream, stream="brine")
 
         # Boundaries
         self.ambient_temperature = Boundary(Temperature)
@@ -83,7 +85,7 @@ class ORC(Module):
         self.is_capped = Output(bool)
 
         # Outlets
-        self.brine_out = Outlet(Stream)
+        self.brine_out = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Cool the brine by the heat the cycle takes at the operating point."""

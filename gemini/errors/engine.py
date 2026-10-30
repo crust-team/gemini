@@ -1,18 +1,25 @@
 """Errors in datasets, clocks, bindings, runs, results, plant files and checkpoints."""
 
+from gemini.errors import base
 from gemini.errors.base import GeminiError
 
 
 class DatasetError(GeminiError, TypeError, ValueError):
     """A dataset cannot be built from, or read with, the given data."""
 
+    code = "invalid_data"
+
 
 class ClockError(GeminiError, KeyError, ValueError):
     """A clock is invalid, or a timestamp is not one of its ticks."""
 
+    code = "invalid_data"
 
-class BindingError(GeminiError, ValueError):
+
+class BindingError(base.ValidationError):
     """Plant bindings do not match the plant or the dataset."""
+
+    code = "invalid_binding"
 
 
 class MissingMeasurementError(GeminiError, ValueError):
@@ -20,6 +27,8 @@ class MissingMeasurementError(GeminiError, ValueError):
 
     ``str(error)`` is the skip reason counted in ``Results.skip_counts``.
     """
+
+    code = "missing_value"
 
 
 class StepError(GeminiError, ValueError):
@@ -33,6 +42,10 @@ class CheckpointError(GeminiError, RuntimeError, ValueError):
 class PlantFormatError(GeminiError, TypeError, ValueError):
     """A saved plant file has another version, plant type or module tree."""
 
+    code = "invalid_format"
+
 
 class UnknownResultError(GeminiError, KeyError, AttributeError):
     """A results module path or field does not exist."""
+
+    code = "unknown_name"

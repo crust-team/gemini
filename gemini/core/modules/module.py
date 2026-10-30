@@ -19,12 +19,14 @@ from collections.abc import Mapping
 from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import partial
 
 import numpy as np
 from pydantic_core import to_jsonable_python
 
 from gemini import backends, ops
 from gemini.core import runtime
+from gemini.core.modules import description
 from gemini.core.physics import units
 from gemini.core.types.bindings import DatedParams, ModuleBindings
 from gemini.core.types.declarations import (
@@ -247,6 +249,19 @@ def _active_call(module):
     return current.owned_by(module) if current is not None else None
 
 
+class _ClassOrInstance:
+    """Method that runs on the instance, or on a new instance when called on the class."""
+
+    def __init__(self, function):
+        """Wrap ``function(module, ...)``."""
+        self.function = function
+        self.__doc__ = function.__doc__
+
+    def __get__(self, instance, owner):
+        """Bind to ``instance``, or to a new ``owner()``."""
+        return partial(self.function, instance if instance is not None else owner())
+
+
 class Module:
     """Base class discovering declarations and child modules assigned in ``__init__``.
 
@@ -256,6 +271,10 @@ class Module:
     """
 
     repr_fields = ()
+    category = None
+    describe = _ClassOrInstance(description.describe)
+    parameter_schema = _ClassOrInstance(description.parameter_schema)
+    validate_params = _ClassOrInstance(description.validate_params)
 
     def __init__(self):
         """Create the ordered registries and the run-owned metadata."""

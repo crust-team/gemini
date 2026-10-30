@@ -43,12 +43,14 @@ class Separator(Module):
     m_in h_in = m_gas h_g + m_liquid h_f, which the unit tests check.
     """
 
+    category = "separation"
+
     def __init__(self):
         """Declare the separator inlet, pressure control, outputs and phase outlets."""
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.inlet = Inlet(Stream, stream="brine")
 
         # Controls
         self.pressure_setpoint = Control(Pressure, gt=0)
@@ -59,8 +61,8 @@ class Separator(Module):
         self.saturation_temperature = Output(Temperature)
 
         # Outlets
-        self.liquid = Outlet(Stream)
-        self.gas = Outlet(Stream)
+        self.liquid = Outlet(Stream, stream="brine")
+        self.gas = Outlet(Stream, stream="gas")
 
     def forward(self, inlets):
         """Flash the inlet to the setpoint pressure and split it into brine and steam."""

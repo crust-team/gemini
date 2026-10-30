@@ -27,12 +27,14 @@ class Blowdown(Module):
     flow through a blowdown is not defined and raises ``PhysicsRangeError``.
     """
 
+    category = "separation"
+
     def __init__(self):
         """Declare the feed, the bleed command and both outlets."""
         super().__init__()
 
         # Inlets
-        self.feed_in = Inlet(Stream)
+        self.feed_in = Inlet(Stream, stream="brine")
 
         # Controls
         self.blowdown_fraction = Control(Fraction)
@@ -41,8 +43,8 @@ class Blowdown(Module):
         self.blowdown_mass_flow = Output(MassFlow)
 
         # Outlets
-        self.retained_out = Outlet(Stream)
-        self.blowdown_out = Outlet(Stream)
+        self.retained_out = Outlet(Stream, stream="brine")
+        self.blowdown_out = Outlet(Stream, stream="brine")
 
     def forward(self, inlets):
         """Split the commanded bleed from the feed."""

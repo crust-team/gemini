@@ -9,7 +9,9 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
 `gemini/utils/__init__.py` exports nothing.
 
 - `strings.py`: `snake_case`, `first_paragraph`, `join_path`, `split_path`, `join_names`,
-  `did_you_mean`.
+  `close_matches`, `did_you_mean`.
+- `jsonable.py`: `to_plain`, the one conversion of returned data to plain JSON (NumPy to Python,
+  NaN and infinity to `None`); every public function that returns data uses it.
 - `time.py`: `to_utc`, `to_utc_index`, `parse_duration`, `median_step`, `interval_seconds`,
   `DEFAULT_STEP`.
 - `hooks.py`: `RemovableHandle` (ordered hook dicts, safe double `remove()`), `has_signature`.
