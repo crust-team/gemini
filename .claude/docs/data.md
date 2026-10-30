@@ -40,6 +40,11 @@ followed by the native cadence. `previous` alignment holds the latest row at or 
 keeps the final text flag. A hold older than `max_gap` (by default twice the native cadence, or
 twice `DEFAULT_STEP` for fewer than two rows) and an empty mean bin give a row of NaN, which the
 engine reports as missing measurements. The dataset is read one `chunk` of ticks at a time.
+`Loader.arrays()` returns the same samples as `Aligned(times, durations, columns)` arrays for the
+batch evaluation of a replay: `previous` and `exact` alignment are vectorised with the held
+positions that iteration uses (gaps are NaN), `mean` iterates and stacks. A column array is
+`float64`, or `object` when the dataset holds text. Tests assert that it equals iteration, gaps,
+`max_gap` and chunk borders included.
 Normal users do not construct loaders.
 
 `Profile.constant(value, unit=..., clock=...)` and `Profile.from_series(series, unit=...)`

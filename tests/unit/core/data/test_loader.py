@@ -79,3 +79,41 @@ def test_options_and_columns_are_validated(source):
         Loader(source, source.to_frame().index, chunk=timedelta(0))
     with pytest.raises(gm.errors.DatasetError, match="absent_a, absent_b"):
         list(Loader(source, source.to_frame().index, columns=["absent_b", "absent_a"]))
+
+
+def _same_as_iteration(loader):
+    """Assert ``arrays()`` holds exactly the times, durations and values iteration yields."""
+    samples = list(loader)
+    aligned = loader.arrays()
+    assert aligned.times == [sample.t for sample in samples]
+    assert aligned.durations.tolist() == [sample.dt for sample in samples]
+    assert list(aligned.columns) == list(loader.columns)
+    for name, values in aligned.columns.items():
+        expected = [sample.row[name] for sample in samples]
+        assert len(values) == len(expected)
+        for actual, wanted in zip(values.tolist(), expected):
+            assert (actual == wanted) or (pd.isna(actual) and pd.isna(wanted))
+
+
+@pytest.mark.parametrize("align", ["previous", "exact", "mean"])
+@pytest.mark.parametrize("chunk", [timedelta(days=7), timedelta(minutes=40)])
+def test_arrays_equal_iteration_with_gaps_and_chunks(source, align, chunk):
+    """Gaps, ``max_gap``, text columns, chunk borders and every alignment agree with iteration."""
+    index = source.to_frame().index
+    sparse = gm.Dataset.from_frame(source.to_frame().drop(index[1:8]))
+    ticks = gm.Clock.range(index[0] - timedelta(hours=1), index[-1] + timedelta(hours=2), "15min")
+    for max_gap in (None, timedelta(minutes=30), timedelta(hours=3)):
+        loader = Loader(sparse, ticks.ticks, align=align, max_gap=max_gap, chunk=chunk)
+        _same_as_iteration(loader)
+
+
+def test_arrays_of_numeric_columns_are_floats_and_cover_empty_reads(source):
+    """Numeric data gives float arrays; ticks far from the data give all-gap arrays."""
+    numeric = gm.Dataset.from_frame(source.to_frame()[["v"]])
+    ticks = gm.Clock.range(numeric.start, numeric.end, "15min").ticks
+    assert Loader(numeric, ticks).arrays().columns["v"].dtype == np.float64
+    far = pd.date_range("2030-01-01", periods=3, freq="15min", tz="UTC")
+    aligned = Loader(numeric, far).arrays()
+    assert np.isnan(aligned.columns["v"]).all()
+    _same_as_iteration(Loader(numeric, far))
+    assert Loader(numeric, []).arrays().times == []

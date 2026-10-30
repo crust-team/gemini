@@ -18,6 +18,14 @@ class Sample(NamedTuple):
     row: dict
 
 
+class Aligned(NamedTuple):
+    """The samples of a whole run as arrays: ``times``, ``durations`` and one array per column."""
+
+    times: list
+    durations: np.ndarray
+    columns: dict
+
+
 class Loader:
     """Align raw rows to any finite tick iterable with bounded source reads.
 
@@ -58,6 +66,41 @@ class Loader:
 
     def __iter__(self):
         """Read each chunk once and sample NumPy arrays without per-row pandas lookups."""
+        sample = self._mean if self.align == "mean" else self._previous
+        for frame, selected, seconds in self._frames():
+            yield from sample(frame, selected, seconds)
+
+    def arrays(self):
+        """Return the same samples as ``Aligned`` arrays, without building a row per tick.
+
+        ``previous`` and ``exact`` alignment are vectorised with the positions ``__iter__``
+        uses; ``mean`` iterates and stacks the samples. Gaps are NaN, and a column array is
+        ``float64`` unless the dataset holds text, when the arrays are ``object``.
+        """
+        if self.align == "mean":
+            return self._stacked(list(self))
+        times, durations, blocks = [], [], []
+        for frame, selected, seconds in self._frames():
+            held, gaps = self._hold(frame, selected)
+            held[gaps] = np.nan
+            blocks.append(held)
+            times.extend(t.to_pydatetime() for t in selected)
+            durations.append(np.asarray(seconds, dtype=float))
+        if not blocks:
+            return Aligned([], np.empty(0), {column: np.empty(0) for column in self.columns})
+        values = np.concatenate(blocks)
+        return Aligned(
+            times, np.concatenate(durations), {c: values[:, i] for i, c in enumerate(self.columns)}
+        )
+
+    def _stacked(self, samples):
+        """Stack iterated samples into ``Aligned`` arrays."""
+        columns = {c: _column([sample.row[c] for sample in samples]) for c in self.columns}
+        durations = np.array([sample.dt for sample in samples], dtype=float)
+        return Aligned([sample.t for sample in samples], durations, columns)
+
+    def _frames(self):
+        """Yield ``(frame, ticks, seconds)`` for each chunk of ticks, reading it once."""
         ticks = pd.DatetimeIndex(list(self.ticks))
         if not len(ticks):
             return
@@ -65,12 +108,11 @@ class Loader:
         seconds = self.durations
         if seconds is None:
             seconds = interval_seconds(ticks, self.dataset.native_step or DEFAULT_STEP)
-        sample = self._mean if self.align == "mean" else self._previous
         for offset, stop in self._chunks(ticks):
             selected = ticks[offset:stop]
             end = selected[-1] + pd.Timedelta(seconds=float(seconds[stop - 1]))
             frame = self.dataset.read(selected[0] - self.max_gap, end, self.columns)
-            yield from sample(frame, selected, seconds[offset:stop])
+            yield frame, selected, seconds[offset:stop]
 
     def _chunks(self, ticks):
         """Yield ``(offset, stop)`` positions of consecutive tick chunks of at most ``chunk``."""
@@ -86,16 +128,37 @@ class Loader:
         Row times are compared as nanosecond integers, the unit of ``Timestamp.value``, whatever
         the resolution of the dataset index (pandas 3 parses text as microseconds).
         """
-        times = frame.index.as_unit("ns").asi8
         values = frame.to_numpy()
-        positions = np.searchsorted(times, ticks.asi8, side="right") - 1
-        for t, previous, dt in zip(ticks, positions, seconds):
-            gap = previous < 0 or t.value - times[previous] > self.max_gap.value
-            if gap or (self.align == "exact" and times[previous] != t.value):
-                raw = [np.nan] * len(self.columns)
-            else:
-                raw = values[previous]
+        positions, gaps = self._positions(frame, ticks)
+        for t, previous, gap, dt in zip(ticks, positions, gaps, seconds):
+            raw = [np.nan] * len(self.columns) if gap else values[previous]
             yield Sample(t.to_pydatetime(), float(dt), dict(zip(self.columns, raw)))
+
+    def _positions(self, frame, ticks):
+        """Return the held row position of each tick and whether the tick is a gap.
+
+        A tick is a gap without a row at or before it, when the hold is older than ``max_gap``
+        or, for ``exact`` alignment, when the row is not at the tick itself.
+        """
+        times = frame.index.as_unit("ns").asi8
+        positions = np.searchsorted(times, ticks.asi8, side="right") - 1
+        if not len(times):
+            return positions, np.ones(len(ticks), dtype=bool)
+        held = times[positions]
+        gaps = (positions < 0) | (ticks.asi8 - held > self.max_gap.value)
+        if self.align == "exact":
+            gaps |= held != ticks.asi8
+        return positions, gaps
+
+    def _hold(self, frame, ticks):
+        """Return the held rows as one 2D array (a copy) and the gap mask."""
+        positions, gaps = self._positions(frame, ticks)
+        values = frame.to_numpy()
+        if values.dtype.kind in "iub":
+            values = values.astype(float)
+        if not len(values):
+            return np.full((len(ticks), len(self.columns)), np.nan), gaps
+        return values[positions], gaps
 
     def _mean(self, frame, ticks, seconds):
         """Average each numeric column over ``[tick, tick + dt)``; text keeps its last value."""
@@ -109,6 +172,15 @@ class Loader:
             block = values[left:right]
             raw = [_bin_value(block[:, i], is_numeric) for i, is_numeric in enumerate(numeric)]
             yield Sample(t.to_pydatetime(), dt, dict(zip(self.columns, raw)))
+
+
+def _column(values):
+    """Return ``values`` as a ``float64`` array, or as an ``object`` array when any is text."""
+    array = np.array(values, dtype=object)
+    try:
+        return array.astype(float)
+    except (TypeError, ValueError):
+        return array
 
 
 def _bin_value(column, is_numeric):
