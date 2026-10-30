@@ -9,6 +9,7 @@ from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.heat import Boiler
 from gemini.core.modules.subsurface import AquiferStorage
 from gemini.core.types import Inlet, Outlet, Output, Stream
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 WARM = Stream(m_dot=30, T=291.15, p=3e5)
 COLD = WARM.with_(T=279.15)
@@ -212,3 +213,32 @@ def test_production_temperature_reads_the_running_step():
     _, result = reader.step({"storage": start}, HOUR, {"supply_in": COLD})
     assert seen[-1] == 288.15 == result.outlets.return_out.T
     assert storage("idle").production_temperature() == 284.15
+
+
+def test_store_arithmetic_matches_on_arrays():
+    """The conduction conductance and the exponential decay agree on arrays for empty stores."""
+    module = storage()
+
+    def numbers(volume, dt):
+        return dict(
+            conductance=module._store_conductance(volume, WARM),
+            decay=module._decay(volume, WARM, dt),
+        )
+
+    rows = [(0.0, HOUR), (1e4, HOUR), (3e5, 24 * HOUR)]
+    assert_function_matches(numbers, rows)
+    assert_same_error(numbers, rows + [(-1.0, HOUR)], gm.errors.PhysicsRangeError)
+
+
+@pytest.mark.parametrize("mode", ["charge", "discharge"])
+def test_moved_store_matches_on_arrays(mode):
+    """Mixing into the target and drawing down the source agree on arrays, empty store included."""
+    module = storage(mode)
+
+    def moved(volume, change):
+        warm = module._moved_store("warm", volume, change)
+        cold = module._moved_store("cold", volume, change)
+        return dict(enumerate(warm + cold))
+
+    rows = [(0.0, 7.0), (500.0, 7.0), (2e5, -5.0)]
+    assert_function_matches(moved, rows)

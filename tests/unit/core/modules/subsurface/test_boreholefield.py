@@ -9,6 +9,7 @@ from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.heat import Boiler
 from gemini.core.modules.subsurface import BoreholeField
 from gemini.core.types import Inlet, Outlet, Output, Stream
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 BRINE = Stream(m_dot=3, T=273.15, p=3e5)
 CP = 4217.4
@@ -142,3 +143,28 @@ def test_composite_step_advances_the_ground():
     state, result = loop.step(state, 7 * DAY, {"inlet": BRINE})
     assert state["field"]["ground_temperature_change"] < 0
     assert 0 < result.outputs.heat_extraction_rate < hand_effectiveness(3) * 3 * CP * 10
+
+
+def test_field_arithmetic_matches_on_arrays():
+    """The loop conductance, surroundings and ground heat capacity agree on arrays."""
+    module = field()
+
+    def numbers(m_dot, T, p):
+        inlet = Stream(m_dot=m_dot, T=T, p=p)
+        return dict(
+            exchange=module._effective_conductance(inlet),
+            surroundings=module._surroundings_conductance(),
+            capacity=module._ground_heat_capacity(),
+        )
+
+    rows = [(3.0, 273.15, 3e5), (0.0, 273.15, 3e5), (0.05, 300.0, 3e5)]
+    assert_function_matches(numbers, rows)
+    assert_same_error(numbers, rows + [(-1.0, 273.15, 3e5)], gm.errors.PhysicsRangeError)
+
+
+def test_zero_flow_does_not_evaluate_the_cell_geometry():
+    """A cell no wider than the borehole is bad design data only where the loop flows."""
+    module = field().update_params(borehole_spacing=0.1)
+    assert module._effective_conductance(BRINE.with_(m_dot=0)) == 0
+    with pytest.raises(gm.errors.ConfigurationError, match="field geometry rejected"):
+        module._effective_conductance(BRINE)

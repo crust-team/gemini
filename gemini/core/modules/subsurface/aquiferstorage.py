@@ -1,8 +1,8 @@
 """Aquifer thermal energy storage (ATES) well pair with a warm and a cold store."""
 
-import math
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import ground
 from gemini.core.types import (
@@ -93,6 +93,9 @@ class AquiferStorage(Module):
     the groundwater loop through this module (production, pump, heat exchanger, injection)
     reads it first with ``production_temperature()`` and then calls the module once with the
     returned groundwater.
+
+    NOTE(refactor): written with ops, but a graph break while the graph has no ``scan``: the
+    store volumes, temperature changes and heat totals are states.
     """
 
     def __init__(self):
@@ -155,11 +158,13 @@ class AquiferStorage(Module):
         self.stored_energy = fluid * stored
         self.production_T = outlets.production_out.T
         charged = self.charged_heat
-        self.recovery_efficiency = self.recovered_heat / charged if charged > 0 else None
+        self.recovery_efficiency = ops.where(
+            charged > 0, ops.truediv(self.recovered_heat, charged), None
+        )
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
-        self.heat_loss = sum(max(loss, 0) for loss in losses)
-        self.heat_absorbed = sum(max(-loss, 0) for loss in losses)
+        self.heat_loss = sum(ops.maximum(loss, 0) for loss in losses)
+        self.heat_absorbed = sum(ops.maximum(-loss, 0) for loss in losses)
         self.heat_accumulation = (
             _enthalpy_flow(inlets.injection_in)
             - _enthalpy_flow(outlets.production_out)
@@ -198,19 +203,26 @@ class AquiferStorage(Module):
         """Return a store's volume [m3] and temperature change [K] after this step's flow."""
         store_volume, change = self._volume(store), self._change(store)
         source, target = SOURCE_AND_TARGET.get(self.mode, (None, None))
-        if store == target and volume > 0:
+        if store == target:
             mixed = store_volume + volume
-            return mixed, (store_volume * change + volume * injected_change) / mixed
+            blended = ops.truediv(store_volume * change + volume * injected_change, mixed)
+            return ops.where(volume > 0, mixed, store_volume), ops.where(
+                volume > 0, blended, change
+            )
         if store == source:
-            return max(store_volume - volume, 0.0), change
+            return ops.maximum(store_volume - volume, 0.0), change
         return store_volume, change
 
     def _decay(self, store_volume, injection, dt):
         """Return exp(-dt UA / ((rho c)_w V)) [-] of a store; an empty store has no excess."""
-        if store_volume == 0:
-            return 0.0
         conductance = self._store_conductance(store_volume, injection)
-        return math.exp(-dt * conductance / (self._fluid_heat_capacity(injection) * store_volume))
+        return ops.where(
+            store_volume == 0,
+            0.0,
+            ops.exp(
+                ops.truediv(-dt * conductance, self._fluid_heat_capacity(injection) * store_volume)
+            ),
+        )
 
     def _production_temperature(self, states):
         """Return the temperature [K] of the store produced from in the current mode."""
@@ -253,15 +265,21 @@ class AquiferStorage(Module):
 
     def _volume_flow(self, injection):
         """Return the injected liquid volume flow [m3/s] after checking it against the mode."""
-        if injection.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: injection_in.m_dot = {injection.m_dot} kg/s; expected >= 0 "
-                "(the mode sets the direction)"
-            )
-        if self.mode == "idle" and injection.m_dot:
-            raise PhysicsRangeError(
-                f"{self.path}: injection_in.m_dot = {injection.m_dot} kg/s in idle mode; "
-                "expected 0"
+        ops.check(
+            injection.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: injection_in.m_dot = {m_dot} kg/s; expected >= 0 "
+            "(the mode sets the direction)",
+            path=self.path,
+            m_dot=injection.m_dot,
+        )
+        if self.mode == "idle":
+            ops.check(
+                injection.m_dot == 0,
+                PhysicsRangeError,
+                "{path}: injection_in.m_dot = {m_dot} kg/s in idle mode; expected 0",
+                path=self.path,
+                m_dot=injection.m_dot,
             )
         return injection.m_dot / injection.fluid.properties(injection.p, injection.T).rho_l
 

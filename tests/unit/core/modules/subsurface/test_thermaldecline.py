@@ -9,6 +9,7 @@ from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.heat import Boiler
 from gemini.core.modules.subsurface import ThermalDecline
 from gemini.core.types import Inlet, Outlet, Output, Stream
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 STREAM = Stream(m_dot=50, T=353.15, p=2e7)
 WATER = 1000 * 4217.4
@@ -127,3 +128,20 @@ def test_composite_step_advances_the_decline():
     late = {"decline": {"injected_volume": 3 * BREAKTHROUGH}}
     _, result = plant.step(late, 86400, {"sandface": STREAM})
     assert result.outputs.temperature_drop == pytest.approx(20)
+
+
+def test_decline_arithmetic_matches_on_arrays():
+    """The liquid flow, breakthrough volume and drop agree on arrays; reverse flow raises alike."""
+    module = decline()
+
+    def numbers(m_dot, T, p):
+        inlet = Stream(m_dot=m_dot, T=T, p=p)
+        return dict(
+            flow=module._liquid_flow(inlet),
+            volume=module._breakthrough_volume(inlet),
+            drop=module._temperature_drop(inlet),
+        )
+
+    rows = [(50.0, 353.15, 2e7), (0.0, 353.15, 2e7), (5.0, 330.0, 1e6)]
+    assert_function_matches(numbers, rows)
+    assert_same_error(numbers, rows + [(-1.0, 353.15, 2e7)], gm.errors.PhysicsRangeError)

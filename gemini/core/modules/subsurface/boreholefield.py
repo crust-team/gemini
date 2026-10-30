@@ -2,6 +2,7 @@
 
 import math
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import ground
 from gemini.core.types import (
@@ -57,6 +58,9 @@ class BoreholeField(Module):
     It suits monthly to seasonal behaviour; peak-hour fluid temperatures are optimistic.
     Constant properties, uniform ground, no groundwater flow and no axial heat flow in the
     ground are assumed. Zero flow exchanges no heat and returns the inlet unchanged.
+
+    NOTE(refactor): written with ops, but a graph break while the graph has no ``scan``: the
+    ground temperature change is a state.
     """
 
     def __init__(self):
@@ -97,7 +101,9 @@ class BoreholeField(Module):
         inlet = inlets.inlet
         capacity_rate = self._capacity_rate(inlet)
         rate = self._effective_conductance(inlet) * (self._ground_temperature() - inlet.T)
-        outlet_T = inlet.T + rate / capacity_rate if capacity_rate else inlet.T
+        outlet_T = ops.where(
+            capacity_rate != 0, inlet.T + ops.truediv(rate, capacity_rate), inlet.T
+        )
         outlet = inlet.with_(T=outlet_T)
 
         outlets = dict(outlet=outlet)
@@ -110,8 +116,8 @@ class BoreholeField(Module):
         self.fluid_mean_T = (inlet.T + outlets.outlet.T) / 2
         self.ground_T = self._ground_temperature()
         self.outlet_T = outlets.outlet.T
-        self.heat_absorbed = max(rate, 0)
-        self.heat_loss = max(-rate, 0)
+        self.heat_absorbed = ops.maximum(rate, 0)
+        self.heat_loss = ops.maximum(-rate, 0)
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.inlet
@@ -119,7 +125,7 @@ class BoreholeField(Module):
         surroundings = self._surroundings_conductance()
         total = exchange + surroundings
         equilibrium = exchange * (inlet.T - self.undisturbed_ground_temperature) / total
-        decay = math.exp(-total * dt / self._ground_heat_capacity())
+        decay = ops.exp(-total * dt / self._ground_heat_capacity())
         change = equilibrium + (self.ground_temperature_change - equilibrium) * decay
         return {"ground_temperature_change": change}
 
@@ -130,23 +136,25 @@ class BoreholeField(Module):
     def _effective_conductance(self, inlet):
         """Return K = eps m_dot cp [W/K], the inlet-to-ground conductance of the loop."""
         capacity_rate = self._capacity_rate(inlet)
-        if capacity_rate == 0:
-            return 0.0
-        cell_radius = self.borehole_spacing / math.sqrt(math.pi)
+        stopped = capacity_rate == 0
+        cell_radius = ops.where(
+            stopped, 2 * self.borehole_radius, self.borehole_spacing / math.sqrt(math.pi)
+        )
         cell = self._design(
             ground.steady_flux_resistance,
-            self.ground_conductivity,
+            ops.where(stopped, 1.0, self.ground_conductivity),
             self.borehole_radius,
             cell_radius,
         )
         length = self.borehole_count * self.borehole_depth
         conductance = length / (self.borehole_resistance + cell)
-        return -math.expm1(-conductance / capacity_rate) * capacity_rate
+        exchange = -ops.expm1(ops.truediv(-conductance, capacity_rate)) * capacity_rate
+        return ops.where(stopped, 0.0, exchange)
 
     def _surroundings_conductance(self):
         """Return the conductance [W/K] between the field volume and the undisturbed ground."""
         area = self.borehole_count * self.borehole_spacing**2
-        diameter = 2 * math.sqrt(area / math.pi)
+        diameter = 2 * ops.sqrt(area / math.pi)
         return self._design(
             ground.vertical_cylinder_conductance,
             self.ground_conductivity,
@@ -161,8 +169,13 @@ class BoreholeField(Module):
 
     def _capacity_rate(self, inlet):
         """Return m_dot cp [W/K] of the loop flow; reverse flow is outside the model."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         return inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
 
     def _design(self, relation, *values):

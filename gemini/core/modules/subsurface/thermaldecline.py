@@ -1,5 +1,6 @@
 """Production temperature decline of a geothermal doublet after thermal breakthrough."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import ground
 from gemini.core.types import (
@@ -52,6 +53,9 @@ class ThermalDecline(Module):
     pressure pass unchanged. The module is deliberately not first-law closed: the temperature
     drop is a correction of the open aquifer boundary, so the stream audit shows the residual
     m_dot cp (T_in - outlet_T), which is not heat lost to the environment.
+
+    NOTE(refactor): written with ops, but a graph break while the graph has no ``scan``: the
+    injected volume is a state.
     """
 
     def __init__(self):
@@ -95,7 +99,7 @@ class ThermalDecline(Module):
         inlet = inlets.inlet
         flow = self._liquid_flow(inlet)
         volume = self._breakthrough_volume(inlet)
-        self.breakthrough_time = volume / flow if flow else None
+        self.breakthrough_time = ops.where(flow != 0, ops.truediv(volume, flow), None)
         self.temperature_drop = self._temperature_drop(inlet)
         self.outlet_T = outlets.outlet.T
 
@@ -122,8 +126,11 @@ class ThermalDecline(Module):
 
     def _liquid_flow(self, inlet):
         """Return the produced liquid volume flow [m3/s]; reverse flow is outside the model."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0 (production)"
-            )
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (production)",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         return inlet.m_dot / inlet.fluid.properties(inlet.p, inlet.T).rho_l
