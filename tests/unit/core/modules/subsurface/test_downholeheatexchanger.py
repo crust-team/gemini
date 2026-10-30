@@ -2,12 +2,15 @@
 
 import math
 
+import numpy as np
 import pytest
 
 import gemini as gm
 from gemini.core.modules import energy_balance, mass_balance
 from gemini.core.modules.subsurface import DownholeHeatExchanger
 from gemini.core.types import Stream
+from gemini.graph import run
+from tests.fixtures.equivalence import assert_module_matches
 
 INLET = Stream(m_dot=5, T=303.15, p=3e5)
 CP = 4217.4
@@ -76,3 +79,28 @@ def test_short_operating_time_is_bad_design_data():
     module = exchanger().update_params(operating_time=3600)
     with pytest.raises(gm.errors.ConfigurationError, match="operating_time rejected"):
         module(inlet=INLET)
+
+
+def test_exchanger_matches_traced():
+    """Extraction, heat loss and zero flow equal one call per row."""
+    rows = [
+        dict(inlet=INLET.with_(m_dot=m_dot, T=T))
+        for m_dot, T in [(5, 303.15), (0.01, 303.15), (0, 303.15), (20, 400), (1, 283.15)]
+    ]
+    assert_module_matches(exchanger(), rows)
+
+
+def test_early_operating_time_is_not_evaluated_at_zero_flow():
+    """A stopped exchanger needs no rock resistance, so a short operating time does not raise."""
+    module = exchanger().update_params(operating_time=3600)
+    assert module(inlet=INLET.with_(m_dot=0)).outputs.heat_extraction_rate == 0
+
+
+def test_traced_early_operating_time_raises_only_for_flowing_rows():
+    """In a traced call the configuration error belongs to the rows that flow."""
+    module = exchanger().update_params(operating_time=3600)
+    stopped = Stream(m_dot=np.zeros(2), T=np.full(2, 303.15), p=np.full(2, 3e5))
+    assert run(module, {"inlet": stopped}).outputs["heat_extraction_rate"].tolist() == [0, 0]
+    mixed = Stream(m_dot=np.array([0.0, 5.0]), T=np.full(2, 303.15), p=np.full(2, 3e5))
+    with pytest.raises(gm.errors.ConfigurationError, match="operating_time rejected"):
+        run(module, {"inlet": mixed})

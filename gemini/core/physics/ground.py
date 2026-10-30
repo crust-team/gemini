@@ -262,7 +262,14 @@ def steady_flux_resistance(
     return shape / (2 * math.pi * conductivity)
 
 
-def ramey_time_function(time: float, diffusivity: float, radius: float) -> float:
+def ramey_time_function(
+    time: float,
+    diffusivity: float,
+    radius: float,
+    *,
+    error: type[Exception] = PhysicsRangeError,
+    context: str = "",
+) -> float:
     """Return Ramey's dimensionless transient conduction function f(t) [-].
 
     Parameters
@@ -273,6 +280,11 @@ def ramey_time_function(time: float, diffusivity: float, radius: float) -> float
         Positive rock thermal diffusivity [m2/s].
     radius : float
         Positive borehole (outer heat-exchange) radius [m].
+    error : type of Exception, optional
+        Class raised for an invalid input; a caller that reports the failure as its own
+        configuration error passes it with a ``context`` prefix for the message.
+    context : str, optional
+        Text placed before the function name in the message of an error.
 
     Returns
     -------
@@ -288,14 +300,16 @@ def ramey_time_function(time: float, diffusivity: float, radius: float) -> float
     ``PhysicsRangeError`` below alpha t / r**2 = 25, where the approximation error exceeds
     about 1 % (roughly the first days of operation).
     """
-    _require_positive("ramey_time_function", time=time)
-    _require_positive("ramey_time_function", diffusivity=diffusivity)
-    _require_positive("ramey_time_function", radius=radius)
+    function = f"{context}ramey_time_function"
+    _require_positive(function, error, time=time)
+    _require_positive(function, error, diffusivity=diffusivity)
+    _require_positive(function, error, radius=radius)
     fourier = diffusivity * time / radius**2
     ops.check(
         ops.logical_not(fourier < MIN_RAMEY_FOURIER),
-        PhysicsRangeError,
-        "ramey_time_function: alpha t / r**2 = {fourier}; expected >= {minimum}",
+        error,
+        "{function}: alpha t / r**2 = {fourier}; expected >= {minimum}",
+        function=function,
         fourier=fourier,
         minimum=MIN_RAMEY_FOURIER,
     )
@@ -368,12 +382,12 @@ def _dipole_travel_time(theta):
     return 3 * difference / ops.sin(theta) ** 3
 
 
-def _require_positive(function, **values):
-    """Raise ``PhysicsRangeError`` unless every value is a positive number."""
+def _require_positive(function, error=PhysicsRangeError, **values):
+    """Raise ``error`` (``PhysicsRangeError`` by default) unless every value is positive."""
     for name, value in values.items():
         ops.check(
             ops.logical_not(ops.logical_or(ops.isnan(value), value <= 0)),
-            PhysicsRangeError,
+            error,
             "{function}: {name} = {value}; expected a positive value",
             function=function,
             name=name,

@@ -2,6 +2,7 @@
 
 import math
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import ground
 from gemini.core.types import (
@@ -93,27 +94,47 @@ class DownholeHeatExchanger(Module):
         rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l * (outlet.T - inlet.T)
         self.heat_extraction_rate = rate
         self.outlet_T = outlet.T
-        self.heat_absorbed = max(rate, 0)
-        self.heat_loss = max(-rate, 0)
+        self.heat_absorbed = ops.maximum(rate, 0)
+        self.heat_loss = ops.maximum(-rate, 0)
 
     def _outlet_temperature(self, inlet):
-        """Return the bottom-hole fluid temperature [K] from Ramey's profile."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
-        if inlet.m_dot == 0:
-            return inlet.T
-        capacity_rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        relaxation = capacity_rate * (self.borehole_resistance + self._rock_resistance())
-        return ground.ramey_fluid_temperature(
-            inlet.T, self.surface_temperature, self.geothermal_gradient, self.depth, relaxation
-        )
+        """Return the bottom-hole fluid temperature [K] from Ramey's profile.
 
-    def _rock_resistance(self):
-        """Return the transient rock resistance f(t) / (2 pi k) [m K/W]."""
-        try:
-            function = ground.ramey_time_function(
-                self.operating_time, self.rock_diffusivity, self.borehole_radius
-            )
-        except PhysicsRangeError as error:
-            raise ConfigurationError(f"{self.path}: operating_time rejected: {error}") from error
+        Zero flow returns the inlet temperature. Both results are always evaluated, so at zero
+        flow the profile receives a relaxation length of 1 m and an operating time of twice
+        the earliest valid one, which keeps its checks quiet; ``where`` discards the profile.
+        """
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
+        stopped = inlet.m_dot == 0
+        capacity_rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
+        relaxation = capacity_rate * (self.borehole_resistance + self._rock_resistance(stopped))
+        profile = ground.ramey_fluid_temperature(
+            inlet.T,
+            self.surface_temperature,
+            self.geothermal_gradient,
+            self.depth,
+            ops.where(stopped, 1.0, relaxation),
+        )
+        return ops.where(stopped, inlet.T, profile)
+
+    def _rock_resistance(self, stopped):
+        """Return the transient rock resistance f(t) / (2 pi k) [m K/W].
+
+        An operating time that is too early for Ramey's asymptote is a configuration error,
+        except at zero flow, which never evaluates the resistance.
+        """
+        earliest = ground.MIN_RAMEY_FOURIER * self.borehole_radius**2 / self.rock_diffusivity
+        function = ground.ramey_time_function(
+            ops.where(stopped, 2 * earliest, self.operating_time),
+            self.rock_diffusivity,
+            self.borehole_radius,
+            error=ConfigurationError,
+            context=f"{self.path}: operating_time rejected: ",
+        )
         return function / (2 * math.pi * self.rock_conductivity)
