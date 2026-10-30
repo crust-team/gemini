@@ -18,7 +18,8 @@ class Graph:
     check nodes (their codes are their position plus one), ``constants`` the ``Constant``
     objects behind the constant inputs, ``outlet_fluids`` the fixed fluid of every outlet,
     ``pre_observers`` the marked read-only pre-hooks and ``observers`` the forward hooks that
-    only read, replayed per row after a run.
+    only read, replayed per row after a run. ``breaks`` lists the children that run untraced, as
+    ``(module path, reason)``.
     """
 
     def __init__(self, module_path):
@@ -30,6 +31,8 @@ class Graph:
         self.checks = []
         self.constants = {}
         self.outlet_fluids = {}
+        self.breaks = []
+        self.breaks = []
         self.pre_observers = []
         self.observers = []
 
@@ -55,6 +58,21 @@ class Graph:
     def output(self, name, value):
         """Name a graph output; ``value`` is a traced value or a literal number."""
         self.outputs[name] = self._operand(value)
+
+    def mark(self):
+        """Return a position to ``rollback`` to: the counts of nodes, inputs and checks."""
+        return len(self.nodes), len(self.inputs), len(self.checks)
+
+    def rollback(self, mark):
+        """Drop every node, input, constant and check added since ``mark``, and their guards."""
+        nodes, inputs, checks = mark
+        for name in list(self.inputs)[inputs:]:
+            del self.inputs[name]
+            self.constants.pop(name, None)
+        del self.nodes[nodes:]
+        del self.checks[checks:]
+        for node in self.nodes:
+            node.guards = [guard for guard in node.guards if guard.index < nodes]
 
     def by_role(self, role):
         """Return the input nodes of one role by name."""
@@ -120,6 +138,7 @@ class Graph:
             lines.append(f"  code {node.code}: {error} at {node.source}")
         lines.append("outputs:")
         lines.extend(f"  {name} = {_describe(value)}" for name, value in self.outputs.items())
+        lines.extend(f"break: {path}: {reason}" for path, reason in self.breaks)
         lines.extend(f"pre-observer: {hook!r}" for hook in self.pre_observers)
         lines.extend(f"observer: {hook!r}" for hook in self.observers)
         return "\n".join(lines)

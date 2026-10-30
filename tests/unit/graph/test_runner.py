@@ -4,9 +4,11 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsRangeError, TraceError
 from gemini.graph import GraphCache, Proxy, run
 from gemini.utils.hooks import observer
+
+from .conftest import Chain, Gain, Opaque, Stubborn, Switcher, Tank
 
 
 def _rows(gain, inlet, frequency):
@@ -127,3 +129,93 @@ def test_composite_errors_raise_the_child_error(line, inlet):
     """A negative control of a child raises the child's error class and message."""
     with pytest.raises(PhysicsRangeError, match="gain: gain = -1.0"):
         run(line, {"inlet": inlet}, {"boost": np.array([1.0, -1.0, 2.0])})
+
+
+def _chain_rows(chain, inlet, drives):
+    rows = []
+    for row in range(3):
+        stream = gm.Stream(
+            m_dot=inlet.m_dot[row], T=inlet.T[row], p=inlet.p[row], fluid=inlet.fluid
+        )
+        rows.append(chain(inlet=stream, drive=drives[row]))
+    return rows
+
+
+@pytest.fixture
+def chain_inlet():
+    """Return a three-row water inlet for the chains."""
+    return gm.Stream(
+        m_dot=np.array([1.0, 2.0, 3.0]),
+        T=np.array([300.0, 310.0, 320.0]),
+        p=np.array([1e5, 2e5, 3e5]),
+        fluid=gm.WATER,
+    )
+
+
+def _break_middles():
+    stubborn = Stubborn().update_params(scale=3.0)
+    hooked = Gain().update_params(scale=3.0)
+    hooked.register_forward_pre_hook(lambda module, inlets: None)
+    return {"stateful": Tank(), "untraceable": stubborn, "pre-hooked": hooked}
+
+
+@pytest.mark.parametrize("kind", ["stateful", "untraceable", "pre-hooked"])
+def test_a_leaf_break_keeps_the_rest_in_the_graph(kind, chain_inlet):
+    """The child runs untraced per row; its values flow into formulas, sums and outlets."""
+    chain = Chain(_break_middles()[kind])
+    drives = np.array([1.0, 2.0, 3.0])
+    result = run(chain, {"inlet": chain_inlet}, {"drive": drives})
+    expected = _chain_rows(chain, chain_inlet, drives)
+    assert result.graph is not None and result.breaks == []
+    assert [path for path, _ in result.graph.breaks] == ["middle"]
+    assert result.graph.nodes[0].op != "break" and "break(" in result.graph.describe()
+    for name in ("value", "pressure", "electricity"):
+        assert result.outputs[name].tolist() == [row.outputs[name] for row in expected]
+    assert result.outlets["outlet"]["p"].tolist() == [row.outlets.outlet.p for row in expected]
+
+
+def test_a_failing_break_row_raises_its_own_exception(chain_inlet):
+    """The exception of the first failing row of the child is raised as it was."""
+    chain = Chain(Stubborn().update_params(scale=3.0))
+    with pytest.raises(PhysicsRangeError, match="middle: gain = -2.0"):
+        run(chain, {"inlet": chain_inlet}, {"drive": np.array([1.0, -2.0, -3.0])})
+
+
+def test_a_break_node_runs_on_the_python_backend_too(chain_inlet):
+    """With scalar rows the break node returns plain Python values."""
+    chain = Chain(Tank())
+    expected = run(chain, {"inlet": chain_inlet}, {"drive": 1.0})
+    actual = run(chain, {"inlet": chain_inlet}, {"drive": 1.0}, backend="python")
+    for name, values in expected.outputs.items():
+        assert actual.outputs[name].tolist() == values.tolist()
+
+
+def test_a_pre_hook_of_a_break_runs_once_per_row(chain_inlet):
+    """A pre-hooked child is called on the plain path for every row, hooks included."""
+    calls = []
+    middle = Gain().update_params(scale=3.0)
+    middle.register_forward_pre_hook(lambda module, inlets: calls.append(1))
+    run(Chain(middle), {"inlet": chain_inlet}, {"drive": 1.0})
+    assert len(calls) == 3
+
+
+def test_a_composite_child_that_cannot_be_traced_breaks_the_whole_root(chain_inlet):
+    """A composite is never a node: its leaves' records feed the parent, so the root breaks."""
+    chain = Chain(Opaque())
+    result = run(chain, {"inlet": chain_inlet}, {"drive": 1.0})
+    assert result.graph is None and "float()" in result.breaks[0]
+
+
+def test_a_marked_observer_on_a_leaf_child_is_not_a_break_node(chain_inlet):
+    """Replaying it per row is only possible at the root, so the root falls back as a whole."""
+    middle = Gain().update_params(scale=3.0)
+    middle.register_forward_hook(observer(lambda module, inlets, outlets: None))
+    result = run(Chain(middle), {"inlet": chain_inlet}, {"drive": 1.0})
+    assert result.graph is None and "observer" in result.breaks[0]
+
+
+def test_a_row_whose_outlet_fluid_differs_from_the_probe_fails(chain_inlet):
+    """The static outlet fluid comes from a probe; another fluid on a row is a failed row."""
+    chain = Chain(Switcher())
+    with pytest.raises(TraceError, match="fluid differs from the traced one"):
+        run(chain, {"inlet": chain_inlet}, {"drive": 1.0})

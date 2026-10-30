@@ -307,8 +307,15 @@ and numeric parameters become graph inputs named `<path below the root>.<name>`,
 values win without validation, and the `ModuleResult` of traced values joins the parent's call
 records, so `Output.of`, automatic sums, `Output.ratio` and `ModuleResult.leaves()` work
 unchanged. `Output.ratio` is `where(bottom == 0, None, top / bottom)` with the division written as
-`ops.truediv`, which gives today's `None` on plain floats. A child that is stateful or has a
-pre-hook, and a child with an observer or a read-only hook, cannot be recorded.
+`ops.truediv`, which gives today's `None` on plain floats. A leaf child that is stateful,
+has a pre-hook, has an unmarked read-only hook or raises `TraceError` becomes one **break node**:
+the graph is rolled back to where the child call started and the child runs on the plain path
+(`module(**row)`, a stateful one from its initial states, hooks included) once per row while the
+graph is evaluated, its outputs and outlet fields being `break_output` nodes. The outlet fluids
+come from one probe of `forward` on representative inlets; a row with another fluid fails. A
+failed row is NaN and carries an error code that raises the child's own exception. A composite
+child that cannot be recorded, and any child with a marked observer, make the whole root a graph
+break (`graph.breaks` lists the leaf breaks with their reasons).
 
 ## Skipping outputs
 

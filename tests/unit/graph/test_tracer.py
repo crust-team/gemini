@@ -158,15 +158,19 @@ def test_uninitialized_parameters_of_the_tree_are_refused(line):
         Tracer().trace(line, {"inlet": line.fluid})
 
 
-def test_observers_on_a_child_are_a_graph_break(line):
-    """A read-only hook on a child cannot be replayed per row at the root."""
-    line.gain.register_forward_hook(lambda module, inlets, outlets: module.rise)
-    with pytest.raises(TraceError, match="gain: forward hook .*cannot be replayed"):
-        Tracer().trace(line, {"inlet": line.fluid})
-    line.gain._hooks.clear()
+def test_marked_observers_on_a_child_are_a_graph_break(line):
+    """An observer is replayed per row for the root only, so one on a child breaks the root."""
     line.gain.register_forward_hook(observer(lambda module, inlets, outlets: None))
-    with pytest.raises(TraceError, match="gain: forward hook"):
+    with pytest.raises(TraceError, match="gain: observer hooks on a child"):
         Tracer().trace(line, {"inlet": line.fluid})
+
+
+def test_a_reading_hook_on_a_leaf_child_makes_it_a_break_node(line):
+    """An unmarked hook that only reads cannot be replayed, so the leaf child runs untraced."""
+    line.gain.register_forward_hook(lambda module, inlets, outlets: module.rise)
+    graph = Tracer().trace(line, {"inlet": line.fluid})
+    assert [path for path, _ in graph.breaks] == ["gain"]
+    assert "only reads" in graph.breaks[0][1]
 
 
 def test_writing_hooks_on_a_child_join_the_graph(line):

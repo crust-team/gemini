@@ -6,6 +6,8 @@ import pytest
 from gemini import ops
 from gemini.core.modules import Module
 from gemini.core.types import (
+    BRINE,
+    WATER,
     Control,
     Electricity,
     Inlet,
@@ -303,3 +305,128 @@ def twice():
 def tank():
     """Return a stateful ``Tank`` module."""
     return Tank()
+
+
+class Chain(Module):
+    """Meter, then the ``middle`` module, then a meter: the middle one can be a graph break."""
+
+    def __init__(self, middle):
+        """Declare the children, the output formulas, the drive control and the ports."""
+        super().__init__()
+
+        # Modules
+        self.first = Meter()
+        self.middle = middle
+        self.last = Meter()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.drive = Control(float, default=1.0)
+
+        # Outputs
+        self.value = Output.of(getattr(self.middle, next(iter(middle._outputs))))
+        self.pressure = Output.of(self.last.outlet.field("p"))
+        self.electricity = Output(Electricity)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Connect the children in series; every control of the middle module gets ``drive``."""
+
+        # Modules
+        metered = self.first(inlet=inlets.inlet, draw=1.0)
+        controls = {name: self.drive for name in self.middle._controls}
+        through = self.middle(inlet=metered.outlets.outlet, **controls)
+        last = self.last(inlet=through.outlets.outlet, draw=1.0)
+
+        # Outlets
+        outlets = dict(outlet=last.outlets.outlet)
+        return outlets
+
+
+class Stubborn(Gain):
+    """A gain whose forward needs a number from the inlet: it cannot be traced."""
+
+    def forward(self, inlets):
+        """Raise the pressure by the gain times the inlet temperature as a plain float."""
+
+        # Outlets
+        ops.check(
+            self.gain >= 0,
+            PhysicsRangeError,
+            "{path}: gain = {gain}",
+            path=self.path,
+            gain=self.gain,
+        )
+        outlet = inlets.inlet.with_(p=inlets.inlet.p + self.gain * float(inlets.inlet.T))
+        outlets = dict(outlet=outlet)
+        return outlets
+
+
+class Opaque(Module):
+    """A composite whose own forward needs a number from the inlet: it cannot be traced."""
+
+    def __init__(self):
+        """Declare one child, an inlet, an output to copy and an outlet."""
+        super().__init__()
+
+        # Modules
+        self.meter = Meter()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outputs
+        self.electricity = Output(Electricity)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Refuse a traced value."""
+
+        # Modules
+        metered = self.meter(inlet=inlets.inlet, draw=float(inlets.inlet.T))
+
+        # Outlets
+        outlets = dict(outlet=metered.outlets.outlet)
+        return outlets
+
+
+class Switcher(Module):
+    """Pass the stream on, but with water when the inlet is warmer than 305 K."""
+
+    def __init__(self):
+        """Declare an inlet, an output and an outlet."""
+        super().__init__()
+
+        # States
+        self.level = State(float, default=0.0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outputs
+        self.seen = Output(float)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Pass the stream; the fluid depends on the value of a row."""
+
+        # Outlets
+        fluid = WATER if inlets.inlet.T < 305.0 else BRINE
+        outlets = dict(
+            outlet=Stream(m_dot=inlets.inlet.m_dot, T=inlets.inlet.T, p=inlets.inlet.p, fluid=fluid)
+        )
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.seen = inlets.inlet.T
+
+    def _advance_states(self, inlets, outlets, dt):
+        return dict(level=self.seen)

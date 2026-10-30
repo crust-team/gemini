@@ -9,6 +9,10 @@ _TRACING_PACKAGES = tuple(
 )
 
 
+STREAM_FIELDS = (("m_dot", "kg/s"), ("T", "K"), ("p", "Pa"))
+"""Stream fields of every inlet and outlet in the graph, with their units."""
+
+
 @dataclass(eq=False, slots=True)
 class Node:
     """A graph input (``op == "input"``) or one op applied to ``operands``.

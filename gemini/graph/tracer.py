@@ -21,12 +21,11 @@ from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult, Values
 from gemini.errors import MissingValueError, TraceError
+from gemini.graph.breaks import record_break
 from gemini.graph.graph import Graph
+from gemini.graph.node import STREAM_FIELDS
 from gemini.utils.hooks import is_observer
 from gemini.utils.strings import join_path
-
-STREAM_FIELDS = (("m_dot", "kg/s"), ("T", "K"), ("p", "Pa"))
-"""Stream fields of every inlet and outlet in the graph, with their units."""
 
 
 class Tracer:
@@ -81,20 +80,46 @@ class Trace:
         self._parameters = {}
 
     def child(self, module, inlets, supplied, parent):
-        """Record one child call and return its ``ModuleResult`` of traced values."""
-        _check_child(module)
-        outlets, call = self.run(module, inlets, supplied, parent)
+        """Record one child call and return its ``ModuleResult`` of traced values.
+
+        A stateful or pre-hooked leaf, and a leaf whose trace raises ``TraceError``, become one
+        break node and the rest of the graph is kept; a composite child that cannot be
+        recorded, or any child with an observer, raises ``TraceError`` instead.
+        """
+        _check_observers(module)
+        reason = _unrecordable(module)
+        mark = self._mark()
+        try:
+            if reason is not None:
+                raise TraceError(f"{module.path}: {reason}")
+            outlets, call = self.run(module, inlets, supplied, parent)
+            outputs, inputs, records = call.outputs or {}, call.inputs, call.call_records
+        except TraceError as error:
+            if not module.is_leaf:
+                raise
+            self._rollback(mark)
+            outlets, outputs, inputs = record_break(
+                self.graph, module, inlets, supplied, outputs_enabled(), str(error)
+            )
+            records = []
         result = ModuleResult(
-            outputs=Values(call.outputs or {}, module._outputs),
+            outputs=Values(outputs, module._outputs),
             outlets=outlets,
             inlets=inlets,
-            inputs=dict(call.inputs),
-            children=dict(call.call_records),
-            call_records=tuple(call.call_records),
+            inputs=dict(inputs),
+            children=dict(records),
+            call_records=tuple(records),
             is_leaf=module.is_leaf,
         )
         parent.call_records.append((module._relative_path(parent.module), result))
         return result
+
+    def _mark(self):
+        return self.graph.mark(), dict(self._inputs), dict(self._parameters)
+
+    def _rollback(self, mark):
+        graph_mark, self._inputs, self._parameters = mark[0], mark[1], mark[2]
+        self.graph.rollback(graph_mark)
 
     def run(self, module, inlets, supplied, parent):
         """Trace ``forward`` and the output step of ``module``; return its outlets and call."""
@@ -188,15 +213,22 @@ def _check_traceable(module):
         raise TraceError(f"{module.path}: cannot be traced: {'; '.join(reasons)}")
 
 
-def _check_child(module):
-    """Refuse a child call that has no place in the graph."""
-    reasons = []
+def _unrecordable(module):
+    """Return why a child call cannot be recorded in the graph, or ``None``."""
     if module.stateful:
-        reasons.append("stateful (needs scan)")
+        return "stateful (needs scan)"
     if module._pre_hooks:
-        reasons.append("has forward pre-hooks")
-    if reasons:
-        raise TraceError(f"{module.path}: cannot be traced: {'; '.join(reasons)}")
+        return "has forward pre-hooks"
+    return None
+
+
+def _check_observers(module):
+    """Refuse a child with an observer: it is replayed per row for the root only."""
+    hooks = (*module._pre_hooks.values(), *module._hooks.values())
+    if any(is_observer(hook) for hook in hooks):
+        raise TraceError(
+            f"{module.path}: observer hooks on a child of a composite cannot be replayed"
+        )
 
 
 def _inlet(graph, name, fluid):

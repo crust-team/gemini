@@ -14,6 +14,7 @@ def test_registered_ops_describe_name_kind_and_arity():
     assert defined["add"] == registry.OpDef("add", "elementwise", 2)
     assert defined["where"].arity == 3 and defined["getitem"].kind == "index"
     assert defined["check"].kind == "check" and defined["scan"].kind == "scan"
+    assert "break" in registry.KINDS
     assert {definition.kind for definition in defined.values()} <= set(registry.KINDS)
 
 

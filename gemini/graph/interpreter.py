@@ -5,13 +5,16 @@ NumPy). The error pass then gives every node the per-row error code of its opera
 checks guarding it (``0`` means no error; of several, the lowest code, the check that ran first,
 wins), except that ``where`` keeps only the code of the branch it selected on each row. The
 first row whose code reaches an output raises the check's ``gm.errors`` class with the message
-of the untraced path, noted with the physics source line of the check.
+of the untraced path, noted with the physics source line of the check. A break node runs its
+module row by row; a failed row has the code of the node's check and its exception is
+re-raised.
 """
 
 import numpy as np
 
 from gemini import backends
 from gemini.errors import CallError
+from gemini.graph.breaks import evaluate_break
 from gemini.graph.node import Node
 from gemini.graph.proxy import Proxy
 from gemini.ops.check import failure
@@ -42,6 +45,8 @@ class Interpreter:
         if node.op == "input":
             return feeds[node.name]
         operands = [_value(operand, values) for operand in node.operands]
+        if node.kind == "break":
+            return _break_value(node, operands)
         method = backends.implementation(self.backend, node.op)
         if node.op == "check":
             return method(operands[0], node.code)
@@ -70,6 +75,8 @@ class Interpreter:
         codes = np.atleast_1d(code)
         row = int(np.flatnonzero(codes)[0])
         check = self.graph.checks[int(codes[row]) - 1]
+        if "break" in check.attributes:
+            raise values[check.attributes["break"]].exceptions[row]
         message_values = {
             name: _value(value.node if isinstance(value, Proxy) else value, values)
             for name, value in check.attributes["values"].items()
@@ -77,6 +84,13 @@ class Interpreter:
         error = failure(check.attributes["error"], check.attributes["message"], message_values, row)
         error.add_note(f"raised by the check at {check.source}")
         raise error
+
+
+def _break_value(node, operands):
+    """Run a break node, or select one column of the result of the one it belongs to."""
+    if node.op == "break":
+        return evaluate_break(node, operands)
+    return operands[0].column(node.attributes["key"])
 
 
 def _value(operand, values):

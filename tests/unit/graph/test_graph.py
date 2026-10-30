@@ -61,3 +61,20 @@ def test_none_and_fixed_tables_are_literals():
     )
     with pytest.raises(TraceError):
         ops.interp(x, [x, 1.0], [2.0, 3.0])
+
+
+def test_rollback_drops_nodes_inputs_constants_checks_and_their_guards():
+    """Everything recorded after a mark disappears, guards on earlier nodes included."""
+    graph = Graph("test")
+    pressure = graph.input("p", "inlet", "Pa")
+    kept = pressure + 1.0
+    mark = graph.mark()
+    extra = graph.input("extra", "control")
+    dropped = kept * LIMIT + extra
+    ops.check(dropped > 0, PhysicsRangeError, "{value}", value=kept)
+    assert kept.node.guards and len(graph.checks) == 1
+    graph.rollback(mark)
+    assert [node.op for node in graph.nodes] == ["input", "add"]
+    assert list(graph.inputs) == ["p"] and graph.constants == {} and graph.checks == []
+    assert kept.node.guards == []
+    assert graph.mark() == mark

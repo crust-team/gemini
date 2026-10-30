@@ -1,0 +1,185 @@
+"""Break nodes: a leaf child that cannot be traced runs untraced, row by row, inside a graph.
+
+``record_break`` records one ``break`` node for the call of a stateful, pre-hooked or
+untraceable leaf child. Its operands are the fields of the inlets and the supplied control and
+boundary values, flattened; its attributes are the module and the layout of the operands. Every
+output and outlet field is a ``break_output`` node of it. ``evaluate_break`` runs the module row
+by row on the plain path (``module(**arguments)``, so a stateful module starts from its initial
+states, exactly like a call outside ``Module.step``) and stacks the results. A row that raises
+is NaN and fails a check guarding every output of the node: the row carries an error code like
+any failed check, and ``Interpreter.run`` re-raises the exception of the first failing row.
+
+The outlet fluids are static in a trace but unknown until the module has run. The recorder
+therefore probes ``forward`` once on representative concrete inlets (never the hooks), and a
+row whose outlet fluid differs from the probed one counts as failed.
+"""
+
+import numpy as np
+
+from gemini.core.modules.module import _Call, _current_call
+from gemini.core.types.flows import Stream
+from gemini.core.types.ports import Ports
+from gemini.errors import MissingValueError, TraceError
+from gemini.graph.node import STREAM_FIELDS
+from gemini.ops import Symbolic, registry
+from gemini.ops.registry import get
+
+PROBE = {"m_dot": 1.0, "T": 300.0, "p": 1e5}
+"""Representative values of the fields of an inlet that is traced when the fluids are probed."""
+
+PROBE_INPUT = 1.0
+"""The value of a traced control or boundary that has no stored value when the fluids are probed."""
+
+registry.register("break", "break", 0)
+registry.register("break_output", "break", 1)
+
+
+class BreakResult:
+    """The stacked results of a break node: arrays by key, and the exception of each failed row."""
+
+    def __init__(self, columns, ok, exceptions, scalar):
+        """Keep the value arrays by key, the per-row success mask and the failures by row."""
+        self.columns = columns
+        self.ok = ok
+        self.exceptions = exceptions
+        self.scalar = scalar
+
+    def column(self, key):
+        """Return the values of one key; plain Python scalars when every operand was a scalar."""
+        values = self.ok if key == ("ok",) else self.columns[key]
+        return values[0].item() if self.scalar else values
+
+
+def record_break(graph, module, inlets, supplied, call_outputs, reason):
+    """Record a break node for ``module`` and return its outlets, output values and inputs.
+
+    ``inlets`` are the traced inlets of the call, ``supplied`` the control and boundary values
+    the caller passed, ``call_outputs`` whether outputs are recorded. The outlet fluids come from
+    a probe of ``forward``. The returned ``Ports`` and ``dict`` hold traced values.
+    """
+    inputs = _probe_inputs(module, supplied)
+    fluids = _probe_fluids(module, inlets, inputs)
+    names = tuple(supplied)
+    operands = [getattr(stream, field) for stream in inlets.values() for field, _ in STREAM_FIELDS]
+    operands.extend(supplied[name] for name in names)
+    keys = [("outlets", port, field) for port in fluids for field, _ in STREAM_FIELDS]
+    keys.extend(("outputs", name) for name in (module._outputs if call_outputs else ()))
+    attributes = {
+        "module": module,
+        "inlets": tuple((port, stream.fluid) for port, stream in inlets.items()),
+        "names": names,
+        "fluids": fluids,
+        "keys": tuple(keys),
+    }
+    node = graph.record(get("break"), operands, attributes)
+    ok = graph.record(get("break_output"), (node,), {"key": ("ok",)})
+    values = {key: graph.record(get("break_output"), (node,), {"key": key}) for key in keys}
+    _guard(graph, module, ok, values.values(), reason)
+    outlets = {
+        port: Stream._trusted(
+            fluid=fluid, **{field: values["outlets", port, field] for field, _ in STREAM_FIELDS}
+        )
+        for port, fluid in fluids.items()
+    }
+    outputs = {key[1]: value for key, value in values.items() if key[0] == "outputs"}
+    return Ports(outlets, path=module.path), outputs, {**inputs, **supplied}
+
+
+def _guard(graph, module, ok, outputs, reason):
+    """Add the check that fails a row of a break node and travels with all its outputs."""
+    attributes = {
+        "error": TraceError,
+        "message": f"{module.path}: graph break",
+        "values": {},
+        "break": ok.node.operands[0],
+    }
+    graph.record(get("check"), (ok,), attributes)
+    for output in outputs:
+        output.node.guards.append(graph.checks[-1])
+    graph.breaks.append((module.path, reason))
+
+
+def _probe_inputs(module, supplied):
+    """Return the concrete controls and boundaries of the probe.
+
+    A supplied number is validated, a traced value or a missing one takes the stored or default
+    value, else ``PROBE_INPUT``: the probe only needs a value that lets ``forward`` run.
+    """
+    inputs = {}
+    for name, declaration in (module._controls | module._boundaries).items():
+        value = supplied.get(name)
+        if value is not None and not isinstance(value, Symbolic):
+            inputs[name] = declaration.validate(value)
+            continue
+        try:
+            inputs[name] = module._input_value(name)
+        except MissingValueError:
+            inputs[name] = PROBE_INPUT
+    return inputs
+
+
+def _probe_fluids(module, inlets, inputs):
+    """Run ``forward`` once on representative inlets and return the fluid of every outlet."""
+    streams = {port: Stream(**PROBE, fluid=stream.fluid) for port, stream in inlets.items()}
+    call = _Call(
+        module=module, inputs=inputs, outputs=None, parent=None, states=module._call_states(None)
+    )
+    token = _current_call.set(call)
+    try:
+        outlets = module._check_outlets(module.forward(Ports(streams, path=module.path)))
+    except Exception as error:
+        raise TraceError(f"{module.path}: cannot probe the outlet fluids: {error}") from error
+    finally:
+        _current_call.reset(token)
+    return {port: stream.fluid for port, stream in outlets.items()}
+
+
+def evaluate_break(node, operands):
+    """Run the module of a break node on every row and return a ``BreakResult``."""
+    attributes = node.attributes
+    arrays = [np.asarray(operand) for operand in operands]
+    scalar = all(array.ndim == 0 for array in arrays)
+    rows = 1 if scalar else max(array.size for array in arrays)
+    columns = {key: np.full(rows, np.nan) for key in attributes["keys"]}
+    ok = np.ones(rows, dtype=bool)
+    exceptions = {}
+    for row in range(rows):
+        try:
+            values = _call_row(attributes, [_item(array, row) for array in arrays])
+        except Exception as error:
+            ok[row] = False
+            exceptions[row] = error
+            continue
+        for key, value in values.items():
+            columns[key][row] = value
+    return BreakResult(columns, ok, exceptions, scalar)
+
+
+def _item(array, row):
+    return array.item() if array.ndim == 0 else array[row].item()
+
+
+def _call_row(attributes, items):
+    """Call the module with one row and return its output and outlet values by key."""
+    module = attributes["module"]
+    arguments, position = {}, 0
+    for port, fluid in attributes["inlets"]:
+        fields = dict(zip((field for field, _ in STREAM_FIELDS), items[position : position + 3]))
+        arguments[port] = Stream(**fields, fluid=fluid)
+        position += 3
+    arguments.update(zip(attributes["names"], items[position:]))
+    result = module(**arguments)
+    values = {}
+    for key in attributes["keys"]:
+        values[key] = _value(result, key)
+    for port, fluid in attributes["fluids"].items():
+        if result.outlets[port].fluid != fluid:
+            raise TraceError(f"{module.path}: outlet {port!r} fluid differs from the traced one")
+    return values
+
+
+def _value(result, key):
+    if key[0] == "outlets":
+        return getattr(result.outlets[key[1]], key[2])
+    value = result.outputs[key[1]]
+    return np.nan if value is None else float(value)
