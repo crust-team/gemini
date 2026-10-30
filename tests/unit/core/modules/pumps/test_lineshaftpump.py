@@ -7,6 +7,7 @@ from gemini.core.modules.pumps import ESP, LineShaftPump
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.errors import PhysicsRangeError
+from tests.fixtures.equivalence import assert_module_matches
 
 CURVES = {
     "no_stages": 12,
@@ -64,3 +65,14 @@ def test_reverse_flow_and_off_curve_raise():
         pump(head_coeff=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
     with pytest.raises(PhysicsRangeError, match="power curve"):
         pump(power_coeff=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Shutoff, running and stopped-efficiency rows trace and equal one call per row."""
+    rows = [
+        dict(suction=Stream(m_dot=m_dot, T=330.0, p=3e5), frequency=frequency)
+        for m_dot, frequency in [(0.0, 50.0), (5.0, 50.0), (10.0, 60.0)]
+    ]
+    assert_module_matches(pump(), rows)
+    idle = pump(power_coeff=[1e-13, 0, 0, 0, 0, 0], no_stages=1)
+    assert_module_matches(idle, rows)

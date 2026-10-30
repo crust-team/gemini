@@ -6,6 +6,7 @@ from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.pumps import CentrifugalPump
 from gemini.core.types.flows import Stream
 from gemini.errors import MissingValueError, PhysicsRangeError
+from tests.fixtures.equivalence import assert_module_matches
 
 CP = 4217.4
 PARAMS = dict(
@@ -90,3 +91,12 @@ def test_off_curve_and_reverse_flow_raise():
         pump()(suction=Stream(m_dot=-1, T=330, p=3e5), frequency=50)
     with pytest.raises(MissingValueError):
         CentrifugalPump()(suction=Stream(m_dot=1, T=330, p=3e5), frequency=50)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Stopped, part-load, rated and slow rows trace and equal one call per row."""
+    rows = [
+        dict(suction=Stream(m_dot=m_dot, T=330.0, p=3e5), frequency=frequency)
+        for m_dot, frequency in [(0.0, 50.0), (25.0, 50.0), (50.0, 50.0), (32.0, 40.0)]
+    ]
+    assert_module_matches(pump(), rows)

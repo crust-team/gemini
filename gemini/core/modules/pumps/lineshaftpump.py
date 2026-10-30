@@ -1,5 +1,6 @@
 """Line-shaft downhole pump on the retained TNO ESP polynomial basis."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import constants, pumps
 from gemini.core.types import (
@@ -21,9 +22,14 @@ from gemini.core.types import (
     VolumeFlow,
 )
 from gemini.errors import PhysicsRangeError
+from gemini.ops import Constant
 
-MIN_EFFICIENCY_POWER = 0.1
-"""Pump power [W] below which the pump is treated as stopped and its efficiency as zero."""
+MIN_EFFICIENCY_POWER = Constant(
+    "LINE_SHAFT_MIN_EFFICIENCY_POWER",
+    0.1,
+    "W",
+    "pump power below which the pump is treated as stopped and its efficiency as zero",
+)
 
 
 class LineShaftPump(Module):
@@ -97,11 +103,15 @@ class LineShaftPump(Module):
     def _compute_outputs(self, inlets, outlets):
         flow = inlets.suction.volumetric_flow()
         pump_power = pumps.power(flow, self.frequency, self.no_stages, self.power_coeff)
-        if pump_power < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: pump power = {pump_power} W at flow = {flow} m3/s; expected >= 0 "
-                "(pump off its power curve)"
-            )
+        ops.check(
+            pump_power >= 0,
+            PhysicsRangeError,
+            "{path}: pump power = {pump_power} W at flow = {flow} m3/s; expected >= 0 "
+            "(pump off its power curve)",
+            path=self.path,
+            pump_power=pump_power,
+            flow=flow,
+        )
         speed = self.frequency / constants.ESP_REFERENCE_FREQUENCY
         friction = self.shaft_friction_loss * self.setting_depth * speed
         self.flow = flow
@@ -109,21 +119,28 @@ class LineShaftPump(Module):
         self.pump_power = pump_power
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction
-        self.efficiency = (
-            flow * self.head / pump_power if pump_power >= MIN_EFFICIENCY_POWER else 0.0
+        self.efficiency = ops.where(
+            pump_power >= MIN_EFFICIENCY_POWER, ops.truediv(flow * self.head, pump_power), 0.0
         )
         self.electricity = self.shaft_power / self.motor_efficiency
 
     def _head(self, flow):
         """Return the pump-curve pressure rise [Pa] at a suction volume flow [m3/s]."""
-        if flow < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: suction volume flow = {flow} m3/s; reverse flow is unsupported"
-            )
+        ops.check(
+            flow >= 0,
+            PhysicsRangeError,
+            "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
+            path=self.path,
+            flow=flow,
+        )
         head = pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
-        if head < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: head = {head} Pa at flow = {flow} m3/s; expected >= 0 (pump off "
-                "its head curve)"
-            )
+        ops.check(
+            head >= 0,
+            PhysicsRangeError,
+            "{path}: head = {head} Pa at flow = {flow} m3/s; expected >= 0 (pump off "
+            "its head curve)",
+            path=self.path,
+            head=head,
+            flow=flow,
+        )
         return head

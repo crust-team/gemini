@@ -6,6 +6,7 @@ from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.pumps import GasCompressor
 from gemini.core.types.flows import Stream
 from gemini.errors import PhysicsRangeError
+from tests.fixtures.equivalence import assert_module_matches
 
 GAS = Stream(m_dot=0.2, T=300, p=1e5)
 
@@ -71,3 +72,18 @@ def test_zero_flow_unit_ratio_and_invalid_setpoints():
         compressor()(suction=GAS, pressure_setpoint=5e4)
     with pytest.raises(PhysicsRangeError, match="reverse flow"):
         compressor()(suction=GAS.with_(m_dot=-0.1), pressure_setpoint=8e5)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Single and intercooled stages at several ratios trace and equal one call per row."""
+    rows = [
+        dict(suction=Stream(m_dot=m_dot, T=300.0, p=p), pressure_setpoint=setpoint)
+        for m_dot, p, setpoint in [
+            (0.2, 1e5, 4e5),
+            (0.0, 1e5, 4e5),
+            (0.5, 1e5, 1e5),
+            (0.1, 2e5, 3e6),
+        ]
+    ]
+    assert_module_matches(compressor(), rows)
+    assert_module_matches(compressor(stage_count=3), rows)

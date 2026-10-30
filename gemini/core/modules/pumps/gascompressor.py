@@ -1,5 +1,6 @@
 """Ideal-gas compressor for separated non-condensable gas."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import compression
 from gemini.core.types import (
@@ -85,7 +86,7 @@ class GasCompressor(Module):
 
         # Outlets
         suction = inlets.suction
-        stage_ratio = self._pressure_ratio(suction) ** (1 / self.stage_count)
+        stage_ratio = ops.pow(self._pressure_ratio(suction), ops.truediv(1, self.stage_count))
         discharge_T = compression.stage_outlet_temperature(
             suction.T, stage_ratio, self.heat_capacity_ratio, self.isentropic_efficiency
         )
@@ -114,13 +115,20 @@ class GasCompressor(Module):
 
     def _pressure_ratio(self, suction):
         """Return the overall pressure ratio [-]; reject reverse flow and expansion."""
-        if suction.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: suction.m_dot = {suction.m_dot} kg/s; reverse flow is unsupported"
-            )
-        if suction.p <= 0 or self.pressure_setpoint < suction.p:
-            raise PhysicsRangeError(
-                f"{self.path}: pressure_setpoint = {self.pressure_setpoint} Pa, suction.p = "
-                f"{suction.p} Pa; expected a positive suction pressure at or below the setpoint"
-            )
-        return self.pressure_setpoint / suction.p
+        ops.check(
+            ops.logical_not(suction.m_dot < 0),
+            PhysicsRangeError,
+            "{path}: suction.m_dot = {m_dot} kg/s; reverse flow is unsupported",
+            path=self.path,
+            m_dot=suction.m_dot,
+        )
+        ops.check(
+            ops.logical_not(ops.logical_or(suction.p <= 0, self.pressure_setpoint < suction.p)),
+            PhysicsRangeError,
+            "{path}: pressure_setpoint = {setpoint} Pa, suction.p = {p} Pa; expected a "
+            "positive suction pressure at or below the setpoint",
+            path=self.path,
+            setpoint=self.pressure_setpoint,
+            p=suction.p,
+        )
+        return ops.truediv(self.pressure_setpoint, suction.p)

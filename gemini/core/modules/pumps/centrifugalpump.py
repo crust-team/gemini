@@ -1,5 +1,6 @@
 """Variable-speed centrifugal pump with a quadratic head curve and affinity-law scaling."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,
@@ -88,11 +89,9 @@ class CentrifugalPump(Module):
         # Outlets
         suction = inlets.suction
         performance = self._performance(suction)
-        rise = 0.0
-        if suction.m_dot > 0:
-            cp = suction.fluid.properties(suction.p, suction.T).cp_l
-            losses = performance["shaft_power"] - performance["hydraulic_power"]
-            rise = losses / (suction.m_dot * cp)
+        cp = suction.fluid.properties(suction.p, suction.T).cp_l
+        losses = performance["shaft_power"] - performance["hydraulic_power"]
+        rise = ops.where(suction.m_dot > 0, ops.truediv(losses, suction.m_dot * cp), 0.0)
 
         discharge = suction.with_(p=suction.p + performance["head"], T=suction.T + rise)
 
@@ -110,28 +109,36 @@ class CentrifugalPump(Module):
     def _performance(self, suction):
         """Return flow [m3/s], head [Pa], hydraulic and shaft power [W] and efficiency [-]."""
         flow = suction.volumetric_flow()
-        if flow < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: suction volume flow = {flow} m3/s; reverse flow is unsupported"
-            )
-        if flow == 0:
-            return dict(flow=0.0, head=0.0, hydraulic_power=0.0, shaft_power=0.0, efficiency=0.0)
+        ops.check(
+            flow >= 0,
+            PhysicsRangeError,
+            "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
+            path=self.path,
+            flow=flow,
+        )
         speed = self.frequency / self.rated_frequency
         c0, c1, c2 = self.head_coeff
         head = c0 * speed**2 + c1 * speed * flow + c2 * flow**2
-        load = flow / (speed * self.best_efficiency_flow)
-        if head < 0 or load >= 2:
-            raise PhysicsRangeError(
-                f"{self.path}: flow = {flow} m3/s at frequency = {self.frequency} Hz gives "
-                f"head = {head} Pa at {load} times the best-efficiency flow; expected a "
-                "nonnegative head below twice the best-efficiency flow (pump off its curve)"
-            )
+        load = ops.truediv(flow, speed * self.best_efficiency_flow)
+        ops.check(
+            ops.logical_or(flow == 0, ops.logical_not(ops.logical_or(head < 0, load >= 2))),
+            PhysicsRangeError,
+            "{path}: flow = {flow} m3/s at frequency = {frequency} Hz gives "
+            "head = {head} Pa at {load} times the best-efficiency flow; expected a "
+            "nonnegative head below twice the best-efficiency flow (pump off its curve)",
+            path=self.path,
+            flow=flow,
+            frequency=self.frequency,
+            head=head,
+            load=load,
+        )
         efficiency = self.best_efficiency * load * (2 - load)
         hydraulic_power = flow * head
+        stopped = flow == 0
         return dict(
-            flow=flow,
-            head=head,
-            hydraulic_power=hydraulic_power,
-            shaft_power=hydraulic_power / efficiency,
-            efficiency=efficiency,
+            flow=ops.where(stopped, 0.0, flow),
+            head=ops.where(stopped, 0.0, head),
+            hydraulic_power=ops.where(stopped, 0.0, hydraulic_power),
+            shaft_power=ops.where(stopped, 0.0, ops.truediv(hydraulic_power, efficiency)),
+            efficiency=ops.where(stopped, 0.0, efficiency),
         )
