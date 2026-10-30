@@ -109,7 +109,9 @@ on both datasets before accepting a golden change. Golden changes are evidence o
 change and are never a routine speed optimization.
 
 Benchmarks are scripts, not tests: `PYTHONPATH=. python scripts/benchmark_esp.py` times the
-ESP over the July dataset tick by tick and as one traced NumPy call and checks they agree.
+ESP over the July dataset tick by tick and as one traced NumPy call, with and without
+common-subexpression elimination, and the full `doublet_heat` replay on the old path and through
+the graph, and checks that they agree.
 
 ## Shared fixtures
 

@@ -11,6 +11,9 @@ The package was rebuilt as composable modules with handwritten plants, in-memory
 finite engine, and then cleaned up. Old import paths are not retained.
 
 ### Added
+- Physics and leaf modules are written with `gemini.ops`, so one source runs on floats, arrays and
+  traced graphs, and `Engine.replay` evaluates each twin as one traced call with identical results.
+  `gemini.graph.settings(traced=False)` selects the old tick-by-tick path.
 - Composable `Module` equipment with declared parameters, ports, controls, boundaries and
   outputs, the handwritten `Doublet` plant and the example `DoubletHeatPlant`, portable plant
   JSON with dated parameters and bindings, and the `gm.legacy` bridge to old GEMINI projects.

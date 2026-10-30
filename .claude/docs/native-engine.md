@@ -213,7 +213,7 @@ Implemented for one leaf module, the ESP, and everything its call needs:
   `tests/integration/test_graph_esp.py`) and is about 390 times faster
   (`scripts/benchmark_esp.py`).
 
-Where the prototype differs from sections 1 to 11, and why:
+Where the implementation differs from sections 1 to 11, and why:
 
 - **Names are not public.** The ops are `gemini.ops.where`, `gemini.ops.check`, ... and the
   backend setting is `gemini.backends.settings(backend=...)`, not `gm.where` or
@@ -287,9 +287,10 @@ Where the prototype differs from sections 1 to 11, and why:
   trace and its value is a cache guard (`traced_shape` in `tracer.py`); use it for a numeric value
   that decides structure. `Declaration.schema` of a port is `{}`.
 - **Units** are recorded on graph inputs only; the unit-check pass is not implemented.
-- **Graph breaks** are composites, stateful modules (no `scan` yet), modules with pre-hooks and
-  float32 precision, besides any `TraceError` from Python control flow or conversions.
-- **Observer hooks run once during the trace** on traced values (that is how a reading hook is
+- **Graph breaks** are stateful modules (no `scan` yet), modules with pre-hooks, float32 precision
+  and any `TraceError` from Python control flow or conversions; section 13 says at which level.
+  The Python solves `close_loop` and `plants/nodal.py` break their whole composite.
+- **An unmarked hook runs once during the trace** on traced values (that is how a reading hook is
   told from a writing one), so anything an observer stores then is a `Proxy`; afterwards they
   are replayed per row. A hook that raises `TraceError` is a graph break even when it would
   only have read, because the trace cannot tell.
@@ -345,3 +346,18 @@ Where the prototype differs from sections 1 to 11, and why:
   9's chunked engine callbacks: nothing needs to declare it changes the run.
 - **Not done.** `scan`, float32, `trial_outlets` and `close_loop` in a graph, the unit-check pass,
   `gm.explain`. `simulate` and `live` stay tick by tick.
+
+Validation is off the hot path. `Declaration` builds one cheap check at construction that accepts
+only an exact `float` inside its bounds, an exact `bool` or `str`, or `None` for an optional kind
+and returns the value unchanged; everything else, including every failure, takes the unchanged
+full path, so values, coercions and messages are the old ones by construction. Defaults are
+validated once (`default_value()`). This keeps a cheap check on the untraced path rather than
+moving validation to the first call, because a bad output at tick 500 must still be caught there.
+Traced rows are validated by `graph/limits.py` and the claim rule. Validation was only about 4 % of
+an untraced ESP call, so this gained about 8 % there and nothing on the replay.
+
+Measured on the July dataset (2976 ticks, 8 twins, none with a graph break): the replay takes
+1.07 s through the graph against 5.22 s on the old path, with identical frames; the ESP alone
+1.6 ms against 425 ms; CSE takes the ESP graph from 151 to 109 nodes and its call from 2.3 to
+1.6 ms. The graph evaluation is only about 5 % of the replay. The rest is the per-tick commit:
+`ModuleResult` per claimed row 40 %, `health` 25 %, `Results.append` 14 %.

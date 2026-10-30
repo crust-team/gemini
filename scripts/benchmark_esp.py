@@ -1,10 +1,11 @@
-"""Benchmark the ESP over the July dataset: tick by tick against one traced NumPy call.
+"""Benchmark the ESP and the full doublet_heat replay over the July dataset.
 
-Run ``PYTHONPATH=. python scripts/benchmark_esp.py`` from the repository root. It
-loads the shared doublet plant, evaluates its ESP on every row of the committed 2,976-row July
-2024 dataset once per row (the current untraced path) and once as a traced graph on the NumPy
-backend, checks that the results agree within the documented tolerance and prints the best of
-``--repeat`` timings, the trace time and the speedup. It is a benchmark, not a test.
+Run ``PYTHONPATH=. python scripts/benchmark_esp.py`` from the repository root. On the committed
+2,976-row July 2024 dataset it evaluates the ESP of the shared doublet plant once per row (the
+untraced path) and as one traced graph on the NumPy backend, with and without
+common-subexpression elimination, then replays the whole plant through the graph and with
+``gemini.graph.settings(traced=False)``. It checks that the results agree and prints the best of
+``--repeat`` timings and the speedups. It is a benchmark, not a test.
 """
 
 import argparse
@@ -16,6 +17,7 @@ import pandas as pd
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from gemini import graph
 from gemini.core.types.flows import Stream
 from gemini.graph import GraphCache, run
 
@@ -76,23 +78,53 @@ def check_agreement(results, graph_run):
     return worst
 
 
+def benchmark_esp(repeat):
+    """Print the ESP tick by tick and traced, with and without common-subexpression elimination."""
+    esp, rows = load()
+    trace_time, _ = best_time(lambda: GraphCache().graph(esp, {"suction": esp.fluid}), 1)
+    merged, unmerged = GraphCache(), GraphCache(optimize=False)
+    traced(esp, rows, merged)
+    traced(esp, rows, unmerged)
+    tick_time, results = best_time(lambda: untraced(esp, rows), repeat)
+    plain_time, plain_run = best_time(lambda: traced(esp, rows, unmerged), repeat)
+    graph_time, graph_run = best_time(lambda: traced(esp, rows, merged), repeat)
+    worst = max(check_agreement(results, plain_run), check_agreement(results, graph_run))
+    print(f"rows: {len(rows)}; nodes: {len(plain_run.graph.nodes)} -> {len(graph_run.graph.nodes)}")
+    print(f"ESP tick by tick (untraced): {tick_time * 1e3:9.2f} ms")
+    print(f"ESP trace (once, cached):    {trace_time * 1e3:9.2f} ms")
+    print(f"ESP traced, no CSE:          {plain_time * 1e3:9.2f} ms")
+    print(f"ESP traced, CSE:             {graph_time * 1e3:9.2f} ms")
+    print(f"ESP speedup: {tick_time / graph_time:.0f}x; largest difference {worst:.3g}")
+
+
+def replay(dataset):
+    """Replay a freshly loaded plant over ``dataset`` and return the engine."""
+    plant, engine = DoubletHeatPlant.load(PLANT), gm.Engine()
+    engine.replay(plant, dataset)
+    return engine
+
+
+def benchmark_replay(repeat):
+    """Print the plant replay on the old path and through the graph; the frames must be equal."""
+    frame = pd.read_csv(DATASET, parse_dates=["time"])
+    dataset = gm.Dataset.from_frame(frame, time_column="time")
+    with graph.settings(traced=False):
+        old_time, old = best_time(lambda: replay(dataset), repeat)
+    new_time, new = best_time(lambda: replay(dataset), repeat)
+    pd.testing.assert_frame_equal(new.results.to_frame(), old.results.to_frame(), check_exact=True)
+    print(f"replay, old path:            {old_time:9.3f} s")
+    print(f"replay, through the graph:   {new_time:9.3f} s")
+    print(f"replay speedup: {old_time / new_time:.1f}x; frames identical; ", end="")
+    print(f"twins not traced: {new.batch.reasons or 'none'}")
+
+
 def main():
-    """Print the tick-by-tick time, the trace time, the traced time and the speedup."""
+    """Run both benchmarks."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--repeat", type=int, default=5, help="timed repetitions per path")
     repeat = parser.parse_args().repeat
-    esp, rows = load()
-    trace_time, _ = best_time(lambda: GraphCache().graph(esp, {"suction": esp.fluid}), 1)
-    cache = GraphCache()
-    traced(esp, rows, cache)
-    tick_time, results = best_time(lambda: untraced(esp, rows), repeat)
-    graph_time, graph_run = best_time(lambda: traced(esp, rows, cache), repeat)
-    worst = check_agreement(results, graph_run)
-    print(f"rows: {len(rows)}; graph nodes: {len(graph_run.graph.nodes)}")
-    print(f"tick by tick (untraced): {tick_time * 1e3:9.2f} ms")
-    print(f"trace (once, cached):    {trace_time * 1e3:9.2f} ms")
-    print(f"traced NumPy call:       {graph_time * 1e3:9.2f} ms")
-    print(f"speedup: {tick_time / graph_time:.0f}x; largest relative difference {worst:.3g}")
+    benchmark_esp(repeat)
+    benchmark_replay(repeat)
 
 
 if __name__ == "__main__":

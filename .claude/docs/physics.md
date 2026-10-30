@@ -67,7 +67,10 @@ Salinity, CO2 and free gas are mass fractions; glycol is a volume fraction. Brin
 viscosity are not inferred from salinity: supply the overrides. A `steam` fluid carries the
 liquid-water snapshot, not vapour properties (use `steam.py`). Mass fractions summing above one,
 a glycol fraction on another kind, or a glycol fraction other than 0.3 raise a pydantic
-`ValueError`, not `PhysicsRangeError`; `gmf` must lie in [0, 1) and properties must be positive.
+`ValueError`, not `PhysicsRangeError`. `FluidProperties` and `Stream` are frozen slots dataclasses:
+invalid physical values (a non-positive property, a gas mass fraction outside [0, 1), a
+non-finite flow, `T <= 0`, `p < 0`) raise `PhysicsRangeError`; on arrays and traced values the same
+limits are `gemini.ops.check` calls.
 
 ## Hydraulics
 
