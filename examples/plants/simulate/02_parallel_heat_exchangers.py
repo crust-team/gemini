@@ -211,9 +211,9 @@ def recalibrated_injectivity(doublet):
 
 def configure_exchangers(plant):
     """Fill the exchangers (no pressure loss, as upstream) and the 50/30/20 split fractions."""
-    for exchanger, ua, share in zip(plant.heat_exchangers, CONDUCTANCES, SHARES):
+    for exchanger, conductance, share in zip(plant.heat_exchangers, CONDUCTANCES, SHARES):
         exchanger.update_params(
-            thermal_conductance=ua,
+            thermal_conductance=conductance,
             hot_nominal_pressure_drop=0,
             cold_nominal_pressure_drop=0,
             hot_nominal_mass_flow=35 * share,

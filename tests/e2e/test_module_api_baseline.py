@@ -25,6 +25,7 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.modules.plants.migration import RENAMED_NAMES
 from tests.fixtures import FIXTURES
 from tests.fixtures.frames import path_frame
 
@@ -57,6 +58,7 @@ def _baseline_frame(directory, name):
         pd.read_csv(directory / name, header=[0, 1], index_col=0, parse_dates=True)
         .rename(columns=PATH_RENAMES, level=0)
         .rename(columns=FIELD_RENAMES, level=1)
+        .rename(columns=RENAMED_NAMES, level=1)
     )
 
 
@@ -114,7 +116,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
     for old_path, old in old_state.items():
         new = new_state[PATH_RENAMES.get(old_path, old_path)]
         assert TYPE_RENAMES.get(old["type"], old["type"]) == new["type"]
-        old_params = dict(old["params"])
+        old_params = {RENAMED_NAMES.get(key, key): value for key, value in old["params"].items()}
         old_params.pop("coefficient_precision", None)
         if "path" in old_params:
             old_params["pipe_path"] = old_params.pop("path")

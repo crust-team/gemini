@@ -675,8 +675,7 @@ Two-stream effectiveness-NTU heat exchanger with fouling diagnostics.
   `fouling_threshold` (`Fraction`, default 0.15).
 - **Outputs**: `duty`, `effectiveness` (soft sensors), `transfer_units`, `log_mean_temperature_difference`, `hot_out_T`,
   `cold_out_T`, `hot_pressure_drop`, `cold_pressure_drop`, `approach_temperature`.
-- **Model**: `C_min`, `C_max` from `m_dot cp`; `NTU = UA / C_min`; effectiveness from
-  `heat_transfer.effectiveness_counterflow` or `effectiveness_parallel`;
+- **Model**: `C_min`, `C_max` from `m_dot cp`; `NTU = UA / C_min`; `heat_transfer.exchanger_balance` takes the effectiveness of the arrangement;
   `duty = eps C_min (T_h,in - T_c,in)`; each side loses `nominal_pressure_drop (m_dot / nominal_mass_flow)^2`.
   A stopped stream transfers nothing.
 - **Physics**: `diagnostics.below_limit`, `diagnostics.bounded_score`,

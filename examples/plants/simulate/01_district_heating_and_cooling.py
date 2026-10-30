@@ -91,13 +91,13 @@ def configure_network(network, design_flow):
         pipe.ambient_temperature = "10 degC"
 
 
-def configure_substation(substation, ua, network_flow):
+def configure_substation(substation, thermal_conductance, network_flow):
     """Fill the valve, exchanger and building circuit shared by both substation types."""
     substation.update_params(building_flow=network_flow * 1.2, building_pressure="3 bar")
     substation.valve.update_params(flow_coefficient="40 m3/h/bar^0.5")
     substation.valve.opening = 0.9
     substation.heat_exchanger.update_params(
-        thermal_conductance=ua,
+        thermal_conductance=thermal_conductance,
         hot_nominal_pressure_drop="0.2 bar",
         cold_nominal_pressure_drop="0.2 bar",
         hot_nominal_mass_flow=network_flow,
