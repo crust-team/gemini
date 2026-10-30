@@ -31,6 +31,22 @@ registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `ge
 `categories()` read it; an unknown name raises `UnknownNameError` with its close matches in
 `suggestions`.
 
+`gm.modules.load_file(path)` imports a Python file, registers every `Module` class it defines that
+has a `category` (a base class without one is skipped) and returns their names, so a new module
+can join a plant spec by `type`. It executes the file; a file that does not import, or defines no
+such class, raises `ValidationError` (code `invalid_format` or `invalid_value`), and a name that is
+already taken by another class is refused.
+
+Before registering a new class, run `gm.testing.check_module(cls, example=None)`. It never raises
+and returns `{module, passed, checks}`, each check `{name, passed, message}` with `passed` `True`,
+`False` or `None` (undecided). The checks are `is_module`, `instantiate` (the declaration rules
+run in `__init__`), `category`, `forward_signature` (exactly `forward(self, inlets)`), `units`
+(every scalar numeric parameter, control, boundary and output is declared with a quantity type
+that has a unit; coefficient arrays are exempt), `describe` (plain JSON) and `call` (one
+`gm.evaluate` call). A module that needs parameters, controls or inlet streams is undecided on
+`call` until `example` gives them in the shape of `gm.evaluate`:
+`{"parameters": {...}, "inlets": {...}, "controls": {...}}`.
+
 Each class sets the class attribute `category` to one of the fixed `registry.CATEGORIES`. Three
 groups have no category of their own and take the nearest one, so these are the places to look if
 the list grows: `ORC` and `FlashTurbine` are `heat_exchange`; `GridConnection` and `PIDController`

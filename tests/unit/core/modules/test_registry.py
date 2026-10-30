@@ -1,5 +1,8 @@
 """One registry of module and plant types."""
 
+import sys
+from pathlib import Path
+
 import pytest
 
 import gemini as gm
@@ -77,3 +80,48 @@ def test_a_spec_plant_builds_a_new_plant_each_time(monkeypatch):
     assert gm.modules.get("Example") is not gm.modules.get("Example")
     with pytest.raises(ValidationError, match="already taken"):
         registry.register_plant("Example", lambda: gm.Plant("Example"))
+
+
+BOOSTER_FILE = Path(__file__).parents[3] / "fixtures" / "booster_module.py"
+
+
+def test_load_file_registers_the_module_classes_of_a_file(monkeypatch):
+    """The names come back in definition order and the class joins the catalogue."""
+    monkeypatch.setattr(registry, "_entries", dict(registry._entries))
+    assert gm.modules.load_file(BOOSTER_FILE) == ["Booster"]
+    assert "Booster" in gm.modules.names("pump")
+    result = gm.evaluate("Booster", {}, {"suction": {"m_dot": 10, "T": 300, "p": 2e5}}, {})
+    assert result["outlets"]["discharge"]["p"]["value"] == pytest.approx(3e5)
+
+
+def test_load_file_accepts_a_text_path_and_refuses_a_second_class_of_a_taken_name(monkeypatch):
+    """Loading the same name from a changed file is a validation error, not a silent swap."""
+    monkeypatch.setattr(registry, "_entries", dict(registry._entries))
+    gm.modules.load_file(str(BOOSTER_FILE))
+    with pytest.raises(ValidationError, match="already taken"):
+        gm.modules.load_file(BOOSTER_FILE)
+
+
+@pytest.mark.parametrize(
+    "source,code,message",
+    [
+        ("def broken(:\n", "invalid_format", "SyntaxError"),
+        ("raise RuntimeError('boom')\n", "invalid_format", "boom"),
+        ("VALUE = 1\n", "invalid_value", "define a Module class"),
+    ],
+)
+def test_load_file_failures_are_validation_errors(tmp_path, monkeypatch, source, code, message):
+    """A file that does not import, or defines nothing to register, is named in the error."""
+    monkeypatch.setattr(registry, "_entries", dict(registry._entries))
+    file = tmp_path / "user_module.py"
+    file.write_text(source)
+    with pytest.raises(ValidationError, match=message) as error:
+        gm.modules.load_file(file)
+    assert error.value.code == code
+    assert ("gemini_loaded_user_module" in sys.modules) == (code == "invalid_value")
+
+
+def test_load_file_needs_an_existing_file(tmp_path):
+    """A missing path is a validation error naming the path."""
+    with pytest.raises(ValidationError, match="expected a Python file"):
+        gm.modules.load_file(tmp_path / "missing.py")

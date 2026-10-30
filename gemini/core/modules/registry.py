@@ -5,11 +5,14 @@ registers under its name with a ``build`` function that returns a new plant. Bot
 table, so a plant spec can name any of them as the ``type`` of a child.
 """
 
+import importlib.util
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from gemini.core.modules.module import Module
-from gemini.errors import NotImplementedYet, UnknownNameError, ValidationError
+from gemini.errors import UnknownNameError, ValidationError
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
 CATEGORIES = (
@@ -111,6 +114,67 @@ def get(name):
     return entry.module if entry.module is not None else entry.build()
 
 
+def _import_file(path):
+    """Import the Python file at ``path`` as a module of its own and return it."""
+    file = Path(path)
+    if not file.is_file():
+        raise ValidationError(f"modules.load_file: path = {str(path)!r}; expected a Python file")
+    name = f"gemini_loaded_{file.stem}"
+    spec = importlib.util.spec_from_file_location(name, file)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception as error:
+        del sys.modules[name]
+        raise ValidationError(
+            f"modules.load_file: path = {str(path)!r}; importing it raised "
+            f"{type(error).__name__}: {error}",
+            path=str(path),
+            code="invalid_format",
+        ) from error
+    return module
+
+
 def load_file(path):
-    """Import the Python file at ``path`` and register the ``Module`` classes it defines."""
-    raise NotImplementedYet(f"modules.load_file: path = {path!r}; lands in this step")
+    """Import the Python file at ``path``, register its ``Module`` classes and return their names.
+
+    The file is executed, so load only code that is meant to run. Every class the file defines
+    that derives from ``Module`` and has a ``category`` is registered with ``register``, in the
+    order of definition, so a plant spec can name it as a ``type``; a base class without a
+    category is left out. A name is registered once per process: loading another class of an
+    already registered name raises ``ValidationError``.
+
+    Parameters
+    ----------
+    path : str or Path
+        A Python source file.
+
+    Returns
+    -------
+    list of str
+        The registered class names.
+
+    Raises
+    ------
+    ValidationError
+        The path is not a file (code ``invalid_value``), executing it raised an error (code
+        ``invalid_format``, the message names the error), or it defines no module class with a
+        category.
+    """
+    module = _import_file(path)
+    classes = [
+        item
+        for item in vars(module).values()
+        if isinstance(item, type)
+        and issubclass(item, Module)
+        and item.__module__ == module.__name__
+        and item.category is not None
+    ]
+    if not classes:
+        raise ValidationError(
+            f"modules.load_file: path = {str(path)!r}; expected the file to define a Module "
+            "class with a category",
+            path=str(path),
+        )
+    return [register(item).__name__ for item in classes]

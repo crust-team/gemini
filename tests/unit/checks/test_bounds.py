@@ -1,0 +1,51 @@
+"""The declared output limits against synthetic columns and the example plant."""
+
+import math
+
+import gemini as gm
+from tests.fixtures.costed_plants import heating_plant
+from tests.fixtures.result_tables import make_results
+
+
+def test_values_inside_the_declared_limits_pass():
+    """A return temperature above 0 K is inside the Temperature limit; NaN is a missing tick."""
+    results = make_results({"heat": {"return_out_T": [300.0, math.nan, 310.0]}})
+    assert gm.checks.bounds(heating_plant(), results) == {
+        "name": "bounds",
+        "passed": True,
+        "value": 0,
+        "tolerance": 0,
+    }
+
+
+def test_values_outside_the_limits_are_counted():
+    """Two of three temperatures are not above 0 K."""
+    results = make_results({"heat": {"return_out_T": [300.0, -1.0, 0.0]}})
+    result = gm.checks.bounds(heating_plant(), results)
+    assert result["passed"] is False and result["value"] == 2
+
+
+def test_nothing_with_a_limit_is_undecided():
+    """An output without a limit gives ``passed`` None and says so."""
+    results = make_results({"heat": {"heat_supplied": [1.0]}})
+    result = gm.checks.bounds(heating_plant(), results)
+    assert result["passed"] is None
+    assert result["reason"] == "no recorded output has a declared limit"
+
+
+def test_a_path_the_plant_lacks_is_refused():
+    """Results of another plant raise with the path."""
+    results = make_results({"elsewhere": {"return_out_T": [300.0]}})
+    try:
+        gm.checks.bounds(heating_plant(), results)
+    except gm.errors.UnknownNameError as error:
+        assert "elsewhere" in str(error)
+    else:
+        raise AssertionError("expected UnknownNameError")
+
+
+def test_the_example_plant_run_stays_inside_its_limits(fresh_plant, fast_dataset):
+    """A six-hour replay records no output outside a declared limit."""
+    replay = gm.Engine(fresh_plant).replay(fast_dataset.window(None, "2024-07-01T06:00:00Z"))
+    result = gm.checks.bounds(fresh_plant, replay)
+    assert result["passed"] is True and result["value"] == 0
