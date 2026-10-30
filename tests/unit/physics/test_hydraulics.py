@@ -439,7 +439,7 @@ def test_valve_flow_coefficient_by_hand_and_on_arrays():
 
 
 def test_affine_correction_and_inflow_relations_by_hand():
-    """a p + b, p -/+ q / J, and the indices that invert them."""
+    """The affine correction, the linear inflow laws and the indices that invert them."""
     assert hydraulics.affine_correction(1e7, 1.1, -5e4) == pytest.approx(1.095e7)
     assert hydraulics.productivity_pressure(2e7, 0.01, 1e-7) == pytest.approx(1.99e7)
     assert hydraulics.injectivity_pressure(2e7, 0.01, 1e-7) == pytest.approx(2.01e7)
