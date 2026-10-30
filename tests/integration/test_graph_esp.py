@@ -50,6 +50,39 @@ def _untraced(esp, week):
     ]
 
 
+def _motor_loss(module, inlets, outlets):
+    module.electricity = module.power / 0.9
+
+
+def _untraceable(module, inlets, outlets):
+    module.electricity = float(module.power) / 0.9
+
+
+def _untraced_with_hook(shared_plant, week, hook):
+    esp = copy.deepcopy(shared_plant.doublet.esp)
+    if hook is not None:
+        esp.register_forward_hook(hook)
+    return _untraced(esp, week)
+
+
+@pytest.fixture(scope="module")
+def plain_week(shared_plant, week):
+    """Return the untraced tick-by-tick results of the week, built once per module."""
+    return _untraced_with_hook(shared_plant, week, None)
+
+
+@pytest.fixture(scope="module")
+def motor_loss_week(shared_plant, week):
+    """Return the untraced week with the graph-compatible motor-loss hook registered."""
+    return _untraced_with_hook(shared_plant, week, _motor_loss)
+
+
+@pytest.fixture(scope="module")
+def untraceable_week(shared_plant, week):
+    """Return the untraced week with the hook that cannot be traced registered."""
+    return _untraced_with_hook(shared_plant, week, _untraceable)
+
+
 def _assert_equal(traced, expected):
     """Compare every output and the discharge fields within ``RTOL``."""
     for name in expected[0].outputs:
@@ -60,10 +93,10 @@ def _assert_equal(traced, expected):
         np.testing.assert_allclose(traced.outlets["discharge"][field], values, rtol=RTOL, atol=0)
 
 
-def test_numpy_backend_equals_the_untraced_path(esp, week):
+def test_numpy_backend_equals_the_untraced_path(esp, week, plain_week):
     """Every ESP output and outlet field of one traced NumPy call matches tick by tick."""
     traced = run(esp, {"suction": _suction(esp, week)}, {"frequency": week[:, 3]})
-    expected = _untraced(esp, week)
+    expected = plain_week
     assert traced.breaks == []
     assert set(traced.outputs) == set(esp.outputs(recurse=False)) == set(expected[0].outputs)
     _assert_equal(traced, expected)
@@ -114,13 +147,12 @@ def test_retrace_happens_only_when_a_guard_changes(esp, week):
     assert cache.traces == 2
 
 
-def test_no_outputs_traces_the_fluid_step_only(esp, week):
+def test_no_outputs_traces_the_fluid_step_only(esp, week, plain_week):
     """Under ``no_outputs()`` the traced run returns outlets and no outputs."""
     with gm.no_outputs():
         traced = run(esp, {"suction": _suction(esp, week)}, {"frequency": week[:, 3]})
     assert traced.outputs == {} and traced.breaks == []
-    expected = _untraced(esp, week)
-    pressures = [row.outlets.discharge.p for row in expected]
+    pressures = [row.outlets.discharge.p for row in plain_week]
     np.testing.assert_allclose(traced.outlets["discharge"]["p"], pressures, rtol=RTOL)
 
 
@@ -144,30 +176,24 @@ def test_reverse_flow_raises_the_untraced_error_at_the_physics_line(esp, week):
     assert first <= int(note.rsplit(":", 1)[1]) < first + len(source)
 
 
-def test_hooks_on_the_traced_esp(esp, week):
+def test_hooks_on_the_traced_esp(esp, week, plain_week, motor_loss_week, untraceable_week):
     """A reading hook is replayed, a gm-op hook joins the graph, an untraceable one breaks."""
     inlets, inputs = {"suction": _suction(esp, week)}, {"frequency": week[:, 3]}
     seen = []
     reader = esp.register_forward_hook(lambda module, inlets, outlets: seen.append(module.head))
     traced = run(esp, inlets, inputs)
     reader.remove()
-    expected_heads = [row.outputs.head for row in _untraced(esp, week)]
+    expected_heads = [row.outputs.head for row in plain_week]
     assert traced.graph.observers and isinstance(seen[0], Proxy)
     assert seen[1:] == pytest.approx(expected_heads, rel=RTOL)
 
-    def motor_loss(module, inlets, outlets):
-        module.electricity = module.power / 0.9
-
-    writer = esp.register_forward_hook(motor_loss)
+    writer = esp.register_forward_hook(_motor_loss)
     traced = run(esp, inlets, inputs)
     assert traced.graph.outputs["outputs.electricity"].op == "truediv"
-    _assert_equal(traced, _untraced(esp, week))
+    _assert_equal(traced, motor_loss_week)
     writer.remove()
 
-    def untraceable(module, inlets, outlets):
-        module.electricity = float(module.power) / 0.9
-
-    esp.register_forward_hook(untraceable)
+    esp.register_forward_hook(_untraceable)
     broken = run(esp, inlets, inputs)
     assert broken.graph is None and "forward hook" in broken.breaks[0]
-    _assert_equal(broken, _untraced(esp, week))
+    _assert_equal(broken, untraceable_week)
