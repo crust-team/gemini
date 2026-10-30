@@ -41,6 +41,48 @@ A port without one, `stream=None`, takes whatever flows through it: piping, `Cen
 `HeatExchanger` and the source side of `HeatPump`. Stream types never change a calculation; they
 say what may be connected.
 
+## Describing a module
+
+`Module.describe()`, `Module.parameter_schema()` and `Module.validate_params(params)` work on a
+class (a new instance answers) or on an instance. They live in
+`gemini/core/modules/description.py`, return plain JSON (`json.dumps(..., allow_nan=False)`) and
+never change the module.
+
+`describe()` returns `{name, type, category, summary, doc, parameters, controls, boundaries,
+measured, state, inlets, outlets, outputs, children, connections, values}`:
+
+- `name` is `module.path`, `type` the class name (a plant shows its given name), `summary` the
+  first paragraph of the docstring and `doc` all of it.
+- `parameters`, `controls`, `boundaries`, `measured` and `state` map a name to `{type, unit,
+  quantity, default, minimum, maximum, enum, description, section}`. A missing item is `null`;
+  `default` is `null` for `UNSET`. `minimum` and `maximum` are the closest limit, so a strict bound
+  (`gt`, `lt`) shows as the bound itself. `enum` comes from a `Literal`. Only the module's own
+  declarations are listed; children appear under `children`.
+- `measured` lists every output of the module itself: replay (`engine/step.py`) takes a measured
+  binding for any output name and compares it with that output; no narrower rule exists.
+- `inlets` and `outlets` map a port to `{stream, fields: {m_dot: {unit: "kg/s"}, T: {unit: "K"},
+  p: {unit: "Pa"}}}`; `stream` is `null` for a port that takes any stream.
+- `outputs` maps a name to `{unit, kind, soft_sensor}`; `kind` is the additive quantity name
+  (one of the nine) or `null`.
+- `children` is `{name: type}` and `connections` is `[{source, target, stream, kind}]`, both empty
+  for a leaf. A plant exposes its wiring through `connection_list()`; a handwritten composite has
+  none, because its wiring is code.
+- `values` holds the current `parameters`, `controls` and `boundaries`; unset ones are left out
+  and a child's values are keyed by dotted path. On a class they are the defaults of a new
+  instance.
+
+`parameter_schema()` is JSON Schema draft 2020-12: `$schema`, `title`, `type: object`,
+`properties`, `required` (parameters with no default) and `additionalProperties: false`. A child's
+parameters appear under their dotted path. Each property has the standard keywords (`type` or
+`anyOf`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `enum`, `default`,
+`description`) plus `unit` and `quantity`. A number with a unit is `anyOf` number and string,
+because inputs accept `"150 m3/h"`.
+
+`validate_params(params)` returns every problem as `[{path, message, code}]` and raises nothing
+for them. `path` is the parameter name; the codes are `unknown_name` (with `suggestions`),
+`invalid_unit`, `out_of_bounds` and `invalid_value`. It runs `declaration.validate` once per entry
+and tells the failures apart by the exception and its cause.
+
 ## Listing declarations
 
 Every declaration listing takes `recurse` with default `True` and keys its result by dotted path
