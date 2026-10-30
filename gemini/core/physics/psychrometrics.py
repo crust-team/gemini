@@ -24,6 +24,7 @@ _WATER = (-5.8002206e3, 1.3914993, -4.8640239e-2, 4.1764768e-5, -1.4452093e-8)
 _WATER_LOG = 6.5459673
 
 
+@ops.physics
 def saturation_pressure(temperature: float) -> float:
     """Return the saturation pressure of water vapour [Pa] over ice or liquid water.
 
@@ -50,9 +51,12 @@ def saturation_pressure(temperature: float) -> float:
     They agree with the IAPWS-95 based ASHRAE table values within 3e-4 relative.
     """
     _check_temperature("saturation_pressure", temperature)
-    return _saturation_pressure(temperature)
+    ice = ops.exp(_polynomial(_ICE, temperature) + _ICE_LOG * ops.log(temperature))
+    water = ops.exp(_polynomial(_WATER, temperature) + _WATER_LOG * ops.log(temperature))
+    return ops.where(temperature < 273.15, ice, water)
 
 
+@ops.physics
 def dew_point(temperature: float, relative_humidity: float) -> float:
     """Return the dew-point temperature [K] of moist air.
 
@@ -93,35 +97,29 @@ def dew_point(temperature: float, relative_humidity: float) -> float:
         relative_humidity=relative_humidity,
         minimum=MINIMUM_TEMPERATURE,
     )
+    inside = ops.logical_and(temperature >= MINIMUM_TEMPERATURE, temperature <= MAXIMUM_TEMPERATURE)
     point = ops.brentq(
         _saturation_residual,
         MINIMUM_TEMPERATURE,
-        temperature,
+        ops.where(inside, temperature, MINIMUM_TEMPERATURE),
         args=(vapour_pressure,),
         xtol=1e-9,
     )
     return ops.where(relative_humidity == 1, temperature, point)
 
 
-def _saturation_pressure(temperature):
-    """Return the Hyland-Wexler saturation pressure [Pa] without checking the temperature.
-
-    Both the ice and the liquid-water branch are evaluated and ``where`` selects one.
-    """
-    ice = ops.exp(_polynomial(_ICE, temperature) + _ICE_LOG * ops.log(temperature))
-    water = ops.exp(_polynomial(_WATER, temperature) + _WATER_LOG * ops.log(temperature))
-    return ops.where(temperature < 273.15, ice, water)
-
-
 def _saturation_residual(point, vapour_pressure):
     """Return the saturation pressure at ``point`` minus ``vapour_pressure`` [Pa].
 
-    The temperature is not checked: a solver evaluates every row, also one whose own check
-    reports the error.
+    NOTE(refactor): ``dew_point`` gives a row whose temperature is outside the valid range (or
+    NaN) the degenerate bracket at ``MINIMUM_TEMPERATURE``, so ``point`` is always inside the
+    valid range and the check of ``saturation_pressure`` cannot fail on any row of a solve; such
+    a row fails by the checks of ``dew_point`` itself.
     """
-    return _saturation_pressure(point) - vapour_pressure
+    return saturation_pressure(point) - vapour_pressure
 
 
+@ops.physics
 def humidity_ratio(temperature: float, relative_humidity: float, pressure: float) -> float:
     """Return the humidity ratio [kg water vapour per kg dry air] of moist air.
 
@@ -159,6 +157,7 @@ def humidity_ratio(temperature: float, relative_humidity: float, pressure: float
     return MOLAR_MASS_RATIO * vapour_pressure / (pressure - vapour_pressure)
 
 
+@ops.physics
 def wet_bulb_temperature(temperature: float, relative_humidity: float) -> float:
     """Return the psychrometric wet-bulb temperature [K] at standard sea-level pressure.
 
@@ -187,8 +186,8 @@ def wet_bulb_temperature(temperature: float, relative_humidity: float) -> float:
     figure's curve) are less accurate; inputs outside the stated ranges raise
     ``PhysicsRangeError``.
     """
-    _check_number("wet_bulb_temperature", temperature=temperature)
-    _check_number("wet_bulb_temperature", relative_humidity=relative_humidity)
+    ops.check_numbers("wet_bulb_temperature", temperature=temperature)
+    ops.check_numbers("wet_bulb_temperature", relative_humidity=relative_humidity)
     ops.check(
         ops.logical_and(
             ops.logical_and(temperature >= 253.15, temperature <= 323.15),
@@ -218,22 +217,9 @@ def _polynomial(coefficients, temperature):
     return inverse / temperature + sum(c * temperature**n for n, c in enumerate(powers))
 
 
-def _check_number(function, **values):
-    """Reject NaN inputs, which would otherwise return NaN as if it were a valid result."""
-    for name, value in values.items():
-        ops.check(
-            ops.logical_not(ops.isnan(value)),
-            PhysicsRangeError,
-            "{function}: {name} = nan; expected a number",
-            function=function,
-            name=name,
-            value=value,
-        )
-
-
 def _check_temperature(function, temperature):
     """Require a temperature inside the Hyland-Wexler range."""
-    _check_number(function, temperature=temperature)
+    ops.check_numbers(function, temperature=temperature)
     ops.check(
         ops.logical_and(temperature >= MINIMUM_TEMPERATURE, temperature <= MAXIMUM_TEMPERATURE),
         PhysicsRangeError,
@@ -247,7 +233,7 @@ def _check_temperature(function, temperature):
 
 def _check_relative_humidity(function, relative_humidity, minimum_included=False):
     """Require a relative humidity in (0, 1], or in [0, 1] when zero is meaningful."""
-    _check_number(function, relative_humidity=relative_humidity)
+    ops.check_numbers(function, relative_humidity=relative_humidity)
     valid = ops.logical_and(relative_humidity <= 1, relative_humidity >= 0)
     if not minimum_included:
         valid = ops.logical_and(valid, relative_humidity > 0)
