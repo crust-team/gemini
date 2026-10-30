@@ -450,6 +450,7 @@ leaves (`ThermalDecline`, `AquiferStorage`, `BoreholeField`, `ThermalStorage`, `
 [equipment.md](equipment.md).
 
 ```python
+from gemini.physics import heat_transfer
 from gemini.types import Power, State, Temperature
 
 
@@ -487,11 +488,12 @@ class Tank(Module):
         self.duty = self._duty(inlets.inlet)
 
     def _advance_states(self, inlets, outlets, dt):
-        rise = self._duty(inlets.inlet) * dt / self.heat_capacity
+        heat = heat_transfer.heat_rate(self._duty(inlets.inlet), dt)
+        rise = heat_transfer.temperature_change(heat, self.heat_capacity)
         return {"temperature": self.temperature + rise}
 
     def _duty(self, inlet):
-        return inlet.m_dot * 4217.4 * (inlet.T - self.temperature)
+        return heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - self.temperature)
 
 
 tank = Tank().update_params(heat_capacity=4.2e5)

@@ -28,3 +28,11 @@ def test_flare_emissions_follow_the_stoichiometry():
     assert combustion.flare_emissions(2.0, 0.1, 0.5, 0.0, 50e6) == (0.2, 1.0, 0.0)
     rows = [(2.0, 0.1, 0.5, 0.98, 50e6), (2.0, 0.1, 0.5, 0.0, 50e6)]
     assert_function_matches(combustion.flare_emissions, rows)
+
+
+def test_emission_rate_adds_fuel_and_grid():
+    """Each source counts with its own factor."""
+    assert combustion.emission_rate(100.0, 0.5, 10.0, 2.0) == 70
+    assert_function_matches(
+        combustion.emission_rate, [(100.0, 0.5, 10.0, 2.0), (0.0, 0.5, 0.0, 2.0)]
+    )

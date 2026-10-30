@@ -112,7 +112,8 @@ and boundaries name the commanded quantity in full words (`frequency`, `producti
 setpoints are `<quantity>_setpoint` (`pressure_setpoint`, `temperature_setpoint`). The `Stream`
 field symbols `m_dot`, `T` and `p` are reserved for `Stream` fields and binding field keys.
 
-Elsewhere use full words, not abbreviations. Booleans read as questions (`is_leaf`,
+[glossary.md](glossary.md) holds the one name of each concept. Elsewhere use full words, not
+abbreviations. Booleans read as questions (`is_leaf`,
 `is_initialized`, `has_input_value`). Add an SI unit suffix only where the type does not carry the
 unit, for example the summary column `energy_J` or the constant `TEST_BUDGET_S`; declared
 quantities carry their unit and never repeat it in the name.
@@ -151,6 +152,15 @@ docstring, never a comment. `test_only_section_headers_and_tool_directives_are_c
 - Explicit errors: raise a `gm.errors` class (see [errors.md](errors.md)), never a bare
   `except`, and no silent fallback that hides a failure.
 - A bug gets a failing test first; the fix makes it pass.
+
+A module holds no `*`, `/`, `**`, numeric literal other than 0 and 1, `math.*`, NumPy maths or
+`ops.exp`-style call: `test_modules_hold_no_formulas` scans `gemini/modules/` except `plants/`, with
+the exceptions and their reasons in `FORMULA_EXCEPTIONS`. Bookkeeping of like quantities (`inlet.p -
+drop`, `m_1 + m_2`) stays in a module; a default value is a named physics constant.
+`test_no_two_physics_functions_share_a_body` compares the normalised bodies of the physics functions,
+so a copy with renamed arguments fails; a body of one operator on two names is a definition and is
+not compared, and different relations of one form are listed in `SAME_FORM`.
+`tests/unit/modules/test_glossary.py` checks every name against [glossary.md](glossary.md).
 
 Enforcement: `tests/unit/test_code_quality.py` checks nesting
 (`test_functions_nest_at_most_three_blocks`), function length

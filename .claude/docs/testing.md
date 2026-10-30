@@ -205,6 +205,8 @@ mirrors still holding only a docstring is empty and must never grow.
 or engine code and `gemini.utils.legacy` no engine code. `tests/unit/test_code_quality.py` enforces the comment rule, the
 nesting limit, the function-length limit with its `LONG_FUNCTIONS` exceptions and the ban on the
 framework name (see [conventions.md](conventions.md#code-quality)); flake8 enforces complexity.
+The same file fails on a formula in a module and on two physics functions with one normalised body;
+`tests/unit/modules/test_glossary.py` checks every declared name against the glossary.
 `tests/unit/test_public_api.py` compares every public name, its parameter names and the schema
 files with `tests/fixtures/public_api.json`, which may only change together with `gm.API_VERSION`
 (see [conventions.md](conventions.md#public-api-freeze)).

@@ -7,6 +7,8 @@ GEMINI is a composable geothermal digital-twin package. Preserve captured numeri
 Test with the development profile (`make test`); see
 [Testing: Test profiles](.claude/docs/testing.md#test-profiles).
 
+Physics lives only in `gemini/physics/`: a module declares and wires, and calls physics functions.
+
 Read every file in `.claude/docs/` before changing the repository:
 
 - [Public API](.claude/docs/api.md): every frozen public name, its return shape and status; start
@@ -18,10 +20,12 @@ Read every file in `.claude/docs/` before changing the repository:
 - [Economics](.claude/docs/economics.md): economics, KPIs, checks and well analysis.
 - [Equipment](.claude/docs/equipment.md): every shipped module, its model and energy audit.
 - [Errors](.claude/docs/errors.md): the `gm.errors` classes and when each is raised.
+- [Glossary](.claude/docs/glossary.md): one name per concept for parameters, outputs and ports.
 - [Legacy](.claude/docs/legacy.md): the old-format boundary and conversion rules.
 - [Modules](.claude/docs/modules.md): declarations, listings, calls, outputs, hooks and state.
 - [Native engine](.claude/docs/native-engine.md): the computation-graph design and its status.
-- [Physics](.claude/docs/physics.md): SI correlations and numerical constraints.
+- [Physics](.claude/docs/physics.md): every physics function by file, SI correlations and numerical
+  constraints.
 - [Refactor notes](.claude/docs/refactor-notes.md): retained numbers and known limitations.
 - [Runtime](.claude/docs/runtime.md): context-local process settings.
 - [Testing](.claude/docs/testing.md): tiers, test profiles, datasets, budgets, fixtures and CI.
@@ -50,12 +54,12 @@ gemini/
 │   └── runtime.py    # context-local precision, display units and default fluid
 ├── ops/              # op registry, dispatch, Constant, where and check used by physics
 ├── graph/            # Node, Graph, Proxy, Tracer, Interpreter, cache and runner
-├── physics/          # SI correlations and unit conversions
+├── physics/          # every formula: SI correlations and unit conversions
 ├── types/            # quantities, streams, fluids, declarations, profiles, bindings, costs
 ├── modules/          # Module base class, registry, containers; one folder per category, plants/ too
 ├── engine/           # Clock, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay
-├── analysis/         # well performance and integrity, gm.kpi
+├── analysis/         # well performance and integrity, fits, gm.kpi
 ├── economics/        # capex, opex, levelised cost, CO2, cash flow
 ├── checks/           # balances and bounds over a finished run
 ├── testing/          # check_module for a new module class

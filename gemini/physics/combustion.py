@@ -118,3 +118,29 @@ def flare_emissions(
     burnt = combustion_efficiency * methane
     co2 = co2_fraction * gas_flow + burnt * constants.CO2_MOLAR_MASS / METHANE_MOLAR_MASS
     return co2, methane - burnt, burnt * heating_value
+
+
+@ops.physics
+def emission_rate(
+    fuel: float, fuel_factor: float, grid_electricity: float, electricity_factor: float
+) -> float:
+    """Return the CO2 emission rate [kg/s]: ``fuel * f_fuel + P_grid * f_electricity``.
+
+    Parameters
+    ----------
+    fuel, grid_electricity : float
+        Fuel input and electricity taken from the grid, both powers [W].
+    fuel_factor, electricity_factor : float
+        Emission factors [kg/J] of the fuel and of the grid.
+
+    Returns
+    -------
+    float
+        Emission rate [kg/s].
+
+    Notes
+    -----
+    Direct and purchased-electricity emissions with factors the user gives, the Scope 1 and 2 sum
+    of the GHG Protocol Corporate Standard (2004); valid for nonnegative inputs.
+    """
+    return fuel * fuel_factor + grid_electricity * electricity_factor

@@ -15,6 +15,7 @@ never manufacture heat loss to force a first-law residual to zero.
 from gemini import ops
 from gemini.modules.pumps import ESP, InjectionPump, LineShaftPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.physics import combustion, diagnostics, heat_transfer
 from gemini.types.flows import Stream
 
 ENERGY_INPUTS = ("electricity", "fuel", "heat_absorbed")
@@ -53,7 +54,7 @@ def emissions(result_tree, fuel_factor, electricity_factor):
     """
     flows = collect_flows(result_tree)
     grid = ops.maximum(0.0, flows["electricity"] - flows["electricity_generated"])
-    return flows["fuel"] * fuel_factor + grid * electricity_factor
+    return combustion.emission_rate(flows["fuel"], fuel_factor, grid, electricity_factor)
 
 
 def _scale(incoming, outgoing):
@@ -66,7 +67,7 @@ def _streams(ports):
 
 
 def _enthalpy(stream):
-    return stream.heat_capacity_rate() * stream.T
+    return heat_transfer.heat_rate(stream.heat_capacity_rate(), stream.T)
 
 
 def _internal_flux(result, measure):
@@ -104,7 +105,9 @@ def mass_balance(module, result):
         "in": incoming,
         "out": outgoing,
         "residual": residual,
-        "relative_residual": ops.abs(residual) / _scale(incoming, outgoing),
+        "relative_residual": diagnostics.performance_ratio(
+            ops.abs(residual), _scale(incoming, outgoing)
+        ),
         "modules": children,
     }
 
@@ -143,10 +146,12 @@ def energy_balance(module, result):
         "in": incoming,
         "out": outgoing,
         "residual": residual,
-        "relative_residual": ops.abs(residual) / scale,
+        "relative_residual": diagnostics.performance_ratio(ops.abs(residual), scale),
         "unresolved_power": unresolved,
         "thermal_residual": residual - unresolved,
-        "relative_thermal_residual": ops.abs(residual - unresolved) / scale,
+        "relative_thermal_residual": diagnostics.performance_ratio(
+            ops.abs(residual - unresolved), scale
+        ),
         "modules": totals["modules"],
     }
 

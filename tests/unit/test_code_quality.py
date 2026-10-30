@@ -40,6 +40,49 @@ VALIDATORS = {"model_validator", "field_validator"}
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
 FRAMEWORK_STEM = "tor" + "ch"
 """Lowercase text that every ``FRAMEWORK`` match contains, checked before the slower regex."""
+MATH_OPS = {
+    "exp",
+    "expm1",
+    "log",
+    "log10",
+    "log1p",
+    "sqrt",
+    "power",
+    "pow",
+    "sin",
+    "cos",
+    "tan",
+    "atan",
+}
+ARITHMETIC = (ast.Pow, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod)
+FORMULA_EXCEPTIONS = {
+    "gemini/modules/exchangers/heatexchanger.py: np.any": "health decides on scalars and arrays; "
+    "ops has no reduction to a Python bool",
+    "gemini/modules/module.py: literal 4": "how many parameters repr shows, not physics",
+    "gemini/modules/module.py: np.float64": "the eager scope wraps a recorded float, not maths",
+    "gemini/modules/module.py: np.ndarray": "a type test of the array path, not maths",
+    "gemini/modules/pumps/esp.py: np.asarray": "the float32 cast of the retained precision",
+    "gemini/modules/pumps/esp.py: np.float32": "the float32 cast of the retained precision",
+    "gemini/modules/serialization.py: literal 2": "the plant file format number",
+}
+"""``file: marker`` of what a module may keep, each with its reason; see ``formula_markers``."""
+SAME_FORM = {
+    (
+        "chemistry.py::co2_solubility_gas",
+        "control.py::pid_derivative",
+        "hydraulics.py::reynolds_number",
+    ): "a product over a divisor: dissolved CO2, a PID term and the Reynolds number",
+    ("compression.py::heat_rejected", "hydraulics.py::productivity_pressure"): "a less b over c: "
+    "compressor heat and a linear inflow relation",
+    (
+        "ground.py::stored_heat",
+        "pumps.py::line_shaft_friction_power",
+        "storage.py::ice_stored_cold",
+    ): "a product of three: stored heat, shaft friction and latent cold",
+    ("pumps.py::best_efficiency_ratio", "refrigeration.py::cooling_minimum_sink_rate"): "a over a "
+    "product: a pump load ratio and a heat pump's smallest sink capacity rate",
+}
+"""Physics functions with one normalised body that are different relations, each with its reason."""
 
 
 def tracked_files():
@@ -183,6 +226,119 @@ def test_package_code_raises_gemini_errors(path):
         if isinstance(node, ast.Raise) and node.exc and raised_name(node) in BUILTIN_ERRORS
     ]
     assert found == []
+
+
+def formula_markers(source):
+    """Return the marks of a formula in a module's source, each once with its line."""
+    found = {}
+    for node in ast.walk(ast.parse(source)):
+        marker = None
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ARITHMETIC):
+            marker = type(node.op).__name__
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            owner, name = node.value.id, node.attr
+            if owner in ("math", "np", "numpy") or (owner == "ops" and name in MATH_OPS):
+                marker = f"{owner}.{name}"
+        elif isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            marker = None if node.value in (0, 1) else f"literal {node.value}"
+        if marker:
+            found.setdefault(marker, node.lineno)
+    return found
+
+
+MODULE_FILES = [
+    path
+    for path in PACKAGE_FILES
+    if path.startswith("gemini/modules/") and not path.startswith("gemini/modules/plants/")
+]
+
+
+@pytest.mark.parametrize("path", MODULE_FILES)
+def test_modules_hold_no_formulas(path):
+    """Physics lives only in ``gemini/physics/``: a module declares and wires."""
+    markers = formula_markers((ROOT / path).read_text())
+    found = {f"{path}: {marker}": line for marker, line in markers.items()}
+    assert {name: line for name, line in found.items() if name not in FORMULA_EXCEPTIONS} == {}
+
+
+def test_formula_exceptions_exist():
+    """Every listed exception still names something the scan finds."""
+    for name in FORMULA_EXCEPTIONS:
+        path, _, marker = name.partition(": ")
+        assert marker in formula_markers((ROOT / path).read_text())
+
+
+class _Names(ast.NodeTransformer):
+    """Replace argument and local names by their order of appearance."""
+
+    def __init__(self):
+        self.names = {}
+
+    def visit_Name(self, node):
+        """Rename a local or an argument; leave modules, functions and constants alone."""
+        if isinstance(node.ctx, ast.Store) or node.id in self.names:
+            node.id = self.names.setdefault(node.id, f"name{len(self.names)}")
+        return node
+
+
+def normalised_body(function):
+    """Return the body of a function without docstring, annotations and its own names."""
+    names = _Names()
+    for argument in function.args.posonlyargs + function.args.args + function.args.kwonlyargs:
+        names.names[argument.arg] = f"name{len(names.names)}"
+    body = function.body[1:] if ast.get_docstring(function) else function.body
+    return "".join(ast.dump(names.visit(statement)) for statement in body)
+
+
+def is_one_operation(function):
+    """Tell whether a body is one operator on two names: a definition, not a formula."""
+    body = function.body[1:] if ast.get_docstring(function) else function.body
+    value = body[0].value if len(body) == 1 and isinstance(body[0], ast.Return) else None
+    operands = (getattr(value, "left", None), getattr(value, "right", None))
+    return isinstance(value, ast.BinOp) and all(isinstance(item, ast.Name) for item in operands)
+
+
+def physics_copies():
+    """Return groups of public and private physics functions with one normalised body."""
+    bodies = {}
+    for path in PACKAGE_FILES:
+        if not path.startswith("gemini/physics/"):
+            continue
+        for function in ast.parse((ROOT / path).read_text()).body:
+            if isinstance(function, ast.FunctionDef) and not is_one_operation(function):
+                name = f"{path.removeprefix('gemini/physics/')}::{function.name}"
+                bodies.setdefault(normalised_body(function), []).append(name)
+    return [tuple(sorted(names)) for names in bodies.values() if len(names) > 1]
+
+
+def test_no_two_physics_functions_share_a_body():
+    """Every formula exists once; a copy with renamed arguments counts as a copy."""
+    assert set(physics_copies()) == set(SAME_FORM)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("x = a * 2", {"Mult": 1, "literal 2": 1}),
+        ("x = ops.exp(a)", {"ops.exp": 1}),
+        ("x = ops.where(a, 0, 1)", {}),
+        ("x = math.pi", {"math.pi": 1}),
+        ("x = np.sum(a)", {"np.sum": 1}),
+    ],
+)
+def test_formula_markers_find_a_formula(source, expected):
+    """The scan sees arithmetic, maths calls and numbers other than 0 and 1."""
+    assert formula_markers(source) == expected
+
+
+def test_a_copy_with_other_argument_names_has_the_same_body():
+    """The normalised body ignores docstrings and argument names, not the formula."""
+    first, second, third = ast.parse(
+        'def f(a, b):\n    """Doc."""\n    return a * b + 1\n'
+        "def g(x, y):\n    return x * y + 1\n"
+        "def h(x, y):\n    return x * y + 2\n"
+    ).body
+    assert normalised_body(first) == normalised_body(second) != normalised_body(third)
 
 
 @pytest.mark.parametrize(
