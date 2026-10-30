@@ -30,16 +30,31 @@ class Interpreter:
 
     def run(self, feeds):
         """Return every graph output by name for the input values ``feeds``."""
+        values, errors = self._pass(feeds)
+        outputs = {name: _value(operand, values) for name, operand in self.graph.outputs.items()}
+        self._raise_reached(errors, values)
+        return outputs
+
+    def evaluate(self, feeds):
+        """Return the outputs and a boolean array of the rows whose error reaches an output.
+
+        Nothing is raised: the engine leaves those rows to the untraced path, which raises the
+        exact error at the exact tick. The mask is ``None`` when no row failed.
+        """
+        values, errors = self._pass(feeds)
+        outputs = {name: _value(operand, values) for name, operand in self.graph.outputs.items()}
+        code = _first(errors.get(operand) for operand in self.graph.outputs.values())
+        return outputs, None if code is None else np.atleast_1d(code) != 0
+
+    def _pass(self, feeds):
+        """Run the value pass, then the error pass; return the node values and error codes."""
         missing = [name for name in self.graph.inputs if name not in feeds]
         if missing:
             raise CallError(f"{self.graph.module_path}: graph inputs without a value: {missing}")
         values = {}
         for node in self.graph.nodes:
             values[node] = self._evaluate(node, values, feeds)
-        errors = self._errors(values)
-        outputs = {name: _value(operand, values) for name, operand in self.graph.outputs.items()}
-        self._raise_reached(errors, values)
-        return outputs
+        return values, self._errors(values)
 
     def _evaluate(self, node, values, feeds):
         if node.op == "input":

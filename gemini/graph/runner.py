@@ -42,7 +42,7 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
         graph = (cache or GraphCache()).graph(module, fluids)
     except TraceError as error:
         return _untraced(module, inlets, inputs, rows, str(error))
-    values = _evaluate(graph, _feeds(graph, module, inlets, inputs), backend, rows)
+    values = _evaluate(graph, graph_feeds(graph, module, inlets, inputs), backend, rows)
     outputs = _stacked_vectors(
         graph,
         {
@@ -86,8 +86,8 @@ def _row_feeds(graph, feeds, row):
     }
 
 
-def _feeds(graph, module, inlets, inputs):
-    """Return the value of every graph input."""
+def graph_feeds(graph, module, inlets, inputs):
+    """Return the value of every graph input; ``inputs`` maps names to arrays or scalars."""
     feeds = {}
     for name, stream in inlets.items():
         feeds |= {
@@ -156,13 +156,6 @@ def _untraced(module, inlets, inputs, rows, reason):
 def _replay_observers(graph, module, inlets, inputs, outputs, outlets, rows):
     """Call every observer hook once per row with that row's inlets, outlets and outputs."""
     for row in range(rows if graph.observers or graph.pre_observers else 0):
-        call = _Call(
-            module=module,
-            inputs=module._resolve_inputs({k: _row(v, row) for k, v in inputs.items()}),
-            outputs={name: _row(value, row) for name, value in outputs.items()},
-            parent=None,
-        )
-        row_inlets = Ports(_row_streams(inlets, row), path=module.path)
         row_outlets = Ports(
             {
                 port: Stream(
@@ -173,11 +166,28 @@ def _replay_observers(graph, module, inlets, inputs, outputs, outlets, rows):
             },
             path=module.path,
         )
-        token = _current_call.set(call)
-        try:
-            for pre_hook in graph.pre_observers:
-                pre_hook(module, row_inlets)
-            for hook in graph.observers:
-                hook(module, row_inlets, row_outlets)
-        finally:
-            _current_call.reset(token)
+        replay_row(
+            graph,
+            module,
+            Ports(_row_streams(inlets, row), path=module.path),
+            row_outlets,
+            module._resolve_inputs({k: _row(v, row) for k, v in inputs.items()}),
+            {name: _row(value, row) for name, value in outputs.items()},
+        )
+
+
+def replay_row(graph, module, inlets, outlets, inputs, outputs):
+    """Call the observer hooks of ``graph`` for one row: pre-hooks first, then forward hooks.
+
+    The hooks run inside a call record holding the row's ``inputs`` and ``outputs``, so
+    ``module.<control>`` and ``module.<output>`` read that row.
+    """
+    call = _Call(module=module, inputs=inputs, outputs=outputs, parent=None)
+    token = _current_call.set(call)
+    try:
+        for pre_hook in graph.pre_observers:
+            pre_hook(module, inlets)
+        for hook in graph.observers:
+            hook(module, inlets, outlets)
+    finally:
+        _current_call.reset(token)

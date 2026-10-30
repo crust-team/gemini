@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from gemini.core.physics import units
@@ -105,3 +106,17 @@ def test_duration_and_productivity_index_field_units():
     assert units.convert(1.5, "h", "s") == 5400
     assert units.convert(2, "d", "min") == 2880
     assert units.convert(36, "m3/h/bar", "m3/s/Pa") == pytest.approx(1e-7)
+
+
+@pytest.mark.parametrize(
+    ("unit", "quantity"),
+    [("bar", "pressure"), ("°C", "temperature"), ("°C", "temperature_difference"), ("m3/h", None)],
+)
+def test_si_conversion_gives_the_bits_of_to_si_on_arrays(unit, quantity):
+    """One scale and offset convert a whole column to exactly the scalar results."""
+    values = np.array([0.1, 3.7, 12.3456789, -4.2e-3, 1e5])
+    scale, offset = units.si_conversion(unit, quantity)
+    expected = [units.to_si(value, unit, quantity) for value in values.tolist()]
+    assert (values * scale + offset).tolist() == expected
+    with pytest.raises(UnitError, match="units.si_conversion"):
+        units.si_conversion("furlong")

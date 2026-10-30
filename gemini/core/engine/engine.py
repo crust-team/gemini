@@ -9,11 +9,13 @@ import pandas as pd
 from gemini.core import runtime
 from gemini.core.data.loader import Loader
 from gemini.core.engine import checkpoint as storage
+from gemini.core.engine.batch import Batch
 from gemini.core.engine.clock import Clock
 from gemini.core.engine.results import Results
 from gemini.core.engine.step import BindingPlan, chained_step, twin_step
 from gemini.core.modules.module import class_path, import_class
 from gemini.errors import CheckpointError, ConfigurationError
+from gemini.graph import GraphCache, traced_enabled
 from gemini.utils.time import parse_duration, to_utc
 
 
@@ -53,6 +55,8 @@ class Engine:
         self._dataset_fingerprint = None
         self._max_gap = None
         self._in_step = False
+        self._graph_cache = GraphCache()
+        self.batch = None
 
     def simulate(self, plant, dataset, clock):
         """Evaluate the handwritten plant chain using assumed, root-bound inputs."""
@@ -165,18 +169,41 @@ class Engine:
         self._max_gap = loader.max_gap
         try:
             self._notify("on_run_start")
-            for sample in loader:
-                self._notify("on_step_start", sample)
-                outputs, skips, errors = self._step(step_fn, plant, sample, plan)
-                self.results.append(sample.t, outputs, sample.dt, skips, errors)
-                self.position = sample.t
-                self._notify("on_step_end", sample)
+            plan.batch = self.batch = self._batch(kind, plan, plant, loader)
+            try:
+                self._commit(step_fn, plant, loader, plan)
+            finally:
+                if plan.batch is not None:
+                    plan.batch.flush()
             self._notify("on_run_end")
         except BaseException as exc:
             self._in_step = False
             self._notify("on_error", exc)
             raise
         return self.results
+
+    def _commit(self, step_fn, plant, loader, plan):
+        """Run the tick loop: each sample is one step, committed to the results and callbacks."""
+        for sample in loader:
+            self._notify("on_step_start", sample)
+            outputs, skips, errors = self._step(step_fn, plant, sample, plan)
+            self.results.append(sample.t, outputs, sample.dt, skips, errors)
+            self.position = sample.t
+            self._notify("on_step_end", sample)
+
+    def _batch(self, kind, plan, plant, loader):
+        """Return the precomputed rows of a replay's twins, or ``None`` when not applicable.
+
+        Only a replay is evaluated through the graph, and only while ``gemini.graph.settings``
+        allows it; ``simulate`` and ``live`` run tick by tick. Rows that are not claimed, and
+        twins the graph cannot carry, run on the plain path in the commit loop.
+        """
+        if kind != "replay" or not traced_enabled():
+            return None
+        aligned = loader.arrays()
+        if not aligned.times:
+            return None
+        return Batch.compute(plan, plant, aligned, self._graph_cache, bool(self.callbacks))
 
     def _step(self, step_fn, plant, sample, plan):
         """Run one step; a failure restores the module states as they were before it.

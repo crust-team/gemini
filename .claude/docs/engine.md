@@ -55,6 +55,37 @@ case the module states are also restored to their value before the step. Under
 `on_error="raise"` a failing replay twin raises `StepError` with the cause chained, and a failing
 simulation step raises its exception.
 
+## Replay through the graph
+
+A replay is two phases (`gemini/core/engine/batch.py`). After `on_run_start` (so `EventLog` has
+attached its hooks) the **batch phase** evaluates each twin once on arrays: for every stretch of
+ticks that share one dated parameter snapshot it converts the bound columns to SI with the same
+scale and offset as `units.to_si` (`units.si_conversion`), builds one stream of arrays per inlet,
+and runs the cached graph (`gemini.graph`) over the rows that can be evaluated. A row is
+**claimed** when every observation is present and finite, the inlet stream is valid, no check or
+break node reaches an output, and every output and outlet value is finite (NaN only for a
+declared `X | None` output, read back as `None`). The **commit phase** is the unchanged tick loop:
+a twin takes a claimed row from the batch (a `ModuleResult` of plain Python floats, bools and
+`None`, without `children` or `call_records`) and runs `health` on it; every other row, of every
+twin, is evaluated at its own tick on the plain path, which raises the exact error, `StepError`
+chain, skip or result an untraced replay gives. Results, skips, errors, callbacks and checkpoints
+therefore come from one code path.
+
+Twins the graph cannot carry run entirely on the plain path: stateful twins (they need
+`scan`), float32 runs, an untraceable twin, and every twin when one twin is a composite with
+another twin below it. `engine.batch.reasons` gives the reason by twin path, `engine.batch.claims`
+the claimed rows, and `claims[path].graph.breaks` the leaf children of a composite twin that run
+untraced inside its graph. The batch is built only for `replay` (including `resume` of one), not
+for `simulate` or `live`, and `gemini.graph.settings(traced=False)` turns it off.
+
+The inputs a claimed row applies to its twin (`module.set_inputs`) are applied at once when the
+engine has callbacks, else once at the end of the run (also on failure) for the last tick whose
+inputs were not replaced by a plain-path tick, so the plant keeps the last tick's inputs. The
+marked observer hooks of a twin (`EventLog`) are replayed for each claimed row, pre-hooks then
+forward hooks, with that row's inlets, outlets, inputs and outputs. Dated parameters apply per
+stretch in the batch phase and are restored afterwards; the commit loop applies them again. One
+`GraphCache` lives on the `Engine`, so repeated replays (calibration) reuse graphs.
+
 ## Callbacks
 
 Callbacks derive from `gemini.core.engine.callbacks.Callback` and run in registration order with

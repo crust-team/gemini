@@ -334,6 +334,16 @@ def si_unit(unit):
     return entry[0] if entry else None
 
 
+def si_conversion(unit, quantity=None):
+    """Return ``(scale, offset)`` with ``to_si(value) == float(value) * scale + offset``.
+
+    Array code converts a whole column with the same two numbers, which gives the bits of the
+    scalar conversion row by row.
+    """
+    _, scale, _ = _entry(unit, "units.si_conversion")
+    return scale, _offset(unit, quantity)
+
+
 def to_si(value: float, unit: str, quantity: str | None = None) -> float:
     """Convert a bound scalar to SI; volume flow remains [m3/s] until density is known."""
     _, scale, _ = _entry(unit, "units.to_si")

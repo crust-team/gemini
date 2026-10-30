@@ -9,6 +9,7 @@ import math
 from collections import Counter
 from copy import deepcopy
 
+from gemini.core.modules.module import Module
 from gemini.core.physics import units
 from gemini.core.types import Fluid, Health, Stream
 from gemini.core.types.bindings import Binding, ModuleBindings
@@ -33,7 +34,7 @@ def _value(row, binding, declaration=None):
     return units.to_si(value, binding.unit, quantity)
 
 
-def _is_volumetric_mass_flow(module, name, binding):
+def is_volumetric_mass_flow(module, name, binding):
     """Whether a kg/s control or boundary is bound to a volumetric flow column."""
     declaration = module.inputs(recurse=False).get(name)
     return (
@@ -54,7 +55,7 @@ def _input_values(module, bindings, row):
         for name, binding in group.items()
     }
     for name, binding in (bindings.controls | bindings.boundaries).items():
-        if _is_volumetric_mass_flow(module, name, binding):
+        if is_volumetric_mass_flow(module, name, binding):
             values[name] *= module.fluid.properties(module.pressure, module.temperature).density
     return values
 
@@ -82,15 +83,23 @@ def prepare(module, bindings, row, defaults=None):
     return kwargs, measured
 
 
+UNAVAILABLE = Health(
+    score=1,
+    alarm=False,
+    assessed=False,
+    message="No diagnostic model or sufficient measurements",
+)
+"""The one health of every module without a diagnostic model, shared by all results."""
+
+
 def health_or_unavailable(module, result, measured):
-    """Keep lack of diagnostics distinct from assessed nominal health."""
-    health = module.health(result, measured) if result.outputs else None
-    return health or Health(
-        score=1,
-        alarm=False,
-        assessed=False,
-        message="No diagnostic model or sufficient measurements",
-    )
+    """Keep lack of diagnostics distinct from assessed nominal health.
+
+    A module that does not override ``health`` is not called; its result is ``UNAVAILABLE``.
+    """
+    if type(module).health is Module.health:
+        return UNAVAILABLE
+    return (module.health(result, measured) if result.outputs else None) or UNAVAILABLE
 
 
 class BindingPlan:
@@ -106,6 +115,7 @@ class BindingPlan:
         """Compile declarations and dataset bindings for repeated evaluations."""
         _check_only(plant, only)
         self.on_error = on_error
+        self.batch = None
         self.stateful = any(module.stateful for module in plant.modules())
         self._dates = _parameter_dates(plant)
         self._started, self._next_change = False, None
@@ -138,7 +148,29 @@ class BindingPlan:
         if not self._started or self._next_change is not None and at >= self._next_change:
             plant.apply_params_at(at)
             self._started = True
-            self._next_change = next((date for date in self._dates if date > at), None)
+            self._next_change = self._change_after(at)
+
+    def _change_after(self, at):
+        return next((date for date in self._dates if date > at), None)
+
+    def parameter_stretches(self, times):
+        """Return the ``(start, stop)`` index ranges of ticks that share one parameter snapshot.
+
+        The ranges follow ``apply_parameters``: the snapshot is applied at the first tick and
+        again at the first tick at or after each later date.
+        """
+        starts, change = [0], self._change_after(times[0])
+        for index, at in enumerate(times):
+            if change is not None and at >= change:
+                starts.append(index)
+                change = self._change_after(at)
+        return list(zip(starts, [*starts[1:], len(times)]))
+
+    def claim(self, path, module, at):
+        """Return ``(result, measured)`` of a row the batch computed, or ``None`` to evaluate it."""
+        if self.batch is None:
+            return None
+        return self.batch.claim(path, module, at)
 
 
 def _check_only(plant, only):
@@ -261,7 +293,7 @@ def _check_volumetric_inputs(path, module, bound):
     """Require ``pressure``/``temperature`` parameters to convert a volumetric mass flow."""
     parameters = dict(module.named_parameters(recurse=False))
     for name, binding in (bound.controls | bound.boundaries).items():
-        if _is_volumetric_mass_flow(module, name, binding) and not (
+        if is_volumetric_mass_flow(module, name, binding) and not (
             {"pressure", "temperature"} <= parameters.keys()
         ):
             raise BindingError(
@@ -288,7 +320,11 @@ def twin_step(plant, sample, states, plan):
     outputs, skips, errors = {}, {}, []
     for path, module, bound, defaults in plan.entries:
         try:
-            outputs[path] = _evaluate_twin(path, module, bound, defaults, sample, states)
+            claimed = plan.claim(path, module, sample.t)
+            if claimed is not None:
+                outputs[path] = claimed[0], health_or_unavailable(module, *claimed)
+                continue
+            outputs[path] = _evaluate_twin(path, module, bound, defaults, sample, states, plan)
         except MissingMeasurementError as exc:
             skips.setdefault(path, Counter())[str(exc)] += 1
         except Exception as exc:
@@ -298,11 +334,13 @@ def twin_step(plant, sample, states, plan):
     return outputs, skips, errors
 
 
-def _evaluate_twin(path, module, bound, defaults, sample, states):
+def _evaluate_twin(path, module, bound, defaults, sample, states, plan):
     """Call one twin on its measured boundary; a stateful twin also advances its state."""
     kwargs, measured = prepare(module, bound, sample.row, defaults)
     applied = {name: kwargs.pop(name) for name in module.inputs(recurse=False) if name in kwargs}
     module.set_inputs(applied)
+    if plan.batch is not None:
+        plan.batch.persisted(path)
     if not module.stateful:
         prediction = module(kwargs)
         return prediction, health_or_unavailable(module, prediction, measured)

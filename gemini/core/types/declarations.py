@@ -105,6 +105,13 @@ class Declaration:
             self._limits = _limits(self.schema)
         return self._limits
 
+    def value_type(self):
+        """Return the JSON type of the value (of each list item): ``number``, ``integer``, ...
+
+        ``None`` for a kind without a schema, such as ``Any``.
+        """
+        return _value_schema(self.schema).get("type")
+
     def accepts_none(self):
         """Return whether the declared kind is ``X | None``."""
         return any(variant.get("type") == "null" for variant in self.schema.get("anyOf", ()))

@@ -54,3 +54,13 @@ def test_missing_inputs_raise_call_errors():
     """Every graph input needs a value."""
     with pytest.raises(CallError, match="without a value: \\['x'\\]"):
         Interpreter(_branch_graph(), backends.get("numpy")).run({})
+
+
+def test_evaluate_marks_the_failing_rows_instead_of_raising():
+    """The mask holds the rows whose error reaches an output; none failing gives ``None``."""
+    graph = _branch_graph()
+    interpreter = Interpreter(graph, backends.get("numpy"))
+    values, failed = interpreter.evaluate({"x": np.array([5.0, -2.0, -3.0, 1.0])})
+    assert failed.tolist() == [False, True, True, False]
+    assert values["outputs.y"][0] == 2.5
+    assert interpreter.evaluate({"x": np.array([5.0, 1.0])})[1] is None
