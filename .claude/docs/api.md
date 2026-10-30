@@ -210,4 +210,4 @@ Pass parameter objects declared `calibratable=True`, such as
 | --- | --- | --- |
 | 1 | 2026-10-30 | First frozen list. |
 | 2 | 2026-10-30 | One classification: `category` is the module's folder. `gm.modules.categories()` and `describe()["category"]` change: `heat_exchange` → `exchangers`, `heat_pump` and `boiler` → `heating`, `chiller` → `cooling`, `network` → `piping`, `well` → `wells`, `pump` → `pumps`, `separation` → `treatment`, `consumer` → `demand`, `plant` → `plants`; `subsurface` and `storage` stay; `power` and `control` are new. Exceptions to that mapping: `ORC`, `FlashTurbine` (`heat_exchange`), `GridConnection` (`network`) and `Separator` (`separation`) are `power`; `PIDController` (`network`) is `control`. |
-| 3 | 2026-10-30 | `gm.legacy` is removed: the bridge moved to the internal `gemini.utils.legacy`. The old-project import stays public through `gm.plants.convert_legacy(folder)` only. |
+| 3 | 2026-10-30 | `gm.legacy` is removed: the bridge moved to the internal `gemini.utils.legacy`. The old-project import stays public through `gm.plants.convert_legacy(folder)` only. Checkpoints written before version 3 do not load. |
