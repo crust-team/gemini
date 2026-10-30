@@ -1,13 +1,15 @@
 """A computation graph: ordered nodes, named inputs by role, named outputs and checks."""
 
+import dataclasses
 import numbers
+from collections.abc import Mapping
 
 import numpy as np
 
 from gemini.errors import TraceError
 from gemini.graph.node import Node, caller_source
 from gemini.graph.proxy import Proxy
-from gemini.ops import Constant
+from gemini.ops import Constant, Failed, registry
 
 
 class Graph:
@@ -33,7 +35,8 @@ class Graph:
         self.outlet_fluids = {}
         self.vectors = {}
         self.breaks = []
-        self.breaks = []
+        self.frames = []
+        self.unframed = []
         self.pre_observers = []
         self.observers = []
 
@@ -81,6 +84,7 @@ class Graph:
             self.constants.pop(name, None)
         del self.nodes[nodes:]
         del self.checks[checks:]
+        self.unframed = [check for check in self.unframed if check.index < nodes]
         for node in self.nodes:
             node.guards = [guard for guard in node.guards if guard.index < nodes]
 
@@ -93,15 +97,73 @@ class Graph:
         return node
 
     def _attach_check(self, node):
-        """Give the check its code and attach its error to its traced message values."""
+        """Give the check its code and keep it for the physics function that recorded it.
+
+        A check recorded outside any physics function is in ``unframed``: it raises at once
+        when eager, so the tracer makes it certain.
+        """
         self.checks.append(node)
         node.code = len(self.checks)
-        values = node.attributes["values"]
-        targets = [value.node for value in values.values() if isinstance(value, Proxy)]
-        if not targets and isinstance(node.operands[0], Node):
-            targets = [node.operands[0]]
-        for target in targets:
-            target.guards.append(node)
+        (self.frames[-1] if self.frames else self.unframed).append(node)
+
+    def open_frame(self):
+        """Start collecting the checks of one physics function; return the next node index."""
+        self.frames.append([])
+        return len(self.nodes)
+
+    def abandon_frame(self):
+        """Drop the running frame after an error; its checks stay unframed."""
+        self.unframed.extend(self.frames.pop())
+
+    def close_frame(self, result, start):
+        """Guard the traced values of ``result`` with the checks of the closing frame.
+
+        A function whose result holds no traced value passes its checks to the enclosing frame,
+        or to ``unframed`` at the root. A result node older than ``start`` (an argument returned
+        unchanged) is guarded through an ``identity`` node, so other users of it stay clean.
+        """
+        checks = self.frames.pop()
+        if not checks:
+            return result
+        guarded = self._guarded(result, checks, start)
+        if guarded is None:
+            (self.frames[-1] if self.frames else self.unframed).extend(checks)
+            return result
+        return guarded[0]
+
+    def _guarded(self, value, checks, start):
+        """Return ``(value with guarded proxies,)``, or ``None`` if ``value`` holds no proxy."""
+        if isinstance(value, Proxy):
+            return (self._guard_proxy(value, checks, start),)
+        if isinstance(value, (list, tuple)):
+            parts = [self._guarded(item, checks, start) for item in value]
+            if all(part is None for part in parts):
+                return None
+            return (type(value)(p[0] if p else item for p, item in zip(parts, value)),)
+        if isinstance(value, Mapping):
+            parts = {key: self._guarded(item, checks, start) for key, item in value.items()}
+            if all(part is None for part in parts.values()):
+                return None
+            return ({k: parts[k][0] if parts[k] else value[k] for k in value},)
+        if dataclasses.is_dataclass(value) and not isinstance(value, type):
+            return self._guarded_dataclass(value, checks, start)
+        return None
+
+    def _guarded_dataclass(self, value, checks, start):
+        parts = {
+            field.name: self._guarded(getattr(value, field.name), checks, start)
+            for field in dataclasses.fields(value)
+        }
+        if all(part is None for part in parts.values()):
+            return None
+        changes = {name: part[0] for name, part in parts.items() if part}
+        return (dataclasses.replace(value, **changes),)
+
+    def _guard_proxy(self, proxy, checks, start):
+        if proxy.node.index < start or proxy.node.op == "input":
+            proxy = self.record(registry.get("identity"), (proxy,))
+        proxy.node.guards.extend(check for check in checks if check not in proxy.node.guards)
+        return proxy
 
     def _operand(self, value):
         """Return the node of a traced value or constant, or a literal unchanged.
@@ -109,6 +171,10 @@ class Graph:
         Literals are numbers, ``None`` (a ``where`` branch without a value) and tuples of numbers
         (the fixed table of an ``interp``); lists become tuples so graphs stay immutable.
         """
+        if isinstance(value, Failed):
+            raise TraceError(
+                f"{self.module_path}: a check failed on constant values: {value.error}"
+            )
         if isinstance(value, Proxy):
             if value.graph is not self:
                 raise TraceError(f"{self.module_path}: traced value of another graph")

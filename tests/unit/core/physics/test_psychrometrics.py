@@ -9,6 +9,7 @@ from gemini import backends
 from gemini.core.physics import psychrometrics
 from gemini.errors import PhysicsRangeError
 from gemini.graph import Graph, Interpreter
+from gemini.graph.limits import certain
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 C = 273.15
@@ -154,6 +155,7 @@ def test_dew_point_in_a_graph_runs_the_solver_and_raises_the_check_error():
     temperature = graph.input("temperature", "inlet")
     humidity = graph.input("humidity", "inlet")
     graph.output("dew", psychrometrics.dew_point(temperature, humidity))
+    certain(graph, graph.unframed)
     run = Interpreter(graph, backends.get("numpy")).run
     rows = DEW_POINT_ROWS
     columns = {

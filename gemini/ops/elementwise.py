@@ -61,3 +61,8 @@ round = elementwise_op(
 clip = elementwise_op(
     "clip", 3, "Return ``value`` limited to ``[low, high]``; ``nan`` stays ``nan``."
 )
+identity = elementwise_op(
+    "identity",
+    1,
+    "Return ``value`` unchanged; a trace uses it to guard a value a function passes through.",
+)

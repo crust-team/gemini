@@ -49,6 +49,10 @@ class NumpyBackend(Backend):
         with np.errstate(all="ignore"):
             return np.power(base, exponent)
 
+    def identity(self, value):
+        """Return ``value`` unchanged."""
+        return value
+
     def neg(self, value):
         """Return ``-value``."""
         return np.negative(value)

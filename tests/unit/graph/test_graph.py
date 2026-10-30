@@ -26,18 +26,49 @@ def test_ops_on_inputs_become_nodes_and_constants_one_named_input():
     )
 
 
-def test_check_errors_travel_with_the_traced_message_values():
-    """A check gets the next code and guards the traced values of its message."""
+def test_a_check_guards_the_results_of_its_physics_function_not_its_named_values():
+    """A check gets the next code; the values it names only fill the message."""
     graph = Graph("test")
     pressure = graph.input("p", "inlet", "Pa")
     flow = graph.input("flow", "inlet", "m3/s")
-    ops.check(flow >= 0, PhysicsRangeError, "flow = {flow}", flow=flow)
-    ops.check(pressure >= 0, PhysicsRangeError, "negative pressure")
+
+    @ops.physics
+    def checked(rate, head):
+        ops.check(rate >= 0, PhysicsRangeError, "flow = {flow}", flow=rate)
+        ops.check(head >= 0, PhysicsRangeError, "negative pressure")
+        return rate * 2.0, head
+
+    with ops.scope.tracing(graph):
+        doubled, passed = checked(flow, pressure)
     first, second = graph.checks
     assert (first.code, second.code) == (1, 2)
-    assert flow.node.guards == [first]
-    assert graph.nodes[second.operands[0].index].guards == [second]
+    assert flow.node.guards == [] and pressure.node.guards == []
+    assert doubled.node.guards == [first, second]
+    assert passed.node.op == "identity" and passed.node.guards == [first, second]
+    assert graph.unframed == []
     assert "code 1: PhysicsRangeError" in graph.describe()
+
+
+def test_a_check_outside_a_physics_function_is_unframed_and_a_result_free_one_moves_up():
+    """Keep an inline check for the tracer; a result-free function hands its checks upward."""
+    graph = Graph("test")
+    flow = graph.input("flow", "inlet")
+    ops.check(flow >= 0, PhysicsRangeError, "inline")
+
+    @ops.physics
+    def inner(value):
+        ops.check(value >= 0, PhysicsRangeError, "inner")
+        return 1.0
+
+    @ops.physics
+    def outer(value):
+        inner(value)
+        return value + 1.0
+
+    with ops.scope.tracing(graph):
+        result = outer(flow)
+    inline, nested = graph.checks
+    assert graph.unframed == [inline] and result.node.guards == [nested]
 
 
 def test_operands_that_are_not_numbers_cannot_be_traced():
@@ -64,15 +95,17 @@ def test_none_and_fixed_tables_are_literals():
 
 
 def test_rollback_drops_nodes_inputs_constants_checks_and_their_guards():
-    """Everything recorded after a mark disappears, guards on earlier nodes included."""
+    """Everything recorded after a mark disappears, guards included."""
     graph = Graph("test")
     pressure = graph.input("p", "inlet", "Pa")
     kept = pressure + 1.0
     mark = graph.mark()
     extra = graph.input("extra", "control")
     dropped = kept * LIMIT + extra
+    graph.open_frame()
     ops.check(dropped > 0, PhysicsRangeError, "{value}", value=kept)
-    assert kept.node.guards and len(graph.checks) == 1
+    graph.close_frame(dropped, mark[0])
+    assert dropped.node.guards and len(graph.checks) == 1
     graph.rollback(mark)
     assert [node.op for node in graph.nodes] == ["input", "add"]
     assert list(graph.inputs) == ["p"] and graph.constants == {} and graph.checks == []

@@ -10,6 +10,7 @@ import gemini as gm
 from gemini import backends, ops
 from gemini.errors import PhysicsRangeError
 from gemini.graph import Graph, GraphCache, Interpreter, run
+from gemini.graph.limits import certain
 from gemini.graph.passes import eliminate_common_subexpressions
 
 COLUMNS = ["suction.m_dot", "suction.T", "suction.p", "frequency"]
@@ -30,7 +31,9 @@ def _merged(build):
     graphs = []
     for optimize in (False, True):
         graph = Graph("test")
-        build(graph, graph.input("x", "inlet"))
+        with ops.scope.tracing(graph):
+            build(graph, graph.input("x", "inlet"))
+        certain(graph, graph.unframed)
         if optimize:
             eliminate_common_subexpressions(graph)
         graphs.append(graph)
@@ -43,6 +46,14 @@ def _count(graph, op):
 
 def _check_positive(value, label="v"):
     ops.check(value > -2, PhysicsRangeError, label + " = {v}; expected > -2", v=value)
+
+
+@ops.physics
+def _checked_double(x):
+    """Return ``x * 2``, guarded by a check of its own value like a physics function's result."""
+    value = x * 2
+    _check_positive(value)
+    return value
 
 
 @pytest.fixture(scope="module")
@@ -196,8 +207,7 @@ def test_guards_survive_a_merge_of_guarded_and_unguarded_twins():
     """Twins that both reach an output merge and the survivor keeps every guard."""
 
     def build(graph, x):
-        guarded, bare = x * 2, x * 2
-        _check_positive(guarded)
+        guarded, bare = _checked_double(x), x * 2
         graph.output("a", guarded + 1)
         graph.output("b", bare + 2)
 
@@ -218,16 +228,14 @@ def test_guard_lists_are_united_in_order_without_duplicates():
         graph.output("y", first + second)
 
     plain, merged = _merged(build)
-    survivor = merged.outputs["y"].operands[0]
-    assert [check.code for check in survivor.guards] == [1, 2]
+    assert [check.code for check in merged.outputs["y"].guards] == [1, 2]
     assert _outcome(plain, np.array([-4.5])) == _outcome(merged, np.array([-4.5]))
     assert _outcome(merged, np.array([-4.5]))[1] == "one -9.0"
 
 
 def _where_graph(shared_use):
     def build(graph, x):
-        guarded, bare = x * 2, x * 2
-        _check_positive(guarded)
+        guarded, bare = _checked_double(x), x * 2
         if shared_use:
             graph.output("direct", guarded + 0.0)
         graph.output("y", ops.where(x > 0, guarded, bare))

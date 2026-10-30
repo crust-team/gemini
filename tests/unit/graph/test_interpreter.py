@@ -11,17 +11,20 @@ from gemini.graph import Graph, Interpreter
 def _branch_graph():
     """Return ``where(x > 0, x / 2, risky())``; the risky branch checks its value ``2 x > -2``.
 
-    The check names the branch's own value, so its error travels with that branch only.
+    The check is in a physics function, so its error guards that function's result and travels
+    with the branch that uses it only.
     """
     graph = Graph("test")
     x = graph.input("x", "inlet")
 
-    def risky():
-        value = x * 2
+    @ops.physics
+    def risky(point):
+        value = point * 2
         ops.check(value > -2, PhysicsRangeError, "test: y = {y}; expected y > -2", y=value)
         return value
 
-    graph.output("outputs.y", ops.where(x > 0, x / 2, risky()))
+    with ops.scope.tracing(graph):
+        graph.output("outputs.y", ops.where(x > 0, x / 2, risky(x)))
     return graph
 
 

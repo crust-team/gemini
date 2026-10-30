@@ -15,6 +15,7 @@ Anything the trace cannot follow raises ``TraceError``, which makes the module a
 
 import numbers
 
+from gemini import ops
 from gemini.core import runtime
 from gemini.core.modules.module import _Call, _current_call, outputs_enabled
 from gemini.core.types.flows import Stream
@@ -42,6 +43,11 @@ class Tracer:
             )
         module._resolve_formula_outputs()
         graph = Graph(module.path)
+        with ops.scope.tracing(graph):
+            return self._record(module, graph, fluids)
+
+    def _record(self, module, graph, fluids):
+        """Record the call of ``module`` into ``graph`` and return it."""
         trace = Trace(graph, module)
         inlets = Ports(
             {name: _inlet(graph, name, fluids[name]) for name in module._inlets},
@@ -56,7 +62,7 @@ class Tracer:
                 graph.output(f"outlets.{port}.{field}", getattr(stream, field))
         for name, value in (call.outputs or {}).items():
             graph.output(f"outputs.{name}", value)
-        certain(graph, trace.limit_checks)
+        certain(graph, trace.limit_checks + graph.unframed)
         return graph
 
 
