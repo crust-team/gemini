@@ -1,5 +1,6 @@
 """Adiabatic junction mixing two streams of the same fluid."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import Inlet, Outlet, Output, PressureDifference, Stream, Temperature
 from gemini.errors import ConfigurationError, PhysicsRangeError
@@ -48,7 +49,7 @@ class Mixer(Module):
         mixed_out = first_in.with_(
             m_dot=first_in.m_dot + second_in.m_dot,
             T=self._mixed_temperature(first_in, second_in),
-            p=min(first_in.p, second_in.p),
+            p=ops.minimum(first_in.p, second_in.p),
         )
 
         outlets = dict(mixed_out=mixed_out)
@@ -56,15 +57,19 @@ class Mixer(Module):
 
     def _compute_outputs(self, inlets, outlets):
         self.mixed_out_T = outlets.mixed_out.T
-        self.pressure_imbalance = abs(inlets.first_in.p - inlets.second_in.p)
+        self.pressure_imbalance = ops.abs(inlets.first_in.p - inlets.second_in.p)
 
     def _check(self, first_in, second_in):
         """Reject reverse flow and streams of different fluids."""
-        if first_in.m_dot < 0 or second_in.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: first_in.m_dot = {first_in.m_dot} kg/s, second_in.m_dot = "
-                f"{second_in.m_dot} kg/s; expected both >= 0"
-            )
+        ops.check(
+            ops.logical_and(first_in.m_dot >= 0, second_in.m_dot >= 0),
+            PhysicsRangeError,
+            "{path}: first_in.m_dot = {first_m_dot} kg/s, second_in.m_dot = "
+            "{second_m_dot} kg/s; expected both >= 0",
+            path=self.path,
+            first_m_dot=first_in.m_dot,
+            second_m_dot=second_in.m_dot,
+        )
         if first_in.fluid != second_in.fluid:
             raise ConfigurationError(
                 f"{self.path}: first_in.fluid = {first_in.fluid!r}, second_in.fluid = "
@@ -75,6 +80,9 @@ class Mixer(Module):
         """Return the adiabatic mixing temperature [K] weighted by heat capacity rates."""
         first_rate = first_in.m_dot * first_in.fluid.properties(first_in.p, first_in.T).cp_l
         second_rate = second_in.m_dot * second_in.fluid.properties(second_in.p, second_in.T).cp_l
-        if first_rate + second_rate == 0:
-            return (first_in.T + second_in.T) / 2
-        return (first_rate * first_in.T + second_rate * second_in.T) / (first_rate + second_rate)
+        total_rate = first_rate + second_rate
+        return ops.where(
+            total_rate == 0,
+            (first_in.T + second_in.T) / 2,
+            ops.truediv(first_rate * first_in.T + second_rate * second_in.T, total_rate),
+        )

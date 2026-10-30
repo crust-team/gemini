@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.core.modules import energy_balance, mass_balance
 from gemini.core.modules.piping import Mixer
 from gemini.core.types import WATER, Fluid, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 HOT = Stream(m_dot=6, T=363.15, p=5e5)
 COLD = Stream(m_dot=2, T=323.15, p=4e5)
@@ -40,3 +41,17 @@ def test_invalid_inputs_raise():
         Mixer()(first_in=HOT, second_in=COLD.with_(fluid=Fluid(liquid_density=1050)))
     with pytest.raises(gm.errors.PhysicsRangeError, match="mixer: first_in.m_dot = -1"):
         Mixer()(first_in=HOT.with_(m_dot=-1), second_in=COLD)
+
+
+def test_mixer_matches_traced():
+    """Either pressure lower, unequal flows and a stopped junction trace correctly."""
+    rows = [
+        dict(first_in=Stream(m_dot=a, T=ta, p=pa), second_in=Stream(m_dot=b, T=tb, p=pb))
+        for a, ta, pa, b, tb, pb in [
+            (6, 363.15, 5e5, 2, 323.15, 4e5),
+            (6, 363.15, 3e5, 2, 323.15, 4e5),
+            (0, 363.15, 5e5, 2, 323.15, 4e5),
+            (0, 363.15, 5e5, 0, 323.15, 4e5),
+        ]
+    ]
+    assert_module_matches(Mixer(), rows)

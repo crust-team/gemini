@@ -2,6 +2,7 @@
 
 import math
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import geometry, heat_transfer, hydraulics
 from gemini.core.types import (
@@ -21,12 +22,21 @@ from gemini.core.types import (
     Temperature,
 )
 from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.ops import Constant
 
-LAMINAR_REYNOLDS = 2300
-"""Reynolds number [-] up to which pipe flow is taken as laminar (Hagen–Poiseuille)."""
+LAMINAR_REYNOLDS = Constant(
+    "PIPE_LAMINAR_REYNOLDS",
+    2300,
+    "-",
+    "Reynolds number up to which pipe flow is taken as laminar (Hagen–Poiseuille)",
+)
 
-TURBULENT_REYNOLDS = 4000
-"""Reynolds number [-] from which pipe flow is taken as turbulent (Swamee–Jain)."""
+TURBULENT_REYNOLDS = Constant(
+    "PIPE_TURBULENT_REYNOLDS",
+    4000,
+    "-",
+    "Reynolds number from which pipe flow is taken as turbulent (Swamee–Jain)",
+)
 
 COMMERCIAL_STEEL_ROUGHNESS = 4.5e-5
 """Absolute roughness [m] of new commercial steel pipe (Moody 1944, Friction factors for pipe
@@ -102,11 +112,15 @@ class Pipe(Module):
         rho = inlet.fluid.properties(inlet.p, inlet.T).rho_l
         static = hydraulics.hydrostatic_dp(rho, self.elevation_change)
         outlet_p = inlet.p - self._friction_drop(inlet) - static
-        if outlet_p < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: outlet pressure = {outlet_p} Pa from inlet.p = {inlet.p} Pa; "
-                "expected the friction and static drops to leave a nonnegative pressure"
-            )
+        ops.check(
+            outlet_p >= 0,
+            PhysicsRangeError,
+            "{path}: outlet pressure = {outlet_p} Pa from inlet.p = {inlet_p} Pa; "
+            "expected the friction and static drops to leave a nonnegative pressure",
+            path=self.path,
+            outlet_p=outlet_p,
+            inlet_p=inlet.p,
+        )
         outlet = inlet.with_(T=self._outlet_temperature(inlet), p=outlet_p)
 
         outlets = dict(outlet=outlet)
@@ -120,21 +134,28 @@ class Pipe(Module):
         self.pressure_drop = inlet.p - outlet.p
         self.velocity = self._velocity(inlet)
         self.outlet_T = outlet.T
-        self.heat_loss = max(heat, 0.0)
-        self.heat_absorbed = max(-heat, 0.0)
+        self.heat_loss = ops.maximum(heat, 0.0)
+        self.heat_absorbed = ops.maximum(-heat, 0.0)
 
     def _check(self, inlet):
         """Reject a pipe shorter than its rise, reverse flow and free gas."""
-        if abs(self.elevation_change) > self.length:
-            raise ConfigurationError(
-                f"{self.path}: elevation_change = {self.elevation_change} m; expected at most "
-                f"length = {self.length} m in magnitude"
-            )
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0 (reverse flow is "
-                "not modelled; wire the pipe in the flow direction)"
-            )
+        ops.check(
+            ops.abs(self.elevation_change) <= self.length,
+            ConfigurationError,
+            "{path}: elevation_change = {elevation_change} m; expected at most "
+            "length = {length} m in magnitude",
+            path=self.path,
+            elevation_change=self.elevation_change,
+            length=self.length,
+        )
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is "
+            "not modelled; wire the pipe in the flow direction)",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         if inlet.fluid.gas_mass_fraction > 0:
             raise PhysicsRangeError(
                 f"{self.path}: inlet.fluid.gas_mass_fraction = "
@@ -156,14 +177,18 @@ class Pipe(Module):
         velocity = self._velocity(inlet)
         velocity_per_reynolds = properties.mu_l / (properties.rho_l * self.inner_diameter)
         reynolds = velocity / velocity_per_reynolds
-        if reynolds <= LAMINAR_REYNOLDS:
-            return self._laminar_drop(velocity, properties)
-        if reynolds >= TURBULENT_REYNOLDS:
-            return self._turbulent_drop(velocity, properties)
         laminar = self._laminar_drop(LAMINAR_REYNOLDS * velocity_per_reynolds, properties)
         turbulent = self._turbulent_drop(TURBULENT_REYNOLDS * velocity_per_reynolds, properties)
         weight = (reynolds - LAMINAR_REYNOLDS) / (TURBULENT_REYNOLDS - LAMINAR_REYNOLDS)
-        return laminar + weight * (turbulent - laminar)
+        return ops.where(
+            reynolds <= LAMINAR_REYNOLDS,
+            self._laminar_drop(velocity, properties),
+            ops.where(
+                reynolds >= TURBULENT_REYNOLDS,
+                self._turbulent_drop(velocity, properties),
+                laminar + weight * (turbulent - laminar),
+            ),
+        )
 
     def _laminar_drop(self, velocity, properties):
         """Return the Hagen–Poiseuille drop ``32 mu L v / D^2`` [Pa], that is ``f = 64/Re``."""
@@ -184,10 +209,13 @@ class Pipe(Module):
 
     def _outlet_temperature(self, inlet):
         """Return the outlet temperature [K] of the exponential ambient-exchange profile."""
-        if inlet.m_dot == 0:
-            return inlet.T
         capacity_rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
         conductance = self.u_value * math.pi * self.inner_diameter * self.length
-        transfer_units = heat_transfer.ntu(conductance, capacity_rate)
+        stopped = inlet.m_dot == 0
+        transfer_units = heat_transfer.ntu(conductance, ops.where(stopped, 1.0, capacity_rate))
         effectiveness = heat_transfer.effectiveness_parallel(transfer_units, 0.0)
-        return inlet.T - effectiveness * (inlet.T - self.ambient_temperature)
+        return ops.where(
+            stopped,
+            inlet.T,
+            inlet.T - effectiveness * (inlet.T - self.ambient_temperature),
+        )

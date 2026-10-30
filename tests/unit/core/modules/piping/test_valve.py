@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.core.modules import energy_balance, mass_balance
 from gemini.core.modules.piping import Valve
 from gemini.core.types import Fluid, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 KV = 100 / 3600 / 1e5**0.5
 """Flow coefficient [m3/s/Pa^0.5] of a catalogue Kv = 100 m3/h/bar^0.5."""
@@ -72,3 +73,14 @@ def test_invalid_inputs_raise():
         valve(rangeability=1)
     with pytest.raises(gm.errors.DeclarationError):
         valve()(inlet=STREAM, opening=1.5)
+
+
+def test_valve_matches_traced():
+    """Both characteristics, a closed valve with no flow and a stopped inlet trace correctly."""
+    rows = [
+        dict(inlet=Stream(m_dot=m_dot, T=353.15, p=20e5), opening=opening)
+        for m_dot, opening in [(10, 1), (10, 0.5), (1, 0.01), (0, 0), (0, 0.3)]
+    ]
+    for module in (valve(), valve(characteristic="linear", rangeability=20)):
+        assert_module_matches(module, rows)
+

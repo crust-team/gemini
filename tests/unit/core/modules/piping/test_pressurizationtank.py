@@ -14,6 +14,7 @@ from gemini.core.types import (
     Stream,
     Temperature,
 )
+from tests.fixtures.equivalence import assert_module_matches
 
 RETURN = Stream(m_dot=10, T=323.15, p=1.2e5)
 
@@ -103,3 +104,12 @@ def test_piping_network_closes_mass_and_energy():
     assert result.outputs.pressure_correction == pytest.approx(3e5 - min(pipe_out, valve_out))
     assert energy_balance(network, result)["relative_residual"] < 1e-12
     assert mass_balance(network, result)["relative_residual"] < 1e-15
+
+
+def test_pressurization_tank_matches_traced():
+    """Setpoint above and below the inlet pressure traces correctly."""
+    rows = [
+        dict(inlet=Stream(m_dot=10, T=323.15, p=p), pressure_setpoint=3e5)
+        for p in (1.2e5, 3e5, 5e5)
+    ]
+    assert_module_matches(PressurizationTank(), rows)

@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.core.modules import energy_balance, mass_balance
 from gemini.core.modules.piping import Pipe
 from gemini.core.types import Fluid, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 STREAM = Stream(m_dot=10, T=353.15, p=5e5)
 
@@ -96,3 +97,22 @@ def test_invalid_inputs_raise():
         pipe()(inlet=STREAM)
     with pytest.raises(gm.errors.DeclarationError):
         pipe(inner_diameter=0)
+
+
+def test_pipe_matches_traced_across_regimes():
+    """Laminar, transition, turbulent, stopped and heat-absorbing rows equal one call per row.
+
+    NOTE: needs the hydraulics and heat_transfer rewrites with ops; until they merge the
+    module is a graph break, hence ``breaks=True``.
+    """
+    rows = [
+        dict(inlet=Stream(m_dot=m_dot, T=T, p=5e5), ambient_temperature=ambient)
+        for m_dot, T, ambient in [
+            (0.05, 353.15, 283.15),
+            (0.08, 353.15, 283.15),
+            (10, 353.15, 283.15),
+            (0, 353.15, 283.15),
+            (10, 283.15, 320.0),
+        ]
+    ]
+    assert_module_matches(pipe(), rows, breaks=True)

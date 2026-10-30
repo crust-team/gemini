@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.core.modules import energy_balance, mass_balance
 from gemini.core.modules.piping import Splitter
 from gemini.core.types import WATER, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 FEED = Stream(m_dot=10, T=353.15, p=5e5, fluid=WATER)
 
@@ -39,3 +40,12 @@ def test_invalid_inputs_raise():
         Splitter()(feed_in=FEED, split_fraction=1.2)
     with pytest.raises(gm.errors.MissingValueError):
         Splitter()(feed_in=FEED)
+
+
+def test_splitter_matches_traced():
+    """Split fractions from zero to one and a stopped feed trace correctly."""
+    rows = [
+        dict(feed_in=Stream(m_dot=m_dot, T=353.15, p=5e5, fluid=WATER), split_fraction=fraction)
+        for m_dot, fraction in [(10, 0.25), (10, 0), (10, 1), (0, 0.5), (0.7, 0.3)]
+    ]
+    assert_module_matches(Splitter(), rows)

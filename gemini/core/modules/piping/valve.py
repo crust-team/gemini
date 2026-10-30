@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,
@@ -16,9 +17,14 @@ from gemini.core.types import (
     Stream,
 )
 from gemini.errors import PhysicsRangeError
+from gemini.ops import Constant
 
-REFERENCE_DENSITY = 1000.0
-"""Reference water density rho_0 [kg/m3] of the flow coefficient (IEC 60534-2-1)."""
+REFERENCE_DENSITY = Constant(
+    "VALVE_REFERENCE_DENSITY",
+    1000.0,
+    "kg/m3",
+    "reference water density rho_0 of the flow coefficient (IEC 60534-2-1)",
+)
 
 
 class Valve(Module):
@@ -77,11 +83,15 @@ class Valve(Module):
         # Outlets
         inlet = inlets.inlet
         drop = self._pressure_drop(inlet)
-        if drop > inlet.p:
-            raise PhysicsRangeError(
-                f"{self.path}: pressure drop = {drop} Pa; expected at most inlet.p = {inlet.p} Pa "
-                "(open the valve or reduce the flow)"
-            )
+        ops.check(
+            drop <= inlet.p,
+            PhysicsRangeError,
+            "{path}: pressure drop = {drop} Pa; expected at most inlet.p = {inlet_p} Pa "
+            "(open the valve or reduce the flow)",
+            path=self.path,
+            drop=drop,
+            inlet_p=inlet.p,
+        )
         outlet = inlet.with_(p=inlet.p - drop)
 
         outlets = dict(outlet=outlet)
@@ -93,32 +103,39 @@ class Valve(Module):
 
     def _effective_flow_coefficient(self):
         """Return the flow coefficient [m3/s/Pa^0.5] at the commanded opening."""
-        if self.opening == 0:
-            return 0.0
         floor = 1 / self.rangeability
         if self.characteristic == "linear":
-            return self.flow_coefficient * (floor + (1 - floor) * self.opening)
-        return self.flow_coefficient * self.rangeability ** (self.opening - 1)
+            coefficient = self.flow_coefficient * (floor + (1 - floor) * self.opening)
+        else:
+            coefficient = self.flow_coefficient * self.rangeability ** (self.opening - 1)
+        return ops.where(self.opening == 0, 0.0, coefficient)
 
     def _pressure_drop(self, inlet):
         """Return the pressure drop [Pa] of the inlet flow at the commanded opening."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0 (reverse flow is "
-                "not modelled)"
-            )
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         if inlet.fluid.gas_mass_fraction > 0:
             raise PhysicsRangeError(
                 f"{self.path}: inlet.fluid.gas_mass_fraction = "
                 f"{inlet.fluid.gas_mass_fraction}; expected 0 (single-phase liquid model)"
             )
-        if inlet.m_dot == 0:
-            return 0.0
         coefficient = self._effective_flow_coefficient()
-        if coefficient == 0:
-            raise PhysicsRangeError(
-                f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s through a closed valve "
-                "(opening = 0); expected zero flow"
-            )
+        ops.check(
+            ops.logical_or(inlet.m_dot == 0, coefficient != 0),
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s through a closed valve "
+            "(opening = 0); expected zero flow",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         rho = inlet.fluid.properties(inlet.p, inlet.T).rho_l
-        return rho / REFERENCE_DENSITY * (inlet.m_dot / rho / coefficient) ** 2
+        return ops.where(
+            inlet.m_dot == 0,
+            0.0,
+            rho / REFERENCE_DENSITY * ops.truediv(inlet.m_dot / rho, coefficient) ** 2,
+        )
