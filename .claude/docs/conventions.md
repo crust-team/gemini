@@ -132,6 +132,22 @@ comments and framework names. Flake8
 and variables (F401, F841) and docstrings. The remaining points (just enough code, names and
 test-first bug fixes) are checked in review.
 
+## One implementation per concept
+
+- No concept has two implementations; the only thing that differs is the backend. A rule, a
+  formula, a check, a message or a result structure is written once, with `gemini.ops`, and every
+  caller runs that source.
+- Behaviour is identical on every backend: values, error class and message, skips, `Results`
+  structure with children, output types, callbacks and health, bit-identical on the Python path and
+  within `1e-12` on NumPy.
+- A direct call (`esp(suction=...)`, `pumps.head(...)`) is **eager**: the same `forward`, the same
+  ops, no graph, on the Python backend. It is not a second implementation. The eager scope below
+  makes plain operators safe in it; a function never has a "checked" and an "unchecked" version.
+- Physics code uses plain operators (`/`, `**`, `-`) where the Python and NumPy results agree. A
+  public function of `core/physics` carries `@ops.physics`; a module method that a user can call
+  directly with raw operators carries it too. Do not add `Failed` handling anywhere in physics or
+  modules.
+
 ## Implicit mechanisms
 
 The package avoids hidden behaviour. These are the only implicit mechanisms left, each with the
@@ -179,6 +195,32 @@ reason it is needed:
   `float64`/`bool_`) directly on the Python backend and a `Constant` computes its operators on its
   value without `dispatch`; arrays, other NumPy scalars, traced values and an active
   `backends.settings(backend=...)` take the full `dispatch` path. A `Constant` is not a `float`.
+- The eager scope (`gemini/ops/scope.py`, `gemini/ops/failed.py`), entered by `@ops.physics` and
+  by `Module._run`, is what makes a direct call behave like the graph. The outermost entry enters
+  `np.errstate(all="ignore")` and gives plain Python floats to the function as `np.float64` (exact
+  `float` only; a module call wraps its parameters, on first read, its controls, states and
+  inlet fields), so `/` by zero, an invalid `**` and an overflow give `inf` or `nan` silently, as
+  on arrays. Leaving the outermost scope converts scalars back to `float`, `np.bool_` to `bool`,
+  recursively, so results, outputs and outlet streams never hold NumPy scalars. Recorded outputs
+  read back inside a call are wrapped too; results of child calls stay plain floats, so a
+  composite that divides child values uses `ops.truediv`. Arrays or traced values among the
+  arguments leave the scope unwrapped. `Module._scalar_mode()` (`WRAP` by default) lets a module
+  ask for `PLAIN`: the ESP does under `precision="float32"`, the one module that honours it,
+  because an `np.float64` scalar would promote the float32 coefficients; its
+  `efficiency_function` keeps `ops.truediv` for that reason. A nested scope costs a
+  context-variable read.
+  A failing `ops.check` on concrete scalars raises the real error marked as coming from a check;
+  `@ops.physics` returns it as a `Failed` value at the function boundary, so
+  `where(stopped, 0.0, checked_function(x))` drops the error of the unselected branch and keeps the
+  selected one, like the graph's error codes. A `Failed` carries through every op, raises when used
+  as a number (`bool`, `float`, `int`, `format`, a `Stream`, a `Declaration`) and raises its error
+  when it leaves the outermost scope. A failing `check` on an eager array raises at once, for the
+  first failing row; tests compare arrays through `gemini.graph.run_function`. In a trace the graph
+  does the same: a check recorded in a physics function guards that function's traced results (all
+  of them, through an `identity` node for a passed-through argument) and reaches an outer function
+  through data, and a check outside any physics function (inline in `forward`) guards every graph
+  output, as it raises at once when eager. Never put the `repr`
+  of a physical value in a message (it reads `np.float64(1.0)`) and use `ops.round`, not `round`.
 - During a trace the `_Call` record carries the traced parameter values, which
   `Module.__getattr__` returns instead of the stored values, and records outputs without
   validating them (`gemini/graph/tracer.py`).
