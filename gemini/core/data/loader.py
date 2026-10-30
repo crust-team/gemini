@@ -19,11 +19,33 @@ class Sample(NamedTuple):
 
 
 class Aligned(NamedTuple):
-    """The samples of a whole run as arrays: ``times``, ``durations`` and one array per column."""
+    """The samples of a run as arrays: ``times``, ``durations`` and one array per column."""
 
     times: list
     durations: np.ndarray
     columns: dict
+
+    def numbers(self, column):
+        """Return a column as floats; a value ``float()`` refuses (text, ``None``) is NaN."""
+        values = self.columns[column]
+        if values.dtype.kind == "f":
+            return values
+        numbers = np.full(len(values), np.nan)
+        for index, value in enumerate(values):
+            try:
+                numbers[index] = float(value)
+            except (TypeError, ValueError):
+                continue
+        return numbers
+
+    def present(self, column):
+        """Return which rows of a column hold a value: one that is a finite number."""
+        return np.isfinite(self.numbers(column))
+
+    def sample(self, index):
+        """Return the ``Sample`` of one tick."""
+        row = {name: values[index] for name, values in self.columns.items()}
+        return Sample(self.times[index], float(self.durations[index]), row)
 
 
 class Loader:
@@ -65,39 +87,31 @@ class Loader:
             )
 
     def __iter__(self):
-        """Read each chunk once and sample NumPy arrays without per-row pandas lookups."""
-        sample = self._mean if self.align == "mean" else self._previous
-        for frame, selected, seconds in self._frames():
-            yield from sample(frame, selected, seconds)
+        """Yield one ``Sample`` per tick, built from the arrays of each chunk."""
+        for block in self._blocks():
+            for index in range(len(block.times)):
+                yield block.sample(index)
 
     def arrays(self):
-        """Return the same samples as ``Aligned`` arrays, without building a row per tick.
+        """Return the samples of all ticks as ``Aligned`` arrays: the one alignment.
 
-        ``previous`` and ``exact`` alignment are vectorised with the positions ``__iter__``
-        uses; ``mean`` iterates and stacks the samples. Gaps are NaN, and a column array is
-        ``float64`` unless the dataset holds text, when the arrays are ``object``.
+        Gaps are NaN, and a column array is ``float64`` unless the dataset holds text, when
+        the arrays are ``object``.
         """
-        if self.align == "mean":
-            return self._stacked(list(self))
-        times, durations, blocks = [], [], []
-        for frame, selected, seconds in self._frames():
-            held, gaps = self._hold(frame, selected)
-            held[gaps] = np.nan
-            blocks.append(held)
-            times.extend(t.to_pydatetime() for t in selected)
-            durations.append(np.asarray(seconds, dtype=float))
+        blocks = list(self._blocks())
         if not blocks:
             return Aligned([], np.empty(0), {column: np.empty(0) for column in self.columns})
-        values = np.concatenate(blocks)
-        return Aligned(
-            times, np.concatenate(durations), {c: values[:, i] for i, c in enumerate(self.columns)}
-        )
+        times = [t for block in blocks for t in block.times]
+        durations = np.concatenate([block.durations for block in blocks])
+        columns = {c: np.concatenate([block.columns[c] for block in blocks]) for c in self.columns}
+        return Aligned(times, durations, columns)
 
-    def _stacked(self, samples):
-        """Stack iterated samples into ``Aligned`` arrays."""
-        columns = {c: _column([sample.row[c] for sample in samples]) for c in self.columns}
-        durations = np.array([sample.dt for sample in samples], dtype=float)
-        return Aligned([sample.t for sample in samples], durations, columns)
+    def _blocks(self):
+        """Yield the ``Aligned`` arrays of each chunk of ticks, reading the chunk once."""
+        align = self._mean if self.align == "mean" else self._previous
+        for frame, selected, seconds in self._frames():
+            times = [t.to_pydatetime() for t in selected]
+            yield Aligned(times, np.asarray(seconds, dtype=float), align(frame, selected, seconds))
 
     def _frames(self):
         """Yield ``(frame, ticks, seconds)`` for each chunk of ticks, reading it once."""
@@ -128,11 +142,9 @@ class Loader:
         Row times are compared as nanosecond integers, the unit of ``Timestamp.value``, whatever
         the resolution of the dataset index (pandas 3 parses text as microseconds).
         """
-        values = frame.to_numpy()
-        positions, gaps = self._positions(frame, ticks)
-        for t, previous, gap, dt in zip(ticks, positions, gaps, seconds):
-            raw = [np.nan] * len(self.columns) if gap else values[previous]
-            yield Sample(t.to_pydatetime(), float(dt), dict(zip(self.columns, raw)))
+        held, gaps = self._hold(frame, ticks)
+        held[gaps] = np.nan
+        return {column: held[:, index] for index, column in enumerate(self.columns)}
 
     def _positions(self, frame, ticks):
         """Return the held row position of each tick and whether the tick is a gap.
@@ -165,13 +177,18 @@ class Loader:
         times = frame.index.as_unit("ns").asi8
         values = frame.to_numpy()
         numeric = [pd.api.types.is_numeric_dtype(frame[column]) for column in self.columns]
-        for t, dt in zip(ticks, seconds):
-            dt = float(dt)
-            left = np.searchsorted(times, t.value, side="left")
-            right = np.searchsorted(times, t.value + round(dt * 1e9), side="left")
-            block = values[left:right]
-            raw = [_bin_value(block[:, i], is_numeric) for i, is_numeric in enumerate(numeric)]
-            yield Sample(t.to_pydatetime(), dt, dict(zip(self.columns, raw)))
+        starts = ticks.asi8
+        lefts = np.searchsorted(times, starts, side="left")
+        lengths = np.round(np.asarray(seconds) * 1e9).astype(np.int64)
+        rights = np.searchsorted(times, starts + lengths, side="left")
+        bins = [
+            [
+                _bin_value(values[left:right, index], is_numeric)
+                for left, right in zip(lefts, rights)
+            ]
+            for index, is_numeric in enumerate(numeric)
+        ]
+        return {column: _column(bin_values) for column, bin_values in zip(self.columns, bins)}
 
 
 def _column(values):

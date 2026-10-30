@@ -117,3 +117,28 @@ def test_arrays_of_numeric_columns_are_floats_and_cover_empty_reads(source):
     assert np.isnan(aligned.columns["v"]).all()
     _same_as_iteration(Loader(numeric, far))
     assert Loader(numeric, []).arrays().times == []
+
+
+@pytest.mark.parametrize("align", ["previous", "exact", "mean"])
+def test_samples_are_built_from_the_arrays(source, align):
+    """Iterating gives the rows of ``arrays()``, for every alignment: there is one alignment."""
+    ticks = source.to_frame().index[::2]
+    loader = Loader(source, ticks, align=align, chunk=timedelta(minutes=70))
+    aligned = loader.arrays()
+    samples = list(loader)
+    assert [sample.t for sample in samples] == aligned.times
+    assert [sample.dt for sample in samples] == aligned.durations.tolist()
+    for index, sample in enumerate(samples):
+        for column in loader.columns:
+            expected = aligned.columns[column][index]
+            assert sample.row[column] == expected or (expected != expected)
+
+
+def test_numbers_and_present_apply_the_missing_rule_once(source):
+    """Text and NaN are not present; numbers convert to floats."""
+    sparse = gm.Dataset.from_frame(source.to_frame().drop(source.to_frame().index[2:4]))
+    ticks = source.to_frame().index[:6]
+    aligned = Loader(sparse, ticks, align="exact", max_gap=timedelta(hours=1)).arrays()
+    assert aligned.present("v").tolist() == [True, True, False, False, True, True]
+    assert np.isnan(aligned.numbers("status")).all()
+    assert aligned.numbers("v")[:2].tolist() == [0.0, 1.0]
