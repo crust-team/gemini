@@ -7,6 +7,7 @@ from gemini.engine.clock import Clock
 from gemini.engine.engine import Engine
 from gemini.engine.evaluate import evaluate
 from gemini.engine.results import Results
+from gemini.engine.run import live, replay, resume, simulate
 from gemini.modules import plants
 from gemini.modules.module import no_outputs
 from gemini.modules.plants import Plant
@@ -15,8 +16,12 @@ from gemini.types import BRINE, WATER, Fluid, Ports, Profile, Quantity, Stream, 
 from gemini.utils.data.dataset import Dataset
 
 __version__ = "1.0.3"
-API_VERSION = 4
+API_VERSION = 5
 __all__ = [
+    "simulate",
+    "replay",
+    "live",
+    "resume",
     "Engine",
     "Plant",
     "Results",

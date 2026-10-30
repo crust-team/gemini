@@ -11,6 +11,9 @@ The package was rebuilt as composable modules with handwritten plants, in-memory
 finite engine, and then cleaned up. Old import paths are not retained.
 
 ### Added
+- Run functions `gm.simulate`, `gm.replay`, `gm.live` and `gm.resume` over the public `gm.Engine`,
+  with `checkpoint` and `checkpoint_every` on `simulate` and `replay`. The plant holds its traced
+  graphs, so repeated calls on one plant trace it once (`gm.API_VERSION = 5`).
 - The public API is frozen at `gm.API_VERSION = 1` ([api.md](.claude/docs/api.md)). New: the plant
   builder `gm.Plant` and the JSON plant spec (format 2, `gm.plants.from_spec`, `validate`,
   `spec_schema`, `migrate`, `from_template`, `example`); `describe`, `parameter_schema`,
@@ -115,6 +118,7 @@ finite engine, and then cleaned up. Old import paths are not retained.
   `.claude/docs/refactor-notes.md`).
 
 ### Removed
+- `plant.simulate(profile)`: use `gm.simulate(plant, profile)`.
 - `gm.modules.list/get/create`, the module catalogue and engine registry, `Sequential`,
   `fidelity`, `apply`, `column_units`, `last_result(s)`, `Module.cost`, keyword-value
   construction, `runtime.dtype` and `runtime.manual_seed`, `gemini.design`, `gemini.agentic`, the

@@ -1,9 +1,10 @@
 # Building plants
 
 A plant can be built three ways, and there is one representation. A built plant is a normal
-composite `Module`: `describe()`, the automatic output sums, `simulate`, `replay` and `live` work
-on it unchanged, on every backend, because its `forward` runs the modules in connection order and
-is traced like any other module. How it is computed is in
+composite `Module`: `describe()`, the automatic output sums, `gm.simulate`, `gm.replay` and
+`gm.live` work on it unchanged, on every backend, because its `forward` runs the modules in
+connection order and is traced like any other module. A plant has no run method of its own: run
+it with `results = gm.simulate(plant, profile)`. How it is computed is in
 [native-engine.md](native-engine.md#14-the-plant-builder-and-the-plant-spec).
 
 ## Level 1: the builder

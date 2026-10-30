@@ -25,6 +25,7 @@ NAMESPACES = (
     "optim",
     "runtime",
 )
+RUN_FUNCTIONS = ("simulate", "replay", "live", "resume")
 METHODS = {
     "Module": (
         "describe",
@@ -44,7 +45,7 @@ METHODS = {
         "get_module",
         "named_modules",
     ),
-    "Plant": ("__init__", "add", "connect", "summary", "validate", "simulate"),
+    "Plant": ("__init__", "add", "connect", "summary", "validate"),
     "Engine": (
         "__init__",
         "simulate",
@@ -120,6 +121,7 @@ def capture():
             "Engine": _methods(gm.Engine, METHODS["Engine"]),
             "Results": _methods(gm.Results, METHODS["Results"]),
         },
+        "run": {name: _parameters(getattr(gm, name)) for name in RUN_FUNCTIONS},
         "evaluate": _parameters(gm.evaluate),
         "kpi": {"call": _parameters(gm.kpi), "names": gm.kpi.names()},
         "errors": {name: value.code for name, value in classes.items() if hasattr(value, "code")},

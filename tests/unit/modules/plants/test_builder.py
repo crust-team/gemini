@@ -197,21 +197,9 @@ def test_to_spec_is_json_and_validate_is_empty(chain):
     assert gm.plants.from_spec(spec).to_spec() == spec
 
 
-def test_simulate_calls_the_engine_with_the_plant(monkeypatch):
-    """``Plant.simulate(profile)`` is ``Engine(plant).simulate(profile)``."""
-    calls = []
-
-    class FakeEngine:
-        def __init__(self, plant):
-            calls.append(plant)
-
-        def simulate(self, profile):
-            return ("results", profile)
-
-    monkeypatch.setattr("gemini.engine.engine.Engine", FakeEngine)
-    plant = gm.Plant("Run")
-    assert plant.simulate("profile") == ("results", "profile")
-    assert calls == [plant]
+def test_a_plant_has_no_run_method():
+    """A plant runs through ``gm.simulate`` or ``gm.Engine``, not through a method of its own."""
+    assert not hasattr(gm.Plant("Run"), "simulate")
 
 
 def test_a_standalone_plant_path_is_its_snake_case_name():

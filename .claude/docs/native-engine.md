@@ -333,7 +333,8 @@ Where the implementation differs from sections 1 to 11, and why:
   (`close_loop`, `nodal.py`, float32), or a stepped root with a stateful module, is a graph with
   one root break that runs the real module per row (`module(streams)` or `module.step`). Its rows are
   real `ModuleResult` trees, so children, sums and `Output.of` stay exact. `GraphCache` stores
-  graphs only; `stepped` is a guard. The design's "only that module breaks" holds for leaves; a
+  graphs only and the module that an engine runs holds it (`graph_cache`), so its graphs outlive the
+  engine; `stepped` is a guard. The design's "only that module breaks" holds for leaves; a
   composite that cannot be traced breaks the root, because its parent reads its leaves' records.
 - **One runner.** `Engine._run` builds a `BindingPlan` (one `Twin` per evaluated module: the twins of
   a replay, the plant in simulate) and gives the `Loader` arrays to `Runner`. A run is chunks of

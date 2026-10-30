@@ -22,5 +22,6 @@ outside the choices raise `gm.errors.UnknownNameError`; an invalid fluid raises 
 Precision selects the ESP's legacy float32 arithmetic, used for golden parity. Display units
 affect module representations only. A default fluid is copied into newly built modules and
 streams; explicit fluids always win. Checkpoints store the settings captured when a run starts.
-`resume()` and `live()` re-apply the saved precision and display units for their run; the default
-fluid is not re-applied because the plant already carries its fluids.
+`gm.resume` and `gm.live`, like `Engine.resume` and `Engine.live`, re-apply the saved precision and
+display units for their run; the default fluid is not re-applied because the plant already carries
+its fluids.

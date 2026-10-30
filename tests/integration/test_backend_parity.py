@@ -9,6 +9,9 @@ means adding it to ``tests.fixtures.parity.BACKENDS``.
 import ast
 import copy
 import functools
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -408,3 +411,22 @@ def test_column_dtypes_are_the_same_on_every_backend(clean, faulty, simulated, s
         for name, outcome in others(runs):
             assert outcome.frame.dtypes.tolist() == runs[REFERENCE].frame.dtypes.tolist(), name
             assert outcome.summary.dtypes.tolist() == runs[REFERENCE].summary.dtypes.tolist()
+
+
+def test_the_example_runner_sets_the_backend_of_the_engine_and_the_functions(tmp_path):
+    """An example under ``run_example.py`` runs on the named backend at either level."""
+    script = tmp_path / "probe.py"
+    script.write_text(
+        "import inspect\n"
+        "import gemini as gm\n"
+        "for function in (gm.Engine, gm.simulate, gm.replay, gm.live):\n"
+        "    print(inspect.signature(function).parameters['backend'].default)\n"
+    )
+    env = os.environ | {"GEMINI_EXAMPLE_BACKEND": "python", "PYTHONPATH": str(ROOT)}
+    completed = subprocess.run(
+        [sys.executable, str(ROOT / "tests/fixtures/run_example.py"), str(script)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert completed.stdout.split() == ["python"] * 4, completed.stderr

@@ -9,6 +9,9 @@ Test with the development profile (`make test`); see
 
 Physics lives only in `gemini/physics/`: a module declares and wires, and calls physics functions.
 
+Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
+`gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
+
 Read every file in `.claude/docs/` before changing the repository:
 
 - [Public API](.claude/docs/api.md): every frozen public name, its return shape and status; start
@@ -57,7 +60,7 @@ gemini/
 ├── physics/          # every formula: SI correlations and unit conversions
 ├── types/            # quantities, streams, fluids, declarations, profiles, bindings, costs
 ├── modules/          # Module base class, registry, containers; one folder per category, plants/ too
-├── engine/           # Clock, Engine, steps, Results, callbacks, checkpoints
+├── engine/           # Clock, run functions, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay
 ├── analysis/         # well performance and integrity, fits, gm.kpi
 ├── economics/        # capex, opex, levelised cost, CO2, cash flow

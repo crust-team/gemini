@@ -172,15 +172,6 @@ class Plant(PortResolver, Module):
         """Return every problem of the plant's spec, the list ``gm.plants.validate`` returns."""
         return reader.problems(type(self), self.to_spec())
 
-    def simulate(self, profile):
-        """Run the plant over ``profile`` and return the results of ``Engine(self).simulate``.
-
-        The engine is imported here because it imports the module package that defines this class.
-        """
-        from gemini.engine.engine import Engine
-
-        return Engine(self).simulate(profile)
-
     def _compiled(self):
         if self._plan is None:
             self._plan = compile_plan(self)

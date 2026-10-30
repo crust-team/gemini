@@ -1,5 +1,47 @@
 # Engine
 
+## Functions or engine
+
+A run has two levels and one implementation. `gm.simulate`, `gm.replay`, `gm.live` and `gm.resume`
+(`gemini/engine/run.py`) are for everyday use: each builds an `Engine`, calls the matching method
+and returns its `Results`, with no run logic of its own. `gm.Engine` stays public for complex
+tasks: a stateful run over several calls, a callback that reads the engine, a live run held in
+memory, a manual checkpoint.
+
+```python
+import gemini as gm
+
+plant = gm.plants.example("DoubletHeatPlant")
+results = gm.simulate(plant, profile)
+```
+
+No object is kept between calls of the functions, except the traced graphs, which the plant holds
+(`gemini.graph.graph_cache`): calling a function hundreds of times on one plant traces it once,
+and an `Engine` built on the plant shares the same graphs. The guards of
+[`GraphCache`](native-engine.md) decide: a changed numeric parameter does not retrace, a changed
+structure does. A copied or pickled plant starts with an empty cache.
+
+The arguments are those of `Engine` and of the matching method, with `plant` first. On `simulate`
+and `replay`, `checkpoint=path` writes a checkpoint at the end of the run, also one that stops
+early (a `gm.errors.Cancelled` or a failure under `on_error="raise"`), replacing an existing file;
+a run that never started (a binding error) writes nothing. `checkpoint_every` also writes it during
+the run through `AutoCheckpoint` and needs `checkpoint`, or raises `ValidationError`.
+
+`gm.resume(checkpoint, callbacks=None)` is `Engine.load_checkpoint(path, callbacks).resume()`, and
+it writes to the same file when the run ends or stops early. `checkpoint_every` is not stored in
+the file: pass `callbacks=[AutoCheckpoint(path, every)]` for periodic saves on a resumed run. A
+live checkpoint raises `CheckpointError` naming `gm.live`. The files are the ones `save_checkpoint`
+writes, so either level resumes the other's.
+
+`gm.live(plant, source, checkpoint, ...)` requires the path, which is all that carries a live run
+between calls; `None` raises `ValidationError`. The first call with a path that does not exist yet
+starts the run and writes it; every later call continues from it and updates it, as
+`Engine.live(source, checkpoint)` does on a new engine ([Live runs](#live-runs)). The callbacks and
+error policy of a call are the caller's, and a call that fails or is cancelled leaves the file as
+it was, so its rows are processed again by the next call.
+
+## The engine
+
 `Engine(plant, backend="numpy", callbacks=None, on_error="record")` runs one plant on a finite clock.
 `simulate(profile, clock=None)` evaluates the plant from root-bound assumptions.
 `replay(data, start=None, end=None, state=None, clock=None, only=None)` evaluates equipment twins on
@@ -34,7 +76,7 @@ except that a unit recorded in `Dataset` metadata replaces it (the rule below st
 ## Threads and backends
 
 Plants and engines are not shared across threads. An engine keeps run state (results, position,
-module states, graph cache) and a plant keeps persisted inputs, so a worker loads its own plant
+module states) and a plant keeps persisted inputs and traced graphs, so a worker loads its own plant
 (`gm.plants.from_dict(...)`) and builds its own engine; settings from `gm.runtime` are
 context-local and a new thread starts from the defaults.
 
@@ -103,7 +145,7 @@ equipment twins of a replay; the plant in simulate) evaluated over **chunks** of
   meets its problems: the first missing column (a skip counted by its name; the missing rule is
   `Aligned.present`), or an inlet stream the limits refuse (an error with the text of the real
   `Stream` constructor). `outcome.evaluate_twin` builds the inlet streams of the ticks that can be
-  evaluated, takes the graph from the engine's `GraphCache` (`graph.breaks` per twin path are in
+  evaluated, takes the graph from the plant's `GraphCache` (`graph.breaks` per twin path are in
   `engine.graph_breaks`), feeds it with `graph_feeds` and calls `gemini.graph.evaluate`: the backend
   is the one of `gemini.backends.settings(backend=...)`, NumPy over arrays by default, Python row by
   row (`backend="python"` is how to debug) and the results are the same. A failing row gets the

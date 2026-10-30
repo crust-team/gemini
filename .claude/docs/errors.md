@@ -73,7 +73,7 @@ exceptions are the topic files of `gemini.utils`, which cannot import them, pyda
   in `Results.errors()`.
 - `StepError(ValueError)`: a replayed twin failed under `on_error="raise"`; the cause is chained.
 - `CheckpointError(RuntimeError, ValueError)`: a checkpoint cannot be saved, loaded or resumed
-  (`checkpoint.py`, `engine.py`, `clock.py`).
+  (`checkpoint.py`, `engine.py`, `run.py`, `clock.py`).
 - `PlantFormatError(TypeError, ValueError)`: a plant file or state with another version, plant
   type or module tree.
 - `UnknownResultError(KeyError, AttributeError)`: an unknown results module path or field.

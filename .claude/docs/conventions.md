@@ -30,9 +30,8 @@ of `gemini` (`tests/unit/test_package_boundaries.py` enforces this). There are t
 the order. `gemini.physics.hydraulics` imports `Stream` and `Fluid` for type checking only, and
 `Stream.__init__` in `gemini.types.flows` imports `gemini.backends.runtime` inside the function to read the
 default fluid, because a module-level import would form a cycle through `gemini.types.fluid`.
-`Plant.simulate` imports `gemini.engine.engine.Engine` inside the function, because the engine
-imports the module package that defines `Plant`, and `gm.plants.convert_legacy` imports
-`gemini.utils.legacy` inside the function, because the legacy bridge sits above `gemini.modules`.
+`gm.plants.convert_legacy` imports `gemini.utils.legacy` inside the function, because the legacy
+bridge sits above `gemini.modules`.
 `gemini.utils.data` imports no module or engine code and `gemini.utils.legacy` imports no engine
 code (the same test file enforces both).
 
@@ -270,6 +269,11 @@ reason it is needed:
   through data, and a check outside any physics function (inline in `forward`) guards every graph
   output, as it raises at once when eager. Never put the `repr`
   of a physical value in a message (it reads `np.float64(1.0)`) and use `ops.round`, not `round`.
+- A module holds its `GraphCache` in `_graph_cache` (`None` until `gemini.graph.graph_cache` first
+  asks for it), so traced graphs outlive an engine and a run function does not trace the plant
+  again. It sits on the module because a graph refers to its module, so a cache outside would keep
+  the module alive; a copied or pickled module starts with an empty cache
+  (`GraphCache.__reduce__`).
 - During a trace the `_Call` record carries the traced parameter values, which
   `Module.__getattr__` returns instead of the stored values, and records outputs without
   validating them (`gemini/graph/tracer.py`).

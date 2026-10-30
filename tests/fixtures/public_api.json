@@ -1,5 +1,5 @@
 {
- "api_version": 4,
+ "api_version": 5,
  "categories": [
   "subsurface",
   "wells",
@@ -110,9 +110,6 @@
     "source",
     "target",
     "kind"
-   ],
-   "simulate": [
-    "profile"
    ],
    "summary": [],
    "validate": []
@@ -543,6 +540,47 @@
   "physics_range",
   "solver_failed"
  ],
+ "run": {
+  "live": [
+   "plant",
+   "source",
+   "checkpoint",
+   "step",
+   "now",
+   "sink",
+   "backend",
+   "callbacks",
+   "on_error"
+  ],
+  "replay": [
+   "plant",
+   "data",
+   "start",
+   "end",
+   "state",
+   "clock",
+   "only",
+   "checkpoint",
+   "checkpoint_every",
+   "backend",
+   "callbacks",
+   "on_error"
+  ],
+  "resume": [
+   "checkpoint",
+   "callbacks"
+  ],
+  "simulate": [
+   "plant",
+   "profile",
+   "clock",
+   "checkpoint",
+   "checkpoint_every",
+   "backend",
+   "callbacks",
+   "on_error"
+  ]
+ },
  "schemas": {
   "error.schema.json": "86c70a1f0ffb4f65371e401e7a4a571c246c455a54438381edc92189bd24d7f1",
   "module_description.schema.json": "1162b599326e224813c700484e8ca41bba0596fd9d0eced4be43ce8edee48a86",
@@ -579,12 +617,16 @@
   "errors",
   "evaluate",
   "kpi",
+  "live",
   "modules",
   "no_outputs",
   "optim",
   "plants",
   "profiles",
+  "replay",
+  "resume",
   "runtime",
+  "simulate",
   "streams",
   "testing",
   "units"

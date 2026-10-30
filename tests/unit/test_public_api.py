@@ -12,6 +12,7 @@ SNAPSHOTS = {
     2: "91dce79b8d07942960e637da063bbbac465426e883ba15cc172c9f76b6ccc15d",
     3: "1c47ff0cb57d8ef77cc41816ec42a140a304965686a577c82b2af664c8817cc9",
     4: "ab0daaad0daa4fd0692f97507e808292f7d9c544c82cd2e14a1c04c8e26f88e8",
+    5: "40b06447d90c1bdd37bd236c9e33c074510bde2cf561aa7246d9f6ec88dbd83a",
 }
 """Hash of the snapshot per ``API_VERSION``: an entry never changes, a new version adds one."""
 
@@ -19,6 +20,10 @@ SNAPSHOTS = {
 def test_public_names_and_docs():
     """Interactive completion exposes exactly the documented, individually documented names."""
     expected = {
+        "simulate",
+        "replay",
+        "live",
+        "resume",
         "Engine",
         "Plant",
         "Results",
