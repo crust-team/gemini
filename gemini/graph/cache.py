@@ -10,6 +10,10 @@ traced is a root break graph (see ``rootbreak``), remembered until a guard chang
 graph is traced once and then merged by
 ``eliminate_common_subexpressions``; ``GraphCache(optimize=False)`` keeps the traced graph as it
 is, for benchmarks and debugging.
+
+``graph_cache`` gives the one cache of a module, which the module holds: a graph keeps a strong
+reference to its module (a root break, a break node), so a cache outside the module would keep
+the module alive, and a module is not shared across threads, so neither is its cache.
 """
 
 import weakref
@@ -29,6 +33,10 @@ class GraphCache:
         self._entries = weakref.WeakKeyDictionary()
         self.traces = 0
 
+    def __reduce__(self):
+        """Copy or pickle as an empty cache: a graph belongs to the module object it traced."""
+        return GraphCache, (self.optimize,)
+
     def graph(self, module, fluids, stepped=False):
         """Return the graph of ``module`` for inlet ``fluids``; a break is a root break graph."""
         guards = _guards(module, fluids, stepped)
@@ -44,6 +52,13 @@ class GraphCache:
         if self.optimize:
             eliminate_common_subexpressions(graph)
         return graph
+
+
+def graph_cache(module):
+    """Return the one ``GraphCache`` of ``module``, so its graphs outlive any one engine."""
+    if module._graph_cache is None:
+        module._graph_cache = GraphCache()
+    return module._graph_cache
 
 
 def _guards(module, fluids, stepped):

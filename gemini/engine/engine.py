@@ -15,7 +15,7 @@ from gemini.engine.results import Results, declared_units
 from gemini.engine.runner import Runner
 from gemini.engine.step import BindingPlan
 from gemini.errors import CheckpointError, ConfigurationError, ValidationError
-from gemini.graph import GraphCache
+from gemini.graph import graph_cache
 from gemini.modules.module import Module, class_path, import_class
 from gemini.utils.data.dataset import as_dataset
 from gemini.utils.data.loader import Loader
@@ -76,7 +76,7 @@ class Engine:
         self._dataset_fingerprint = None
         self._max_gap = None
         self._in_step = False
-        self._graph_cache = GraphCache()
+        self._graph_cache = graph_cache(plant)
         self.graph_breaks = {}
         self.step_results = {}
 

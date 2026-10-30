@@ -7,7 +7,7 @@ graph per module until a guard changes and ``run`` evaluates a module over array
 The design is described in ``.claude/docs/native-engine.md``.
 """
 
-from gemini.graph.cache import GraphCache
+from gemini.graph.cache import GraphCache, graph_cache
 from gemini.graph.evaluation import Evaluation, evaluate
 from gemini.graph.graph import Graph
 from gemini.graph.interpreter import Interpreter
@@ -20,6 +20,7 @@ __all__ = [
     "Evaluation",
     "Graph",
     "GraphCache",
+    "graph_cache",
     "Interpreter",
     "Node",
     "Proxy",
