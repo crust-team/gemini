@@ -37,6 +37,22 @@ class Proxy(Symbolic, Operators):
         """Return the traced ``logical_and(self, other)``."""
         return dispatch("logical_and", self, other)
 
+    def __rand__(self, other):
+        """Return the traced ``logical_and(other, self)``."""
+        return dispatch("logical_and", other, self)
+
+    def __or__(self, other):
+        """Return the traced ``logical_or(self, other)``."""
+        return dispatch("logical_or", self, other)
+
+    def __ror__(self, other):
+        """Return the traced ``logical_or(other, self)``."""
+        return dispatch("logical_or", other, self)
+
+    def __invert__(self):
+        """Return the traced ``logical_not(self)``."""
+        return dispatch("logical_not", self)
+
     def __getitem__(self, index):
         """Return item ``index`` of a traced vector."""
         return dispatch("getitem", self, index)

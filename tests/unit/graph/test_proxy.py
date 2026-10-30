@@ -60,3 +60,13 @@ def test_untraceable_uses_raise_trace_errors(graph, use, what):
     """Control flow and conversions name what failed and suggest the ops."""
     with pytest.raises(TraceError, match=f"{what}.*use gemini.ops.where"):
         use(graph.input("x", "inlet"))
+
+
+def test_logical_operators_record_their_ops():
+    """``&``, ``|`` and ``~`` on traced conditions record the logical ops on either side."""
+    graph = Graph("test")
+    x = graph.input("x", "inlet")
+    records = {"and": True & (x > 0), "or": True | (x > 0), "not": ~(x > 0)}
+    assert records["and"].node.op == "logical_and" and records["and"].node.operands[0] is True
+    assert records["or"].node.op == "logical_or" and records["or"].node.operands[0] is True
+    assert records["not"].node.op == "logical_not"

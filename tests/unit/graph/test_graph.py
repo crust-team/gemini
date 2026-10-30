@@ -1,5 +1,6 @@
 """Graphs record ops, lift constants to named inputs and attach checks to traced values."""
 
+import numpy as np
 import pytest
 
 from gemini import ops
@@ -47,3 +48,16 @@ def test_operands_that_are_not_numbers_cannot_be_traced():
         value + "a"
     with pytest.raises(TraceError, match="another graph"):
         value + other.input("y", "inlet")
+
+
+def test_none_and_fixed_tables_are_literals():
+    """``None`` stays a literal; a list of numbers becomes a tuple; traced items are refused."""
+    graph = Graph("test")
+    x = graph.input("x", "inlet")
+    assert ops.where(x > 0, None, x).node.operands[1] is None
+    assert ops.interp(x, [0, 1], np.array([2.0, 3.0])).node.operands[1:] == (
+        (0.0, 1.0),
+        (2.0, 3.0),
+    )
+    with pytest.raises(TraceError):
+        ops.interp(x, [x, 1.0], [2.0, 3.0])

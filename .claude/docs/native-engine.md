@@ -219,11 +219,12 @@ Where the prototype differs from sections 1 to 11, and why:
   backend setting is `gemini.backends.settings(backend=...)`, not `gm.where` or
   `gm.runtime.settings(backend=...)`: the curated `gm` names are pinned and the public API is
   unchanged, and `core.runtime` sits above the backends in the dependency order.
-- **`where` branches may be callables.** Evaluating both branches eagerly is fine on arrays,
-  but on Python floats the branch that is not selected can raise (`ZeroDivisionError` for the
-  ESP efficiency, whose example power curve is zero on every row). `where(c, a, lambda: b)`
-  evaluates only the selected branch on the Python backend; a trace and NumPy evaluate both.
-  In a graph the Python backend's division returns the IEEE `inf`/`nan` instead of raising.
+- **`where` branches are plain values; the ops never raise.** Physics authors write
+  `where(condition, a, b)` and both branches are always evaluated. On the Python backend
+  `truediv`, `pow`, `log`, `sqrt`, `exp`, `mod`, `floordiv` and the other ops return `inf` or `nan`
+  silently, like NumPy, for division by zero, a negative logarithm or overflow. One thing cannot be
+  hidden: `/` and `**` on two plain Python floats raise before any op runs, so a division or power
+  that can be invalid in an unselected branch is written `ops.truediv(a, b)` or `ops.pow(a, b)`.
 - **A check's error travels with the values passed to it.** `check(condition, error, message,
   **values)` attaches its error code to the traced `values` (or to the condition when none is
   traced); codes then flow along data dependencies and `where` keeps the selected branch's
@@ -233,8 +234,12 @@ Where the prototype differs from sections 1 to 11, and why:
   f-string; the error carries a note with the check's source line.
 - **`Constant` lives in `gemini.ops`**, because physics (below `core.modules`) uses it;
   `parameter.py` re-exports it. It is not a `float` subclass: NumPy 2 does not treat float
-  subclasses as weak scalars, which would change the float32 golden path. Only the ESP
-  constants are `Constant`s so far.
+  subclasses as weak scalars, which would change the float32 golden path. Its operators compute
+  on `value` in plain Python unless the other operand is `Symbolic`, and the `ops` functions
+  take a fast path for plain scalars unless `backends.settings(backend=...)` is active.
+- **Literals in a graph** are numbers, `None` (a `where` branch without a value, NaN on arrays,
+  read back as `None` for an `X | None` output) and tuples of numbers (the fixed table of an
+  `interp`).
 - **An `index` op kind** (`getitem`) selects one item of a vector parameter such as a curve
   coefficient, on the last axis so a scenario axis can lead.
 - **No `named_constants` or `named_states`.** A module's constants are known only by tracing

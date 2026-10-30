@@ -21,7 +21,7 @@ def _branch_graph():
         ops.check(value > -2, PhysicsRangeError, "test: y = {y}; expected y > -2", y=value)
         return value
 
-    graph.output("outputs.y", ops.where(x > 0, lambda: x / 2, risky))
+    graph.output("outputs.y", ops.where(x > 0, x / 2, risky()))
     return graph
 
 

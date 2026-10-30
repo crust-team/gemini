@@ -55,7 +55,7 @@ class Gain(Module):
 
     def _compute_outputs(self, inlets, outlets):
         self.rise = outlets.outlet.p - inlets.inlet.p
-        self.boost = ops.where(self.rise > 0, lambda: self.rise / self.gain, 0.0)
+        self.boost = ops.where(self.rise > 0, ops.truediv(self.rise, self.gain), 0.0)
 
 
 @pytest.fixture

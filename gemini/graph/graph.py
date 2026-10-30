@@ -74,15 +74,21 @@ class Graph:
             target.guards.append(node)
 
     def _operand(self, value):
-        """Return the node of a traced value or constant, or a literal number unchanged."""
+        """Return the node of a traced value or constant, or a literal unchanged.
+
+        Literals are numbers, ``None`` (a ``where`` branch without a value) and tuples of numbers
+        (the fixed table of an ``interp``); lists become tuples so graphs stay immutable.
+        """
         if isinstance(value, Proxy):
             if value.graph is not self:
                 raise TraceError(f"{self.module_path}: traced value of another graph")
             return value.node
         if isinstance(value, Constant):
             return self._constant(value)
-        if isinstance(value, (numbers.Number, np.number, np.bool_)):
+        if value is None or isinstance(value, (numbers.Number, np.number, np.bool_)):
             return value
+        if isinstance(value, (list, tuple, np.ndarray)) and not _holds_traced(value):
+            return tuple(np.asarray(value, dtype=float).tolist())
         raise TraceError(
             f"{self.module_path}: operand {value!r} of type {type(value).__name__} cannot be "
             "traced; expected a number, a traced value or a Constant"
@@ -114,6 +120,10 @@ class Graph:
         lines.extend(f"  {name} = {_describe(value)}" for name, value in self.outputs.items())
         lines.extend(f"observer: {hook!r}" for hook in self.observers)
         return "\n".join(lines)
+
+
+def _holds_traced(values):
+    return any(isinstance(value, Proxy) for value in values)
 
 
 def _describe(operand):
