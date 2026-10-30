@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import compression
+from gemini.physics import compression, pumps
 from gemini.types import (
     Control,
     Count,
@@ -86,7 +86,9 @@ class GasCompressor(Module):
 
         # Outlets
         suction = inlets.suction
-        stage_ratio = self._pressure_ratio(suction) ** (1 / self.stage_count)
+        stage_ratio = compression.stage_pressure_ratio(
+            self._pressure_ratio(suction), self.stage_count
+        )
         discharge_T = compression.stage_outlet_temperature(
             suction.T, stage_ratio, self.heat_capacity_ratio, self.isentropic_efficiency
         )
@@ -108,10 +110,12 @@ class GasCompressor(Module):
             self.isentropic_efficiency,
             self.stage_count,
         )
-        self.shaft_power = suction.m_dot * work
-        self.electricity = self.shaft_power / self.motor_efficiency
+        self.shaft_power = compression.shaft_power(suction.m_dot, work)
+        self.electricity = pumps.motor_electricity(self.shaft_power, self.motor_efficiency)
         self.discharge_T = discharge.T
-        self.heat_loss = self.electricity - self.shaft_power / self.stage_count
+        self.heat_loss = compression.heat_rejected(
+            self.electricity, self.shaft_power, self.stage_count
+        )
 
     def _pressure_ratio(self, suction):
         """Return the overall pressure ratio [-]; reject reverse flow and expansion."""
@@ -131,4 +135,4 @@ class GasCompressor(Module):
             setpoint=self.pressure_setpoint,
             p=suction.p,
         )
-        return self.pressure_setpoint / suction.p
+        return compression.overall_pressure_ratio(self.pressure_setpoint, suction.p)

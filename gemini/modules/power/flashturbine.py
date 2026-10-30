@@ -39,9 +39,9 @@ class FlashTurbine(Module):
     cannot represent the latent heat of the steam, so its residual is not valid for this phase
     change; the unit tests check closure with the steam enthalpies instead.
 
-    Defaults: ``isentropic_efficiency`` 0.85 is the dry turbine efficiency DiPippo assumes for
-    geothermal steam turbines and ``baumann_factor`` 1 is the classical Baumann rule
-    (DiPippo, R. (2016), Geothermal Power Plants, 4th ed., section 5.5). Assumptions: no
+    Defaults: ``isentropic_efficiency`` (``steam.DEFAULT_TURBINE_EFFICIENCY``, 0.85) is the dry
+    turbine efficiency DiPippo assumes for geothermal steam turbines and ``baumann_factor`` 1 is
+    the classical Baumann rule (DiPippo, R. (2016), Geothermal Power Plants, 4th ed., section 5.5). Assumptions: no
     non-condensable gases, steam ejector or gland losses; condenser at a fixed pressure.
     Valid for inlet pressures up to 16.529 MPa above a condenser pressure of at least
     611.213 Pa, with a wet exhaust.
@@ -52,7 +52,7 @@ class FlashTurbine(Module):
         super().__init__()
 
         # Parameters
-        self.isentropic_efficiency = Parameter(Efficiency, default=0.85)
+        self.isentropic_efficiency = Parameter(Efficiency, default=steam.DEFAULT_TURBINE_EFFICIENCY)
         self.baumann_factor = Parameter(Ratio, default=1)
         self.condenser_pressure = Parameter(Pressure, gt=0)
         self.generator_efficiency = Parameter(Efficiency)
@@ -87,10 +87,17 @@ class FlashTurbine(Module):
         inlet = inlets.inlet
         expansion = self._expansion(inlet)
         condensate = steam.saturation_properties(self.condenser_pressure).liquid_enthalpy
-        self.gross_power = inlet.m_dot * (expansion.inlet_enthalpy - expansion.outlet_enthalpy)
-        self.electricity_generated = self.gross_power * self.generator_efficiency
-        self.condenser_duty = inlet.m_dot * (expansion.outlet_enthalpy - condensate)
-        self.heat_loss = self.condenser_duty + self.gross_power - self.electricity_generated
+        balance = steam.turbine_balance(
+            inlet.m_dot,
+            expansion.inlet_enthalpy,
+            expansion.outlet_enthalpy,
+            condensate,
+            self.generator_efficiency,
+        )
+        self.gross_power = balance.gross_power
+        self.electricity_generated = balance.electricity_generated
+        self.condenser_duty = balance.condenser_duty
+        self.heat_loss = balance.heat_loss
         self.exhaust_quality = expansion.outlet_quality
 
     def _expansion(self, inlet):

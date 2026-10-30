@@ -33,16 +33,22 @@ class InjectionPump(Module):
         # Parameters
         self.no_stages = Parameter(Count | None, default=None)
         self.pump_type = Parameter(str, default="unspecified")
-        self.efficiency = Parameter(Efficiency, default=0.7, calibratable=True)
-        self.head_coeff = Parameter(list[float] | None, default=None, shape=(6,))
-        self.power_coeff = Parameter(list[float] | None, default=None, shape=(6,))
+        self.efficiency = Parameter(
+            Efficiency, default=pumps.DEFAULT_INJECTION_PUMP_EFFICIENCY, calibratable=True
+        )
+        self.head_coeff = Parameter(
+            list[float] | None, default=None, shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,)
+        )
+        self.power_coeff = Parameter(
+            list[float] | None, default=None, shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,)
+        )
 
         # Inlets
         self.suction = Inlet(Stream, stream="brine")
 
         # Controls
         self.pressure_setpoint = Control(Pressure | None, default=None)
-        self.frequency = Control(Frequency, default=60)
+        self.frequency = Control(Frequency, default=pumps.DEFAULT_INJECTION_PUMP_FREQUENCY)
 
         # Outputs
         self.head = Output(PressureDifference, soft_sensor=True)
@@ -80,7 +86,7 @@ class InjectionPump(Module):
         if self.head_coeff is not None and self.power_coeff is not None:
             self.power = pumps.power(flow, self.frequency, self.no_stages, self.power_coeff)
         else:
-            self.power = flow * self.head / self.efficiency
+            self.power = pumps.shaft_power(pumps.hydraulic_power(flow, self.head), self.efficiency)
         self.discharge_pressure = discharge.p
         self.electricity = self.power
 

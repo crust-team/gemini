@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import heat_transfer, pumps
 from gemini.types import (
     Control,
     Efficiency,
@@ -58,7 +59,9 @@ class CentrifugalPump(Module):
         super().__init__()
 
         # Parameters
-        self.head_coeff = Parameter(list[float], shape=(3,), calibratable=True)
+        self.head_coeff = Parameter(
+            list[float], shape=(pumps.CENTRIFUGAL_HEAD_COEFFICIENT_COUNT,), calibratable=True
+        )
         self.rated_frequency = Parameter(Frequency)
         self.best_efficiency = Parameter(Efficiency, calibratable=True)
         self.best_efficiency_flow = Parameter(VolumeFlow, gt=0)
@@ -90,7 +93,7 @@ class CentrifugalPump(Module):
         suction = inlets.suction
         performance = self._performance(suction)
         losses = performance["shaft_power"] - performance["hydraulic_power"]
-        rise = ops.where(suction.m_dot > 0, losses / suction.heat_capacity_rate(), 0.0)
+        rise = heat_transfer.temperature_change(losses, suction.heat_capacity_rate())
 
         discharge = suction.with_(p=suction.p + performance["head"], T=suction.T + rise)
 
@@ -101,7 +104,9 @@ class CentrifugalPump(Module):
         performance = self._performance(inlets.suction)
         for name, value in performance.items():
             setattr(self, name, value)
-        self.electricity = performance["shaft_power"] / self.motor_efficiency
+        self.electricity = pumps.motor_electricity(
+            performance["shaft_power"], self.motor_efficiency
+        )
         self.heat_loss = self.electricity - performance["shaft_power"]
         self.discharge_T = outlets.discharge.T
 
@@ -115,12 +120,13 @@ class CentrifugalPump(Module):
             path=self.path,
             flow=flow,
         )
-        speed = self.frequency / self.rated_frequency
-        c0, c1, c2 = self.head_coeff
-        head = c0 * speed**2 + c1 * speed * flow + c2 * flow**2
-        load = flow / (speed * self.best_efficiency_flow)
+        speed = pumps.speed_ratio(self.frequency, self.rated_frequency)
+        head = pumps.centrifugal_head(flow, speed, self.head_coeff)
+        load = pumps.best_efficiency_ratio(flow, speed, self.best_efficiency_flow)
         ops.check(
-            ops.logical_or(flow == 0, ops.logical_not(ops.logical_or(head < 0, load >= 2))),
+            ops.logical_or(
+                flow == 0, ops.logical_not(ops.logical_or(head < 0, load >= pumps.RUNOUT_LOAD))
+            ),
             PhysicsRangeError,
             "{path}: flow = {flow} m3/s at frequency = {frequency} Hz gives "
             "head = {head} Pa at {load} times the best-efficiency flow; expected a "
@@ -131,13 +137,13 @@ class CentrifugalPump(Module):
             head=head,
             load=load,
         )
-        efficiency = self.best_efficiency * load * (2 - load)
-        hydraulic_power = flow * head
+        efficiency = pumps.parabolic_efficiency(self.best_efficiency, load)
+        hydraulic_power = pumps.hydraulic_power(flow, head)
         stopped = flow == 0
         return dict(
             flow=ops.where(stopped, 0.0, flow),
             head=ops.where(stopped, 0.0, head),
             hydraulic_power=ops.where(stopped, 0.0, hydraulic_power),
-            shaft_power=ops.where(stopped, 0.0, hydraulic_power / efficiency),
+            shaft_power=ops.where(stopped, 0.0, pumps.shaft_power(hydraulic_power, efficiency)),
             efficiency=ops.where(stopped, 0.0, efficiency),
         )

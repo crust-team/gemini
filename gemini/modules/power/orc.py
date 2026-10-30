@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import heat_transfer, power_cycles
 from gemini.types import (
     Boundary,
     Efficiency,
@@ -91,7 +92,9 @@ class ORC(Module):
         # Outlets
         brine_in = inlets.brine_in
         design = self._design(brine_in)
-        brine_out_T = brine_in.T - design["share"] * (brine_in.T - design["outlet_T"])
+        brine_out_T = power_cycles.brine_outlet_temperature(
+            brine_in.T, design.processed_share, design.outlet_temperature
+        )
 
         brine_out = brine_in.with_(T=brine_out_T)
 
@@ -102,21 +105,24 @@ class ORC(Module):
         brine_in = inlets.brine_in
         brine_out = outlets.brine_out
         design = self._design(brine_in)
-        self.heat_input = brine_in.heat_capacity_rate() * (brine_in.T - brine_out.T)
-        self.gross_power = design["cycle_efficiency"] * self.heat_input
-        self.parasitic_power = self.parasitic_fraction * self.gross_power
-        self.electricity_generated = self.gross_power - self.parasitic_power
-        self.condenser_duty = self.heat_input - self.gross_power
-        self.heat_loss = self.condenser_duty + self.parasitic_power
-        self.thermal_efficiency = ops.where(
-            self.heat_input > 0, self.electricity_generated / self.heat_input, None
+        self.heat_input = heat_transfer.heat_rate(
+            brine_in.heat_capacity_rate(), brine_in.T - brine_out.T
         )
-        self.condensing_temperature = design["condensing_T"]
+        balance = power_cycles.plant_balance(
+            self.heat_input, design.cycle_efficiency, self.parasitic_fraction
+        )
+        self.gross_power = balance.gross_power
+        self.parasitic_power = balance.parasitic_power
+        self.electricity_generated = balance.electricity_generated
+        self.condenser_duty = balance.condenser_duty
+        self.heat_loss = balance.heat_loss
+        self.thermal_efficiency = balance.thermal_efficiency
+        self.condensing_temperature = design.condensing_temperature
         self.brine_out_T = brine_out.T
-        self.is_capped = design["is_capped"]
+        self.is_capped = design.is_capped
 
     def _design(self, brine_in):
-        """Return the cycle temperatures, gross cycle efficiency and processed brine share."""
+        """Return the ``power_cycles.cycle_design`` of the brine inlet."""
         ops.check(
             brine_in.m_dot >= 0,
             PhysicsRangeError,
@@ -124,20 +130,15 @@ class ORC(Module):
             path=self.path,
             m_dot=brine_in.m_dot,
         )
-        condensing_T = self.ambient_temperature + self.condenser_approach
-        outlet_T = ops.maximum(self.minimum_brine_outlet_temperature, condensing_T + self.pinch)
-        running = brine_in.T > outlet_T
-        hot, cold = brine_in.T - self.pinch, outlet_T - self.pinch
-        reversible = 1 - condensing_T * ops.log(hot / cold) / (hot - cold)
-        efficiency = self.fraction_of_carnot * reversible
         cp = brine_in.fluid.properties(brine_in.p, brine_in.T).cp_l
-        uncapped = efficiency * brine_in.m_dot * cp * (brine_in.T - outlet_T)
-        is_capped = uncapped > self.capacity
-        share = ops.where(is_capped, self.capacity / uncapped, 1.0)
-        return dict(
-            condensing_T=condensing_T,
-            outlet_T=outlet_T,
-            cycle_efficiency=ops.where(running, efficiency, 0.0),
-            share=ops.where(running, share, 0.0),
-            is_capped=ops.where(running, is_capped, False),
+        return power_cycles.cycle_design(
+            brine_in.T,
+            brine_in.m_dot,
+            cp,
+            self.ambient_temperature,
+            self.condenser_approach,
+            self.pinch,
+            self.minimum_brine_outlet_temperature,
+            self.fraction_of_carnot,
+            self.capacity,
         )

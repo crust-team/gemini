@@ -3,7 +3,6 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.ops import Constant
 from gemini.physics import constants, pumps
 from gemini.types import (
     Control,
@@ -22,13 +21,6 @@ from gemini.types import (
     PressureDifference,
     Stream,
     VolumeFlow,
-)
-
-MIN_EFFICIENCY_POWER = Constant(
-    "LINE_SHAFT_MIN_EFFICIENCY_POWER",
-    0.1,
-    "W",
-    "pump power below which the pump is treated as stopped and its efficiency as zero",
 )
 
 
@@ -64,8 +56,12 @@ class LineShaftPump(Module):
 
         # Parameters
         self.no_stages = Parameter(Count)
-        self.head_coeff = Parameter(list[float], shape=(6,), calibratable=True)
-        self.power_coeff = Parameter(list[float], shape=(6,), calibratable=True)
+        self.head_coeff = Parameter(
+            list[float], shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,), calibratable=True
+        )
+        self.power_coeff = Parameter(
+            list[float], shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,), calibratable=True
+        )
         self.setting_depth = Parameter(Length)
         self.shaft_friction_loss = Parameter(LinearPower, ge=0)
         self.motor_efficiency = Parameter(Efficiency)
@@ -112,17 +108,17 @@ class LineShaftPump(Module):
             pump_power=pump_power,
             flow=flow,
         )
-        speed = self.frequency / constants.ESP_REFERENCE_FREQUENCY
-        friction = self.shaft_friction_loss * self.setting_depth * speed
+        speed = pumps.speed_ratio(self.frequency, constants.ESP_REFERENCE_FREQUENCY)
+        friction = pumps.line_shaft_friction_power(
+            self.shaft_friction_loss, self.setting_depth, speed
+        )
         self.flow = flow
         self.head = outlets.discharge.p - inlets.suction.p
         self.pump_power = pump_power
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction
-        self.efficiency = ops.where(
-            pump_power >= MIN_EFFICIENCY_POWER, flow * self.head / pump_power, 0.0
-        )
-        self.electricity = self.shaft_power / self.motor_efficiency
+        self.efficiency = pumps.pump_efficiency(flow, self.head, pump_power)
+        self.electricity = pumps.motor_electricity(self.shaft_power, self.motor_efficiency)
 
     def _head(self, flow):
         """Return the pump-curve pressure rise [Pa] at a suction volume flow [m3/s]."""

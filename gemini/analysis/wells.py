@@ -230,10 +230,28 @@ def _correction(pump, points):
     return {"slope": slope, "offset": offset}, None
 
 
+def _head_curve(module, frequency, n_points=50):
+    """Return plotting points (flow [m3/s], head [Pa]) of an ESP at a frequency [Hz].
+
+    The flows run from zero to twice the speed-scaled maximum flow; the head is evaluated at the
+    flow referred to the reference speed.
+    """
+    if frequency <= 0 or n_points < 2:
+        raise ConfigurationError(
+            f"{module.path}: positive frequency and at least two curve points required; got "
+            f"frequency = {frequency} Hz, n_points = {n_points}"
+        )
+    scale = frequency / constants.ESP_REFERENCE_FREQUENCY
+    return [
+        (float(flow), module.head_function(flow / scale, frequency))
+        for flow in np.linspace(0, 2 * module.max_flow * scale, n_points)
+    ]
+
+
 def pump_curve(plant, pump, measured=None):
     """Return an ESP's head curve at the reference frequency and the fit of measured points.
 
-    The curve is the pump's polynomial head curve (``ESP.head_curve``) at the reference
+    The curve is the pump's polynomial head curve (``_head_curve``) at the reference
     frequency of 60 Hz, for flows from zero to twice the maximum flow. Head is a pressure
     difference in Pa; the head of a fluid column in metres is ``head / (density * g)`` with the
     density of the pumped fluid.
@@ -268,7 +286,7 @@ def pump_curve(plant, pump, measured=None):
         point["theoretical_head"] = float(module.head_function(point["flow"], point["frequency"]))
     correction, reason = _correction(module, points) if points else (None, "no measured points")
     reference = constants.ESP_REFERENCE_FREQUENCY.value
-    flows, heads = zip(*module.head_curve(reference))
+    flows, heads = zip(*_head_curve(module, reference))
     return to_plain(
         {
             "pump": pump,

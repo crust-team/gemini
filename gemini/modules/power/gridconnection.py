@@ -1,7 +1,7 @@
 """Electricity exchange of a plant with the public grid through a limited connection."""
 
-from gemini import ops
 from gemini.modules.module import Module
+from gemini.physics import electricity
 from gemini.types import Boundary, MoneyPerEnergy, MoneyRate, Output, Parameter, Power
 
 
@@ -11,9 +11,9 @@ class GridConnection(Module):
     A parent plant passes its electricity ``consumption`` and ``generation`` as call keywords
     (for example sums of its children's ``electricity`` and ``electricity_generated``). The
     balance consumption - generation is imported when positive and exported when negative,
-    each up to its connection limit (``None`` means unlimited). Consumption above the import
-    limit is reported as ``unserved_consumption`` (load to shed) and surplus generation above the
-    export limit as ``curtailed_generation``. ``cost_rate`` is import_price * net_import -
+    each up to its connection limit (``None`` means unlimited; ``physics.electricity.net_exchange``).
+    Consumption above the import limit is reported as ``unserved_consumption`` (load to shed)
+    and surplus generation above the export limit as ``curtailed_generation``. ``cost_rate`` is import_price * net_import -
     export_price * net_export in currency per second; negative values are revenue. Integrating
     it over a step gives the step's electricity cost.
 
@@ -53,17 +53,18 @@ class GridConnection(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        demand = ops.maximum(0.0, self.consumption - self.generation)
-        surplus = ops.maximum(0.0, self.generation - self.consumption)
-        self.net_import = _limited(demand, self.import_limit)
-        self.net_export = _limited(surplus, self.export_limit)
-        self.unserved_consumption = demand - self.net_import
-        self.curtailed_generation = surplus - self.net_export
+        exchange = electricity.net_exchange(
+            self.consumption,
+            self.generation,
+            self.import_limit,
+            self.export_limit,
+            self.import_price,
+            self.export_price,
+        )
+        self.net_import = exchange.net_import
+        self.net_export = exchange.net_export
+        self.unserved_consumption = exchange.unserved_consumption
+        self.curtailed_generation = exchange.curtailed_generation
         self.is_import_limited = self.unserved_consumption > 0
         self.is_export_limited = self.curtailed_generation > 0
-        self.cost_rate = self.import_price * self.net_import - self.export_price * self.net_export
-
-
-def _limited(power, limit):
-    """Return ``power`` [W] capped at ``limit`` [W]; ``None`` means unlimited."""
-    return power if limit is None else ops.minimum(power, limit)
+        self.cost_rate = exchange.cost_rate

@@ -67,26 +67,29 @@ class Separator(Module):
 
         # Outlets
         inlet = inlets.inlet
-        fraction, saturation = self._flash(inlet)
-        steam_flow = fraction * inlet.m_dot
-        liquid_T = ops.where(fraction > 0, saturation.temperature, inlet.T)
+        state = self._flash(inlet)
 
-        liquid = inlet.with_(m_dot=inlet.m_dot - steam_flow, T=liquid_T, p=self.pressure_setpoint)
+        liquid = inlet.with_(
+            m_dot=state.liquid_flow, T=state.liquid_temperature, p=self.pressure_setpoint
+        )
         gas = inlet.with_(
-            m_dot=steam_flow, T=saturation.temperature, p=self.pressure_setpoint, fluid=STEAM
+            m_dot=state.steam_flow,
+            T=state.saturation_temperature,
+            p=self.pressure_setpoint,
+            fluid=STEAM,
         )
 
         outlets = dict(liquid=liquid, gas=gas)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        fraction, saturation = self._flash(inlets.inlet)
-        self.steam_fraction = fraction
+        state = self._flash(inlets.inlet)
+        self.steam_fraction = state.steam_fraction
         self.steam_mass_flow = outlets.gas.m_dot
-        self.saturation_temperature = saturation.temperature
+        self.saturation_temperature = state.saturation_temperature
 
     def _flash(self, inlet):
-        """Return the steam fraction [-] and the saturation state at the setpoint pressure."""
+        """Return the ``steam.flash_state`` of the inlet at the setpoint pressure."""
         ops.check(
             inlet.m_dot >= 0,
             PhysicsRangeError,
@@ -107,7 +110,4 @@ class Separator(Module):
             setpoint=self.pressure_setpoint,
             p=inlet.p,
         )
-        liquid_pressure = ops.maximum(inlet.p, steam.saturation_pressure(inlet.T))
-        enthalpy = steam.liquid_enthalpy(liquid_pressure, inlet.T)
-        fraction = steam.flash_fraction(enthalpy, self.pressure_setpoint)
-        return fraction, steam.saturation_properties(self.pressure_setpoint)
+        return steam.flash_state(inlet.m_dot, inlet.T, inlet.p, self.pressure_setpoint)
