@@ -10,7 +10,7 @@ from pydantic import model_serializer, model_validator
 from gemini.errors import ValidationError
 from gemini.physics import constants, gas, units
 from gemini.physics.chemistry import henry_constant
-from gemini.physics.fluid import DEFAULT_LIQUID_DENSITY, FluidProperties
+from gemini.physics.fluid import DEFAULT_LIQUID_DENSITY, FluidProperties, mixture_density
 from gemini.types.quantities import (
     Density,
     Fraction,
@@ -191,12 +191,26 @@ class Fluid(BaseModel):
     def density_at(self, p: Pressure, T: Temperature):
         """Return the density [kg/m3] of the fluid at ``p`` and ``T``, arrays or traced values too.
 
-        A gas fluid without a given density is an ideal gas of its composition; any other fluid
-        has the constant mixture density of its property snapshot.
+        A gas fluid without a given density is an ideal gas of its composition, and a liquid with a
+        composition mixes with that gas at ``p`` and ``T``: a low-pressure density would swell the
+        mixture at depth. Any other fluid has the constant density of its property snapshot.
         """
-        if self.kind == "gas" and self.density is None:
-            return gas.ideal_gas_density(p, T, gas.molar_mass(self.gas_composition))
-        return self.properties(p, T).density
+        if self.kind == "gas":
+            return self.gas_density_at(p, T) if self.density is None else self.density
+        if self.gas_composition is None:
+            return self.properties(p, T).density
+        return mixture_density(
+            self._liquid_density(), self.gas_density_at(p, T), self.gas_mass_fraction
+        )
+
+    def gas_density_at(self, p: Pressure, T: Temperature):
+        """Return the density [kg/m3] of the gas of this fluid at ``p`` and ``T``.
+
+        Ideal-gas for a composition; the constant ``rho_g`` of the property snapshot otherwise.
+        """
+        if self.gas_composition is None:
+            return self.properties(p, T).rho_g
+        return gas.ideal_gas_density(p, T, gas.molar_mass(self.gas_composition))
 
     def corrosion_inputs(self, p: Pressure, T: Temperature) -> dict[str, float]:
         """Convert dissolved CO2 and salt mass fractions for the existing corrosion boundary.
@@ -250,8 +264,10 @@ def _properties(fluid: Fluid) -> FluidProperties:
     values = {"gmf": fluid.gas_mass_fraction}
     if fluid.kind == "glycol_water":
         values.update(_GLYCOL_30_PROPERTIES)
+    if fluid.gas_composition is not None:
+        values["rho_g"] = fluid.normal_density()
     if fluid.kind == "gas":
-        values.update(rho_l=fluid.normal_density(), rho_g=fluid.normal_density())
+        values["rho_l"] = fluid.normal_density()
     for field, name in _OVERRIDES:
         value = getattr(fluid, field)
         if value is not None:

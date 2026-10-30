@@ -639,8 +639,7 @@ signed so that the pressure rises by both when flowing down and falls by both wh
   ambient_temperature)` takes each section from `Fluid.properties`: `Q = fluid.volume_flow(m_dot,
   density)`, the velocities `geometry.mean_velocity(m, rho, D)` = `m / rho / A` with `A =
   pi D^2 / 4`, `us_l` from `(1 - gmf) m` and `rho_l`, and Darcy-Weisbach when the gas mass
-  fraction is zero, otherwise Beggs-Brill with `us_g = mean_velocity(gmf, rho_g, D)`; the gas
-  velocity keeps the original form, which ignores the flow rate. Pressures are floored at 0.001
+  fraction is zero, otherwise Beggs-Brill with `us_g = mean_velocity(m_g, rho_g, D)` and `rho_g` the density of the gas at the section's `p` and `T` (`Fluid.gas_density_at`). Pressures are floored at 0.001
   Pa. `direction` is `up` or `down`; zero flow gives zero drops (gravity too). The marched outlet
   is uncorrected; the affine correction `p = a p_out + b` is `hydraulics.affine_correction`,
   applied by the `Well` module.

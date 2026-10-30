@@ -124,3 +124,15 @@ def test_a_gas_fluid_is_an_ideal_gas_of_its_composition():
     assert Stream(flow="10 m3/h", p=101325.0, T=273.15, fluid=gas).m_dot == pytest.approx(
         10 / 3600 * normal
     )
+
+
+def test_a_brine_with_a_composition_mixes_with_its_gas_at_the_stream_pressure():
+    """The mixture is denser at depth; a flow in m3/h is the liquid volume at high pressure."""
+    brine = Fluid(**HACKATHON)
+    deep, shallow = brine.density_at(200e5, 360.0), brine.density_at(5e5, 360.0)
+    assert brine.gas_density_at(200e5, 360.0) == pytest.approx(144.6, abs=0.5)
+    assert 1020 < deep < 1030 and shallow < deep
+    assert brine.properties(1e5, 300).rho_g == pytest.approx(brine.normal_density())
+    assert Stream(m_dot=1.0, p=200e5, T=360.0, fluid=brine).volumetric_flow() == pytest.approx(
+        1 / deep
+    )

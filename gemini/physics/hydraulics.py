@@ -862,7 +862,7 @@ def _traversal(path, direction):
 def _section_drops(section, p, T, flow, fluid, heat_transfer_coefficient, ambient_temperature):
     """Return friction and gravity drops [Pa] and the temperature change [K] of one section.
 
-    Two-phase reverse flow passes the liquid velocity magnitude to Beggs–Brill and reverses
+    Two-phase reverse flow passes the velocity magnitudes to Beggs–Brill and reverses
     the friction sign, as Darcy–Weisbach does through ``abs(velocity) * velocity``.
 
     The two-phase model is chosen by ``fluid.gas_mass_fraction``, which is fixed in a trace: a
@@ -876,24 +876,27 @@ def _section_drops(section, p, T, flow, fluid, heat_transfer_coefficient, ambien
 
     NOTE(refactor): DPDT's zero-flow branch suppresses gravity as well as friction.
 
-    NOTE(refactor): the gas superficial velocity keeps the original ``gmf / rho_g / area``,
-    which does not use the gas mass flow, so two-phase regime and holdup do not follow the
-    flow rate; the physical form would be ``m_g / rho_g / area``.
+    NOTE(refactor): the gas superficial velocity is ``m_g / rho_g / area``. The original
+    ``gmf / rho_g / area`` left out the mass flow, so regime and holdup did not follow the flow;
+    ``test_the_gas_superficial_velocity_is_the_gas_mass_flow_over_its_density_and_area`` holds a
+    hand calculation. ``rho_g`` is the density of the free gas at this section's pressure and
+    temperature, ideal-gas for a fluid with a ``gas_composition``.
     """
     stopped = flow == 0
     f = fluid.properties(p, T)
     mass = flow * f.density
     m_l, m_g = (1 - f.gmf) * mass, f.gmf * mass
     us_l = geometry.mean_velocity(m_l, f.rho_l, section.inner_diameter)
-    us_g = geometry.mean_velocity(f.gmf, f.rho_g, section.inner_diameter)
+    rho_g = fluid.gas_density_at(p, T)
+    us_g = geometry.mean_velocity(m_g, rho_g, section.inner_diameter)
     shape = (section.inner_diameter, section.roughness, section.length)
     if fluid.gas_mass_fraction == 0:
         friction, gravity = darcy_weisbach_dp(us_l, f.rho_l, section.inclination, f.mu_l, *shape)
     else:
         drops = beggs_brill_dp(
-            us_g,
+            ops.abs(us_g),
             ops.abs(us_l),
-            f.rho_g,
+            rho_g,
             f.rho_l,
             section.inclination,
             f.mu_g,

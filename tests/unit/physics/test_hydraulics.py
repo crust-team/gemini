@@ -492,3 +492,28 @@ def test_design_pump_head_closes_the_pressure_balance():
     friction = head - (1e6 + gravity - 2.5e7 + 2.4e6)
     assert 0 < friction < 1e6
     assert hydraulics.design_pump_head(0.0, 1e9, 0.0, 1000.0, 1e-3, 10.0, 0.2, 1e-5, 0.01) == 0
+
+
+def test_the_gas_superficial_velocity_is_the_gas_mass_flow_over_its_density_and_area(monkeypatch):
+    """10 kg/s with x = 1e-3 of gas at 1.976 kg/m3 in a 0.2 m pipe is 0.1611 m/s, by hand.
+
+    m_g = 1e-3 * 10 = 0.01 kg/s, A = pi 0.2**2 / 4 = 0.03142 m2, us_g = 0.01 / 1.976 / 0.03142.
+    """
+    seen = {}
+
+    def spy(us_g, us_l, *rest):
+        seen.update(us_g=us_g, us_l=us_l)
+        return 0.0, 0.0
+
+    monkeypatch.setattr(hydraulics, "beggs_brill_dp", spy)
+    fluid = Fluid(gas_mass_fraction=1e-3)
+    path = geometry.PipePath(
+        sections=[
+            geometry.PipeSection(
+                length=100.0, inclination=math.pi / 2, inner_diameter=0.2, roughness=1e-5
+            )
+        ]
+    )
+    stream = Stream(m_dot=10.0, T=350.0, p=2e6, fluid=fluid)
+    hydraulics.pipe_path_profile(path, stream, fluid, "up", 0.0, 300.0)
+    assert seen["us_g"] == pytest.approx(0.01 / 1.976 / (math.pi * 0.2**2 / 4), rel=1e-9)
