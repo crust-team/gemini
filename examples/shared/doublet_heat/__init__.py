@@ -1,5 +1,1 @@
-"""Shared doublet heat plant and six-month operating history."""
-
-from .plant import DoubletHeatPlant
-
-__all__ = ["DoubletHeatPlant"]
+"""Shared doublet heat plant file and six-month operating history."""

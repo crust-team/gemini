@@ -50,6 +50,11 @@ class Plant(PortResolver, Module):
         return self._name
 
     @property
+    def path(self):
+        """Return the assigned tree path, or the snake case name of a standalone plant."""
+        return self._path or snake_case(self._name)
+
+    @property
     def _type_label(self):
         return self._name
 

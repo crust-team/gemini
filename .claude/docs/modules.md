@@ -375,7 +375,7 @@ returned `ModuleResult`.
 ## Traced calls
 
 While `gemini.graph` traces a module, its `_Call` carries the running `Trace` (`call.trace`) and a
-child call made inside it, from `forward` or from a helper method such as `Doublet.produce()`,
+child call made inside it, from `forward` or from a helper method such as the `produce()` of the nodal doublet example,
 is recorded in the graph by `Trace.child` instead of evaluated: the child's controls, boundaries
 and numeric parameters become graph inputs named `<path below the root>.<name>`, supplied keyword
 values win without validation, and the `ModuleResult` of traced values joins the parent's call

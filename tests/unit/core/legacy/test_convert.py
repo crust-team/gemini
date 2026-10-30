@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.legacy import convert
 from gemini.errors import LegacyFormatError
 
@@ -22,7 +21,7 @@ def project():
 @pytest.fixture(scope="module")
 def converted(project):
     """Convert the example project once into a plant that tests must not mutate."""
-    return gm.legacy.to_plant(project, DoubletHeatPlant())
+    return gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
 
 
 def _node_id(project, kind):
@@ -37,7 +36,7 @@ def test_to_plant_uses_the_in_memory_project(project):
     """Edits to a parsed project reach the plant instead of a re-read of its folder."""
     edited = project.model_copy(deep=True)
     edited.params[_node_id(edited, "heat_exchanger")]["heat_transfer_coeff"].values = [1.0]
-    plant = gm.legacy.to_plant(edited, DoubletHeatPlant())
+    plant = gm.legacy.to_plant(edited, gm.plants.get("DoubletHeatPlant"))
     assert plant.heat_exchanger.ua == 1.0
     assert plant.heat_exchanger._param_history[-1].params["ua"] == 1.0
 
@@ -65,7 +64,7 @@ def test_to_plant_rejects_an_ambiguous_data_csv(tmp_path):
     shutil.copytree(OLD, folder)
     (folder / "extra.csv").write_text("Timestamp;x\n", encoding="utf-8")
     with pytest.raises(LegacyFormatError, match="exactly one"):
-        gm.legacy.to_plant(gm.legacy.read_project(folder), DoubletHeatPlant())
+        gm.legacy.to_plant(gm.legacy.read_project(folder), gm.plants.get("DoubletHeatPlant"))
 
 
 def test_to_dataset_converts_and_reports_missing_columns(project):
@@ -93,7 +92,7 @@ def test_old_units_from_si():
 
 def test_results_to_frame_uses_old_columns_and_units(project, converted, fast_dataset):
     """Predicted measured outputs return as old tag columns in old units."""
-    plant = gm.legacy.to_plant(project, DoubletHeatPlant())
+    plant = gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
     results = gm.Engine(plant).replay(fast_dataset.window(end=fast_dataset.start))
     frame = gm.legacy.results_to_frame(results, project)
     assert list(frame.columns[:2]) == ["Timestamp", "ESP_Head"]
@@ -104,7 +103,7 @@ def test_results_to_frame_uses_old_columns_and_units(project, converted, fast_da
 
 def test_from_plant_writes_changed_values_and_keeps_the_rest(project):
     """Changed parameters are exported in old units; unchanged raw values are kept."""
-    plant = gm.legacy.to_plant(project, DoubletHeatPlant())
+    plant = gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
     plant.doublet.reservoir.update_params(pressure=2.3e7)
     exported = gm.legacy.from_plant(plant, project)
     production = _node_id_named(project, "reservoir_c1b5")
@@ -116,7 +115,7 @@ def test_from_plant_writes_changed_values_and_keeps_the_rest(project):
 
 def test_check_wiring_leaves_the_plant_unchanged(project):
     """Tracing runs on a copy: the caller's controls and call results stay untouched."""
-    plant = gm.legacy.to_plant(project, DoubletHeatPlant())
+    plant = gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
     assert "frequency" not in plant.doublet.esp._input_values
     assert gm.legacy.check_wiring(plant, project) == []
     assert "frequency" not in plant.doublet.esp._input_values
@@ -130,13 +129,15 @@ def test_check_wiring_reports_mismatches_and_raises_on_errors(project, converted
     errors = gm.legacy.check_wiring(converted, edited)
     assert len(errors) == 1 and errors[0].startswith("Unexpected connection")
     with pytest.raises(LegacyFormatError, match="root_inputs"):
-        gm.legacy.check_wiring(DoubletHeatPlant(), project)
+        gm.legacy.check_wiring(gm.plants.get("DoubletHeatPlant"), project)
 
 
 def test_round_trip_through_from_plant_converts_the_edited_project(project):
     """A project exported by from_plant converts from memory, not from its source folder."""
-    plant = gm.legacy.to_plant(project, DoubletHeatPlant())
+    plant = gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
     plant.heat_exchanger.update_params(ua=123456.0)
-    reconverted = gm.legacy.to_plant(gm.legacy.from_plant(plant, project), DoubletHeatPlant())
+    reconverted = gm.legacy.to_plant(
+        gm.legacy.from_plant(plant, project), gm.plants.get("DoubletHeatPlant")
+    )
     assert reconverted.heat_exchanger.ua == 123456.0
     assert reconverted.state_dict() == plant.state_dict()

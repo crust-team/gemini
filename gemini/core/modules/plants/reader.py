@@ -172,12 +172,18 @@ def read(cls, spec):
     if error is not None:
         raise error
     plant, items = build(cls, spec)
-    if items:
-        first = items[0]
-        raise ValidationError(
-            "; ".join(f"{item['path']}: {item['message']}" for item in items),
-            path=first["path"],
-            code=first["code"],
-            suggestions=first["suggestions"],
-        )
+    raise_problems(items)
     return plant
+
+
+def raise_problems(items):
+    """Raise one ``ValidationError`` that lists ``items``, the problems of a spec, if any."""
+    if not items:
+        return
+    first = items[0]
+    raise ValidationError(
+        "; ".join(f"{item['path']}: {item['message']}" for item in items),
+        path=first["path"],
+        code=first["code"],
+        suggestions=first["suggestions"],
+    )

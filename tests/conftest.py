@@ -9,9 +9,9 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.modules import Module
 from tests.cpu_budget import BUDGET_S, exceeds_budget, measure_cpu
+from tests.fixtures.plant_classes import spec_plant_classes
 
 TIER_MARKERS = {
     "unit": pytest.mark.unit,
@@ -76,20 +76,20 @@ def shared_plant():
     """Load and validate one read-only shared plant design."""
     with warnings.catch_warnings(record=True) as warnings_seen:
         warnings.simplefilter("always")
-        plant = DoubletHeatPlant.load(ROOT / "examples/shared/doublet_heat/plant.json")
+        plant = gm.Plant.load(ROOT / "examples/shared/doublet_heat/plant.json")
     assert not warnings_seen
     return plant
 
 
 def shipped_module_classes():
-    """Return every concrete module class shipped in ``gemini`` and the shared example plant."""
+    """Return every concrete module class shipped in ``gemini`` and a class per spec plant."""
     exported = [getattr(gm.modules, name) for name in gm.modules.__all__]
     classes = [
         item
         for item in exported
         if isinstance(item, type) and issubclass(item, Module) and item is not Module
     ]
-    return tuple(classes) + (gm.plants.Doublet, DoubletHeatPlant)
+    return tuple(classes) + spec_plant_classes()
 
 
 def pytest_generate_tests(metafunc):

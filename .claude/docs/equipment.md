@@ -79,11 +79,11 @@ Shared conventions, stated once here and not repeated per module:
 | Power | `GridConnection` | none | no | net import/export, limits, tariff |
 | Demand | `HeatConsumer` | `supply_in` -> `return_out` | no | demand capped by return floor |
 | Demand | `CoolingConsumer` | `supply_in` -> `return_out` | no | sensible, latent, dew point |
-| Composite | `Doublet` | `return_in` -> `supply_out` | no | reservoir, wells, ESP, injector, sink |
-| Composite | `MultiWellPlant` | `return_in` -> `supply_out` | no | N producers, M injectors |
+| Plant (spec) | `Doublet` | `return_in` -> `supply_out` | no | reservoir, wells, ESP, injector, sink |
+| Plant (spec) | `MultiWellPlant` | `return_in` -> `supply_out` | no | N producers, M injectors |
 | Composite | `HeatingSubstation` | `network_in` -> `network_out` | no | valve, HX, heat consumer |
 | Composite | `CoolingSubstation` | `network_in` -> `network_out` | no | valve, HX, cooler |
-| Composite | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
+| Plant (spec) | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
 | Composite | `ATESPlant` | `building_in` -> `building_out` | child | ATES, pump, HX, heat pump |
 
 ## Pumps
@@ -1464,25 +1464,33 @@ assert result.outputs.heat_absorbed == 60000 and not result.outputs.is_unmet
 
 ## Composite plants
 
+`Doublet`, `DoubletHeatPlant`, `MultiWellPlant` and `DistrictNetwork` are plants built from a spec
+(`gm.plants.names()` lists them with the others); `HeatingSubstation`, `CoolingSubstation` and
+`ATESPlant` stay `Module` subclasses because a loop closed inside one call, or a `mode` that selects
+which children run, is not wiring alone.
+
 ### Doublet
 
-Reusable production and reinjection limbs of a geothermal doublet (`gm.plants.Doublet`).
+Reusable production and reinjection limbs of a geothermal doublet (`gm.plants.get("Doublet")`).
+A plant built from a spec: `plants/specs/Doublet.json`, no handwritten class.
 
 - **Children**: `reservoir` (`ProductionReservoir`), `well` (`ProductionWell` below the ESP),
   `esp` (`ESP`), `riser` (`ProductionWell` above the ESP), `injector` (`InjectionWell`),
   `sink` (`InjectionReservoir`).
 - **Ports**: `return_in` -> `supply_out`.
 - **Outputs**: `electricity` and `heat_loss` (automatic sums over the leaves).
-- **Model**: `forward` injects `return_in` through injector and sink, then produces through
-  reservoir, lower well, ESP and riser; `produce()` and `inject(stream)` are the two limbs,
-  which a parent plant can connect separately (see [refactor-notes.md](refactor-notes.md)).
+- **Model**: the connections list the injection limb first, so the plan injects `return_in`
+  through injector and sink, then produces through reservoir, lower well, ESP and riser, the
+  order of the class it replaced. Inside `DoubletHeatPlant` the doublet is *opened* (the surface
+  equipment connects `supply_out` to `return_in`), so its limbs are steps of the parent plant
+  and are recorded as `doublet.reservoir`, ... (see [native-engine.md](native-engine.md),
+  section 14).
 - **Energy audit**: the sum of its leaves; the residual is the ESP's unresolved power.
 
 ```python
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
-doublet = DoubletHeatPlant.load("examples/shared/doublet_heat/plant.json").doublet
+doublet = gm.Plant.load("examples/shared/doublet_heat/plant.json").doublet
 doublet.set_inputs({"reservoir.production_rate": "42.4 kg/s", "esp.frequency": "55.5 Hz"})
 result = doublet(return_in=gm.Stream(m_dot=40, T="45 C", p="20 bar", fluid=doublet.fluid))
 assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
@@ -1492,25 +1500,29 @@ assert gm.modules.mass_balance(doublet, result)["residual"] == 0
 ### MultiWellPlant
 
 Purpose: geothermal well field with N production limbs mixed into one supply and M injection
-limbs fed from one return.
+limbs fed from one return. A spec plant of variable size: `gm.plants.from_template("MultiWellPlant",
+{"producers": 3, "injectors": 2})` returns the plant of that size; the file
+`plants/specs/MultiWellPlant.json` is the default size (2 and 1) and equals the output of
+`multi_well_spec` in `plants/generators.py`.
 
 - Structure: `producers` (default 2) `ModuleList` of `ModuleDict(reservoir=ProductionReservoir,
   well=ProductionWell, esp=ESP, riser=ProductionWell)`; `mixers` (`producers - 1` `Mixer`s);
   `splitters` (`injectors - 1` `Splitter`s); `injectors` (default 1) `ModuleList` of
   `ModuleDict(well=InjectionWell, sink=InjectionReservoir)`. Paths like
   `producers.0.esp.frequency`, `injectors.1.sink...`. Fewer than one producer or injector
-  raises `ConfigurationError`.
+  raises `ConfigurationError` from the generator and `ValidationError` from `from_template`.
 - Ports: `return_in` -> `supply_out`.
 - Parameters, controls, boundaries, states: none of its own (children's: `production_rate` per
   reservoir, `frequency` per ESP, `split_fraction` per splitter).
 - Outputs: `electricity`, `heat_loss` (automatic sums), `supply_out_T` (`Output.of` the last
   mixer's `mixed_out_T`, or the single riser's `wellhead_temperature`).
-- Model: each limb is traversed like `Doublet.produce`. N-way mixing is a cascade of two-way
-  mixers, the running mix entering `first_in`; capacity-rate weighting is associative, so the
-  cascade gives `sum(m_i cp_i T_i) / sum(m_i cp_i)` at the lowest wellhead pressure. The return
-  is split by a cascade: splitter i sends its `split_fraction` of the flow reaching it to
+- Model: each limb is traversed like the production limb of `Doublet`. N-way mixing is a cascade
+  of two-way mixers, the running mix entering `first_in`; capacity-rate weighting is associative,
+  so the cascade gives `sum(m_i cp_i T_i) / sum(m_i cp_i)` at the lowest wellhead pressure. The
+  return is split by a cascade: splitter i sends its `split_fraction` of the flow reaching it to
   injector i, the last injector takes the rest, so injector i receives `f_i prod_{j<i}(1 - f_j)`
-  (equal shares: `f_i = 1 / (M - i)`).
+  (equal shares: `f_i = 1 / (M - i)`). The connections are listed so that the plan calls every
+  production limb, the mixers, then each splitter before its injection limb.
 - Assumptions: as in `Doublet`, the return boundary is independent of production within a call;
   splitters stand for chokes or the injection-pump allocation; no field hydraulics.
 - Validity: that of the reservoirs, wells and ESPs; all limbs must deliver the same fluid
@@ -1518,11 +1530,9 @@ limbs fed from one return.
 
 ```python
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
-from gemini.core.modules import MultiWellPlant
 
-doublet = DoubletHeatPlant.load("examples/shared/doublet_heat/plant.json").doublet
-field = MultiWellPlant(producers=2, injectors=2)
+doublet = gm.Plant.load("examples/shared/doublet_heat/plant.json").doublet
+field = gm.plants.from_template("MultiWellPlant", {"producers": 2, "injectors": 2})
 for limb, rate in zip(field.producers, (40.0, 30.0)):
     for name in ("reservoir", "well", "esp", "riser"):
         getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
@@ -1630,13 +1640,18 @@ print(out.heat_absorbed, out.unmet_latent)  # 70000.0 0.0
 
 ### DistrictNetwork
 
-Purpose: two-pipe district heating or cooling network with parallel substations.
+Purpose: two-pipe district heating or cooling network with parallel substations. A spec plant of
+variable size: `gm.plants.from_template("DistrictNetwork", {"consumers": 3, "service": "cooling"})`;
+the file `plants/specs/DistrictNetwork.json` is the default size (2 heating consumers) and equals
+`district_network_spec()` in `plants/generators.py`.
 
 - Structure: `pump` (`CentrifugalPump`, network circulation), `supply_pipe` (`Pipe`),
   `splitters` (`consumers - 1`), `substations` (`consumers` `HeatingSubstation`s for
   `service="heating"`, `CoolingSubstation`s for `"cooling"`), `mixers` (`consumers - 1`),
-  `return_pipe` (`Pipe`). An unknown service or `consumers < 1` raises `ConfigurationError`.
-  The service choice mirrors the two substation classes.
+  `return_pipe` (`Pipe`). An unknown service or `consumers < 1` raises `ConfigurationError` from the generator and
+  `ValidationError` from `from_template`.
+  `HeatingSubstation` and `CoolingSubstation` stay handwritten composites: each closes its building
+  loop inside one call.
 - Ports: `supply_in` -> `return_out`.
 - Parameters, controls, boundaries, states: none of its own.
 - Outputs: `heat_supplied` (heating networks only: a cooling network has no leaf declaring
@@ -1651,9 +1666,9 @@ Purpose: two-pipe district heating or cooling network with parallel substations.
 
 ```python
 import gemini as gm
-from gemini.core.modules import DistrictNetwork, energy_balance
+from gemini.core.modules import energy_balance
 
-network = DistrictNetwork(consumers=2, service="heating")
+network = gm.plants.from_template("DistrictNetwork", {"consumers": 2, "service": "heating"})
 network.pump.update_params(
     head_coeff=[4e5, 0.0, -1e9], rated_frequency="50 Hz", best_efficiency=0.75,
     best_efficiency_flow=0.004, motor_efficiency=0.9,

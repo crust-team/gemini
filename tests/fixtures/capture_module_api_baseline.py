@@ -12,7 +12,6 @@ from time import perf_counter
 import pandas as pd
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from tests.fixtures import FIXTURES, SHARED
 from tests.fixtures.frames import path_frame
 
@@ -22,7 +21,7 @@ OUTPUT = FIXTURES / "module_api_baseline"
 def main():
     """Write plant state, full replay, quickstart simulation and timing metadata."""
     OUTPUT.mkdir(exist_ok=True)
-    plant = DoubletHeatPlant.load(SHARED / "plant.json")
+    plant = gm.Plant.load(SHARED / "plant.json")
     data = gm.Dataset.from_frame(
         pd.read_csv(SHARED / "doublet_2024_15min.csv", parse_dates=["time"]),
         time_column="time",

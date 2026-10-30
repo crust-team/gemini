@@ -12,7 +12,7 @@ PYTHONPATH=. python examples/core/simulate/01_district_heating_and_cooling.py
 """
 
 import gemini as gm
-from gemini.core.modules import ATESPlant, DistrictNetwork, energy_balance
+from gemini.core.modules import ATESPlant, energy_balance
 from gemini.core.types import (
     Electricity,
     HeatAbsorbed,
@@ -37,9 +37,11 @@ class DistrictEnergyPlant(gm.modules.Module):
         super().__init__()
 
         # Modules
-        self.heating = DistrictNetwork(consumers=2, service="heating")
+        self.heating = gm.plants.from_template("DistrictNetwork", {"consumers": 2})
         self.ates = ATESPlant()
-        self.cooling = DistrictNetwork(consumers=1, service="cooling")
+        self.cooling = gm.plants.from_template(
+            "DistrictNetwork", {"consumers": 1, "service": "cooling"}
+        )
 
         # Inlets
         self.heat_supply_in = Inlet(Stream)

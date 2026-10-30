@@ -306,7 +306,7 @@ Where the implementation differs from sections 1 to 11, and why:
   `<relative path>.<name>` (the root keeps plain names); a child called twice reuses them; supplied
   keywords win without validation. The `ModuleResult` of traced values joins the parent's
   `call_records`, so `Output.of`, automatic sums, `Output.ratio` (now `where(bottom == 0, None,
-  truediv(top, bottom))`) and helpers such as `Doublet.produce()` work unchanged. Guards cover every
+  truediv(top, bottom))`) and helpers such as the `produce()` of the nodal doublet example work unchanged. Guards cover every
   module of the tree. This replaces section 2's "each Module is traced on its own".
 - **Breaks.** A stateful, pre-hooked or untraceable *leaf* child becomes one `break` node after the
   graph is rolled back (`Graph.mark`, `Graph.rollback`). It runs `module(**row)` on the plain path
@@ -422,3 +422,14 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   plant takes that plant's wiring with the stored values that differ from the starting values,
   any other root becomes a handwritten root. `scripts/migrate_plants.py` runs it over files.
   Loading an old file raises `PlantFormatError` with code `old_format`, naming the function.
+- **Shipped plants and templates.** `specs/` holds the plants that ship as specs (`Doublet`,
+  `DoubletHeatPlant`, `MultiWellPlant`, `DistrictNetwork`), registered by file name. The two of
+  variable size are written by `generators.py` (`multi_well_spec`, `district_network_spec`): the
+  generator orders the connections to reproduce the call order of the classes they replaced, and
+  the shipped file of the default size equals its output. `templates/` holds template files and
+  `templates.py` fills them: `from_template(name, parameters)` sets `"<module>.<parameter>"`
+  values, removes every unit whose `"<module>.enabled"` is false with its connections, ports and
+  outputs (the template's `bypass` connections close the gap), validates the plain spec and builds
+  the plant. `catalogue.py` has `names()` and `get(name)`. The special cases
+  (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) stay classes, because a loop closed by
+  `loops.close_loop` inside one call or a `mode` that chooses which children run is not wiring.

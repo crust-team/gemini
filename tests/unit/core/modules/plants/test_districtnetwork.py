@@ -6,12 +6,17 @@ import pytest
 
 import gemini as gm
 from gemini.core.modules import energy_balance, mass_balance
-from gemini.core.modules.plants import CoolingSubstation, DistrictNetwork, HeatingSubstation
+from gemini.core.modules.plants import CoolingSubstation, HeatingSubstation, generators
 from gemini.core.types import Stream
 
 CP = 4217.4
 HOT = Stream(m_dot=4.0, T=348.15, p=6e5)
 CHILLED = Stream(m_dot=6.0, T=279.15, p=6e5)
+
+
+def _network(**parameters):
+    """Return a district network of the given size from its template."""
+    return gm.plants.from_template("DistrictNetwork", parameters)
 
 
 def _leaf_sum(result, name):
@@ -21,7 +26,7 @@ def _leaf_sum(result, name):
 
 def test_heating_network_serves_both_substations(plants):
     """Equal shares feed identical substations; totals and the stream audit add up."""
-    network = plants["network"](DistrictNetwork(), plants["heating_substation"])
+    network = plants["network"](_network(), plants["heating_substation"])
     result = network(supply_in=HOT)
     out = result.outputs
     children = result.children
@@ -46,7 +51,7 @@ def test_heating_network_serves_both_substations(plants):
 
 def test_network_sums_leaf_outputs_by_type_through_nested_substations(plants):
     """The network sums the consumers inside its substations once, not the substation sums."""
-    network = plants["network"](DistrictNetwork(consumers=3), plants["heating_substation"])
+    network = plants["network"](_network(consumers=3), plants["heating_substation"])
     result = network(supply_in=HOT.with_(m_dot=4.5))
     substation_sums = [
         result.children[f"substations.{index}"].outputs.heat_supplied for index in range(3)
@@ -58,7 +63,7 @@ def test_network_sums_leaf_outputs_by_type_through_nested_substations(plants):
 
 def test_three_way_split_and_mix(plants):
     """The cascades give every substation a third and mix three returns."""
-    network = plants["network"](DistrictNetwork(consumers=3), plants["heating_substation"])
+    network = plants["network"](_network(consumers=3), plants["heating_substation"])
     result = network(supply_in=HOT.with_(m_dot=4.5))
     feeds = [result.children[f"substations.{index}"].inlets.network_in.m_dot for index in range(3)]
     assert feeds == pytest.approx([1.5] * 3, rel=1e-15)
@@ -69,7 +74,7 @@ def test_three_way_split_and_mix(plants):
 
 def test_cooling_network_absorbs_building_and_ground_heat(plants):
     """A cooling network has no heat_supplied; heat_absorbed adds consumers and pipe gains."""
-    network = plants["network"](DistrictNetwork(service="cooling"), plants["cooling_substation"])
+    network = plants["network"](_network(service="cooling"), plants["cooling_substation"])
     assert isinstance(network.substations[0], CoolingSubstation)
     assert "heat_supplied" not in network.outputs(recurse=False)
     result = network(supply_in=CHILLED)
@@ -83,11 +88,13 @@ def test_cooling_network_absorbs_building_and_ground_heat(plants):
 
 def test_single_consumer_and_invalid_structure(plants):
     """One substation needs no tees; bad structural arguments raise."""
-    network = plants["network"](DistrictNetwork(consumers=1), plants["heating_substation"])
+    network = plants["network"](_network(consumers=1), plants["heating_substation"])
     assert isinstance(network.substations[0], HeatingSubstation)
     result = network(supply_in=HOT.with_(m_dot=2.0))
     assert result.outputs.heat_supplied == pytest.approx(1.5e5, rel=1e-12)
     with pytest.raises(gm.errors.ConfigurationError, match="service"):
-        DistrictNetwork(service="steam")
+        generators.district_network_spec(service="steam")
     with pytest.raises(gm.errors.ConfigurationError, match="consumers"):
-        DistrictNetwork(consumers=0)
+        generators.district_network_spec(consumers=0)
+    with pytest.raises(gm.errors.ValidationError, match="service"):
+        gm.plants.from_template("DistrictNetwork", {"service": "steam"})

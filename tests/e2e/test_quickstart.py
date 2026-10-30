@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from tests.fixtures import ROOT
 
 pytestmark = pytest.mark.e2e
@@ -20,7 +19,7 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
 
     SHARED = "examples/shared/doublet_heat"
 
-    plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
+    plant = gm.Plant.load(f"{SHARED}/plant.json")
     print(plant)
 
     df = pd.read_csv(dataset_path, parse_dates=["time"])
@@ -39,7 +38,7 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.ua")])
     print(fit)
     plant.save("runs/my_plant.json")
-    assert DoubletHeatPlant.load("runs/my_plant.json").state_dict() == plant.state_dict()
+    assert gm.Plant.load("runs/my_plant.json").state_dict() == plant.state_dict()
 
     clock = gm.Clock.days(2027, 1, 1, days=1)
     profiles = {

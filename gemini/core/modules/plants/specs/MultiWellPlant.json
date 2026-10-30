@@ -1,0 +1,141 @@
+{
+  "format": 2,
+  "name": "MultiWellPlant",
+  "modules": {
+    "producers": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "ModuleDict",
+          "modules": {
+            "reservoir": {
+              "type": "ProductionReservoir",
+              "params": {}
+            },
+            "well": {
+              "type": "ProductionWell",
+              "params": {}
+            },
+            "esp": {
+              "type": "ESP",
+              "params": {}
+            },
+            "riser": {
+              "type": "ProductionWell",
+              "params": {}
+            }
+          }
+        },
+        "1": {
+          "type": "ModuleDict",
+          "modules": {
+            "reservoir": {
+              "type": "ProductionReservoir",
+              "params": {}
+            },
+            "well": {
+              "type": "ProductionWell",
+              "params": {}
+            },
+            "esp": {
+              "type": "ESP",
+              "params": {}
+            },
+            "riser": {
+              "type": "ProductionWell",
+              "params": {}
+            }
+          }
+        }
+      }
+    },
+    "mixers": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "Mixer",
+          "params": {}
+        }
+      }
+    },
+    "splitters": {
+      "type": "ModuleList",
+      "modules": {}
+    },
+    "injectors": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "ModuleDict",
+          "modules": {
+            "well": {
+              "type": "InjectionWell",
+              "params": {}
+            },
+            "sink": {
+              "type": "InjectionReservoir",
+              "params": {}
+            }
+          }
+        }
+      }
+    }
+  },
+  "connections": [
+    {
+      "source": "producers.0.reservoir.sandface",
+      "target": "producers.0.well.bottom"
+    },
+    {
+      "source": "producers.0.well.wellhead",
+      "target": "producers.0.esp.suction"
+    },
+    {
+      "source": "producers.0.esp.discharge",
+      "target": "producers.0.riser.bottom"
+    },
+    {
+      "source": "producers.1.reservoir.sandface",
+      "target": "producers.1.well.bottom"
+    },
+    {
+      "source": "producers.1.well.wellhead",
+      "target": "producers.1.esp.suction"
+    },
+    {
+      "source": "producers.1.esp.discharge",
+      "target": "producers.1.riser.bottom"
+    },
+    {
+      "source": "producers.0.riser.wellhead",
+      "target": "mixers.0.first_in"
+    },
+    {
+      "source": "producers.1.riser.wellhead",
+      "target": "mixers.0.second_in"
+    },
+    {
+      "source": "injectors.0.well.bottom",
+      "target": "injectors.0.sink.sandface"
+    }
+  ],
+  "inlets": {
+    "return_in": "injectors.0.well.wellhead"
+  },
+  "outlets": {
+    "supply_out": "mixers.0.mixed_out"
+  },
+  "outputs": {
+    "electricity": {
+      "sum": "electricity"
+    },
+    "heat_loss": {
+      "sum": "heat_loss"
+    },
+    "supply_out_T": {
+      "of": "mixers.0.mixed_out_T"
+    }
+  },
+  "bindings": {},
+  "param_history": {}
+}

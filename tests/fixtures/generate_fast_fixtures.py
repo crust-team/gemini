@@ -12,7 +12,6 @@ evidence of a numerical change, never a routine update (see ``.claude/docs/testi
 import pandas as pd
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from tests.fixtures import FIXTURES, SHARED
 from tests.fixtures.frames import path_frame
 
@@ -32,7 +31,7 @@ def generate_golden():
     """Replay the generated month and save its exact result frame."""
     frame = pd.read_csv(FAST, parse_dates=["time"])
     data = gm.Dataset.from_frame(frame, time_column="time")
-    plant = DoubletHeatPlant.load(SHARED / "plant.json")
+    plant = gm.Plant.load(SHARED / "plant.json")
     GOLDEN.parent.mkdir(parents=True, exist_ok=True)
     path_frame(gm.Engine(plant).replay(data)).to_csv(
         GOLDEN, compression={"method": "gzip", "mtime": 0}

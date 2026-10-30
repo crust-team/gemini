@@ -78,11 +78,10 @@ def test_unmapped_fields_warn_once(tmp_path):
         "esp_1ee3.parameters.esp_colour",
         "esp_1ee3.tagnames.measured.esp_noise",
     ]
-    from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        gm.legacy.to_plant(project, DoubletHeatPlant())
+        gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
     assert len(caught) == 1 and issubclass(caught[0].category, GeminiWarning)
     assert "esp_colour" in str(caught[0].message) and "esp_noise" in str(caught[0].message)
 

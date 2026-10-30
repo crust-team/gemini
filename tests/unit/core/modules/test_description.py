@@ -127,14 +127,31 @@ def test_instance_values_follow_the_module():
 
 def test_composite_lists_children_and_dotted_values():
     """A composite names its children and nests their values by dotted path."""
-    doublet = gm.plants.Doublet()
-    description = doublet.describe()
+    substation = gm.modules.HeatingSubstation()
+    description = substation.describe()
     assert description["children"]
     assert all(isinstance(name, str) for name in description["children"].values())
     assert description["connections"] == []
-    schema = doublet.parameter_schema()
+    schema = substation.parameter_schema()
     assert any("." in name for name in schema["properties"])
     assert_valid_schema(schema)
+
+
+def test_a_spec_plant_lists_its_connections():
+    """A plant built from a spec names its children, its connections and dotted values."""
+    doublet = gm.plants.get("Doublet")
+    description = doublet.describe()
+    assert list(description["children"]) == [
+        "reservoir",
+        "well",
+        "esp",
+        "riser",
+        "injector",
+        "sink",
+    ]
+    assert len(description["connections"]) == 4
+    assert {item["source"] for item in description["connections"]} >= {"esp.discharge"}
+    assert any("." in name for name in doublet.parameter_schema()["properties"])
 
 
 def test_description_does_not_mutate():

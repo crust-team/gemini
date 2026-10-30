@@ -8,9 +8,8 @@ Run from the repository root: PYTHONPATH=. python examples/core/simulate/00_esp_
 """
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
-plant = DoubletHeatPlant.load("examples/shared/doublet_heat/plant.json")
+plant = gm.Plant.load("examples/shared/doublet_heat/plant.json")
 clock = gm.Clock.days(2027, 1, 1, days=1)
 for frequency in (55, 60, 65):
     profiles = {

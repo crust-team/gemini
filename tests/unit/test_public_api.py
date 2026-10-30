@@ -43,16 +43,12 @@ def test_public_names_and_docs():
     assert set(dir(gm)) == expected == set(gm.__all__)
     assert all(getattr(gm, name).__doc__ for name in expected)
     assert all(getattr(gm.modules, name).__doc__ for name in gm.modules.__all__)
-    assert gm.plants.Doublet
+    assert "Doublet" in gm.plants.names()
 
 
 def test_readable_tree():
     """Printing a loaded plant displays nested equipment and scalar human-unit parameters."""
-    from examples.shared.doublet_heat.plant import DoubletHeatPlant
-
-    plant = DoubletHeatPlant.load(
-        Path(__file__).parents[2] / "examples/shared/doublet_heat/plant.json"
-    )
+    plant = gm.Plant.load(Path(__file__).parents[2] / "examples/shared/doublet_heat/plant.json")
     with gm.runtime.settings(display_units="field"):
         rendered = repr(plant)
     assert "DoubletHeatPlant(" in rendered and "(doublet): Doublet(" in rendered

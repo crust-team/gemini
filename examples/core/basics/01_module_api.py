@@ -8,7 +8,6 @@ import os
 import pandas as pd
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 SHARED = "examples/shared/doublet_heat"
 
@@ -75,7 +74,7 @@ def uninitialized():
 def plants_and_containers(plant):
     """Plants build their own tree; state dictionaries copy a design into a fresh plant."""
     assert isinstance(plant.filters, gm.modules.ModuleDict)
-    fresh = DoubletHeatPlant()
+    fresh = gm.plants.get("DoubletHeatPlant")
     assert not fresh.is_initialized
     fresh.load_state_dict(plant.state_dict())
     assert fresh.is_initialized
@@ -105,7 +104,7 @@ def engine_and_calibration(plant):
 
 def main():
     """Run every part of the tour in order."""
-    plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
+    plant = gm.Plant.load(f"{SHARED}/plant.json")
     esp = configured_esp(plant)
     stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
     persistent = call_forms(esp, stream)

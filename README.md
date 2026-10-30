@@ -11,10 +11,9 @@ Run from the repository root with Python 3.11, 3.12, 3.13 or 3.14:
 import pandas as pd
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 SHARED = "examples/shared/doublet_heat"
-plant = DoubletHeatPlant.load(f"{SHARED}/plant.json")
+plant = gm.Plant.load(f"{SHARED}/plant.json")
 design = {name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
 esp = gm.modules.ESP().update_params(**design)
 stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")

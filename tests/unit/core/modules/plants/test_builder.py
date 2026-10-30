@@ -212,3 +212,9 @@ def test_simulate_calls_the_engine_with_the_plant(monkeypatch):
     plant = gm.Plant("Run")
     assert plant.simulate("profile") == ("results", "profile")
     assert calls == [plant]
+
+
+def test_a_standalone_plant_path_is_its_snake_case_name():
+    """The root path keeps the name the class-based plant had, in events and messages."""
+    assert gm.Plant("DoubletHeatPlant").path == "doublet_heat_plant"
+    assert gm.plants.get("DoubletHeatPlant").path == "doublet_heat_plant"

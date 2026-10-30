@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 pytestmark = pytest.mark.e2e
 ROOT = Path(__file__).parents[2]
@@ -16,7 +15,7 @@ SHARED = ROOT / "examples/shared/doublet_heat"
 def test_legacy_bridge(tmp_path):
     """Convert old assets, replay, write old outputs and preserve raw project values."""
     project = gm.legacy.read_project(OLD)
-    plant = gm.legacy.to_plant(project, DoubletHeatPlant())
+    plant = gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
     data = gm.legacy.to_dataset(project, gm.legacy.read_csv(OLD / "doublet_2024_old.csv"))
     assert gm.legacy.check_wiring(plant, project) == []
     plant.save(tmp_path / "plant.json")

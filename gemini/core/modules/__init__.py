@@ -8,7 +8,7 @@ from .demand import CoolingConsumer, HeatConsumer
 from .heat import CHP, AbsorptionUnit, AdsorptionChiller, Boiler, Cooler, HeatExchanger, HeatPump
 from .module import Module
 from .piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
-from .plants import ATESPlant, CoolingSubstation, DistrictNetwork, HeatingSubstation, MultiWellPlant
+from .plants import ATESPlant, CoolingSubstation, HeatingSubstation
 from .power import ORC, FlashTurbine, GridConnection, Separator
 from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
 from .registry import categories, get, load_file, names, register
@@ -70,10 +70,8 @@ __all__ = [
     "Separator",
     "FlashTurbine",
     "GridConnection",
-    "MultiWellPlant",
     "HeatingSubstation",
     "CoolingSubstation",
-    "DistrictNetwork",
     "ATESPlant",
     "collect_flows",
     "emissions",

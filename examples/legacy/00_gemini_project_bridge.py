@@ -7,7 +7,6 @@ import argparse
 from pathlib import Path
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--out", default="runs/bridge")
@@ -17,7 +16,7 @@ target = Path(arguments.out)
 target.mkdir(parents=True, exist_ok=True)
 
 project = gm.legacy.read_project(source)
-plant = gm.legacy.to_plant(project, DoubletHeatPlant())
+plant = gm.legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
 old_frame = gm.legacy.read_csv(source / "doublet_2024_old.csv")
 data = gm.legacy.to_dataset(project, old_frame)
 plant.save(target / "plant.json")

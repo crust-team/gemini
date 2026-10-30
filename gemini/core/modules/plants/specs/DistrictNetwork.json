@@ -1,0 +1,104 @@
+{
+  "format": 2,
+  "name": "DistrictNetwork",
+  "modules": {
+    "pump": {
+      "type": "CentrifugalPump",
+      "params": {}
+    },
+    "supply_pipe": {
+      "type": "Pipe",
+      "params": {}
+    },
+    "splitters": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "Splitter",
+          "params": {}
+        }
+      }
+    },
+    "substations": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "HeatingSubstation",
+          "params": {}
+        },
+        "1": {
+          "type": "HeatingSubstation",
+          "params": {}
+        }
+      }
+    },
+    "mixers": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "Mixer",
+          "params": {}
+        }
+      }
+    },
+    "return_pipe": {
+      "type": "Pipe",
+      "params": {}
+    }
+  },
+  "connections": [
+    {
+      "source": "pump.discharge",
+      "target": "supply_pipe.inlet"
+    },
+    {
+      "source": "supply_pipe.outlet",
+      "target": "splitters.0.feed_in"
+    },
+    {
+      "source": "splitters.0.second_out",
+      "target": "substations.0.network_in"
+    },
+    {
+      "source": "splitters.0.first_out",
+      "target": "substations.1.network_in"
+    },
+    {
+      "source": "substations.0.network_out",
+      "target": "mixers.0.first_in"
+    },
+    {
+      "source": "substations.1.network_out",
+      "target": "mixers.0.second_in"
+    },
+    {
+      "source": "mixers.0.mixed_out",
+      "target": "return_pipe.inlet"
+    }
+  ],
+  "inlets": {
+    "supply_in": "pump.suction"
+  },
+  "outlets": {
+    "return_out": "return_pipe.outlet"
+  },
+  "outputs": {
+    "heat_supplied": {
+      "sum": "heat_supplied"
+    },
+    "heat_absorbed": {
+      "sum": "heat_absorbed"
+    },
+    "heat_loss": {
+      "sum": "heat_loss"
+    },
+    "electricity": {
+      "sum": "electricity"
+    },
+    "return_out_T": {
+      "of": "return_pipe.outlet_T"
+    }
+  },
+  "bindings": {},
+  "param_history": {}
+}

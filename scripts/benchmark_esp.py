@@ -17,7 +17,6 @@ import numpy as np
 import pandas as pd
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini import backends
 from gemini.core.types.flows import Stream
 from gemini.graph import GraphCache, run
@@ -32,7 +31,7 @@ RTOL = 1e-12
 
 def load():
     """Return the plant's ESP and its SI inputs: mass flow, T, p and frequency per row."""
-    esp = DoubletHeatPlant.load(PLANT).doublet.esp
+    esp = gm.Plant.load(PLANT).doublet.esp
     frame = pd.read_csv(DATASET, parse_dates=["time"])
     rows = frame[[f"doublet.esp.{column}" for column in COLUMNS]].dropna().to_numpy()
     rows[:, 0] *= esp.fluid.properties(None, None).density
@@ -100,21 +99,21 @@ def benchmark_esp(repeat):
 
 def replay(dataset):
     """Replay a freshly loaded plant over ``dataset`` and return the engine."""
-    engine = gm.Engine(DoubletHeatPlant.load(PLANT))
+    engine = gm.Engine(gm.Plant.load(PLANT))
     engine.replay(dataset)
     return engine
 
 
 def simulate(dataset):
     """Simulate a freshly loaded plant over ``dataset`` and return the engine."""
-    engine = gm.Engine(DoubletHeatPlant.load(PLANT))
+    engine = gm.Engine(gm.Plant.load(PLANT))
     engine.simulate(dataset, gm.Clock.from_data(dataset))
     return engine
 
 
 def live(frame):
     """Evaluate ``frame`` one new row at a time through ``Engine.live``; return the engine."""
-    engine = gm.Engine(DoubletHeatPlant.load(PLANT))
+    engine = gm.Engine(gm.Plant.load(PLANT))
     views = [
         gm.Dataset.from_frame(frame.iloc[: row + 1], time_column="time")
         for row in range(len(frame))

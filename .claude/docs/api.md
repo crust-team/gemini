@@ -40,9 +40,8 @@ stored and requested types in the message.
 ```python
 import pandas as pd
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
-plant = DoubletHeatPlant.load("examples/shared/doublet_heat/plant.json")
+plant = gm.Plant.load("examples/shared/doublet_heat/plant.json")
 frame = pd.read_csv("examples/shared/doublet_heat/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
 results = gm.Engine().replay(plant, data)

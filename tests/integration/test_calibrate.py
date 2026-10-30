@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.data.loader import Aligned
 from gemini.core.engine.columns import read
 from gemini.core.engine.step import BindingPlan
@@ -44,7 +43,7 @@ def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
     assert plant.heat_exchanger.ua == fitted.fitted["ua"]
     assert len(plant.heat_exchanger._param_history) == count
     plant.save(tmp_path / "plant.json")
-    loaded = DoubletHeatPlant.load(tmp_path / "plant.json")
+    loaded = gm.Plant.load(tmp_path / "plant.json")
     assert loaded.state_dict() == plant.state_dict()
     assert loaded.heat_exchanger._param_history == plant.heat_exchanger._param_history
     assert loaded.bindings == plant.bindings

@@ -9,10 +9,9 @@ from tempfile import TemporaryDirectory
 import pandas as pd
 
 import gemini as gm
-from examples.shared.doublet_heat.plant import DoubletHeatPlant
 
 shared = "examples/shared/doublet_heat"
-plant = DoubletHeatPlant.load(f"{shared}/plant.json")
+plant = gm.Plant.load(f"{shared}/plant.json")
 dataset_path = os.environ.get("GEMINI_EXAMPLE_DATASET", f"{shared}/doublet_2024_15min.csv")
 frame = pd.read_csv(dataset_path, parse_dates=["time"])
 start = frame["time"].iloc[0]

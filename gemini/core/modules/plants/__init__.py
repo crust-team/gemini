@@ -2,15 +2,14 @@
 
 from .atesplant import ATESPlant
 from .builder import Plant
+from .catalogue import get, names
 from .coolingsubstation import CoolingSubstation
-from .districtnetwork import DistrictNetwork
-from .doublet import Doublet
 from .heatingsubstation import HeatingSubstation
 from .library import register_shipped
 from .migration import migrate
-from .multiwellplant import MultiWellPlant
 from .schema import spec_schema
 from .spec import from_dict, from_spec, validate
+from .templates import from_template
 
 __all__ = [
     "Plant",
@@ -19,11 +18,11 @@ __all__ = [
     "validate",
     "spec_schema",
     "migrate",
-    "Doublet",
-    "MultiWellPlant",
+    "names",
+    "get",
+    "from_template",
     "HeatingSubstation",
     "CoolingSubstation",
-    "DistrictNetwork",
     "ATESPlant",
 ]
 
