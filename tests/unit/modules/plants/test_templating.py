@@ -15,7 +15,11 @@ def _chain_template():
         "parameters": {
             "first.enabled": {"default": True, "unit": None, "description": "Keep the first."},
             "middle.enabled": {"default": True, "unit": None, "description": "Keep the middle."},
-            "last.dp_nominal": {"default": None, "unit": "Pa", "description": "Pressure drop."},
+            "last.nominal_pressure_drop": {
+                "default": None,
+                "unit": "Pa",
+                "description": "Pressure drop.",
+            },
         },
         "optional": {
             "middle": {"bypass": [{"source": "middle.inlet", "target": "middle.outlet"}]},
@@ -70,8 +74,8 @@ def test_default_sizes_build_the_shipped_plants():
 
 def test_a_parameter_sets_a_module_parameter_in_the_spec():
     """A name ``<module>.<parameter>`` states the value, unit strings included."""
-    spec = templating.fill(_chain_template(), {"last.dp_nominal": "2 bar"})
-    assert spec["modules"]["last"]["params"] == {"dp_nominal": "2 bar"}
+    spec = templating.fill(_chain_template(), {"last.nominal_pressure_drop": "2 bar"})
+    assert spec["modules"]["last"]["params"] == {"nominal_pressure_drop": "2 bar"}
     assert spec["modules"]["first"]["params"] == {}
 
 
@@ -94,7 +98,7 @@ def test_a_disabled_end_unit_drops_its_ports_and_its_connections():
 def test_the_original_template_is_not_changed_by_filling():
     """Two fills of one template are independent."""
     template = _chain_template()
-    templating.fill(template, {"middle.enabled": False, "last.dp_nominal": "1 bar"})
+    templating.fill(template, {"middle.enabled": False, "last.nominal_pressure_drop": "1 bar"})
     assert template == _chain_template()
 
 
@@ -113,7 +117,7 @@ def test_a_template_value_of_the_wrong_unit_is_a_problem_of_the_spec(monkeypatch
     template = _chain_template()
     monkeypatch.setattr(templating, "load", lambda name: template)
     with pytest.raises(gm.errors.ValidationError, match="last"):
-        templating.from_template("Chain", {"last.dp_nominal": "2 m"})
+        templating.from_template("Chain", {"last.nominal_pressure_drop": "2 m"})
     with pytest.raises(gm.errors.ValidationError, match="expected true or false"):
         templating.from_template("Chain", {"middle.enabled": "no"})
     assert templating.from_template("Chain", {"middle.enabled": False}).name == "Chain"

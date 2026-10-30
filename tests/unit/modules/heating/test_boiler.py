@@ -13,7 +13,7 @@ def test_capacity_balance_and_no_cooling():
     s = Stream(m_dot=10, T=300, p=1e6)
     result = c(temperature_setpoint=360, inlet=s)
     out, streams = result.outputs, result.outlets
-    assert out.capped and out.duty == 100000 and out.fuel_or_power == 125000
+    assert out.is_capped and out.duty == 100000 and out.fuel_or_power == 125000
     assert (streams["outlet"].T - s.T) * s.m_dot * 4217.4 == pytest.approx(out.duty)
     assert streams["outlet"].m_dot == s.m_dot and streams["outlet"].p == s.p
     out = c(temperature_setpoint=290, inlet=s).outputs

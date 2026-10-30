@@ -76,8 +76,8 @@ class CoolingSubstation(Module):
         self.unmet_latent = Output.of(self.consumer.unmet_latent)
         self.is_unmet = Output.of(self.consumer.is_unmet)
         self.dew_point = Output.of(self.consumer.dew_point)
-        self.building_supply_T = Output.of(self.heat_exchanger.hot_out_T)
-        self.building_return_T = Output.of(self.consumer.return_out_T)
+        self.building_supply_temperature = Output.of(self.heat_exchanger.hot_out_T)
+        self.building_return_temperature = Output.of(self.consumer.return_out_T)
         self.network_out_T = Output.of(self.heat_exchanger.cold_out_T)
         self.valve_pressure_drop = Output.of(self.valve.pressure_drop)
 

@@ -20,7 +20,7 @@
     }
   },
   "doublet.esp": {
-    "bep_ratio": {
+    "best_efficiency_ratio": {
       "max": 1.1879430572710905,
       "mean": 1.1879430572710905,
       "min": 1.1879430572710905,
@@ -100,13 +100,13 @@
       "min": 294.9817572253119,
       "unit": "K"
     },
-    "dp_friction": {
+    "friction_pressure_drop": {
       "max": -225709.3119260473,
       "mean": -225709.3119260473,
       "min": -225709.3119260473,
       "unit": "Pa"
     },
-    "dp_gravity": {
+    "gravity_pressure_drop": {
       "max": 20954160.0,
       "mean": 20954160.0,
       "min": 20954160.0,
@@ -138,7 +138,7 @@
       "min": 679938.095238097,
       "unit": "Pa"
     },
-    "flow_dp": {
+    "flow_pressure_drop": {
       "max": 87569.0255701087,
       "mean": 87569.0255701087,
       "min": 87569.0255701087,
@@ -150,7 +150,7 @@
       "min": 1.0,
       "unit": "-"
     },
-    "hydrostatic_dp": {
+    "hydrostatic_pressure_drop": {
       "max": 18858744.0,
       "mean": 18858744.0,
       "min": 18858744.0,
@@ -168,7 +168,7 @@
       "min": 22087569.02557011,
       "unit": "Pa"
     },
-    "skin_dp": {
+    "skin_pressure_drop": {
       "max": 0.0,
       "mean": 0.0,
       "min": 0.0,
@@ -216,7 +216,7 @@
     }
   },
   "heat_exchanger": {
-    "approach_T": {
+    "approach_temperature": {
       "max": 36.563707186841214,
       "mean": 36.563707186841214,
       "min": 36.563707186841214,
@@ -228,13 +228,7 @@
       "min": 313.6610032297727,
       "unit": "K"
     },
-    "dp_cold": {
-      "max": 0.0,
-      "mean": 0.0,
-      "min": 0.0,
-      "unit": "Pa"
-    },
-    "dp_hot": {
+    "cold_pressure_drop": {
       "max": 0.0,
       "mean": 0.0,
       "min": 0.0,
@@ -276,13 +270,19 @@
       "min": 331.4207071868412,
       "unit": "K"
     },
-    "lmtd": {
+    "hot_pressure_drop": {
+      "max": 0.0,
+      "mean": 0.0,
+      "min": 0.0,
+      "unit": "Pa"
+    },
+    "log_mean_temperature_difference": {
       "max": 38.007591528178146,
       "mean": 38.007591528178146,
       "min": 38.007591528178146,
       "unit": "K"
     },
-    "ntu": {
+    "transfer_units": {
       "max": 0.5717092806853881,
       "mean": 0.5717092806853881,
       "min": 0.5717092806853881,

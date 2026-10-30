@@ -102,7 +102,7 @@ def test_invalid_operating_points_raise():
             source_in=source.with_(m_dot=-1), sink_in=sink, temperature_setpoint=340
         )
     with pytest.raises(PhysicsRangeError, match="heating COP above 1"):
-        heat_pump("heating", carnot_efficiency=0.2)(
+        heat_pump("heating", carnot_fraction=0.2)(
             source_in=source.with_(T=270), sink_in=sink, temperature_setpoint=340
         )
     with pytest.raises(PhysicsRangeError, match="to reject the cooling duty"):
@@ -146,7 +146,7 @@ def test_lorenz_mode_limits():
             source_in=source, sink_in=sink, temperature_setpoint=290
         )
     with pytest.raises(PhysicsRangeError, match="heating COP above 1"):
-        heat_pump("heating", cop_model="lorenz", lorenz_efficiency=0.1)(
+        heat_pump("heating", cop_model="lorenz", lorenz_fraction=0.1)(
             source_in=source.with_(T=250), sink_in=sink, temperature_setpoint=340
         )
 

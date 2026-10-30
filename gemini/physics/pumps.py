@@ -271,7 +271,7 @@ def esp_efficiency(flow, head, power):
 
 
 @ops.physics
-def in_operating_window(flow, minimum_flow, maximum_flow, speed):
+def is_in_operating_window(flow, minimum_flow, maximum_flow, speed):
     """Return whether a flow lies inside the speed-scaled operating window of a pump.
 
     Parameters

@@ -74,9 +74,9 @@ def test_unresolved_pump_work():
 def test_esp_motor_efficiency_does_not_change_shaft_power():
     """Motor efficiency changes grid draw while shaft prediction stays fixed."""
     pump = ESP().update_params(
-        no_stages=10,
-        head_coeff=[10, 0, 0, 0, 0, 0],
-        power_coeff=[1, 0, 0, 0, 0, 0],
+        stage_count=10,
+        head_coefficients=[10, 0, 0, 0, 0, 0],
+        power_coefficients=[1, 0, 0, 0, 0, 0],
     )
     inlet = Stream(m_dot=30, T=300, p=1e6)
     first = pump(frequency=60, suction=inlet)

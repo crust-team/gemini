@@ -30,10 +30,10 @@ class ORC(Module):
     brine ``pinch`` colder, between T_a = T_in - pinch and T_b = T_out - pinch, so the
     reversible (Lorenz, triangular-cycle) work of the heat input Q = m cp (T_in - T_out) is
     W_rev = m cp ((T_a - T_b) - T_c ln(T_a / T_b)), that is Q (1 - T_c / T_lm) with the
-    logarithmic mean T_lm of T_a and T_b. The gross power is ``fraction_of_carnot`` W_rev
+    logarithmic mean T_lm of T_a and T_b. The gross power is ``carnot_fraction`` W_rev
     (DiPippo, R. (2007), Ideal thermal efficiency for geothermal binary plants, Geothermics
     36, 276-285; DiPippo, R. (2016), Geothermal Power Plants, 4th ed., chapter 8).
-    ``fraction_of_carnot`` is plant specific: second-law efficiencies of operating binary
+    ``carnot_fraction`` is plant specific: second-law efficiencies of operating binary
     plants are roughly 0.3 to 0.6 (DiPippo, R. (2004), Second Law assessment of binary plants
     generating power from low-temperature geothermal fluids, Geothermics 33, 565-586).
 
@@ -60,7 +60,7 @@ class ORC(Module):
         # Parameters
         self.minimum_brine_outlet_temperature = Parameter(Temperature)
         self.pinch = Parameter(TemperatureDifference, ge=0)
-        self.fraction_of_carnot = Parameter(Efficiency)
+        self.carnot_fraction = Parameter(Efficiency)
         self.condenser_approach = Parameter(TemperatureDifference, ge=0)
         self.parasitic_fraction = Parameter(Fraction, lt=1)
         self.capacity = Parameter(Power, gt=0)
@@ -139,6 +139,6 @@ class ORC(Module):
             self.condenser_approach,
             self.pinch,
             self.minimum_brine_outlet_temperature,
-            self.fraction_of_carnot,
+            self.carnot_fraction,
             self.capacity,
         )

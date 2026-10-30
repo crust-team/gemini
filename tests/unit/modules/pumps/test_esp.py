@@ -13,8 +13,8 @@ from tests.fixtures.equivalence import assert_health_matches, assert_module_matc
 
 ESP_PARAMS = {
     "pump_type": "HC27000",
-    "no_stages": 12,
-    "head_coeff": [
+    "stage_count": 12,
+    "head_coefficients": [
         83.08389282,
         -0.000460444,
         -1.19e-07,
@@ -22,7 +22,7 @@ ESP_PARAMS = {
         -6.36e-16,
         6.69e-21,
     ],
-    "power_coeff": [
+    "power_coefficients": [
         10.02089977,
         -0.000160233,
         6.52e-08,
@@ -55,7 +55,7 @@ def test_fit_recovers_curve_and_health_threshold():
     freq = np.linspace(40, 60, 20)
     heads = [pump.head_function(q, f) for q, f in zip(flows, freq)]
     fitted = analysis.fit_head_coefficients(flows, freq, heads, 12)
-    other = ESP().update_params(**dict(ESP_PARAMS, head_coeff=fitted))
+    other = ESP().update_params(**dict(ESP_PARAMS, head_coefficients=fitted))
     assert other.head_function(0.037, 53) == pytest.approx(pump.head_function(0.037, 53), rel=1e-9)
     result = pump(frequency=60, suction=Stream(m_dot=40, T=300, p=1e5))
     power = result.outputs.power
@@ -83,7 +83,7 @@ def _health_rows(pump, flows_kg_s):
 
 def test_health_on_arrays_equals_one_call_per_row():
     """Worst key, drift, window and message of every row match, with and without drifts."""
-    pump = ESP().update_params(**ESP_PARAMS, max_flow=0.05)
+    pump = ESP().update_params(**ESP_PARAMS, maximum_flow=0.05)
     results = _health_rows(pump, [20.0, 40.0, 40.0, 60.0, 30.0])
     outputs = [result.outputs for result in results]
     scales = [(1.0, 1.3), (1.2, 0.5), (1.0, 1.0), (0.8, 1.5), (1.05, 0.99)]

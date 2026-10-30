@@ -46,7 +46,7 @@ class _Reservoir(Module):
         self.pressure = Parameter(Pressure, calibratable=True)
         self.temperature = Parameter(Temperature)
         self.permeability = Parameter(Permeability)
-        self.thickness = Parameter(Length, gt=0)
+        self.aquifer_thickness = Parameter(Length, gt=0)
         self.drainage_radius = Parameter(Length, structural=True)
         self.top_depth = Parameter(Length)
         self.productivity_index = Parameter(
@@ -67,9 +67,9 @@ class _Reservoir(Module):
         self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
         self.drawdown = Output(PressureDifference)
         self.overpressure = Output(PressureDifference)
-        self.flow_dp = Output(PressureDifference | None)
-        self.skin_dp = Output(PressureDifference | None)
-        self.hydrostatic_dp = Output(PressureDifference)
+        self.flow_pressure_drop = Output(PressureDifference | None)
+        self.skin_pressure_drop = Output(PressureDifference | None)
+        self.hydrostatic_pressure_drop = Output(PressureDifference)
         self.radial_bottomhole_pressure = Output(Pressure | None)
 
         self._fluid_cache = (None, None, None)
@@ -99,25 +99,27 @@ class _Reservoir(Module):
     def _calculate_outputs(self, flow, p_bh):
         properties = self.fluid.properties(self.pressure, self.temperature)
         if self.drainage_radius == 0:
-            flow_dp = skin_dp = radial = None
+            flow_pressure_drop = skin_pressure_drop = radial = None
         else:
-            flow_dp, skin_dp = hydraulics.radial_pressure_drops(
+            flow_pressure_drop, skin_pressure_drop = hydraulics.radial_pressure_drops(
                 flow,
                 properties.mu_l,
                 self.permeability,
-                self.thickness,
+                self.aquifer_thickness,
                 self.drainage_radius,
                 self.wellbore_radius,
                 self.skin,
             )
-            radial = self.pressure + flow_dp + skin_dp
+            radial = self.pressure + flow_pressure_drop + skin_pressure_drop
         return {
             "bottomhole_pressure": p_bh,
             "drawdown": self.pressure - p_bh if self.role == "production" else 0,
             "overpressure": p_bh - self.pressure if self.role == "injection" else 0,
-            "flow_dp": flow_dp,
-            "skin_dp": skin_dp,
-            "hydrostatic_dp": hydraulics.hydrostatic_dp(properties.rho_l, self.top_depth),
+            "flow_pressure_drop": flow_pressure_drop,
+            "skin_pressure_drop": skin_pressure_drop,
+            "hydrostatic_pressure_drop": hydraulics.hydrostatic_dp(
+                properties.rho_l, self.top_depth
+            ),
             "radial_bottomhole_pressure": radial,
         }
 

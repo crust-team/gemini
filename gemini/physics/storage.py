@@ -210,8 +210,8 @@ def ice_advance(
     water_mass: float,
     latent_heat: float,
     freezing_temperature: float,
-    water_heat_capacity: float,
-    ice_heat_capacity: float,
+    water_specific_heat: float,
+    ice_specific_heat: float,
 ) -> tuple[float, float]:
     """Return the frozen fraction and the temperature of an ice store after a step.
 
@@ -232,7 +232,7 @@ def ice_advance(
         Mass of water in the store [kg].
     latent_heat, freezing_temperature : float
         Latent heat of fusion [J/kg] and freezing temperature [K].
-    water_heat_capacity, ice_heat_capacity : float
+    water_specific_heat, ice_specific_heat : float
         Specific heat capacities of liquid water and of ice [J/kg/K].
 
     Returns
@@ -259,8 +259,8 @@ def ice_advance(
             water_mass,
             latent_heat,
             freezing_temperature,
-            water_heat_capacity,
-            ice_heat_capacity,
+            water_specific_heat,
+            ice_specific_heat,
         )
         state = _select(finished, state, advanced)
     return state[0], state[1]
@@ -276,15 +276,15 @@ def ice_step(
     water_mass: float,
     latent_heat: float,
     freezing_temperature: float,
-    water_heat_capacity: float,
-    ice_heat_capacity: float,
+    water_specific_heat: float,
+    ice_specific_heat: float,
 ) -> tuple[float, float, float]:
     """Advance an ice store through one phase segment.
 
     Parameters
     ----------
     fraction, temperature, duration, inlet_temperature, conductance, water_mass, latent_heat,
-    freezing_temperature, water_heat_capacity, ice_heat_capacity : float
+    freezing_temperature, water_specific_heat, ice_specific_heat : float
         As in ``ice_advance``; ``duration`` is the time left in the step [s].
 
     Returns
@@ -307,8 +307,8 @@ def ice_step(
         temperature < freezing,
         ops.logical_and(fraction == 1, inlet_temperature < freezing),
     )
-    water = water_mass * water_heat_capacity
-    ice = water_mass * ice_heat_capacity
+    water = water_mass * water_specific_heat
+    ice = water_mass * ice_specific_heat
     args = (fraction, temperature, inlet_temperature, freezing)
     return _select(
         liquid,

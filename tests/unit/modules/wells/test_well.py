@@ -28,10 +28,10 @@ def test_both_wells_share_the_design_parameters_in_order():
     shared = [
         "pipe_path",
         "friction_correlation",
-        "friction_correlation_2p",
+        "two_phase_friction_correlation",
         "correction_factors",
         "soil_temperature",
-        "u_value",
+        "heat_transfer_coefficient",
     ]
     assert list(dict(InjectionWell().named_parameters())) == shared
     assert list(dict(ProductionWell().named_parameters()))[:6] == shared

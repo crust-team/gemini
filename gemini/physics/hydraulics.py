@@ -207,12 +207,12 @@ def _turbulent_drop(velocity, rho, mu, diameter, roughness, length):
 
 
 @ops.physics
-def pipe_conductance(u_value: float, diameter: float, length: float) -> float:
+def pipe_conductance(heat_transfer_coefficient: float, diameter: float, length: float) -> float:
     """Return the conductance ``UA`` [W/K] of a pipe wall, ``U pi D L``.
 
     Parameters
     ----------
-    u_value : float
+    heat_transfer_coefficient : float
         Overall heat transfer coefficient [W/m2/K] referred to the inner wall area.
     diameter, length : float
         Internal diameter and length [m].
@@ -228,7 +228,7 @@ def pipe_conductance(u_value: float, diameter: float, length: float) -> float:
     area ``geometry.lateral_area``. Reference: Incropera et al., Fundamentals of Heat and Mass
     Transfer, overall heat transfer coefficient ``UA``.
     """
-    return u_value * geometry.lateral_area(diameter, length)
+    return heat_transfer_coefficient * geometry.lateral_area(diameter, length)
 
 
 @ops.physics
@@ -676,8 +676,8 @@ class PathResult:
 
     p_out: float
     T_out: float
-    dp_friction: float
-    dp_gravity: float
+    friction_pressure_drop: float
+    gravity_pressure_drop: float
     section_pressure: list[float]
     section_temperature: list[float]
 
@@ -769,17 +769,17 @@ def pipe_path_profile(
     stream: Stream,
     fluid: Fluid,
     direction: Literal["up", "down"],
-    u_value: float,
+    heat_transfer_coefficient: float,
     ambient_temperature: float,
     correlation: Literal["darcy_weisbach"] = "darcy_weisbach",
     correlation_2p: Literal["BeggsBrill"] = "BeggsBrill",
 ) -> PathResult:
     """March the pressure and temperature of a stream along a pipe path.
 
-    Per section ``p_out = p -/+ (dp_friction + dp_gravity)`` and ``T_out = T -/+ dT``, with the
-    drops of ``darcy_weisbach_dp`` (liquid only) or ``beggs_brill_dp`` (free gas) and the
-    temperature change of ``heat_transfer.pipe_temperature_change``; the signs are those of
-    the traversal direction.
+    Per section ``p_out = p -/+ (friction_pressure_drop + gravity_pressure_drop)`` and ``T_out = T
+    -/+ dT``, with the drops of ``darcy_weisbach_dp`` (liquid only) or ``beggs_brill_dp`` (free
+    gas) and the temperature change of ``heat_transfer.pipe_temperature_change``; the signs are
+    those of the traversal direction.
 
     Parameters
     ----------
@@ -792,7 +792,7 @@ def pipe_path_profile(
     direction : str
         Traversal direction, 'up' or 'down' (case and surrounding spaces ignored); the flow
         sign is independent.
-    u_value, ambient_temperature : float
+    heat_transfer_coefficient, ambient_temperature : float
         Heat transfer coefficient [W/m2/K] and ambient temperature [K].
     correlation, correlation_2p : str
         Single-phase and two-phase correlation names.
@@ -820,10 +820,10 @@ def pipe_path_profile(
     p, T = stream.p, stream.T
     flow = fluid_physics.volume_flow(stream.m_dot, fluid.properties(p, T).density)
     pressures, temperatures = [], []
-    dp_friction = dp_gravity = 0.0
+    friction_pressure_drop = gravity_pressure_drop = 0.0
     for section in sections:
         friction, gravity, delta_T = _section_drops(
-            section, p, T, flow, fluid, u_value, ambient_temperature
+            section, p, T, flow, fluid, heat_transfer_coefficient, ambient_temperature
         )
         if direction == "down":
             p, T = ops.maximum(MIN_PATH_PRESSURE, p + friction + gravity), T + delta_T
@@ -831,9 +831,9 @@ def pipe_path_profile(
             p, T = ops.maximum(MIN_PATH_PRESSURE, p - friction - gravity), T - delta_T
         pressures.append(p)
         temperatures.append(T)
-        dp_friction += friction
-        dp_gravity += gravity
-    return PathResult(p, T, dp_friction, dp_gravity, pressures, temperatures)
+        friction_pressure_drop += friction
+        gravity_pressure_drop += gravity
+    return PathResult(p, T, friction_pressure_drop, gravity_pressure_drop, pressures, temperatures)
 
 
 def _traversal(path, direction):
@@ -847,7 +847,7 @@ def _traversal(path, direction):
     return direction, sections
 
 
-def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
+def _section_drops(section, p, T, flow, fluid, heat_transfer_coefficient, ambient_temperature):
     """Return friction and gravity drops [Pa] and the temperature change [K] of one section.
 
     Two-phase reverse flow passes the liquid velocity magnitude to Beggs–Brill and reverses
@@ -893,7 +893,7 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
         friction = ops.where(us_l < 0, -friction, friction)
     delta_T = heat_transfer.pipe_temperature_change(
         T,
-        u_value,
+        heat_transfer_coefficient,
         geometry.lateral_area(section.inner_diameter, section.length),
         ops.where(stopped, 1.0, m_l),
         m_g,
@@ -971,7 +971,7 @@ def corrosion_profile(
     stream: Stream,
     fluid: Fluid,
     direction: Literal["up", "down"],
-    u_value: float,
+    heat_transfer_coefficient: float,
     ambient_temperature: float,
     chemistry: dict,
     model: Literal["NORSOK", "DLM", "DLD"] = "NORSOK",
@@ -991,7 +991,7 @@ def corrosion_profile(
         SI property model.
     direction : str
         Traversal direction, up or down [-].
-    u_value, ambient_temperature : float
+    heat_transfer_coefficient, ambient_temperature : float
         Heat transfer coefficient [W/m2/K] and ambient temperature [K].
     chemistry : dict
         Keyword arguments for co2_corrosion_rate in its documented SI units.
@@ -1010,7 +1010,9 @@ def corrosion_profile(
     M-506; de Waard and Lotz); see pipe_path_profile and corrosion.co2_corrosion_rate. The
     loop over sections reads the plain path geometry.
     """
-    result = pipe_path_profile(path, stream, fluid, direction, u_value, ambient_temperature)
+    result = pipe_path_profile(
+        path, stream, fluid, direction, heat_transfer_coefficient, ambient_temperature
+    )
     _, sections = _traversal(path, direction)
     rates = []
     for section, p, T in zip(sections, result.section_pressure, result.section_temperature):

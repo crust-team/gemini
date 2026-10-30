@@ -45,7 +45,7 @@ class Boiler(Module):
         self.duty = Output(Duty)
         self.fuel_or_power = Output(Power)
         self.outlet_T = Output(Temperature)
-        self.capped = Output(bool)
+        self.is_capped = Output(bool)
         self.electricity = Output(Electricity)
         self.fuel = Output(Fuel)
         self.heat_loss = Output(HeatLoss)
@@ -84,7 +84,7 @@ class Boiler(Module):
         self.duty = ops.minimum(requested, self.capacity)
         self.fuel_or_power = energy.input_power(self.duty, self.efficiency)
         self.outlet_T = outlet.T
-        self.capped = requested > self.capacity
+        self.is_capped = requested > self.capacity
         self.electricity = self.fuel_or_power if self.fuel_type == "electric" else 0
         self.fuel = self.fuel_or_power if self.fuel_type == "gas" else 0
         self.heat_loss = self.fuel_or_power - self.duty

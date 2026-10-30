@@ -75,7 +75,7 @@ class ThermalStorage(Module):
         # Parameters
         self.service = Parameter(Literal["hot", "chilled"])
         self.volume = Parameter(Volume, gt=0)
-        self.heat_loss_coefficient = Parameter(ThermalConductance)
+        self.heat_loss_conductance = Parameter(ThermalConductance)
         self.reference_temperature = Parameter(Temperature)
         self.charge_effectiveness = Parameter(Fraction, default=1)
         self.discharge_effectiveness = Parameter(Fraction, default=1)
@@ -120,7 +120,7 @@ class ThermalStorage(Module):
         charge = self._circuit_heat(inlets.charge_in, self.charge_effectiveness)
         discharge = self._circuit_heat(inlets.discharge_in, self.discharge_effectiveness)
         ambient = heat_transfer.heat_rate(
-            self.heat_loss_coefficient, self.temperature - self.ambient_temperature
+            self.heat_loss_conductance, self.temperature - self.ambient_temperature
         )
         reports = storage.tank_service_report(
             self.service == "hot",
@@ -145,7 +145,7 @@ class ThermalStorage(Module):
             charge_in.T,
             self._conductance(discharge_in, self.discharge_effectiveness),
             discharge_in.T,
-            self.heat_loss_coefficient,
+            self.heat_loss_conductance,
             self.ambient_temperature,
         )
         return {"temperature": relaxed}

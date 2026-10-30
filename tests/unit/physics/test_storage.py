@@ -11,8 +11,8 @@ ICE = dict(
     water_mass=1000.0,
     latent_heat=storage.DEFAULT_LATENT_HEAT,
     freezing_temperature=273.15,
-    water_heat_capacity=storage.DEFAULT_WATER_HEAT_CAPACITY,
-    ice_heat_capacity=storage.DEFAULT_ICE_HEAT_CAPACITY,
+    water_specific_heat=storage.DEFAULT_WATER_HEAT_CAPACITY,
+    ice_specific_heat=storage.DEFAULT_ICE_HEAT_CAPACITY,
 )
 
 

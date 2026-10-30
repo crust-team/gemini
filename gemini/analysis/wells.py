@@ -244,7 +244,7 @@ def _head_curve(module, frequency, n_points=50):
     scale = frequency / constants.ESP_REFERENCE_FREQUENCY
     return [
         (float(flow), module.head_function(flow / scale, frequency))
-        for flow in np.linspace(0, 2 * module.max_flow * scale, n_points)
+        for flow in np.linspace(0, 2 * module.maximum_flow * scale, n_points)
     ]
 
 
@@ -317,7 +317,7 @@ def calibrate_pump(plant, pump, measured):
     -------
     dict
         Plain JSON ``{pump, params, rms_before, rms_after}``, ``params`` ready for
-        ``plant.set_params(pump, params)`` (``head_coeff`` and ``power_coeff``).
+        ``plant.set_params(pump, params)`` (``head_coefficients`` and ``power_coefficients``).
 
     Raises
     ------

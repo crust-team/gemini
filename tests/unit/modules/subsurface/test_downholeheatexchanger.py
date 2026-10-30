@@ -19,11 +19,11 @@ CP = 4217.4
 def exchanger():
     """Return a 2.5 km exchanger after one year of operation."""
     return DownholeHeatExchanger().update_params(
-        depth="2500 m",
+        borehole_depth="2500 m",
         surface_temperature="10 degC",
         geothermal_gradient="30 K/km",
-        rock_conductivity=2.5,
-        rock_diffusivity=1e-6,
+        ground_conductivity=2.5,
+        ground_diffusivity=1e-6,
         borehole_radius=0.1,
         borehole_resistance=0.05,
         operating_time=3.15e7,

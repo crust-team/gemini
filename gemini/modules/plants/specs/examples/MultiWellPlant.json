@@ -14,7 +14,7 @@
                 "pressure": 22000000.0,
                 "temperature": 353.15,
                 "permeability": 9.869233e-12,
-                "thickness": 45.0,
+                "aquifer_thickness": 45.0,
                 "drainage_radius": 1000.0,
                 "top_depth": 1800.0,
                 "productivity_index": 5.833333333333333e-08,
@@ -104,8 +104,8 @@
             "esp": {
               "type": "ESP",
               "params": {
-                "no_stages": 15,
-                "head_coeff": [
+                "stage_count": 15,
+                "head_coefficients": [
                   125.518426,
                   -0.0020852856,
                   2.28955651e-07,
@@ -113,7 +113,7 @@
                   2.37859645e-16,
                   -1.18258356e-21
                 ],
-                "power_coeff": [
+                "power_coefficients": [
                   0.0,
                   0.0,
                   0.0,
@@ -123,9 +123,9 @@
                 ],
                 "pump_type": "DEFAULT-PUMP",
                 "setting_depth": 600.0,
-                "min_flow": 0.02277777777777778,
-                "max_flow": 0.049444444444444444,
-                "bep_flow": 0.03610555555555555,
+                "minimum_flow": 0.02277777777777778,
+                "maximum_flow": 0.049444444444444444,
+                "best_efficiency_flow": 0.03610555555555555,
                 "tubing": 0.1778
               }
             },
@@ -218,7 +218,7 @@
                 "pressure": 22000000.0,
                 "temperature": 353.15,
                 "permeability": 9.869233e-12,
-                "thickness": 45.0,
+                "aquifer_thickness": 45.0,
                 "drainage_radius": 1000.0,
                 "top_depth": 1800.0,
                 "productivity_index": 5.833333333333333e-08,
@@ -308,8 +308,8 @@
             "esp": {
               "type": "ESP",
               "params": {
-                "no_stages": 15,
-                "head_coeff": [
+                "stage_count": 15,
+                "head_coefficients": [
                   125.518426,
                   -0.0020852856,
                   2.28955651e-07,
@@ -317,7 +317,7 @@
                   2.37859645e-16,
                   -1.18258356e-21
                 ],
-                "power_coeff": [
+                "power_coefficients": [
                   0.0,
                   0.0,
                   0.0,
@@ -327,9 +327,9 @@
                 ],
                 "pump_type": "DEFAULT-PUMP",
                 "setting_depth": 600.0,
-                "min_flow": 0.02277777777777778,
-                "max_flow": 0.049444444444444444,
-                "bep_flow": 0.03610555555555555,
+                "minimum_flow": 0.02277777777777778,
+                "maximum_flow": 0.049444444444444444,
+                "best_efficiency_flow": 0.03610555555555555,
                 "tubing": 0.1778
               }
             },
@@ -468,7 +468,7 @@
                 "pressure": 22000000.0,
                 "temperature": 353.15,
                 "permeability": 9.869233e-12,
-                "thickness": 45.0,
+                "aquifer_thickness": 45.0,
                 "drainage_radius": 0.0,
                 "top_depth": 0.0,
                 "injectivity_index": 5.5555555555555555e-08,

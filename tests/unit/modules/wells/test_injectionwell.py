@@ -21,7 +21,7 @@ def test_injection_flow_sign_and_pressure():
     )
     result = c(wellhead=Stream(m_dot=40, T=300, p=5e6))
     out, streams = result.outputs, result.outlets
-    assert out.dp_friction < 0 and out.dp_gravity > 0
+    assert out.friction_pressure_drop < 0 and out.gravity_pressure_drop > 0
     assert streams["bottom"].m_dot == 40
     assert out.bottomhole_pressure > 5e6
 
@@ -61,8 +61,8 @@ def test_injection_traversal_matches_on_arrays():
         return dict(
             p=bottom.p,
             T=bottom.T,
-            dp_friction=result.dp_friction,
-            dp_gravity=result.dp_gravity,
+            friction_pressure_drop=result.friction_pressure_drop,
+            gravity_pressure_drop=result.gravity_pressure_drop,
             first_pressure=result.section_pressure[0],
         )
 

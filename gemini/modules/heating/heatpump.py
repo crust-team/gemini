@@ -34,13 +34,13 @@ class HeatPump(Module):
     cooling-mode heat pump is an electric chiller. The useful duty is
     ``min(requested, capacity)``; below ``minimum_part_load * capacity`` the machine is off.
 
-    COP = carnot_efficiency * T_sink_out / max(T_sink_out - T_source_out, minimum_temperature_lift)
-    when heating and carnot_efficiency * T_source_out / max(...) when cooling, from the outlet
+    COP = carnot_fraction * T_sink_out / max(T_sink_out - T_source_out, minimum_temperature_lift)
+    when heating and carnot_fraction * T_source_out / max(...) when cooling, from the outlet
     temperatures of both circuits. Because one outlet temperature depends on the COP, the
     balance Q_sink = Q_source + electricity is solved in closed form (it is linear in the
     unknown outlet temperature). The model is first-law closed.
 
-    With ``cop_model="lorenz"`` (heating only) the COP is lorenz_efficiency * T_h /
+    With ``cop_model="lorenz"`` (heating only) the COP is lorenz_fraction * T_h /
     max(T_h - T_s, minimum_temperature_lift), with T_h and T_s the log-mean temperatures of the
     sink and source glides (``refrigeration.lorenz_cop_heating``). The source outlet then enters
     the COP through a logarithm, so the balance is solved by ``brentq`` instead of in closed
@@ -74,12 +74,8 @@ class HeatPump(Module):
         self.mode = Parameter(Literal["heating", "cooling"])
         self.capacity = Parameter(Power, gt=0)
         self.cop_model = Parameter(Literal["carnot", "lorenz"], default="carnot")
-        self.carnot_efficiency = Parameter(
-            Efficiency, default=refrigeration.DEFAULT_CARNOT_FRACTION
-        )
-        self.lorenz_efficiency = Parameter(
-            Efficiency, default=refrigeration.DEFAULT_LORENZ_FRACTION
-        )
+        self.carnot_fraction = Parameter(Efficiency, default=refrigeration.DEFAULT_CARNOT_FRACTION)
+        self.lorenz_fraction = Parameter(Efficiency, default=refrigeration.DEFAULT_LORENZ_FRACTION)
         self.minimum_temperature_lift = Parameter(
             TemperatureDifference, default=refrigeration.DEFAULT_MINIMUM_LIFT, gt=0
         )
@@ -270,8 +266,8 @@ class HeatPump(Module):
     def _efficiency(self):
         """Return the Carnot or Lorenz fraction of the COP model [-]."""
         if self.cop_model == "lorenz":
-            return self.lorenz_efficiency
-        return self.carnot_efficiency
+            return self.lorenz_fraction
+        return self.carnot_fraction
 
     def _cop_function(self):
         """Return the COP function of the mode and COP model, which all take the same arguments."""
@@ -306,7 +302,7 @@ class HeatPump(Module):
             inlet_T,
             heat_transfer.temperature_change(duty, rate),
             sink_T,
-            self.carnot_efficiency,
+            self.carnot_fraction,
             self.minimum_temperature_lift,
         )
         ops.check(
@@ -316,7 +312,7 @@ class HeatPump(Module):
             "above 1 at sink outlet {sink_T} K",
             path=self.path,
             inlet_T=inlet_T,
-            minimum=refrigeration.heating_cop_minimum_source(sink_T, self.carnot_efficiency),
+            minimum=refrigeration.heating_cop_minimum_source(sink_T, self.carnot_fraction),
             sink_T=sink_T,
         )
         return outlet_T
@@ -335,7 +331,7 @@ class HeatPump(Module):
             sink_in.T,
             sink_T,
             duty,
-            self.lorenz_efficiency,
+            self.lorenz_fraction,
             self.minimum_temperature_lift,
         )
         lower = source_in.T - heat_transfer.temperature_change(duty, rate)
@@ -386,7 +382,7 @@ class HeatPump(Module):
             inlet_T,
             heat_transfer.temperature_change(duty, rate),
             source_T,
-            self.carnot_efficiency,
+            self.carnot_fraction,
             self.minimum_temperature_lift,
         )
         ops.check(
@@ -396,7 +392,7 @@ class HeatPump(Module):
             "the cooling duty {duty} W",
             path=self.path,
             rate=rate,
-            minimum=refrigeration.cooling_minimum_sink_rate(duty, self.carnot_efficiency, source_T),
+            minimum=refrigeration.cooling_minimum_sink_rate(duty, self.carnot_fraction, source_T),
             duty=duty,
         )
         return outlet_T

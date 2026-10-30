@@ -26,11 +26,13 @@ class Filter(Module):
         super().__init__()
 
         # Parameters
-        self.dp_nominal = Parameter(
+        self.nominal_pressure_drop = Parameter(
             PressureDifference, default=separation.FILTER_NOMINAL_DROP, ge=0
         )
-        self.m_dot_nominal = Parameter(MassFlow, default=separation.FILTER_NOMINAL_MASS_FLOW, gt=0)
-        self.clogging_dp = Parameter(
+        self.nominal_mass_flow = Parameter(
+            MassFlow, default=separation.FILTER_NOMINAL_MASS_FLOW, gt=0
+        )
+        self.clogging_pressure_drop = Parameter(
             PressureDifference, default=units.bar_to_pa(separation.FILTER_CLOGGING_BAR), gt=0
         )
 
@@ -61,8 +63,8 @@ class Filter(Module):
         if "pressure_drop" not in measured:
             return None
         dp = measured["pressure_drop"]
-        ratio = diagnostics.performance_ratio(ops.maximum(0, dp), self.clogging_dp)
-        alarm = dp > self.clogging_dp
+        ratio = diagnostics.performance_ratio(ops.maximum(0, dp), self.clogging_pressure_drop)
+        alarm = dp > self.clogging_pressure_drop
         return Health(
             score=diagnostics.remaining_margin(ratio),
             alarm=alarm,
@@ -74,4 +76,6 @@ class Filter(Module):
 
     def _pressure_drop(self, inlet):
         """Return the clean-filter loss [Pa], quadratic in mass flow."""
-        return hydraulics.quadratic_pressure_drop(self.dp_nominal, inlet.m_dot, self.m_dot_nominal)
+        return hydraulics.quadratic_pressure_drop(
+            self.nominal_pressure_drop, inlet.m_dot, self.nominal_mass_flow
+        )

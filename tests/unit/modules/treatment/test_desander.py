@@ -13,7 +13,9 @@ INLET = Stream(m_dot=20, T=350, p=1e6)
 
 def desander():
     """Return a desander rated 1 bar at 40 kg/s that removes 90 % of the sand."""
-    return Desander().update_params(separation_efficiency=0.9, dp_nominal=1e5, m_dot_nominal=40)
+    return Desander().update_params(
+        separation_efficiency=0.9, nominal_pressure_drop=1e5, nominal_mass_flow=40
+    )
 
 
 def test_hand_computed_removal_and_loss():

@@ -26,7 +26,7 @@ class PIDController(Module):
     ``Ti`` and the derivative time ``Td`` the command of step k is the ideal (ISA) form,
     discretised as in Astrom and Hagglund 2006, *Advanced PID Control*, chapter 3:
 
-        u_k = clamp(K * e_k + I_k + D_k, output_min, output_max)
+        u_k = clamp(K * e_k + I_k + D_k, minimum_output, maximum_output)
         D_k = K * Td * (e_k - e_(k-1)) / h_(k-1)
         I_(k+1) = I_k + K * h_k / Ti * e_k
 
@@ -62,8 +62,8 @@ class PIDController(Module):
         self.proportional_gain = Parameter(Dimensionless, gt=0)
         self.integral_time = Parameter(Duration | None, default=None, gt=0)
         self.derivative_time = Parameter(Duration, default=0)
-        self.output_min = Parameter(Dimensionless)
-        self.output_max = Parameter(Dimensionless)
+        self.minimum_output = Parameter(Dimensionless)
+        self.maximum_output = Parameter(Dimensionless)
         self.direction = Parameter(Literal["direct", "reverse"])
 
         # Controls
@@ -90,7 +90,7 @@ class PIDController(Module):
     def _compute_outputs(self, inlets, outlets):
         unclamped = self._unclamped_command()
         self.error = self._error()
-        self.command = ops.minimum(self.output_max, ops.maximum(self.output_min, unclamped))
+        self.command = ops.minimum(self.maximum_output, ops.maximum(self.minimum_output, unclamped))
         self.is_saturated = self.command != unclamped
 
     def _advance_states(self, inlets, outlets, dt):
@@ -102,7 +102,7 @@ class PIDController(Module):
                 self.proportional_gain, dt, self.integral_time, error
             )
         increment = control.anti_windup_increment(
-            increment, unclamped, self.output_min, self.output_max
+            increment, unclamped, self.minimum_output, self.maximum_output
         )
         return {"integral": self.integral + increment, "previous_error": error, "previous_step": dt}
 
@@ -113,13 +113,13 @@ class PIDController(Module):
     def _unclamped_command(self):
         """Return K * e + I + D from the start-of-step states, before the output limits."""
         ops.check(
-            self.output_min < self.output_max,
+            self.minimum_output < self.maximum_output,
             ConfigurationError,
-            "{path}: output_min = {output_min}, output_max = {output_max}; "
-            "expected output_min < output_max",
+            "{path}: minimum_output = {minimum_output}, maximum_output = {maximum_output}; "
+            "expected minimum_output < maximum_output",
             path=self.path,
-            output_min=self.output_min,
-            output_max=self.output_max,
+            minimum_output=self.minimum_output,
+            maximum_output=self.maximum_output,
         )
         error = self._error()
         derivative = 0.0

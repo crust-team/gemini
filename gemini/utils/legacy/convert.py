@@ -58,6 +58,7 @@ def _converted_bindings(design):
         for section in _SECTIONS:
             for keys, binding in _entries(section, getattr(old, section)):
                 name = join_path(path, ".".join(keys))
+                name = tables.DATA_COLUMNS.get(name, name)
                 new = Binding(column=name, unit=_si_unit(binding.unit))
                 set_nested(getattr(bound, section), keys, new)
                 sources[name] = binding
@@ -186,7 +187,8 @@ def _coefficient_value(values, original):
 def _inverse(name, params):
     """Return ``(new parameter, conversion from SI)`` of an old property, or ``None``."""
     if name == "heat_transfer_coeff":
-        return ("ua" if "ua" in params else name), None
+        key = "thermal_conductance"
+        return (key if key in params else "heat_transfer_coefficient"), None
     if name in tables.PROPERTY_INVERSE:
         return tables.PROPERTY_INVERSE[name]
     for suffix, key, conversion in tables.SUFFIX_INVERSE:
@@ -200,7 +202,7 @@ def _legacy_property(name, params, original):
     if name in tables.COEFFICIENT_PROPERTIES:
         return _coefficient_value(params[tables.COEFFICIENT_PROPERTIES[name]], original)
     if name == "esp_correction_factor":
-        slope, offset = params["correction_factor"]
+        slope, offset = params["correction_factors"]
         return _coefficient_value([slope, units.pa_to_bar(offset)], original)
     inverse = _inverse(name, params)
     if inverse is None:

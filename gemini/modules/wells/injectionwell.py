@@ -37,8 +37,8 @@ class InjectionWell(_Well):
         # Outputs
         self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
         self.bottomhole_temperature = Output(Temperature)
-        self.dp_friction = Output(PressureDifference)
-        self.dp_gravity = Output(PressureDifference)
+        self.friction_pressure_drop = Output(PressureDifference)
+        self.gravity_pressure_drop = Output(PressureDifference)
         self.section_pressure = Output(list[Pressure])
         self.section_temperature = Output(list[Temperature])
         self.heat_loss = Output(HeatLoss)
@@ -71,8 +71,8 @@ class InjectionWell(_Well):
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
         self.bottomhole_pressure = bottom.p
         self.bottomhole_temperature = bottom.T
-        self.dp_friction = result.dp_friction
-        self.dp_gravity = result.dp_gravity
+        self.friction_pressure_drop = result.friction_pressure_drop
+        self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
         capacity_rate = fluid.heat_capacity_rate(

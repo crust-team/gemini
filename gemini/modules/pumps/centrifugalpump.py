@@ -28,8 +28,8 @@ class CentrifugalPump(Module):
     """Centrifugal booster or circulation pump with affinity-law speed control.
 
     At the rated frequency the pressure rise follows the quadratic head curve
-    ``H(Q) = c0 + c1 Q + c2 Q^2`` (``head_coeff``, H in Pa and Q in m3/s). With the speed ratio
-    ``s = frequency / rated_frequency`` the affinity laws (Q ~ s, H ~ s^2) give
+    ``H(Q) = c0 + c1 Q + c2 Q^2`` (``head_coefficients``, H in Pa and Q in m3/s). With the speed
+    ratio ``s = frequency / rated_frequency`` the affinity laws (Q ~ s, H ~ s^2) give
     ``H = c0 s^2 + c1 s Q + c2 Q^2``. The hydraulic efficiency is the parabola through the
     origin with its maximum ``best_efficiency`` at the best-efficiency flow ``s * Q_bep``:
     ``eta = eta_bep * x * (2 - x)`` with ``x = Q / (s Q_bep)``, the speed-scaled quadratic
@@ -59,7 +59,7 @@ class CentrifugalPump(Module):
         super().__init__()
 
         # Parameters
-        self.head_coeff = Parameter(
+        self.head_coefficients = Parameter(
             list[float], shape=(pumps.CENTRIFUGAL_HEAD_COEFFICIENT_COUNT,), calibratable=True
         )
         self.rated_frequency = Parameter(Frequency)
@@ -119,7 +119,7 @@ class CentrifugalPump(Module):
             flow=flow,
         )
         speed = pumps.speed_ratio(self.frequency, self.rated_frequency)
-        head = pumps.centrifugal_head(flow, speed, self.head_coeff)
+        head = pumps.centrifugal_head(flow, speed, self.head_coefficients)
         load = pumps.best_efficiency_ratio(flow, speed, self.best_efficiency_flow)
         ops.check(
             ops.logical_or(

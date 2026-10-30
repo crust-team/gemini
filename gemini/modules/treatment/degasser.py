@@ -27,11 +27,12 @@ class Degasser(Module):
     - the liquid gas mass fraction is ``(1 - eta) * x / (1 - eta * x)``, so the free gas left
       in the liquid is conserved.
 
-    Both outlets leave at the vessel pressure, ``p_out`` when set, otherwise ``dp`` below the
-    inlet pressure, and at the inlet temperature: no dissolved-gas exsolution, no latent or
-    expansion heat. ``separation_efficiency`` is a lumped vessel performance figure; residence
-    time, level and gas solubility (Henry's law) are not modelled, so dissolved CO2 stays in the
-    liquid. Reverse flow scales both outlets, because the split is linear in mass flow.
+    Both outlets leave at the vessel pressure, ``outlet_pressure`` when set, otherwise
+    ``nominal_pressure_drop`` below the inlet pressure, and at the inlet temperature: no
+    dissolved-gas exsolution, no latent or expansion heat. ``separation_efficiency`` is a lumped
+    vessel performance figure; residence time, level and gas solubility (Henry's law) are not
+    modelled, so dissolved CO2 stays in the liquid. Reverse flow scales both outlets, because the
+    split is linear in mass flow.
 
     The ``gas`` stream's ``m_dot`` is the separated gas mass flow at vessel pressure and
     temperature. Its ``fluid`` is the liquid outlet's fluid, so its liquid properties do not
@@ -53,9 +54,11 @@ class Degasser(Module):
         super().__init__()
 
         # Parameters
-        self.p_out = Parameter(Pressure | None, default=None)
-        self.dp = Parameter(PressureDifference, default=separation.DEFAULT_DEGASSER_DROP, ge=0)
-        self.heat_transfer_coeff = Parameter(float, default=0, ge=0)
+        self.outlet_pressure = Parameter(Pressure | None, default=None)
+        self.nominal_pressure_drop = Parameter(
+            PressureDifference, default=separation.DEFAULT_DEGASSER_DROP, ge=0
+        )
+        self.heat_transfer_coefficient = Parameter(float, default=0, ge=0)
         self.separation_efficiency = Parameter(Fraction, default=0, structural=True)
 
         # Inlets
@@ -74,7 +77,11 @@ class Degasser(Module):
 
         # Outlets
         inlet = inlets.inlet
-        pressure = self.p_out if self.p_out is not None else inlet.p - self.dp
+        pressure = (
+            self.outlet_pressure
+            if self.outlet_pressure is not None
+            else inlet.p - self.nominal_pressure_drop
+        )
         liquid_flow, gas_flow, remaining = separation.degasser_split(
             inlet.m_dot, inlet.fluid.gas_mass_fraction, self.separation_efficiency
         )

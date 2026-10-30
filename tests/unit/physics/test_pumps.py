@@ -52,8 +52,8 @@ def test_power_chain_and_window():
     assert energy.input_power(2500, 0.9) == pytest.approx(2500 / 0.9)
     assert pumps.speed_ratio(45, 60) == pytest.approx(0.75)
     assert pumps.line_shaft_friction_power(2.0, 100, 0.75) == pytest.approx(150)
-    assert pumps.in_operating_window(0.02, 0.01, 0.04, 0.75)
-    assert not pumps.in_operating_window(0.02, 0.04, 0.05, 0.75)
+    assert pumps.is_in_operating_window(0.02, 0.01, 0.04, 0.75)
+    assert not pumps.is_in_operating_window(0.02, 0.04, 0.05, 0.75)
 
 
 def test_efficiencies_are_zero_below_the_power_floor():
@@ -73,4 +73,6 @@ def test_new_functions_match_on_arrays():
     assert_function_matches(
         pumps.centrifugal_head, [(0.0, 0.5), (0.02, 1.0)], coefficients=[100.0, -3.0, -1.0]
     )
-    assert_function_matches(pumps.in_operating_window, [(0.02, 0.01, 0.04, 0.75), (0.5, 0, 1, 0.1)])
+    assert_function_matches(
+        pumps.is_in_operating_window, [(0.02, 0.01, 0.04, 0.75), (0.5, 0, 1, 0.1)]
+    )

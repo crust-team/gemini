@@ -20,7 +20,7 @@ DETERMINED, NONPOSITIVE_INPUT, DISAGREEING_DUTIES, NO_LMTD = 0, 1, 2, 3
 @ops.physics
 def pipe_temperature_change(
     inlet_temperature: float,
-    u_value: float,
+    heat_transfer_coefficient: float,
     area: float,
     liquid_mass_flow: float,
     gas_mass_flow: float,
@@ -34,7 +34,7 @@ def pipe_temperature_change(
     ----------
     inlet_temperature, ambient_temperature : float
         Fluid and ambient temperature [K].
-    u_value, area : float
+    heat_transfer_coefficient, area : float
         Heat transfer coefficient [W/m2/K] and pipe surface area [m2].
     liquid_mass_flow, gas_mass_flow : float
         Signed phase mass flows [kg/s] with a nonzero sum.
@@ -65,7 +65,7 @@ def pipe_temperature_change(
     gas_fraction = gas_mass_flow / total_mass_flow
     heat_capacity = liquid_fraction * liquid_heat_capacity + gas_fraction * gas_heat_capacity
     return (
-        u_value
+        heat_transfer_coefficient
         * area
         * (inlet_temperature - ambient_temperature)
         / (total_mass_flow * heat_capacity)

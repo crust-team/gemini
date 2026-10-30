@@ -113,7 +113,7 @@ def configure_doublet(doublet):
     reservoir = dict(
         temperature="80 degC",
         permeability=1e-12,
-        thickness=100,
+        aquifer_thickness=100,
         drainage_radius=0,
         wellbore_radius=0.1,
     )
@@ -123,7 +123,9 @@ def configure_doublet(doublet):
     producer = dict(pipe_path=vertical_path(2400), soil_temperature="20 degC", esp_depth=650)
     doublet.well.update_params(segment="below_esp", **producer)
     doublet.riser.update_params(segment="above_esp", **producer)
-    doublet.esp.update_params(no_stages=10, head_coeff=ESP_HEAD, power_coeff=ESP_POWER)
+    doublet.esp.update_params(
+        stage_count=10, head_coefficients=ESP_HEAD, power_coefficients=ESP_POWER
+    )
     doublet.esp.frequency = "65 Hz"
     doublet.injection_pump.update_params(efficiency=0.8)
     doublet.injector.update_params(pipe_path=vertical_path(3100), soil_temperature="20 degC")
@@ -137,11 +139,11 @@ def configure_doublet(doublet):
 def configure_surface(plant):
     """Fill the exchanger, the 50/50 secondary split, the boiler and the CHP."""
     plant.heat_exchanger.update_params(
-        ua=2.5e5,
-        dp_hot_nominal=0,
-        dp_cold_nominal=0,
-        m_dot_hot_nominal=36,
-        m_dot_cold_nominal=19.4,
+        thermal_conductance=2.5e5,
+        hot_nominal_pressure_drop=0,
+        cold_nominal_pressure_drop=0,
+        hot_nominal_mass_flow=36,
+        cold_nominal_mass_flow=19.4,
     )
     plant.splitter.split_fraction = 0.5
     plant.boiler.update_params(fuel_type="gas", capacity="3 MW", efficiency=0.8)

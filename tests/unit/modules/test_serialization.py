@@ -11,20 +11,20 @@ from gemini.modules import serialization
 
 def test_a_handwritten_root_writes_its_class_and_flat_params():
     """Leaf and composite roots use the same format 2 file."""
-    exchanger = gm.modules.HeatExchanger().update_params(dp_hot_nominal="2 bar")
+    exchanger = gm.modules.HeatExchanger().update_params(hot_nominal_pressure_drop="2 bar")
     spec = exchanger.to_dict()
     assert spec["type"] == "HeatExchanger" and spec["format"] == 2
-    assert spec["params"]["dp_hot_nominal"] == 2e5
+    assert spec["params"]["hot_nominal_pressure_drop"] == 2e5
     assert json.dumps(spec, allow_nan=False)
     assert gm.modules.HeatExchanger.from_dict(spec).to_dict() == spec
 
 
 def test_fluids_bindings_and_history_round_trip():
     """Non-default sections are written and read back."""
-    exchanger = gm.modules.HeatExchanger().update_params(ua=1.0)
+    exchanger = gm.modules.HeatExchanger().update_params(thermal_conductance=1.0)
     exchanger.fluid = gm.WATER
     exchanger.set_bindings("", {"measured": {"duty": {"column": "d", "unit": "kW"}}})
-    exchanger.set_params("", {"ua": 2.0}, valid_from="2020-01-01")
+    exchanger.set_params("", {"thermal_conductance": 2.0}, valid_from="2020-01-01")
     spec = exchanger.to_dict()
     assert spec["fluids"][""]["kind"] == "water" and "boundary" not in spec
     loaded = gm.modules.HeatExchanger.from_dict(spec)

@@ -17,7 +17,7 @@ data = gm.Dataset.from_frame(frame, time_column="time")
 fit = gm.optim.calibrate(
     plant,
     data,
-    params=[plant.get_parameter("heat_exchanger.ua")],
+    params=[plant.get_parameter("heat_exchanger.thermal_conductance")],
     end=frame.loc[7 * 96 - 1, "time"],
 )
 print(fit)

@@ -31,8 +31,10 @@ def test_met_demand_closes_the_building_loop(plants):
     assert not out.is_unmet and out.unmet_demand == pytest.approx(0, abs=1e-6)
     assert out.network_out_T == pytest.approx(348.15 - 1.5e5 / (2 * CP), rel=1e-12)
     expected_return = 348.15 - 1.5e5 / (effectiveness * 2 * CP)
-    assert out.building_return_T == pytest.approx(expected_return, abs=1e-8)
-    assert out.building_supply_T == pytest.approx(expected_return + 1.5e5 / (3 * CP), abs=1e-8)
+    assert out.building_return_temperature == pytest.approx(expected_return, abs=1e-8)
+    assert out.building_supply_temperature == pytest.approx(
+        expected_return + 1.5e5 / (3 * CP), abs=1e-8
+    )
     valve = result.children["valve"]
     assert out.valve_pressure_drop == valve.outputs.pressure_drop > 0
     assert result.outlets.network_out.p == pytest.approx(6e5 - out.valve_pressure_drop - 2e4)
@@ -47,7 +49,7 @@ def test_large_demand_is_capped_at_the_return_floor(plants):
     out = substation(network_in=NETWORK).outputs
     effectiveness = counterflow_effectiveness(2e4, 2 * CP, 3 * CP)
     available = effectiveness * 2 * CP * (348.15 - 303.15)
-    assert out.building_return_T == pytest.approx(303.15, abs=1e-8)
+    assert out.building_return_temperature == pytest.approx(303.15, abs=1e-8)
     assert out.heat_supplied == pytest.approx(available, rel=1e-9)
     assert out.is_unmet and out.unmet_demand == pytest.approx(5e5 - available, rel=1e-9)
 
@@ -59,7 +61,7 @@ def test_stopped_or_cold_network_delivers_nothing(plants):
     assert stopped.heat_supplied == 0 and stopped.unmet_demand == 1.5e5
     assert stopped.valve_pressure_drop == 0 and stopped.network_out_T == 348.15
     cold = substation(network_in=NETWORK.with_(T=300.15)).outputs
-    assert cold.heat_supplied == 0 and cold.building_return_T == 300.15
+    assert cold.heat_supplied == 0 and cold.building_return_temperature == 300.15
 
 
 def test_invalid_inputs_raise(plants):

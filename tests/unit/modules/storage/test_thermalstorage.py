@@ -32,7 +32,7 @@ DISCHARGE = Stream(m_dot=0.5, T=313.15, p=3e5)
 def _tank(service="hot", **changes):
     """Return a configured 2 m3 tank with UA = 10 W/K."""
     params = dict(
-        service=service, volume=2.0, heat_loss_coefficient=10.0, reference_temperature=313.15
+        service=service, volume=2.0, heat_loss_conductance=10.0, reference_temperature=313.15
     )
     return ThermalStorage().update_params(**(params | changes))
 
@@ -127,7 +127,7 @@ def test_stopped_circuits_leave_only_ambient_cooling():
     assert result.outputs.charge_duty == 0 and result.outputs.discharge_duty == 0
     expected = 293.15 + 60 * math.exp(-10 * 3600 / CAPACITY)
     assert state["temperature"] == pytest.approx(expected, rel=1e-14)
-    insulated = _tank(heat_loss_coefficient=0)
+    insulated = _tank(heat_loss_conductance=0)
     insulated.ambient_temperature = 293.15
     assert insulated.step({"temperature": 353.15}, 3600, stopped)[0] == {"temperature": 353.15}
 
@@ -216,7 +216,7 @@ def test_thermal_storage_matches_per_row(service):
 
 def test_thermal_storage_advance_matches_per_row(monkeypatch):
     """The exact exponential step on stacked temperatures equals one step per row."""
-    tank = _tank(heat_loss_coefficient=0.0)
+    tank = _tank(heat_loss_conductance=0.0)
     rows = _rows()
     temperatures = [343.15, 303.15, 283.15]
 

@@ -24,8 +24,8 @@ def test_the_old_example_plant_migrates_to_the_stored_spec(old):
     spec = gm.plants.migrate(old)
     assert spec == json.loads(MIGRATED.read_text())
     assert gm.plants.validate(spec) == []
-    assert spec["modules"]["doublet"]["params"]["esp.no_stages"] == 15
-    assert "ua" in spec["modules"]["heat_exchanger"]["params"]
+    assert spec["modules"]["doublet"]["params"]["esp.stage_count"] == 15
+    assert "thermal_conductance" in spec["modules"]["heat_exchanger"]["params"]
     assert "" in spec["bindings"] and "" in spec["boundary"] and "" in spec["fluids"]
 
 
@@ -41,7 +41,7 @@ def test_a_handwritten_root_becomes_flat_dotted_params(old):
     other["plant_type"] = "tests.fixtures:Booster"
     spec = gm.plants.migrate(other)
     assert spec["type"] == "Booster" and spec["modules"] == {}
-    assert spec["params"]["doublet.esp.no_stages"] == 15
+    assert spec["params"]["doublet.esp.stage_count"] == 15
 
 
 def test_a_module_the_wiring_lacks_fails_with_migration_failed(old):

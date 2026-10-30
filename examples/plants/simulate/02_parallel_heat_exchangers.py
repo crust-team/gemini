@@ -161,7 +161,7 @@ def configure_doublet(doublet):
     reservoir = dict(
         temperature="80 degC",
         permeability=1e-12,
-        thickness=100,
+        aquifer_thickness=100,
         drainage_radius=0,
         wellbore_radius=0.1,
     )
@@ -174,8 +174,8 @@ def configure_doublet(doublet):
     doublet.well.update_params(segment="below_esp", **producer)
     doublet.riser.update_params(segment="above_esp", **producer)
     doublet.esp.update_params(
-        no_stages=18,
-        head_coeff=[
+        stage_count=18,
+        head_coefficients=[
             125.518426,
             -0.0020852856,
             2.28955651e-07,
@@ -183,7 +183,7 @@ def configure_doublet(doublet):
             2.37859645e-16,
             -1.18258356e-21,
         ],
-        power_coeff=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+        power_coefficients=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
     )
     doublet.esp.frequency = "60 Hz"
     doublet.injection_pump.update_params(efficiency=0.8)
@@ -213,11 +213,11 @@ def configure_exchangers(plant):
     """Fill the exchangers (no pressure loss, as upstream) and the 50/30/20 split fractions."""
     for exchanger, ua, share in zip(plant.heat_exchangers, CONDUCTANCES, SHARES):
         exchanger.update_params(
-            ua=ua,
-            dp_hot_nominal=0,
-            dp_cold_nominal=0,
-            m_dot_hot_nominal=35 * share,
-            m_dot_cold_nominal=35 * share,
+            thermal_conductance=ua,
+            hot_nominal_pressure_drop=0,
+            cold_nominal_pressure_drop=0,
+            hot_nominal_mass_flow=35 * share,
+            cold_nominal_mass_flow=35 * share,
         )
     remaining = 1.0
     for index, share in enumerate(SHARES[:-1]):

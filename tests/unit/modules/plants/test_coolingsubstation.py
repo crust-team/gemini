@@ -31,9 +31,11 @@ def test_met_loads_close_the_building_loop(plants):
     assert not out.is_unmet
     assert out.network_out_T == pytest.approx(279.15 + 7e4 / (3 * CP), rel=1e-12)
     expected_return = 279.15 + 7e4 / (effectiveness * 3 * CP)
-    assert out.building_return_T == pytest.approx(expected_return, abs=1e-8)
-    assert out.building_supply_T == pytest.approx(expected_return - 7e4 / (4 * CP), abs=1e-8)
-    assert out.building_supply_T < out.dew_point - 1.0
+    assert out.building_return_temperature == pytest.approx(expected_return, abs=1e-8)
+    assert out.building_supply_temperature == pytest.approx(
+        expected_return - 7e4 / (4 * CP), abs=1e-8
+    )
+    assert out.building_supply_temperature < out.dew_point - 1.0
     assert energy_balance(substation, result)["relative_residual"] < 1e-12
     assert mass_balance(substation, result)["residual"] == 0
 
@@ -42,7 +44,7 @@ def test_warm_network_cannot_dehumidify(plants):
     """A supply too warm for the dew-point margin leaves the latent load unmet."""
     substation = plants["cooling_substation"](CoolingSubstation())
     out = substation(network_in=NETWORK.with_(T=284.15)).outputs
-    assert out.building_supply_T > out.dew_point - 1.0
+    assert out.building_supply_temperature > out.dew_point - 1.0
     assert out.unmet_latent == 1e4 and out.is_unmet
     assert out.heat_absorbed == pytest.approx(6e4, rel=1e-12)
     assert out.unmet_sensible == pytest.approx(0, abs=1e-6)
@@ -54,7 +56,7 @@ def test_large_load_is_capped_at_the_return_limit(plants):
     out = substation(network_in=NETWORK).outputs
     effectiveness = counterflow_effectiveness(3e4, 3 * CP, 4 * CP)
     available = effectiveness * 3 * CP * (291.15 - 279.15)
-    assert out.building_return_T == pytest.approx(291.15, abs=1e-8)
+    assert out.building_return_temperature == pytest.approx(291.15, abs=1e-8)
     assert out.heat_absorbed == pytest.approx(available, rel=1e-9)
     assert out.unmet_sensible == pytest.approx(5e5 - available, rel=1e-9)
     assert out.unmet_latent == 1e4

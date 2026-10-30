@@ -697,7 +697,7 @@ class Module:
     def update_params(self, **changes):
         """Set validated parameters, addressed by local or dotted path, as explicit overrides.
 
-        Returns the module, so ``ESP().update_params(no_stages=12)`` builds a configured module.
+        Returns the module, so ``ESP().update_params(stage_count=12)`` builds a configured module.
         """
         for name, value in changes.items():
             self.get_parameter(name).set(value)

@@ -7,9 +7,9 @@ import pytest
 import gemini as gm
 
 ESP_PARAMETERS = {
-    "no_stages": 12,
-    "head_coeff": [1.2e-10, -2.5e-6, 4e-3, 0.2, 5.0, 100.0],
-    "power_coeff": [1.0e-10, -1.0e-6, 3.0e-3, 0.3, 4.0, 200.0],
+    "stage_count": 12,
+    "head_coefficients": [1.2e-10, -2.5e-6, 4e-3, 0.2, 5.0, 100.0],
+    "power_coefficients": [1.0e-10, -1.0e-6, 3.0e-3, 0.3, 4.0, 200.0],
 }
 SUCTION = {"suction": {"flow": "150 m3/h", "T": "80 degC", "p": "20 bar"}}
 
@@ -59,7 +59,7 @@ def test_evaluate_accepts_si_numbers_as_well_as_unit_strings():
         ({"module": "ESp"}, "unknown_name"),
         ({"module": 3}, "invalid_value"),
         ({"parameters": {}}, "missing_value"),
-        ({"parameters": {"no_stages": "many"}}, "invalid_value"),
+        ({"parameters": {"stage_count": "many"}}, "invalid_value"),
         ({"inlets": {}}, "invalid_call"),
         ({"controls": {"frequency": "50 bar"}}, "invalid_unit"),
         ({"inlets": {"suction": {"flow": "1 m3/h", "T": "-5 K", "p": "1 bar"}}}, "invalid_call"),

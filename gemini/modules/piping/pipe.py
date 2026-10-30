@@ -25,7 +25,7 @@ from gemini.types import (
 class Pipe(Module):
     """Surface pipeline carrying a single-phase liquid, with friction, elevation and heat loss.
 
-    Pressure: ``p_out = p_in - dp_friction - rho g dz`` with ``dz`` the signed
+    Pressure: ``p_out = p_in - friction_pressure_drop - rho g dz`` with ``dz`` the signed
     ``elevation_change`` from inlet to outlet (positive when the outlet is higher). The
     friction drop is Darcy–Weisbach ``f L/D rho v^2/2``: laminar ``f = 64/Re`` (Hagen–Poiseuille)
     up to Re = 2300, Swamee and Jain (1976, Explicit equations for pipe-flow problems, J. Hydraul.
@@ -34,21 +34,21 @@ class Pipe(Module):
     transition regime; all of it in ``hydraulics.pipe_friction_drop``.
 
     Heat: the fluid exchanges heat with surroundings at the fixed ``ambient_temperature``
-    through the overall coefficient ``u_value`` referred to the inner wall area ``pi d L`` (the
-    convention of the well path model). With constant ``u_value`` and ``cp`` the outlet
-    temperature is the exact exponential profile ``T_out = T_amb + (T_in - T_amb) exp(-NTU)``,
-    ``NTU = U pi d L / (m_dot cp)`` (Incropera et al. 2007, Fundamentals of Heat and Mass
-    Transfer, 6th ed., Section 8.3, constant external temperature), computed as an exchanger
-    with an infinite-capacity ambient (``C_r = 0``). The legacy explicit increment
+    through the overall coefficient ``heat_transfer_coefficient`` referred to the inner wall area
+    ``pi d L`` (the convention of the well path model). With constant ``heat_transfer_coefficient``
+    and ``cp`` the outlet temperature is the exact exponential profile ``T_out = T_amb + (T_in -
+    T_amb) exp(-NTU)``, ``NTU = U pi d L / (m_dot cp)`` (Incropera et al. 2007, Fundamentals of
+    Heat and Mass Transfer, 6th ed., Section 8.3, constant external temperature), computed as an
+    exchanger with an infinite-capacity ambient (``C_r = 0``). The legacy explicit increment
     ``heat_transfer.pipe_temperature_change`` is its first-order expansion and is not reused
     because it overshoots past ambient when ``NTU > 1``. The heat exchanged leaves as
     ``heat_loss`` (fluid warmer than ambient) or enters as ``heat_absorbed`` (fluid colder), so
     the stream energy audit closes exactly.
 
     Simplifications: steady state (no fluid or wall heat capacity, no transit time), constant
-    fluid properties, uniform ``u_value`` and ambient along the pipe, no fittings (add their
-    equivalent length to ``length``), kinetic and pressure energy outside the thermal model.
-    Validity: single-phase liquid (free gas raises ``PhysicsRangeError``), forward flow
+    fluid properties, uniform ``heat_transfer_coefficient`` and ambient along the pipe, no fittings
+    (add their equivalent length to ``length``), kinetic and pressure energy outside the thermal
+    model. Validity: single-phase liquid (free gas raises ``PhysicsRangeError``), forward flow
     (reverse flow raises ``PhysicsRangeError``; wire the pipe in the flow direction), relative
     roughness 1e-6 to 1e-2 and Re up to 1e8 (Swamee–Jain range), ``|elevation_change| <=
     length``. Zero flow has no friction or heat exchange and keeps the static head; the stopped
@@ -64,7 +64,7 @@ class Pipe(Module):
         self.inner_diameter = Parameter(Length, gt=0)
         self.roughness = Parameter(Length, default=hydraulics.COMMERCIAL_STEEL_ROUGHNESS)
         self.elevation_change = Parameter(Elevation)
-        self.u_value = Parameter(HeatTransferCoefficient)
+        self.heat_transfer_coefficient = Parameter(HeatTransferCoefficient)
 
         # Inlets
         self.inlet = Inlet(Stream)
@@ -157,7 +157,9 @@ class Pipe(Module):
 
     def _outlet_temperature(self, inlet):
         """Return the outlet temperature [K] of the exponential ambient-exchange profile."""
-        conductance = hydraulics.pipe_conductance(self.u_value, self.inner_diameter, self.length)
+        conductance = hydraulics.pipe_conductance(
+            self.heat_transfer_coefficient, self.inner_diameter, self.length
+        )
         effectiveness = heat_transfer.ambient_effectiveness(conductance, inlet.heat_capacity_rate())
         return heat_transfer.effectiveness_outlet_temperature(
             inlet.T, effectiveness, self.ambient_temperature

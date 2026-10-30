@@ -192,7 +192,7 @@ reason it is needed:
   current control and boundary values (running call, then persisted value, then default),
   outputs recorded in the running call, state values at the start of the running step (the
   initial states outside a step), and otherwise the port and output declarations. This lets
-  `forward` and `_compute_outputs` read `self.ua` or `self.frequency` as plain values.
+  `forward` and `_compute_outputs` read `self.thermal_conductance` or `self.frequency` as plain values.
 - The values of one call live in one `_Call` record held in the `_current_call` context variable
   of `gemini/modules/module.py`. Modules keep no per-call state on `self`, so nested,
   re-entrant and concurrent calls stay separate and composite formulas can read the results of

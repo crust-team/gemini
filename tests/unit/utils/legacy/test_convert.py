@@ -38,14 +38,14 @@ def test_to_plant_uses_the_in_memory_project(project):
     edited = project.model_copy(deep=True)
     edited.params[_node_id(edited, "heat_exchanger")]["heat_transfer_coeff"].values = [1.0]
     plant = legacy.to_plant(edited, gm.plants.get("DoubletHeatPlant"))
-    assert plant.heat_exchanger.ua == 1.0
-    assert plant.heat_exchanger._param_history[-1].params["ua"] == 1.0
+    assert plant.heat_exchanger.thermal_conductance == 1.0
+    assert plant.heat_exchanger._param_history[-1].params["thermal_conductance"] == 1.0
 
 
 def test_to_plant_fills_parameters_bindings_and_boundary(converted):
     """The converted plant carries SI values, dated histories, bindings and assumptions."""
     assert converted.doublet.reservoir.pressure == 220e5
-    assert converted.doublet.esp.min_flow == pytest.approx(82 / 3600)
+    assert converted.doublet.esp.minimum_flow == pytest.approx(82 / 3600)
     assert converted.doublet.well.segment == "below_esp"
     assert converted.doublet.riser.segment == "above_esp"
     assert converted.injection_pump.efficiency == 0.8
@@ -136,9 +136,9 @@ def test_check_wiring_reports_mismatches_and_raises_on_errors(project, converted
 def test_round_trip_through_from_plant_converts_the_edited_project(project):
     """A project exported by from_plant converts from memory, not from its source folder."""
     plant = legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
-    plant.heat_exchanger.update_params(ua=123456.0)
+    plant.heat_exchanger.update_params(thermal_conductance=123456.0)
     reconverted = legacy.to_plant(
         legacy.from_plant(plant, project), gm.plants.get("DoubletHeatPlant")
     )
-    assert reconverted.heat_exchanger.ua == 123456.0
+    assert reconverted.heat_exchanger.thermal_conductance == 123456.0
     assert reconverted.state_dict() == plant.state_dict()

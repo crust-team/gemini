@@ -76,7 +76,7 @@ assert plant.to_spec() == spec
 | `type`, `params` | no | root of a handwritten module: its registry name and flat dotted values |
 
 - `type` is a registry name. It may name a registered plant, whose parameters are then dotted
-  (`"esp.no_stages"`), so templates can contain sub-plants.
+  (`"esp.stage_count"`), so templates can contain sub-plants.
 - `ModuleDict` and `ModuleList` are groups: they hold children and have no wiring of their own.
   Connections reach through a group (`filters.hot.outlet`) but never into a plant child:
   `doublet.supply_out` is right, `doublet.esp.discharge` is an error.
@@ -146,7 +146,7 @@ A template file has `title`, `description`, `purpose`, `parameters`, `optional`,
 ## Parameters by date and bindings
 
 ```python
-plant.set_params("doublet.esp", {"no_stages": 14}, valid_from="2025-01-01")
+plant.set_params("doublet.esp", {"stage_count": 14}, valid_from="2025-01-01")
 plant.params_at("doublet.esp", time="2024-06-01")
 plant.param_history("doublet.esp")
 plant.bindable("doublet.esp")

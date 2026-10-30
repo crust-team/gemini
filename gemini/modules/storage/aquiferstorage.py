@@ -123,7 +123,7 @@ class AquiferStorage(Module):
 
         # Outputs
         self.stored_energy = Output(Energy)
-        self.production_T = Output(Temperature)
+        self.production_out_T = Output(Temperature)
         self.recovery_efficiency = Output(Dimensionless | None)
         self.warm_temperature = Output(Temperature)
         self.cold_temperature = Output(Temperature)
@@ -170,7 +170,7 @@ class AquiferStorage(Module):
             self.cold_volume,
             self.cold_temperature_change,
         )
-        self.production_T = outlets.production_out.T
+        self.production_out_T = outlets.production_out.T
         self.recovery_efficiency = ground.thermal_recovery(self.recovered_heat, self.charged_heat)
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change

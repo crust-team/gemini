@@ -487,7 +487,7 @@ def store_conductance(
     volume: float,
     conductivity: float,
     porosity: float,
-    water_heat_capacity: float,
+    water_volumetric_heat_capacity: float,
     rock_heat_capacity: float,
     height: float,
     period: float,
@@ -502,7 +502,7 @@ def store_conductance(
         Positive thermal conductivity of the aquifer and its surroundings [W/m/K].
     porosity : float
         Porosity in (0, 1) [-].
-    water_heat_capacity, rock_heat_capacity : float
+    water_volumetric_heat_capacity, rock_heat_capacity : float
         Volumetric heat capacities of the water and of the rock matrix [J/m3/K].
     height, period : float
         Positive aquifer thickness [m] and storage period [s].
@@ -520,11 +520,13 @@ def store_conductance(
     scaling of ATES losses; Carslaw and Jaeger (1959) for the conduction (see
     ``cylinder_store_conductance``).
     """
-    aquifer = aquifer_volumetric_heat_capacity(porosity, water_heat_capacity, rock_heat_capacity)
+    aquifer = aquifer_volumetric_heat_capacity(
+        porosity, water_volumetric_heat_capacity, rock_heat_capacity
+    )
     return cylinder_store_conductance(
         conductivity,
         conductivity / aquifer,
-        volume * water_heat_capacity / aquifer,
+        volume * water_volumetric_heat_capacity / aquifer,
         height,
         period,
     )
@@ -563,7 +565,11 @@ def mix_store(
 
 @ops.physics
 def store_relaxation(
-    change: float, volume: float, conductance: float, duration: float, water_heat_capacity: float
+    change: float,
+    volume: float,
+    conductance: float,
+    duration: float,
+    water_volumetric_heat_capacity: float,
 ) -> float:
     """Return a store's temperature change after conduction towards the aquifer temperature.
 
@@ -577,7 +583,7 @@ def store_relaxation(
         Conduction conductance of the store [W/K], nonnegative (``store_conductance``).
     duration : float
         Step length [s], nonnegative.
-    water_heat_capacity : float
+    water_volumetric_heat_capacity : float
         Volumetric heat capacity (rho c)_w of the water [J/m3/K].
 
     Returns
@@ -594,18 +600,20 @@ def store_relaxation(
     factor = ops.where(
         volume == 0,
         0.0,
-        heat_transfer.relaxation_factor(conductance, duration, water_heat_capacity * volume),
+        heat_transfer.relaxation_factor(
+            conductance, duration, water_volumetric_heat_capacity * volume
+        ),
     )
     return heat_transfer.exponential_relaxation(change, 0.0, factor)
 
 
 @ops.physics
-def stored_heat(water_heat_capacity: float, volume: float, change: float) -> float:
+def stored_heat(water_volumetric_heat_capacity: float, volume: float, change: float) -> float:
     """Return the excess heat of a water volume at a temperature change.
 
     Parameters
     ----------
-    water_heat_capacity : float
+    water_volumetric_heat_capacity : float
         Volumetric heat capacity (rho c)_w [J/m3/K].
     volume : float
         Water volume [m3].
@@ -621,12 +629,12 @@ def stored_heat(water_heat_capacity: float, volume: float, change: float) -> flo
     -----
     Sensible heat of a liquid at constant volumetric heat capacity.
     """
-    return water_heat_capacity * volume * change
+    return water_volumetric_heat_capacity * volume * change
 
 
 @ops.physics
 def aquifer_stored_energy(
-    water_heat_capacity: float,
+    water_volumetric_heat_capacity: float,
     warm_volume: float,
     warm_change: float,
     cold_volume: float,
@@ -636,7 +644,7 @@ def aquifer_stored_energy(
 
     Parameters
     ----------
-    water_heat_capacity : float
+    water_volumetric_heat_capacity : float
         Volumetric heat capacity (rho c)_w [J/m3/K].
     warm_volume, cold_volume : float
         Water volumes of the stores [m3].
@@ -652,7 +660,7 @@ def aquifer_stored_energy(
     -----
     Sum of the sensible excess heats of the two stores at one volumetric heat capacity.
     """
-    return water_heat_capacity * (warm_volume * warm_change + cold_volume * cold_change)
+    return water_volumetric_heat_capacity * (warm_volume * warm_change + cold_volume * cold_change)
 
 
 @ops.physics

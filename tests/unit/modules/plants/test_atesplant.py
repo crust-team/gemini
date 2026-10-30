@@ -26,7 +26,7 @@ def _plant(mode="charge"):
     )
     plant.storage.mode = mode
     plant.pump.update_params(
-        head_coeff=[3e5, 0.0, -1e8],
+        head_coefficients=[3e5, 0.0, -1e8],
         rated_frequency=50,
         best_efficiency=0.7,
         best_efficiency_flow=0.03,
@@ -34,7 +34,11 @@ def _plant(mode="charge"):
     )
     plant.pump.frequency = 50
     plant.heat_exchanger.update_params(
-        ua=1e6, dp_hot_nominal=3e4, dp_cold_nominal=3e4, m_dot_hot_nominal=40, m_dot_cold_nominal=30
+        thermal_conductance=1e6,
+        hot_nominal_pressure_drop=3e4,
+        cold_nominal_pressure_drop=3e4,
+        hot_nominal_mass_flow=40,
+        cold_nominal_mass_flow=30,
     )
     plant.heat_pump.update_params(mode="heating", capacity=2e6)
     plant.heat_pump.temperature_setpoint = 313.15
@@ -56,7 +60,7 @@ def test_charge_cools_the_building_with_native_groundwater():
     out = result.outputs
     exchanger = result.children["heat_exchanger"]
     groundwater = exchanger.inlets.cold_in
-    assert out.production_T == 284.15 and groundwater.T > 284.15
+    assert out.production_out_T == 284.15 and groundwater.T > 284.15
     assert result.outlets.building_out == exchanger.outlets.hot_out
     assert result.outlets.building_out.T < SUMMER.T
     storage = result.children["storage"]
@@ -95,8 +99,8 @@ def test_discharge_feeds_the_heat_pump_from_the_warm_store():
     state, result = plant.step(state, HOUR, {"building_in": WINTER})
     out = result.outputs
     lifted = result.children["heat_pump"]
-    assert out.production_T == pytest.approx(warm, rel=1e-14)
-    assert result.children["pump"].inlets.suction.T == out.production_T
+    assert out.production_out_T == pytest.approx(warm, rel=1e-14)
+    assert result.children["pump"].inlets.suction.T == out.production_out_T
     assert result.outlets.building_out.T == pytest.approx(313.15, rel=1e-12)
     assert lifted.inlets.source_in == result.children["pump"].outlets.discharge
     assert result.children["storage"].inlets.injection_in.T == lifted.outlets.source_out.T < warm

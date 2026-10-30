@@ -110,7 +110,7 @@ as a result column; that is a change to the engine, not to this package.
 | `pump_curve(plant, pump, measured=None)` | real | `ESP.head_curve` at 60 Hz, theoretical head of measured points, `ESP.fit_head_correction` |
 | `corrosion_forecast(model, until)` | real | `co2_corrosion_rate`, `wall_loss`, `time_to_minimum_wall` |
 | `injectivity(data, well)` | `NotImplementedYet` | Hall analysis not built |
-| `calibrate_pump(plant, pump, measured)` | `NotImplementedYet` | no module applies `ESP.correction_factor`; it will run `gm.optim.calibrate` |
+| `calibrate_pump(plant, pump, measured)` | `NotImplementedYet` | no module applies `ESP.correction_factors`; it will run `gm.optim.calibrate` |
 | `calibrate_corrosion(logs)` | `NotImplementedYet` | no fit of the correlation constants to logs exists |
 | `erosion(plant, well)` | `NotImplementedYet` | a plant holds neither flow nor solids content, and the retained model has no solids fraction |
 

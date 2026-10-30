@@ -35,7 +35,9 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     engine2 = gm.Engine.load_checkpoint("runs/replay.ckpt")
     res2 = engine2.resume()
 
-    fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.ua")])
+    fit = gm.optim.calibrate(
+        plant, data, params=[plant.get_parameter("heat_exchanger.thermal_conductance")]
+    )
     print(fit)
     plant.save("runs/my_plant.json")
     assert gm.Plant.load("runs/my_plant.json").state_dict() == plant.state_dict()

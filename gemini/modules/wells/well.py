@@ -33,12 +33,12 @@ class _Well(Module):
         # Parameters
         self.pipe_path = Parameter(geometry.PipePath)
         self.friction_correlation = Parameter(Literal["darcy_weisbach"], default="darcy_weisbach")
-        self.friction_correlation_2p = Parameter(Literal["BeggsBrill"], default="BeggsBrill")
+        self.two_phase_friction_correlation = Parameter(Literal["BeggsBrill"], default="BeggsBrill")
         self.correction_factors = Parameter(
             tuple[Dimensionless, PressureDifference], default=(1, 0), calibratable=True
         )
         self.soil_temperature = Parameter(Temperature)
-        self.u_value = Parameter(
+        self.heat_transfer_coefficient = Parameter(
             HeatTransferCoefficient,
             default=hydraulics.DEFAULT_WELL_U_VALUE,
             ge=0,
@@ -57,10 +57,10 @@ class _Well(Module):
             stream,
             stream.fluid,
             direction,
-            self.u_value,
+            self.heat_transfer_coefficient,
             self.soil_temperature,
             self.friction_correlation,
-            self.friction_correlation_2p,
+            self.two_phase_friction_correlation,
         )
 
     def corrected(self, stream, result):
@@ -87,7 +87,7 @@ class _Well(Module):
             self._traversal_stream(stream),
             stream.fluid,
             self.flow_direction,
-            self.u_value,
+            self.heat_transfer_coefficient,
             self.soil_temperature,
             chemistry,
             model,

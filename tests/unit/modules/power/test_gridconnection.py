@@ -49,7 +49,7 @@ class GridPlant(Module):
         self.orc = ORC().update_params(
             minimum_brine_outlet_temperature=343.15,
             pinch=5,
-            fraction_of_carnot=0.5,
+            carnot_fraction=0.5,
             condenser_approach=15,
             parasitic_fraction=0.15,
             capacity=5e6,

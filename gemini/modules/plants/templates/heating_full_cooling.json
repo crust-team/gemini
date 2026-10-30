@@ -3,7 +3,7 @@
   "description": "Every unit but the heat pump: peak boiler, absorption, adsorption and compression chillers.",
   "purpose": "both",
   "parameters": {
-    "heat_exchanger.ua": {
+    "heat_exchanger.thermal_conductance": {
       "default": null,
       "unit": "W/K",
       "description": "Heat transfer conductance of the geothermal heat exchanger."
@@ -53,7 +53,7 @@
       "unit": "m",
       "description": "Elevation gain of the heating supply pipe from inlet to outlet."
     },
-    "heating_supply_pipe.u_value": {
+    "heating_supply_pipe.heat_transfer_coefficient": {
       "default": null,
       "unit": "W/m2/K",
       "description": "Overall heat transfer coefficient of the heating supply pipe to its surroundings."
@@ -73,7 +73,7 @@
       "unit": "m",
       "description": "Elevation gain of the heating return pipe from inlet to outlet."
     },
-    "heating_return_pipe.u_value": {
+    "heating_return_pipe.heat_transfer_coefficient": {
       "default": null,
       "unit": "W/m2/K",
       "description": "Overall heat transfer coefficient of the heating return pipe to its surroundings."
@@ -93,7 +93,7 @@
       "unit": "m",
       "description": "Elevation gain of the cooling supply pipe from inlet to outlet."
     },
-    "cooling_supply_pipe.u_value": {
+    "cooling_supply_pipe.heat_transfer_coefficient": {
       "default": null,
       "unit": "W/m2/K",
       "description": "Overall heat transfer coefficient of the cooling supply pipe to its surroundings."
@@ -113,7 +113,7 @@
       "unit": "m",
       "description": "Elevation gain of the cooling return pipe from inlet to outlet."
     },
-    "cooling_return_pipe.u_value": {
+    "cooling_return_pipe.heat_transfer_coefficient": {
       "default": null,
       "unit": "W/m2/K",
       "description": "Overall heat transfer coefficient of the cooling return pipe to its surroundings."

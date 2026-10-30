@@ -31,7 +31,7 @@ def test_filter_matches_traced():
 def test_health_matches_on_arrays():
     """Score, alarm and message agree row by row below, at and above the clogging limit."""
     module = Filter()
-    limit = module.clogging_dp
+    limit = module.clogging_pressure_drop
     measured = [
         {"pressure_drop": dp} for dp in (-100.0, 0.0, 40000.0, limit, limit + 1.0, 3 * limit)
     ]

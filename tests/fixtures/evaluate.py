@@ -10,6 +10,7 @@ import json
 import pytest
 
 from gemini.analysis import estimate_reservoir_pressure
+from gemini.modules.plants.migration import RENAMED_NAMES
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell
@@ -40,9 +41,10 @@ def golden_cases():
 def assert_values(actual, expected):
     """Recursively compare numeric leaves within 1e-9 relative, keeping strings and nulls exact."""
     if isinstance(expected, dict):
-        assert actual.keys() == expected.keys()
-        for key in expected:
-            assert_values(actual[key], expected[key])
+        current = {RENAMED_NAMES.get(key, key): value for key, value in expected.items()}
+        assert actual.keys() == current.keys()
+        for key in current:
+            assert_values(actual[key], current[key])
     elif isinstance(expected, list):
         assert len(actual) == len(expected)
         for left, right in zip(actual, expected):
@@ -56,7 +58,9 @@ def assert_values(actual, expected):
 def configured(module_class, parameters):
     """Build a standalone module and set its parameters as explicit values."""
     module = module_class()
-    module.update_params(**parameters)
+    module.update_params(
+        **{RENAMED_NAMES.get(key, key): value for key, value in parameters.items()}
+    )
     return module
 
 
@@ -102,7 +106,7 @@ def _reservoir_parameters():
         pressure=22e6,
         temperature=353.15,
         permeability=units.md_to_m2(10000),
-        thickness=45,
+        aquifer_thickness=45,
         drainage_radius=1000,
         top_depth=1800,
         wellbore_radius=0.0765,
@@ -148,9 +152,9 @@ def _reservoir_dp(inputs):
     reservoir = configured(ProductionReservoir, parameters)
     outputs = reservoir(production_rate=inputs["flow"] * inputs["density"]).outputs
     return dict(
-        Hydrostatic_dp=outputs.hydrostatic_dp,
-        skin_dp=outputs.skin_dp,
-        bottomhole_dp=outputs.flow_dp,
+        Hydrostatic_dp=outputs.hydrostatic_pressure_drop,
+        skin_pressure_drop=outputs.skin_pressure_drop,
+        bottomhole_dp=outputs.flow_pressure_drop,
         reservoir_dp=outputs.radial_bottomhole_pressure,
     )
 
@@ -201,8 +205,8 @@ def _well(is_production, parameters, inputs):
     return dict(
         pressure_output=outlet_stream.p,
         temperature_output=outlet_stream.T,
-        pressuredrop_fric_output=outputs.dp_friction,
-        pressuredrop_grav_output=outputs.dp_gravity,
+        pressuredrop_fric_output=outputs.friction_pressure_drop,
+        pressuredrop_grav_output=outputs.gravity_pressure_drop,
         section_pressure_output=outputs.section_pressure,
         section_temperature_output=outputs.section_temperature,
     )

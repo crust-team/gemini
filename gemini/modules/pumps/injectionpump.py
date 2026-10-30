@@ -24,22 +24,22 @@ from gemini.types import (
 class InjectionPump(Module):
     """Raise brine pressure with a simple hydraulic-power estimate."""
 
-    repr_fields = ("no_stages", "efficiency", "pump_type")
+    repr_fields = ("stage_count", "efficiency", "pump_type")
 
     def __init__(self):
         """Declare injection pump design data, ports and controls."""
         super().__init__()
 
         # Parameters
-        self.no_stages = Parameter(Count | None, default=None)
+        self.stage_count = Parameter(Count | None, default=None)
         self.pump_type = Parameter(str, default="unspecified")
         self.efficiency = Parameter(
             Efficiency, default=pumps.DEFAULT_INJECTION_PUMP_EFFICIENCY, calibratable=True
         )
-        self.head_coeff = Parameter(
+        self.head_coefficients = Parameter(
             list[float] | None, default=None, shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,)
         )
-        self.power_coeff = Parameter(
+        self.power_coefficients = Parameter(
             list[float] | None, default=None, shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,)
         )
 
@@ -83,8 +83,10 @@ class InjectionPump(Module):
         discharge = outlets.discharge
         flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
-        if self.head_coeff is not None and self.power_coeff is not None:
-            self.power = pumps.power(flow, self.frequency, self.no_stages, self.power_coeff)
+        if self.head_coefficients is not None and self.power_coefficients is not None:
+            self.power = pumps.power(
+                flow, self.frequency, self.stage_count, self.power_coefficients
+            )
         else:
             self.power = energy.input_power(pumps.hydraulic_power(flow, self.head), self.efficiency)
         self.discharge_pressure = discharge.p
@@ -93,7 +95,8 @@ class InjectionPump(Module):
     def _head(self, suction):
         """Return the pressure rise [Pa] from the head curve, else from the pressure setpoint.
 
-        A ``power_coeff`` curve is used for power only together with a ``head_coeff`` curve.
+        A ``power_coefficients`` curve is used for power only together with a ``head_coefficients``
+        curve.
         """
         flow = suction.volumetric_flow()
         ops.check(
@@ -103,12 +106,15 @@ class InjectionPump(Module):
             path=self.path,
             flow=flow,
         )
-        if self.head_coeff is not None:
-            if self.no_stages is None:
-                raise ConfigurationError(f"{self.path}: head_coeff curves require no_stages")
-            return pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
+        if self.head_coefficients is not None:
+            if self.stage_count is None:
+                raise ConfigurationError(
+                    f"{self.path}: head_coefficients curves require stage_count"
+                )
+            return pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         if self.pressure_setpoint is not None:
             return self.pressure_setpoint - suction.p
         raise ConfigurationError(
-            f"{self.path}: supply the pressure_setpoint control or head_coeff and no_stages"
+            f"{self.path}: supply the pressure_setpoint control or head_coefficients and "
+            "stage_count"
         )

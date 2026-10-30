@@ -60,7 +60,7 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
         "format": 2,
         "name": "Nested",
         "modules": {
-            "doublet": {"type": "Doublet", "params": {"esp.no_stages": 12}},
+            "doublet": {"type": "Doublet", "params": {"esp.stage_count": 12}},
             "filters": {"type": "ModuleDict", "modules": {"hot": {"type": "Filter", "params": {}}}},
         },
         "connections": [{"source": "doublet.supply_out", "target": "filters.hot.inlet"}],
@@ -68,7 +68,7 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
         "param_history": {},
     }
     plant = gm.plants.from_spec(spec)
-    assert plant.doublet.esp.no_stages == 12
+    assert plant.doublet.esp.stage_count == 12
     assert plant.to_spec() == spec
 
 

@@ -10,9 +10,9 @@ from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
 
 CURVES = {
-    "no_stages": 12,
-    "head_coeff": [83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
-    "power_coeff": [10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+    "stage_count": 12,
+    "head_coefficients": [83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
+    "power_coefficients": [10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
 }
 
 
@@ -62,9 +62,9 @@ def test_reverse_flow_and_off_curve_raise():
     with pytest.raises(PhysicsRangeError, match="reverse flow"):
         pump()(suction=suction.with_(m_dot=-1), frequency=50)
     with pytest.raises(PhysicsRangeError, match="head curve"):
-        pump(head_coeff=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
+        pump(head_coefficients=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
     with pytest.raises(PhysicsRangeError, match="power curve"):
-        pump(power_coeff=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
+        pump(power_coefficients=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
 
 
 def test_traced_call_matches_one_call_per_row():
@@ -74,5 +74,5 @@ def test_traced_call_matches_one_call_per_row():
         for m_dot, frequency in [(0.0, 50.0), (5.0, 50.0), (10.0, 60.0)]
     ]
     assert_module_matches(pump(), rows)
-    idle = pump(power_coeff=[1e-13, 0, 0, 0, 0, 0], no_stages=1)
+    idle = pump(power_coefficients=[1e-13, 0, 0, 0, 0, 0], stage_count=1)
     assert_module_matches(idle, rows)

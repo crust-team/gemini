@@ -13,7 +13,7 @@ DESIGN = dict(
     condenser_approach=15.0,
     pinch=5.0,
     minimum_outlet_temperature=340.0,
-    fraction_of_carnot=0.5,
+    carnot_fraction=0.5,
     capacity=1e6,
 )
 

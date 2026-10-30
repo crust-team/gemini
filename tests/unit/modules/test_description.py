@@ -99,7 +99,7 @@ def test_leaf_description_shape():
     assert set(description["parameters"]["setting_depth"]) == ENTRY_KEYS
     efficiency = description["parameters"]["motor_efficiency"]
     assert (efficiency["minimum"], efficiency["maximum"], efficiency["unit"]) == (0, 1, "-")
-    assert description["parameters"]["no_stages"]["default"] is None
+    assert description["parameters"]["stage_count"]["default"] is None
     assert description["inlets"]["suction"]["stream"] == "brine"
     assert description["inlets"]["suction"]["fields"]["T"] == {"unit": "K"}
     assert description["outputs"]["electricity"] == {
@@ -115,12 +115,12 @@ def test_leaf_description_shape():
 def test_instance_values_follow_the_module():
     """An instance reports current values and omits uninitialised ones."""
     esp = gm.modules.ESP()
-    esp.update_params(no_stages=12)
+    esp.update_params(stage_count=12)
     assert "frequency" not in esp.describe()["values"]["controls"]
     esp.set_inputs({"frequency": 50.0})
     values = esp.describe()["values"]
-    assert values["parameters"]["no_stages"] == 12
-    assert "head_coeff" not in values["parameters"]
+    assert values["parameters"]["stage_count"] == 12
+    assert "head_coefficients" not in values["parameters"]
     assert values["controls"]["frequency"] == 50.0
 
 
@@ -155,11 +155,11 @@ def test_a_spec_plant_lists_its_connections():
 
 def test_description_does_not_mutate():
     """Describing and validating leave the module as it was."""
-    esp = gm.modules.ESP().update_params(no_stages=3)
+    esp = gm.modules.ESP().update_params(stage_count=3)
     before = esp.state_dict()
     esp.describe()
     esp.parameter_schema()
-    esp.validate_params({"no_stages": "5", "bogus": 1})
+    esp.validate_params({"stage_count": "5", "bogus": 1})
     assert esp.state_dict() == before
 
 
@@ -182,22 +182,22 @@ def test_schema_accepts_unit_strings_and_keeps_units():
     assert depth["unit"] == "m" and depth["quantity"] == "length"
     assert [variant["type"] for variant in depth["anyOf"]] == ["number", "string"]
     assert depth["anyOf"][0]["minimum"] == 0
-    assert "no_stages" in gm.modules.ESP.parameter_schema()["required"]
+    assert "stage_count" in gm.modules.ESP.parameter_schema()["required"]
 
 
 def test_validate_params_accepts_valid_values_and_unit_strings():
     """Numbers and unit strings in the right dimension raise nothing."""
-    assert gm.modules.ESP.validate_params({"no_stages": 12, "setting_depth": "1000 ft"}) == []
+    assert gm.modules.ESP.validate_params({"stage_count": 12, "setting_depth": "1000 ft"}) == []
 
 
 def test_validate_params_reports_every_problem():
     """Unknown names, units and bounds are all reported at once."""
     problems = gm.modules.ESP.validate_params(
-        {"no_stage": 3, "setting_depth": "5 bar", "motor_efficiency": 1.5, "tubing": "x"}
+        {"stage_coun": 3, "setting_depth": "5 bar", "motor_efficiency": 1.5, "tubing": "x"}
     )
     by_path = {problem["path"]: problem for problem in problems}
-    assert by_path["no_stage"]["code"] == "unknown_name"
-    assert by_path["no_stage"]["suggestions"] == ["no_stages"]
+    assert by_path["stage_coun"]["code"] == "unknown_name"
+    assert by_path["stage_coun"]["suggestions"] == ["stage_count"]
     assert by_path["setting_depth"]["code"] == "invalid_unit"
     assert by_path["motor_efficiency"]["code"] == "out_of_bounds"
     assert by_path["tubing"]["code"] == "invalid_value"
@@ -210,7 +210,7 @@ def test_the_example_plant_describes_itself_with_its_values(shared_plant):
     """Pipe paths and every other stored value serialise, for the agent's ``read_plant``."""
     description = shared_plant.describe()
     assert json.dumps(description, allow_nan=False)
-    assert "doublet.esp.no_stages" in description["values"]["parameters"]
+    assert "doublet.esp.stage_count" in description["values"]["parameters"]
 
 
 def test_values_are_only_on_an_instance():

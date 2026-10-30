@@ -881,7 +881,7 @@ def test_listings_recurse_by_default_and_ports_stay_local(fresh_plant):
     assert "reservoir.production_rate" in doublet.inputs()
     assert "esp.head" in doublet.outputs()
     assert "esp.head" in doublet.soft_sensors()
-    assert "esp.no_stages" in dict(doublet.named_parameters())
+    assert "esp.stage_count" in dict(doublet.named_parameters())
     assert list(doublet.controls(recurse=False)) == []
     assert list(doublet.outputs(recurse=False)) == ["electricity", "heat_loss"]
     assert list(doublet.inlets()) == ["return_in"]

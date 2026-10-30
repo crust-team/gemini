@@ -42,7 +42,7 @@ engine.save_checkpoint("runs/replay.ckpt")
 restored = gm.Engine.load_checkpoint("runs/replay.ckpt")
 assert len(restored.resume()) == len(results)
 
-fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.ua")])
+fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.thermal_conductance")])
 print(fit)
 ```
 

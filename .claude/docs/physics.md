@@ -105,7 +105,7 @@ signed so that the pressure rises by both when flowing down and falls by both wh
   ln Re - 3.8215) / Re + K / (3.71 D)))^-2`, friction `0.5 rho_m u_m |u_m| f_n exp(s) L / D`
   and gravity `(H_l rho_l + (1 - H_l) rho_g) g L sin(theta)` [Pa]. The SI terms use inputs
   converted to the US basis and back, which changes the last bits and is kept for the goldens.
-- `pipe_path_profile(path, stream, fluid, direction, u_value, T_ambient)` takes each section
+- `pipe_path_profile(path, stream, fluid, direction, heat_transfer_coefficient, T_ambient)` takes each section
   from `Fluid.properties`: `Q = m_dot / density`, `us_l = (1 - gmf) m / rho_l / A` and, with
   `A = pi D^2 / 4`, Darcy-Weisbach when the gas mass flow is zero, otherwise Beggs-Brill with
   `us_g = gmf / rho_g / A`; the gas velocity keeps the original form, which ignores the flow

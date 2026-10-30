@@ -119,17 +119,32 @@ def test_parameters_and_constants_are_named_inputs_without_baked_values(esp):
     """The graph reads parameters and constants as inputs; no parameter value is a literal."""
     graph = GraphCache().graph(esp, {"suction": esp.fluid})
     parameters = set(graph.by_role("parameter"))
-    assert {"no_stages", "head_coeff", "power_coeff", "motor_efficiency", "bep_flow"} <= parameters
+    assert {
+        "stage_count",
+        "head_coefficients",
+        "power_coefficients",
+        "motor_efficiency",
+        "best_efficiency_flow",
+    } <= parameters
     assert set(graph.by_role("constant")) == {
         "ESP_REFERENCE_FREQUENCY",
         "ESP_EFFICIENCY_FLOW_FACTOR",
         "ESP_MIN_EFFICIENCY_POWER",
     }
-    assert graph.inputs["head_coeff"].shape == (6,) and graph.inputs["frequency"].unit == "Hz"
+    assert (
+        graph.inputs["head_coefficients"].shape == (6,) and graph.inputs["frequency"].unit == "Hz"
+    )
     literals = {
         operand for node in graph.nodes for operand in node.operands if not hasattr(operand, "op")
     }
-    baked = {float(esp.no_stages), *esp.head_coeff, esp.bep_flow, 60.0, 135773.0, 0.1}
+    baked = {
+        float(esp.stage_count),
+        *esp.head_coefficients,
+        esp.best_efficiency_flow,
+        60.0,
+        135773.0,
+        0.1,
+    }
     assert not literals & (baked - {0.0, 1.0})
 
 
@@ -138,7 +153,7 @@ def test_retrace_happens_only_when_a_guard_changes(esp, week):
     cache = GraphCache()
     inlets, inputs = {"suction": _suction(esp, week)}, {"frequency": week[:, 3]}
     before = run(esp, inlets, inputs, cache=cache).outputs["head"]
-    esp.update_params(no_stages=2 * esp.no_stages)
+    esp.update_params(stage_count=2 * esp.stage_count)
     after = run(esp, inlets, inputs, cache=cache).outputs["head"]
     assert cache.traces == 1
     np.testing.assert_allclose(after, 2 * before, rtol=RTOL)

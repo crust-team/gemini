@@ -18,8 +18,8 @@ def _controller(**changes):
     params = dict(
         proportional_gain=2.0,
         integral_time=100.0,
-        output_min=0.0,
-        output_max=1.0,
+        minimum_output=0.0,
+        maximum_output=1.0,
         direction="reverse",
     )
     return PIDController().update_params(**(params | changes))
@@ -80,8 +80,10 @@ def test_clamping_stops_windup_and_allows_unwinding():
 
 def test_invalid_settings_raise():
     """Crossed output limits and nonpositive tuning are configuration errors."""
-    with pytest.raises(gm.errors.ConfigurationError, match="expected output_min < output_max"):
-        _controller(output_min=1.0, output_max=0.0)(setpoint=1, measurement=0)
+    with pytest.raises(
+        gm.errors.ConfigurationError, match="expected minimum_output < maximum_output"
+    ):
+        _controller(minimum_output=1.0, maximum_output=0.0)(setpoint=1, measurement=0)
     with pytest.raises(gm.errors.DeclarationError):
         _controller(proportional_gain=0)
     with pytest.raises(gm.errors.DeclarationError):
@@ -100,7 +102,7 @@ class ControlledTank(Module):
         # Modules
         self.controller = _controller(proportional_gain=0.1, integral_time=600.0)
         self.storage = ThermalStorage().update_params(
-            service="hot", volume=1.0, heat_loss_coefficient=0, reference_temperature=313.15
+            service="hot", volume=1.0, heat_loss_conductance=0, reference_temperature=313.15
         )
 
         # Inlets
@@ -175,7 +177,7 @@ PID_ROWS = [
 def test_pid_command_and_advance_match_per_row(monkeypatch, direction, integral_time):
     """The command, the anti-windup integral and the stored error on stacked rows equal per row."""
     pid = _controller(
-        direction=direction, integral_time=integral_time, derivative_time=5.0, output_max=1.2
+        direction=direction, integral_time=integral_time, derivative_time=5.0, maximum_output=1.2
     )
 
     def load(*columns):

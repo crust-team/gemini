@@ -8,7 +8,7 @@
         "reservoir.pressure": 22000000.0,
         "reservoir.temperature": 353.15,
         "reservoir.permeability": 9.869233e-12,
-        "reservoir.thickness": 45.0,
+        "reservoir.aquifer_thickness": 45.0,
         "reservoir.drainage_radius": 1000.0,
         "reservoir.top_depth": 1800.0,
         "reservoir.productivity_index": 5.833333333333333e-08,
@@ -88,8 +88,8 @@
         "well.soil_temperature": 288.15,
         "well.segment": "below_esp",
         "well.esp_depth": 600.0,
-        "esp.no_stages": 15,
-        "esp.head_coeff": [
+        "esp.stage_count": 15,
+        "esp.head_coefficients": [
           125.518426,
           -0.0020852856,
           2.28955651e-07,
@@ -97,7 +97,7 @@
           2.37859645e-16,
           -1.18258356e-21
         ],
-        "esp.power_coeff": [
+        "esp.power_coefficients": [
           0.0,
           0.0,
           0.0,
@@ -107,9 +107,9 @@
         ],
         "esp.pump_type": "DEFAULT-PUMP",
         "esp.setting_depth": 600.0,
-        "esp.min_flow": 0.02277777777777778,
-        "esp.max_flow": 0.049444444444444444,
-        "esp.bep_flow": 0.03610555555555555,
+        "esp.minimum_flow": 0.02277777777777778,
+        "esp.maximum_flow": 0.049444444444444444,
+        "esp.best_efficiency_flow": 0.03610555555555555,
         "esp.tubing": 0.1778,
         "riser.pipe_path": {
           "sections": [
@@ -210,7 +210,7 @@
         "sink.pressure": 22000000.0,
         "sink.temperature": 353.15,
         "sink.permeability": 9.869233e-12,
-        "sink.thickness": 45.0,
+        "sink.aquifer_thickness": 45.0,
         "sink.drainage_radius": 0.0,
         "sink.top_depth": 0.0,
         "sink.injectivity_index": 5.5555555555555555e-08,
@@ -222,7 +222,7 @@
     "degasser": {
       "type": "Degasser",
       "params": {
-        "heat_transfer_coeff": 100000.0
+        "heat_transfer_coefficient": 100000.0
       }
     },
     "filters": {
@@ -241,17 +241,17 @@
     "heat_exchanger": {
       "type": "HeatExchanger",
       "params": {
-        "ua": 100000.0,
-        "dp_hot_nominal": 0.0,
-        "dp_cold_nominal": 0.0,
-        "m_dot_hot_nominal": 1.0,
-        "m_dot_cold_nominal": 1.0
+        "thermal_conductance": 100000.0,
+        "hot_nominal_pressure_drop": 0.0,
+        "cold_nominal_pressure_drop": 0.0,
+        "hot_nominal_mass_flow": 1.0,
+        "cold_nominal_mass_flow": 1.0
       }
     },
     "injection_pump": {
       "type": "InjectionPump",
       "params": {
-        "no_stages": 10,
+        "stage_count": 10,
         "pump_type": "DEFAULT-PUMP",
         "efficiency": 0.8
       }
@@ -654,7 +654,7 @@
           "column": "heat_exchanger.duty",
           "unit": "W"
         },
-        "dp_hot": {
+        "hot_pressure_drop": {
           "column": "heat_exchanger.dp_hot",
           "unit": "Pa"
         }
@@ -755,7 +755,7 @@
           "pressure": 22000000.0,
           "temperature": 353.15,
           "permeability": 9.869233e-12,
-          "thickness": 45.0,
+          "aquifer_thickness": 45.0,
           "drainage_radius": 1000.0,
           "top_depth": 1800.0,
           "productivity_index": 5.833333333333333e-08,
@@ -843,13 +843,13 @@
             ]
           },
           "friction_correlation": "darcy_weisbach",
-          "friction_correlation_2p": "BeggsBrill",
+          "two_phase_friction_correlation": "BeggsBrill",
           "correction_factors": [
             1.0,
             0.0
           ],
           "soil_temperature": 288.15,
-          "u_value": 10.0,
+          "heat_transfer_coefficient": 10.0,
           "segment": "below_esp",
           "esp_depth": 600.0
         }
@@ -859,8 +859,8 @@
       {
         "valid_from": "2020-01-01T00:00:00Z",
         "params": {
-          "no_stages": 15,
-          "head_coeff": [
+          "stage_count": 15,
+          "head_coefficients": [
             125.518426,
             -0.0020852856,
             2.28955651e-07,
@@ -868,7 +868,7 @@
             2.37859645e-16,
             -1.18258356e-21
           ],
-          "power_coeff": [
+          "power_coefficients": [
             0.0,
             0.0,
             0.0,
@@ -879,10 +879,10 @@
           "pump_type": "DEFAULT-PUMP",
           "setting_depth": 600.0,
           "motor_efficiency": 1.0,
-          "min_flow": 0.02277777777777778,
-          "max_flow": 0.049444444444444444,
-          "bep_flow": 0.03610555555555555,
-          "correction_factor": [
+          "minimum_flow": 0.02277777777777778,
+          "maximum_flow": 0.049444444444444444,
+          "best_efficiency_flow": 0.03610555555555555,
+          "correction_factors": [
             1.0,
             0.0
           ],
@@ -966,13 +966,13 @@
             ]
           },
           "friction_correlation": "darcy_weisbach",
-          "friction_correlation_2p": "BeggsBrill",
+          "two_phase_friction_correlation": "BeggsBrill",
           "correction_factors": [
             1.0,
             0.0
           ],
           "soil_temperature": 288.15,
-          "u_value": 10.0,
+          "heat_transfer_coefficient": 10.0,
           "segment": "above_esp",
           "esp_depth": 600.0
         }
@@ -1005,13 +1005,13 @@
             ]
           },
           "friction_correlation": "darcy_weisbach",
-          "friction_correlation_2p": "BeggsBrill",
+          "two_phase_friction_correlation": "BeggsBrill",
           "correction_factors": [
             1.0,
             0.0
           ],
           "soil_temperature": 288.15,
-          "u_value": 10.0
+          "heat_transfer_coefficient": 10.0
         }
       }
     ],
@@ -1023,7 +1023,7 @@
           "pressure": 22000000.0,
           "temperature": 353.15,
           "permeability": 9.869233e-12,
-          "thickness": 45.0,
+          "aquifer_thickness": 45.0,
           "drainage_radius": 0.0,
           "top_depth": 0.0,
           "productivity_index": null,
@@ -1040,9 +1040,9 @@
       {
         "valid_from": "2020-01-01T00:00:00Z",
         "params": {
-          "p_out": null,
-          "dp": 14900.0,
-          "heat_transfer_coeff": 100000.0,
+          "outlet_pressure": null,
+          "nominal_pressure_drop": 14900.0,
+          "heat_transfer_coefficient": 100000.0,
           "separation_efficiency": 0.0
         }
       }
@@ -1051,9 +1051,9 @@
       {
         "valid_from": "2020-01-01T00:00:00Z",
         "params": {
-          "dp_nominal": 1600.0,
-          "m_dot_nominal": 44.20333333333333,
-          "clogging_dp": 50000.0
+          "nominal_pressure_drop": 1600.0,
+          "nominal_mass_flow": 44.20333333333333,
+          "clogging_pressure_drop": 50000.0
         }
       }
     ],
@@ -1061,9 +1061,9 @@
       {
         "valid_from": "2020-01-01T00:00:00Z",
         "params": {
-          "dp_nominal": 1600.0,
-          "m_dot_nominal": 44.20333333333333,
-          "clogging_dp": 50000.0
+          "nominal_pressure_drop": 1600.0,
+          "nominal_mass_flow": 44.20333333333333,
+          "clogging_pressure_drop": 50000.0
         }
       }
     ],
@@ -1071,12 +1071,12 @@
       {
         "valid_from": "2020-01-01T00:00:00Z",
         "params": {
-          "ua": 100000.0,
+          "thermal_conductance": 100000.0,
           "arrangement": "counterflow",
-          "dp_hot_nominal": 0.0,
-          "dp_cold_nominal": 0.0,
-          "m_dot_hot_nominal": 1.0,
-          "m_dot_cold_nominal": 1.0,
+          "hot_nominal_pressure_drop": 0.0,
+          "cold_nominal_pressure_drop": 0.0,
+          "hot_nominal_mass_flow": 1.0,
+          "cold_nominal_mass_flow": 1.0,
           "fouling_threshold": 0.15
         }
       }
@@ -1085,11 +1085,11 @@
       {
         "valid_from": "2020-01-01T00:00:00Z",
         "params": {
-          "no_stages": 10,
+          "stage_count": 10,
           "pump_type": "DEFAULT-PUMP",
           "efficiency": 0.8,
-          "head_coeff": null,
-          "power_coeff": null
+          "head_coefficients": null,
+          "power_coefficients": null
         }
       }
     ]

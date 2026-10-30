@@ -29,8 +29,8 @@ class IceStorage(Module):
     The store holds ``water_mass`` M of water at one uniform temperature T, of which the
     state ``ice_fraction`` x is frozen. The state ``temperature`` is the store temperature: the
     freezing temperature T_f while partly frozen (0 < x < 1), above it only as all liquid
-    (x = 0, sensible heat with ``water_heat_capacity``) and below it only as all ice (x = 1,
-    sensible heat with ``ice_heat_capacity``). Other combinations raise ``ConfigurationError``.
+    (x = 0, sensible heat with ``water_specific_heat``) and below it only as all ice (x = 1,
+    sensible heat with ``ice_specific_heat``). Other combinations raise ``ConfigurationError``.
 
     The coil is a heat exchanger against a store at uniform temperature (capacity ratio zero),
     so with ``C = m_dot * cp`` of the glycol its effectiveness is ``e = 1 - exp(-UA / C)``
@@ -56,8 +56,8 @@ class IceStorage(Module):
     Defaults: ``latent_heat`` 333.55 kJ/kg is the conventional latent heat of fusion of ice at
     0 degC and 101.325 kPa; IAPWS R10-06 (Feistel and Wagner 2006, *A new equation of state for
     H2O ice Ih*) gives 333.44 kJ/kg at the triple point, 0.03 % lower. ``freezing_temperature``
-    273.15 K is the normal melting point. ``water_heat_capacity`` 4219.9 J/kg/K is saturated
-    liquid water at 0.01 degC (IAPWS-95, Wagner and Pruss 2002) and ``ice_heat_capacity``
+    273.15 K is the normal melting point. ``water_specific_heat`` 4219.9 J/kg/K is saturated
+    liquid water at 0.01 degC (IAPWS-95, Wagner and Pruss 2002) and ``ice_specific_heat``
     2096.8 J/kg/K is ice Ih at the triple point (IAPWS R10-06).
 
     Simplifications and validity: one lumped store temperature, constant coil UA (in a real
@@ -79,15 +79,15 @@ class IceStorage(Module):
 
         # Parameters
         self.water_mass = Parameter(Mass, gt=0)
-        self.ua = Parameter(ThermalConductance, gt=0)
+        self.thermal_conductance = Parameter(ThermalConductance, gt=0)
         self.latent_heat = Parameter(SpecificEnthalpy, default=storage.DEFAULT_LATENT_HEAT, gt=0)
         self.freezing_temperature = Parameter(
             Temperature, default=storage.DEFAULT_FREEZING_TEMPERATURE
         )
-        self.water_heat_capacity = Parameter(
+        self.water_specific_heat = Parameter(
             SpecificHeat, default=storage.DEFAULT_WATER_HEAT_CAPACITY
         )
-        self.ice_heat_capacity = Parameter(SpecificHeat, default=storage.DEFAULT_ICE_HEAT_CAPACITY)
+        self.ice_specific_heat = Parameter(SpecificHeat, default=storage.DEFAULT_ICE_HEAT_CAPACITY)
 
         # Inlets
         self.inlet = Inlet(Stream, stream="chilled_water")
@@ -144,8 +144,8 @@ class IceStorage(Module):
             self.water_mass,
             self.latent_heat,
             self.freezing_temperature,
-            self.water_heat_capacity,
-            self.ice_heat_capacity,
+            self.water_specific_heat,
+            self.ice_specific_heat,
         )
         return {"ice_fraction": fraction, "temperature": temperature}
 
@@ -164,7 +164,7 @@ class IceStorage(Module):
         """Return the coil effectiveness 1 - exp(-UA / C) [-] after checking the store state."""
         self._check_state()
         rate = self._rate(inlet)
-        return heat_transfer.ambient_effectiveness(self.ua, rate)
+        return heat_transfer.ambient_effectiveness(self.thermal_conductance, rate)
 
     def _conductance(self, inlet):
         """Return the coil conductance e * m_dot * cp [W/K]."""

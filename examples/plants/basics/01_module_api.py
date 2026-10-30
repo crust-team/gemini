@@ -66,9 +66,9 @@ def describe(esp):
 def uninitialized():
     """Show that a new module reports missing parameters until they are assigned."""
     empty = gm.modules.ESP()
-    assert not empty.is_initialized and "no_stages" in empty.missing_parameters()
-    empty.no_stages = 120
-    assert empty.no_stages == 120
+    assert not empty.is_initialized and "stage_count" in empty.missing_parameters()
+    empty.stage_count = 120
+    assert empty.stage_count == 120
 
 
 def plants_and_containers(plant):
@@ -98,7 +98,9 @@ def engine_and_calibration(plant):
     data = gm.Dataset.from_frame(frame, time_column="time")
     results = gm.Engine(plant).replay(data)
     print(results["doublet.esp"].get("head", unit="bar").head())
-    fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.ua")])
+    fit = gm.optim.calibrate(
+        plant, data, params=[plant.get_parameter("heat_exchanger.thermal_conductance")]
+    )
     print(fit)
 
 

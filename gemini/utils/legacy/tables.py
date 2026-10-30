@@ -187,11 +187,14 @@ IGNORED_TAGS = {
 }
 """Measured old tags deliberately left unbound, with the reason."""
 
+DATA_COLUMNS = {"heat_exchanger.hot_pressure_drop": "heat_exchanger.dp_hot"}
+"""Column of the shipped datasets for a binding whose output was renamed after they were written."""
+
 SUPPLEMENTS = {
     "degasser": [("inlets.inlet.T", "T_p_in", "degC")],
     "heat_exchanger": [
         ("measured.duty", "Thermal_PowerGen", "W"),
-        ("measured.dp_hot", "HEX_PDrop", "bar"),
+        ("measured.hot_pressure_drop", "HEX_PDrop", "bar"),
     ],
     "production_reservoir": [("controls.production_rate", "Qp", "m3/h")],
 }
@@ -275,15 +278,15 @@ PROPERTY_OWNERS = {
 
 PROPERTY_INVERSE = {
     "esp_depth": ("setting_depth", None),
-    "esp_no_stage": ("no_stages", None),
+    "esp_no_stage": ("stage_count", None),
     "esp_tubing": ("tubing", None),
     "esp_type": ("pump_type", None),
-    "esp_bep_flow": ("bep_flow", units.m3s_to_m3h),
-    "esp_min_flow": ("min_flow", units.m3s_to_m3h),
-    "esp_max_flow": ("max_flow", units.m3s_to_m3h),
-    "injectionpump_no_stage": ("no_stages", None),
+    "esp_bep_flow": ("best_efficiency_flow", units.m3s_to_m3h),
+    "esp_min_flow": ("minimum_flow", units.m3s_to_m3h),
+    "esp_max_flow": ("maximum_flow", units.m3s_to_m3h),
+    "injectionpump_no_stage": ("stage_count", None),
     "injectionpump_type": ("pump_type", None),
-    "reservoir_thickness": ("thickness", None),
+    "reservoir_thickness": ("aquifer_thickness", None),
     "reservoir_radius": ("drainage_radius", None),
     "reservoir_top": ("top_depth", None),
     "reservoir_pressure": ("pressure", units.pa_to_bar),
@@ -299,14 +302,17 @@ PROPERTY_INVERSE = {
 SUFFIX_INVERSE = [
     ("_soil_temperature", "soil_temperature", units.k_to_c),
     ("_friction_correlation", "friction_correlation", None),
-    ("_friction_correlation_2p", "friction_correlation_2p", None),
+    ("_friction_correlation_2p", "two_phase_friction_correlation", None),
     ("_friction_correction_factors", "correction_factors", list),
     ("_productivity_index", "productivity_index", units.index_from_si),
     ("_injectivity_index", "injectivity_index", units.index_from_si),
 ]
 """Well properties named ``<prefix><suffix>``: suffix -> (new parameter, conversion)."""
 
-COEFFICIENT_PROPERTIES = {"esp_head_coeff": "head_coeff", "esp_power_coeff": "power_coeff"}
+COEFFICIENT_PROPERTIES = {
+    "esp_head_coeff": "head_coefficients",
+    "esp_power_coeff": "power_coefficients",
+}
 """Old ``;``-separated coefficient lists -> new list parameters."""
 
 
@@ -338,15 +344,15 @@ def esp_params_from_gemini(properties: dict) -> dict:
     """Convert ESP flow limits [m3/h] and VLP correction offset [bar] to SI parameters."""
     correction = parse_coefficients(properties.get("esp_correction_factor", "1;0"))
     return dict(
-        no_stages=properties["esp_no_stage"],
-        head_coeff=parse_coefficients(properties["esp_head_coeff"]),
-        power_coeff=parse_coefficients(properties["esp_power_coeff"]),
+        stage_count=properties["esp_no_stage"],
+        head_coefficients=parse_coefficients(properties["esp_head_coeff"]),
+        power_coefficients=parse_coefficients(properties["esp_power_coeff"]),
         pump_type=properties.get("esp_type"),
         setting_depth=properties.get("esp_depth", 0),
-        min_flow=units.m3h_to_m3s(properties.get("esp_min_flow", 0)),
-        max_flow=units.m3h_to_m3s(properties.get("esp_max_flow", 1e6)),
-        bep_flow=units.m3h_to_m3s(properties.get("esp_bep_flow", 1)),
-        correction_factor=(correction[0], units.bar_to_pa(correction[1])),
+        minimum_flow=units.m3h_to_m3s(properties.get("esp_min_flow", 0)),
+        maximum_flow=units.m3h_to_m3s(properties.get("esp_max_flow", 1e6)),
+        best_efficiency_flow=units.m3h_to_m3s(properties.get("esp_bep_flow", 1)),
+        correction_factors=(correction[0], units.bar_to_pa(correction[1])),
         tubing=properties.get("esp_tubing"),
     )
 
@@ -361,7 +367,7 @@ def reservoir_params_from_gemini(
         pressure=units.bar_to_pa(properties["reservoir_pressure"]),
         temperature=units.c_to_k(properties["reservoir_temperature"]),
         permeability=units.md_to_m2(properties["reservoir_permeability"]),
-        thickness=properties["reservoir_thickness"],
+        aquifer_thickness=properties["reservoir_thickness"],
         drainage_radius=properties["reservoir_radius"],
         top_depth=properties["reservoir_top"],
         wellbore_radius=well.get("wellbore_radius", properties.get("wellbore_radius", 0.0765)),
@@ -408,10 +414,12 @@ def _well_params(properties, prefix, base_path):
     return dict(
         pipe_path=geometry.build_path(table, tally),
         friction_correlation=properties.get(f"{prefix}_friction_correlation", "darcy_weisbach"),
-        friction_correlation_2p=properties.get(f"{prefix}_friction_correlation_2p", "BeggsBrill"),
+        two_phase_friction_correlation=properties.get(
+            f"{prefix}_friction_correlation_2p", "BeggsBrill"
+        ),
         correction_factors=tuple(properties.get(f"{prefix}_friction_correction_factors", (1, 0))),
         soil_temperature=units.c_to_k(properties[f"{prefix}_soil_temperature"]),
-        u_value=properties.get("u_value", 10),
+        heat_transfer_coefficient=properties.get("u_value", 10),
     )
 
 
@@ -432,7 +440,7 @@ def injectionwell_params_from_gemini(properties: dict, *, base_path: str | Path 
 def injectionpump_params_from_gemini(properties: dict) -> dict:
     """Map injection-pump stages and equipment type [-]."""
     return dict(
-        no_stages=properties["injectionpump_no_stage"], pump_type=properties["injectionpump_type"]
+        stage_count=properties["injectionpump_no_stage"], pump_type=properties["injectionpump_type"]
     )
 
 
@@ -442,13 +450,15 @@ def degasser_params_from_gemini(properties: dict) -> dict:
     NOTE(refactor): no legacy calculation establishes this coefficient's meaning or unit. It is
     kept as metadata; the liquid-only passthrough has no gas or thermal model.
     """
-    return dict(heat_transfer_coeff=properties["heat_transfer_coeff"])
+    return dict(heat_transfer_coefficient=properties["heat_transfer_coeff"])
 
 
 def filter_params_from_gemini(properties: dict) -> dict:
     """Map an optional filter clogging limit [bar] to [Pa]."""
     return dict(
-        clogging_dp=units.bar_to_pa(properties.get("clogging_dp", separation.FILTER_CLOGGING_BAR))
+        clogging_pressure_drop=units.bar_to_pa(
+            properties.get("clogging_dp", separation.FILTER_CLOGGING_BAR)
+        )
     )
 
 
@@ -459,12 +469,12 @@ def heatexchanger_params_from_gemini(properties: dict) -> dict:
     Nominal pressure drops and mass rates must be supplied to predict hydraulic losses.
     """
     return dict(
-        ua=properties.get("ua", properties.get("heat_transfer_coeff")),
+        thermal_conductance=properties.get("ua", properties.get("heat_transfer_coeff")),
         arrangement=properties.get("arrangement", "counterflow"),
-        dp_hot_nominal=properties.get("dp_hot_nominal", 0),
-        dp_cold_nominal=properties.get("dp_cold_nominal", 0),
-        m_dot_hot_nominal=properties.get("m_dot_hot_nominal", 1),
-        m_dot_cold_nominal=properties.get("m_dot_cold_nominal", 1),
+        hot_nominal_pressure_drop=properties.get("dp_hot_nominal", 0),
+        cold_nominal_pressure_drop=properties.get("dp_cold_nominal", 0),
+        hot_nominal_mass_flow=properties.get("m_dot_hot_nominal", 1),
+        cold_nominal_mass_flow=properties.get("m_dot_cold_nominal", 1),
     )
 
 

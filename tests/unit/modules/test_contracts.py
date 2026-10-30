@@ -8,7 +8,7 @@ def test_metadata_is_derived():
     assert HeatExchanger().name == "heat_exchanger"
     assert HeatExchanger().path == "heat_exchanger"
     assert HeatExchanger.help().startswith("Two-stream heat exchanger")
-    assert "ua: W/K, calibratable" in HeatExchanger.help()
+    assert "thermal_conductance: W/K, calibratable" in HeatExchanger.help()
 
 
 def test_every_module_class_is_documented(module_class):

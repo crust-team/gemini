@@ -104,7 +104,7 @@ def _holdout(plant, dataset, engine, data):
     fit = gm.optim.calibrate(
         plant,
         dataset,
-        params=[plant.get_parameter("heat_exchanger.ua")],
+        params=[plant.get_parameter("heat_exchanger.thermal_conductance")],
         end=data.index[FIRST_WEEK_ROWS - 1],
     )
     holdout = path_frame(

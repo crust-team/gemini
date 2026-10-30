@@ -21,8 +21,8 @@ _MASS_FLOW_UNITS = {"kg/s", "t/h"}
 """Mass-flow units ``units.to_si`` accepts; other flow units are volume flows."""
 
 _FIT_TARGETS = [
-    (HeatExchanger, ("ua",), {"duty", "hot_out_T", "cold_out_T"}),
-    (ESP, ("head_coeff",), {"head", "discharge_pressure"}),
+    (HeatExchanger, ("thermal_conductance",), {"duty", "hot_out_T", "cold_out_T"}),
+    (ESP, ("head_coefficients",), {"head", "discharge_pressure"}),
     (ESP, None, {"power", "head", "discharge_pressure"}),
 ]
 """Measured outputs fitted per module class and parameter set (``None``: any parameters)."""
@@ -228,20 +228,20 @@ def _head_coefficient_guess(module, path, observed, measured, valid):
     distinct = len(np.unique(flows[valid]))
     if distinct < 6:
         raise InsufficientDataError(
-            f"{path}.head_coeff: distinct valid flows = {distinct}; expected at least 6 to seed "
-            "the head-curve guess"
+            f"{path}.head_coefficients: distinct valid flows = {distinct}; expected at least 6 to "
+            "seed the head-curve guess"
         )
     frequencies = observed.values(observed.bindings.controls["frequency"])[valid]
     return fit_head_coefficients(
-        flows[valid], frequencies, measured["head"][valid], module.no_stages
+        flows[valid], frequencies, measured["head"][valid], module.stage_count
     )
 
 
 def _initial_guess(module, path, fields, observed, measured, valid):
     """Return an equipment-specific starting value for the fitted parameters, or ``None``."""
-    if isinstance(module, HeatExchanger) and fields == ["ua"]:
+    if isinstance(module, HeatExchanger) and fields == ["thermal_conductance"]:
         return _ua_guess(module, observed, measured, valid)
-    if isinstance(module, ESP) and fields == ["head_coeff"]:
+    if isinstance(module, ESP) and fields == ["head_coefficients"]:
         return _head_coefficient_guess(module, path, observed, measured, valid)
     return None
 

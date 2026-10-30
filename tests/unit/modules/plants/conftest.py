@@ -12,7 +12,11 @@ def configure_heating_substation(substation, demand=1.5e5):
     substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
     substation.valve.opening = 0.8
     substation.heat_exchanger.update_params(
-        ua=2e4, dp_hot_nominal=2e4, dp_cold_nominal=2e4, m_dot_hot_nominal=2, m_dot_cold_nominal=3
+        thermal_conductance=2e4,
+        hot_nominal_pressure_drop=2e4,
+        cold_nominal_pressure_drop=2e4,
+        hot_nominal_mass_flow=2,
+        cold_nominal_mass_flow=3,
     )
     substation.consumer.update_params(minimum_return_temperature=303.15)
     substation.consumer.heat_demand = demand
@@ -25,7 +29,11 @@ def configure_cooling_substation(substation, sensible=6e4, latent=1e4):
     substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
     substation.valve.opening = 1.0
     substation.heat_exchanger.update_params(
-        ua=3e4, dp_hot_nominal=2e4, dp_cold_nominal=2e4, m_dot_hot_nominal=4, m_dot_cold_nominal=3
+        thermal_conductance=3e4,
+        hot_nominal_pressure_drop=2e4,
+        cold_nominal_pressure_drop=2e4,
+        hot_nominal_mass_flow=4,
+        cold_nominal_mass_flow=3,
     )
     substation.consumer.update_params(maximum_return_temperature=291.15, dew_point_margin=1.0)
     substation.set_inputs(
@@ -42,7 +50,7 @@ def configure_cooling_substation(substation, sensible=6e4, latent=1e4):
 def configure_circulation_pump(pump):
     """Fill a circulation pump: 4 bar shut-off head, 75 % efficiency at 4 l/s, 90 % motor."""
     pump.update_params(
-        head_coeff=[4e5, 0.0, -1e9],
+        head_coefficients=[4e5, 0.0, -1e9],
         rated_frequency=50,
         best_efficiency=0.75,
         best_efficiency_flow=0.004,
@@ -54,7 +62,9 @@ def configure_circulation_pump(pump):
 
 def configure_pipe(pipe):
     """Fill a 500 m DN100 pipe with U = 1 W/m2/K in 10 degC ground."""
-    pipe.update_params(length=500, inner_diameter=0.1, elevation_change=0, u_value=1.0)
+    pipe.update_params(
+        length=500, inner_diameter=0.1, elevation_change=0, heat_transfer_coefficient=1.0
+    )
     pipe.ambient_temperature = 283.15
     return pipe
 

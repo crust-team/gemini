@@ -22,7 +22,11 @@ INDEX = 10 / 3.6e8
 """Productivity and injectivity index [m3/s/Pa]: 10 m3/h/bar."""
 
 RESERVOIR = dict(
-    temperature=353.15, permeability=1e-12, thickness=100, drainage_radius=0, wellbore_radius=0.1
+    temperature=353.15,
+    permeability=1e-12,
+    aquifer_thickness=100,
+    drainage_radius=0,
+    wellbore_radius=0.1,
 )
 
 UPSTREAM_FLOW_69_HZ = 135.92584228893725
@@ -53,9 +57,9 @@ def producer():
         pipe_path=path, soil_temperature=293.15, segment="above_esp", esp_depth=650
     )
     esp = ESP().update_params(
-        no_stages=10,
-        head_coeff=[83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
-        power_coeff=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+        stage_count=10,
+        head_coefficients=[83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
+        power_coefficients=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
     )
     return reservoir, well, esp, riser
 
@@ -194,8 +198,8 @@ def test_injection_pressure_gap_to_upstream_is_the_friction_sign():
     wellhead = Stream(flow="125.1 m3/h", T=343.15, p=1e5)
     pressure = nodal.solve_injection_pressure(well, sink, wellhead, (1e5, 1e8))
     out = well(wellhead=wellhead.with_(p=pressure)).outputs
-    assert out.dp_friction == pytest.approx(-5.197358519692272e5, rel=1e-9)
-    assert out.dp_gravity - UPSTREAM_GRAVITY == pytest.approx(0.0085e5, abs=10)
-    gap = -2 * out.dp_friction - (out.dp_gravity - UPSTREAM_GRAVITY)
+    assert out.friction_pressure_drop == pytest.approx(-5.197358519692272e5, rel=1e-9)
+    assert out.gravity_pressure_drop - UPSTREAM_GRAVITY == pytest.approx(0.0085e5, abs=10)
+    gap = -2 * out.friction_pressure_drop - (out.gravity_pressure_drop - UPSTREAM_GRAVITY)
     assert pressure - UPSTREAM_INJECTION_PRESSURE == pytest.approx(gap, abs=1)
     assert pressure / 1e5 == pytest.approx(54.86, abs=0.005)

@@ -15,7 +15,9 @@ STREAM = Stream(m_dot=10, T=353.15, p=5e5)
 
 def pipe(**changes):
     """Return a 1 km DN100 steel pipe rising 5 m with a weakly insulated wall."""
-    params = dict(length=1000, inner_diameter=0.1, elevation_change=5, u_value=1.0)
+    params = dict(
+        length=1000, inner_diameter=0.1, elevation_change=5, heat_transfer_coefficient=1.0
+    )
     return Pipe().update_params(**(params | changes))
 
 
@@ -40,7 +42,7 @@ def test_turbulent_flow_matches_hand_calculation():
 
 def test_laminar_flow_and_continuous_transition():
     """Laminar flow follows Hagen–Poiseuille and the transition bridge has no jumps."""
-    module = pipe(elevation_change=0, u_value=0)
+    module = pipe(elevation_change=0, heat_transfer_coefficient=0)
     laminar = module(inlet=STREAM.with_(m_dot=0.1), ambient_temperature=283.15).outputs
     velocity = 0.1 / 1000 / (math.pi * 0.1**2 / 4)
     assert laminar.pressure_drop == pytest.approx(32 * 0.001 * 1000 * velocity / 0.1**2)
@@ -66,9 +68,11 @@ def test_cold_fluid_absorbs_heat_and_long_pipes_approach_ambient():
     assert chilled.outputs.heat_loss == 0 and chilled.outputs.heat_absorbed > 0
     assert 280.15 < chilled.outputs.outlet_T < 300.15
     assert energy_balance(pipe(), chilled)["relative_residual"] < 1e-12
-    bare = pipe(u_value=1e4)(inlet=STREAM.with_(m_dot=0.5), ambient_temperature=283.15)
+    bare = pipe(heat_transfer_coefficient=1e4)(
+        inlet=STREAM.with_(m_dot=0.5), ambient_temperature=283.15
+    )
     assert bare.outputs.outlet_T == pytest.approx(283.15) and bare.outputs.outlet_T >= 283.15
-    adiabatic = pipe(u_value=0)(inlet=STREAM, ambient_temperature=283.15)
+    adiabatic = pipe(heat_transfer_coefficient=0)(inlet=STREAM, ambient_temperature=283.15)
     assert adiabatic.outputs.outlet_T == STREAM.T and adiabatic.outputs.heat_loss == 0
 
 

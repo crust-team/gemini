@@ -62,7 +62,7 @@ def cycle_design(
     condenser_approach: float,
     pinch: float,
     minimum_outlet_temperature: float,
-    fraction_of_carnot: float,
+    carnot_fraction: float,
     capacity: float,
 ) -> CycleDesign:
     """Return the design point of an air-cooled binary cycle fed by brine.
@@ -81,7 +81,7 @@ def cycle_design(
         Pinch between brine and working fluid [K], nonnegative.
     minimum_outlet_temperature : float
         Lowest allowed brine outlet temperature [K].
-    fraction_of_carnot : float
+    carnot_fraction : float
         Second-law fraction of the Lorenz efficiency [-].
     capacity : float
         Gross power limit [W], positive.
@@ -107,7 +107,7 @@ def cycle_design(
     reversible = lorenz_efficiency(
         brine_temperature - pinch, outlet_temperature - pinch, condensing_temperature
     )
-    efficiency = fraction_of_carnot * reversible
+    efficiency = carnot_fraction * reversible
     uncapped = (
         efficiency
         * brine_mass_flow

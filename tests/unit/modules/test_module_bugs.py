@@ -86,7 +86,7 @@ def test_assigned_fluid_survives_parameter_changes_and_is_saved():
     """E-modules-003: ``module.fluid = ...`` is not reverted and ``state_dict`` stores it."""
     module = Filter()
     module.fluid = gm.WATER
-    module.dp_nominal = 1000
+    module.nominal_pressure_drop = 1000
     assert module.fluid == gm.WATER
     assert Filter().load_state_dict(module.state_dict()).fluid == gm.WATER
 
@@ -237,7 +237,7 @@ def test_injection_reservoir_without_injectivity_fails_in_forward():
         pressure=2e7,
         temperature=350,
         permeability=1e-13,
-        thickness=100,
+        aquifer_thickness=100,
         drainage_radius=0,
         top_depth=2000,
         wellbore_radius=0.1,

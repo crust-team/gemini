@@ -52,8 +52,8 @@ def test_path_golden(role):
         dict(
             pressure_output=result.p_out,
             temperature_output=result.T_out,
-            pressuredrop_fric_output=result.dp_friction,
-            pressuredrop_grav_output=result.dp_gravity,
+            pressuredrop_fric_output=result.friction_pressure_drop,
+            pressuredrop_grav_output=result.gravity_pressure_drop,
             section_pressure_output=result.section_pressure,
             section_temperature_output=result.section_temperature,
         ),
@@ -141,8 +141,8 @@ def test_two_phase_reverse_flow_reverses_friction():
     reverse = Stream(m_dot=-40, T=350, p=20e5, fluid=GAS)
     ahead = hydraulics.pipe_path_profile(path, forward, GAS, "down", 0, 300)
     back = hydraulics.pipe_path_profile(path, reverse, GAS, "down", 0, 300)
-    assert back.dp_friction == pytest.approx(-ahead.dp_friction)
-    assert back.dp_gravity == pytest.approx(ahead.dp_gravity)
+    assert back.friction_pressure_drop == pytest.approx(-ahead.friction_pressure_drop)
+    assert back.gravity_pressure_drop == pytest.approx(ahead.gravity_pressure_drop)
 
 
 def test_zero_flow_unknown_correlation_and_direction():
@@ -151,7 +151,7 @@ def test_zero_flow_unknown_correlation_and_direction():
     stream = Stream(m_dot=0, p=1e6, T=350)
     result = hydraulics.pipe_path_profile(path, stream, BRINE, "up", 10, 290)
     assert result.p_out == stream.p and result.T_out == stream.T
-    assert result.dp_friction == result.dp_gravity == 0
+    assert result.friction_pressure_drop == result.gravity_pressure_drop == 0
     assert hydraulics.pipe_path_profile(path, stream, BRINE, " Up ", 10, 290) == result
     with pytest.raises(UnknownCorrelationError, match="'unknown'"):
         hydraulics.pipe_path_profile(path, stream, BRINE, "up", 10, 290, correlation="unknown")
@@ -180,11 +180,13 @@ def test_erosion_check_compares_each_section():
 
 def test_radial_pressure_drops_and_hydrostatics():
     """Radial Darcy and skin drops scale with flow; nonpositive geometry is rejected."""
-    flow_dp, skin_dp = hydraulics.radial_pressure_drops(0.04, 6.5e-4, 1e-11, 45, 1000, 0.0765, 2)
-    assert flow_dp == pytest.approx(
+    flow_pressure_drop, skin_pressure_drop = hydraulics.radial_pressure_drops(
+        0.04, 6.5e-4, 1e-11, 45, 1000, 0.0765, 2
+    )
+    assert flow_pressure_drop == pytest.approx(
         0.04 * 6.5e-4 * math.log(1000 / 0.0765) / (2 * math.pi * 1e-11 * 45)
     )
-    assert skin_dp == pytest.approx(0.04 * 6.5e-4 * 2 / (2 * math.pi * 1e-11 * 45))
+    assert skin_pressure_drop == pytest.approx(0.04 * 6.5e-4 * 2 / (2 * math.pi * 1e-11 * 45))
     with pytest.raises(PhysicsRangeError, match="thickness = 0"):
         hydraulics.radial_pressure_drops(0.04, 6.5e-4, 1e-11, 0, 1000, 0.0765, 2)
     assert hydraulics.hydrostatic_dp(1000, 10) == pytest.approx(98100)
@@ -273,8 +275,8 @@ def _profile(path, fluid, direction):
         return dict(
             p_out=result.p_out,
             T_out=result.T_out,
-            dp_friction=result.dp_friction,
-            dp_gravity=result.dp_gravity,
+            friction_pressure_drop=result.friction_pressure_drop,
+            gravity_pressure_drop=result.gravity_pressure_drop,
             **{f"p{i}": value for i, value in enumerate(result.section_pressure)},
             **{f"T{i}": value for i, value in enumerate(result.section_temperature)},
         )
@@ -304,7 +306,7 @@ def test_two_phase_zero_flow_in_a_steep_downhill_section_returns_zero_drops():
     stream = Stream(m_dot=0, p=1e6, T=350, fluid=GAS)
     result = hydraulics.pipe_path_profile(path, stream, GAS, "down", 10, 290)
     assert (result.p_out, result.T_out) == (1e6, 350)
-    assert result.dp_friction == result.dp_gravity == 0
+    assert result.friction_pressure_drop == result.gravity_pressure_drop == 0
 
 
 def test_two_phase_zero_flow_rows_match_on_arrays_in_a_steep_downhill_section():

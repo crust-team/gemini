@@ -30,7 +30,7 @@ class ProductionWell(_Well):
     section.
     """
 
-    repr_fields = ("segment", "esp_depth", "soil_temperature", "u_value")
+    repr_fields = ("segment", "esp_depth", "soil_temperature", "heat_transfer_coefficient")
 
     def __init__(self):
         """Declare production-well geometry, inlet and outputs."""
@@ -46,8 +46,8 @@ class ProductionWell(_Well):
         # Outputs
         self.wellhead_pressure = Output(Pressure, soft_sensor=True)
         self.wellhead_temperature = Output(Temperature, soft_sensor=True)
-        self.dp_friction = Output(PressureDifference)
-        self.dp_gravity = Output(PressureDifference)
+        self.friction_pressure_drop = Output(PressureDifference)
+        self.gravity_pressure_drop = Output(PressureDifference)
         self.section_pressure = Output(list[Pressure])
         self.section_temperature = Output(list[Temperature])
         self.heat_loss = Output(HeatLoss)
@@ -73,8 +73,8 @@ class ProductionWell(_Well):
         result = self.traverse(bottom, start, end, "up")
         self.wellhead_pressure = wellhead.p
         self.wellhead_temperature = wellhead.T
-        self.dp_friction = result.dp_friction
-        self.dp_gravity = result.dp_gravity
+        self.friction_pressure_drop = result.friction_pressure_drop
+        self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
         capacity_rate = fluid.heat_capacity_rate(

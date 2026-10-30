@@ -13,24 +13,29 @@ BINDING = {"column": "x", "unit": "kW/K"}
 def exchanger():
     """Return a heat exchanger with a design."""
     return gm.modules.HeatExchanger().set_params(
-        "", {"ua": 1e3, "dp_hot_nominal": 1e4, "dp_cold_nominal": 1e4}
+        "",
+        {
+            "thermal_conductance": 1e3,
+            "hot_nominal_pressure_drop": 1e4,
+            "cold_nominal_pressure_drop": 1e4,
+        },
     )
 
 
 def test_an_undated_set_changes_the_base_and_the_current_value(exchanger):
     """Unit strings are converted, and the value is in force at once."""
-    exchanger.set_params("", {"dp_hot_nominal": "2 bar"})
-    assert exchanger.dp_hot_nominal == 2e5
-    assert exchanger.params_at("")["dp_hot_nominal"] == 2e5
+    exchanger.set_params("", {"hot_nominal_pressure_drop": "2 bar"})
+    assert exchanger.hot_nominal_pressure_drop == 2e5
+    assert exchanger.params_at("")["hot_nominal_pressure_drop"] == 2e5
     history = exchanger.param_history("")
     assert len(history) == 1 and history[0]["valid_from"] is None
-    assert history[0]["params"]["dp_hot_nominal"] == 2e5
+    assert history[0]["params"]["hot_nominal_pressure_drop"] == 2e5
 
 
 def test_a_dated_snapshot_is_complete_and_sorted(exchanger):
     """Each snapshot holds the values in force merged with the change."""
-    exchanger.set_params("", {"ua": 5.0}, valid_from="2021-01-01")
-    exchanger.set_params("", {"ua": 3.0}, valid_from="2020-01-01")
+    exchanger.set_params("", {"thermal_conductance": 5.0}, valid_from="2021-01-01")
+    exchanger.set_params("", {"thermal_conductance": 3.0}, valid_from="2020-01-01")
     history = exchanger.param_history("")
     assert [item["valid_from"] for item in history] == [
         None,
@@ -38,15 +43,15 @@ def test_a_dated_snapshot_is_complete_and_sorted(exchanger):
         "2021-01-01T00:00:00Z",
     ]
     assert history[2]["params"].keys() == history[0]["params"].keys()
-    assert exchanger.params_at("", "2020-06-01")["ua"] == 3.0
-    assert exchanger.params_at("")["ua"] == 5.0
+    assert exchanger.params_at("", "2020-06-01")["thermal_conductance"] == 3.0
+    assert exchanger.params_at("")["thermal_conductance"] == 5.0
 
 
 def test_an_unknown_parameter_suggests_a_name(exchanger):
     """The error names the closest parameter."""
     with pytest.raises(UnknownNameError) as caught:
-        exchanger.set_params("", {"uaa": 1.0})
-    assert caught.value.suggestions == ("ua",)
+        exchanger.set_params("", {"thermal_conductanc": 1.0})
+    assert caught.value.suggestions == ("thermal_conductance",)
 
 
 def test_bindable_lists_what_a_module_accepts(exchanger):

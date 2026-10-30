@@ -42,11 +42,11 @@ def exchanger_for(row, measured, ua):
         mapping.read_property(DATA / "heat_exchanger_3410.param")
     )
     params = base | dict(
-        ua=ua,
-        dp_hot_nominal=units.bar_to_pa(row.HEX_PDrop),
-        dp_cold_nominal=0,
-        m_dot_hot_nominal=measured["m_dot_hot"],
-        m_dot_cold_nominal=measured["m_dot_cold"],
+        thermal_conductance=ua,
+        hot_nominal_pressure_drop=units.bar_to_pa(row.HEX_PDrop),
+        cold_nominal_pressure_drop=0,
+        hot_nominal_mass_flow=measured["m_dot_hot"],
+        cold_nominal_mass_flow=measured["m_dot_cold"],
     )
     streams = {
         "hot_in": Stream(
@@ -71,7 +71,7 @@ def test_measured_heat_exchanger_performance():
         assert out.hot_out_T == pytest.approx(measured["hot_out_T"], abs=0.5)
         assert out.cold_out_T == pytest.approx(measured["cold_out_T"], abs=0.5)
         assert out.duty == pytest.approx(row.Thermal_PowerGen, rel=0.02)
-        assert 10000 < out.dp_hot < 20000
+        assert 10000 < out.hot_pressure_drop < 20000
         assert not exchanger.health(result, measured).alarm
         fouled, _ = exchanger_for(row, measured, ua * 0.8)
         reduced = fouled(**streams).outputs
@@ -83,12 +83,12 @@ def test_measured_heat_exchanger_performance():
 def test_first_law_equal_capacity_and_limits(arrangement):
     """Both arrangements conserve energy, retain mass and respect zero-flow/zero-UA limits."""
     p = dict(
-        ua=100000,
+        thermal_conductance=100000,
         arrangement=arrangement,
-        dp_hot_nominal=1000,
-        dp_cold_nominal=2000,
-        m_dot_hot_nominal=10,
-        m_dot_cold_nominal=10,
+        hot_nominal_pressure_drop=1000,
+        cold_nominal_pressure_drop=2000,
+        hot_nominal_mass_flow=10,
+        cold_nominal_mass_flow=10,
     )
     c = HeatExchanger().update_params(**p)
     hot, cold = Stream(m_dot=10, T=350, p=1e6), Stream(m_dot=10, T=300, p=1e6)
@@ -100,11 +100,11 @@ def test_first_law_equal_capacity_and_limits(arrangement):
     assert streams["hot_out"].p == hot.p - 1000
     out = c(hot_in=hot.with_(m_dot=0), cold_in=cold).outputs
     assert out.duty == 0
-    c.update_params(ua=0)
+    c.update_params(thermal_conductance=0)
     out = c(hot_in=hot, cold_in=cold).outputs
     assert out.duty == 0 and out.hot_out_T == hot.T
     out = c(hot_in=hot, cold_in=cold.with_(T=350)).outputs
-    assert out.duty == 0 and out.lmtd == 0
+    assert out.duty == 0 and out.log_mean_temperature_difference == 0
 
 
 def test_invalid_measurements():
@@ -116,11 +116,11 @@ def test_invalid_measurements():
 def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
     """E-modules-011/012: zero flow or zero design UA mean not assessed, not an error."""
     exchanger = HeatExchanger().update_params(
-        ua=100000,
-        dp_hot_nominal=1000,
-        dp_cold_nominal=1000,
-        m_dot_hot_nominal=10,
-        m_dot_cold_nominal=10,
+        thermal_conductance=100000,
+        hot_nominal_pressure_drop=1000,
+        cold_nominal_pressure_drop=1000,
+        hot_nominal_mass_flow=10,
+        cold_nominal_mass_flow=10,
     )
     stopped = exchanger(
         hot_in=Stream(m_dot=0, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6)
@@ -131,7 +131,7 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
         hot_in=Stream(m_dot=10, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6)
     )
     assert exchanger.health(running, measured) is not None
-    exchanger.update_params(ua=0)
+    exchanger.update_params(thermal_conductance=0)
     assert exchanger.health(running, measured) is None
     with pytest.raises(gm.errors.UnknownCorrelationError, match="arrangement"):
         gm.analysis.estimate_conductance(350, 340, 300, 310, 10, 10, arrangement="cross")
@@ -141,12 +141,12 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
 def test_traced_call_matches_one_call_per_row(arrangement):
     """Unequal, equal, stopped and pinched rows trace and equal one call per row."""
     exchanger = HeatExchanger().update_params(
-        ua=100000,
+        thermal_conductance=100000,
         arrangement=arrangement,
-        dp_hot_nominal=1000,
-        dp_cold_nominal=2000,
-        m_dot_hot_nominal=10,
-        m_dot_cold_nominal=10,
+        hot_nominal_pressure_drop=1000,
+        cold_nominal_pressure_drop=2000,
+        hot_nominal_mass_flow=10,
+        cold_nominal_mass_flow=10,
     )
     rows = [
         dict(hot_in=Stream(m_dot=hot, T=hot_T, p=1e6), cold_in=Stream(m_dot=cold, T=300, p=1e6))
@@ -165,12 +165,12 @@ def test_traced_call_matches_one_call_per_row(arrangement):
 
 def _health_exchanger(arrangement):
     return HeatExchanger().update_params(
-        ua=100000,
+        thermal_conductance=100000,
         arrangement=arrangement,
-        dp_hot_nominal=1000,
-        dp_cold_nominal=2000,
-        m_dot_hot_nominal=10,
-        m_dot_cold_nominal=10,
+        hot_nominal_pressure_drop=1000,
+        cold_nominal_pressure_drop=2000,
+        hot_nominal_mass_flow=10,
+        cold_nominal_mass_flow=10,
         fouling_threshold=0.15,
     )
 

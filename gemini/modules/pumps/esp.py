@@ -35,6 +35,10 @@ HEALTH_KEYS = ("power", "head", "discharge_pressure")
 NO_MEASUREMENTS_OUTSIDE = "No performance measurements; outside operating window"
 
 
+CURVE_SHAPE = (pumps.POLYNOMIAL_COEFFICIENT_COUNT,)
+"""Shape of the head and power coefficient lists."""
+
+
 def _float32():
     """Return whether the runtime precision is float32."""
     return runtime.get_precision() == "float32"
@@ -43,27 +47,25 @@ def _float32():
 class ESP(Module):
     """Electrical submersible pump installed inside a production well."""
 
-    repr_fields = ("no_stages", "setting_depth", "motor_efficiency", "bep_flow")
+    repr_fields = ("stage_count", "setting_depth", "motor_efficiency", "best_efficiency_flow")
 
     def __init__(self):
         """Declare ESP design data, ports and computed performance."""
         super().__init__()
 
         # Parameters
-        self.no_stages = Parameter(Count)
-        self.head_coeff = Parameter(
-            list[float], shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,), calibratable=True
-        )
-        self.power_coeff = Parameter(
-            list[float], shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,), calibratable=True
-        )
+        self.stage_count = Parameter(Count)
+        self.head_coefficients = Parameter(list[float], shape=CURVE_SHAPE, calibratable=True)
+        self.power_coefficients = Parameter(list[float], shape=CURVE_SHAPE, calibratable=True)
         self.pump_type = Parameter(str | None, default=None)
         self.setting_depth = Parameter(Length, default=0)
         self.motor_efficiency = Parameter(Efficiency, default=1)
-        self.min_flow = Parameter(VolumeFlow, default=0, ge=0)
-        self.max_flow = Parameter(VolumeFlow, default=1, gt=0)
-        self.bep_flow = Parameter(VolumeFlow, default=pumps.DEFAULT_BEP_FLOW, gt=0)
-        self.correction_factor = Parameter(tuple[Dimensionless, PressureDifference], default=(1, 0))
+        self.minimum_flow = Parameter(VolumeFlow, default=0, ge=0)
+        self.maximum_flow = Parameter(VolumeFlow, default=1, gt=0)
+        self.best_efficiency_flow = Parameter(VolumeFlow, default=pumps.DEFAULT_BEP_FLOW, gt=0)
+        self.correction_factors = Parameter(
+            tuple[Dimensionless, PressureDifference], default=(1, 0)
+        )
         self.tubing = Parameter(Length | None, default=None, gt=0)
         self.drift_threshold = Parameter(
             Fraction, default=diagnostics.DEFAULT_DRIFT_THRESHOLD, gt=0, le=1
@@ -81,8 +83,8 @@ class ESP(Module):
         self.efficiency = Output(Dimensionless, soft_sensor=True)
         self.discharge_pressure = Output(Pressure, soft_sensor=True)
         self.flow = Output(VolumeFlow)
-        self.in_operating_window = Output(bool)
-        self.bep_ratio = Output(Ratio)
+        self.is_in_operating_window = Output(bool)
+        self.best_efficiency_ratio = Output(Ratio)
         self.electricity = Output(Electricity)
 
         # Outlets
@@ -127,19 +129,25 @@ class ESP(Module):
         self.efficiency = pumps.esp_efficiency(self.flow, self.head, self.power)
         scale = pumps.speed_ratio(self.frequency, constants.ESP_REFERENCE_FREQUENCY)
         self.discharge_pressure = discharge.p
-        self.in_operating_window = pumps.in_operating_window(
-            self.flow, self.min_flow, self.max_flow, scale
+        self.is_in_operating_window = pumps.is_in_operating_window(
+            self.flow, self.minimum_flow, self.maximum_flow, scale
         )
-        self.bep_ratio = pumps.best_efficiency_ratio(self.flow, scale, self.bep_flow)
+        self.best_efficiency_ratio = pumps.best_efficiency_ratio(
+            self.flow, scale, self.best_efficiency_flow
+        )
         self.electricity = energy.input_power(self.power, self.motor_efficiency)
 
     def head_function(self, flow: float, frequency: float) -> float:
         """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""
-        return pumps.head(flow, frequency, self.no_stages, self._coefficients(self.head_coeff))
+        return pumps.head(
+            flow, frequency, self.stage_count, self._coefficients(self.head_coefficients)
+        )
 
     def power_function(self, flow: float, frequency: float) -> float:
         """Return shaft power [W] for flow [m3/s] and frequency [Hz]."""
-        return pumps.power(flow, frequency, self.no_stages, self._coefficients(self.power_coeff))
+        return pumps.power(
+            flow, frequency, self.stage_count, self._coefficients(self.power_coefficients)
+        )
 
     def health(self, result, measured):
         """Score the worst available relative drift and the operating window.
@@ -148,7 +156,7 @@ class ESP(Module):
         selected with ``ops.where`` over complete strings, the first key winning a tie.
         """
         predicted = result.outputs
-        window = predicted.in_operating_window
+        window = predicted.is_in_operating_window
         drifts = {
             key: diagnostics.relative_drift(measured[key], getattr(predicted, key))
             for key in HEALTH_KEYS

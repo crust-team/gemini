@@ -90,9 +90,9 @@ def esp_cases():
     """
     block = property_block("esp_1ee3.param")
     params = {
-        "no_stages": block["esp_no_stage"],
-        "head_coeff": list(map(float, block["esp_head_coeff"].split(";"))),
-        "power_coeff": list(map(float, block["esp_power_coeff"].split(";"))),
+        "stage_count": block["esp_no_stage"],
+        "head_coefficients": list(map(float, block["esp_head_coeff"].split(";"))),
+        "power_coefficients": list(map(float, block["esp_power_coeff"].split(";"))),
     }
     cases = {
         f"esp_{frequency}": case(ESP, params, {"pump_flow": flow / 3600, "pump_freq": frequency})
@@ -100,7 +100,7 @@ def esp_cases():
     }
     cases["esp_power"] = case(
         ESP,
-        dict(params, power_coeff=ESP_POWER_COEFFICIENTS),
+        dict(params, power_coefficients=ESP_POWER_COEFFICIENTS),
         {"pump_flow": 130 / 3600, "pump_freq": 60},
     )
     return cases
@@ -170,7 +170,7 @@ def well_case(role, name, direction, flow, pressure):
         "diameter": np.array([r["ID"] for r in table[1:]]),
         "roughness": [r["roughness"] for r in table[1:]],
         "friction_correlation": "darcy_weisbach",
-        "friction_correlation_2p": "BeggsBrill",
+        "two_phase_friction_correlation": "BeggsBrill",
         "correction_factors": [1, 0],
     }
     inputs = {

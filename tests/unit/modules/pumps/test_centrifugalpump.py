@@ -10,7 +10,7 @@ from tests.fixtures.equivalence import assert_module_matches
 
 CP = 4217.4
 PARAMS = dict(
-    head_coeff=[6e5, 0, -4e7],
+    head_coefficients=[6e5, 0, -4e7],
     rated_frequency=50,
     best_efficiency=0.8,
     best_efficiency_flow=0.05,
@@ -84,7 +84,7 @@ def test_off_curve_and_reverse_flow_raise():
     """Run-out beyond twice the best-efficiency flow, negative head and reverse flow raise."""
     with pytest.raises(PhysicsRangeError, match="off its curve"):
         pump()(suction=Stream(m_dot=100, T=330, p=3e5), frequency=50)
-    steep = pump().update_params(head_coeff=[6e5, 0, -4e8])
+    steep = pump().update_params(head_coefficients=[6e5, 0, -4e8])
     with pytest.raises(PhysicsRangeError, match="head = -"):
         steep(suction=Stream(m_dot=60, T=330, p=3e5), frequency=50)
     with pytest.raises(PhysicsRangeError, match="reverse flow"):

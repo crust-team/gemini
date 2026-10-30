@@ -120,7 +120,7 @@ def pid_integral_increment(
 
 @ops.physics
 def anti_windup_increment(
-    increment: float, unclamped: float, output_min: float, output_max: float
+    increment: float, unclamped: float, minimum_output: float, maximum_output: float
 ) -> float:
     """Return the integral increment, zero while the output is clamped and driven further out.
 
@@ -130,20 +130,20 @@ def anti_windup_increment(
         Candidate integral increment, in command units.
     unclamped : float
         Command before the output limits, in command units.
-    output_min, output_max : float
+    minimum_output, maximum_output : float
         Output limits, in command units.
 
     Returns
     -------
     float
-        ``0`` if ``unclamped >= output_max`` and ``increment > 0``, or ``unclamped <=
-        output_min`` and ``increment < 0``; otherwise ``increment``.
+        ``0`` if ``unclamped >= maximum_output`` and ``increment > 0``, or ``unclamped <=
+        minimum_output`` and ``increment < 0``; otherwise ``increment``.
 
     Notes
     -----
     Reference: Astrom and Hagglund 2006, Advanced PID Control, section on anti-windup:
     clamping (conditional integration).
     """
-    winding_up = ops.logical_and(unclamped >= output_max, increment > 0)
-    winding_down = ops.logical_and(unclamped <= output_min, increment < 0)
+    winding_up = ops.logical_and(unclamped >= maximum_output, increment > 0)
+    winding_down = ops.logical_and(unclamped <= minimum_output, increment < 0)
     return ops.where(ops.logical_or(winding_up, winding_down), 0.0, increment)

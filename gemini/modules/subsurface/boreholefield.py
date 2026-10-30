@@ -29,14 +29,14 @@ class BoreholeField(Module):
 
     The state is the change theta of the mean ground temperature of the field volume
     V = N s**2 H (``borehole_count`` N, ``borehole_spacing`` s, ``borehole_depth`` H) from
-    ``undisturbed_ground_temperature`` T_u; ``ground_T`` = T_u + theta. The fluid exchanges
-    heat with that mean ground temperature through the borehole resistance R_b plus the
+    ``undisturbed_ground_temperature`` T_u; ``ground_temperature`` = T_u + theta. The fluid
+    exchanges heat with that mean ground temperature through the borehole resistance R_b plus the
     steady-flux resistance R_sf of each borehole's ground cell of equivalent radius
     r_e = s / sqrt(pi) (``ground.steady_flux_resistance``, Hellstrom 1991). With the
     conductance UA = N H / (R_b + R_sf), plug flow along the loop gives the effectiveness
     eps = 1 - exp(-UA / (m_dot cp)), the extraction rate Q = eps m_dot cp (T_g - T_in) and
-    outlet_T = T_in + eps (T_g - T_in); ``fluid_mean_T`` is the arithmetic mean of inlet and
-    outlet, the usual design convention. A positive Q is heat taken from the ground
+    outlet_T = T_in + eps (T_g - T_in); ``fluid_mean_temperature`` is the arithmetic mean of inlet
+    and outlet, the usual design convention. A positive Q is heat taken from the ground
     (``heat_absorbed``), a negative Q heat rejected into it (``heat_loss``; the ground is the
     plant's environment), so the stream audit closes.
 
@@ -83,8 +83,8 @@ class BoreholeField(Module):
 
         # Outputs
         self.heat_extraction_rate = Output(Power)
-        self.fluid_mean_T = Output(Temperature)
-        self.ground_T = Output(Temperature)
+        self.fluid_mean_temperature = Output(Temperature)
+        self.ground_temperature = Output(Temperature)
         self.outlet_T = Output(Temperature)
         self.heat_absorbed = Output(HeatAbsorbed)
         self.heat_loss = Output(HeatLoss)
@@ -109,8 +109,8 @@ class BoreholeField(Module):
         inlet = inlets.inlet
         rate = self._extraction_rate(inlet)
         self.heat_extraction_rate = rate
-        self.fluid_mean_T = heat_transfer.mean_temperature(inlet.T, outlets.outlet.T)
-        self.ground_T = self._ground_temperature()
+        self.fluid_mean_temperature = heat_transfer.mean_temperature(inlet.T, outlets.outlet.T)
+        self.ground_temperature = self._ground_temperature()
         self.outlet_T = outlets.outlet.T
         self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 

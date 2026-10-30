@@ -101,7 +101,7 @@ def _esp_vlp_values(row, well_property, esp_property, reservoir_property):
         m_dot=mass, p=units.bar_to_pa(row.Pwh_prod), T=units.c_to_k(row.T_p_in), fluid=well.fluid
     )
     discharge = well.discharge_from_wellhead(wellhead)
-    slope, offset = tables.esp_params_from_gemini(esp_property)["correction_factor"]
+    slope, offset = tables.esp_params_from_gemini(esp_property)["correction_factors"]
     outlet_pressure = units.pa_to_bar(slope * discharge.p + offset)
     return {
         "esp_1ee3:esp_vlp_ipr_inlet_pressure.calculated": [units.pa_to_bar(intake.p)],

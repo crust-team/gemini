@@ -77,7 +77,7 @@ class DistrictEnergyPlant(gm.modules.Module):
 def configure_network(network, design_flow):
     """Fill the circulation pump and the two 400 m DN150 pipes of a network."""
     network.pump.update_params(
-        head_coeff=[3e5, 0.0, -1e5 / design_flow**2],
+        head_coefficients=[3e5, 0.0, -1e5 / design_flow**2],
         rated_frequency="50 Hz",
         best_efficiency=0.75,
         best_efficiency_flow=design_flow,
@@ -85,7 +85,9 @@ def configure_network(network, design_flow):
     )
     network.pump.frequency = "50 Hz"
     for pipe in (network.supply_pipe, network.return_pipe):
-        pipe.update_params(length=400, inner_diameter=0.15, elevation_change=0, u_value=0.8)
+        pipe.update_params(
+            length=400, inner_diameter=0.15, elevation_change=0, heat_transfer_coefficient=0.8
+        )
         pipe.ambient_temperature = "10 degC"
 
 
@@ -95,11 +97,11 @@ def configure_substation(substation, ua, network_flow):
     substation.valve.update_params(flow_coefficient="40 m3/h/bar^0.5")
     substation.valve.opening = 0.9
     substation.heat_exchanger.update_params(
-        ua=ua,
-        dp_hot_nominal="0.2 bar",
-        dp_cold_nominal="0.2 bar",
-        m_dot_hot_nominal=network_flow,
-        m_dot_cold_nominal=network_flow * 1.2,
+        thermal_conductance=ua,
+        hot_nominal_pressure_drop="0.2 bar",
+        cold_nominal_pressure_drop="0.2 bar",
+        hot_nominal_mass_flow=network_flow,
+        cold_nominal_mass_flow=network_flow * 1.2,
     )
 
 
@@ -108,7 +110,7 @@ def configure_heating(network):
     configure_network(network, design_flow=0.005)
     network.splitters[0].split_fraction = 0.5
     for substation, demand in zip(network.substations, ("150 kW", "100 kW")):
-        configure_substation(substation, ua=2.5e4, network_flow=2.5)
+        configure_substation(substation, thermal_conductance=2.5e4, network_flow=2.5)
         substation.consumer.update_params(minimum_return_temperature="30 degC")
         substation.consumer.heat_demand = demand
 
@@ -117,7 +119,7 @@ def configure_cooling(network):
     """Fill the cooling network: one building with a 150 kW sensible load."""
     configure_network(network, design_flow=0.01)
     substation = network.substations[0]
-    configure_substation(substation, ua=1.2e5, network_flow=10.0)
+    configure_substation(substation, thermal_conductance=1.2e5, network_flow=10.0)
     substation.consumer.update_params(maximum_return_temperature="19 degC", dew_point_margin=1.0)
     substation.set_inputs(
         {
@@ -142,7 +144,7 @@ def configure_ates(ates):
     )
     ates.storage.mode = "charge"
     ates.pump.update_params(
-        head_coeff=[2e5, 0.0, -5e8],
+        head_coefficients=[2e5, 0.0, -5e8],
         rated_frequency="50 Hz",
         best_efficiency=0.7,
         best_efficiency_flow=0.01,
@@ -150,11 +152,11 @@ def configure_ates(ates):
     )
     ates.pump.frequency = "50 Hz"
     ates.heat_exchanger.update_params(
-        ua=4e5,
-        dp_hot_nominal="0.3 bar",
-        dp_cold_nominal="0.3 bar",
-        m_dot_hot_nominal=10,
-        m_dot_cold_nominal=10,
+        thermal_conductance=4e5,
+        hot_nominal_pressure_drop="0.3 bar",
+        cold_nominal_pressure_drop="0.3 bar",
+        hot_nominal_mass_flow=10,
+        cold_nominal_mass_flow=10,
     )
     ates.heat_pump.update_params(mode="heating", capacity="1 MW")
     ates.heat_pump.temperature_setpoint = "40 degC"

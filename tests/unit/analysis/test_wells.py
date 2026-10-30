@@ -95,7 +95,7 @@ def test_pump_curve_starts_at_the_shut_in_head_of_the_polynomial(shared_plant):
     """At zero flow and 60 Hz the head is the first coefficient times the stages, in Pa."""
     pump = shared_plant.get_module("doublet.esp")
     curve = wells.pump_curve(shared_plant, "doublet.esp")
-    expected = units.ft_head_to_pa(pump.head_coeff[0] * pump.no_stages)
+    expected = units.ft_head_to_pa(pump.head_coefficients[0] * pump.stage_count)
     assert curve["curve"]["flow"][0] == 0.0
     assert curve["curve"]["head"][0] == pytest.approx(expected, rel=1e-12)
     assert curve["frequency"] == 60.0

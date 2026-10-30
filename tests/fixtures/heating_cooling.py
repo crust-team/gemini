@@ -12,7 +12,7 @@ import gemini as gm
 from gemini.modules.plants import templating
 
 SIZES = {
-    "heat_exchanger.ua": 1e5,
+    "heat_exchanger.thermal_conductance": 1e5,
     "heat_pump.capacity": 2e6,
     "peak_boiler.fuel_type": "gas",
     "peak_boiler.capacity": 15e6,
@@ -40,7 +40,12 @@ ADSORPTION_FIT = dict(
     evaporator_coefficient=1.0,
     auxiliary_power_ratio=0.02,
 )
-PIPE_SIZE = {"length": 100.0, "inner_diameter": 0.3, "elevation_change": 0.0, "u_value": 0.8}
+PIPE_SIZE = {
+    "length": 100.0,
+    "inner_diameter": 0.3,
+    "elevation_change": 0.0,
+    "heat_transfer_coefficient": 0.8,
+}
 PIPES = ("heating_return_pipe", "heating_supply_pipe", "cooling_return_pipe", "cooling_supply_pipe")
 INPUTS = {
     "doublet.reservoir.production_rate": 42.36,

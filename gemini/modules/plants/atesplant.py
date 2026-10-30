@@ -83,7 +83,7 @@ class ATESPlant(Module):
         self.heat_absorbed = Output(HeatAbsorbed)
         self.heat_accumulation = Output(HeatAccumulation)
         self.stored_energy = Output.of(self.storage.stored_energy)
-        self.production_T = Output.of(self.storage.production_T)
+        self.production_out_T = Output.of(self.storage.production_out_T)
         self.recovery_efficiency = Output.of(self.storage.recovery_efficiency)
 
         # Outlets

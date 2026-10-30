@@ -30,8 +30,8 @@ class Desander(Module):
     - liquid volume flow ``Q = m_dot * (1 - x_gas) / rho_l``;
     - ``sand_removal_rate = separation_efficiency * sand_concentration * Q``;
     - ``residual_sand_concentration = (1 - separation_efficiency) * sand_concentration``;
-    - ``pressure_drop = dp_nominal * (m_dot / m_dot_nominal) ** 2``, the quadratic law of a
-      fixed-geometry cyclone at constant resistance coefficient (as for ``Filter``).
+    - ``pressure_drop = nominal_pressure_drop * (m_dot / nominal_mass_flow) ** 2``, the quadratic
+      law of a fixed-geometry cyclone at constant resistance coefficient (as for ``Filter``).
 
     ``sand_concentration`` is kg of sand per m3 of liquid at the inlet (1 mg/l = 1 g/m3 =
     1e-3 kg/m3). Streams carry no solids, so the liquid mass flow, temperature and fluid pass
@@ -47,8 +47,8 @@ class Desander(Module):
 
         # Parameters
         self.separation_efficiency = Parameter(Fraction)
-        self.dp_nominal = Parameter(PressureDifference, ge=0)
-        self.m_dot_nominal = Parameter(MassFlow, gt=0)
+        self.nominal_pressure_drop = Parameter(PressureDifference, ge=0)
+        self.nominal_mass_flow = Parameter(MassFlow, gt=0)
 
         # Inlets
         self.inlet = Inlet(Stream, stream="brine")
@@ -94,7 +94,9 @@ class Desander(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        drop = hydraulics.quadratic_pressure_drop(self.dp_nominal, inlet.m_dot, self.m_dot_nominal)
+        drop = hydraulics.quadratic_pressure_drop(
+            self.nominal_pressure_drop, inlet.m_dot, self.nominal_mass_flow
+        )
         ops.check(
             drop <= inlet.p,
             PhysicsRangeError,

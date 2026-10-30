@@ -24,9 +24,9 @@ def test_esp_converter_uses_si():
             "esp_correction_factor": "1;0.5",
         }
     )
-    assert params["head_coeff"] == [1.0, 2.0]
-    assert params["min_flow"] == pytest.approx(0.01)
-    assert params["correction_factor"] == (1.0, 50000.0)
+    assert params["head_coefficients"] == [1.0, 2.0]
+    assert params["minimum_flow"] == pytest.approx(0.01)
+    assert params["correction_factors"] == (1.0, 50000.0)
 
 
 def test_trajectory_file_is_read_as_utf8_with_bom(tmp_path):

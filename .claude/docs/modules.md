@@ -19,7 +19,7 @@ Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
 ## Construction and metadata
 
 Construct a module without arguments and set its values afterwards; `update_params` returns the
-module, so `ESP().update_params(no_stages=12, ...)` builds a configured pump. Only structural
+module, so `ESP().update_params(stage_count=12, ...)` builds a configured pump. Only structural
 tree-shape arguments (for example `ModuleList(modules)`) go to `__init__`. There is no
 class-creation hook: `module.name` is the snake_case class name computed on access,
 `Module.help()` reads the first paragraph of the class docstring and lists the declarations, and
@@ -142,9 +142,9 @@ class Pump(Module):
         super().__init__()
 
         # Parameters
-        self.no_stages = Parameter(Count)
-        self.head_coeff = Parameter(list[float], shape=(6,))
-        self.power_coeff = Parameter(list[float], shape=(6,))
+        self.stage_count = Parameter(Count)
+        self.head_coefficients = Parameter(list[float], shape=(6,))
+        self.power_coefficients = Parameter(list[float], shape=(6,))
 
         # Inlets
         self.suction = Inlet(Stream)
@@ -167,7 +167,7 @@ class Pump(Module):
         # Outlets
         suction = inlets.suction
         flow = suction.volumetric_flow()
-        head = pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
+        head = pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         discharge = suction.with_(p=suction.p + head)
 
         outlets = dict(discharge=discharge)
@@ -178,7 +178,7 @@ class Pump(Module):
         discharge = outlets.discharge
         self.flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
-        self.power = pumps.power(self.flow, self.frequency, self.no_stages, self.power_coeff)
+        self.power = pumps.power(self.flow, self.frequency, self.stage_count, self.power_coefficients)
         self.electricity = self.power
 ```
 
@@ -297,11 +297,11 @@ Parameters, controls and boundaries are set by attribute assignment or in bulk:
 
 ```python
 curve = [1, 0, 0, 0, 0, 0]
-pump = Pump().update_params(no_stages=10, head_coeff=curve, power_coeff=curve)
+pump = Pump().update_params(stage_count=10, head_coefficients=curve, power_coefficients=curve)
 plant = HeatPlant()
 plant.load_state_dict({"pump": pump.state_dict()[""]}, strict=False)
 plant.heat_exchanger.update_params(
-    ua=5e5, dp_hot_nominal=0, dp_cold_nominal=0, m_dot_hot_nominal=40, m_dot_cold_nominal=40
+    thermal_conductance=5e5, hot_nominal_pressure_drop=0, cold_nominal_pressure_drop=0, hot_nominal_mass_flow=40, cold_nominal_mass_flow=40
 )
 assert plant.is_initialized and not pump.has_input_value("frequency")
 plant.set_inputs({"pump.frequency": "50 Hz"})

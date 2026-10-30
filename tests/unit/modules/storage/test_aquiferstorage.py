@@ -101,7 +101,7 @@ def test_two_charge_steps_fill_and_mix_the_warm_store():
     decay = math.exp(-HOUR * conductance(2 * volume) / (WATER * 2 * volume))
     assert state["warm_temperature_change"] == pytest.approx(mixed * decay, rel=1e-12)
     assert result.outputs.heat_loss == pytest.approx(conductance(volume) * first, rel=1e-12)
-    assert result.outputs.production_T == 284.15
+    assert result.outputs.production_out_T == 284.15
 
 
 def test_heat_accumulation_is_the_rate_of_change_of_stored_energy():
@@ -126,7 +126,7 @@ def test_heat_accumulation_is_the_rate_of_change_of_stored_energy():
     audit = energy_balance(module, result)
     assert audit["relative_residual"] < 1e-12
     assert audit["heat_accumulation"] == out.heat_accumulation
-    assert out.production_T == 289.15 and out.recovery_efficiency == pytest.approx(1 / 6)
+    assert out.production_out_T == 289.15 and out.recovery_efficiency == pytest.approx(1 / 6)
     recovered = 1e12 + WATER * 30 / 1000 * 5.0
     assert state["recovered_heat"] == pytest.approx(recovered)
 
@@ -156,10 +156,10 @@ def test_overdrawn_store_empties_to_native_groundwater():
     module = storage("discharge")
     start = storage().initial_state() | {"warm_volume": 10.0, "warm_temperature_change": 5.0}
     state, result = module.step(start, HOUR, {"injection_in": COLD})
-    assert result.outputs.production_T == 289.15
+    assert result.outputs.production_out_T == 289.15
     assert state["warm_volume"] == 0 and state["warm_temperature_change"] == 0
     _, result = module.step(state, HOUR, {"injection_in": COLD})
-    assert result.outputs.production_T == 284.15
+    assert result.outputs.production_out_T == 284.15
 
 
 def test_composite_step_charges_through_the_plant():

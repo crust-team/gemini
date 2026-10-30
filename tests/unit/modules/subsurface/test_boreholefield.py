@@ -88,8 +88,8 @@ def test_plain_call_extracts_with_the_loop_effectiveness():
     assert module.initial_state() == {"ground_temperature_change": 0}
     assert out.heat_extraction_rate == pytest.approx(rate, rel=1e-12)
     assert out.outlet_T == pytest.approx(273.15 + rate / (3 * CP))
-    assert out.fluid_mean_T == pytest.approx((273.15 + out.outlet_T) / 2)
-    assert out.ground_T == 283.15 and out.heat_absorbed == out.heat_extraction_rate
+    assert out.fluid_mean_temperature == pytest.approx((273.15 + out.outlet_T) / 2)
+    assert out.ground_temperature == 283.15 and out.heat_absorbed == out.heat_extraction_rate
     assert out.heat_loss == 0
     assert energy_balance(module, result)["relative_residual"] < 1e-12
     assert mass_balance(module, result)["residual"] == 0
@@ -105,7 +105,7 @@ def test_two_steps_follow_the_exact_ground_response():
     decay = math.exp(-total * 30 * DAY / (2.2e6 * 360 * 150))
     assert state["ground_temperature_change"] == pytest.approx(equilibrium * (1 - decay))
     state, result = module.step(state, 30 * DAY, {"inlet": BRINE})
-    assert result.outputs.ground_T == pytest.approx(283.15 + equilibrium * (1 - decay))
+    assert result.outputs.ground_temperature == pytest.approx(283.15 + equilibrium * (1 - decay))
     double, _ = module.step(None, 60 * DAY, {"inlet": BRINE})
     assert state["ground_temperature_change"] == pytest.approx(
         double["ground_temperature_change"], rel=1e-12

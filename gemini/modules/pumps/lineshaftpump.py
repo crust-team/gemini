@@ -28,8 +28,8 @@ class LineShaftPump(Module):
     """Downhole multistage pump driven by a surface motor through a line shaft.
 
     The pump stages use the same TNO R11363 polynomial basis as ``ESP``
-    (``gemini.physics.pumps``): ``head_coeff`` and ``power_coeff`` give ft of head and
-    bhp per stage at 60 Hz with the flow in bbl/day, scaled by ``no_stages`` and by the square
+    (``gemini.physics.pumps``): ``head_coefficients`` and ``power_coefficients`` give ft of head and
+    bhp per stage at 60 Hz with the flow in bbl/day, scaled by ``stage_count`` and by the square
     (head) and cube (power) of ``frequency / 60 Hz``. The line shaft from the surface motor to
     the pump at ``setting_depth`` adds the mechanical friction loss
     ``P_friction = shaft_friction_loss * setting_depth * frequency / 60 Hz``: the friction loss
@@ -48,18 +48,18 @@ class LineShaftPump(Module):
     polynomial curve) raise ``PhysicsRangeError``; at zero flow the pump runs at shutoff.
     """
 
-    repr_fields = ("no_stages", "setting_depth", "motor_efficiency")
+    repr_fields = ("stage_count", "setting_depth", "motor_efficiency")
 
     def __init__(self):
         """Declare line-shaft pump design data, ports and computed performance."""
         super().__init__()
 
         # Parameters
-        self.no_stages = Parameter(Count)
-        self.head_coeff = Parameter(
+        self.stage_count = Parameter(Count)
+        self.head_coefficients = Parameter(
             list[float], shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,), calibratable=True
         )
-        self.power_coeff = Parameter(
+        self.power_coefficients = Parameter(
             list[float], shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,), calibratable=True
         )
         self.setting_depth = Parameter(Length)
@@ -98,7 +98,7 @@ class LineShaftPump(Module):
 
     def _compute_outputs(self, inlets, outlets):
         flow = inlets.suction.volumetric_flow()
-        pump_power = pumps.power(flow, self.frequency, self.no_stages, self.power_coeff)
+        pump_power = pumps.power(flow, self.frequency, self.stage_count, self.power_coefficients)
         ops.check(
             pump_power >= 0,
             PhysicsRangeError,
@@ -129,7 +129,7 @@ class LineShaftPump(Module):
             path=self.path,
             flow=flow,
         )
-        head = pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
+        head = pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         ops.check(
             head >= 0,
             PhysicsRangeError,

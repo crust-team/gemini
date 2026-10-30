@@ -12,6 +12,7 @@ from gemini import backends
 from gemini.engine import checkpoint
 from gemini.engine.callbacks import AutoCheckpoint, Callback, EventLog
 from gemini.engine.results import Results
+from gemini.modules.plants.migration import RENAMED_NAMES
 from gemini.types import Control, Output
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from tests.fixtures.frames import path_frame
@@ -66,6 +67,7 @@ def _reference(name, actual):
     """
     old = pd.read_pickle(REFERENCE / name)
     old = old.rename(columns={"filter_hot": "filters.hot", "filter_return": "filters.cold"})
+    old = old.rename(columns=RENAMED_NAMES)
     for column in old:
         old[column] = old[column].astype(actual[column].dtype)
     if isinstance(old.index, pd.DatetimeIndex):
@@ -214,7 +216,8 @@ def test_missing_data_dates_events_and_export(setup, tmp_path):
     module = plant.filters.hot
     module._param_history.append(
         DatedParams(
-            valid_from=frame.index[1], params=module._params_at(None) | {"dp_nominal": 3200}
+            valid_from=frame.index[1],
+            params=module._params_at(None) | {"nominal_pressure_drop": 3200},
         )
     )
     events = EventLog(tmp_path / "events.jsonl")
@@ -299,7 +302,7 @@ def test_error_policies_and_missing_columns(setup):
 def test_plant_only_checkpoint(setup, tmp_path):
     """A configured engine can save before its first run, including fitted design overrides."""
     plant, _ = setup
-    plant.heat_exchanger.update_params(ua=123456)
+    plant.heat_exchanger.update_params(thermal_conductance=123456)
     engine = gm.Engine(plant)
     path = tmp_path / "design.ckpt"
     engine.save_checkpoint(path)

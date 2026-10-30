@@ -55,11 +55,11 @@ class DownholeHeatExchanger(Module):
         super().__init__()
 
         # Parameters
-        self.depth = Parameter(Length, gt=0)
+        self.borehole_depth = Parameter(Length, gt=0)
         self.surface_temperature = Parameter(Temperature)
         self.geothermal_gradient = Parameter(TemperatureGradient)
-        self.rock_conductivity = Parameter(ThermalConductivity, calibratable=True)
-        self.rock_diffusivity = Parameter(ThermalDiffusivity)
+        self.ground_conductivity = Parameter(ThermalConductivity, calibratable=True)
+        self.ground_diffusivity = Parameter(ThermalDiffusivity)
         self.borehole_radius = Parameter(Length, gt=0)
         self.borehole_resistance = Parameter(LinearThermalResistance, calibratable=True)
         self.operating_time = Parameter(Duration, gt=0)
@@ -114,7 +114,7 @@ class DownholeHeatExchanger(Module):
             inlet.T,
             self.surface_temperature,
             self.geothermal_gradient,
-            self.depth,
+            self.borehole_depth,
             relaxation,
         )
         return ops.where(inlet.m_dot == 0, inlet.T, profile)
@@ -127,9 +127,9 @@ class DownholeHeatExchanger(Module):
         """
         return ground.ramey_rock_resistance(
             self.operating_time,
-            self.rock_diffusivity,
+            self.ground_diffusivity,
             self.borehole_radius,
-            self.rock_conductivity,
+            self.ground_conductivity,
             error=ConfigurationError,
             context=f"{self.path}: operating_time rejected: ",
         )

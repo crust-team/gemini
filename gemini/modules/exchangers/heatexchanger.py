@@ -30,19 +30,24 @@ from gemini.types.results import NOT_ASSESSED
 class HeatExchanger(Module):
     """Two-stream heat exchanger with thermal and fouling diagnostics."""
 
-    repr_fields = ("ua", "arrangement", "dp_hot_nominal", "dp_cold_nominal")
+    repr_fields = (
+        "thermal_conductance",
+        "arrangement",
+        "hot_nominal_pressure_drop",
+        "cold_nominal_pressure_drop",
+    )
 
     def __init__(self):
         """Declare exchanger design data, ports and computed performance."""
         super().__init__()
 
         # Parameters
-        self.ua = Parameter(ThermalConductance, calibratable=True)
+        self.thermal_conductance = Parameter(ThermalConductance, calibratable=True)
         self.arrangement = Parameter(Literal["counterflow", "parallel"], default="counterflow")
-        self.dp_hot_nominal = Parameter(PressureDifference, ge=0)
-        self.dp_cold_nominal = Parameter(PressureDifference, ge=0)
-        self.m_dot_hot_nominal = Parameter(MassFlow, gt=0)
-        self.m_dot_cold_nominal = Parameter(MassFlow, gt=0)
+        self.hot_nominal_pressure_drop = Parameter(PressureDifference, ge=0)
+        self.cold_nominal_pressure_drop = Parameter(PressureDifference, ge=0)
+        self.hot_nominal_mass_flow = Parameter(MassFlow, gt=0)
+        self.cold_nominal_mass_flow = Parameter(MassFlow, gt=0)
         self.fouling_threshold = Parameter(
             Fraction, default=diagnostics.DEFAULT_FOULING_THRESHOLD, gt=0, le=1
         )
@@ -54,13 +59,13 @@ class HeatExchanger(Module):
         # Outputs
         self.duty = Output(Duty, soft_sensor=True)
         self.effectiveness = Output(Fraction, soft_sensor=True)
-        self.ntu = Output(Ratio)
-        self.lmtd = Output(TemperatureDifference)
+        self.transfer_units = Output(Ratio)
+        self.log_mean_temperature_difference = Output(TemperatureDifference)
         self.hot_out_T = Output(Temperature)
         self.cold_out_T = Output(Temperature)
-        self.dp_hot = Output(PressureDifference)
-        self.dp_cold = Output(PressureDifference)
-        self.approach_T = Output(TemperatureDifference)
+        self.hot_pressure_drop = Output(PressureDifference)
+        self.cold_pressure_drop = Output(PressureDifference)
+        self.approach_temperature = Output(TemperatureDifference)
 
         # Outlets
         self.hot_out = Outlet(Stream)
@@ -74,8 +79,8 @@ class HeatExchanger(Module):
         cold_in = inlets.cold_in
         values = self._performance(hot_in, cold_in)
 
-        hot_out = hot_in.with_(T=values["hot_out_T"], p=hot_in.p - values["dp_hot"])
-        cold_out = cold_in.with_(T=values["cold_out_T"], p=cold_in.p - values["dp_cold"])
+        hot_out = hot_in.with_(T=values["hot_out_T"], p=hot_in.p - values["hot_pressure_drop"])
+        cold_out = cold_in.with_(T=values["cold_out_T"], p=cold_in.p - values["cold_pressure_drop"])
 
         outlets = dict(hot_out=hot_out, cold_out=cold_out)
         return outlets
@@ -94,14 +99,14 @@ class HeatExchanger(Module):
             cold_in.T,
             hot_in.heat_capacity_rate(),
             cold_in.heat_capacity_rate(),
-            self.ua,
+            self.thermal_conductance,
             self.arrangement == "counterflow",
         )
-        dp_hot = hydraulics.quadratic_pressure_drop(
-            self.dp_hot_nominal, hot_in.m_dot, self.m_dot_hot_nominal
+        hot_pressure_drop = hydraulics.quadratic_pressure_drop(
+            self.hot_nominal_pressure_drop, hot_in.m_dot, self.hot_nominal_mass_flow
         )
-        dp_cold = hydraulics.quadratic_pressure_drop(
-            self.dp_cold_nominal, cold_in.m_dot, self.m_dot_cold_nominal
+        cold_pressure_drop = hydraulics.quadratic_pressure_drop(
+            self.cold_nominal_pressure_drop, cold_in.m_dot, self.cold_nominal_mass_flow
         )
         dt1, dt2 = heat_transfer.terminal_differences(
             hot_in.T, hot_T, cold_in.T, cold_T, self.arrangement == "counterflow"
@@ -109,13 +114,15 @@ class HeatExchanger(Module):
         return {
             "duty": duty,
             "effectiveness": effectiveness,
-            "ntu": ntu,
-            "lmtd": heat_transfer.lmtd(ops.maximum(0.0, dt1), ops.maximum(0.0, dt2)),
+            "transfer_units": ntu,
+            "log_mean_temperature_difference": heat_transfer.lmtd(
+                ops.maximum(0.0, dt1), ops.maximum(0.0, dt2)
+            ),
             "hot_out_T": hot_T,
             "cold_out_T": cold_T,
-            "dp_hot": dp_hot,
-            "dp_cold": dp_cold,
-            "approach_T": ops.minimum(dt1, dt2),
+            "hot_pressure_drop": hot_pressure_drop,
+            "cold_pressure_drop": cold_pressure_drop,
+            "approach_temperature": ops.minimum(dt1, dt2),
         }
 
     def _check_inlets(self, hot_in, cold_in):
@@ -152,7 +159,7 @@ class HeatExchanger(Module):
         if {"hot_out_T", "cold_out_T"} <= measured.keys():
             measured = measured | _inlet_measurements(result.inlets)
         keys = ("hot_in_T", "hot_out_T", "cold_in_T", "cold_out_T", "m_dot_hot", "m_dot_cold")
-        if not set(keys) <= measured.keys() or not self.ua:
+        if not set(keys) <= measured.keys() or not self.thermal_conductance:
             return None
         apparent, code, _, _, _ = heat_transfer.apparent_conductance(
             self.arrangement,
@@ -163,7 +170,7 @@ class HeatExchanger(Module):
         assessed = code == heat_transfer.DETERMINED
         if not np.any(assessed):
             return None
-        ratio = diagnostics.performance_ratio(apparent, self.ua)
+        ratio = diagnostics.performance_ratio(apparent, self.thermal_conductance)
         alarm = diagnostics.below_limit(ratio, self.fouling_threshold)
         return Health(
             assessed=assessed,
