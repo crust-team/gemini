@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
@@ -86,7 +87,7 @@ class Cooler(Module):
         # Outlets
         inlet = inlets.inlet
         duty, rate, _ = self._duty(inlet)
-        outlet = inlet.with_(T=inlet.T - duty / rate if duty else inlet.T)
+        outlet = inlet.with_(T=ops.where(duty == 0, inlet.T, inlet.T - ops.truediv(duty, rate)))
 
         outlets = dict(outlet=outlet)
         return outlets
@@ -102,12 +103,17 @@ class Cooler(Module):
 
     def _duty(self, inlet):
         """Return the rejected duty [W], heat capacity rate [W/K] and uncapped request [W]."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
-        target = max(self.temperature_setpoint, self._air_temperature() + self.approach)
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
+        target = ops.maximum(self.temperature_setpoint, self._air_temperature() + self.approach)
         rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        requested = rate * max(0, inlet.T - target)
-        return min(requested, self.capacity), rate, requested
+        requested = rate * ops.maximum(0, inlet.T - target)
+        return ops.minimum(requested, self.capacity), rate, requested
 
     def _air_temperature(self):
         """Return the reference air temperature [K]: dry bulb for dry, wet bulb for wet."""
@@ -118,9 +124,13 @@ class Cooler(Module):
             raise ConfigurationError(
                 f"{self.path}: wet_bulb_temperature = None; expected a value for a wet cooler"
             )
-        if wet_bulb > self.ambient_temperature:
-            raise PhysicsRangeError(
-                f"{self.path}: wet_bulb_temperature = {wet_bulb} K; expected at most "
-                f"ambient_temperature = {self.ambient_temperature} K"
-            )
+        ops.check(
+            wet_bulb <= self.ambient_temperature,
+            PhysicsRangeError,
+            "{path}: wet_bulb_temperature = {wet_bulb} K; expected at most "
+            "ambient_temperature = {ambient} K",
+            path=self.path,
+            wet_bulb=wet_bulb,
+            ambient=self.ambient_temperature,
+        )
         return wet_bulb

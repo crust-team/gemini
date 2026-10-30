@@ -5,6 +5,7 @@ import pytest
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.heat import CHP
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import ConfigurationError, PhysicsRangeError
 
 CP = 4217.4
@@ -71,3 +72,20 @@ def test_invalid_design_and_flow_raise():
         engine(thermal_efficiency=0.7)(inlet=WATER, load_fraction=1)
     with pytest.raises(PhysicsRangeError, match="inlet.m_dot = -1"):
         engine()(inlet=WATER.with_(m_dot=-1), load_fraction=1)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Off, part load, full load, dumping and stopped-water rows trace and equal per-row calls."""
+    unit = engine(no_load_fuel_fraction=0.1)
+    rows = [
+        dict(inlet=Stream(m_dot=m_dot, T=T, p=3e5), load_fraction=load)
+        for m_dot, T, load in [
+            (20, 333.15, 1),
+            (20, 333.15, 0.5),
+            (20, 333.15, 0),
+            (2, 333.15, 1),
+            (0, 333.15, 1),
+            (20, 370, 1),
+        ]
+    ]
+    assert_module_matches(unit, rows)

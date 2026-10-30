@@ -5,6 +5,7 @@ import pytest
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.heat import Cooler
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import ConfigurationError, PhysicsRangeError
 
 CP = 4217.4
@@ -76,3 +77,25 @@ def test_invalid_inputs_raise():
         )
     with pytest.raises(PhysicsRangeError, match="inlet.m_dot = -1"):
         cooler("dry")(inlet=HOT.with_(m_dot=-1), temperature_setpoint=290, ambient_temperature=300)
+
+
+@pytest.mark.parametrize("cooler_type", ["dry", "wet"])
+def test_traced_call_matches_one_call_per_row(cooler_type):
+    """Approach-limited, capped, warm-enough and stopped rows trace and equal per-row calls."""
+    unit = cooler(cooler_type)
+    rows = [
+        dict(
+            inlet=Stream(m_dot=m_dot, T=T, p=3e5),
+            temperature_setpoint=setpoint,
+            ambient_temperature=298.15,
+            wet_bulb_temperature=wet_bulb,
+        )
+        for m_dot, T, setpoint, wet_bulb in [
+            (20, 313.15, 293.15, 290.0),
+            (20, 313.15, 308.15, 290.0),
+            (60, 340.0, 293.15, 295.0),
+            (0, 313.15, 293.15, 290.0),
+            (20, 300.0, 310.0, 298.15),
+        ]
+    ]
+    assert_module_matches(unit, rows)

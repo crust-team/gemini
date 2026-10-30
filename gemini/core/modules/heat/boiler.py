@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,
@@ -56,11 +57,18 @@ class Boiler(Module):
 
         # Outlets
         inlet = inlets.inlet
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        duty = min(self._requested_duty(inlet, cp), self.capacity)
-        outlet_T = inlet.T + duty / (inlet.m_dot * cp) if inlet.m_dot else inlet.T
+        duty = ops.minimum(self._requested_duty(inlet, cp), self.capacity)
+        outlet_T = ops.where(
+            inlet.m_dot == 0, inlet.T, inlet.T + ops.truediv(duty, inlet.m_dot * cp)
+        )
 
         outlet = inlet.with_(T=outlet_T)
 
@@ -72,7 +80,7 @@ class Boiler(Module):
         outlet = outlets.outlet
         cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
         requested = self._requested_duty(inlet, cp)
-        self.duty = min(requested, self.capacity)
+        self.duty = ops.minimum(requested, self.capacity)
         self.fuel_or_power = self.duty / self.efficiency
         self.outlet_T = outlet.T
         self.capped = requested > self.capacity
@@ -82,4 +90,4 @@ class Boiler(Module):
 
     def _requested_duty(self, inlet, cp):
         """Return the heat flow [W] that would lift the inlet to the setpoint, without the cap."""
-        return inlet.m_dot * cp * max(0, self.temperature_setpoint - inlet.T)
+        return inlet.m_dot * cp * ops.maximum(0, self.temperature_setpoint - inlet.T)

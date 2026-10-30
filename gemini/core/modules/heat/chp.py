@@ -1,5 +1,6 @@
 """Gas-engine combined heat and power unit heating a water circuit."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,
@@ -89,21 +90,28 @@ class CHP(Module):
 
     def _performance(self, inlet):
         """Return fuel, electricity, heat flows [W] and the outlet temperature [K]."""
-        if self.electric_efficiency + self.thermal_efficiency > 1:
-            raise ConfigurationError(
-                f"{self.path}: electric_efficiency + thermal_efficiency = "
-                f"{self.electric_efficiency + self.thermal_efficiency}; expected <= 1"
-            )
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        ops.check(
+            self.electric_efficiency + self.thermal_efficiency <= 1,
+            ConfigurationError,
+            "{path}: electric_efficiency + thermal_efficiency = {total}; expected <= 1",
+            path=self.path,
+            total=self.electric_efficiency + self.thermal_efficiency,
+        )
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         load = self.load_fraction
-        fuel = 0.0
-        if load:
-            share = self.no_load_fuel_fraction + (1 - self.no_load_fuel_fraction) * load
-            fuel = share * self.electric_capacity / self.electric_efficiency
+        share = self.no_load_fuel_fraction + (1 - self.no_load_fuel_fraction) * load
+        fuel = ops.where(load != 0, share * self.electric_capacity / self.electric_efficiency, 0.0)
         engine_heat = self.thermal_efficiency * fuel
         rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        recovered = min(engine_heat, rate * max(0, self.maximum_outlet_temperature - inlet.T))
+        recovered = ops.minimum(
+            engine_heat, rate * ops.maximum(0, self.maximum_outlet_temperature - inlet.T)
+        )
         generated = load * self.electric_capacity
         return {
             "fuel": fuel,
@@ -111,5 +119,5 @@ class CHP(Module):
             "heat_recovered": recovered,
             "dumped_heat": engine_heat - recovered,
             "heat_loss": fuel - generated - recovered,
-            "outlet_T": inlet.T + recovered / rate if recovered else inlet.T,
+            "outlet_T": ops.where(recovered != 0, inlet.T + ops.truediv(recovered, rate), inlet.T),
         }
