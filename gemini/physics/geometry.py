@@ -15,11 +15,51 @@ from . import units
 
 @ops.physics
 def circle_area(diameter: float) -> float:
-    """Return the area [m2] of a circle with ``diameter`` [m], ``pi * d**2 / 4``.
+    """Return the area [m2] of a circle, ``A = pi * d**2 / 4``.
 
-    NORSOK's shear stress keeps its own ``pi * (d / 2) ** 2``, which differs in the last bit.
+    Parameters
+    ----------
+    diameter : float
+        Circle diameter [m]; the flow cross-section of a pipe is its internal diameter.
+
+    Returns
+    -------
+    float
+        Area [m2].
+
+    Notes
+    -----
+    Valid for any real diameter; the area of a diameter of zero is zero. Reference: the
+    elementary area of a circle, as in any geometry text.
     """
     return math.pi * diameter**2 / 4
+
+
+@ops.physics
+def mean_velocity(mass_flow: float, density: float, diameter: float) -> float:
+    """Return the mean velocity [m/s] of a flow through a circular section, ``m / rho / A``.
+
+    Parameters
+    ----------
+    mass_flow : float
+        Signed mass flow [kg/s]; the velocity takes its sign.
+    density : float
+        Fluid density [kg/m3], nonzero.
+    diameter : float
+        Internal diameter of the section [m], nonzero.
+
+    Returns
+    -------
+    float
+        Mean velocity [m/s] over ``circle_area(diameter)``.
+
+    Notes
+    -----
+    Continuity for a uniform velocity profile, ``m = rho u A``. For a phase of a mixture pass
+    the flow and the density of that phase to get its superficial velocity. Reference: the
+    continuity equation, e.g. White, Fluid Mechanics, 8th ed., section 3.3.
+    """
+    return mass_flow / density / circle_area(diameter)
 
 
 class PipeSection(BaseModel):
@@ -112,8 +152,12 @@ def build_path(trajectory_table: list[dict], tally_table: list[dict] | None = No
 
     Notes
     -----
-    Reference: GEMINI WIMS build_trajectory_geometry, extended with SI tally
-    interval intersections. Inclination follows sin(angle) = delta_TVD / delta_MD and is
+    Valid for a trajectory of at least two points with increasing MD and
+    ``|delta TVD| <= delta MD``; a violation raises ``PhysicsRangeError``. The value tests
+    validate plain configuration numbers at build time, so the function is not
+    ``@ops.physics``. Reference: GEMINI WIMS build_trajectory_geometry, extended with SI tally
+    interval intersections; the angle is the elementary relation of a straight interval.
+    Inclination follows sin(angle) = delta_TVD / delta_MD and is
     rounded to 0.01 degree, as in WIMS, so paths match the original section angles.
 
     NOTE(refactor): example roughness 2e-5 is metres, despite DPDT's old mm comment.

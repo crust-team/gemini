@@ -77,3 +77,16 @@ def test_project_trajectory_slices():
     assert path.total_length == 2800
     assert path.subpath(600, 2800).total_length + path.subpath(0, 600).total_length == 2800
     assert path.index_at_measured_depth(600) == 2
+
+
+def test_mean_velocity_by_hand():
+    """Velocity is m / (rho A): the flow of 1 m/s in a 0.1 m water pipe, sign kept."""
+    area = math.pi * 0.1**2 / 4
+    assert geometry.mean_velocity(1000 * area, 1000.0, 0.1) == pytest.approx(1.0)
+    assert geometry.mean_velocity(-1000 * area, 1000.0, 0.1) == pytest.approx(-1.0)
+
+
+def test_mean_velocity_matches_on_arrays():
+    """The velocity runs on arrays as on floats for forward, reverse and zero flow."""
+    rows = [(flow, 1000.0, 0.1778) for flow in (10.0, -10.0, 0.0)]
+    assert_function_matches(geometry.mean_velocity, rows)

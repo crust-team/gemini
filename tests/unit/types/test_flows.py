@@ -159,3 +159,11 @@ def test_heat_capacity_rate_is_mass_flow_times_liquid_heat_capacity():
         1.0 * BRINE.properties(1e5, 300).cp_l,
         2.0 * BRINE.properties(1e5, 300).cp_l,
     ]
+
+
+def test_stream_flows_use_the_stream_fluid():
+    """volumetric_flow is m / rho and heat_capacity_rate m cp_l of the stream's fluid."""
+    stream = Stream(m_dot=-10.0, T=300.0, p=1e5)
+    properties = stream.fluid.properties(1e5, 300.0)
+    assert stream.volumetric_flow() == -10.0 / properties.density
+    assert stream.heat_capacity_rate() == -10.0 * properties.cp_l

@@ -8,6 +8,7 @@ import numpy as np
 
 from gemini import ops
 from gemini.errors import CallError, PhysicsRangeError, UnitError
+from gemini.physics import fluid as fluid_physics
 from gemini.physics import units
 from gemini.types.fluid import Fluid
 from gemini.types.quantities import MassFlow, Pressure, Temperature
@@ -96,11 +97,13 @@ class Stream:
 
     def volumetric_flow(self):
         """Return signed mixture volume flow [m3/s] using the stream fluid."""
-        return self.m_dot / self.fluid.properties(self.p, self.T).density
+        return fluid_physics.volume_flow(self.m_dot, self.fluid.properties(self.p, self.T).density)
 
     def heat_capacity_rate(self):
         """Return the signed heat capacity rate ``m_dot * cp_l`` [W/K] of the stream."""
-        return self.m_dot * self.fluid.properties(self.p, self.T).cp_l
+        return fluid_physics.heat_capacity_rate(
+            self.m_dot, self.fluid.properties(self.p, self.T).cp_l
+        )
 
     def with_(self, **changes) -> "Stream":
         """Return a copy with updated SI stream fields.

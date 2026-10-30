@@ -60,7 +60,7 @@ def _particle_flow(flow_rate_m3h, rho_fluid, diameter):
     """
     particle_mass_flow = units.kgh_to_kgs(flow_rate_m3h * rho_fluid)
     area = geometry.circle_area(diameter)
-    velocity = particle_mass_flow / (rho_fluid * area)
+    velocity = geometry.mean_velocity(particle_mass_flow, rho_fluid, diameter)
     return particle_mass_flow, velocity, area
 
 
@@ -183,7 +183,13 @@ def erosion_rate(
     rho_pipe: float = 7800,
     shape_factor: float = 0.5,
 ) -> float:
-    """Return erosion rate [mm/year] from the original DNV, OKA or Tulsa correlation.
+    """Return the erosion rate [mm/year] of the DNV, OKA or E/CRC Tulsa correlation.
+
+    All three have the form ``E = c * m_p * K(u, ...) * F(alpha) / (rho_pipe * A_impact)`` for
+    particle mass flow ``m_p = rho q``, impact velocity ``u = m_p / (rho A)`` and impact area
+    ``A_impact = A / sin(alpha)``: DNV with ``K = K_m u**n``, OKA with the particle, hardness
+    and diameter terms of its erosion-per-mass ratio, Tulsa with ``2.17e-7 B**-0.59 F_s
+    u**2.41`` for Brinell hardness ``B`` and shape factor ``F_s``.
 
     Parameters
     ----------
@@ -206,8 +212,13 @@ def erosion_rate(
 
     Notes
     -----
-    The impact angle is converted to degrees at this boundary and back to radians inside the
-    correlations; the rad→deg→rad round trip changes the last bits and is retained.
+    Valid for sand-laden single-phase flow with a nonzero impact angle and a nonnegative
+    flow (a negative flow makes a velocity power complex and raises). The impact angle is
+    converted to degrees at this boundary and back to radians inside the correlations; the
+    rad→deg→rad round trip changes the last bits and is retained. Reference: DNV RP O501,
+    Erosive Wear in Piping Systems; Oka, Okamura and Yoshida (2005), Practical estimation of
+    erosion damage caused by solid particle impact, Wear 259, 95-101; the E/CRC (University
+    of Tulsa) erosion model.
     """
     spelling = str(model).strip().upper()
     name = _MODELS.get(spelling)
@@ -251,7 +262,10 @@ def erosion_rate(
 
 @ops.physics
 def api_erosional_velocity(rho_fluid: float) -> float:
-    """Evaluate the API erosional velocity limit.
+    """Return the API erosional velocity limit [m/s], ``u_e = C / sqrt(rho)``.
+
+    ``C`` is the API empirical constant 125 in the imperial basis (``u_e`` in ft/s, ``rho``
+    in lb/ft3); ``units.API_VELOCITY_FACTOR`` converts the result to SI.
 
     Parameters
     ----------
@@ -265,7 +279,8 @@ def api_erosional_velocity(rho_fluid: float) -> float:
 
     Notes
     -----
-    Reference: API RP 14E; GEMINI uses C=125 with historical imperial conversions.
+    Reference: API RP 14E, ``u_e = C / sqrt(rho)`` with C = 100 to 125 for continuous and
+    intermittent service; GEMINI uses C=125 with historical imperial conversions.
     """
     ops.check(
         rho_fluid > 0,
@@ -292,7 +307,8 @@ def api_velocity_comparison(actual: float, limit: float) -> dict:
 
     Notes
     -----
-    Reference: GEMINI WIMS API velocity comparison; margin = limit - actual.
+    Reference: GEMINI WIMS API velocity comparison against the API RP 14E limit (see
+    ``api_erosional_velocity``); margin = limit - actual.
     """
     ops.check(
         limit > 0,

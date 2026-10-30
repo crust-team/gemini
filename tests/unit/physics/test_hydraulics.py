@@ -376,3 +376,27 @@ def test_valve_pressure_drop_follows_the_iec_sizing_equation():
         hydraulics.valve_pressure_drop,
         [(10.0, 1000.0, 1e-4), (0.0, 1000.0, 0.0), (5.0, 1068.0, 5.4e-5)],
     )
+
+
+def test_reynolds_number_by_hand():
+    """Re = |u| rho D / mu: 2 m/s of water in a 0.1 m pipe at 1 mPa s is 2e5, sign ignored."""
+    assert hydraulics.reynolds_number(2.0, 1000.0, 0.1, 1e-3) == pytest.approx(2e5)
+    assert hydraulics.reynolds_number(2.0, 1000.0, 0.1, 1e-3) == pytest.approx(2e5)
+
+
+def test_reynolds_number_matches_on_arrays():
+    """Forward, reverse and zero velocity give the same Reynolds number on arrays and floats."""
+    rows = [(velocity, 1000.0, 0.1778, 1e-3) for velocity in (2.0, -2.0, 0.0, 1e-4)]
+    assert_function_matches(hydraulics.reynolds_number, rows)
+
+
+def test_hydrostatic_dp_by_hand_and_inclination():
+    """Pressure is rho g h s: 100 m of water is 981 kPa; a 30 degree run halves it."""
+    assert hydraulics.hydrostatic_dp(1000.0, 100.0) == pytest.approx(981000.0)
+    assert hydraulics.hydrostatic_dp(1000.0, 100.0, 0.5) == pytest.approx(490500.0)
+
+
+def test_hydrostatic_dp_matches_on_arrays():
+    """The inclination factor runs on arrays as on floats, with and without its default."""
+    assert_function_matches(hydraulics.hydrostatic_dp, [(1000.0, 100.0), (850.0, -20.0)])
+    assert_function_matches(hydraulics.hydrostatic_dp, [(1000.0, 100.0, 0.5), (850.0, -20.0, -1.0)])

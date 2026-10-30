@@ -6,7 +6,6 @@ bicarbonate in mg/l and ionic strength in g/l. Rates are in mm/year, the explici
 literature-unit exception of the package.
 """
 
-import math
 from dataclasses import dataclass
 from typing import Literal
 
@@ -17,6 +16,7 @@ from gemini.errors import MissingChemistryError, PhysicsRangeError, UnknownCorre
 from gemini.utils.strings import did_you_mean, join_names
 
 from . import geometry, units
+from .fluid import DEFAULT_LIQUID_DENSITY
 
 _DEFAULT_COEFFICIENTS = {
     "NORSOK": {"A": 1},
@@ -123,7 +123,7 @@ def co2_corrosion_rate(
     temperature: float,
     pressure: float,
     water_flow_rate: float,
-    water_density: float = 1000,
+    water_density: float = DEFAULT_LIQUID_DENSITY,
     water_viscosity: float = 0.001,
     diameter: float = 0.1,
     roughness: float = 0.00005,
@@ -133,7 +133,13 @@ def co2_corrosion_rate(
     ionic_strength: float = 71,
     coefficients: dict[str, float] | None = None,
 ) -> float:
-    """Evaluate the original CO2 correlation through an SI boundary.
+    """Return the CO2 wall penetration rate [mm/year] of the NORSOK, DLM or DLD correlation.
+
+    NORSOK: ``CR = Kt f_CO2**0.62 (S / 19)**(0.146 + 0.0324 log10 f_CO2) f(pH)``. DLM:
+    ``log10 CR = A - B / T + C log10 f_CO2``, DLD adds the flow term
+    ``1 / CR = 1 / CR_r + 1 / CR_m`` with ``CR_m = D u**0.8 f_CO2 / d**0.2``; both are
+    multiplied by the protective-scale factor. ``S`` is the wall shear stress [Pa], ``u`` the
+    mean velocity [m/s], ``f_CO2`` the fugacity [bar], ``T`` [K] and ``d`` [m].
 
     Parameters
     ----------
@@ -164,6 +170,13 @@ def co2_corrosion_rate(
 
     Notes
     -----
+    Valid for the published ranges of the correlations (NORSOK M-506: 5 to 150 degC, pH 3.5
+    to 6.5, CO2 partial pressure up to the fugacity cap of 250 bar), single-phase water
+    flow and a positive CO2 partial pressure. The ``coefficients`` of a fitted variant are in
+    the correlations' empirical basis.
+    Reference: NORSOK M-506 (CO2 corrosion rate calculation model); de Waard, Lotz and
+    Milliams (1991), Corrosion 47(12); de Waard, Lotz and Dugstad (1995), CORROSION/95, NACE.
+
     NOTE(refactor): NORSOK retains exact-temperature pH branches and fallback 7 (see
     ``_ph_factor``). A NORSOK pH solve that does not converge also keeps its last iterate
     without a warning (see ``_hydrogen_ion``).
@@ -337,13 +350,12 @@ def _norsok_shear_stress(conditions):
     """Return the NORSOK wall shear stress [Pa] of single-phase water flow.
 
     The m3/day flow converts back to m3/s, and the mixture density and viscosity are
-    flow-weighted as ``(rho * q) / q`` for a later multiphase extension. Both round trips and
-    the area ``pi * (d / 2) ** 2`` change the last bits and are retained for the goldens.
+    flow-weighted as ``(rho * q) / q`` for a later multiphase extension. Both round trips change
+    the last bits and are retained for the goldens.
     """
     flow_rate = units.m3day_to_m3s(conditions.water_flow_rate)
     diameter = conditions.diameter
-    area = math.pi * (diameter / 2) ** 2
-    velocity = flow_rate / area
+    velocity = flow_rate / geometry.circle_area(diameter)
     density = (conditions.water_density * flow_rate) / (flow_rate)
     viscosity = units.cp_to_pas((conditions.water_viscosity * flow_rate) / flow_rate)
     friction_factor = 0.001375 * (
@@ -483,7 +495,10 @@ _RATES = {"NORSOK": _norsok_rate, "DLM": _dlm_rate, "DLD": _dld_rate}
 def wall_loss(
     rates_mm_per_year: list[float] | np.ndarray, durations_s: list[float] | np.ndarray
 ) -> np.ndarray:
-    """Integrate interval corrosion rates to cumulative wall loss.
+    """Return the cumulative radial wall loss [mm] of piecewise-constant corrosion rates.
+
+    ``loss_k = sum_{i<=k} rate_i * dt_i / year`` with the year of ``units.SECONDS_PER_YEAR``
+    (365.25 days).
 
     Parameters
     ----------
@@ -499,8 +514,10 @@ def wall_loss(
 
     Notes
     -----
-    Reference: GEMINI WIMS corroded_mm_for_interval; piecewise-constant integration
-    using a 365.25-day year.
+    Valid for nonnegative durations and rates constant over each interval (rectangle rule
+    for the integral of the rate over time); the rates and durations have one shape.
+    Reference: GEMINI WIMS corroded_mm_for_interval, a retained formulation without a
+    published source.
     """
     rates = _series(rates_mm_per_year)
     durations = _series(durations_s)
@@ -527,7 +544,7 @@ def _series(values):
 
 @ops.physics
 def remaining_wall_thickness(outer_radius: float, inner_radius: float, loss: float) -> float:
-    """Predict the remaining wall using WIMS' radial wall-loss convention.
+    """Return the remaining wall thickness [m], ``t = r_o - (r_i + loss)``.
 
     Parameters
     ----------
@@ -543,15 +560,20 @@ def remaining_wall_thickness(outer_radius: float, inner_radius: float, loss: flo
 
     Notes
     -----
-    Reference: GEMINI WIMS corrosion_model.predict_remaining_thickness; outer radius
-    minus the predicted inner radius. A negative loss retains the original deposition case.
+    Valid for a circular wall with the radii and loss measured on one basis; the result is not
+    clipped, so a negative value marks a breached wall. Reference: GEMINI WIMS
+    corrosion_model.predict_remaining_thickness (outer radius minus the predicted inner
+    radius), a retained formulation without a published source. A negative loss retains the
+    original deposition case.
     """
     return outer_radius - (inner_radius + loss)
 
 
 @ops.physics
 def time_to_minimum_wall(thickness: float, minimum: float, rate: float) -> float:
-    """Extrapolate time to a minimum thickness at a constant penetration rate.
+    """Return the time [s] to a minimum wall thickness, ``t = (w - w_min) / rate``.
+
+    The projection is linear at the constant penetration rate.
 
     Parameters
     ----------
@@ -568,8 +590,10 @@ def time_to_minimum_wall(thickness: float, minimum: float, rate: float) -> float
 
     Notes
     -----
-    Reference: GEMINI WIMS corrosion_from_logs.get_remaining_days_to_min_thickness.
-    The original linear projection and special-value handling are retained in SI units.
+    Valid for a constant rate in the same length unit per second as the thicknesses; a
+    corrosion rate that varies in time needs ``wall_loss`` instead. Reference: GEMINI WIMS
+    corrosion_from_logs.get_remaining_days_to_min_thickness, a retained linear projection
+    without a published source; the special-value handling is retained in SI units.
     """
     remaining = (thickness - minimum) / rate
     remaining = ops.where(

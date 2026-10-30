@@ -15,7 +15,9 @@ from typing import TYPE_CHECKING, Literal
 from gemini import ops
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
 
-from . import corrosion, erosion, geometry, heat_transfer, units
+from . import corrosion, erosion
+from . import fluid as fluid_physics
+from . import geometry, heat_transfer, units
 from .constants import G_FT, MIN_PATH_PRESSURE, VALVE_REFERENCE_DENSITY, G
 
 if TYPE_CHECKING:
@@ -38,6 +40,34 @@ _INTERMITTENT_UPHILL = (2.96, 0.305, -0.4473, 0.0978)
 
 
 @ops.physics
+def reynolds_number(velocity: float, density: float, diameter: float, viscosity: float) -> float:
+    """Return the Reynolds number [-] of a flow in a pipe, ``Re = u rho D / mu``.
+
+    Parameters
+    ----------
+    velocity : float
+        Mean velocity [m/s]; pass its magnitude for a signed flow.
+    density : float
+        Density [kg/m3].
+    diameter : float
+        Internal diameter [m].
+    viscosity : float
+        Dynamic viscosity [Pa s], nonzero.
+
+    Returns
+    -------
+    float
+        Reynolds number [-], zero at zero velocity.
+
+    Notes
+    -----
+    Definition of the ratio of inertial to viscous forces. Any consistent unit system gives
+    the same value. Reference: White, Fluid Mechanics, 8th ed., section 6.1.
+    """
+    return velocity * density * diameter / viscosity
+
+
+@ops.physics
 def darcy_weisbach_dp(
     velocity: float,
     rho: float,
@@ -47,7 +77,10 @@ def darcy_weisbach_dp(
     roughness: float,
     length: float,
 ) -> tuple[float, float]:
-    """Evaluate signed friction and gravity pressure drops.
+    """Return the signed friction and gravity pressure drops [Pa] of one pipe interval.
+
+    ``dp_f = f (rho L / D) u |u| / 2`` with ``Re = |u| rho D / mu`` and the Swamee-Jain factor
+    ``f = 0.25 / log10(eps / (3.7 D) + 5.74 / Re**0.9)**2``; ``dp_g = rho g L sin(theta)``.
 
     Parameters
     ----------
@@ -65,12 +98,15 @@ def darcy_weisbach_dp(
 
     Notes
     -----
-    Reference: Swamee and Jain (1976), Explicit Equations for Pipe-Flow Problems,
-    combined with Darcy–Weisbach and hydrostatic balance; retained GEMINI formulation.
+    Valid for single-phase turbulent flow, ``5e3 <= Re <= 1e8`` and ``1e-6 <= eps / D <= 1e-2``
+    (the range of the Swamee-Jain fit); outside it, and for laminar flow, the friction is
+    extrapolated. Reference: Swamee and Jain (1976), Explicit Equations for Pipe-Flow
+    Problems, J. Hydraul. Div. ASCE 102(5), 657-664, combined with the Darcy-Weisbach
+    equation and the hydrostatic balance; retained GEMINI formulation.
     """
-    reynolds = ops.abs(velocity) * rho * diameter / mu
+    reynolds = reynolds_number(ops.abs(velocity), rho, diameter, mu)
     friction_factor = 0.25 / (ops.log10((roughness / (3.7 * diameter)) + 5.74 / reynolds**0.9)) ** 2
-    gravity = rho * G * length * ops.sin(inclination)
+    gravity = hydrostatic_dp(rho, length, ops.sin(inclination))
     friction = friction_factor * rho * length / diameter * (ops.abs(velocity) * velocity) / 2
     return ops.where(velocity == 0, 0.0, friction), gravity
 
@@ -89,7 +125,14 @@ def beggs_brill_dp(
     roughness: float,
     length: float,
 ) -> tuple[float, float]:
-    """Evaluate two-phase friction and gravity pressure drops.
+    """Return the two-phase friction and gravity pressure drops [Pa] of one pipe interval.
+
+    ``dp_f = f_n (f_tp / f_n) (rho_n u_m |u_m| / 2) (L / D)`` with the no-slip density
+    ``rho_n``, mixture velocity ``u_m = us_g + us_l`` and Reynolds number
+    ``Re = u_m rho_n D / mu_n``, the explicit Colebrook-type friction factor ``f_n`` of the
+    no-slip mixture and the Beggs-Brill multiplier ``f_tp / f_n = exp(s)``;
+    ``dp_g = rho_s g L sin(theta)`` with the slip density ``rho_s = H rho_l + (1 - H) rho_g``
+    of the liquid holdup ``H``.
 
     Parameters
     ----------
@@ -113,8 +156,13 @@ def beggs_brill_dp(
 
     Notes
     -----
-    Reference: Beggs and Brill (1973), A Study of Two-Phase Flow in Inclined Pipes;
-    original GEMINI implementation cites Shoham, p. 59. The flow regime and holdup use the
+    Valid for a nonzero liquid and mixture velocity and a no-slip holdup inside the flow-regime
+    map; the correlation was fitted to air-water flow in 1 to 1.5 in. pipes at inclinations
+    of -90 to +90 degrees and is used beyond that range. Reference: Beggs and Brill (1973), A
+    Study of Two-Phase Flow in Inclined Pipes, J. Pet. Technol. 25(5), 607-617, with the
+    regime map revised by Brill and Beggs; the formulation follows Shoham, Mechanistic
+    Modeling of Gas-Liquid Two-Phase Flow in Pipes (2006), p. 59, as the original GEMINI
+    implementation does. The flow regime and holdup use the
     correlation's US basis (ft/s, lbm/ft3, dyne/cm, ft). The SI friction and gravity terms
     then use the inputs converted back from that basis, not the inputs themselves: the
     m→ft→m, kg/m3→lbm/ft3→kg/m3 and Pa·s→cP→Pa·s round trips change the last bits, and the
@@ -147,7 +195,7 @@ def beggs_brill_dp(
     friction = _no_slip_friction((us_g, us_l), (rho_g, rho_l), (mu_g, mu_l), diameter, roughness)
     friction = friction * friction_multiplier * length / diameter
     slip_density = (holdup * rho_l) + (1 - holdup) * rho_g
-    gravity = slip_density * G * length * ops.sin(inclination)
+    gravity = hydrostatic_dp(slip_density, length, ops.sin(inclination))
     return friction, gravity
 
 
@@ -164,7 +212,7 @@ def _no_slip_friction(velocities, densities, viscosities, diameter, roughness):
     no_slip_holdup = us_l / mixture_velocity
     density = (no_slip_holdup * rho_l) + (1 - no_slip_holdup) * rho_g
     viscosity = (no_slip_holdup * mu_l) + (1 - no_slip_holdup) * mu_g
-    reynolds = mixture_velocity * density * diameter / viscosity
+    reynolds = reynolds_number(mixture_velocity, density, diameter, viscosity)
     friction_factor = (
         -0.8685
         * ops.log((1.964 * ops.log(reynolds) - 3.8215) / reynolds + roughness / (diameter * 3.71))
@@ -408,24 +456,29 @@ def valve_pressure_drop(mass_flow: float, density: float, flow_coefficient: floa
 
 
 @ops.physics
-def hydrostatic_dp(rho: float, height: float) -> float:
-    """Evaluate hydrostatic pressure.
+def hydrostatic_dp(rho: float, height: float, inclination_sine: float = 1.0) -> float:
+    """Return the hydrostatic pressure difference [Pa] of a fluid column, ``dp = rho g h s``.
 
     Parameters
     ----------
     rho, height : float
-        Density [kg/m3] and signed vertical height [m].
+        Density [kg/m3] and signed length of the column [m].
+    inclination_sine : float
+        Sine of the column's angle from horizontal [-]; the default 1 is a vertical column
+        and ``height`` is then the vertical height.
 
     Returns
     -------
     float
-        Pressure difference [Pa].
+        Pressure difference [Pa], positive down the column.
 
     Notes
     -----
-    Reference: Hydrostatic balance dp = rho*g*height; GEMINI gravity 9.81 m/s2.
+    Valid for a static or slow fluid of uniform density. Reference: the hydrostatic balance
+    ``dp / dz = rho g`` (White, Fluid Mechanics, 8th ed., section 2.3) with GEMINI's
+    ``G`` = 9.81 m/s2.
     """
-    return rho * G * height
+    return rho * G * height * inclination_sine
 
 
 @ops.physics
@@ -439,7 +492,12 @@ def pipe_path_profile(
     correlation: Literal["darcy_weisbach"] = "darcy_weisbach",
     correlation_2p: Literal["BeggsBrill"] = "BeggsBrill",
 ) -> PathResult:
-    """March the original DPDT equations along a pipe path using SI units.
+    """March the pressure and temperature of a stream along a pipe path.
+
+    Per section ``p_out = p -/+ (dp_friction + dp_gravity)`` and ``T_out = T -/+ dT``, with the
+    drops of ``darcy_weisbach_dp`` (liquid only) or ``beggs_brill_dp`` (free gas) and the
+    temperature change of ``heat_transfer.pipe_temperature_change``; the signs are those of
+    the traversal direction.
 
     Parameters
     ----------
@@ -464,8 +522,12 @@ def pipe_path_profile(
 
     Notes
     -----
-    Marched pressures never fall below ``MIN_PATH_PRESSURE`` (0.001 Pa), so a path whose
-    drops exceed the inlet pressure keeps a positive absolute pressure, as in DPDT.
+    Valid where its section correlations are: steady single-phase or no-slip two-phase flow in
+    circular pipes with the property snapshot of ``fluid``. Marched pressures never fall below
+    ``MIN_PATH_PRESSURE`` (0.001 Pa), so a path whose drops exceed the inlet pressure keeps a
+    positive absolute pressure, as in DPDT. Reference: the section equations (Swamee and Jain
+    1976; Beggs and Brill 1973) marched as in GEMINI's DPDT; the loop over sections is
+    configuration-sized and reads the plain path geometry.
     """
     direction, sections = _traversal(path, direction)
     if correlation != "darcy_weisbach" or correlation_2p != "BeggsBrill":
@@ -474,7 +536,7 @@ def pipe_path_profile(
             f"{correlation_2p!r}; expected 'darcy_weisbach' and 'BeggsBrill'"
         )
     p, T = stream.p, stream.T
-    flow = stream.m_dot / fluid.properties(p, T).density
+    flow = fluid_physics.volume_flow(stream.m_dot, fluid.properties(p, T).density)
     pressures, temperatures = [], []
     dp_friction = dp_gravity = 0.0
     for section in sections:
@@ -528,9 +590,8 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     f = fluid.properties(p, T)
     mass = flow * f.density
     m_l, m_g = (1 - f.gmf) * mass, f.gmf * mass
-    area = geometry.circle_area(section.inner_diameter)
-    us_l = m_l / f.rho_l / area
-    us_g = f.gmf / f.rho_g / area
+    us_l = geometry.mean_velocity(m_l, f.rho_l, section.inner_diameter)
+    us_g = geometry.mean_velocity(f.gmf, f.rho_g, section.inner_diameter)
     shape = (section.inner_diameter, section.roughness, section.length)
     if fluid.gas_mass_fraction == 0:
         friction, gravity = darcy_weisbach_dp(us_l, f.rho_l, section.inclination, f.mu_l, *shape)
@@ -575,7 +636,9 @@ def radial_pressure_drops(
     wellbore_radius: float,
     skin: float,
 ) -> tuple[float, float]:
-    """Return radial Darcy and skin pressure drops [Pa] (Akin 2019).
+    """Return the radial Darcy and skin pressure drops [Pa] of an inflow to a well (Akin 2019).
+
+    ``dp_flow = q mu ln(r_e / r_w) / (2 pi k h)`` and ``dp_skin = q mu s / (2 pi k h)``.
 
     Parameters
     ----------
@@ -590,6 +653,14 @@ def radial_pressure_drops(
     -------
     tuple of float
         Flow and skin pressure drops [Pa].
+
+    Notes
+    -----
+    Valid for steady-state single-phase radial Darcy flow of an incompressible liquid in a
+    homogeneous reservoir of constant thickness, ``r_e > r_w``; positive permeability,
+    thickness and radii are required. Reference: Darcy (1856) in radial form, with the skin
+    factor of van Everdingen (1953), The Skin Effect and Its Influence on the Productive
+    Capacity of a Well, Trans. AIME 198, 171-176.
     """
     smallest = ops.minimum(
         ops.minimum(ops.minimum(permeability, thickness), drainage_radius), wellbore_radius
@@ -623,7 +694,10 @@ def corrosion_profile(
     chemistry: dict,
     model: Literal["NORSOK", "DLM", "DLD"] = "NORSOK",
 ) -> list[float]:
-    """Evaluate section corrosion along the traversed hydraulic profile.
+    """Return the CO2 corrosion rate [mm/year] of each section along the hydraulic profile.
+
+    Each section takes the marched pressure and temperature of ``pipe_path_profile`` and the
+    liquid flow ``q = |m| / rho`` at them, then the rate of ``corrosion.co2_corrosion_rate``.
 
     Parameters
     ----------
@@ -649,8 +723,10 @@ def corrosion_profile(
 
     Notes
     -----
-    Reference: GEMINI WIMS composition of DPDT and CO2 corrosion correlations;
-    see pipe_path_profile and corrosion.co2_corrosion_rate.
+    Valid where ``co2_corrosion_rate`` is (NORSOK M-506: 5 to 150 degC, pH 3.5 to 6.5) and a
+    nonzero flow. Reference: GEMINI WIMS composition of DPDT and the CO2 correlations (NORSOK
+    M-506; de Waard and Lotz); see pipe_path_profile and corrosion.co2_corrosion_rate. The
+    loop over sections reads the plain path geometry.
     """
     result = pipe_path_profile(path, stream, fluid, direction, u_value, ambient_temperature)
     _, sections = _traversal(path, direction)
@@ -662,7 +738,7 @@ def corrosion_profile(
                 model,
                 temperature=T,
                 pressure=p,
-                water_flow_rate=abs(stream.m_dot) / f.density,
+                water_flow_rate=fluid_physics.volume_flow(ops.abs(stream.m_dot), f.density),
                 water_density=f.rho_l,
                 water_viscosity=f.mu_l,
                 diameter=section.inner_diameter,
@@ -676,6 +752,9 @@ def corrosion_profile(
 @ops.physics
 def erosion_check(path: geometry.PipePath, stream: Stream, fluid: Fluid) -> dict:
     """Compare section velocities with the API erosional velocity limit.
+
+    Per section ``u = |m| / (rho A)`` and the limit ``u_e = C / sqrt(rho)`` of
+    ``erosion.api_erosional_velocity`` at the inlet mixture density.
 
     Parameters
     ----------
@@ -693,12 +772,14 @@ def erosion_check(path: geometry.PipePath, stream: Stream, fluid: Fluid) -> dict
 
     Notes
     -----
-    Reference: API RP 14E velocity criterion, as implemented in GEMINI WIMS.
+    Valid for clean, solids-free service; the limit uses the density at the inlet conditions
+    for every section. Reference: API RP 14E (Recommended Practice for Design and Installation
+    of Offshore Production Platform Piping Systems), as implemented in GEMINI WIMS.
     """
     density = fluid.properties(stream.p, stream.T).density
     limit = erosion.api_erosional_velocity(density)
     velocity = [
-        ops.abs(stream.m_dot) / density / geometry.circle_area(s.inner_diameter)
+        geometry.mean_velocity(ops.abs(stream.m_dot), density, s.inner_diameter)
         for s in path.sections
     ]
     sections = [erosion.api_velocity_comparison(v, limit) for v in velocity]
