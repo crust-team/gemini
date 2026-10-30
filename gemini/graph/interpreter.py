@@ -3,8 +3,8 @@
 The value pass runs every node in creation order on the backend (missing ops fall back to
 NumPy; a ``None`` branch of ``where`` is NaN, as it is on arrays). The error pass then gives
 every node the per-row error code of its operands and of the checks guarding it (``0`` means
-no error; of several, the lowest code, the check that ran first, wins), except that ``where`` keeps only the code of the branch it selected on each row. The
-first row whose code reaches an output raises, in ``run``, the exception ``failures.row_error``
+no error; of several, the lowest code, the check that ran first, wins), except that ``where`` keeps only the code of the branch it selected on each row.
+The first row whose code reaches an output raises, in ``run``, the exception ``failures.row_error``
 builds. ``evaluation.evaluate`` is the form that keeps every row. A break node runs its module
 row by row; a failed row has the code of the node's check and its exception is re-raised.
 """
