@@ -63,7 +63,8 @@ class Fluid(BaseModel):
         """Convert dissolved CO2 and salt mass fractions for the existing corrosion boundary.
 
         The Henry-law approximation is evaluated at the inlet temperature. Explicit
-        measured gas mole fraction/partial pressure should override it when available.
+        measured gas mole fraction/partial pressure should override it when available. ``T``
+        may be an array or a traced value; the fluid and its density stay static.
 
         NOTE(refactor): dissolved mass fraction is NOT a gas mole fraction. It converts from
         kg/m3 to mol/m3 with the CO2 molar mass, then inverts the existing Henry law.

@@ -2,6 +2,7 @@
 
 import json
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 from pydantic_core import to_jsonable_python
@@ -10,6 +11,7 @@ from gemini.core.physics.fluid import FluidProperties
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import BRINE, GLYCOL_30, STEAM, WATER, Fluid
 from gemini.errors import CallError
+from tests.fixtures.equivalence import assert_function_matches
 
 
 def test_fluid_properties_and_identity():
@@ -53,3 +55,11 @@ def test_corrosion_composition_conversion():
     values = fluid.corrosion_inputs(1e6, 300)
     assert values["ionic_strength"] == pytest.approx(74.76)
     assert values["co2_partial_pressure"] * henry_constant(300) == pytest.approx(1.068 / 0.04401)
+
+
+def test_corrosion_inputs_on_arrays_match_floats():
+    """The conversion works on arrays of pressure and temperature."""
+    fluid = Fluid(salinity=0.07, co2_mass_fraction=0.001, liquid_density=1068)
+    assert_function_matches(fluid.corrosion_inputs, [(1e6, 300.0), (2e6, 340.0), (5e5, 285.0)])
+    values = fluid.corrosion_inputs(np.array([1e6, 2e6]), np.array([300.0, 340.0]))
+    assert values["co2_partial_pressure"].shape == (2,)

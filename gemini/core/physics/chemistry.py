@@ -1,6 +1,6 @@
 """Henry-law CO2 partition model retained from GEMINI water-analysis workflows."""
 
-import math
+from gemini import ops
 
 from . import units
 
@@ -23,7 +23,7 @@ def henry_constant(temperature: float) -> float:
     Reference: GEMINI co2_partial_pressure_model.henry_constant; 0.0385 mol/l/bar
     at 293.15 K, with the original 2400 K exponential temperature coefficient.
     """
-    return units.mol_l_bar_to_mol_m3_pa(0.0385 * math.exp(2400 * (1 / temperature - 1 / 293.15)))
+    return units.mol_l_bar_to_mol_m3_pa(0.0385 * ops.exp(2400 * (1 / temperature - 1 / 293.15)))
 
 
 def co2_solubility_liquid(co2_fraction: float, temperature: float, pressure: float) -> float:
