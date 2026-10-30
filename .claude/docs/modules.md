@@ -282,11 +282,10 @@ Hook return values are ignored. Any non-fixed hook signature fails at registrati
 `DeclarationError`. Remove a hook with `handle.remove()`; removing twice does nothing. Assigning a
 control inside a hook changes only the running call.
 
-A hook that only reads can be marked with `gemini.utils.hooks.observer(fn)` (also for a
-`functools.partial`). The graph engine never calls an observer on traced values: on a root leaf it
-replays the pre-hooks and then the forward hooks for each row of a batch with that row's values.
-`EventLog` marks both its hooks. An unmarked pre-hook makes its module a graph break; an unmarked
-forward hook is called once on traced values and classified as writing or reading.
+A pre-hook makes its module a graph break, and so does a forward hook that only reads: the tracer
+calls such a hook once on traced values to classify it, then the module runs for real, row by row,
+hooks included. A forward hook that writes an output is part of the graph. `EventLog` registers no
+hook: it reads the results of each tick.
 
 ## Per-call values
 
@@ -308,13 +307,13 @@ values win without validation, and the `ModuleResult` of traced values joins the
 records, so `Output.of`, automatic sums, `Output.ratio` and `ModuleResult.leaves()` work
 unchanged. `Output.ratio` is `where(bottom == 0, None, top / bottom)` with the division written as
 `ops.truediv`, which gives today's `None` on plain floats. A leaf child that is stateful,
-has a pre-hook, has an unmarked read-only hook or raises `TraceError` becomes one **break node**:
+has a pre-hook, has a read-only hook or raises `TraceError` becomes one **break node**:
 the graph is rolled back to where the child call started and the child runs on the plain path
 (`module(**row)`, a stateful one from its initial states, hooks included) once per row while the
 graph is evaluated, its outputs and outlet fields being `break_output` nodes. The outlet fluids
 come from one probe of `forward` on representative inlets; a row with another fluid fails. A
 failed row is NaN and carries an error code that raises the child's own exception. A composite
-child that cannot be recorded, and any child with a marked observer, make the whole root a graph
+child that cannot be recorded makes the whole root a graph
 break (`graph.breaks` lists the leaf breaks with their reasons).
 
 An output of a list or tuple of traced values (the per-section profiles of the wells) is a vector

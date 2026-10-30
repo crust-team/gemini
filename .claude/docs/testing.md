@@ -152,8 +152,9 @@ shortest `Dataset.window` that still crosses every boundary relevant to the prop
 failing row, and `assert_module_matches` a module called per row against one traced call. Every
 physics function and module has such a test, over rows that cross every branch. A module with no
 inlets, and a stateful module's `_advance_states`, are tested on arrays directly. A module with a
-list output (the wells' section profiles) compares each item. The whole engine is compared with
-`gemini.graph.settings(traced=False)` in `tests/unit/core/engine/test_batch.py` (synthetic twins:
+list output (the wells' section profiles) compares each item. The whole engine is compared on the NumPy and Python backends
+(`gemini.backends.settings(backend="python")` evaluates row by row) in
+`tests/unit/core/engine/test_runner.py` (synthetic twins:
 skips, failing checks under `record` and `raise`, dated parameters, `only`, a stateful twin,
 `EventLog`, `AutoCheckpoint` with resume, a raising callback, persisted inputs, health) and in
 `tests/integration/test_replay_graph.py` (the doublet heat plant): frames, dtypes, skips,

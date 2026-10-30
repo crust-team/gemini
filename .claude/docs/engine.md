@@ -9,7 +9,7 @@ belong to the caller.
 
 The pieces fit together as follows: the plant `Module` owns its design and bindings, the
 in-memory `Dataset` holds raw observations, the internal `Loader` aligns rows to the engine
-`Clock`, one private `Engine._run` loop evaluates every tick and calls the callbacks,
+`Clock`, one private `Engine._run` hands the run to the `Runner`, which evaluates chunks of ticks and replays the callbacks,
 `save_checkpoint`/`load_checkpoint`/`resume` persist and continue a run, and `optim.calibrate`
 fits parameters by calling `Engine.replay`.
 
@@ -46,8 +46,9 @@ quantities convert by scale only.
 
 State bound to a sensor is authoritative for that tick; otherwise `module.step` integrates the
 previous state. A twin skipped for missing data keeps its previous state, and the skipped tick's
-`dt` is not integrated. After each replayed twin the engine calls `module.health(result,
-measured)`; a module without a diagnostic is recorded as `assessed=False`.
+`dt` is not integrated. The engine assesses `module.health(result,
+measured)` for each replayed twin (once on the arrays of a chunk); a module without a diagnostic
+is recorded as `assessed=False`.
 
 Under `on_error="record"` an ordinary exception becomes a recorded error: per twin when a replayed
 twin fails, otherwise (always in simulation) for the whole step with module path `""`, in which
@@ -55,49 +56,75 @@ case the module states are also restored to their value before the step. Under
 `on_error="raise"` a failing replay twin raises `StepError` with the cause chained, and a failing
 simulation step raises its exception.
 
-## Replay through the graph
+## The runner
 
-A replay is two phases (`gemini/core/engine/batch.py`). After `on_run_start` (so `EventLog` has
-attached its hooks) the **batch phase** evaluates each twin once on arrays: for every stretch of
-ticks that share one dated parameter snapshot it converts the bound columns to SI with the same
-scale and offset as `units.to_si` (`units.si_conversion`), builds one stream of arrays per inlet,
-and runs the cached graph (`gemini.graph`) over the rows that can be evaluated. A row is
-**claimed** when every observation is present and finite, the inlet stream is valid, no check or
-break node reaches an output, and every output and outlet value is finite (NaN only for a
-declared `X | None` output, read back as `None`). The **commit phase** is the unchanged tick loop:
-a twin takes a claimed row from the batch (a `ModuleResult` of plain Python floats, bools and
-`None`, without `children` or `call_records`, built from per-row tuples prepared once and
-unchecked `Ports` and `Values`) and runs `health` on it; every other row, of every
-twin, is evaluated at its own tick on the plain path, which raises the exact error, `StepError`
-chain, skip or result an untraced replay gives. Results, skips, errors, callbacks and checkpoints
-therefore come from one code path.
+`Engine.replay`, `live`, `simulate` and `resume` all reach `Engine._run`, which builds the
+`BindingPlan` and the `Loader` arrays and hands them to `Runner` (`gemini/core/engine/runner.py`).
+There is no tick loop and no second path for a failing row: a run is a list of **twins** (the
+equipment twins of a replay; the plant in simulate) evaluated over **chunks** of ticks.
 
-Twins the graph cannot carry run entirely on the plain path: stateful twins (they need
-`scan`), float32 runs, an untraceable twin, and every twin when one twin is a composite with
-another twin below it. `engine.batch.reasons` gives the reason by twin path, `engine.batch.claims`
-the claimed rows, and `claims[path].graph.breaks` the leaf children of a composite twin that run
-untraced inside its graph. The batch is built only for `replay` (including `resume` of one), not
-for `simulate` or `live`, and `gemini.graph.settings(traced=False)` turns it off.
+- **Chunks.** Ticks that share one dated parameter snapshot form a stretch (the snapshot is applied
+  at its first tick). A chunk is the whole stretch, except that it is **one tick** when a stateful
+  module is stepped (`Twin.stepped`), when a twin sits below another twin (its controls are read
+  from what the other twin persisted this tick), or when a callback declares `changes_run = True`.
+  `live` evaluates the ticks of one call as one chunk, like `replay`.
+- **Per chunk and twin.** `columns.read` converts the bound columns to SI (`units.si_conversion`,
+  volumetric flows with `flows.mass_flow`) and gives every tick a status in the order a plain call
+  meets its problems: the first missing column (a skip counted by its name; the missing rule is
+  `Aligned.present`), or an inlet stream the limits refuse (an error with the text of the real
+  `Stream` constructor). `outcome.evaluate_twin` builds the inlet streams of the ticks that can be
+  evaluated, takes the graph from the engine's `GraphCache` (`graph.breaks` per twin path are in
+  `engine.graph_breaks`), feeds it with `graph_feeds` and calls `gemini.graph.evaluate`: the backend
+  is the one of `gemini.backends.settings(backend=...)`, NumPy over arrays by default, Python row by
+  row (`backend="python"` is how to debug) and the results are the same. A failing row gets the
+  check's class and exact message from `Evaluation.error`; a bound violation on a declaration reads
+  `declaration.validate`. Then `health.assess` runs `Module.health` once on the arrays (row by row on
+  the Python backend, or when the call on arrays raises, which finds the rows whose health fails:
+  they are errors), and the columns are spread over the chunk (`PathColumns.spread`).
+- **Breaks.** A leaf that is stateful, pre-hooked, untraceable or has a hook that only reads is a
+  break node. A root that cannot be traced as a whole (`close_loop`, `nodal.py`, float32
+  precision, or a stateful module in a stepped run) is one **root break**: the real module, called
+  row by row with its states, so its results are real `ModuleResult` trees (children, sums and
+  `Output.of` exact). There is one implementation of a break, used by every mode.
+- **Skips and errors.** A twin is skipped for the first missing column in this order: controls,
+  boundaries, inlet fields (each inlet's stream is checked once its fields are read), observations,
+  measured states. In simulate the plant is the one twin: root inlets, then the leaf inputs; a skip
+  is counted under `""`. A failing row is recorded as `module=path, message=str(error),
+  type=type(error).__name__`; in simulate, whatever fails is a whole-step error under `""` and the
+  states stay as they were.
+- **Inputs.** Each tick sets the module's controls and boundaries on its twin (`set_inputs`)
+  before the module is called, so a failing tick has persisted them; the runner sets them at the
+  end of a chunk, for the last tick that applied them (one tick at a time when there are callbacks
+  or one-tick chunks), so the plant keeps the last tick's inputs, as an interrupted run does.
+- **States.** A stateful twin is a root break stepped once per tick with the run's state;
+  `engine.module_states` is `{path: tree}` in replay and `{"": tree}` in simulate, as in a
+  checkpoint. State bound to a sensor is passed as the start state and stays authoritative.
+- **`on_error="raise"`.** The ticks before the first failing one are committed, their callbacks run,
+  `on_step_start` of the failing tick is delivered and the error is raised: `StepError` chained to
+  the cause in replay, the exception itself in simulate. A later twin of the failing tick is not
+  evaluated when the chunk is one tick.
 
-The inputs a claimed row applies to its twin (`module.set_inputs`) are applied at once when the
-engine has callbacks, else once at the end of the run (also on failure) for the last tick whose
-inputs were not replaced by a plain-path tick, so the plant keeps the last tick's inputs. The
-marked observer hooks of a twin (`EventLog`) are replayed for each claimed row, pre-hooks then
-forward hooks, with that row's inlets, outlets, inputs and outputs. Dated parameters apply per
-stretch in the batch phase and are restored afterwards; the commit loop applies them again. One
-`GraphCache` lives on the `Engine`, so repeated replays (calibration) reuse graphs.
+A direct call such as `esp(suction=...)` stays eager: the same `forward` and ops.
 
 ## Callbacks
 
 Callbacks derive from `gemini.core.engine.callbacks.Callback` and run in registration order with
-the engine as first argument: `on_run_start(engine)`, `on_step_start(engine, sample)`,
+the engine as first argument. They are **replayed from the results of a chunk**, tick by tick,
+seeing the engine as a tick loop left it (results, position and states of that tick, the plant's
+inputs); a callback that changes the run (the plant, its parameters or inputs, the dataset) sets
+the class attribute `changes_run = True`, which makes the chunks one tick and calls
+`on_step_start` before the tick is evaluated. Without callbacks a chunk is committed at once, with
+callbacks one tick at a time: `on_run_start(engine)`, `on_step_start(engine, sample)`,
 `on_step_end(engine, sample)` after results and position have committed, and
 `on_run_end(engine)`. `on_error(engine, error)` observes only a failure that ends the run (an
 exception in a step under `on_error="raise"`, in a callback or an interrupt), with
 checkpoint-consistent state, before it propagates. Errors recorded under `on_error="record"` are
 results: they are in `engine.results.errors` when `on_step_end` runs. `EventLog(path=None)`
-writes JSON-lines events (in memory without a path), observes every module call through hooks that
-it always removes at run end or failure, and records non-finite floats as `NaN`/`Infinity`.
+writes JSON-lines events (in memory without a path); after each tick it logs a `forward` event for
+every module call of `engine.step_results` (the tick's `ModuleResult` tree by twin path, built
+from the arrays when asked), children before the module that called them, with no hook on the
+plant, and records non-finite floats as `NaN`/`Infinity`. A failing composite call logs no event
+for the children that had completed.
 `AutoCheckpoint(path, every=100)` saves every N steps or every elapsed duration such as `"1h"`.
 
 ## Results
@@ -110,9 +137,8 @@ for and one column per field, every column with one entry per tick (entries of a
 ignored). A column is a NumPy array or, for objects such as list outputs and message strings, a
 Python list; `PathColumns.of(result, health, present)` takes them from a leaf `ModuleResult` and
 a `Health` of arrays or scalars (scalars broadcast) and computes `operating` from the flows.
-Columns are kept by reference. `Results.append(at, outputs, dt, skips, errors)` stays as the
-one-tick form for plain results: the row waits as cells and joins the columns as one chunk when a
-table, file or slice is wanted. Chunks are concatenated lazily in `to_frame`, which gives the
+Columns are kept by reference; a declared `X | None` float output with NaN becomes a list with
+`None`. A chunk of one tick is the same code as a window. Chunks are concatenated lazily in `to_frame`, which gives the
 columns and dtypes a table built row by row would have: columns in the order of first appearance
 (paths by the first tick they are present, then as given), a typed array that is present
 everywhere keeps its dtype, floats with an absent tick are `float64` with NaN, and every other
