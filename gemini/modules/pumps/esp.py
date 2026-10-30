@@ -156,7 +156,7 @@ class ESP(Module):
         }
         worst, message = self._worst_drift(drifts, window)
         return Health(
-            score=ops.maximum(0, 1 - worst),
+            score=diagnostics.remaining_margin(worst),
             alarm=ops.logical_or(worst > self.drift_threshold, ops.logical_not(window)),
             message=message,
             metrics=drifts,
