@@ -43,15 +43,29 @@ def _adapter(kind, bounds):
     return TypeAdapter(Annotated[kind, Field(**bounds)] if bounds else kind)
 
 
+_LIMIT_KEYS = {"minimum": "ge", "exclusiveMinimum": "gt", "maximum": "le", "exclusiveMaximum": "lt"}
+
+
+def _limits(schema):
+    """Return the ``ge``/``gt``/``le``/``lt`` bounds of the value (or list item) in ``schema``."""
+    value_schema = _value_schema(schema)
+    return {key: value_schema[name] for name, key in _LIMIT_KEYS.items() if name in value_schema}
+
+
+def _value_schema(schema):
+    """Return the schema of the non-null variant of ``schema``, or of its list items."""
+    variants = schema.get("anyOf", [schema])
+    value_schema = next((value for value in variants if value.get("type") != "null"), schema)
+    return value_schema.get("items", value_schema)
+
+
 def _schema_metadata(adapter):
     """Return the JSON schema of ``adapter`` and the quantity, unit and additivity of its value.
 
     Optional kinds describe the non-null variant, and lists describe their items.
     """
     schema = adapter.json_schema()
-    variants = schema.get("anyOf", [schema])
-    value_schema = next((value for value in variants if value.get("type") != "null"), schema)
-    value_schema = value_schema.get("items", value_schema)
+    value_schema = _value_schema(schema)
     quantity = value_schema.get("quantity")
     return schema, quantity, value_schema.get("unit"), value_schema.get("additive", False)
 
@@ -70,6 +84,7 @@ class Declaration:
         self.name = None
         self.owner = None
         self._adapter = _adapter(kind, bounds)
+        self._limits = None
         self.schema, self.quantity, self.unit, self.additive = _schema_metadata(self._adapter)
 
     @property
@@ -78,6 +93,21 @@ class Declaration:
         if self.owner is None or self.name is None:
             return self.name or "<unbound>"
         return f"{self.owner.path}.{self.name}"
+
+    def limits(self):
+        """Return the numeric bounds the value must satisfy, as ``ge``/``gt``/``le``/``lt``.
+
+        They are read once from the quantity metadata and the declared ``bounds`` (both are in the
+        schema, the stricter wins) and apply to each item of a list. A kind without bounds, such
+        as a flag or a text, gives an empty mapping.
+        """
+        if self._limits is None:
+            self._limits = _limits(self.schema)
+        return self._limits
+
+    def accepts_none(self):
+        """Return whether the declared kind is ``X | None``."""
+        return any(variant.get("type") == "null" for variant in self.schema.get("anyOf", ()))
 
     def bind(self, owner, name):
         """Attach this declaration to a module and local name."""
@@ -181,6 +211,7 @@ class _StreamPort(Declaration):
         self.bounds = {}
         self.name = None
         self.owner = None
+        self._limits = None
         self.schema, self.quantity, self.unit, self.additive = {}, None, None, False
 
     def validate(self, value):

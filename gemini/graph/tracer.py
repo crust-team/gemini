@@ -23,6 +23,7 @@ from gemini.core.types.results import ModuleResult, Values
 from gemini.errors import MissingValueError, TraceError
 from gemini.graph.breaks import record_break
 from gemini.graph.graph import Graph
+from gemini.graph.limits import certain, check_declared_limits
 from gemini.graph.node import STREAM_FIELDS
 from gemini.utils.hooks import is_observer
 from gemini.utils.strings import join_path
@@ -47,6 +48,7 @@ class Tracer:
             path=module.path,
         )
         graph.pre_observers.extend(module._pre_hooks.values())
+        trace.limit_checks.extend(graph.checks)
         outlets, call = trace.run(module, inlets, {}, None)
         for port, stream in outlets.items():
             graph.outlet_fluids[port] = stream.fluid
@@ -54,6 +56,7 @@ class Tracer:
                 graph.output(f"outlets.{port}.{field}", getattr(stream, field))
         for name, value in (call.outputs or {}).items():
             graph.output(f"outputs.{name}", value)
+        certain(graph, trace.limit_checks)
         return graph
 
 
@@ -78,6 +81,7 @@ class Trace:
         self.root = root
         self._inputs = {}
         self._parameters = {}
+        self.limit_checks = []
 
     def child(self, module, inlets, supplied, parent):
         """Record one child call and return its ``ModuleResult`` of traced values.
@@ -136,6 +140,9 @@ class Trace:
             outlets = Ports(_forward(module, inlets), path=module.path)
             if call.outputs is not None:
                 self._trace_outputs(module, call, inlets, outlets)
+            before = len(self.graph.checks)
+            check_declared_limits(module, call)
+            self.limit_checks.extend(self.graph.checks[before:])
         finally:
             _current_call.reset(token)
         return outlets, call
@@ -234,7 +241,7 @@ def _check_observers(module):
 def _inlet(graph, name, fluid):
     """Return the traced stream of one inlet: graph inputs for its fields, the fixed fluid."""
     fields = {field: graph.input(f"{name}.{field}", "inlet", unit) for field, unit in STREAM_FIELDS}
-    return Stream._trusted(fluid=fluid, **fields)
+    return Stream(fluid=fluid, **fields)
 
 
 def _parameters(graph, module, prefix):

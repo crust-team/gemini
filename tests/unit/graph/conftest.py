@@ -8,14 +8,18 @@ from gemini.core.modules import Module
 from gemini.core.types import (
     BRINE,
     WATER,
+    Boundary,
     Control,
     Electricity,
     Inlet,
     Outlet,
     Output,
     Parameter,
+    Pressure,
+    Ratio,
     State,
     Stream,
+    Temperature,
 )
 from gemini.errors import PhysicsRangeError
 from gemini.ops import Constant
@@ -457,3 +461,46 @@ class Vectored(Module):
 
     def _compute_outputs(self, inlets, outlets):
         self.profile = [inlets.inlet.p, inlets.inlet.p + 1.0]
+
+
+class Bounded(Module):
+    """Declare a bound on a control, a boundary and three outputs: a pressure, a list, a ratio."""
+
+    def __init__(self):
+        """Declare the bounded values and the passing stream."""
+        super().__init__()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.setpoint = Control(Pressure)
+
+        # Boundaries
+        self.ambient = Boundary(Temperature)
+
+        # Outputs
+        self.margin = Output(Pressure)
+        self.profile = Output(list[Pressure])
+        self.share = Output(Ratio | None)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Pass the stream."""
+
+        # Outlets
+        outlets = dict(outlet=inlets.inlet)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.margin = inlets.inlet.p - self.setpoint
+        self.profile = [self.setpoint, self.setpoint - 1.0]
+        self.share = ops.where(self.ambient > 1000.0, None, self.setpoint / inlets.inlet.p)
+
+
+@pytest.fixture
+def bounded():
+    """Return a ``Bounded`` module."""
+    return Bounded()

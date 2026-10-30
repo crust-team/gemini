@@ -16,7 +16,9 @@ from gemini.core.types import (
     Outlet,
     Output,
     Parameter,
+    Pressure,
     PressureDifference,
+    Ratio,
     Stream,
     Temperature,
     TemperatureDifference,
@@ -147,3 +149,13 @@ def test_invalid_values_raise_declaration_errors():
         Parameter(list[float], shape=(2,)).bind(None, "coefficients").validate([1])
     with pytest.raises(DeclarationError, match="outlet.mdot: unknown stream field.*'m_dot'"):
         Outlet(Stream).bind(None, "outlet").field("mdot")
+
+
+def test_limits_come_from_the_quantity_and_the_bounds():
+    """Quantity bounds and declared bounds merge; kinds without bounds give nothing."""
+    assert Control(Pressure, le=9).limits() == {"ge": 0, "le": 9}
+    assert Output(Temperature).limits() == {"gt": 0}
+    assert Output(list[Pressure]).limits() == {"ge": 0}
+    assert Output(bool).limits() == {}
+    assert Output(Ratio | None).accepts_none() and not Output(float).accepts_none()
+    assert Inlet(Stream).limits() == {}

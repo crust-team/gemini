@@ -321,6 +321,14 @@ An output of a list or tuple of traced values (the per-section profiles of the w
 output of fixed length: `Graph.output` records each item as `<name>[<index>]`, `graph.vectors`
 keeps the length, and `gemini.graph.run` returns one array of shape `(rows, length)`.
 
+A traced call is not validated, so the tracer adds the validation as graph checks. For every
+traced call (children included, break nodes excepted) each control, boundary and output with
+bounds (`Declaration.limits()`: `ge`/`gt`/`le`/`lt` read once from the quantity metadata and the
+declared bounds, applied to each item of a list; an `X | None` kind lets NaN pass) gets an
+`ops.check` raising `DeclarationError`, and the root inlets carry the `Stream` limits (finite
+`m_dot`, `T > 0`, `p >= 0`). These checks are attached to every graph output, so a row that
+violates a bound fails even where the arithmetic never reads the bad value.
+
 ## Skipping outputs
 
 `gm.no_outputs()` is a nestable, context-local context manager and decorator. It skips
