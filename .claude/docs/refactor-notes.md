@@ -187,6 +187,8 @@ reservoir pressure/temperature and an appropriate variable-UA reference are the 
     head and power polynomials use (`core/physics/pumps.py`): ESP head and discharge pressure
     move by up to 1.4e-15 relative (1.9e-9 Pa) in 28,532 replay cells, and three golden ESP
     values by up to 5.8e-16.
+    The eager scope wraps scalars as `np.float64`, for which `sum()` does not compensate, so from
+    step 3 of the native engine the eager path equals the array sum on 3.12 too; 3.11 is unchanged.
   - NumPy 2.5's `polyfit` moves the golden reservoir pressure estimate from 21999999.999999974
     to 21999999.999999993 Pa (8.5e-16 relative).
 

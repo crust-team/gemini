@@ -7,15 +7,17 @@ IAPWS-IF97 steam, ground heat transport and psychrometrics (sections below, the 
 correlations first).
 
 - Use plain typed functions and SI inputs/outputs; small structured return models are allowed.
-- Every function runs on floats, arrays and traced values: it is written with `gemini.ops`, a
-  value-dependent `if` is `ops.where`, a `raise` is `ops.check` with the same class and message
-  and `math.*` is an op (see [native-engine.md](native-engine.md)). Both branches of `where`
-  always run, so a division or power that can be invalid in a branch is `ops.truediv` or
-  `ops.pow`; these and the other ops return `inf` or `nan` silently, so an out-of-domain number
-  in a correlation with no check gives NaN instead of a `math` exception. A function whose
-  checks belong to one path gets harmless inputs on the other (`ntu` needs a positive `c_min`,
-  so a caller passes a safe rate through `where`; Beggs-Brill at zero flow gets a unit liquid
-  velocity).
+- Every function runs on floats, arrays and traced values. Public functions carry `@ops.physics`:
+  it gives scalars NumPy types, so plain `/` and `**` are silent in an eager call as they are on
+  arrays and in a graph. A value-dependent `if` is `ops.where`, a `raise` is `ops.check` with the
+  same class and message, and `math.*` is an op (see [native-engine.md](native-engine.md)). A check
+  guards all results of its function and `where` drops the error of the unselected branch, so a
+  function has one version: `where(stopped, 0.0, ntu(rate))` works. An out-of-domain number in a
+  correlation with no check gives NaN. A failed tuple cannot be unpacked, so a physics function
+  returning a tuple is read by index when its check can fail. Where a module reports its own error
+  class the function takes `error` and `context` (`ramey_time_function`, `steady_flux_resistance`,
+  `vertical_cylinder_conductance`). A direct call on arrays raises a failing check at once, for the
+  first failing row; rows crossing a `where` around a check need a graph (`run_function`).
 - State dimensions, reference formulas and assumptions in docstrings.
 - Keep correlation-specific US or laboratory bases explicit at the formula boundary.
 - `units._UNITS` is the single table of public data units (SI unit, scale, offset). A declared

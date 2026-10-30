@@ -248,19 +248,17 @@ Where the implementation differs from sections 1 to 11, and why:
   for step with an active-row mask. `find_root` lands up to 1.4e-12 relative from the Python
   result (Brent's own error is within `xtol`, so no setting meets 1e-12) and array
   `scipy.optimize.newton` returns a different iterate, which moved the rounded NORSOK pH on 34 %
-  of random rows. The vectorised versions differ by at most 6.4e-16. CSE never merges solvers.
-- **Checked functions called inside a branch.** Both branches of `where` always run, so a check
-  in a public function called from a branch would fire for the unselected one. Such a function
-  splits into a checked wrapper and an unchecked private helper (`steam._saturation_pressure`,
-  `psychrometrics._saturation_pressure`). A value-dependent `break` becomes a fixed number of
-  passes with a finished mask (`IceStorage`). `ntu` raises on a zero rate, so a `where`-selected
-  call passes a safe rate.
-- **Inputs of the unselected path.** Because `check` raises at once on Python floats and `where`
-  runs both branches, a call whose checks belong to one path gets harmless inputs on the other
-  (Beggs-Brill, Ramey and the borehole cell at zero flow). An unselected solve must not poison a
-  `where`, so the inputs of later checked functions are masked with `where(selected, root,
-  fallback)`. A solve that can fail needs its own `check` for its selected rows; `HeatPump` adds
-  two, where scipy's `ValueError` surfaced before.
+  of random rows. The vectorised versions give the same iterates: measured worst relative differences are
+  6.4e-16 (`dew_point`, earlier grid; 3.1e-16 on the latest), 2.2e-16 (NORSOK pH) and 0
+  (`doublet_cold_fraction`). CSE never merges solvers.
+- **A value-dependent `break`** becomes a fixed number of passes with a finished mask (`IceStorage`).
+- **A result used only for its validity** (`FlashTurbine.forward`) goes through `ops.require`,
+  or its error is dropped on every backend: errors travel with values, and nothing reads this one.
+- **A physics function given a `Failed` returns it**, so the earliest failure wins as in a graph.
+- **Integers** are `np.int64` in an eager call, so an integer argument divides like a float and
+  still prints, indexes and loops as an int. Ints beyond 64 bits stay Python ints.
+- **A solver's function may hold a check** when its bracket keeps it inside the valid range
+  (`dew_point` passes a degenerate bracket for an out-of-range row).
 - **Discrete choices and error rewraps.** A string-valued choice decided by values becomes an
   integer code selected by `where` (the Beggs-Brill regime). A `try` around a physics call cannot
   work in a trace, so the physics function takes the `error` class (`ramey_time_function`).
@@ -359,3 +357,7 @@ Measured on the July dataset (2976 ticks, 8 twins, none with a graph break): the
 1.6 ms against 425 ms; CSE takes the ESP graph from 151 to 109 nodes and its call from 2.3 to
 1.6 ms. The graph evaluation is only about 5 % of the replay. The rest is the per-tick commit:
 `ModuleResult` per claimed row 40 %, `health` 25 %, `Results.append` 14 %.
+
+Known gap: fluid properties and published correlation coefficients stay inline in the graph, not
+`Parameter` or `Constant` inputs, so a calibration or sensitivity run cannot reach them without a
+retrace. Named physical constants and module-level model constants are `Constant`s.
