@@ -4,6 +4,7 @@ from gemini import ops
 from gemini.errors import PhysicsRangeError
 
 
+@ops.physics
 def pipe_temperature_change(
     inlet_temperature: float,
     u_value: float,
@@ -56,6 +57,7 @@ def pipe_temperature_change(
     )
 
 
+@ops.physics
 def lmtd(dt1: float, dt2: float) -> float:
     """Return logarithmic mean temperature difference; reject a temperature cross.
 
@@ -74,7 +76,7 @@ def lmtd(dt1: float, dt2: float) -> float:
     Reference: Incropera et al., Fundamentals of Heat and Mass Transfer,
     heat-exchanger LMTD method: (dt1-dt2)/ln(dt1/dt2).
     """
-    _check_numbers("lmtd", dt1=dt1, dt2=dt2)
+    ops.check_numbers("lmtd", dt1=dt1, dt2=dt2)
     ops.check(
         ops.logical_and(dt1 >= 0, dt2 >= 0),
         PhysicsRangeError,
@@ -82,12 +84,13 @@ def lmtd(dt1: float, dt2: float) -> float:
         dt1=dt1,
         dt2=dt2,
     )
-    logarithmic = ops.truediv(dt1 - dt2, ops.log(ops.truediv(dt1, dt2)))
+    logarithmic = (dt1 - dt2) / ops.log(dt1 / dt2)
     return ops.where(
         dt1 == dt2, dt1, ops.where(ops.logical_or(dt1 == 0, dt2 == 0), 0.0, logarithmic)
     )
 
 
+@ops.physics
 def ntu(ua: float, c_min: float) -> float:
     """Return the number of transfer units.
 
@@ -106,7 +109,7 @@ def ntu(ua: float, c_min: float) -> float:
     Reference: Incropera et al., Fundamentals of Heat and Mass Transfer,
     effectiveness–NTU method.
     """
-    _check_numbers("ntu", ua=ua, c_min=c_min)
+    ops.check_numbers("ntu", ua=ua, c_min=c_min)
     ops.check(
         ops.logical_and(ua >= 0, c_min > 0),
         PhysicsRangeError,
@@ -117,6 +120,7 @@ def ntu(ua: float, c_min: float) -> float:
     return ua / c_min
 
 
+@ops.physics
 def effectiveness_counterflow(transfer_units: float, c_ratio: float) -> float:
     """Return counterflow heat-exchanger effectiveness.
 
@@ -136,13 +140,12 @@ def effectiveness_counterflow(transfer_units: float, c_ratio: float) -> float:
     counterflow effectiveness–NTU relation, including the equal-capacity limit.
     """
     _check_effectiveness_inputs("effectiveness_counterflow", transfer_units, c_ratio)
-    balanced = ops.where(
-        ops.isinf(transfer_units), 1.0, ops.truediv(transfer_units, 1 + transfer_units)
-    )
-    term = ops.exp(ops.mul(-transfer_units, 1 - c_ratio))
-    return ops.where(c_ratio == 1, balanced, ops.truediv(1 - term, 1 - c_ratio * term))
+    balanced = ops.where(ops.isinf(transfer_units), 1.0, transfer_units / (1 + transfer_units))
+    term = ops.exp(-transfer_units * (1 - c_ratio))
+    return ops.where(c_ratio == 1, balanced, (1 - term) / (1 - c_ratio * term))
 
 
+@ops.physics
 def effectiveness_parallel(transfer_units: float, c_ratio: float) -> float:
     """Return parallel-flow heat-exchanger effectiveness.
 
@@ -165,22 +168,9 @@ def effectiveness_parallel(transfer_units: float, c_ratio: float) -> float:
     return -ops.expm1(-transfer_units * (1 + c_ratio)) / (1 + c_ratio)
 
 
-def _check_numbers(function, **values):
-    """Reject NaN inputs, which would otherwise return NaN as if it were a valid result."""
-    for name, value in values.items():
-        ops.check(
-            ops.logical_not(ops.isnan(value)),
-            PhysicsRangeError,
-            "{function}: {name} = nan; expected a number",
-            function=function,
-            name=name,
-            value=value,
-        )
-
-
 def _check_effectiveness_inputs(function, transfer_units, c_ratio):
     """Require a nonnegative NTU and a capacity ratio in [0, 1]."""
-    _check_numbers(function, transfer_units=transfer_units, c_ratio=c_ratio)
+    ops.check_numbers(function, transfer_units=transfer_units, c_ratio=c_ratio)
     ops.check(
         ops.logical_and(transfer_units >= 0, ops.logical_and(c_ratio >= 0, c_ratio <= 1)),
         PhysicsRangeError,
