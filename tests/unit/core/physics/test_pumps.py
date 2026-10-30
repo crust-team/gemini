@@ -3,6 +3,7 @@
 import pytest
 
 from gemini.core.physics import constants, pumps, units
+from tests.fixtures.equivalence import assert_function_matches
 
 
 def test_head_and_power_polynomials():
@@ -23,3 +24,11 @@ def test_affinity_scaling_with_frequency_and_stages():
     power = pumps.power(flow, constants.ESP_REFERENCE_FREQUENCY, 1, [5, 0.02])
     assert pumps.head(flow, 30, 4, [5, 0.02]) == pytest.approx(head)
     assert pumps.power(flow, 30, 8, [5, 0.02]) == pytest.approx(power)
+
+
+def test_polynomials_match_on_arrays():
+    """Head and power on arrays equal one call per row, across frequencies and stage counts."""
+    rows = [(0.0, 60.0, 1.0), (0.01, 45.0, 4.0), (0.05, 30.0, 8.0)]
+    for function in (pumps.head, pumps.power):
+        for coefficients in ([10, 0.01], [10, 0.01, -1e-6]):
+            assert_function_matches(function, rows, coefficients=coefficients)
