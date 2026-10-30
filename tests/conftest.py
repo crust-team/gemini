@@ -11,6 +11,7 @@ import pytest
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
 from gemini.core.modules import Module
+from tests.cpu_budget import BUDGET_S, exceeds_budget, measure_cpu
 
 TIER_MARKERS = {
     "unit": pytest.mark.unit,
@@ -19,7 +20,7 @@ TIER_MARKERS = {
 }
 
 ROOT = Path(__file__).parents[1]
-TEST_BUDGET_S = 1.0
+CPU_SECONDS = pytest.StashKey[float]()
 SESSION_BUDGET_S = 300.0
 DATASETS = {
     "fast": ROOT / "examples/shared/doublet_heat/doublet_2024_15min_month.csv",
@@ -123,22 +124,38 @@ def pytest_collection_modifyitems(items):
             item.add_marker(marker)
 
 
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item):
+    """Record the CPU time of the test call itself, without fixture setup or teardown."""
+    try:
+        with measure_cpu() as cpu:
+            return (yield)
+    finally:
+        item.stash[CPU_SECONDS] = cpu.seconds
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Fail a development-profile fast-tier call that exceeds the one-second budget."""
+    """Fail a development-profile fast-tier call whose CPU time exceeds the one-second budget.
+
+    Elapsed time is not the measure: under a parallel run or a busy machine a test is descheduled
+    and its wall time grows without any extra work. See ``tests/cpu_budget.py``.
+    """
     outcome = yield
     report = outcome.get_result()
     markers = {marker.name for marker in item.iter_markers()}
+    cpu_seconds = item.stash.get(CPU_SECONDS, 0.0)
     if (
         report.when == "call"
         and report.passed
-        and report.duration > TEST_BUDGET_S
+        and exceeds_budget(cpu_seconds)
         and item.config.getoption("--profile") == "development"
         and not markers.intersection({"e2e", "slow"})
     ):
         report.outcome = "failed"
         report.longrepr = (
-            f"Fast-tier test took {report.duration:.2f}s (budget: {TEST_BUDGET_S:.2f}s). "
+            f"Fast-tier test used {cpu_seconds:.2f}s of CPU time in {report.duration:.2f}s "
+            f"elapsed (budget: {BUDGET_S:.2f}s CPU). "
             "Move it to slow or make it faster, see .claude/docs/testing.md."
         )
 

@@ -71,10 +71,20 @@ bound only for a known incompatibility.
 
 ## Speed budget and slow tests
 
-An individual fast-tier test call may take at most one second. In the development profile the
-root `tests/conftest.py` hook fails a slower unit or integration test, also inside xdist workers,
-with instructions to optimize it or mark it `slow`. E2E tests, including the example smoke
-tests, are exempt, and the release profile does not enforce the budget.
+An individual fast-tier test call may take at most one second **of CPU time**. In the
+development profile the root `tests/conftest.py` hook fails a unit or integration test whose call
+phase (without fixture setup and teardown) used more, also inside xdist workers, with
+instructions to optimize it or mark it `slow`. E2E tests, including the example smoke tests, are
+exempt, and the release profile does not enforce the budget.
+
+The measure is `time.process_time()` around the call (`tests/cpu_budget.py`), not elapsed time:
+under `-n auto` or on a busy machine a test is descheduled and its wall time grows without any
+extra work, so a wall-clock budget flaked on tests that need 0.5 s alone. `process_time` adds the
+CPU of every thread of the process, so work a test hands to its own threads or to the NumPy
+thread pool still counts (`thread_time` would miss it and let a heavy test pass), while sleeping
+and waiting do not count. A worker runs one test at a time, so the process clock belongs to the
+test. The budget stays one second; the failure message shows CPU and elapsed time. Never raise
+the budget, skip a test or mark it flaky to get under it.
 Marking is allowed only when the property inherently needs long elapsed work or a large real-data
 window; add a one-line reason to its docstring. Do not delete, skip or weaken a test to meet the
 budget.
