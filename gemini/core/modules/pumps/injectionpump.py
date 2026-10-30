@@ -1,5 +1,6 @@
 """Injection pump using supplied curves or a discharge-pressure setpoint."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import pumps
 from gemini.core.types import (
@@ -58,10 +59,13 @@ class InjectionPump(Module):
         # Outlets
         suction = inlets.suction
         head = self._head(suction)
-        if head < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: head = {head} Pa; discharge pressure is below suction pressure"
-            )
+        ops.check(
+            head >= 0,
+            PhysicsRangeError,
+            "{path}: head = {head} Pa; discharge pressure is below suction pressure",
+            path=self.path,
+            head=head,
+        )
 
         discharge = suction.with_(p=suction.p + head)
 
@@ -86,10 +90,13 @@ class InjectionPump(Module):
         A ``power_coeff`` curve is used for power only together with a ``head_coeff`` curve.
         """
         flow = suction.volumetric_flow()
-        if flow < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: suction volume flow = {flow} m3/s; reverse flow is unsupported"
-            )
+        ops.check(
+            flow >= 0,
+            PhysicsRangeError,
+            "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
+            path=self.path,
+            flow=flow,
+        )
         if self.head_coeff is not None:
             if self.no_stages is None:
                 raise ConfigurationError(f"{self.path}: head_coeff curves require no_stages")

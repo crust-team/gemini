@@ -2,6 +2,7 @@
 
 from gemini.core.modules.pumps import InjectionPump
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 
 def test_equipment_forward():
@@ -11,3 +12,31 @@ def test_equipment_forward():
     assert sum(s.m_dot for s in result.outlets.values() if isinstance(s, Stream)) == 1
     assert result.outlets["discharge"].T == 300
     assert result.outlets["discharge"].p >= 0
+
+
+def _rows():
+    return [
+        dict(suction=Stream(m_dot=m_dot, T=300, p=p), pressure_setpoint=setpoint, frequency=60)
+        for m_dot, p, setpoint in [(1, 1e6, 2e6), (5, 2e6, 6e6), (0.5, 1e6, 1e6)]
+    ]
+
+
+def test_setpoint_matches_traced():
+    """The setpoint branch traces and equals one call per row."""
+    module = InjectionPump().update_params(efficiency=0.65)
+    assert_module_matches(module, _rows())
+
+
+def test_curves_match_traced():
+    """The head and power curve branch traces and equals one call per row."""
+    module = InjectionPump().update_params(
+        no_stages=10, head_coeff=[100, -0.01, 0, 0, 0, 0], power_coeff=[1, 0.001, 0, 0, 0, 0]
+    )
+    rows = [{k: v for k, v in row.items() if k != "pressure_setpoint"} for row in _rows()]
+    assert_module_matches(module, rows)
+
+
+def test_setpoint_below_suction_raises():
+    """A setpoint below the suction pressure is a physics range error."""
+    with pytest.raises(PhysicsRangeError, match="below suction pressure"):
+        InjectionPump()(suction=Stream(m_dot=1, T=300, p=2e6), pressure_setpoint=1e6)
