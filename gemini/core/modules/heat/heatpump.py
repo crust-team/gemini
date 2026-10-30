@@ -347,6 +347,11 @@ class HeatPump(Module):
             source_in.T,
             args=arguments,
         )
+        self._check_lorenz_root(root, lower, source_in.T, duty, sink_T)
+        return root
+
+    def _check_lorenz_root(self, root, lower, inlet_T, duty, sink_T):
+        """Reject a failed evaporator solve on the rows that have a duty."""
         ops.check(
             ops.logical_or(duty == 0, root == root),
             PhysicsRangeError,
@@ -354,11 +359,10 @@ class HeatPump(Module):
             "evaporator duty {duty} W at sink outlet {sink_T} K",
             path=self.path,
             lower=lower,
-            inlet_T=source_in.T,
+            inlet_T=inlet_T,
             duty=duty,
             sink_T=sink_T,
         )
-        return root
 
     def _sink_outlet_T(self, inlet_T, rate, source_T, duty):
         """Return the sink outlet [K] that rejects a cooling duty [W] at source outlet source_T.

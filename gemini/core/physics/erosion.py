@@ -161,6 +161,16 @@ def _tulsa_rate(
     return units.ms_to_mm_year(1) * erosion_per_mass * mass_flow / (rho_pipe * impact_area)
 
 
+def _particle_model_rate(name, alpha_deg, hardness_gpa, particle, pipe, flow):
+    """Return the OKA or Tulsa rate [mm/year] for the shared ``erosion_rate`` conditions."""
+    particle_material, particle_diameter = particle
+    shape_factor, rho_pipe = pipe
+    if name == "OKA":
+        millimetres = units.m_to_mm(particle_diameter)
+        return _oka_rate(alpha_deg, particle_material, hardness_gpa, millimetres, *flow)
+    return _tulsa_rate(alpha_deg, hardness_gpa, shape_factor, rho_pipe, *flow)
+
+
 def erosion_rate(
     model: str,
     *,
@@ -216,25 +226,15 @@ def erosion_rate(
     flow_rate_m3h, alpha_deg = units.m3s_to_m3h(flow_rate), units.rad_to_deg(alpha)
     if name == "DNV":
         rate = _dnv_rate(alpha_deg, material, rho_fluid, diameter, flow_rate_m3h)
-    elif name == "OKA":
-        rate = _oka_rate(
-            alpha_deg,
-            particle_material,
-            units.pa_to_gpa(hardness),
-            units.m_to_mm(particle_diameter),
-            rho_fluid,
-            diameter,
-            flow_rate_m3h,
-        )
     else:
-        rate = _tulsa_rate(
+        hardness_gpa = units.pa_to_gpa(hardness)
+        rate = _particle_model_rate(
+            name,
             alpha_deg,
-            units.pa_to_gpa(hardness),
-            shape_factor,
-            rho_pipe,
-            rho_fluid,
-            diameter,
-            flow_rate_m3h,
+            hardness_gpa,
+            (particle_material, particle_diameter),
+            (shape_factor, rho_pipe),
+            (rho_fluid, diameter, flow_rate_m3h),
         )
     ops.check(
         ops.logical_not(ops.isnan(rate)),

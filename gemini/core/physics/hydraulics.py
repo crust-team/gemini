@@ -144,6 +144,22 @@ def beggs_brill_dp(
     diameter = units.ft_to_m(diameter_ft)
     roughness, length = (units.ft_to_m(units.m_to_ft(value)) for value in (roughness, length))
 
+    friction = _no_slip_friction((us_g, us_l), (rho_g, rho_l), (mu_g, mu_l), diameter, roughness)
+    friction = friction * friction_multiplier * length / diameter
+    slip_density = (holdup * rho_l) + (1 - holdup) * rho_g
+    gravity = slip_density * G * length * ops.sin(inclination)
+    return friction, gravity
+
+
+def _no_slip_friction(velocities, densities, viscosities, diameter, roughness):
+    """Return ``0.5 rho_m u_m |u_m| f_n`` [Pa/-] of the no-slip mixture.
+
+    ``velocities``, ``densities`` and ``viscosities`` are gas and liquid pairs. The caller
+    multiplies by the two-phase multiplier and ``L / D`` in the published order.
+    """
+    us_g, us_l = velocities
+    rho_g, rho_l = densities
+    mu_g, mu_l = viscosities
     mixture_velocity = us_g + us_l
     no_slip_holdup = us_l / mixture_velocity
     density = (no_slip_holdup * rho_l) + (1 - no_slip_holdup) * rho_g
@@ -154,16 +170,7 @@ def beggs_brill_dp(
         * ops.log((1.964 * ops.log(reynolds) - 3.8215) / reynolds + roughness / (diameter * 3.71)),
         -2,
     )
-    friction = (
-        (0.5 * density * mixture_velocity * ops.abs(mixture_velocity))
-        * friction_factor
-        * friction_multiplier
-        * length
-        / diameter
-    )
-    slip_density = (holdup * rho_l) + (1 - holdup) * rho_g
-    gravity = slip_density * G * length * ops.sin(inclination)
-    return friction, gravity
+    return (0.5 * density * mixture_velocity * ops.abs(mixture_velocity)) * friction_factor
 
 
 def _holdup_and_friction_multiplier(

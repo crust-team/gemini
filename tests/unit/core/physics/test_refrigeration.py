@@ -199,6 +199,10 @@ def test_sorption_relations_on_arrays_match_floats():
         [sensitivity_rows[0], (100.0, -2.0, 300.0, 1.5, 2.5, 1.2, 1.1)],
         PhysicsRangeError,
     )
+
+
+def test_sorption_capacity_on_arrays_matches_floats():
+    """A running, a below-threshold and a stopped machine agree on arrays and floats."""
     capacity_rows = [
         (360.0, 300.0, 285.0, 5e4, 6e4, 7e4),
         (330.0, 310.0, 285.0, 5e4, 6e4, 7e4),
