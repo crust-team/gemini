@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import hydraulics
 from gemini.types import (
     Boundary,
     Fraction,
@@ -92,7 +93,7 @@ class Desander(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        drop = self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
+        drop = hydraulics.quadratic_pressure_drop(self.dp_nominal, inlet.m_dot, self.m_dot_nominal)
         ops.check(
             drop <= inlet.p,
             PhysicsRangeError,

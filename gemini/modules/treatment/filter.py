@@ -2,7 +2,7 @@
 
 from gemini import ops
 from gemini.modules.module import Module
-from gemini.physics import units
+from gemini.physics import hydraulics, units
 from gemini.types import (
     Health,
     Inlet,
@@ -81,4 +81,4 @@ class Filter(Module):
 
     def _pressure_drop(self, inlet):
         """Return the clean-filter loss [Pa], quadratic in mass flow."""
-        return self.dp_nominal * (inlet.m_dot / self.m_dot_nominal) ** 2
+        return hydraulics.quadratic_pressure_drop(self.dp_nominal, inlet.m_dot, self.m_dot_nominal)

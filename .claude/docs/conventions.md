@@ -56,6 +56,12 @@ hash to `SNAPSHOTS` for the new version; never edit the hash of an existing vers
 
 ## Module rules
 
+**Physics lives only in `gemini/physics/`.** Modules declare and wire; they never define physics.
+Reuse existing physics functions wherever possible and combine them; add a new physics function
+only when nothing existing can do the job, and generalise an existing one rather than writing a
+second copy. Never write a formula inside a module, and never write the same formula twice.
+Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
+
 1. Assign declarations and children only in `__init__`, after `super().__init__()`.
 2. Constructor sections are `# Modules`, `# Parameters`, `# Inlets`, `# Controls`,
    `# Boundaries`, `# States`, `# Outputs`, `# Outlets`, in that order, with empty sections

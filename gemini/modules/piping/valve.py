@@ -5,7 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.ops import Constant
+from gemini.physics import hydraulics
 from gemini.types import (
     Control,
     FlowCoefficient,
@@ -17,13 +17,6 @@ from gemini.types import (
     PressureDifference,
     Ratio,
     Stream,
-)
-
-REFERENCE_DENSITY = Constant(
-    "VALVE_REFERENCE_DENSITY",
-    1000.0,
-    "kg/m3",
-    "reference water density rho_0 of the flow coefficient (IEC 60534-2-1)",
 )
 
 
@@ -134,8 +127,4 @@ class Valve(Module):
             m_dot=inlet.m_dot,
         )
         rho = inlet.fluid.properties(inlet.p, inlet.T).rho_l
-        return ops.where(
-            inlet.m_dot == 0,
-            0.0,
-            rho / REFERENCE_DENSITY * (inlet.m_dot / rho / coefficient) ** 2,
-        )
+        return hydraulics.valve_pressure_drop(inlet.m_dot, rho, coefficient)

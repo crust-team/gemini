@@ -16,7 +16,7 @@ from gemini import ops
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
 
 from . import corrosion, erosion, geometry, heat_transfer, units
-from .constants import G_FT, MIN_PATH_PRESSURE, G
+from .constants import G_FT, MIN_PATH_PRESSURE, VALVE_REFERENCE_DENSITY, G
 
 if TYPE_CHECKING:
     from gemini.types.flows import Stream
@@ -350,6 +350,61 @@ class PathResult:
     dp_gravity: float
     section_pressure: list[float]
     section_temperature: list[float]
+
+
+@ops.physics
+def quadratic_pressure_drop(reference_drop: float, flow: float, reference_flow: float) -> float:
+    """Return the pressure drop [Pa] of a fixed resistance: ``dp_ref * (q / q_ref)^2``.
+
+    Parameters
+    ----------
+    reference_drop : float
+        Pressure drop [Pa] at the reference flow.
+    flow, reference_flow : float
+        Flow and its nonzero reference, both in one unit: mass [kg/s] or volume [m3/s].
+
+    Returns
+    -------
+    float
+        Pressure drop [Pa]; a reverse flow gives the same positive drop.
+
+    Notes
+    -----
+    Valid for fully turbulent flow through a fixed geometry at constant density, where the loss
+    coefficient does not depend on the Reynolds number. Reference: Idelchik, Handbook of Hydraulic
+    Resistance, 4th ed. (2007), chapter 1: ``dp = zeta rho u^2 / 2`` with constant ``zeta``.
+    """
+    return reference_drop * (flow / reference_flow) ** 2
+
+
+@ops.physics
+def valve_pressure_drop(mass_flow: float, density: float, flow_coefficient: float) -> float:
+    """Return the liquid pressure drop [Pa] of a valve: ``dp = (rho / rho_0) (q / Kv)^2``.
+
+    Parameters
+    ----------
+    mass_flow, density : float
+        Mass flow [kg/s] and liquid density [kg/m3]; ``q = m_dot / rho``.
+    flow_coefficient : float
+        Flow coefficient Kv [m3/s/Pa^0.5] at the opening, nonzero where the flow is nonzero.
+
+    Returns
+    -------
+    float
+        Pressure drop [Pa], zero at zero flow.
+
+    Notes
+    -----
+    Non-choked turbulent liquid flow without a Reynolds or piping correction. Reference: IEC
+    60534-2-1:2011, with ``rho_0`` = ``VALVE_REFERENCE_DENSITY``.
+    """
+    return ops.where(
+        mass_flow == 0,
+        0.0,
+        quadratic_pressure_drop(
+            density / VALVE_REFERENCE_DENSITY, mass_flow / density, flow_coefficient
+        ),
+    )
 
 
 @ops.physics

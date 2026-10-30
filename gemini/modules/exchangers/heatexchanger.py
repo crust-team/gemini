@@ -7,7 +7,7 @@ import numpy as np
 from gemini import ops
 from gemini.errors import InsufficientDataError, PhysicsRangeError, UnknownCorrelationError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer
+from gemini.physics import heat_transfer, hydraulics
 from gemini.types import (
     Duty,
     Fraction,
@@ -111,8 +111,12 @@ class HeatExchanger(Module):
             cold_T=cold_in.T,
         )
         effectiveness, ntu, duty, hot_T, cold_T = self._heat_balance(hot_in, cold_in)
-        dp_hot = self.dp_hot_nominal * (hot_in.m_dot / self.m_dot_hot_nominal) ** 2
-        dp_cold = self.dp_cold_nominal * (cold_in.m_dot / self.m_dot_cold_nominal) ** 2
+        dp_hot = hydraulics.quadratic_pressure_drop(
+            self.dp_hot_nominal, hot_in.m_dot, self.m_dot_hot_nominal
+        )
+        dp_cold = hydraulics.quadratic_pressure_drop(
+            self.dp_cold_nominal, cold_in.m_dot, self.m_dot_cold_nominal
+        )
         if self.arrangement == "counterflow":
             dt1, dt2 = hot_in.T - cold_T, hot_T - cold_in.T
         else:

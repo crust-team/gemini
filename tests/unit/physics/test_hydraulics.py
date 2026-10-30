@@ -356,3 +356,23 @@ def test_corrosion_profile_matches_on_arrays():
 
     profile.__name__ = "corrosion_profile"
     assert_function_matches(profile, [(40, 50e5, 350), (10, 30e5, 340), (-40, 50e5, 350)])
+
+
+def test_quadratic_pressure_drop_scales_with_the_flow_squared():
+    """Twice the reference flow gives four times the reference drop, in either direction."""
+    assert hydraulics.quadratic_pressure_drop(1600, 2.0, 1.0) == 6400
+    assert hydraulics.quadratic_pressure_drop(1600, -1.0, 2.0) == 400
+    assert_function_matches(
+        hydraulics.quadratic_pressure_drop,
+        [(1600.0, 44.2, 44.2), (1600.0, 0.0, 44.2), (1e5, -30.0, 45.0)],
+    )
+
+
+def test_valve_pressure_drop_follows_the_iec_sizing_equation():
+    """Water at the rated Kv loses one reference pressure unit; zero flow loses nothing."""
+    assert hydraulics.valve_pressure_drop(1000.0, 1000.0, 1.0) == 1.0
+    assert hydraulics.valve_pressure_drop(0.0, 1000.0, 0.0) == 0.0
+    assert_function_matches(
+        hydraulics.valve_pressure_drop,
+        [(10.0, 1000.0, 1e-4), (0.0, 1000.0, 0.0), (5.0, 1068.0, 5.4e-5)],
+    )

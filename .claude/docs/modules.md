@@ -10,6 +10,12 @@ declarations from `gemini.types`. The base class has no string catalogue, sequen
 container, fidelity flag or cost method. The shipped equipment, with each model's ports, parameters, equations and energy-audit status, is
 listed in [equipment.md](equipment.md); its classes are good references for new modules.
 
+**Physics lives only in `gemini/physics/`.** Modules declare and wire; they never define physics.
+Reuse existing physics functions wherever possible and combine them; add a new physics function
+only when nothing existing can do the job, and generalise an existing one rather than writing a
+second copy. Never write a formula inside a module, and never write the same formula twice.
+Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
+
 ## Construction and metadata
 
 Construct a module without arguments and set its values afterwards; `update_params` returns the
