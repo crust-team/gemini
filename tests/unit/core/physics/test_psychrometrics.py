@@ -1,9 +1,15 @@
 """Saturation pressure, dew point, humidity ratio and wet bulb against reference values."""
 
+import math
+
+import numpy as np
 import pytest
 
+from gemini import backends
 from gemini.core.physics import psychrometrics
 from gemini.errors import PhysicsRangeError
+from gemini.graph import Graph, Interpreter
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 C = 273.15
 
@@ -91,3 +97,70 @@ def test_out_of_range_inputs_raise(call, message):
     """Inputs outside each correlation's domain raise PhysicsRangeError."""
     with pytest.raises(PhysicsRangeError, match=message):
         call()
+
+
+DEW_POINT_ROWS = [
+    (300.0, 0.5),
+    (300.0, 1.0),
+    (200.0, 0.4),
+    (173.15, 1.0),
+    (473.15, 0.2),
+    (260.0, 0.05),
+    (280.0, 0.999999),
+    (350.0, 0.7),
+]
+
+
+def test_dew_point_on_arrays_matches_floats_on_every_branch():
+    """Frost point, dew point and the saturated shortcut agree on arrays and floats."""
+    assert_function_matches(psychrometrics.dew_point, DEW_POINT_ROWS)
+
+
+def test_dew_point_on_a_dense_grid_stays_within_the_documented_tolerance():
+    """The vectorised Brent follows the scalar solve over temperature and humidity."""
+    temperature, humidity = np.meshgrid(np.linspace(180, 473, 40), np.linspace(0.05, 1, 40))
+    rows = list(zip(temperature.ravel().tolist(), humidity.ravel().tolist()))
+    floats = []
+    for row in rows:
+        try:
+            floats.append(psychrometrics.dew_point(*row))
+        except PhysicsRangeError:
+            floats.append(math.nan)
+    valid = np.isfinite(floats)
+    columns = [np.array(column)[valid] for column in zip(*rows)]
+    np.testing.assert_allclose(
+        psychrometrics.dew_point(*columns), np.array(floats)[valid], rtol=1e-12, atol=0
+    )
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [(300.0, 0.5), (100.0, 0.5), (500.0, 0.5)],
+        [(300.0, 0.5), (300.0, 0.0), (300.0, 1.2)],
+        [(300.0, 0.5), (300.0, 1e-9)],
+        [(300.0, 0.5), (math.nan, 0.5)],
+        [(300.0, math.nan)],
+    ],
+)
+def test_dew_point_rows_raise_the_error_of_the_float_path(rows):
+    """The first failing row raises the same class and message on arrays."""
+    assert_same_error(psychrometrics.dew_point, rows, PhysicsRangeError)
+
+
+def test_dew_point_in_a_graph_runs_the_solver_and_raises_the_check_error():
+    """A traced dew point equals the floats; a row without a root raises its own message."""
+    graph = Graph("dew_point")
+    temperature = graph.input("temperature", "inlet")
+    humidity = graph.input("humidity", "inlet")
+    graph.output("dew", psychrometrics.dew_point(temperature, humidity))
+    run = Interpreter(graph, backends.get("numpy")).run
+    rows = DEW_POINT_ROWS
+    columns = {
+        "temperature": np.array([r[0] for r in rows]),
+        "humidity": np.array([r[1] for r in rows]),
+    }
+    expected = [psychrometrics.dew_point(*row) for row in rows]
+    np.testing.assert_allclose(run(columns)["dew"], expected, rtol=1e-12, atol=0)
+    with pytest.raises(PhysicsRangeError, match="expected a dew point above"):
+        run({"temperature": np.array([300.0, 300.0]), "humidity": np.array([0.5, 1e-9])})

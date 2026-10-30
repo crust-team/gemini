@@ -8,8 +8,7 @@ humidity ratios (about 0.4 % at sea level); see ``humidity_ratio``.
 
 import math
 
-from scipy.optimize import brentq
-
+from gemini import ops
 from gemini.errors import PhysicsRangeError
 
 MINIMUM_TEMPERATURE = 173.15
@@ -53,9 +52,7 @@ def saturation_pressure(temperature: float) -> float:
     They agree with the IAPWS-95 based ASHRAE table values within 3e-4 relative.
     """
     _check_temperature("saturation_pressure", temperature)
-    if temperature < 273.15:
-        return math.exp(_polynomial(_ICE, temperature) + _ICE_LOG * math.log(temperature))
-    return math.exp(_polynomial(_WATER, temperature) + _WATER_LOG * math.log(temperature))
+    return _saturation_pressure(temperature)
 
 
 def dew_point(temperature: float, relative_humidity: float) -> float:
@@ -84,21 +81,47 @@ def dew_point(temperature: float, relative_humidity: float) -> float:
     """
     _check_temperature("dew_point", temperature)
     _check_relative_humidity("dew_point", relative_humidity)
-    if relative_humidity == 1:
-        return temperature
     vapour_pressure = relative_humidity * saturation_pressure(temperature)
-    if vapour_pressure < saturation_pressure(MINIMUM_TEMPERATURE):
-        raise PhysicsRangeError(
-            f"dew_point: vapour pressure = {vapour_pressure} Pa at temperature = {temperature} K "
-            f"and relative_humidity = {relative_humidity}; expected a dew point above "
-            f"{MINIMUM_TEMPERATURE} K"
-        )
-    return brentq(
-        lambda point: saturation_pressure(point) - vapour_pressure,
+    ops.check(
+        ops.logical_or(
+            relative_humidity == 1, vapour_pressure >= saturation_pressure(MINIMUM_TEMPERATURE)
+        ),
+        PhysicsRangeError,
+        "dew_point: vapour pressure = {vapour_pressure} Pa at temperature = {temperature} K "
+        "and relative_humidity = {relative_humidity}; expected a dew point above "
+        "{minimum} K",
+        vapour_pressure=vapour_pressure,
+        temperature=temperature,
+        relative_humidity=relative_humidity,
+        minimum=MINIMUM_TEMPERATURE,
+    )
+    point = ops.brentq(
+        _saturation_residual,
         MINIMUM_TEMPERATURE,
         temperature,
+        args=(vapour_pressure,),
         xtol=1e-9,
     )
+    return ops.where(relative_humidity == 1, temperature, point)
+
+
+def _saturation_pressure(temperature):
+    """Return the Hyland-Wexler saturation pressure [Pa] without checking the temperature.
+
+    Both the ice and the liquid-water branch are evaluated and ``where`` selects one.
+    """
+    ice = ops.exp(_polynomial(_ICE, temperature) + _ICE_LOG * ops.log(temperature))
+    water = ops.exp(_polynomial(_WATER, temperature) + _WATER_LOG * ops.log(temperature))
+    return ops.where(temperature < 273.15, ice, water)
+
+
+def _saturation_residual(point, vapour_pressure):
+    """Return the saturation pressure at ``point`` minus ``vapour_pressure`` [Pa].
+
+    The temperature is not checked: a solver evaluates every row, also one whose own check
+    reports the error.
+    """
+    return _saturation_pressure(point) - vapour_pressure
 
 
 def humidity_ratio(temperature: float, relative_humidity: float, pressure: float) -> float:
@@ -191,30 +214,41 @@ def _polynomial(coefficients, temperature):
 def _check_number(function, **values):
     """Reject NaN inputs, which would otherwise return NaN as if it were a valid result."""
     for name, value in values.items():
-        if math.isnan(value):
-            raise PhysicsRangeError(f"{function}: {name} = nan; expected a number")
+        ops.check(
+            ops.logical_not(ops.isnan(value)),
+            PhysicsRangeError,
+            "{function}: {name} = nan; expected a number",
+            function=function,
+            name=name,
+            value=value,
+        )
 
 
 def _check_temperature(function, temperature):
     """Require a temperature inside the Hyland-Wexler range."""
     _check_number(function, temperature=temperature)
-    if not MINIMUM_TEMPERATURE <= temperature <= MAXIMUM_TEMPERATURE:
-        raise PhysicsRangeError(
-            f"{function}: temperature = {temperature} K; expected {MINIMUM_TEMPERATURE} K to "
-            f"{MAXIMUM_TEMPERATURE} K"
-        )
+    ops.check(
+        ops.logical_and(temperature >= MINIMUM_TEMPERATURE, temperature <= MAXIMUM_TEMPERATURE),
+        PhysicsRangeError,
+        "{function}: temperature = {temperature} K; expected {minimum} K to {maximum} K",
+        function=function,
+        temperature=temperature,
+        minimum=MINIMUM_TEMPERATURE,
+        maximum=MAXIMUM_TEMPERATURE,
+    )
 
 
 def _check_relative_humidity(function, relative_humidity, minimum_included=False):
     """Require a relative humidity in (0, 1], or in [0, 1] when zero is meaningful."""
     _check_number(function, relative_humidity=relative_humidity)
-    if (
-        relative_humidity > 1
-        or relative_humidity < 0
-        or (relative_humidity == 0 and not minimum_included)
-    ):
-        expected = "[0, 1]" if minimum_included else "(0, 1]"
-        raise PhysicsRangeError(
-            f"{function}: relative_humidity = {relative_humidity}; expected a fraction in "
-            f"{expected}"
-        )
+    valid = ops.logical_and(relative_humidity <= 1, relative_humidity >= 0)
+    if not minimum_included:
+        valid = ops.logical_and(valid, relative_humidity > 0)
+    ops.check(
+        valid,
+        PhysicsRangeError,
+        "{function}: relative_humidity = {relative_humidity}; expected a fraction in {expected}",
+        function=function,
+        relative_humidity=relative_humidity,
+        expected="[0, 1]" if minimum_included else "(0, 1]",
+    )
