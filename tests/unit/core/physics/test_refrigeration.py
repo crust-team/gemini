@@ -6,6 +6,7 @@ import pytest
 
 from gemini.core.physics import refrigeration
 from gemini.errors import PhysicsRangeError
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 
 def test_carnot_cops_and_lift_floor():
@@ -149,3 +150,80 @@ def test_part_load_duty():
         refrigeration.part_load_duty(-1, 1e6, 0)
     with pytest.raises(PhysicsRangeError, match="minimum_part_load = 2"):
         refrigeration.part_load_duty(1, 1e6, 2)
+
+
+NAN = math.nan
+
+
+def test_carnot_and_lorenz_cops_on_arrays_match_floats():
+    """Floored, unfloored, equal and glide temperatures agree on arrays and floats."""
+    rows = [(350.0, 280.0, 10.0), (300.0, 295.0, 10.0), (300.0, 300.0, 5.0), (330.0, 290.0, 0.0)]
+    assert_function_matches(refrigeration.carnot_cop_heating, rows)
+    assert_function_matches(refrigeration.carnot_cop_cooling, rows)
+    lorenz = [(300.0, 330.0, 285.0, 280.0, 10.0), (300.0, 300.0, 285.0, 285.0, 5.0)]
+    assert_function_matches(refrigeration.lorenz_cop_heating, lorenz)
+    assert_function_matches(refrigeration.log_mean_temperature, [(350.0, 340.0), (300.0, 300.0)])
+    for function in (refrigeration.carnot_cop_heating, refrigeration.carnot_cop_cooling):
+        for bad in [(0.0, 280.0, 1.0), (350.0, 280.0, -1.0), (280.0, 300.0, 0.0), (NAN, 1.0, 1.0)]:
+            assert_same_error(function, [rows[0], bad], PhysicsRangeError)
+    assert_same_error(
+        refrigeration.log_mean_temperature, [(350.0, 340.0), (0.0, 300.0)], PhysicsRangeError
+    )
+    assert_same_error(
+        refrigeration.log_mean_temperature, [(350.0, 340.0), (NAN, 300.0)], PhysicsRangeError
+    )
+
+
+def test_sorption_relations_on_arrays_match_floats():
+    """Stopped, below-threshold and running sorption machines agree on arrays and floats."""
+    assert_function_matches(
+        refrigeration.characteristic_temperature_difference,
+        [(360.0, 300.0, 285.0, 1.2, 1.1), (350.0, 310.0, 280.0, 2.0, 1.0)],
+    )
+    inf = math.inf
+    duty_rows = [(10.0, 4.0, 1000.0, 0.01), (3.0, 4.0, 1000.0, 0.01), (10.0, 4.0, 1000.0, inf)]
+    assert_function_matches(refrigeration.characteristic_evaporator_duty, duty_rows)
+    assert_same_error(
+        refrigeration.characteristic_evaporator_duty,
+        [duty_rows[0], (10.0, 4.0, -1.0, 0.01)],
+        PhysicsRangeError,
+    )
+    sensitivity_rows = [
+        (100.0, 200.0, 300.0, 1.5, 2.5, 1.2, 1.1),
+        (0.0, 200.0, 300.0, 1.5, 2.5, 1.2, 1.1),
+        (100.0, 200.0, 0.0, 1.5, 2.5, 1.2, 1.1),
+    ]
+    assert_function_matches(refrigeration.characteristic_sensitivity, sensitivity_rows)
+    assert_same_error(
+        refrigeration.characteristic_sensitivity,
+        [sensitivity_rows[0], (100.0, -2.0, 300.0, 1.5, 2.5, 1.2, 1.1)],
+        PhysicsRangeError,
+    )
+    capacity_rows = [
+        (360.0, 300.0, 285.0, 5e4, 6e4, 7e4),
+        (330.0, 310.0, 285.0, 5e4, 6e4, 7e4),
+        (360.0, 300.0, 285.0, 0.0, 6e4, 7e4),
+    ]
+    fixed = dict(
+        slope=2000.0,
+        minimum_driving_difference=20.0,
+        rejection_coefficient=1.2,
+        evaporator_coefficient=1.1,
+        thermal_cop=0.7,
+        auxiliary_power_ratio=0.02,
+    )
+    assert_function_matches(refrigeration.sorption_evaporator_capacity, capacity_rows, **fixed)
+    assert_same_error(
+        refrigeration.sorption_evaporator_capacity,
+        capacity_rows,
+        PhysicsRangeError,
+        **(fixed | dict(thermal_cop=0.0)),
+    )
+
+
+def test_part_load_duty_on_arrays_matches_floats():
+    """Capped, below-minimum and passed-through duties agree on arrays and floats."""
+    rows = [(50.0, 100.0, 0.2), (500.0, 100.0, 0.2), (10.0, 100.0, 0.2), (0.0, 100.0, 0.0)]
+    assert_function_matches(refrigeration.part_load_duty, rows)
+    for bad in [(-1.0, 100.0, 0.2), (1.0, 0.0, 0.2), (1.0, 100.0, 1.5), (1.0, 100.0, NAN)]:
+        assert_same_error(refrigeration.part_load_duty, [rows[0], bad], PhysicsRangeError)

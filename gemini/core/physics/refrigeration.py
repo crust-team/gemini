@@ -7,6 +7,7 @@ its kelvin inputs internally.
 
 import math
 
+from gemini import ops
 from gemini.core.physics.units import k_to_c
 from gemini.errors import PhysicsRangeError
 
@@ -89,15 +90,20 @@ def log_mean_temperature(inlet_temperature: float, outlet_temperature: float) ->
         inlet_temperature=inlet_temperature,
         outlet_temperature=outlet_temperature,
     )
-    if inlet_temperature <= 0 or outlet_temperature <= 0:
-        raise PhysicsRangeError(
-            f"log_mean_temperature: inlet_temperature = {inlet_temperature} K, "
-            f"outlet_temperature = {outlet_temperature} K; expected positive temperatures"
-        )
-    if inlet_temperature == outlet_temperature:
-        return inlet_temperature
+    ops.check(
+        ops.logical_and(inlet_temperature > 0, outlet_temperature > 0),
+        PhysicsRangeError,
+        "log_mean_temperature: inlet_temperature = {inlet_temperature} K, "
+        "outlet_temperature = {outlet_temperature} K; expected positive temperatures",
+        inlet_temperature=inlet_temperature,
+        outlet_temperature=outlet_temperature,
+    )
     glide = inlet_temperature - outlet_temperature
-    return glide / math.log(inlet_temperature / outlet_temperature)
+    return ops.where(
+        inlet_temperature == outlet_temperature,
+        inlet_temperature,
+        ops.truediv(glide, ops.log(ops.truediv(inlet_temperature, outlet_temperature))),
+    )
 
 
 def lorenz_cop_heating(
@@ -222,14 +228,21 @@ def characteristic_evaporator_duty(
         slope=slope,
         sensitivity=sensitivity,
     )
-    if slope < 0 or sensitivity < 0:
-        raise PhysicsRangeError(
-            f"characteristic_evaporator_duty: slope = {slope} W/K, sensitivity = "
-            f"{sensitivity} K/W; expected both >= 0"
-        )
-    if math.isinf(sensitivity) or driving_difference <= minimum_driving_difference:
-        return 0.0
-    return slope * (driving_difference - minimum_driving_difference) / (1 + slope * sensitivity)
+    ops.check(
+        ops.logical_and(slope >= 0, sensitivity >= 0),
+        PhysicsRangeError,
+        "characteristic_evaporator_duty: slope = {slope} W/K, sensitivity = "
+        "{sensitivity} K/W; expected both >= 0",
+        slope=slope,
+        sensitivity=sensitivity,
+    )
+    return ops.where(
+        ops.logical_or(ops.isinf(sensitivity), driving_difference <= minimum_driving_difference),
+        0.0,
+        slope
+        * (driving_difference - minimum_driving_difference)
+        / (1 + ops.mul(slope, sensitivity)),
+    )
 
 
 def characteristic_sensitivity(
@@ -265,22 +278,29 @@ def characteristic_sensitivity(
     circuit cools, the heat-rejection circuit warms and the chilled circuit cools as the
     evaporator duty rises; all three lower ddt for positive coefficients.
     """
-    rates = dict(
+    _check_numbers(
+        "characteristic_sensitivity",
         generator_rate=generator_rate,
         rejection_rate=rejection_rate,
         evaporator_rate=evaporator_rate,
     )
-    _check_numbers("characteristic_sensitivity", **rates)
-    if min(rates.values()) < 0:
-        raise PhysicsRangeError(
-            f"characteristic_sensitivity: capacity rates {rates} W/K; expected all >= 0"
-        )
-    if min(rates.values()) == 0:
-        return math.inf
-    return (
-        generator_ratio / (2 * generator_rate)
-        + rejection_coefficient * rejection_ratio / (2 * rejection_rate)
-        + evaporator_coefficient / (2 * evaporator_rate)
+    smallest = ops.minimum(ops.minimum(generator_rate, rejection_rate), evaporator_rate)
+    ops.check(
+        smallest >= 0,
+        PhysicsRangeError,
+        "characteristic_sensitivity: capacity rates {{'generator_rate': {generator_rate}, "
+        "'rejection_rate': {rejection_rate}, 'evaporator_rate': {evaporator_rate}}} W/K; "
+        "expected all >= 0",
+        generator_rate=generator_rate,
+        rejection_rate=rejection_rate,
+        evaporator_rate=evaporator_rate,
+    )
+    return ops.where(
+        smallest == 0,
+        math.inf,
+        ops.truediv(generator_ratio, 2 * generator_rate)
+        + ops.truediv(rejection_coefficient * rejection_ratio, 2 * rejection_rate)
+        + ops.truediv(evaporator_coefficient, 2 * evaporator_rate),
     )
 
 
@@ -330,11 +350,14 @@ def sorption_evaporator_capacity(
     constant thermal COP is a simplification of its separate generator equation, reasonable
     away from the threshold where the measured COP of single-effect machines is nearly flat.
     """
-    if thermal_cop <= 0 or auxiliary_power_ratio < 0:
-        raise PhysicsRangeError(
-            f"sorption_evaporator_capacity: thermal_cop = {thermal_cop}, auxiliary_power_ratio "
-            f"= {auxiliary_power_ratio}; expected thermal_cop > 0 and auxiliary_power_ratio >= 0"
-        )
+    ops.check(
+        ops.logical_and(thermal_cop > 0, auxiliary_power_ratio >= 0),
+        PhysicsRangeError,
+        "sorption_evaporator_capacity: thermal_cop = {thermal_cop}, auxiliary_power_ratio "
+        "= {auxiliary_power_ratio}; expected thermal_cop > 0 and auxiliary_power_ratio >= 0",
+        thermal_cop=thermal_cop,
+        auxiliary_power_ratio=auxiliary_power_ratio,
+    )
     generator_ratio = 1 / thermal_cop
     driving = characteristic_temperature_difference(
         generator_temperature,
@@ -385,16 +408,21 @@ def part_load_duty(requested: float, capacity: float, minimum_part_load: float) 
         capacity=capacity,
         minimum_part_load=minimum_part_load,
     )
-    if requested < 0 or capacity <= 0 or not 0 <= minimum_part_load <= 1:
-        raise PhysicsRangeError(
-            f"part_load_duty: requested = {requested} W, capacity = {capacity} W, "
-            f"minimum_part_load = {minimum_part_load}; expected requested >= 0, capacity > 0 "
-            "and minimum_part_load in [0, 1]"
-        )
-    duty = min(requested, capacity)
-    if duty < minimum_part_load * capacity:
-        return 0.0
-    return duty
+    ops.check(
+        ops.logical_and(
+            ops.logical_and(requested >= 0, capacity > 0),
+            ops.logical_and(minimum_part_load >= 0, minimum_part_load <= 1),
+        ),
+        PhysicsRangeError,
+        "part_load_duty: requested = {requested} W, capacity = {capacity} W, "
+        "minimum_part_load = {minimum_part_load}; expected requested >= 0, capacity > 0 "
+        "and minimum_part_load in [0, 1]",
+        requested=requested,
+        capacity=capacity,
+        minimum_part_load=minimum_part_load,
+    )
+    duty = ops.minimum(requested, capacity)
+    return ops.where(duty < minimum_part_load * capacity, 0.0, duty)
 
 
 def _lift(function, sink_temperature, source_temperature, minimum_lift):
@@ -405,23 +433,41 @@ def _lift(function, sink_temperature, source_temperature, minimum_lift):
         source_temperature=source_temperature,
         minimum_lift=minimum_lift,
     )
-    if sink_temperature <= 0 or source_temperature <= 0 or minimum_lift < 0:
-        raise PhysicsRangeError(
-            f"{function}: sink_temperature = {sink_temperature} K, source_temperature = "
-            f"{source_temperature} K, minimum_lift = {minimum_lift} K; expected positive "
-            "temperatures and minimum_lift >= 0"
-        )
+    ops.check(
+        ops.logical_and(
+            ops.logical_and(sink_temperature > 0, source_temperature > 0), minimum_lift >= 0
+        ),
+        PhysicsRangeError,
+        "{function}: sink_temperature = {sink_temperature} K, source_temperature = "
+        "{source_temperature} K, minimum_lift = {minimum_lift} K; expected positive "
+        "temperatures and minimum_lift >= 0",
+        function=function,
+        sink_temperature=sink_temperature,
+        source_temperature=source_temperature,
+        minimum_lift=minimum_lift,
+    )
     lift = sink_temperature - source_temperature
-    if max(lift, minimum_lift) <= 0:
-        raise PhysicsRangeError(
-            f"{function}: lift = {lift} K, minimum_lift = {minimum_lift} K; expected "
-            "sink_temperature above source_temperature or a positive minimum_lift"
-        )
-    return max(lift, minimum_lift)
+    floored = ops.maximum(lift, minimum_lift)
+    ops.check(
+        floored > 0,
+        PhysicsRangeError,
+        "{function}: lift = {lift} K, minimum_lift = {minimum_lift} K; expected "
+        "sink_temperature above source_temperature or a positive minimum_lift",
+        function=function,
+        lift=lift,
+        minimum_lift=minimum_lift,
+    )
+    return floored
 
 
 def _check_numbers(function, **values):
     """Reject NaN inputs, which would otherwise return NaN as if it were a valid result."""
     for name, value in values.items():
-        if math.isnan(value):
-            raise PhysicsRangeError(f"{function}: {name} = nan; expected a number")
+        ops.check(
+            ops.logical_not(ops.isnan(value)),
+            PhysicsRangeError,
+            "{function}: {name} = nan; expected a number",
+            function=function,
+            name=name,
+            value=value,
+        )
