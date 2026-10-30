@@ -246,3 +246,85 @@ def test_norsok_ph_underflow_raises_the_error_of_the_float_path():
     """Equilibrium constants that underflow raise on arrays with the same message."""
     rows = [(60.0, 100.0, 10.0, 100.0, 1.0), (60.0, 100.0, 1e5, 100.0, 1.0)]
     assert_same_error(_ph, rows, PhysicsRangeError)
+
+
+RATE_ROWS = [
+    (278.15, 3e5, 0.011574),
+    (313.15, 3e5, 0.02),
+    (333.15, 5e6, 0.05),
+    (350.0, 3e7, 0.011574),
+    (420.0, 1e7, 0.003),
+]
+
+
+def _rate(model, **fixed):
+    def rate(temperature, pressure, water_flow_rate):
+        return corrosion.co2_corrosion_rate(
+            model,
+            temperature=temperature,
+            pressure=pressure,
+            water_flow_rate=water_flow_rate,
+            **(dict(co2_fraction=0.1) | fixed),
+        )
+
+    return rate
+
+
+@pytest.mark.parametrize("model", ["NORSOK", "DLM", "DLD"])
+@pytest.mark.parametrize("chemistry", [{"co2_fraction": 0.1}, {"co2_partial_pressure": 40000}])
+def test_co2_corrosion_rate_matches_arrays(model, chemistry):
+    """Each correlation gives the same numbers on arrays as per row, with either CO2 input."""
+    rate = _rate(model, **({"co2_fraction": None} | chemistry))
+    assert_function_matches(rate, RATE_ROWS)
+
+
+def test_fitted_coefficients_match_arrays():
+    """Fitted DLD coefficients apply on arrays as on floats."""
+    rate = _rate("DLD", fitted=True, coefficients={"A": 5.0, "D": 2.0})
+    assert_function_matches(rate, RATE_ROWS)
+
+
+@pytest.mark.parametrize("model", ["NORSOK", "DLM", "DLD"])
+def test_zero_co2_error_matches_arrays(model):
+    """Zero CO2 raises the same message on arrays as on floats."""
+    assert_same_error(_rate(model, co2_fraction=0.0), RATE_ROWS, PhysicsRangeError)
+
+
+@pytest.mark.parametrize("model", ["NORSOK", "DLD"])
+def test_flow_errors_match_arrays(model):
+    """Zero flow raises the same message on arrays as on floats; DLD also rejects negative."""
+    assert_same_error(_rate(model), RATE_ROWS[:2] + [(330.0, 3e5, 0.0)], PhysicsRangeError)
+    if model == "DLD":
+        assert_same_error(_rate(model), RATE_ROWS[:2] + [(330.0, 3e5, -0.01)], PhysicsRangeError)
+
+
+def test_kt_and_ph_factor_match_arrays():
+    """The interpolation and the exact-temperature pH table agree, with fallbacks and NaN."""
+    temperatures = [5.0, 12.0, 15.0, 20.0, 40.0, 40.001, 75.0, 90.0, 150.0, 200.0, 0.0, math.nan]
+    assert_function_matches(corrosion._kt, [(t,) for t in temperatures])
+    rows = [(t, ph) for t in (5.0, 15.0, 90.0, 120.0, 150.0, 41.0) for ph in (3.4, 4.2, 5.3, 6.5)]
+    assert_function_matches(corrosion._ph_factor, rows + [(40.0, math.nan), (60.0, 99.99)])
+
+
+def test_wall_loss_and_lifetime_match_traced_semantics():
+    """Wall loss accumulates as an array; lifetimes keep infinity and NaN on arrays."""
+    year = units.SECONDS_PER_YEAR
+    np.testing.assert_array_equal(
+        corrosion.wall_loss(np.array([1.0, 2.0, -0.5]), np.array([year, year / 2, year])),
+        np.cumsum(np.array([1.0, 1.0, -0.5])),
+    )
+    assert_function_matches(
+        corrosion.time_to_minimum_wall,
+        [
+            (0.008, 0.006, 1e-10),
+            (0.005, 0.006, 1e-10),
+            (0.008, 0.006, 0.0),
+            (0.008, 0.006, -1.0),
+            (math.nan, 0.006, 1e-10),
+            (0.008, 0.006, math.nan),
+            (0.008, 0.006, math.inf),
+        ],
+    )
+    assert_function_matches(
+        corrosion.remaining_wall_thickness, [(0.1, 0.09, 0.002), (0.1, 0.09, -0.002)]
+    )

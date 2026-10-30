@@ -6,7 +6,6 @@ bicarbonate in mg/l and ionic strength in g/l. Rates are in mm/year, the explici
 literature-unit exception of the package.
 """
 
-import bisect
 import math
 from dataclasses import dataclass
 from typing import Literal
@@ -68,11 +67,11 @@ _PH_FACTOR = {
     ),
     80.0: (
         (4.6, lambda ph: 2.6727 - 0.3636 * ph),
-        (6.5, lambda ph: 331.68 * math.exp(-1.2618 * ph)),
+        (6.5, lambda ph: 331.68 * ops.exp(-1.2618 * ph)),
     ),
     90.0: (
         (4.57, lambda ph: 3.1355 - 0.4673 * ph),
-        (5.62, lambda ph: 21254 * math.exp(-2.1811 * ph)),
+        (5.62, lambda ph: 21254 * ops.exp(-2.1811 * ph)),
         (6.5, lambda ph: 0.4014 - 0.0538 * ph),
     ),
     120.0: (
@@ -192,12 +191,15 @@ def co2_corrosion_rate(
         ionic_strength=ionic_strength,
     )
     rate = _RATES[model](conditions, coefficients)
-    if isinstance(rate, complex):
-        raise PhysicsRangeError(
-            f"co2_corrosion_rate {model}: water_flow_rate = {water_flow_rate} m3/s gives a "
-            "complex rate; expected a nonnegative flow"
-        )
-    return float(rate)
+    ops.check(
+        ops.logical_not(ops.isnan(rate)),
+        PhysicsRangeError,
+        "co2_corrosion_rate {model}: water_flow_rate = {water_flow_rate} m3/s gives a "
+        "complex rate; expected a nonnegative flow",
+        model=model,
+        water_flow_rate=water_flow_rate,
+    )
+    return rate
 
 
 def _conditions(model, *, co2_fraction, co2_partial_pressure, **values):
@@ -214,15 +216,21 @@ def _conditions(model, *, co2_fraction, co2_partial_pressure, **values):
             f"co2_corrosion_rate {model}: co2_fraction and co2_partial_pressure are None; "
             "expected one of them"
         )
-    if co2_pressure <= 0:
-        raise PhysicsRangeError(
-            f"co2_corrosion_rate {model}: CO2 partial pressure = {co2_pressure} bar; expected "
-            "a positive value (the correlations take its logarithm)"
-        )
-    if values["flow_rate"] == 0 and model != "DLM":
-        raise PhysicsRangeError(
-            f"co2_corrosion_rate {model}: water_flow_rate = 0 m3/s; expected a nonzero flow "
-            "(the flow-dependent correlations divide by the flow velocity)"
+    ops.check(
+        co2_pressure > 0,
+        PhysicsRangeError,
+        "co2_corrosion_rate {model}: CO2 partial pressure = {co2_pressure} bar; expected "
+        "a positive value (the correlations take its logarithm)",
+        model=model,
+        co2_pressure=co2_pressure,
+    )
+    if model != "DLM":
+        ops.check(
+            ops.ne(values["flow_rate"], 0),
+            PhysicsRangeError,
+            "co2_corrosion_rate {model}: water_flow_rate = 0 m3/s; expected a nonzero flow "
+            "(the flow-dependent correlations divide by the flow velocity)",
+            model=model,
         )
     return _Conditions(
         co2_pressure=co2_pressure,
@@ -239,7 +247,7 @@ def _co2_fugacity(temperature, pressure, co2_pressure):
     the validity limit of the de Waard–Lotz fit.
     """
     temperature_kelvin = units.c_to_k(temperature)
-    capped = pressure if pressure <= _FUGACITY_PRESSURE_CAP else _FUGACITY_PRESSURE_CAP
+    capped = ops.where(pressure <= _FUGACITY_PRESSURE_CAP, pressure, _FUGACITY_PRESSURE_CAP)
     fugacity_coefficient = 10 ** (capped * (0.0031 - 1.4 / temperature_kelvin))
     return fugacity_coefficient * co2_pressure
 
@@ -251,9 +259,9 @@ def _scaling_factor(temperature, fugacity, exponent):
     temperature 2400 / (6.7 + 0.6 log f); DLM uses exponent 0.6 and DLD 0.44.
     """
     temperature_kelvin = units.c_to_k(temperature)
-    threshold = 2400 / (6.7 + 0.6 * math.log10(fugacity))
-    factor = 10 ** (2400 / temperature_kelvin - exponent * math.log10(fugacity) - 6.7)
-    return min(factor, 1) if temperature_kelvin >= threshold else 1
+    threshold = 2400 / (6.7 + 0.6 * ops.log10(fugacity))
+    factor = 10 ** (2400 / temperature_kelvin - exponent * ops.log10(fugacity) - 6.7)
+    return ops.where(temperature_kelvin >= threshold, ops.minimum(factor, 1), 1)
 
 
 def _dlm_rate(conditions, coefficients):
@@ -265,7 +273,7 @@ def _dlm_rate(conditions, coefficients):
     temperature_kelvin = units.c_to_k(conditions.temperature)
     a, b, c = coefficients["A"], coefficients["B"], coefficients["C"]
     return 10 ** (
-        a - b / temperature_kelvin + c * math.log10(conditions.fugacity)
+        a - b / temperature_kelvin + c * ops.log10(conditions.fugacity)
     ) * _scaling_factor(conditions.temperature, conditions.fugacity, 0.6)
 
 
@@ -281,10 +289,12 @@ def _dld_rate(conditions, coefficients):
     reaction = 10 ** (
         coefficients["A"]
         - coefficients["B"] / temperature_kelvin
-        + coefficients["C"] * math.log10(fugacity)
+        + coefficients["C"] * ops.log10(fugacity)
     )
     velocity = conditions.flow_rate / geometry.circle_area(conditions.diameter)
-    mass_transfer = coefficients["D"] * (velocity**0.8 / conditions.diameter**0.2) * fugacity
+    mass_transfer = (
+        coefficients["D"] * (ops.pow(velocity, 0.8) / ops.pow(conditions.diameter, 0.2)) * fugacity
+    )
     rate = 1 / (1 / reaction + 1 / mass_transfer)
     return rate * _scaling_factor(conditions.temperature, fugacity, 0.44)
 
@@ -300,8 +310,8 @@ def _norsok_rate(conditions, coefficients):
     ph = _norsok_ph(conditions)
     ph_factor = _ph_factor(conditions.temperature, ph)
     kt = _kt(conditions.temperature)
-    shear_factor = (shear_stress / 19) ** (0.146 + 0.0324 * math.log10(fugacity))
-    fugacity_factor = fugacity**0.62
+    shear_factor = ops.pow(shear_stress / 19, 0.146 + 0.0324 * ops.log10(fugacity))
+    fugacity_factor = ops.pow(fugacity, 0.62)
     return coefficients["A"] * kt * fugacity_factor * shear_factor * ph_factor
 
 
@@ -309,15 +319,18 @@ def _kt(temperature):
     """Return the NORSOK temperature constant Kt, linearly interpolated in degC.
 
     Temperatures outside 5–150 degC take the nearest tabulated value.
+
+    NOTE(refactor): ``ops.interp`` evaluates the segment slope first and differs from this
+    arithmetic in the last bits, so the segments are folded with ``where`` in the order of the
+    former ``bisect_left`` search (a NaN temperature takes the first value, as it did).
     """
-    pos = bisect.bisect_left(_KT_TEMPERATURES, temperature)
-    if pos == 0:
-        return _KT_VALUES[0]
-    if pos == len(_KT_TEMPERATURES):
-        return _KT_VALUES[-1]
-    temp_l, temp_u = _KT_TEMPERATURES[pos - 1], _KT_TEMPERATURES[pos]
-    kt_lower, kt_upper = _KT_VALUES[pos - 1], _KT_VALUES[pos]
-    return kt_lower + (temperature - temp_l) * (kt_upper - kt_lower) / (temp_u - temp_l)
+    kt = _KT_VALUES[-1]
+    for pos in range(len(_KT_TEMPERATURES) - 1, 0, -1):
+        temp_l, temp_u = _KT_TEMPERATURES[pos - 1], _KT_TEMPERATURES[pos]
+        kt_lower, kt_upper = _KT_VALUES[pos - 1], _KT_VALUES[pos]
+        interpolated = kt_lower + (temperature - temp_l) * (kt_upper - kt_lower) / (temp_u - temp_l)
+        kt = ops.where(ops.logical_not(temp_u < temperature), interpolated, kt)
+    return ops.where(ops.logical_not(_KT_TEMPERATURES[0] < temperature), _KT_VALUES[0], kt)
 
 
 def _norsok_shear_stress(conditions):
@@ -335,11 +348,11 @@ def _norsok_shear_stress(conditions):
     viscosity = units.cp_to_pas((conditions.water_viscosity * flow_rate) / flow_rate)
     friction_factor = 0.001375 * (
         1
-        + (
+        + ops.pow(
             20000 * conditions.roughness / diameter
-            + 10**6 * viscosity / (velocity * diameter * density)
+            + 10**6 * viscosity / (velocity * diameter * density),
+            0.33,
         )
-        ** 0.33
     )
     return 0.5 * density * friction_factor * velocity**2
 
@@ -454,10 +467,13 @@ def _ph_factor(temperature, ph):
     40.001 degC. The 5 degC first segment keeps ``2.0676 + 0.2309 pH`` where NORSOK M-506 and
     the other temperatures read ``- 0.2309``. Changing either changes goldens.
     """
-    segments = _PH_FACTOR.get(temperature)
-    if segments is None or not 3.5 <= ph <= 6.5:
-        return 7
-    return next(formula(ph) for upper, formula in segments if ph <= upper)
+    factor = 7
+    for tabulated, segments in _PH_FACTOR.items():
+        segment = segments[-1][1](ph)
+        for upper, formula in reversed(segments[:-1]):
+            segment = ops.where(ph <= upper, formula(ph), segment)
+        factor = ops.where(ops.eq(temperature, tabulated), segment, factor)
+    return ops.where(ops.logical_and(3.5 <= ph, ph <= 6.5), factor, 7)
 
 
 _RATES = {"NORSOK": _norsok_rate, "DLM": _dlm_rate, "DLD": _dld_rate}
@@ -485,16 +501,27 @@ def wall_loss(
     Reference: GEMINI WIMS corroded_mm_for_interval; piecewise-constant integration
     using a 365.25-day year.
     """
-    rates = np.asarray(rates_mm_per_year, dtype=float)
-    durations = np.asarray(durations_s, dtype=float)
-    if rates.shape != durations.shape:
-        raise PhysicsRangeError(
-            f"wall_loss: rates shape = {rates.shape}; expected the durations shape "
-            f"{durations.shape}"
-        )
-    if np.any(durations < 0):
-        raise PhysicsRangeError("wall_loss: durations contain negative values; expected >= 0 s")
-    return np.cumsum(rates * durations / units.SECONDS_PER_YEAR)
+    rates = _series(rates_mm_per_year)
+    durations = _series(durations_s)
+    if not isinstance(rates, ops.Symbolic) and not isinstance(durations, ops.Symbolic):
+        if rates.shape != durations.shape:
+            raise PhysicsRangeError(
+                f"wall_loss: rates shape = {rates.shape}; expected the durations shape "
+                f"{durations.shape}"
+            )
+    ops.check(
+        durations >= 0,
+        PhysicsRangeError,
+        "wall_loss: durations contain negative values; expected >= 0 s",
+    )
+    return ops.cumsum(rates * durations / units.SECONDS_PER_YEAR)
+
+
+def _series(values):
+    """Return a plain sequence or array as a float array and a traced series unchanged."""
+    if isinstance(values, ops.Symbolic):
+        return values
+    return np.asarray(values, dtype=float)
 
 
 def remaining_wall_thickness(outer_radius: float, inner_radius: float, loss: float) -> float:
@@ -541,10 +568,9 @@ def time_to_minimum_wall(thickness: float, minimum: float, rate: float) -> float
     Reference: GEMINI WIMS corrosion_from_logs.get_remaining_days_to_min_thickness.
     The original linear projection and special-value handling are retained in SI units.
     """
-    if np.isnan(thickness) or np.isnan(rate):
-        return float("nan")
-    if thickness <= minimum:
-        return 0.0
-    if rate <= 0 or not np.isfinite(rate):
-        return float("inf")
-    return (thickness - minimum) / rate
+    remaining = ops.truediv(thickness - minimum, rate)
+    remaining = ops.where(
+        ops.logical_or(rate <= 0, ops.logical_not(ops.isfinite(rate))), float("inf"), remaining
+    )
+    remaining = ops.where(thickness <= minimum, 0.0, remaining)
+    return ops.where(ops.logical_or(ops.isnan(thickness), ops.isnan(rate)), float("nan"), remaining)
