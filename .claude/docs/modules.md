@@ -105,7 +105,8 @@ output-enabled call.
 
 ## Composite modules
 
-Composites never override `_compute_outputs`. They declare formula outputs in declaration order:
+Composites declare formula outputs in declaration order and override `_compute_outputs` only to
+record their own value for an additive output:
 
 - `Output.of("child.path.output")` copies one descendant output from this call. Outlet fields,
   such as `Output.of("degasser.gas.m_dot")`, are also supported. The descendant must be called
@@ -115,6 +116,13 @@ Composites never override `_compute_outputs`. They declare formula outputs in de
   mass-flow quantity.
 - `Output.ratio("thermal_power", "electricity_use")` divides earlier outputs on the same module
   and records `None` when either value is `None` or the denominator is zero.
+- An output of an additive quantity declared without a formula, such as
+  `self.electricity = Output(Electricity)`, is the automatic sum of the descendant leaf outputs
+  with the same name over this call; a leaf called twice counts twice and the sums of nested
+  composites are not counted again. Every descendant leaf output of that name must have the same
+  quantity and unit, and at least one must exist; otherwise the first call raises `FormulaError`
+  (with a close-match suggestion for a name no leaf declares). A composite that records its own
+  value for the output in `_compute_outputs` replaces the sum.
 
 ```python
 from gemini.core.modules import HeatExchanger
@@ -236,8 +244,8 @@ One call performs these steps:
 1. validate inlets and resolve controls and boundaries (call keyword, persisted value, default);
 2. run forward pre-hooks;
 3. run `forward` and validate its fluid outlet dictionary;
-4. run leaf `_compute_outputs`;
-5. evaluate composite formula outputs in declaration order;
+4. run `_compute_outputs`;
+5. evaluate composite formula outputs and automatic sums in declaration order;
 6. run forward hooks;
 7. verify every output was assigned and build `ModuleResult`.
 

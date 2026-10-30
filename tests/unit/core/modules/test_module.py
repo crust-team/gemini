@@ -532,6 +532,124 @@ def test_total_counts_every_call():
     assert RepeatedTotal()().outputs.total == 4
 
 
+class SummedParent(Module):
+    """Declare an additive output without a formula over one leaf called ``calls`` times."""
+
+    calls = 1
+
+    def __init__(self):
+        """Declare one child and the summed output."""
+        super().__init__()
+
+        # Modules
+        self.child = EnergyLeaf()
+
+        # Outputs
+        self.electricity = Output(Electricity)
+
+    def forward(self, inlets):
+        """Call the child ``calls`` times."""
+
+        # Modules
+        for _ in range(self.calls):
+            self.child(inlet=STREAM)
+
+        outlets = dict()
+        return outlets
+
+
+class NestedSum(Module):
+    """Sum over a leaf and two composites that sum their own leaves."""
+
+    def __init__(self):
+        """Declare one leaf, two summing composites and the summed output."""
+        super().__init__()
+
+        # Modules
+        self.leaf = EnergyLeaf()
+        self.first = SummedParent()
+        self.second = SummedParent()
+
+        # Outputs
+        self.electricity = Output(Electricity)
+
+    def forward(self, inlets):
+        """Call every child once."""
+
+        # Modules
+        self.leaf(inlet=STREAM)
+        self.first()
+        self.second()
+
+        outlets = dict()
+        return outlets
+
+
+def test_additive_output_without_formula_sums_descendant_leaf_calls():
+    """A summed output counts every leaf call once, including leaves of nested composites."""
+
+    class Twice(SummedParent):
+        calls = 2
+
+    assert SummedParent()().outputs.electricity == 2
+    assert Twice()().outputs.electricity == 4
+    assert NestedSum()().outputs.electricity == 6
+
+
+class PowerLeaf(EnergyLeaf):
+    """Declare ``electricity`` as plain power instead of the additive quantity."""
+
+    def __init__(self):
+        """Declare the same name with another quantity."""
+        Module.__init__(self)
+        self.inlet = Inlet(Stream)
+        self.electricity = Output(Power)
+        self.outlet = Outlet(Stream)
+
+
+def test_summed_output_rejects_the_same_name_with_another_quantity():
+    """A descendant output of the same name but another quantity cannot be summed."""
+
+    class Mixed(SummedParent):
+        def __init__(self):
+            super().__init__()
+            self.other = PowerLeaf()
+
+    with pytest.raises(gm.errors.FormulaError, match="other.electricity = power.*expected electr"):
+        Mixed()()
+
+
+def test_summed_output_without_descendant_suggests_a_close_name():
+    """A summed name that no descendant leaf declares names the closest leaf output."""
+
+    class Typo(SummedParent):
+        def __init__(self):
+            super().__init__()
+            self.electricty = Output(Electricity)
+
+    with pytest.raises(gm.errors.FormulaError, match="did you mean 'electricity'"):
+        Typo()()
+
+
+def test_composite_own_value_replaces_the_automatic_sum():
+    """A composite that records its own additive value is not summed."""
+
+    class Own(SummedParent):
+        def _compute_outputs(self, inlets, outlets):
+            self.electricity = 7
+
+    assert Own()().outputs.electricity == 7
+
+
+def test_forward_hook_sees_the_automatic_sum():
+    """Forward hooks run after automatic sums and read them like any output."""
+    module = SummedParent()
+    seen = []
+    module.register_forward_hook(lambda module, inlets, outlets: seen.append(module.electricity))
+    module()
+    assert seen == [2]
+
+
 def test_copy_needs_exactly_one_call():
     """``Output.of`` refuses a descendant that was called twice."""
     with pytest.raises(gm.errors.OutputError, match="child.*called 2 times"):

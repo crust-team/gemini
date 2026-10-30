@@ -620,7 +620,7 @@ class Module:
         if call.outputs is None:
             return outlets
         self._compute_outputs(inlets, outlets)
-        self._compute_formula_outputs(call.call_records)
+        self._compute_formula_outputs(call)
         for hook in tuple(self._hooks.values()):
             hook(self, inlets, outlets)
         self._check_outputs(call.outputs)
@@ -776,14 +776,20 @@ class Module:
         )
 
     def _resolve_formula_outputs(self):
-        """Check every formula output once and remember how to compute it."""
+        """Check every formula and automatic-sum output once and remember how to compute it."""
         seen = set()
         for name, output in self._outputs.items():
-            if output.formula is not None and output._resolved_formula is None:
+            if output._resolved_formula is not None:
+                seen.add(name)
+                continue
+            if output.formula is not None:
                 resolved, declaration = self._resolve_formula(name, output, seen)
                 if declaration is not None:
                     output.infer_kind(declaration)
                 output._resolved_formula = resolved
+            elif output.additive and not self.is_leaf:
+                self._check_summed(name, output)
+                output._resolved_formula = ("sum", name)
             seen.add(name)
 
     def _resolve_formula(self, name, output, seen):
@@ -805,6 +811,27 @@ class Module:
     def _descendant_leaves(self):
         """Return every leaf module below this one."""
         return [module for path, module in self.named_modules() if path and module.is_leaf]
+
+    def _check_summed(self, name, output):
+        """Check that descendant leaves declare ``name`` with the quantity and unit of ``output``.
+
+        A composite's additive output without a formula is the sum of the descendant leaf
+        outputs of the same name; every one must have the same quantity and unit.
+        """
+        leaves = self._descendant_leaves()
+        declarations = [leaf._outputs[name] for leaf in leaves if name in leaf._outputs]
+        if not declarations:
+            names = sorted({output for leaf in leaves for output in leaf._outputs})
+            raise FormulaError(
+                f"{self.path}.{name}: no descendant leaf declares output {name!r} to sum"
+                f"{did_you_mean(name, names)}"
+            )
+        for declaration in declarations:
+            if (declaration.quantity, declaration.unit) != (output.quantity, output.unit):
+                raise FormulaError(
+                    f"{self.path}.{name}: {declaration.path} = {declaration.quantity} "
+                    f"[{declaration.unit}]; expected {output.quantity} [{output.unit}] to sum it"
+                )
 
     def _resolve_total(self, name, target):
         """Return the declaration that ``Output.total(target)`` sums, after checking it."""
@@ -835,17 +862,21 @@ class Module:
             yield full_path, result
             yield from Module._recorded_calls(result.call_records, full_path)
 
-    def _compute_formula_outputs(self, call_records):
-        calls = list(self._recorded_calls(call_records))
+    def _compute_formula_outputs(self, call):
+        """Record formula outputs and automatic sums in declaration order.
+
+        An automatic sum is skipped when the module already recorded its own value.
+        """
+        calls = list(self._recorded_calls(call.call_records))
         for name, output in self._outputs.items():
-            if output.formula is None:
+            if output._resolved_formula is None:
                 continue
             kind, *arguments = output._resolved_formula
             if kind == "of":
                 setattr(self, name, self._output_of(name, calls, *arguments))
-            elif kind == "total":
+            elif kind in ("total", "sum") and not (kind == "sum" and name in call.outputs):
                 setattr(self, name, self._output_total(calls, *arguments))
-            else:
+            elif kind == "ratio":
                 setattr(self, name, self._output_ratio(*arguments))
 
     def _output_of(self, name, calls, module_path, access):
