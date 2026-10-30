@@ -1,5 +1,6 @@
 """Clean-filter quadratic hydraulic loss and clogging diagnostics."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import units
 from gemini.core.types import (
@@ -62,15 +63,13 @@ class Filter(Module):
         if "pressure_drop" not in measured:
             return None
         dp = measured["pressure_drop"]
-        ratio = max(0, dp) / self.clogging_dp
+        ratio = ops.maximum(0, dp) / self.clogging_dp
         alarm = dp > self.clogging_dp
         return Health(
-            score=max(0, 1 - ratio),
+            score=ops.maximum(0, 1 - ratio),
             alarm=alarm,
-            message=(
-                "Filter pressure drop exceeds limit"
-                if alarm
-                else "Filter pressure drop within limit"
+            message=ops.where(
+                alarm, "Filter pressure drop exceeds limit", "Filter pressure drop within limit"
             ),
             metrics={"pressure_drop": dp},
         )
