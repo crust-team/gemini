@@ -2,6 +2,7 @@
 
 import pytest
 
+from gemini import ops
 from gemini.core.physics import compression
 from gemini.errors import PhysicsRangeError
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
@@ -77,3 +78,16 @@ def test_functions_match_on_arrays():
 def test_checks_match_on_arrays(function, rows):
     """A failing row raises the same error and message on arrays and on floats."""
     assert_same_error(function, rows, PhysicsRangeError)
+
+
+@ops.physics
+def _work_when_running(running, specific_heat):
+    """Return the work of a compressor that is off (zero heat capacity) on some rows."""
+    work = compression.specific_compression_work(300.0, 4.0, 1.4, specific_heat, 0.8, 2.0)
+    return ops.where(running > 0, work, 0.0)
+
+
+def test_a_failing_check_in_an_unselected_branch_is_dropped():
+    """A stopped row with an invalid heat capacity gives zero on floats and on arrays."""
+    rows = [(1.0, 1005.0), (0.0, 0.0), (0.0, -1.0)]
+    assert_function_matches(_work_when_running, rows)

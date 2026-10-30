@@ -1,8 +1,11 @@
 """TNO R11363 pump polynomial correlations with the historical US-basis curves."""
 
+from gemini import ops
+
 from . import constants, units
 
 
+@ops.physics
 def head(volume_flow, frequency, stages, coefficients):
     """Return pressure rise [Pa] from flow [m3/s], frequency [Hz], stages and ft coefficients.
 
@@ -15,6 +18,7 @@ def head(volume_flow, frequency, stages, coefficients):
     return units.ft_head_to_pa(value)
 
 
+@ops.physics
 def power(volume_flow, frequency, stages, coefficients):
     """Return power [W] from flow [m3/s], frequency [Hz], stages and bhp coefficients.
 

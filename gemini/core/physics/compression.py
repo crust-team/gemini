@@ -12,6 +12,7 @@ from gemini import ops
 from gemini.errors import PhysicsRangeError
 
 
+@ops.physics
 def isentropic_outlet_temperature(
     inlet_temperature: float, pressure_ratio: float, heat_capacity_ratio: float
 ) -> float:
@@ -43,11 +44,10 @@ def isentropic_outlet_temperature(
         "isentropic_outlet_temperature: heat_capacity_ratio = {heat_capacity_ratio}; expected > 1",
         heat_capacity_ratio=heat_capacity_ratio,
     )
-    return inlet_temperature * ops.pow(
-        pressure_ratio, (heat_capacity_ratio - 1) / heat_capacity_ratio
-    )
+    return inlet_temperature * pressure_ratio ** ((heat_capacity_ratio - 1) / heat_capacity_ratio)
 
 
+@ops.physics
 def stage_outlet_temperature(
     inlet_temperature: float,
     pressure_ratio: float,
@@ -81,9 +81,10 @@ def stage_outlet_temperature(
         isentropic_efficiency=isentropic_efficiency,
     )
     ideal = isentropic_outlet_temperature(inlet_temperature, pressure_ratio, heat_capacity_ratio)
-    return inlet_temperature + ops.truediv(ideal - inlet_temperature, isentropic_efficiency)
+    return inlet_temperature + (ideal - inlet_temperature) / isentropic_efficiency
 
 
+@ops.physics
 def specific_compression_work(
     inlet_temperature: float,
     pressure_ratio: float,
@@ -126,7 +127,7 @@ def specific_compression_work(
     _check_stage("specific_compression_work", inlet_temperature, pressure_ratio)
     outlet = stage_outlet_temperature(
         inlet_temperature,
-        ops.pow(pressure_ratio, ops.truediv(1, stages)),
+        pressure_ratio ** (1 / stages),
         heat_capacity_ratio,
         isentropic_efficiency,
     )
