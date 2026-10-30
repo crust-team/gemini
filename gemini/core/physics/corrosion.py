@@ -7,13 +7,13 @@ literature-unit exception of the package.
 """
 
 import bisect
-import itertools
 import math
 from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
 
+from gemini import ops
 from gemini.errors import MissingChemistryError, PhysicsRangeError, UnknownCorrelationError
 from gemini.utils.strings import did_you_mean, join_names
 
@@ -354,9 +354,7 @@ def _norsok_ph(conditions):
         conditions.temperature, conditions.pressure, conditions.ionic_strength
     )
     h_ion = _hydrogen_ion(bicarb, conditions.co2_pressure, constants)
-    if h_ion > 0:
-        return round(-(math.log(h_ion) / 2.3026), 2)
-    return _NO_ROOT_PH
+    return ops.where(h_ion > 0, ops.round(-(ops.log(h_ion) / 2.3026), 2), _NO_ROOT_PH)
 
 
 def _norsok_equilibrium_constants(temperature, pressure, ionic_strength):
@@ -403,35 +401,48 @@ def _hydrogen_ion(bicarb, co2_pressure, constants):
 
     Newton's method starts at 10^-3.5 (CO2 pressure up to 20 bar) or 10^-2.9 and stops when
     a step is below 1e-6 of the current value. After 100 steps it returns the last iterate
-    without a warning: decision 5 keeps replay output unchanged.
+    without a warning: decision 5 keeps replay output unchanged. A failing iteration gives NaN,
+    which ``_norsok_ph`` reports as the nonpositive root.
     """
     h0, k0, k1, k2, ksp_feco3, kw = constants
     denominator = h0 * k0 * k1 * k2 * co2_pressure
-    if denominator == 0:
-        raise PhysicsRangeError(
-            f"co2_corrosion_rate NORSOK: equilibrium constants underflow at CO2 pressure = "
-            f"{co2_pressure} bar; expected a temperature inside the NORSOK range"
-        )
+    ops.check(
+        denominator != 0,
+        PhysicsRangeError,
+        "co2_corrosion_rate NORSOK: equilibrium constants underflow at CO2 pressure = "
+        "{co2_pressure} bar; expected a temperature inside the NORSOK range",
+        co2_pressure=co2_pressure,
+    )
     saturation = 2 * ksp_feco3 / denominator
-    h_ion = 10**-3.5 if co2_pressure <= 20 else 10**-2.9
-    for iteration in itertools.count():
-        residual = (
-            saturation * h_ion**4
-            + h_ion**3
-            + bicarb * h_ion**2
-            - h_ion * (k1 * k0 * h0 * co2_pressure + kw)
-            - 2 * k1 * k2 * k0 * h0 * co2_pressure
-        )
-        slope = (
-            4 * saturation * h_ion**3
-            + 3 * h_ion**2
-            + 2 * bicarb * h_ion
-            - (k1 * k0 * h0 * co2_pressure + kw)
-        )
-        h_next = h_ion - residual / slope
-        if abs(h_next - h_ion) < _NEWTON_TOLERANCE * h_ion or iteration >= _NEWTON_MAX_ITERATIONS:
-            return h_ion
-        h_ion = h_next
+    return ops.newton(
+        _charge_balance,
+        ops.where(co2_pressure <= 20, 10**-3.5, 10**-2.9),
+        _charge_balance_slope,
+        args=(saturation, bicarb, co2_pressure, h0, k0, k1, k2, kw),
+        tolerance=_NEWTON_TOLERANCE,
+        max_iterations=_NEWTON_MAX_ITERATIONS,
+    )
+
+
+def _charge_balance(h_ion, saturation, bicarb, co2_pressure, h0, k0, k1, k2, kw):
+    """Return the NORSOK charge-balance residual at the hydrogen-ion concentration."""
+    return (
+        saturation * h_ion**4
+        + h_ion**3
+        + bicarb * h_ion**2
+        - h_ion * (k1 * k0 * h0 * co2_pressure + kw)
+        - 2 * k1 * k2 * k0 * h0 * co2_pressure
+    )
+
+
+def _charge_balance_slope(h_ion, saturation, bicarb, co2_pressure, h0, k0, k1, k2, kw):
+    """Return the derivative of ``_charge_balance`` with respect to the hydrogen-ion value."""
+    return (
+        4 * saturation * h_ion**3
+        + 3 * h_ion**2
+        + 2 * bicarb * h_ion
+        - (k1 * k0 * h0 * co2_pressure + kw)
+    )
 
 
 def _ph_factor(temperature, ph):

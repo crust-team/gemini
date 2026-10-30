@@ -3,12 +3,14 @@
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from gemini.core.physics import corrosion, units
 from gemini.errors import MissingChemistryError, PhysicsRangeError, UnknownCorrelationError
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 GOLDEN = json.loads((Path(__file__).parents[3] / "fixtures/golden_values.json").read_text())
 
@@ -188,3 +190,59 @@ def test_wims_remaining_wall_and_lifetime():
     assert corrosion.time_to_minimum_wall(0.005, 0.006, 1e-10) == 0
     assert math.isinf(corrosion.time_to_minimum_wall(0.008, 0.006, 0))
     assert math.isnan(corrosion.time_to_minimum_wall(float("nan"), 0.006, 1e-10))
+
+
+def _ph(temperature, pressure, ionic_strength, bicarb_concentration, co2_pressure):
+    """Return the NORSOK pH of the conditions given as separate columns."""
+    return corrosion._norsok_ph(
+        SimpleNamespace(
+            temperature=temperature,
+            pressure=pressure,
+            ionic_strength=ionic_strength,
+            bicarb_concentration=bicarb_concentration,
+            co2_pressure=co2_pressure,
+        )
+    )
+
+
+PH_ROWS = [
+    (60.0, 100.0, 10.0, 100.0, 1.0),
+    (20.0, 3.0, 0.0, 1.0, 0.3),
+    (120.0, 250.0, 80.0, 2500.0, 15.0),
+    (40.0, 30.0, 5.0, 10.0, 25.0),
+    (150.0, 400.0, 100.0, 0.5, 100.0),
+    (
+        26.131076070282795,
+        443.6679871260469,
+        36.9328387953744,
+        -56680.8741604043,
+        103.19760812153439,
+    ),
+    (60.0, 100.0, 10.0, math.nan, 1.0),
+]
+
+
+def test_norsok_ph_on_arrays_matches_floats_including_the_failed_root():
+    """Both Newton starts, a nonpositive root and a NaN iteration agree on arrays and floats."""
+    assert _ph(*PH_ROWS[5]) == 99.99 and _ph(*PH_ROWS[6]) == 99.99
+    assert_function_matches(_ph, PH_ROWS)
+
+
+def test_norsok_ph_on_a_dense_grid_has_no_rounding_boundary_flips():
+    """The array Newton repeats the scalar stopping rule, so no pH moves by a rounding step."""
+    generator = np.random.default_rng(3)
+    columns = [
+        generator.uniform(1, 160, 1500),
+        generator.uniform(1, 300, 1500),
+        generator.uniform(0, 150, 1500),
+        generator.uniform(0.1, 3000, 1500),
+        10 ** generator.uniform(-2, 2, 1500),
+    ]
+    expected = [_ph(*row) for row in zip(*(column.tolist() for column in columns))]
+    np.testing.assert_allclose(_ph(*columns), expected, rtol=1e-12, atol=0)
+
+
+def test_norsok_ph_underflow_raises_the_error_of_the_float_path():
+    """Equilibrium constants that underflow raise on arrays with the same message."""
+    rows = [(60.0, 100.0, 10.0, 100.0, 1.0), (60.0, 100.0, 1e5, 100.0, 1.0)]
+    assert_same_error(_ph, rows, PhysicsRangeError)
