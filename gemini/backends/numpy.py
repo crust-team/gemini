@@ -9,14 +9,8 @@ leading scenario axis.
 
 import numpy as np
 
-from gemini.backends.base import Backend
+from gemini.backends.base import Backend, quiet
 from gemini.backends.solvers import brent_roots, newton_roots
-
-
-def quiet(function, *values):
-    """Return ``function`` of ``values`` with floating-point warnings silenced."""
-    with np.errstate(all="ignore"):
-        return function(*values)
 
 
 class NumpyBackend(Backend):

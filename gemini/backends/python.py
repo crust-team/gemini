@@ -17,21 +17,15 @@ from itertools import accumulate
 import numpy as np
 from scipy import optimize
 
-from gemini.backends.base import Backend
+from gemini.backends.base import Backend, quiet
 
 PLAIN_NUMBERS = frozenset({float, int})
 DIVISIBLE = PLAIN_NUMBERS | {np.float64}
 
 
-def numpy_result(function, *values):
-    """Return ``function`` of ``values`` as NumPy computes it, with its warnings silenced."""
-    with np.errstate(all="ignore"):
-        return function(*values)
-
-
 def numpy_float(function, *values):
     """Return ``function`` of ``values`` as a Python float computed the way NumPy computes it."""
-    return float(numpy_result(function, *(float(value) for value in values)))
+    return float(quiet(function, *(float(value) for value in values)))
 
 
 class PythonBackend(Backend):
@@ -54,7 +48,7 @@ class PythonBackend(Backend):
     def truediv(self, left, right):
         """Return ``left / right``; a zero divisor gives ``inf`` or ``nan`` as in IEEE 754."""
         if type(left) not in DIVISIBLE or type(right) not in DIVISIBLE:
-            return numpy_result(np.true_divide, left, right)
+            return quiet(np.true_divide, left, right)
         if right != 0:
             return left / right
         if left == 0 or math.isnan(left):
@@ -64,7 +58,7 @@ class PythonBackend(Backend):
     def pow(self, base, exponent):
         """Return ``base ** exponent``; an invalid or overflowing power gives ``inf`` or ``nan``."""
         if type(base) not in PLAIN_NUMBERS or type(exponent) not in PLAIN_NUMBERS:
-            return numpy_result(np.power, base, exponent)
+            return quiet(np.power, base, exponent)
         try:
             result = base**exponent
         except (ZeroDivisionError, OverflowError):
@@ -124,7 +118,7 @@ class PythonBackend(Backend):
     def mod(self, left, right):
         """Return ``left % right``; a zero divisor gives ``nan``."""
         if type(left) not in PLAIN_NUMBERS or type(right) not in PLAIN_NUMBERS:
-            return numpy_result(np.mod, left, right)
+            return quiet(np.mod, left, right)
         if right == 0:
             return math.nan
         return left % right
@@ -132,7 +126,7 @@ class PythonBackend(Backend):
     def floordiv(self, left, right):
         """Return ``left // right``; a zero divisor gives ``inf`` or ``nan``."""
         if type(left) not in PLAIN_NUMBERS or type(right) not in PLAIN_NUMBERS:
-            return numpy_result(np.floor_divide, left, right)
+            return quiet(np.floor_divide, left, right)
         if right == 0:
             return numpy_float(np.floor_divide, left, right)
         return left // right
@@ -343,7 +337,7 @@ class PythonBackend(Backend):
         or power in it gives ``inf`` or ``nan`` like NumPy instead of raising.
         """
         try:
-            return numpy_result(
+            return quiet(
                 optimize.brentq,
                 lambda value, *rest: function(np.float64(value), *rest),
                 low,

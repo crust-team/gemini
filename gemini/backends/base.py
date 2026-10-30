@@ -14,6 +14,12 @@ forced_name = _selected.get
 """Return the name set by ``settings(backend=...)``, else ``None``; a bound ``ContextVar.get``."""
 
 
+def quiet(function, *values):
+    """Return ``function`` of ``values`` with floating-point warnings silenced."""
+    with np.errstate(all="ignore"):
+        return function(*values)
+
+
 class Backend:
     """Evaluate ops on one kind of value; subclasses define one method per op name.
 
