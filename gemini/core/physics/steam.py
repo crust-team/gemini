@@ -209,6 +209,7 @@ class Expansion:
     efficiency: float
 
 
+@ops.physics
 def saturation_pressure(temperature: float) -> float:
     """Return the saturation pressure [Pa] of water at a temperature [K].
 
@@ -226,9 +227,15 @@ def saturation_pressure(temperature: float) -> float:
         MINIMUM_TEMPERATURE,
         CRITICAL_TEMPERATURE,
     )
-    return _saturation_pressure(temperature)
+    n = _REGION_4
+    theta = temperature + n[8] / (temperature - n[9])
+    a = theta**2 + n[0] * theta + n[1]
+    b = n[2] * theta**2 + n[3] * theta + n[4]
+    c = n[5] * theta**2 + n[6] * theta + n[7]
+    return (2 * c / (-b + ops.sqrt(b**2 - 4 * a * c))) ** 4 * 1e6
 
 
+@ops.physics
 def saturation_temperature(pressure: float) -> float:
     """Return the saturation temperature [K] of water at a pressure [Pa].
 
@@ -251,6 +258,7 @@ def saturation_temperature(pressure: float) -> float:
     return (n[9] + d - ops.sqrt((n[9] + d) ** 2 - 4 * (n[8] + n[9] * d))) / 2
 
 
+@ops.physics
 def liquid_enthalpy(pressure: float, temperature: float) -> float:
     """Return the specific enthalpy [J/kg] of liquid water in IF97 region 1.
 
@@ -260,6 +268,7 @@ def liquid_enthalpy(pressure: float, temperature: float) -> float:
     return _region_1(pressure, temperature)[0]
 
 
+@ops.physics
 def liquid_entropy(pressure: float, temperature: float) -> float:
     """Return the specific entropy [J/kg/K] of liquid water in IF97 region 1.
 
@@ -269,6 +278,7 @@ def liquid_entropy(pressure: float, temperature: float) -> float:
     return _region_1(pressure, temperature)[1]
 
 
+@ops.physics
 def vapour_enthalpy(pressure: float, temperature: float) -> float:
     """Return the specific enthalpy [J/kg] of steam in IF97 region 2.
 
@@ -279,6 +289,7 @@ def vapour_enthalpy(pressure: float, temperature: float) -> float:
     return _region_2(pressure, temperature)[0]
 
 
+@ops.physics
 def vapour_entropy(pressure: float, temperature: float) -> float:
     """Return the specific entropy [J/kg/K] of steam in IF97 region 2.
 
@@ -289,6 +300,7 @@ def vapour_entropy(pressure: float, temperature: float) -> float:
     return _region_2(pressure, temperature)[1]
 
 
+@ops.physics
 def b23_pressure(temperature: float) -> float:
     """Return the region 2/3 boundary pressure [Pa] (IF97 eq. 5, 623.15 K to 863.15 K)."""
     _check_range(
@@ -299,9 +311,11 @@ def b23_pressure(temperature: float) -> float:
         REGION_1_MAXIMUM_TEMPERATURE,
         B23_MAXIMUM_TEMPERATURE,
     )
-    return _b23_pressure(temperature)
+    n = _B23
+    return (n[0] + n[1] * temperature + n[2] * temperature**2) * 1e6
 
 
+@ops.physics
 def saturation_properties(pressure: float) -> SaturationProperties:
     """Return saturated liquid and vapour enthalpy and entropy at a pressure [Pa].
 
@@ -323,6 +337,7 @@ def saturation_properties(pressure: float) -> SaturationProperties:
     return SaturationProperties(pressure, temperature, liquid[0], vapour[0], liquid[1], vapour[1])
 
 
+@ops.physics
 def flash_fraction(enthalpy: float, pressure: float) -> float:
     """Return the steam mass fraction [-] after isenthalpic flashing to a pressure [Pa].
 
@@ -346,6 +361,7 @@ def flash_fraction(enthalpy: float, pressure: float) -> float:
     )
 
 
+@ops.physics
 def baumann_expansion(
     inlet_pressure: float,
     outlet_pressure: float,
@@ -442,22 +458,6 @@ def _region_2(pressure, temperature):
     return rt * tau * gamma_tau, GAS_CONSTANT * (tau * gamma_tau - gamma)
 
 
-def _saturation_pressure(temperature):
-    """Return IF97 eq. 30 without a range check, for the branches of ``_check_vapour``."""
-    n = _REGION_4
-    theta = temperature + ops.truediv(n[8], temperature - n[9])
-    a = theta**2 + n[0] * theta + n[1]
-    b = n[2] * theta**2 + n[3] * theta + n[4]
-    c = n[5] * theta**2 + n[6] * theta + n[7]
-    return ops.pow(ops.truediv(2 * c, -b + ops.sqrt(b**2 - 4 * a * c)), 4) * 1e6
-
-
-def _b23_pressure(temperature):
-    """Return IF97 eq. 5 without a range check, for the branches of ``_check_vapour``."""
-    n = _B23
-    return (n[0] + n[1] * temperature + n[2] * temperature**2) * 1e6
-
-
 def _check_range(function, name, value, unit, lower, upper):
     """Raise ``PhysicsRangeError`` unless lower <= value <= upper (NaN fails)."""
     ops.check(
@@ -478,7 +478,7 @@ def _check_liquid(function, pressure, temperature):
     _check_range(
         function, "temperature", temperature, "K", MINIMUM_TEMPERATURE, REGION_1_MAXIMUM_TEMPERATURE
     )
-    lower = _saturation_pressure(temperature) * (1 - SATURATION_TOLERANCE)
+    lower = saturation_pressure(temperature) * (1 - SATURATION_TOLERANCE)
     _check_range(function, "pressure", pressure, "Pa", lower, MAXIMUM_PRESSURE)
 
 
@@ -489,10 +489,10 @@ def _check_vapour(function, pressure, temperature):
     )
     upper = ops.where(
         temperature <= REGION_1_MAXIMUM_TEMPERATURE,
-        _saturation_pressure(temperature) * (1 + SATURATION_TOLERANCE),
+        saturation_pressure(temperature) * (1 + SATURATION_TOLERANCE),
         ops.where(
             temperature <= B23_MAXIMUM_TEMPERATURE,
-            _b23_pressure(temperature),
+            b23_pressure(temperature),
             MAXIMUM_PRESSURE,
         ),
     )
