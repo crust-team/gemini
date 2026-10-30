@@ -8,10 +8,10 @@ import pytest
 
 import gemini as gm
 from gemini import ops
-from gemini.modules import Boiler, Module, energy_balance, mass_balance
+from gemini.modules import ElectricBoiler, Module, energy_balance, mass_balance
 from gemini.modules.storage import ThermalStorage
 from gemini.types import (
-    Fuel,
+    Electricity,
     Inlet,
     Outlet,
     Output,
@@ -152,7 +152,7 @@ class BoilerCharging(Module):
         super().__init__()
 
         # Modules
-        self.boiler = Boiler().update_params(fuel_type="gas", capacity=2e5, efficiency=0.9)
+        self.boiler = ElectricBoiler().update_params(capacity=2e5, efficiency=0.9)
         self.storage = _tank()
 
         # Inlets
@@ -160,7 +160,7 @@ class BoilerCharging(Module):
         self.discharge_in = Inlet(Stream)
 
         # Outputs
-        self.fuel = Output(Fuel)
+        self.electricity = Output(Electricity)
 
         # Outlets
         self.charge_out = Outlet(Stream)
@@ -192,7 +192,7 @@ def test_composite_step_charges_the_tank():
     state, result = plant.step(state, 900, {"charge_in": cold, "discharge_in": DISCHARGE})
     storage = result.children["storage"].outputs
     assert state["storage"]["temperature"] > storage.tank_temperature > 293.15
-    assert result.outputs.fuel > 0
+    assert result.outputs.electricity > 0
     audit = energy_balance(plant, result)
     assert audit["relative_residual"] < 1e-12
     assert mass_balance(plant, result)["residual"] == 0

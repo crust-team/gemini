@@ -6,6 +6,7 @@ CODES = (
     "out_of_bounds",
     "missing_value",
     "no_value",
+    "missing_assumption",
     "invalid_unit",
     "unknown_name",
     "unknown_port",

@@ -25,3 +25,29 @@ def input_power(useful_power: float, efficiency: float) -> float:
     belongs to. Reference: Moran and Shapiro, Fundamentals of Engineering Thermodynamics, section 2.
     """
     return useful_power / efficiency
+
+
+@ops.physics
+def output_power(input_power_value: float, efficiency: float) -> float:
+    """Return the useful power [W] of an input power, ``P = F eta``.
+
+    Parameters
+    ----------
+    input_power_value : float
+        Power drawn [W], nonnegative.
+    efficiency : float
+        Useful share of it [-], positive.
+
+    Returns
+    -------
+    float
+        Useful power [W].
+
+    Notes
+    -----
+    Definition of an efficiency, the inverse of ``input_power``.
+
+    Validity: Any real inputs. No division occurs.
+    Source: Definition of an efficiency; no published source is needed.
+    """
+    return input_power_value * efficiency

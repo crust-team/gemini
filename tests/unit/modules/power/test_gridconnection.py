@@ -3,7 +3,7 @@
 import pytest
 
 from gemini.modules import Module, collect_flows, energy_balance
-from gemini.modules.heating import Boiler
+from gemini.modules.heating import ElectricBoiler
 from gemini.modules.power import ORC, GridConnection
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_module_matches
@@ -54,7 +54,7 @@ class GridPlant(Module):
             parasitic_fraction=0.15,
             capacity=5e6,
         )
-        self.boiler = Boiler().update_params(fuel_type="electric", capacity=1e6, efficiency=0.99)
+        self.boiler = ElectricBoiler().update_params(capacity=1e6, efficiency=0.99)
         self.grid = grid(export_limit="10 MW")
 
         # Inlets

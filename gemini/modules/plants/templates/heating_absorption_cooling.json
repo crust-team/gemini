@@ -8,11 +8,6 @@
       "unit": "W/K",
       "description": "Heat transfer conductance of the geothermal heat exchanger."
     },
-    "peak_boiler.fuel_type": {
-      "default": null,
-      "unit": null,
-      "description": "Peak boiler fuel: 'gas' or 'electric'."
-    },
     "peak_boiler.capacity": {
       "default": null,
       "unit": "W",
@@ -191,9 +186,17 @@
       "cooling_consumer": {
         "type": "CoolingConsumer",
         "params": {}
+      },
+      "gas_grid": {
+        "type": "GasGrid",
+        "params": {}
       }
     },
     "connections": [
+      {
+        "source": "gas_grid.outlet",
+        "target": "peak_boiler.fuel_in"
+      },
       {
         "source": "doublet.supply_out",
         "target": "degasser.inlet"
@@ -260,7 +263,8 @@
       "heating_return_out": "heating_consumer.return_out",
       "cooling_return_out": "cooling_consumer.return_out",
       "gas": "degasser.gas",
-      "absorption_cooling_out": "absorption_chiller.cooling_out"
+      "absorption_cooling_out": "absorption_chiller.cooling_out",
+      "boiler_gas": "peak_boiler.gas_out"
     },
     "bindings": {},
     "param_history": {}

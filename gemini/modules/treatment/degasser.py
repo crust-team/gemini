@@ -35,10 +35,11 @@ class Degasser(Module):
     split is linear in mass flow.
 
     The ``gas`` stream's ``m_dot`` is the separated gas mass flow at vessel pressure and
-    temperature. Its ``fluid`` is the liquid outlet's fluid, so its liquid properties do not
-    describe the gas: downstream gas equipment uses its own gas properties (or ``rho_g`` and
-    ``cp_g`` of ``FluidProperties``). The sensible audit values every stream at ``cp_l``, which
-    the degasser therefore closes exactly; the gas enthalpy at ``cp_l`` is an audit convention.
+    temperature. Its ``fluid`` is a ``kind="gas"`` fluid with the inlet's ``gas_composition``, with
+    the ``cp_l`` of the liquid: the sensible audit values every stream at ``cp_l``, which the
+    degasser therefore closes exactly, and the gas enthalpy at ``cp_l`` is an audit convention. An
+    inlet fluid without a composition gives the gas the liquid outlet's fluid: its liquid
+    properties then do not describe the gas.
 
     NOTE(refactor): ``separation_efficiency`` is structural: it sets the gas fraction of the liquid
     outlet's ``Fluid``, which is static during a trace, so a trace reads it as a plain number.
@@ -85,9 +86,10 @@ class Degasser(Module):
         liquid_flow, gas_flow, remaining = separation.degasser_split(
             inlet.m_dot, inlet.fluid.gas_mass_fraction, self.separation_efficiency
         )
-        fluid = inlet.fluid.model_copy(update={"gas_mass_fraction": remaining})
-        liquid = inlet.with_(m_dot=liquid_flow, p=pressure, fluid=fluid)
-        gas = liquid.with_(m_dot=gas_flow)
+        liquid = inlet.with_(
+            m_dot=liquid_flow, p=pressure, fluid=inlet.fluid.with_gas_fraction(remaining)
+        )
+        gas = liquid.with_(m_dot=gas_flow, fluid=inlet.fluid.free_gas())
 
         outlets = dict(liquid=liquid, gas=gas)
         return outlets

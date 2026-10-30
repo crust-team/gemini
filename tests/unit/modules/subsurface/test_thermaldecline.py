@@ -6,7 +6,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules import Module, energy_balance, mass_balance
-from gemini.modules.heating import Boiler
+from gemini.modules.heating import ElectricBoiler
 from gemini.modules.subsurface import ThermalDecline
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
@@ -35,7 +35,7 @@ class Producer(Module):
 
         # Modules
         self.decline = decline()
-        self.heater = Boiler().update_params(fuel_type="gas", capacity=1e7, efficiency=0.9)
+        self.heater = ElectricBoiler().update_params(capacity=1e7, efficiency=0.9)
 
         # Inlets
         self.sandface = Inlet(Stream)

@@ -13,11 +13,6 @@
       "unit": "W",
       "description": "Heat pump capacity (cap on the useful duty)."
     },
-    "peak_boiler.fuel_type": {
-      "default": null,
-      "unit": null,
-      "description": "Peak boiler fuel: 'gas' or 'electric'."
-    },
     "peak_boiler.capacity": {
       "default": null,
       "unit": "W",
@@ -202,9 +197,17 @@
       "cooling_consumer": {
         "type": "CoolingConsumer",
         "params": {}
+      },
+      "gas_grid": {
+        "type": "GasGrid",
+        "params": {}
       }
     },
     "connections": [
+      {
+        "source": "gas_grid.outlet",
+        "target": "peak_boiler.fuel_in"
+      },
       {
         "source": "doublet.supply_out",
         "target": "degasser.inlet"
@@ -275,7 +278,8 @@
       "heating_return_out": "heating_consumer.return_out",
       "cooling_return_out": "cooling_consumer.return_out",
       "gas": "degasser.gas",
-      "compression_rejection_out": "compression_chiller.sink_out"
+      "compression_rejection_out": "compression_chiller.sink_out",
+      "boiler_gas": "peak_boiler.gas_out"
     },
     "bindings": {},
     "param_history": {}

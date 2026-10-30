@@ -1,12 +1,9 @@
 """CO2 of a run against the balance code and a hand sum."""
 
-from types import SimpleNamespace
-
 import pytest
 
 import gemini as gm
 from gemini.economics import emissions as module
-from gemini.modules.balance import emissions
 from tests.fixtures.costed_plants import HOURS, day, heating_plant
 from tests.fixtures.result_tables import make_results
 
@@ -14,32 +11,38 @@ DAY = HOURS * 3600.0
 """Seconds of the runs below."""
 
 
-def test_co2_is_fuel_and_grid_electricity_times_their_factors():
-    """1000 W of fuel and 60 W of grid electricity (100 consumed, 40 generated) for a day."""
+def test_co2_sums_the_emission_outputs_and_grid_electricity():
+    """1 kg/s of CO2, 0.1 kg/s of methane and 60 W of grid electricity for a day."""
     values = gm.economics.Assumptions(electricity_emission_factor=1e-7)
-    result = gm.economics.co2(
-        heating_plant(), day(electricity=100.0, generated=40.0, fuel=1000.0), values
+    run = make_results(
+        {
+            "boiler": {"co2_emission": [1.0] * HOURS, "electricity": [100.0] * HOURS},
+            "chp": {"electricity_generated": [40.0] * HOURS},
+            "vent": {"methane_emission": [0.1] * HOURS},
+        }
     )
+    result = gm.economics.co2(heating_plant(), run, values)
     assert result["unit"] == "kg"
-    assert result["fuel_energy"] == {"value": 1000.0 * DAY, "unit": "J"}
+    assert result["direct"] == {"value": DAY, "unit": "kg"}
+    assert result["methane"]["value"] == pytest.approx(0.1 * DAY)
     assert result["grid_energy"] == {"value": 60.0 * DAY, "unit": "J"}
-    assert result["value"] == pytest.approx(1000.0 * DAY * 56.1e-9 + 60.0 * DAY * 1e-7, rel=1e-12)
+    assert result["electricity"]["value"] == pytest.approx(60.0 * DAY * 1e-7)
+    assert result["value"] == pytest.approx(DAY + 0.1 * DAY * 29.8 + 60.0 * DAY * 1e-7)
     assert result["window"] == {"value": DAY, "unit": "s"}
 
 
-def test_co2_is_the_balance_emissions_rate_times_the_tick():
-    """One tick gives exactly ``emissions`` of the same leaf totals times its duration."""
-    one = make_results(
-        {"a": {"electricity": [30.0], "electricity_generated": [10.0]}, "b": {"fuel": [500.0]}}
-    )
-    values = gm.economics.Assumptions(electricity_emission_factor=2e-7)
-    leaf = SimpleNamespace(
-        children={}, outputs={"electricity": 30.0, "electricity_generated": 10.0, "fuel": 500.0}
-    )
-    rate = emissions({"": leaf}, values.fuel_emission_factor, 2e-7)
-    assert gm.economics.co2(heating_plant(), one, values)["value"] == pytest.approx(
-        rate * 3600.0, rel=1e-12
-    )
+def test_the_methane_factor_is_an_assumption():
+    """``methane_gwp`` scales the methane released."""
+    run = make_results({"vent": {"methane_emission": [1.0]}})
+    values = gm.economics.Assumptions(methane_gwp=10.0)
+    assert gm.economics.co2(heating_plant(), run, values)["value"] == pytest.approx(36000.0)
+
+
+def test_fuel_alone_emits_nothing_of_its_own():
+    """Emissions come from the composition through the modules, not from a fuel factor."""
+    run = make_results({"boiler": {"fuel": [500.0]}})
+    assert gm.economics.co2(heating_plant(), run)["value"] == 0
+    assert gm.economics.co2(heating_plant(), run)["fuel_energy"]["value"] == 500.0 * 3600
 
 
 def test_a_surplus_of_generation_earns_no_credit():
@@ -53,7 +56,7 @@ def test_grid_electricity_without_a_factor_is_refused():
     """Drawing electricity with no ``electricity_emission_factor`` names what to give."""
     with pytest.raises(gm.errors.ValidationError, match="electricity_emission_factor") as error:
         gm.economics.co2(heating_plant(), day())
-    assert error.value.code == "missing_value"
+    assert error.value.code == "missing_assumption"
 
 
 def test_source_energies_of_a_run_without_fuel_or_electricity_is_zero():

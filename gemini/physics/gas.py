@@ -197,6 +197,30 @@ def mass_fraction(composition: dict, species: str) -> float:
     return composition.get(species, 0.0) * SPECIES[species][0] / molar_mass(composition)
 
 
+def emission_per_energy(composition: dict) -> float:
+    """Return the CO2 [kg] a burner emits per joule of fuel energy of a gas.
+
+    Parameters
+    ----------
+    composition : dict
+        Mole fraction [-] per species of ``SPECIES``; the gas must burn.
+
+    Returns
+    -------
+    float
+        ``(f_CO2 + x_CO2) / LHV`` [kg/J]: the CO2 formed plus the CO2 the gas carries.
+
+    Notes
+    -----
+    A kilogram of gas gives its heating value and all of its carbon as CO2.
+
+    Validity: Complete combustion of a gas with a positive heating value.
+    Source: Stoichiometry; no published source is needed.
+    """
+    emitted = combustion_co2(composition) + mass_fraction(composition, "CO2")
+    return emitted / lower_heating_value(composition)
+
+
 @ops.physics
 def gas_mass_fraction(ratio: float, density_normal: float, liquid_density: float) -> float:
     """Return the gas mass fraction [-] of a gas-liquid ratio, ``x = R rho_n / (rho_l + R rho_n)``.

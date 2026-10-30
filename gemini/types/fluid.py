@@ -53,6 +53,9 @@ class Fluid(BaseModel):
     density at a stream's pressure and temperature is ``density_at``, ideal-gas unless ``density``
     is given, and its ``properties`` snapshot holds the density at normal conditions.
 
+    ``grid_composition`` marks a stream on which a burner may draw grid gas, and says what that
+    gas is. ``GasGrid`` and ``GasMakeup`` set it.
+
     ``steam`` marks water vapour, such as the gas outlet of a flash ``Separator``. Its
     constant property snapshot is the liquid-water default and does not describe vapour:
     steam equipment takes enthalpy and entropy from ``gemini.physics.steam`` instead, so
@@ -66,6 +69,7 @@ class Fluid(BaseModel):
     gas_mass_fraction: Fraction = Field(0.0, lt=1)
     gas_liquid_ratio: GasLiquidRatio | None = None
     gas_composition: dict[str, Fraction] | None = None
+    grid_composition: dict[str, Fraction] | None = None
     glycol_fraction: Fraction = 0.0
     property_model: Literal["constant_stp"] = "constant_stp"
     density: Density | None = None
@@ -126,18 +130,11 @@ class Fluid(BaseModel):
             raise ValidationError("gas_liquid_ratio needs gas_composition")
         if self.kind == "gas" and self.gas_composition is None:
             raise ValidationError("A gas fluid needs gas_composition")
-        if self.gas_composition is None:
-            return
-        if not given and self.kind != "gas":
+        if self.gas_composition is not None and not given and self.kind != "gas":
             raise ValidationError("gas_composition needs gas_liquid_ratio")
-        unknown = [name for name in self.gas_composition if name not in gas.SPECIES]
-        if unknown:
-            raise ValidationError(
-                f"gas_composition: species = {unknown[0]!r}; expected one of "
-                f"{join_names(gas.SPECIES)}{did_you_mean(unknown[0], gas.SPECIES)}"
-            )
-        if abs(sum(self.gas_composition.values()) - 1) > gas.COMPOSITION_TOLERANCE:
-            raise ValidationError("gas_composition: mole fractions must sum to one")
+        for composition in (self.gas_composition, self.grid_composition):
+            if composition is not None:
+                _check_composition(composition)
 
     @model_serializer(mode="wrap")
     def _without_derived(self, handler):
@@ -153,6 +150,39 @@ class Fluid(BaseModel):
     def normal_density(self):
         """Return the density [kg/Nm3] of the gas of this fluid at normal conditions."""
         return gas.normal_density(self.gas_composition)
+
+    def heating_value(self):
+        """Return the lower heating value [J/kg] of the gas; zero without a composition."""
+        if self.gas_composition is None:
+            return 0.0
+        return gas.lower_heating_value(self.gas_composition)
+
+    def emission_factor(self):
+        """Return the CO2 [kg/J] of burning the gas; zero when it does not burn."""
+        if self.heating_value() == 0:
+            return 0.0
+        return gas.emission_per_energy(self.gas_composition)
+
+    def free_gas(self):
+        """Return the gas fluid of the free gas of this fluid; this fluid without a composition.
+
+        NOTE(refactor): the gas keeps the liquid's ``cp_l``, the audit convention of
+        ``energy_balance``, which values every stream at ``cp_l``.
+        """
+        return _free_gas(self)
+
+    def with_grid(self, composition):
+        """Return this fluid marked as a stream on which a burner may draw grid gas."""
+        return self.model_copy(update={"grid_composition": composition})
+
+    def with_gas_fraction(self, fraction):
+        """Return this fluid with the free gas of mass fraction ``fraction`` left in it."""
+        update = {"gas_mass_fraction": fraction}
+        if self.gas_liquid_ratio is not None:
+            update["gas_liquid_ratio"] = gas.gas_liquid_ratio(
+                fraction, self.normal_density(), self._liquid_density()
+            )
+        return self.model_copy(update=update)
 
     def properties(self, p: Pressure, T: Temperature) -> FluidProperties:
         """Return cached constant SI properties; pressure and temperature are independent."""
@@ -196,6 +226,18 @@ _OVERRIDES = (
 )
 
 
+def _check_composition(composition):
+    """Reject a composition of unknown species or whose mole fractions do not sum to one."""
+    unknown = [name for name in composition if name not in gas.SPECIES]
+    if unknown:
+        raise ValidationError(
+            f"gas composition: species = {unknown[0]!r}; expected one of "
+            f"{join_names(gas.SPECIES)}{did_you_mean(unknown[0], gas.SPECIES)}"
+        )
+    if abs(sum(composition.values()) - 1) > gas.COMPOSITION_TOLERANCE:
+        raise ValidationError("gas composition: mole fractions must sum to one")
+
+
 @lru_cache(maxsize=256)
 def _properties(fluid: Fluid) -> FluidProperties:
     """Return the constant property snapshot of a fluid, cached by its complete value.
@@ -215,6 +257,23 @@ def _properties(fluid: Fluid) -> FluidProperties:
         if value is not None:
             values[name] = value
     return FluidProperties(**values)
+
+
+@lru_cache(maxsize=256)
+def _free_gas(fluid: Fluid) -> Fluid:
+    """Return the gas fluid of the free gas of ``fluid``, cached by its complete value."""
+    if fluid.gas_composition is None:
+        return fluid
+    return Fluid(
+        kind="gas",
+        gas_composition=fluid.gas_composition,
+        specific_heat=fluid.properties(0, 0).cp_l,
+    )
+
+
+def grid_gas(composition):
+    """Return the gas fluid of a gas grid of ``composition``, marked as grid gas."""
+    return Fluid(kind="gas", gas_composition=composition, grid_composition=composition)
 
 
 BRINE = Fluid()

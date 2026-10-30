@@ -79,6 +79,7 @@ with it; its hash per version is held in the test.
 | `gm.modules.register(cls)` | `cls`, now in the registry; it states `category = "<one of the list>"`; a taken name is refused | real |
 | `gm.modules.load_file(path)` | names of the `Module` classes of a Python file that state a `category`, registered | real |
 | `gm.modules.<Equipment>`, `Module`, `ModuleList`, `ModuleDict`, `collect_flows`, `emissions`, `energy_balance`, `mass_balance`, `trace_wiring` | classes and one-call audits, see [equipment.md](equipment.md) | real |
+| `gm.modules.Boiler`, `ElectricBoiler`, `CHP`, `Flare`, `GasGrid`, `GasMakeup` | the gas chain: `boiler.fuel_in`, `boiler.gas_out`, see [equipment.md](equipment.md) | real |
 | `gm.streams.names()` | `brine`, `hot_water`, `chilled_water`, `gas`, `electricity`, `fuel` | real |
 
 On a class or an instance of `Module` (and on what `gm.modules.get` returns):
@@ -231,7 +232,7 @@ returns is a value; every entry here takes *units*, except where a coefficient h
 
 Every economics function takes `(plant, results, ...)`, only `capex` has no results, and returns a
 value with the parts of the result as more keys. A value the inputs cannot give raises
-`ValidationError` (code `no_value`, or `missing_value` for an assumption nobody gave); with
+`ValidationError` (code `no_value`, or `missing_assumption` for an assumption nobody gave); with
 `on_error="record"` it is `{value: null, unit, reason}`. No shipped module declares a cost yet, so a
 shipped plant has no value until modules declare `capex()`.
 

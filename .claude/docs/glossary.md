@@ -98,10 +98,10 @@ above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersi
 
 ```text
 absorbed absorber accumulation active adsorber ambient approach aquifer arrangement auxiliary
-baumann best blowdown borehole bottom bottomhole breakthrough brine building bulb capacity
+baumann best blowdown borehole bottom bottomhole breakthrough brine building bulb burned capacity
 capped carnot change characteristic charge charged chilled clogging co2 coefficient coefficients
-cold combustion command concentration condenser condensing conductance conductivity consumption
-cooler cooling cop correction correlation cost count curtailed decline demand density depth
+cold combustion command composition concentration condenser condensing conductance conductivity consumption
+cooler cooling cop coproduced correction correlation cost count curtailed decline demand density depth
 derivative dew diameter difference diffusivity direction discharge dose drainage drawdown drift
 driving drop dumped duty effective effectiveness efficiency electric electricity elevation
 emission empty energy error esp evaporation evaporator exhaust export extraction factor factors
@@ -112,7 +112,7 @@ injection injectivity inlet inner input integral is isentropic latent length lif
 liquid load log lorenz loss margin mass maximum mean measurement methane minimum mixed mode
 model motor net network no nominal opening operating or out outlet output overpressure parasitic
 part path period permeability phase pinch pipe point porosity power pressure previous price
-product production productivity proportional pump quality radial radius rangeability rate rated
+product production productivity proportional pump purchased quality radial radius rangeability rate rated
 ratio recovered recovery reference rejection relative removal residual resistance retained
 return rock role roughness running sand sandface saturated saturation second secondary section segment
 sensible separation service setpoint setting shaft sink skin slope soil source spacing specific

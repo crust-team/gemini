@@ -5,8 +5,9 @@ import pytest
 import gemini as gm
 from gemini.economics import costs
 from gemini.physics.units import SECONDS_PER_YEAR
-from tests.fixtures.costed_plants import cooling_plant, day, heating_plant
+from tests.fixtures.costed_plants import HOURS, cooling_plant, day, heating_plant
 from tests.fixtures.errors import raises
+from tests.fixtures.result_tables import make_results
 
 HEAT_PER_YEAR = 1000.0 * SECONDS_PER_YEAR
 """Heat [J/year] of 1000 W delivered all year."""
@@ -71,7 +72,23 @@ def test_opex_needs_the_price_of_an_energy_the_run_draws():
     """Electricity is drawn but has no price: the user is asked, not guessed for."""
     with pytest.raises(gm.errors.ValidationError, match="electricity_price") as error:
         gm.economics.opex(heating_plant(), day())
-    assert error.value.code == "missing_value"
+    assert error.value.code == "missing_assumption"
+
+
+def test_gas_price_buys_purchased_gas_only():
+    """Co-produced gas costs nothing; a price per MWh prices what was purchased."""
+    columns = {
+        "pump": {"electricity": [0.0] * HOURS},
+        "boiler": {"fuel": [3e6] * HOURS, "fuel_purchased": [1e6] * HOURS},
+    }
+    values = gm.economics.Assumptions(gas_price=40.0)
+    annual = costs.annual_energies(heating_plant(), make_results(columns))
+    bill = costs._bill(values, annual)
+    assert bill["fuel"] == pytest.approx(annual.fuel / 3.6e9 * 40.0)
+    assert annual.fuel == pytest.approx(1e6 * SECONDS_PER_YEAR)
+    with pytest.raises(gm.errors.ValidationError, match="gas_price") as error:
+        costs._bill(gm.economics.Assumptions(), annual)
+    assert error.value.code == "missing_assumption"
 
 
 def test_opex_without_declared_costs_reports_only_the_bill():

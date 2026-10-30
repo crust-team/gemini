@@ -45,15 +45,15 @@ def test_series_previous_and_resample():
 
 def test_profiles_drive_scenario():
     """Dotted profile inputs drive an ordinary handwritten module without configuration."""
-    from gemini.modules.heating.boiler import Boiler
+    from gemini.modules.heating.boiler import ElectricBoiler
     from gemini.types.bindings import Binding, ModuleBindings
 
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
     clock = gm.Clock.range(start, start + timedelta(hours=2), "1h")
     target = Profile.constant(320, unit="K", clock=clock)
     inlet = dict(m_dot=1, T=300, p=1e5)
-    boiler = Boiler()
-    boiler.update_params(fuel_type="electric", capacity=1e6, efficiency=0.9)
+    boiler = ElectricBoiler()
+    boiler.update_params(capacity=1e6, efficiency=0.9)
     boiler.bindings = {
         "": ModuleBindings(
             controls={"temperature_setpoint": Binding(column="temperature_setpoint", unit="K")},

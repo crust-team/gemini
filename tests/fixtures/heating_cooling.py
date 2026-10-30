@@ -14,7 +14,6 @@ from gemini.modules.plants import templating
 SIZES = {
     "heat_exchanger.thermal_conductance": 1e5,
     "heat_pump.capacity": 2e6,
-    "peak_boiler.fuel_type": "gas",
     "peak_boiler.capacity": 15e6,
     "peak_boiler.efficiency": 0.9,
     "absorption_chiller.capacity": 3e5,

@@ -7,9 +7,9 @@ from .control import PIDController
 from .cooling import AbsorptionUnit, AdsorptionChiller
 from .demand import CoolingConsumer, HeatConsumer
 from .exchangers import Cooler, HeatExchanger
-from .heating import CHP, Boiler, HeatPump
+from .heating import CHP, Boiler, ElectricBoiler, HeatPump
 from .module import Module
-from .piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
+from .piping import GasGrid, GasMakeup, Mixer, Pipe, PressurizationTank, Splitter, Valve
 from .plants import ATESPlant, CoolingSubstation, HeatingSubstation
 from .power import ORC, FlashTurbine, GridConnection, Separator
 from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
@@ -22,7 +22,7 @@ from .subsurface import (
     ProductionReservoir,
     ThermalDecline,
 )
-from .treatment import Blowdown, Degasser, Desander, Filter, InhibitorDosing, Vent
+from .treatment import Blowdown, Degasser, Desander, Filter, Flare, InhibitorDosing, Vent
 from .wells import InjectionWell, ProductionWell
 from .wiring import trace_wiring
 
@@ -31,6 +31,10 @@ __all__ = [
     "ModuleList",
     "ModuleDict",
     "Boiler",
+    "ElectricBoiler",
+    "Flare",
+    "GasGrid",
+    "GasMakeup",
     "HeatExchanger",
     "HeatPump",
     "AbsorptionUnit",

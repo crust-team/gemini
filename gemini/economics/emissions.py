@@ -41,47 +41,61 @@ def source_energies(results):
 
 
 def co2(plant, results, assumptions=None, on_error="raise"):
-    """Return the CO2 emitted over the run [kg] from the fuel burnt and the grid electricity.
+    """Return the CO2-equivalent emitted over the run [kg].
 
-    This is ``gemini.modules.balance.emissions`` summed over the ticks: fuel energy times
-    ``fuel_emission_factor`` plus grid electricity energy times ``electricity_emission_factor``.
-    On-site generation offsets consumption before grid electricity is counted and a surplus
-    earns no credit. Gas vented by a ``Vent`` is not included.
+    The sum over the leaves of ``co2_emission``, plus ``methane_emission`` times
+    ``Assumptions.methane_gwp``, plus grid electricity energy times
+    ``electricity_emission_factor``. Emissions come from what each module burns or releases, so
+    they follow the gas composition. On-site generation offsets consumption before grid
+    electricity is counted and a surplus earns no credit.
 
     Parameters
     ----------
     plant : Module
         The plant of the run, as for every economics function; the columns alone give the value.
     results : Results
-        A finished run; its leaf ``electricity``, ``fuel`` and ``electricity_generated`` columns
-        are summed.
+        A finished run; its leaf emission columns and ``electricity`` and
+        ``electricity_generated`` columns are summed.
     assumptions : Assumptions, optional
-        The emission factors [kg/J]. The default has the sourced fuel factor of natural gas and
-        no electricity factor.
+        ``methane_gwp`` and ``electricity_emission_factor`` [kg/J].
     on_error : {"raise", "record"}, optional
         A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
     Returns
     -------
     dict
-        ``{value, unit, fuel_energy, grid_energy, window}``: ``value`` in kg over the window of
-        the results; ``fuel_energy`` and ``grid_energy`` in J and ``window`` in s, each a value.
-        Grid electricity drawn without ``electricity_emission_factor`` raises
-        ``ValidationError`` (code ``missing_value``).
+        ``{value, unit, direct, methane, electricity, fuel_energy, grid_energy, window}``: ``value``
+        in kg over the window of the results; ``direct`` the CO2, ``methane`` the methane released
+        and ``electricity`` the CO2 of grid electricity, in kg; ``fuel_energy`` and ``grid_energy``
+        in J and ``window`` in s, each a value. Grid electricity drawn without
+        ``electricity_emission_factor`` raises ``ValidationError`` (code ``missing_assumption``).
     """
     return reported(on_error, "kg", lambda: _co2(results, assumptions))
 
 
+def released(results, field):
+    """Return the mass [kg] of leaf column ``field`` over the run; a run without it gives zero."""
+    total = results_total(results, results.to_frame(), field)
+    if total is None:
+        return 0.0
+    return float(np.nansum(total.to_numpy(dtype=float) * window_seconds(results)))
+
+
 def _co2(results, assumptions):
-    """Return the CO2 value of a run."""
+    """Return the CO2-equivalent of a run."""
     assumptions = resolve(assumptions)
     fuel, grid = source_energies(results)
-    emitted = fuel * assumptions.fuel_emission_factor
+    direct = released(results, "co2_emission")
+    methane = released(results, "methane_emission")
+    electricity = 0.0
     if grid > 0:
-        emitted += grid * require(assumptions, "electricity_emission_factor")
+        electricity = grid * require(assumptions, "electricity_emission_factor")
     return value(
-        emitted,
+        direct + methane * assumptions.methane_gwp + electricity,
         "kg",
+        direct=value(direct, "kg"),
+        methane=value(methane, "kg"),
+        electricity=value(electricity, "kg"),
         fuel_energy=value(fuel, "J"),
         grid_energy=value(grid, "J"),
         window=value(float(window_seconds(results).sum()), "s"),

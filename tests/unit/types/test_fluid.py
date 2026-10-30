@@ -85,7 +85,7 @@ def test_the_hackathon_brine_derives_its_gas_mass_fraction():
 
 
 def test_a_fluid_with_a_ratio_round_trips_and_hashes():
-    """A dump leaves the derived fraction out, so it reads back; a composition does not stop a hash."""
+    """A dump leaves the derived fraction out and reads back; a composition has a hash."""
     brine = Fluid(**HACKATHON)
     dumped = brine.model_dump(mode="json")
     assert "gas_mass_fraction" not in dumped

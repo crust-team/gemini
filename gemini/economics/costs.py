@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass
 
-from gemini.analysis.series import energy, leaf_total, window_seconds
+from gemini.analysis.series import energy, leaf_total, results_total, window_seconds
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.emissions import source_energies
 from gemini.economics.outcome import currency_of, reported, unavailable
 from gemini.errors import ValidationError
 from gemini.modules.demand import CoolingConsumer, HeatConsumer
+from gemini.physics import units
 from gemini.physics.units import SECONDS_PER_YEAR
 from gemini.types.cost import total_cost
 from gemini.types.shapes import value
@@ -30,7 +31,7 @@ class Annual:
 
 
 def annual_energies(plant, results):
-    """Return the heat and cold delivered and the fuel and grid electricity drawn per year.
+    """Return the heat and cold delivered and the gas and electricity bought per year.
 
     The run is taken as representative of a year: each energy over the window of the results is
     scaled by one year over that window. The heat is the ``heat_supplied`` of the plant's
@@ -42,11 +43,12 @@ def annual_energies(plant, results):
     scale = SECONDS_PER_YEAR / seconds.sum()
     heat = leaf_total(plant, frame, "heat_supplied", HeatConsumer)
     cold = leaf_total(plant, frame, "heat_absorbed", CoolingConsumer)
-    fuel, grid = source_energies(results)
+    _, grid = source_energies(results)
+    fuel = results_total(results, frame, "fuel_purchased")
     return Annual(
         heat=0.0 if heat is None else energy(heat, seconds) * scale,
         cold=0.0 if cold is None else energy(cold, seconds) * scale,
-        fuel=fuel * scale,
+        fuel=0.0 if fuel is None else energy(fuel, seconds) * scale,
         grid=grid * scale,
     )
 
@@ -91,7 +93,8 @@ def _bill(assumptions, annual):
     if annual.grid > 0:
         electricity = annual.grid * require(assumptions, "electricity_price")
     if annual.fuel > 0:
-        fuel = annual.fuel * require(assumptions, "fuel_price")
+        price = require(assumptions, "gas_price")
+        fuel = annual.fuel * units.convert(price, "currency/MWh", "currency/J")
     return {"electricity": electricity, "fuel": fuel}
 
 
@@ -115,8 +118,9 @@ def opex(plant, results, assumptions=None, on_error="raise"):
     results : Results
         A finished run of the plant.
     assumptions : Assumptions, optional
-        ``electricity_price`` and ``fuel_price`` [currency/J], needed only for an energy that the
-        run draws; a missing needed price raises ``ValidationError`` (code ``missing_value``).
+        ``electricity_price`` [currency/J] and ``gas_price`` [currency/MWh], needed only for an
+        energy that the run buys; a missing needed price raises ``ValidationError`` (code
+        ``missing_assumption``). Co-produced gas costs nothing.
     on_error : {"raise", "record"}, optional
         A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 

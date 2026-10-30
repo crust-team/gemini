@@ -452,6 +452,23 @@ assert round(mixed.outputs.mixed_out_T - 273.15, 6) == 72.0
 assert mixed.outlets.mixed_out.p == 5.5e5 and mixed.outputs.pressure_imbalance == 5e4
 ```
 
+### GasGrid
+
+Fuel source of a burner without co-produced gas: `grid.outlet` to `boiler.fuel_in`.
+
+- **Ports**: `outlet` (gas), no inlet.
+- **Parameters**: `composition` (mole fractions, default `gas.GRID_COMPOSITION`, a published grid
+  analysis).
+- **Model**: the outlet carries no flow at normal conditions and marks that the burner may draw grid
+  gas: purchased gas enters no stream, the burner reports it.
+- **Energy audit**: closed.
+
+### GasMakeup
+
+In-line between a degasser and a burner: `inlet` -> `outlet` (gas), with `composition` as `GasGrid`.
+The stream passes unchanged but for the mark that the burner may draw grid gas, so it shows the grid
+connection on the flowsheet and moves no gas. **Energy audit**: closed.
+
 ### PressurizationTank
 
 Pressure-maintenance (expansion) vessel that holds a closed circuit at its pressure setpoint
@@ -524,9 +541,10 @@ Separates a share of the free gas carried by the brine and applies the vessel pr
   temperature. The default `eta = 0` reproduces the former liquid-only model exactly.
 - **Physics**: `separation.degasser_split`
 - **Assumptions**: isothermal, no exsolution of dissolved gas, no latent or expansion heat, a
-  lumped efficiency (no residence time, level or Henry's law). The `gas` stream carries the gas
-  mass flow, but its `fluid` is the liquid's, so its property snapshot does not describe the
-  gas. Reverse flow scales both outlets.
+  lumped efficiency (no residence time, level or Henry's law). The `gas` stream carries a
+  `kind="gas"` fluid with the inlet's `gas_composition`, at the vessel pressure, and the liquid's
+  `cp_l`; an inlet without a composition gives it the liquid's fluid, whose property snapshot does
+  not describe the gas. Reverse flow scales both outlets.
 - **Energy audit**: closed (every stream is valued at `cp_l`, an audit convention for the gas).
 
 ```python
@@ -661,6 +679,20 @@ flared = vent(inlet=gm.Stream(m_dot=0.076, T="80 C", p="4.85 bar"))
 assert round(flared.outputs.co2_emission, 6) == 0.085032
 assert round(flared.outputs.get("heat_loss", unit="kW"), 1) == 372.4
 ```
+
+### Flare
+
+Burns the gas that reaches it; the gas leaves the plant here.
+
+- **Ports**: `inlet` (gas), no outlet.
+- **Parameters**: `combustion_efficiency` (default 0.98, US EPA AP-42 section 13.5).
+- **Outputs**: `burned_mass_flow`, `co2_emission`, `methane_emission` (kg/s).
+- **Model**: from the composition of the stream, `co2_emission = m (x_CO2 + eta f_CO2)` with
+  `f_CO2` the CO2 complete combustion forms per kg of gas, `methane_emission = m x_CH4 (1 - eta)`.
+- **Physics**: `combustion.burnt_gas_emissions`, `gas.mass_fraction`, `gas.combustion_co2`
+- **Assumptions**: a stream without a composition emits nothing. A `Vent` with `mode="flare"` burns
+  by mass-fraction parameters; both end in the stoichiometry of `combustion`.
+- **Energy audit**: closed; the sensible enthalpy of the gas leaves through `burned_mass_flow`.
 
 ## Exchangers
 
@@ -825,35 +857,51 @@ assert round(result.outputs.cop, 4) == 6.531 and round(result.outputs.electricit
 
 ### Boiler
 
-Auxiliary gas or electric boiler heating a stream to a setpoint.
+Auxiliary gas boiler heating a stream to a setpoint, burning co-produced gas first.
 
-- **Ports**: `inlet` -> `outlet`.
-- **Parameters** (all required): `fuel_type` (`"gas"` or `"electric"`), `capacity` (`Power`,
-  > 0), `efficiency` (`Efficiency`).
+- **Ports**: `inlet` -> `outlet` (water); `fuel_in` -> `gas_out` (gas).
+- **Parameters** (all required): `capacity` (`Power`, > 0), `efficiency` (`Efficiency`).
 - **Controls**: `temperature_setpoint` (`Temperature`).
-- **Outputs**: `duty`, `fuel_or_power`, `outlet_T`, `is_capped`, `electricity`, `fuel` (the unused
-  one is zero), `heat_loss` (conversion loss).
-- **Model**: `duty = min(m_dot cp max(0, T_set - T_in), capacity)`, `fuel_or_power = duty /
-  efficiency`, `heat_loss = fuel_or_power - duty`.
-- **Physics**: `energy.input_power`, `heat_transfer.setpoint_duty`,
-  `heat_transfer.temperature_change`
+- **Outputs**: `duty`, `fuel_or_power`, `outlet_T`, `is_capped`, `heat_loss` (conversion loss), `fuel`
+  (total), `fuel_coproduced`, `fuel_purchased`, `burned_mass_flow` (co-produced gas burned),
+  `co2_emission` (kg/s, formed and carried, of everything burned).
+- **Model**: `duty = min(m_dot cp max(0, T_set - T_in), limit)`, `fuel = duty / efficiency`,
+  `heat_loss = fuel - duty`. With `F = fuel_in.m_dot LHV`: `fuel_coproduced = min(fuel, F)`,
+  `fuel_purchased = fuel - fuel_coproduced`; `gas_out` is `fuel_in` less what was burned. `limit` is
+  the `capacity`, and `min(capacity, F efficiency)` on a stream no `GasMakeup` or `GasGrid` marked.
+- **Physics**: `energy.input_power`, `energy.output_power`, `heat_transfer.setpoint_duty`,
+  `heat_transfer.temperature_change`, `combustion.fuel_power`, `combustion.fuel_split`,
+  `combustion.emission_rate`, `gas.emission_per_energy`
 - **Validity**: negative flow raises `PhysicsError`.
-- **Energy audit**: closed.
+- **Energy audit**: closed; purchased gas enters no stream, so it is in `fuel` and not in
+  `mass_balance`, and the burned co-produced gas leaves through `burned_mass_flow`.
 
 ```python
 import gemini as gm
-from gemini.modules import Boiler
+from gemini.modules import Boiler, GasGrid
 
-boiler = Boiler().update_params(fuel_type="gas", capacity="1 MW", efficiency=0.9)
-result = boiler(inlet=gm.Stream(flow="10 kg/s", T="60 C", p="3 bar"), temperature_setpoint="80 C")
+boiler = Boiler().update_params(capacity="1 MW", efficiency=0.9)
+result = boiler(
+    inlet=gm.Stream(flow="10 kg/s", T="60 C", p="3 bar"),
+    fuel_in=GasGrid()().outlets.outlet,
+    temperature_setpoint="80 C",
+)
 assert round(result.outputs.duty) == 843480 and round(result.outputs.fuel) == 937200
 ```
 
+### ElectricBoiler
+
+The water side of `Boiler` without gas ports: `electricity = fuel_or_power = duty / efficiency`. It
+has `electricity` and no `fuel` outputs. **Energy audit**: closed.
+
 ### CHP
+
+Burns as `Boiler` does: `fuel_in` -> `gas_out`, with `fuel_coproduced`, `fuel_purchased`,
+`burned_mass_flow` and `co2_emission`; on a stream without the grid mark the gas limits the load.
 
 Gas-engine combined heat and power unit heating a water circuit.
 
-- **Ports**: `inlet` -> `outlet`.
+- **Ports**: `inlet` -> `outlet` (water); `fuel_in` -> `gas_out` (gas).
 - **Parameters**: `electric_capacity` (`Power`, > 0), `electric_efficiency`,
   `thermal_efficiency` (`Efficiency`, full load, LHV; typical gas engines 0.35 to 0.44 and 0.40
   to 0.50), `maximum_outlet_temperature` (`Temperature`), all required;
@@ -879,7 +927,11 @@ chp = CHP().update_params(
     electric_capacity="1 MW", electric_efficiency=0.4, thermal_efficiency=0.45,
     no_load_fuel_fraction=0.1, maximum_outlet_temperature="90 C",
 )
-result = chp(inlet=gm.Stream(flow="20 kg/s", T="60 C", p="3 bar"), load_fraction=0.5)
+result = chp(
+    inlet=gm.Stream(flow="20 kg/s", T="60 C", p="3 bar"),
+    fuel_in=gm.modules.GasGrid()().outlets.outlet,
+    load_fraction=0.5,
+)
 assert round(result.outputs.fuel) == 1375000 and round(result.outputs.heat_recovered) == 618750
 ```
 

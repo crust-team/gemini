@@ -216,13 +216,13 @@ full first-law closure. The audit status of every shipped module, including the 
 residuals of models that are deliberately not closed per call or whose energy is not sensible
 liquid enthalpy (gas, steam), is listed in [equipment.md](equipment.md).
 
-`emissions(result, fuel_factor, electricity_factor)` turns the same leaf totals into a CO2 rate
-[kg/s] for any topology: `fuel * fuel_factor + max(0, electricity - electricity_generated) *
-electricity_factor`. Factors are SI kg/J (kg/GJ / 1e9, kg/kWh / 3.6e6; the unit table has no
-emission-factor units). All on-site generation offsets the electricity of all consumers (ESP,
-pumps, compressors, heat pumps), not only the ESP as in the upstream GEMINI KPI, before grid
-electricity is charged; a surplus earns no credit; fuel is charged on its full input, so CHP electricity is
-not charged twice. A `Vent`'s `co2_emission` is a separate output and is not included.
+`emissions(result, fuel_factor, electricity_factor)` turns the same leaf totals into a rate for any
+topology: `fuel * fuel_factor + max(0, electricity - electricity_generated) * electricity_factor`.
+Factors are SI kg/J (kg/GJ / 1e9, kg/kWh / 3.6e6; the unit table has no emission-factor units). All
+on-site generation offsets the electricity of all consumers (ESP, pumps, compressors, heat pumps), not
+only the ESP as in the upstream GEMINI KPI, before grid electricity is charged; a surplus earns no
+credit. `gm.economics` uses it for the energies drawn; the CO2 of a run comes from the `co2_emission`
+and `methane_emission` outputs, which follow the gas composition.
 
 ## Profiles and costs
 

@@ -252,6 +252,23 @@ def _entries_of(modules, prefix=""):
         yield from _entries_of(entry.get("modules", {}), path)
 
 
+def _current_boilers(spec):
+    """Return a spec with the boilers of 0.2.0: an electric one, or a gas one on a grid."""
+    for entries in spec.get("param_history", {}).values():
+        for entry in entries:
+            entry["params"].pop("fuel_type", None)
+    fed = {item["target"] for item in spec.get("connections", [])}
+    for path, entry in list(_entries_of(spec.get("modules", {}))):
+        fuel = entry.get("params", {}).pop("fuel_type", "gas")
+        if fuel == "electric":
+            entry["type"] = "ElectricBoiler"
+        if entry.get("type") in ("Boiler", "CHP") and f"{path}.fuel_in" not in fed:
+            grid = f"{path.replace('.', '_')}_grid"
+            spec["modules"][grid] = {"type": "GasGrid", "params": {}}
+            spec["connections"].append({"source": f"{grid}.outlet", "target": f"{path}.fuel_in"})
+    return spec
+
+
 def _named_ports(spec):
     """Return a format 2 spec with the ports that were automatic plant ports before 0.2.0 named.
 
@@ -271,14 +288,16 @@ def migrate(old):
     """Convert a format 1 plant file to a format 2 spec; a spec is returned as a copy.
 
     A format 2 spec written before 0.2.0 gets explicit names for its free ports, the fluid fields
-    of 0.2.0 and the reservoir ``liquid_density`` and ``liquid_viscosity`` on the module's fluid.
+    of 0.2.0 and the reservoir ``liquid_density`` and ``liquid_viscosity`` on the module's fluid;
+    a ``Boiler`` of ``fuel_type="electric"`` becomes an ``ElectricBoiler``, and a gas ``Boiler`` or
+    a ``CHP`` without a ``fuel_in`` gets a ``GasGrid``.
 
     A tree whose root class is a shipped plant takes that plant's wiring, with the stored
     values filled in; any other root is written as a handwritten root with flat dotted params.
     Failures raise ``ValidationError`` with code ``migration_failed``.
     """
     if isinstance(old, dict) and old.get("format") == FORMAT:
-        return _named_ports(_current_fluids(deepcopy(old)))
+        return _named_ports(_current_boilers(_current_fluids(deepcopy(old))))
     try:
         return _convert(old)
     except GeminiError:

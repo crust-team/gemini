@@ -12,12 +12,12 @@ def test_only_the_sourced_defaults_are_set():
     """The currency label and the natural-gas factor are the only values nobody gave."""
     given = Assumptions().model_dump()
     assert given["currency"] == "EUR"
-    assert given["fuel_emission_factor"] == pytest.approx(56.1 / 1e9)
+    assert given["methane_gwp"] == 29.8
     assert [name for name, value in given.items() if value is None] == [
         "discount_rate",
         "lifetime_years",
         "electricity_price",
-        "fuel_price",
+        "gas_price",
         "heat_price",
         "cold_price",
         "electricity_emission_factor",
@@ -46,7 +46,7 @@ def test_require_names_the_missing_assumption():
     """A value the user must give raises with the code the backend lists."""
     with pytest.raises(gm.errors.ValidationError, match="discount_rate") as error:
         module.require(Assumptions(), "discount_rate")
-    assert error.value.code == "missing_value"
+    assert error.value.code == "missing_assumption"
     assert error.value.path == "assumptions.discount_rate"
     assert module.require(Assumptions(discount_rate=0.05), "discount_rate") == 0.05
 

@@ -20,7 +20,7 @@ PYTHONPATH=. python examples/plants/simulate/03_boiler_chp_secondary.py
 
 import gemini as gm
 from examples.shared.nodal_doublet import NodalDoublet
-from gemini.modules import CHP, Boiler, HeatExchanger, Mixer, Splitter, emissions
+from gemini.modules import CHP, Boiler, GasGrid, HeatExchanger, Mixer, Splitter, emissions
 from gemini.modules.treatment import Degasser, Filter
 from gemini.physics.geometry import build_path
 from gemini.types import (
@@ -59,6 +59,7 @@ class BoilerChpPlant(gm.modules.Module):
         self.heat_exchanger = HeatExchanger()
         self.cold_filter = Filter()
         self.splitter = Splitter()
+        self.grid = GasGrid()
         self.boiler = Boiler()
         self.chp = CHP()
         self.mixer = Mixer()
@@ -91,8 +92,9 @@ class BoilerChpPlant(gm.modules.Module):
         )
         returned = self.cold_filter(inlet=exchanged.outlets.hot_out)
         self.doublet.inject(returned.outlets.outlet)
-        boiled = self.boiler(inlet=exchanged.outlets.cold_out)
-        cogenerated = self.chp(inlet=split.outlets.second_out)
+        gas = self.grid().outlets.outlet
+        boiled = self.boiler(inlet=exchanged.outlets.cold_out, fuel_in=gas)
+        cogenerated = self.chp(inlet=split.outlets.second_out, fuel_in=gas)
         mixed = self.mixer(first_in=boiled.outlets.outlet, second_in=cogenerated.outlets.outlet)
 
         # Outlets
@@ -146,7 +148,7 @@ def configure_surface(plant):
         cold_nominal_mass_flow=19.4,
     )
     plant.splitter.split_fraction = 0.5
-    plant.boiler.update_params(fuel_type="gas", capacity="3 MW", efficiency=0.8)
+    plant.boiler.update_params(capacity="3 MW", efficiency=0.8)
     plant.boiler.temperature_setpoint = "70 degC"
     plant.chp.update_params(
         electric_capacity="400 kW",

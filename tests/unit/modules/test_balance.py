@@ -5,7 +5,8 @@ import pytest
 
 from gemini.modules import Module
 from gemini.modules.balance import collect_flows, emissions, energy_balance, mass_balance
-from gemini.modules.heating import CHP, Boiler
+from gemini.modules.heating import CHP, Boiler, ElectricBoiler
+from gemini.modules.piping import GasGrid
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.types import (
     HeatLoss,
@@ -18,6 +19,8 @@ from gemini.types import (
 from gemini.types.ports import Ports
 from gemini.types.results import ModuleResult, Values
 from tests.fixtures.equivalence import STREAM_FIELDS, assert_close
+
+GRID_GAS = GasGrid()().outlets.outlet
 
 
 class Radiator(Module):
@@ -52,11 +55,18 @@ class Radiator(Module):
         self.heat_loss = 0.1 * released
 
 
+def boiler_of(fuel):
+    """Return a boiler of ``fuel`` and the extra inlets a call of it takes."""
+    if fuel == "electric":
+        return ElectricBoiler().update_params(capacity=1e6, efficiency=0.9), {}
+    return Boiler().update_params(capacity=1e6, efficiency=0.9), {"fuel_in": GRID_GAS}
+
+
 @pytest.mark.parametrize("fuel", ["electric", "gas"])
 def test_boiler_balance(fuel):
     """Electric and gas boilers conserve total modeled energy."""
-    boiler = Boiler().update_params(fuel_type=fuel, capacity=1e6, efficiency=0.9)
-    result = boiler(inlet=Stream(m_dot=10, T=300, p=1e6), temperature_setpoint=320)
+    boiler, gas = boiler_of(fuel)
+    result = boiler(inlet=Stream(m_dot=10, T=300, p=1e6), temperature_setpoint=320, **gas)
     assert mass_balance(boiler, result)["residual"] == 0
     assert energy_balance(boiler, result)["relative_residual"] < 1e-12
     assert collect_flows(result)["electricity" if fuel == "electric" else "fuel"] > 0
@@ -116,7 +126,7 @@ class GasHeatedInjection(Module):
             thermal_efficiency=0.45,
             maximum_outlet_temperature=363.15,
         )
-        self.boiler = Boiler().update_params(fuel_type="gas", capacity=1e6, efficiency=0.9)
+        self.boiler = Boiler().update_params(capacity=1e6, efficiency=0.9)
         self.pump = InjectionPump().update_params(efficiency=0.8)
 
         # Inlets
@@ -129,8 +139,8 @@ class GasHeatedInjection(Module):
         """Pass the stream through CHP, boiler and pump in flow order."""
 
         # Modules
-        heated = self.chp(inlet=inlets.return_in).outlets.outlet
-        topped = self.boiler(inlet=heated).outlets.outlet
+        heated = self.chp(inlet=inlets.return_in, fuel_in=GRID_GAS).outlets.outlet
+        topped = self.boiler(inlet=heated, fuel_in=GRID_GAS).outlets.outlet
         pumped = self.pump(suction=topped)
 
         # Outlets
@@ -163,8 +173,8 @@ def test_emissions_charge_fuel_and_net_grid_electricity(load):
 
 def test_emissions_without_energy_outputs_are_zero():
     """A leaf that burns and draws nothing emits nothing."""
-    result = Boiler().update_params(fuel_type="gas", capacity=1e6, efficiency=0.9)(
-        inlet=Stream(m_dot=10, T=350, p=2e5), temperature_setpoint=340
+    result = Boiler().update_params(capacity=1e6, efficiency=0.9)(
+        inlet=Stream(m_dot=10, T=350, p=2e5), fuel_in=GRID_GAS, temperature_setpoint=340
     )
     assert emissions(result, GAS_FACTOR, GRID_FACTOR) == 0
 
@@ -212,9 +222,9 @@ BALANCE_KEYS = {
 @pytest.mark.parametrize("fuel", ["electric", "gas"])
 def test_balances_match_on_stacked_boiler_results(fuel):
     """Audits and emissions on array-valued results equal the audits per row."""
-    boiler = Boiler().update_params(fuel_type=fuel, capacity=1e6, efficiency=0.9)
+    boiler, gas = boiler_of(fuel)
     results = [
-        boiler(inlet=Stream(m_dot=m_dot, T=300, p=1e6), temperature_setpoint=setpoint)
+        boiler(inlet=Stream(m_dot=m_dot, T=300, p=1e6), temperature_setpoint=setpoint, **gas)
         for m_dot, setpoint in [(10, 320), (2, 310), (0.5, 300)]
     ]
     _assert_balances_match(boiler, results, BALANCE_KEYS)

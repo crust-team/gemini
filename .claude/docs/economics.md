@@ -14,10 +14,11 @@ the composite outputs. Everything below is therefore built from declared leaf ou
 - Heat delivered is `heat_supplied` of the `HeatConsumer` leaves and cold delivered is
   `heat_absorbed` of the `CoolingConsumer` leaves (`analysis/series.py`: `leaf_total`).
 - Electricity, fuel and generation are the leaf columns of those names, summed over every path
-  (`results_total`). Grid electricity per tick is `max(0, electricity - electricity_generated)` and
-  CO2 is `gemini.modules.balance.emissions` over those totals: one implementation, the
-  weights are the emission factors (a weight of 1 and 0 gives the fuel energy, 0 and 1 the grid
-  energy).
+  (`results_total`). Grid electricity per tick is `max(0, electricity - electricity_generated)`,
+  through `gemini.modules.balance.emissions` with weights of 0 and 1. The fuel bought is the column
+  `fuel_purchased`.
+- CO2 comes from the emitters: every module that emits declares the additive output `co2_emission`,
+  and `Vent` and `Flare` also `methane_emission`, in kg/s.
 - A tick with no value (a skipped or failed row) adds no energy and is left out of ratios and peaks.
 - The window of a run is the sum of its tick durations. Annual figures scale the window to one year
   (`SECONDS_PER_YEAR`, 365.25 days): the run is taken as representative of a year.
@@ -30,17 +31,17 @@ its heat and cold KPIs and levelised costs are `null` with that reason.
 Every function returns a value with the parts of its result as more keys, each a value or a text;
 `unit` is the currency (`EUR`), `EUR/year`, `EUR/J`, `year` or `kg`. Every function takes
 `on_error="raise"`: a value the inputs cannot give raises `ValidationError`, code `no_value`, or
-`missing_value` for an assumption nobody gave. With `on_error="record"` nothing is raised and it is
+`missing_assumption`, naming it, for an assumption nobody gave. With `on_error="record"` nothing is raised and it is
 `{value: null, unit, reason}`.
 
 | Name | Returns |
 |---|---|
 | `Assumptions` | frozen object; see the table of sources below |
 | `capex(plant, assumptions=None)` | `total_cost(plant)`: investment in the currency of the declared costs, with `price_year` and `source` |
-| `opex(plant, results, assumptions=None)` | fixed + variable cost per year + yearly bill of grid electricity and fuel; `components` lists the parts |
+| `opex(plant, results, assumptions=None)` | fixed + variable cost per year + yearly bill of grid electricity and purchased gas (`fuel_purchased` at `gas_price`; co-produced gas costs nothing); `components` lists the parts |
 | `lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `(capex + opex A) / (heat A)` in currency/J, `A` the annuity factor |
 | `lcoc(...)` | the same with the cold delivered |
-| `co2(plant, results, assumptions=None)` | kg over the window, from `balance.emissions` |
+| `co2(plant, results, assumptions=None)` | kg of CO2-equivalent over the window: the leaf `co2_emission`, `methane_emission` times `methane_gwp`, grid electricity times `electricity_emission_factor` |
 | `npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `-capex + (revenue - opex) A` |
 | `payback(plant, results, assumptions=None)` | `capex / (revenue - opex)` in years, undiscounted |
 
@@ -51,9 +52,9 @@ declares a cost" (under `"record"`, `opex` still lists the energy bill in `compo
 returns a `Cost`. Costs in different currencies or price years raise `ValidationError`; assumptions
 in another currency than the costs raise `ValidationError`.
 
-Missing user inputs raise `ValidationError` with code `missing_value` and the path
-`assumptions.<name>`: a discount rate or lifetime given nowhere, an electricity or fuel price for an
-energy the run draws, a heat or cold price for a product it delivers, an electricity emission factor
+Missing user inputs raise `ValidationError` with code `missing_assumption` and the path
+`assumptions.<name>`: a discount rate or lifetime given nowhere, an electricity or gas price for an
+energy the run buys, a heat or cold price for a product it delivers, an electricity emission factor
 for grid electricity drawn. A price is asked for only when its energy is non-zero.
 
 `lcoh` charges the whole plant cost to the heat, so a plant that also delivers cold has no value ("the split of its cost is not defined"); `lcoc` likewise. Levelised cost, `npv` and `payback`
@@ -65,10 +66,11 @@ residual value.
 | Field | Unit | Default | Source |
 |---|---|---|---|
 | `currency` | text | `"EUR"` | label only, the default of `Cost`; not a price |
-| `fuel_emission_factor` | kg/J | 56.1e-9 | IPCC 2006 Guidelines for National Greenhouse Gas Inventories, vol. 2 Energy, ch. 2, table 2.2: natural gas, 56 100 kg CO2/TJ on the net calorific value. Natural gas only |
+| `methane_gwp` | - | 29.8 | IPCC Sixth Assessment Report, Working Group I, ch. 7, table 7.15 (Forster et al. 2021): fossil methane over 100 years |
 | `discount_rate` | per year | None | depends on the project; the user gives it |
 | `lifetime_years` | years | None | depends on the equipment; the user gives it |
-| `electricity_price`, `fuel_price` | currency/J | None | depends on country, year and contract |
+| `electricity_price` | currency/J | None | depends on country, year and contract |
+| `gas_price` | currency/MWh | None | per MWh of fuel energy; depends on country, year and contract |
 | `heat_price`, `cold_price` | currency/J | None | depends on the contract |
 | `electricity_emission_factor` | kg/J | None | depends on the grid and the year |
 

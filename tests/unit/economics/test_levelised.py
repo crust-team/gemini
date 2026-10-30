@@ -48,7 +48,7 @@ def test_a_missing_rate_is_asked_for():
     """No rate anywhere raises with the missing-value code."""
     with pytest.raises(gm.errors.ValidationError, match="discount_rate") as error:
         gm.economics.lcoh(heating_plant(), day(), None, 20, PRICES)
-    assert error.value.code == "missing_value"
+    assert error.value.code == "missing_assumption"
 
 
 def test_null_with_a_reason_when_the_cost_or_the_heat_is_missing():

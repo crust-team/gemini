@@ -7,7 +7,7 @@ import pytest
 import gemini as gm
 from gemini import ops
 from gemini.modules import Module, energy_balance, mass_balance
-from gemini.modules.heating import Boiler
+from gemini.modules.heating import ElectricBoiler
 from gemini.modules.storage import AquiferStorage
 from gemini.physics import ground
 from gemini.types import Inlet, Outlet, Output, Stream
@@ -49,7 +49,7 @@ class Plant(Module):
         super().__init__()
 
         # Modules
-        self.heater = Boiler().update_params(fuel_type="gas", capacity=1e7, efficiency=0.9)
+        self.heater = ElectricBoiler().update_params(capacity=1e7, efficiency=0.9)
         self.storage = storage()
 
         # Inlets

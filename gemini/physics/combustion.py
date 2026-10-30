@@ -133,6 +133,129 @@ def flare_emissions(
 
 
 @ops.physics
+def burnt_gas_emissions(
+    gas_flow: float,
+    carried_co2: float,
+    formed_co2: float,
+    methane_fraction: float,
+    combustion_efficiency: float,
+) -> tuple:
+    """Return the CO2 and methane emissions of a gas of known composition burnt in a flare.
+
+    Parameters
+    ----------
+    gas_flow : float
+        Gas mass flow [kg/s].
+    carried_co2 : float
+        Mass fraction of CO2 in the gas [-].
+    formed_co2 : float
+        CO2 that complete combustion forms per kilogram of gas [-].
+    methane_fraction : float
+        Mass fraction of methane in the gas [-].
+    combustion_efficiency : float
+        Share of the combustible gas burnt [-].
+
+    Returns
+    -------
+    tuple of float
+        ``(CO2, CH4)`` [kg/s]: ``m (x_CO2 + eta f_CO2)`` and ``m x_CH4 (1 - eta)``.
+
+    Notes
+    -----
+    The composition form of ``flare_emissions``, for every species of ``gas.SPECIES``.
+
+    Validity: gas_flow nonnegative; fractions in [0, 1]; combustion_efficiency in [0, 1].
+    Source: Destruction efficiency from US EPA AP-42, section 13.5, as cited for FLARE_EFFICIENCY;
+    the balance is stoichiometry.
+    """
+    co2 = gas_flow * (carried_co2 + combustion_efficiency * formed_co2)
+    return co2, gas_flow * methane_fraction * (1 - combustion_efficiency)
+
+
+@ops.physics
+def fuel_power(gas_flow: float, heating_value: float) -> float:
+    """Return the fuel power [W] of a gas flow, ``F = m LHV``.
+
+    Parameters
+    ----------
+    gas_flow : float
+        Gas mass flow [kg/s].
+    heating_value : float
+        Lower heating value [J/kg].
+
+    Returns
+    -------
+    float
+        Fuel power on the lower heating value [W].
+
+    Notes
+    -----
+    Definition of a heating value.
+
+    Validity: Any real inputs. No division occurs.
+    Source: Definition of a heating value; no published source is needed.
+    """
+    return gas_flow * heating_value
+
+
+@ops.physics
+def covered_load(load: float, need: float, available: float) -> float:
+    """Return the load [-] an engine reaches on the fuel available, ``L min(1, F_a / F_n)``.
+
+    Parameters
+    ----------
+    load : float
+        Commanded load [-].
+    need : float
+        Fuel power that load needs [W], nonnegative.
+    available : float
+        Fuel power available [W], nonnegative.
+
+    Returns
+    -------
+    float
+        The load scaled by the share of the need that is covered; the commanded load at no need.
+
+    Notes
+    -----
+    Validity: Nonnegative inputs; with a no-load fuel fraction the result is slightly above the
+    load of the Willans line, and ``CHP`` takes the smaller fuel.
+    Source: A plain energy balance; no published source is needed.
+    """
+    share = ops.where(need > 0, ops.minimum(1.0, ops.truediv(available, need)), 1.0)
+    return load * share
+
+
+@ops.physics
+def fuel_split(need: float, available: float, heating_value: float) -> tuple:
+    """Return how a burner covers a fuel need: co-produced gas first, the grid for the rest.
+
+    Parameters
+    ----------
+    need : float
+        Fuel power the burner needs [W], nonnegative.
+    available : float
+        Fuel power of the co-produced gas that reaches it [W], nonnegative.
+    heating_value : float
+        Lower heating value of the co-produced gas [J/kg]; zero for a gas that does not burn.
+
+    Returns
+    -------
+    tuple of float
+        ``(coproduced, purchased, burnt)``: the co-produced ``min(need, available)`` and the
+        purchased ``need - coproduced`` [W], and the co-produced gas burnt [kg/s].
+
+    Notes
+    -----
+    Validity: Nonnegative inputs. Source: The dispatch rule of the challenge model; a plain energy
+    balance, no published source is needed.
+    """
+    coproduced = ops.minimum(need, available)
+    burnt = ops.where(heating_value > 0, ops.truediv(coproduced, heating_value), 0.0)
+    return coproduced, need - coproduced, burnt
+
+
+@ops.physics
 def emission_rate(
     fuel: float, fuel_factor: float, grid_electricity: float, electricity_factor: float
 ) -> float:

@@ -79,6 +79,7 @@ code is never renamed without raising the minor number of `gm.__version__`.
 | `invalid_value` | `ValidationError` | A value has the wrong type or shape |
 | `out_of_bounds` | `ValidationError` | A value is outside its declared bounds |
 | `missing_value` | `ValidationError` | A required value is absent |
+| `missing_assumption` | `ValidationError` | An economics function needs an assumption nobody gave; the path names it |
 | `no_value` | `ValidationError` | The inputs cannot give this value, such as a plant without a declared cost |
 | `invalid_unit` | `ValidationError` | A unit is unknown or does not fit the quantity |
 | `unknown_name` | `ValidationError` | A module type, path, parameter, category, correlation or field does not exist |

@@ -239,7 +239,6 @@ def _project_fluid(project, kinds, modules, paths, columns):
         raise ValidationError(
             "old project: no reservoir without an incoming link", code="invalid_format"
         )
-    params = modules[paths[reservoir]].params[-1].params
     properties = _snapshot(project, reservoir, -1)
     brine = Fluid(
         density=properties.get("liquid_density") or tables.FALLBACK_LIQUID_DENSITY,

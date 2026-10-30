@@ -8,18 +8,16 @@ from gemini.errors import ValidationError
 class Assumptions(BaseModel):
     """Discount rate, lifetime, energy prices and emission factors of one assessment.
 
-    Every field is ``None`` until the user gives it, except the two below that have a source.
+    Every field is ``None`` until the user gives it, except those below that have a source.
     No price, rate or lifetime has a default, because none is valid everywhere: they depend on
     the country, the year, the contract and the project. Money is in ``currency`` and energy in
     J, as everywhere in GEMINI; convert at the boundary (EUR/MWh divided by 3.6e9 is EUR/J,
-    kg/GJ divided by 1e9 is kg/J).
+    kg/GJ divided by 1e9 is kg/J). ``gas_price`` is the one price per MWh.
 
     Defaults with a source:
 
-    - ``fuel_emission_factor`` = 56.1e-9 kg/J (56.1 kg CO2 per GJ of fuel energy): the
-      IPCC default for natural gas, 56 100 kg/TJ on the net calorific value, in the 2006 IPCC
-      Guidelines for National Greenhouse Gas Inventories, volume 2 (Energy), chapter 2, table
-      2.2. It is the factor of natural gas only: give another for oil, biomass or a blend.
+    - ``methane_gwp`` = 29.8 kg CO2-eq per kg of fossil methane over 100 years: IPCC Sixth
+      Assessment Report, Working Group I, chapter 7, table 7.15 (Forster et al. 2021).
     - ``currency`` = ``"EUR"``: a label, the currency of the prices you give and of the
       ``Cost`` default; it is not a price.
 
@@ -31,15 +29,17 @@ class Assumptions(BaseModel):
         Real discount rate per year [-], for example 0.05.
     lifetime_years : int or None
         Years of operation that the levelised cost and the net present value cover.
-    electricity_price, fuel_price : float or None
-        Price of purchased electricity and of fuel [currency/J of energy].
+    electricity_price : float or None
+        Price of purchased electricity [currency/J of energy].
+    gas_price : float or None
+        Price of purchased gas [currency/MWh of fuel energy]; co-produced gas costs nothing.
     heat_price, cold_price : float or None
         Revenue per joule of heat or cold delivered [currency/J].
     electricity_emission_factor : float or None
         CO2 emitted per joule of grid electricity drawn [kg/J]; it depends on the grid and the
         year, so there is no default.
-    fuel_emission_factor : float
-        CO2 emitted per joule of fuel burnt [kg/J].
+    methane_gwp : float
+        CO2-equivalent of a kilogram of methane released [-].
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
@@ -48,11 +48,11 @@ class Assumptions(BaseModel):
     discount_rate: float | None = Field(None, ge=0)
     lifetime_years: int | None = Field(None, ge=1)
     electricity_price: float | None = Field(None, ge=0)
-    fuel_price: float | None = Field(None, ge=0)
+    gas_price: float | None = Field(None, ge=0)
     heat_price: float | None = Field(None, ge=0)
     cold_price: float | None = Field(None, ge=0)
     electricity_emission_factor: float | None = Field(None, ge=0)
-    fuel_emission_factor: float = Field(56.1e-9, ge=0)
+    methane_gwp: float = Field(29.8, ge=0)
 
 
 def resolve(assumptions):
@@ -73,7 +73,7 @@ def require(assumptions, name):
         raise ValidationError(
             f"assumptions.{name} is None; expected a value from the user (it has no default)",
             path=f"assumptions.{name}",
-            code="missing_value",
+            code="missing_assumption",
         )
     return value
 
@@ -81,8 +81,8 @@ def require(assumptions, name):
 def discounting(assumptions, discount_rate, lifetime):
     """Return ``(rate, years)``: the explicit arguments, else those of ``assumptions``.
 
-    A value given nowhere raises ``ValidationError`` (code ``missing_value``); a negative rate or
-    a lifetime under one year raises ``ValidationError``.
+    A value given nowhere raises ``ValidationError`` (code ``missing_assumption``); a negative rate
+    or a lifetime under one year raises ``ValidationError``.
     """
     rate = discount_rate if discount_rate is not None else require(assumptions, "discount_rate")
     years = lifetime if lifetime is not None else require(assumptions, "lifetime_years")

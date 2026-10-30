@@ -7,7 +7,7 @@ import pytest
 import gemini as gm
 from gemini import ops
 from gemini.modules import Module, energy_balance, mass_balance
-from gemini.modules.heating import Boiler
+from gemini.modules.heating import ElectricBoiler
 from gemini.modules.subsurface import BoreholeField
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
@@ -55,7 +55,7 @@ class HeatPumpLoop(Module):
 
         # Modules
         self.field = field()
-        self.heater = Boiler().update_params(fuel_type="gas", capacity=1e5, efficiency=0.9)
+        self.heater = ElectricBoiler().update_params(capacity=1e5, efficiency=0.9)
 
         # Inlets
         self.inlet = Inlet(Stream)

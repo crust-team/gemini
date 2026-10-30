@@ -120,7 +120,7 @@ def _leaf_mass(module, result):
         incoming += result.inputs["production_rate"]
     elif isinstance(module, InjectionReservoir):
         outgoing += sum(s.m_dot for s in _streams(result.inlets))
-    return incoming, outgoing
+    return incoming, outgoing + result.outputs.get("burned_mass_flow", 0.0)
 
 
 def energy_balance(module, result):
@@ -173,6 +173,14 @@ def _composite_energy(module, result):
     }
 
 
+def _burned_enthalpy(result):
+    """Return the sensible enthalpy [W] of the gas a burner or flare burned, which leaves here."""
+    gas = next((s for s in _streams(result.inlets) if s.fluid.kind == "gas"), None)
+    if gas is None:
+        return 0.0
+    return _enthalpy(gas.with_(m_dot=result.outputs.get("burned_mass_flow", 0.0)))
+
+
 def _leaf_energy(module, result, flows):
     """Audit one leaf; aquifers are open boundaries.
 
@@ -187,7 +195,7 @@ def _leaf_energy(module, result, flows):
     elif isinstance(module, InjectionReservoir):
         outgoing += incoming
     incoming += sum(flows[key] for key in ENERGY_INPUTS)
-    outgoing += sum(flows[key] for key in ENERGY_OUTPUTS)
+    outgoing += sum(flows[key] for key in ENERGY_OUTPUTS) + _burned_enthalpy(result)
     is_pump = isinstance(module, (ESP, InjectionPump, LineShaftPump))
     return {
         "residual": incoming - outgoing,

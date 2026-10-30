@@ -2,6 +2,7 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.heating import burner
 from gemini.modules.module import Module
 from gemini.physics import combustion, heat_transfer
 from gemini.types import (
@@ -12,6 +13,7 @@ from gemini.types import (
     Fuel,
     HeatLoss,
     Inlet,
+    MassFlow,
     Outlet,
     Output,
     Parameter,
@@ -39,6 +41,12 @@ class CHP(Module):
     heat_loss = F - electricity_generated - heat_recovered (exhaust, radiation and dumped heat),
     so the model is first-law closed.
 
+    ``fuel_in`` brings the co-produced gas: the engine burns it first, up to its need, and takes
+    the rest from the grid; ``gas_out`` carries the gas it did not burn. It may draw grid gas when
+    ``fuel_in`` comes from a ``GasMakeup`` or a ``GasGrid``; without that mark the fuel energy of
+    the stream limits the load. ``fuel_coproduced``, ``fuel_purchased``, ``burned_mass_flow`` and
+    ``co2_emission`` are those of ``Boiler``.
+
     Assumptions: steady operation at a constant thermal efficiency on the fuel basis, no
     minimum stable load or start-up losses, no pressure loss, constant liquid heat capacity.
     Validity: L in (0, 1] at rated speed; efficiencies at full load with
@@ -59,12 +67,17 @@ class CHP(Module):
 
         # Inlets
         self.inlet = Inlet(Stream, stream="hot_water")
+        self.fuel_in = Inlet(Stream, stream="gas")
 
         # Controls
         self.load_fraction = Control(Fraction)
 
         # Outputs
         self.fuel = Output(Fuel)
+        self.fuel_coproduced = Output(Fuel)
+        self.fuel_purchased = Output(Fuel)
+        self.burned_mass_flow = Output(MassFlow)
+        self.co2_emission = Output(MassFlow)
         self.electricity_generated = Output(ElectricityGenerated)
         self.heat_recovered = Output(Power)
         self.dumped_heat = Output(Power)
@@ -73,23 +86,39 @@ class CHP(Module):
 
         # Outlets
         self.outlet = Outlet(Stream, stream="hot_water")
+        self.gas_out = Outlet(Stream, stream="gas")
 
     def forward(self, inlets):
-        """Heat the water circuit by the recovered engine heat."""
+        """Heat the water circuit by the recovered engine heat and pass on the gas not burned."""
 
         # Outlets
-        inlet = inlets.inlet
-        values = self._performance(inlet)
+        inlet, fuel = inlets.inlet, inlets.fuel_in
+        values = self._performance(inlet, fuel)
         outlet = inlet.with_(T=values["outlet_T"])
+        gas_out = burner.unburned_gas(values["fuel"], fuel)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(outlet=outlet, gas_out=gas_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        for name, value in self._performance(inlets.inlet).items():
+        values = self._performance(inlets.inlet, inlets.fuel_in)
+        values |= burner.fuel_outputs(values["fuel"], inlets.fuel_in)
+        for name, value in values.items():
             setattr(self, name, value)
 
-    def _performance(self, inlet):
+    def _load(self, fuel):
+        """Return the load: the commanded one, or less when the stream alone must cover it."""
+        if burner.has_grid(fuel):
+            return self.load_fraction
+        need = combustion.willans_fuel_input(
+            self.load_fraction,
+            self.electric_capacity,
+            self.electric_efficiency,
+            self.no_load_fuel_fraction,
+        )
+        return combustion.covered_load(self.load_fraction, need, burner.available_fuel(fuel))
+
+    def _performance(self, inlet, fuel_in):
         """Return fuel, electricity, heat flows [W] and the outlet temperature [K]."""
         ops.check(
             self.electric_efficiency + self.thermal_efficiency <= 1,
@@ -106,7 +135,7 @@ class CHP(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        load = self.load_fraction
+        load = self._load(fuel_in)
         fuel = combustion.willans_fuel_input(
             load, self.electric_capacity, self.electric_efficiency, self.no_load_fuel_fraction
         )
