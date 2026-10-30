@@ -18,6 +18,7 @@ from gemini.core.modules.subsurface import (
     ProductionWell,
 )
 from gemini.core.modules.treatment import Degasser, Filter
+from gemini.core.modules.treatment.filter import DEFAULT_CLOGGING_BAR
 from gemini.core.physics import geometry, units
 from gemini.errors import LegacyFormatError
 from gemini.utils.files import read_json
@@ -451,7 +452,7 @@ def degasser_params_from_gemini(properties: dict) -> dict:
 
 def filter_params_from_gemini(properties: dict) -> dict:
     """Map an optional filter clogging limit [bar] to [Pa]."""
-    return dict(clogging_dp=units.bar_to_pa(properties.get("clogging_dp", 0.5)))
+    return dict(clogging_dp=units.bar_to_pa(properties.get("clogging_dp", DEFAULT_CLOGGING_BAR)))
 
 
 def heatexchanger_params_from_gemini(properties: dict) -> dict:

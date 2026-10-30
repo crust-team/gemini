@@ -20,6 +20,9 @@ NOMINAL_MASS_FLOW = 149 / 3600 * 1068
 NOTE(refactor): nominal clean loss from the example (0.016 bar at 149 m3/h).
 """
 
+DEFAULT_CLOGGING_BAR = 0.5
+"""Default clogging pressure-loss limit [bar] of a filter, also that of an old project."""
+
 
 class Filter(Module):
     """Filter with a quadratic clean-filter pressure loss and a clogging alarm.
@@ -34,7 +37,9 @@ class Filter(Module):
         # Parameters
         self.dp_nominal = Parameter(PressureDifference, default=1600, ge=0)
         self.m_dot_nominal = Parameter(MassFlow, default=NOMINAL_MASS_FLOW, gt=0)
-        self.clogging_dp = Parameter(PressureDifference, default=units.bar_to_pa(0.5), gt=0)
+        self.clogging_dp = Parameter(
+            PressureDifference, default=units.bar_to_pa(DEFAULT_CLOGGING_BAR), gt=0
+        )
 
         # Inlets
         self.inlet = Inlet(Stream)

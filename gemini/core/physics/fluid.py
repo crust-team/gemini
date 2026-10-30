@@ -50,6 +50,11 @@ class FluidProperties:
         """Return homogeneous mixture density [kg/m3]."""
         return mixture_density(self.rho_l, self.rho_g, self.gmf)
 
+    @property
+    def liquid_volumetric_heat_capacity(self) -> float:
+        """Return the liquid volumetric heat capacity rho_l * cp_l [J/m3/K]."""
+        return self.rho_l * self.cp_l
+
 
 def mixture_density(liquid_density, gas_density, gas_mass_fraction):
     """Return the homogeneous mixture density [kg/m3] of a gas mass fraction [-].

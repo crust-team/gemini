@@ -151,7 +151,7 @@ class ThermalStorage(Module):
     def _capacity(self, charge_in):
         """Return the tank heat capacity rho * cp * V [J/K] of ``module.fluid``."""
         properties = self.fluid.properties(charge_in.p, self.temperature)
-        return properties.rho_l * properties.cp_l * self.volume
+        return properties.liquid_volumetric_heat_capacity * self.volume
 
     def _conductance(self, stream, effectiveness):
         """Return the circuit conductance e * m_dot * cp [W/K]; reject reverse flow."""

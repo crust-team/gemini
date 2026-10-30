@@ -48,7 +48,6 @@ _MODELS = {
     "TULSA": "TULSA",
     "E/CRC TULSA": "TULSA",
     "ECRC": "TULSA",
-    "API": "API",
 }
 """Accepted model spellings (upper-cased, stripped) and their correlation."""
 
@@ -210,11 +209,12 @@ def erosion_rate(
     The impact angle is converted to degrees at this boundary and back to radians inside the
     correlations; the rad→deg→rad round trip changes the last bits and is retained.
     """
-    name = _MODELS.get(str(model).strip().upper())
-    if name is None or name == "API":
+    spelling = str(model).strip().upper()
+    name = _MODELS.get(spelling)
+    if name is None:
         raise UnknownCorrelationError(
             f"erosion_rate: model = {model!r}; expected DNV, OKA or TULSA"
-            + ("; API is a velocity limit, use api_erosional_velocity" if name else "")
+            + ("; API is a velocity limit, use api_erosional_velocity" if spelling == "API" else "")
         )
     ops.check(
         ops.ne(alpha, 0),

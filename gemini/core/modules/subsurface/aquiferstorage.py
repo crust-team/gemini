@@ -254,7 +254,7 @@ class AquiferStorage(Module):
     def _fluid_heat_capacity(stream):
         """Return the volumetric heat capacity (rho c)_w [J/m3/K] of the circuit liquid."""
         fluid = stream.fluid.properties(stream.p, stream.T)
-        return fluid.rho_l * fluid.cp_l
+        return fluid.liquid_volumetric_heat_capacity
 
     def _volume_flow(self, injection):
         """Return the injected liquid volume flow [m3/s] after checking it against the mode."""

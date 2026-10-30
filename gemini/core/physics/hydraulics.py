@@ -646,9 +646,10 @@ def erosion_check(path: geometry.PipePath, stream: Stream, fluid: Fluid) -> dict
         ops.abs(stream.m_dot) / density / geometry.circle_area(s.inner_diameter)
         for s in path.sections
     ]
+    sections = [erosion.api_velocity_comparison(v, limit) for v in velocity]
     return {
         "velocity": velocity,
         "limit": limit,
-        "sections": [erosion.api_velocity_comparison(v, limit) for v in velocity],
-        "alarm": reduce(ops.logical_or, (v > limit for v in velocity), False),
+        "sections": sections,
+        "alarm": reduce(ops.logical_or, (s["exceeds_api_limit"] for s in sections), False),
     }

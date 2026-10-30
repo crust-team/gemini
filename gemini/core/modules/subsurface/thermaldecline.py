@@ -116,7 +116,7 @@ class ThermalDecline(Module):
     def _breakthrough_volume(self, inlet):
         """Return the Gringarten-Sauty breakthrough volume V_B [m3] for the inlet fluid."""
         fluid = inlet.fluid.properties(inlet.p, inlet.T)
-        water = fluid.rho_l * fluid.cp_l
+        water = fluid.liquid_volumetric_heat_capacity
         aquifer = ground.aquifer_volumetric_heat_capacity(
             self.porosity, water, self.rock_volumetric_heat_capacity
         )

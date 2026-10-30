@@ -49,6 +49,11 @@ DRIFT_FLOOR = 1e-12
 """Smallest prediction magnitude used as a drift denominator, so a zero prediction is finite."""
 
 
+def _float32():
+    """Return whether the runtime precision is float32."""
+    return runtime.get_precision() == "float32"
+
+
 class ESP(Module):
     """Electrical submersible pump installed inside a production well."""
 
@@ -99,7 +104,7 @@ class ESP(Module):
         honours float32 precision, so its ``efficiency_function`` keeps ``ops.truediv``: a
         plain ``/`` by a zero power would raise there.
         """
-        return backends.PLAIN if runtime.get_precision() == "float32" else backends.WRAP
+        return backends.PLAIN if _float32() else backends.WRAP
 
     def forward(self, inlets):
         """Raise the suction-stream pressure by the pump-curve head."""
@@ -244,6 +249,6 @@ class ESP(Module):
 
         NOTE(refactor): old monitoring uses NumPy float32 arithmetic when selected globally.
         """
-        if runtime.get_precision() == "float32":
+        if _float32():
             return np.asarray(values, dtype=np.float32)
         return values
