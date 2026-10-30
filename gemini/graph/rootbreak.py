@@ -19,7 +19,7 @@ import numpy as np
 from gemini import backends
 from gemini.core.types.flows import Stream
 from gemini.graph.graph import Graph
-from gemini.graph.node import STREAM_FIELDS
+from gemini.graph.node import STREAM_FIELDS, row_item
 
 _ABSENT = object()
 
@@ -70,24 +70,18 @@ def _call_row(graph, feeds, row, dt, state):
     module = graph.root
     streams = {
         port: Stream(
-            **{field: _item(feeds[f"{port}.{field}"], row) for field, _ in STREAM_FIELDS},
+            **{field: row_item(feeds[f"{port}.{field}"], row) for field, _ in STREAM_FIELDS},
             fluid=fluid,
         )
         for port, fluid in graph.inlet_fluids.items()
     }
     fields = graph.by_role("inlet")
-    inputs = {name: _item(value, row) for name, value in feeds.items() if name not in fields}
+    inputs = {name: row_item(value, row) for name, value in feeds.items() if name not in fields}
     with backends.settings(backend=None), _applied(module, inputs):
         if not graph.stepped:
             return module(streams), state
         next_state, result = module.step(state, dt, streams)
         return result, next_state
-
-
-def _item(value, row):
-    """Return row ``row`` of a column as a plain Python value; a scalar holds for every row."""
-    array = np.asarray(value)
-    return array[row].item() if array.ndim else array.item()
 
 
 @contextmanager

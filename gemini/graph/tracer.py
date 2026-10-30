@@ -22,7 +22,7 @@ from gemini.core import runtime
 from gemini.core.modules.module import _Call, _current_call, outputs_enabled
 from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
-from gemini.core.types.results import ModuleResult, Values
+from gemini.core.types.results import ModuleResult
 from gemini.errors import MissingValueError, TraceError
 from gemini.graph.breaks import record_break
 from gemini.graph.graph import Graph
@@ -70,14 +70,8 @@ class Tracer:
         )
         trace.limit_checks.extend(graph.checks)
         outlets, call = trace.run(module, inlets, {}, None)
-        graph.result = ModuleResult(
-            outputs=Values(call.outputs or {}, module._outputs),
-            outlets=outlets,
-            inlets=inlets,
-            inputs=dict(call.inputs),
-            children=dict(call.call_records),
-            call_records=tuple(call.call_records),
-            is_leaf=module.is_leaf,
+        graph.result = ModuleResult.of(
+            module, call.outputs or {}, outlets, inlets, call.inputs, call.call_records
         )
         for port, stream in outlets.items():
             graph.outlet_fluids[port] = stream.fluid
@@ -134,15 +128,7 @@ class Trace:
                 self.graph, module, inlets, supplied, outputs_enabled(), str(error)
             )
             records = []
-        result = ModuleResult(
-            outputs=Values(outputs, module._outputs),
-            outlets=outlets,
-            inlets=inlets,
-            inputs=dict(inputs),
-            children=dict(records),
-            call_records=tuple(records),
-            is_leaf=module.is_leaf,
-        )
+        result = ModuleResult.of(module, outputs, outlets, inlets, inputs, records)
         parent.call_records.append((module._relative_path(parent.module), result))
         return result
 
@@ -167,7 +153,7 @@ class Trace:
         try:
             outlets = Ports(_forward(module, inlets), path=module.path)
             if call.outputs is not None:
-                self._trace_outputs(module, call, inlets, outlets)
+                module._output_step(inlets, inlets, outlets, call)
             before = len(self.graph.checks)
             check_declared_limits(module, call)
             self.limit_checks.extend(self.graph.checks[before:])
@@ -202,21 +188,17 @@ class Trace:
             self._parameters[module] = _parameters(self.graph, module, self._prefix(module))
         return self._parameters[module]
 
-    def _trace_outputs(self, module, call, inlets, outlets):
-        """Trace the output step; a forward hook must write an output to be part of the graph."""
-        module._compute_outputs(inlets, outlets)
-        module._compute_formula_outputs(call)
-        for hook in tuple(module._hooks.values()):
-            before = dict(call.outputs)
-            try:
-                hook(module, inlets, outlets)
-            except TraceError as error:
-                raise TraceError(f"{module.path}: forward hook {hook!r}: {error}") from error
-            if all(before.get(name) is value for name, value in call.outputs.items()):
-                raise TraceError(
-                    f"{module.path}: forward hook {hook!r} only reads and runs on real values"
-                )
-        module._check_outputs(call.outputs)
+    def hook(self, module, hook, inlets, outlets, call):
+        """Call a forward hook on traced values; it must write an output to be part of the graph."""
+        before = dict(call.outputs)
+        try:
+            hook(module, inlets, outlets)
+        except TraceError as error:
+            raise TraceError(f"{module.path}: forward hook {hook!r}: {error}") from error
+        if all(before.get(name) is value for name, value in call.outputs.items()):
+            raise TraceError(
+                f"{module.path}: forward hook {hook!r} only reads and runs on real values"
+            )
 
 
 def _untraceable(module, stepped):

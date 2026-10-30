@@ -21,7 +21,7 @@ from gemini.core.modules.module import _Call, _current_call
 from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
 from gemini.errors import MissingValueError, TraceError
-from gemini.graph.node import STREAM_FIELDS
+from gemini.graph.node import STREAM_FIELDS, row_item
 from gemini.ops import Symbolic, registry
 from gemini.ops.registry import get
 
@@ -147,7 +147,7 @@ def evaluate_break(node, operands):
     for row in range(rows):
         try:
             with backends.settings(backend=None):
-                values = _call_row(attributes, [_item(array, row) for array in arrays])
+                values = _call_row(attributes, [row_item(array, row) for array in arrays])
         except Exception as error:
             ok[row] = False
             exceptions[row] = error
@@ -155,10 +155,6 @@ def evaluate_break(node, operands):
         for key, value in values.items():
             columns[key][row] = value
     return BreakResult(columns, ok, exceptions, scalar)
-
-
-def _item(array, row):
-    return array.item() if array.ndim == 0 else array[row].item()
 
 
 def _call_row(attributes, items):

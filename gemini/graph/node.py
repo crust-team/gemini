@@ -4,6 +4,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
+
 from gemini.core.types import flows
 
 _TRACING_PACKAGES = tuple(
@@ -13,6 +15,12 @@ _TRACING_PACKAGES = tuple(
 
 STREAM_FIELDS = tuple(zip(flows.STREAM_FIELDS, ("kg/s", "K", "Pa")))
 """Stream fields of every inlet and outlet in the graph, with their units."""
+
+
+def row_item(value, row):
+    """Return row ``row`` of a column as a plain Python value; a scalar holds for every row."""
+    array = np.asarray(value)
+    return array[row].item() if array.ndim else array.item()
 
 
 @dataclass(eq=False, slots=True)

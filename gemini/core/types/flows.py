@@ -212,6 +212,11 @@ _LIMITS = {"m_dot": (-math.inf, True, "kg/s"), "T": (0, True, "K"), "p": (0, Fal
 _EXPECTED = {"m_dot": "a finite mass flow", "T": "T > 0 and finite", "p": "p >= 0 and finite"}
 
 
+def mass_flow(volume_flow, fluid, pressure, temperature):
+    """Return a volume flow [m3/s] as mass flow [kg/s] with the density of ``fluid`` at (p, T)."""
+    return volume_flow * fluid.properties(pressure, temperature).density
+
+
 def _mass_flow(flow, fluid, pressure, temperature):
     """Return a public ``flow`` value as mass flow [kg/s], using density for volume units."""
     number, unit = units.split_quantity(flow)
@@ -221,5 +226,5 @@ def _mass_flow(flow, fluid, pressure, temperature):
         )
     if units.si_unit(unit) == "m3/s":
         volume = units.value_in_si(flow, "m3/s", "Stream.flow")
-        return volume * fluid.properties(pressure, temperature).density
+        return mass_flow(volume, fluid, pressure, temperature)
     return units.value_in_si(flow, "kg/s", "Stream.flow")

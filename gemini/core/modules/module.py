@@ -42,7 +42,7 @@ from gemini.core.types.declarations import (
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import Fluid
 from gemini.core.types.ports import Ports
-from gemini.core.types.results import ModuleResult, Values
+from gemini.core.types.results import ModuleResult
 from gemini.errors import (
     CallError,
     ConfigurationError,
@@ -719,14 +719,13 @@ class Module:
                     step.advance(self._step_keys(step), values)
             finally:
                 _current_call.reset(token)
-        result = ModuleResult(
-            outputs=Values(call.outputs or {}, self._outputs),
-            outlets=outlets,
-            inlets=inlets,
-            inputs=ops.scope.plain(dict(call.inputs)),
-            children=dict(call.call_records),
-            call_records=tuple(call.call_records),
-            is_leaf=self.is_leaf,
+        result = ModuleResult.of(
+            self,
+            call.outputs or {},
+            outlets,
+            inlets,
+            ops.scope.plain(dict(call.inputs)),
+            call.call_records,
         )
         if parent is not None:
             parent.call_records.append((self._relative_path(parent.module), result))
@@ -769,14 +768,24 @@ class Module:
         for hook in tuple(self._pre_hooks.values()):
             hook(self, inlets)
         outlets = self._check_outlets(_restored(self.forward(scoped), scoped, inlets))
-        if call.outputs is None:
-            return outlets
+        if call.outputs is not None:
+            self._output_step(scoped, inlets, outlets, call)
+        return outlets
+
+    def _output_step(self, scoped, inlets, outlets, call):
+        """Compute the outputs after ``forward``, the one sequence of an eager and a traced call.
+
+        ``_compute_outputs`` and the formula outputs see ``scoped``; forward hooks see the plain
+        ``inlets``, in a trace through ``call.trace`` which tells whether they write an output.
+        """
         self._compute_outputs(scoped, outlets)
         self._compute_formula_outputs(call)
         for hook in tuple(self._hooks.values()):
-            hook(self, inlets, outlets)
+            if call.trace is None:
+                hook(self, inlets, outlets)
+            else:
+                call.trace.hook(self, hook, inlets, outlets, call)
         self._check_outputs(call.outputs)
-        return outlets
 
     def _relative_path(self, owner):
         prefix = owner._path + "." if owner._path else ""

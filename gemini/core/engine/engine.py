@@ -138,6 +138,10 @@ class Engine:
         values.pop("default_fluid", None)
         return runtime.settings(**values)
 
+    def _remaining(self, clock):
+        """Return the ticks of ``clock`` after the committed position."""
+        return clock.after(self.position) if self.position is not None else clock
+
     def _notify(self, method, *args):
         for callback in self.callbacks:
             getattr(callback, method)(self, *args)
@@ -159,7 +163,7 @@ class Engine:
             self._dataset_fingerprint = dataset.fingerprint()
         self.only = list(only) if only is not None else None
         self.graph_breaks = {}
-        remaining = clock.after(self.position) if self.position is not None else clock
+        remaining = self._remaining(clock)
         loader = Loader(
             dataset,
             remaining.ticks,
@@ -211,7 +215,7 @@ class Engine:
             return None
         if self.position is None or self._max_gap is None:
             return self.dataset
-        if self.clock is None or not len(self.clock.after(self.position)):
+        if self.clock is None or not len(self._remaining(self.clock)):
             return None
         return self.dataset.window(start=self.position - self._max_gap)
 
@@ -250,7 +254,7 @@ class Engine:
             return self.results if self.results is not None else Results()
         if self.clock is None:
             raise CheckpointError(f"{self.run_kind} checkpoint: clock = None; expected a clock")
-        remaining = self.clock.after(self.position) if self.position is not None else self.clock
+        remaining = self._remaining(self.clock)
         if not len(remaining):
             return self.results
         if self.dataset is None:

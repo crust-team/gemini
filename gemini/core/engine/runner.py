@@ -41,7 +41,6 @@ class Runner:
         self.callbacks = engine.callbacks
         changes_run = any(getattr(callback, "changes_run", False) for callback in self.callbacks)
         self.single = plan.one_tick or changes_run or engine.run_kind == "live"
-        self._numbers = {}
 
     def run(self):
         """Evaluate and commit every tick, stretch by stretch."""
@@ -49,12 +48,6 @@ class Runner:
             size = 1 if self.single else stop - start
             for first in range(start, stop, size):
                 self._chunk(first, min(first + size, stop), first == start)
-
-    def _column(self, name):
-        """Return a data column as floats over the run; what is not a number is NaN."""
-        if name not in self._numbers:
-            self._numbers[name] = self.aligned.numbers(name)
-        return self._numbers[name]
 
     def _chunk(self, first, stop, opening):
         """Evaluate the ticks ``[first, stop)`` and commit what happened.
@@ -98,7 +91,7 @@ class Runner:
     def _twin(self, twin, first, stop):
         """Return the outcome of one twin over the chunk; a single tick persists its inputs."""
         engine = self.engine
-        block = read(twin, self._column, first, stop)
+        block = read(twin, self.aligned, first, stop)
         state = engine.module_states.get(twin.path)
         durations = self.aligned.durations[first:stop]
         outcome = evaluate_twin(twin, block, engine._graph_cache, durations, state)

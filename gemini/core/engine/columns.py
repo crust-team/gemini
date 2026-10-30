@@ -15,7 +15,7 @@ import numpy as np
 from gemini.core.engine.step import VOLUMETRIC_UNITS
 from gemini.core.physics import units
 from gemini.core.types import Fluid, Stream
-from gemini.core.types.flows import STREAM_FIELDS, stream_valid
+from gemini.core.types.flows import STREAM_FIELDS, mass_flow, stream_valid
 from gemini.errors import MissingMeasurementError
 
 
@@ -64,22 +64,20 @@ class Block:
             return error
 
 
-def read(twin, numbers, start, stop):
-    """Return the ``Block`` of ``twin`` over the ticks ``[start, stop)``.
-
-    ``numbers`` maps a column name to its values over the whole run as floats (NaN for a value
-    that is missing).
-    """
+def read(twin, aligned, start, stop):
+    """Return the ``Block`` of ``twin`` over the ticks ``[start, stop)`` of ``aligned`` samples."""
     block = Block(stop - start, np.zeros(stop - start, dtype=int), [], twin.ports)
     defaults = {port: _defaults(twin, port) for port in twin.ports}
     for source in twin.sources:
         if source.kind == "stream":
             _check_stream(block, twin, source.key, defaults[source.key])
             continue
-        values = _convert(source, numbers(source.binding.column)[start:stop])
-        _mark_missing(block, source, values)
+        column = source.binding.column
+        values = _convert(source, aligned.numbers(column)[start:stop])
+        _mark_missing(block, source, aligned.present(column)[start:stop])
         if source.density is not None:
-            values = values * _density(source.density)
+            module = source.density
+            values = mass_flow(values, module.fluid, module.pressure, module.temperature)
         _store(block, source, values)
     return block
 
@@ -96,14 +94,9 @@ def _convert(source, raw):
     return raw * scale + offset
 
 
-def _density(module):
-    """Return the density at the reference state of a module's ``pressure`` and ``temperature``."""
-    return module.fluid.properties(module.pressure, module.temperature).density
-
-
-def _mark_missing(block, source, values):
+def _mark_missing(block, source, present):
     """Give the ticks that miss this source, and nothing before, a skip status."""
-    missing = (block.status == 0) & ~np.isfinite(values)
+    missing = (block.status == 0) & ~present
     if not missing.any():
         return
     block.reasons.append(str(MissingMeasurementError(source.binding.column)))
@@ -134,8 +127,9 @@ def _check_stream(block, twin, port, defaults):
         return
     m_dot, temperature, pressure = (block.fields[port, name] for name in STREAM_FIELDS)
     if _volumetric(twin, port):
-        density = block.fluids[port].properties(pressure, temperature).density
-        block.fields[port, "m_dot"] = m_dot = m_dot * density
+        block.fields[port, "m_dot"] = m_dot = mass_flow(
+            m_dot, block.fluids[port], pressure, temperature
+        )
     with np.errstate(all="ignore"):
         valid = stream_valid(m_dot, temperature, pressure)
     refused = (block.status == 0) & ~np.broadcast_to(valid, (block.size,))

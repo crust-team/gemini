@@ -159,6 +159,22 @@ class ModuleResult:
     call_records: tuple[tuple[str, "ModuleResult"], ...] = field(default_factory=tuple, repr=False)
     is_leaf: bool = True
 
+    @classmethod
+    def of(cls, module, outputs, outlets, inlets, inputs, records):
+        """Return the result of a call of ``module``: the one way a call's result is built.
+
+        ``records`` are the ``(relative path, result)`` pairs of the child calls it made.
+        """
+        return cls(
+            outputs=Values(outputs, module._outputs),
+            outlets=outlets,
+            inlets=inlets,
+            inputs=dict(inputs),
+            children=dict(records),
+            call_records=tuple(records),
+            is_leaf=module.is_leaf,
+        )
+
     def leaves(self, prefix=""):
         """Flatten only descendant leaf results, with relative module paths."""
         if not self.children:

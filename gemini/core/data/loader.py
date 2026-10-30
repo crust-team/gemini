@@ -18,34 +18,47 @@ class Sample(NamedTuple):
     row: dict
 
 
-class Aligned(NamedTuple):
-    """The samples of a run as arrays: ``times``, ``durations`` and one array per column."""
+class Aligned:
+    """The samples of a run as arrays: ``times``, ``durations`` and one array per column.
 
-    times: list
-    durations: np.ndarray
-    columns: dict
+    ``numbers`` and ``present`` are the one conversion of a column to floats and the one rule of
+    what is missing there; both are computed once per column.
+    """
+
+    def __init__(self, times, durations, columns):
+        """Keep the aligned ``times``, their ``durations`` and the ``columns`` by name."""
+        self.times, self.durations, self.columns = times, durations, columns
+        self._numbers, self._present = {}, {}
 
     def numbers(self, column):
         """Return a column as floats; a value ``float()`` refuses (text, ``None``) is NaN."""
-        values = self.columns[column]
-        if values.dtype.kind == "f":
-            return values
-        numbers = np.full(len(values), np.nan)
-        for index, value in enumerate(values):
-            try:
-                numbers[index] = float(value)
-            except (TypeError, ValueError):
-                continue
-        return numbers
+        if column not in self._numbers:
+            self._numbers[column] = _floats(self.columns[column])
+        return self._numbers[column]
 
     def present(self, column):
         """Return which rows of a column hold a value: one that is a finite number."""
-        return np.isfinite(self.numbers(column))
+        if column not in self._present:
+            self._present[column] = np.isfinite(self.numbers(column))
+        return self._present[column]
 
     def sample(self, index):
         """Return the ``Sample`` of one tick."""
         row = {name: values[index] for name, values in self.columns.items()}
         return Sample(self.times[index], float(self.durations[index]), row)
+
+
+def _floats(values):
+    """Return an array as floats; what ``float()`` refuses is NaN."""
+    if values.dtype.kind == "f":
+        return values
+    numbers = np.full(len(values), np.nan)
+    for index, value in enumerate(values):
+        try:
+            numbers[index] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return numbers
 
 
 class Loader:

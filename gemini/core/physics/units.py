@@ -346,8 +346,8 @@ def si_conversion(unit, quantity=None):
 
 def to_si(value: float, unit: str, quantity: str | None = None) -> float:
     """Convert a bound scalar to SI; volume flow remains [m3/s] until density is known."""
-    _, scale, _ = _entry(unit, "units.to_si")
-    return float(value) * scale + _offset(unit, quantity)
+    scale, offset = si_conversion(unit, quantity)
+    return float(value) * scale + offset
 
 
 def split_quantity(value):

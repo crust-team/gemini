@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import gemini as gm
+from gemini.core.data.loader import Aligned
 from gemini.core.engine.columns import read
 from gemini.core.engine.step import BindingPlan
 from gemini.core.types.bindings import Binding, ModuleBindings
@@ -17,7 +18,13 @@ def _read(module, **changes):
     columns = {
         name: np.asarray(changes.get(name, [value]), dtype=float) for name, value in ROW.items()
     }
-    return read(plan.twins[0], columns.__getitem__, 0, len(columns["rate"]))
+    return read(plan.twins[0], _aligned(columns), 0, len(columns["rate"]))
+
+
+def _aligned(columns):
+    """Return aligned samples holding the given column arrays."""
+    count = len(next(iter(columns.values())))
+    return Aligned([TIME] * count, np.full(count, 900.0), columns)
 
 
 def test_volumetric_controls_convert_with_the_module_reference_state():
@@ -53,5 +60,5 @@ def test_measured_differences_convert_without_unit_offsets():
         "": ModuleBindings(measured={"pressure_drop": Binding(column="dp", unit="barg")})
     }
     plan = BindingPlan(module, gm.Dataset.from_dict({"dp": [0.5]}, [TIME]), "replay")
-    block = read(plan.twins[0], {"dp": np.array([0.5])}.__getitem__, 0, 1)
+    block = read(plan.twins[0], _aligned({"dp": np.array([0.5])}), 0, 1)
     assert block.measured["pressure_drop"][0] == pytest.approx(5e4)

@@ -8,6 +8,7 @@ import pytest
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
+from gemini.core.data.loader import Aligned
 from gemini.core.engine.columns import read
 from gemini.core.engine.step import BindingPlan
 from gemini.core.types import Binding, Stream
@@ -18,7 +19,8 @@ def _kwargs(plant, path, row):
     """Return the call keywords of the twin at ``path`` for one row, as the engine builds them."""
     data = gm.Dataset.from_frame(pd.DataFrame([row], index=[pd.Timestamp("2024-01-01", tz="UTC")]))
     (twin,) = BindingPlan(plant, data, "replay", only=[path]).twins
-    block = read(twin, lambda column: np.array([float(row[column])]), 0, 1)
+    columns = {column: np.array([value], dtype=object) for column, value in row.items()}
+    block = read(twin, Aligned([data.start], np.array([900.0]), columns), 0, 1)
     kwargs = {name: values[0] for name, values in block.inputs.items()}
     for port, fluid in block.fluids.items():
         fields = {name: block.fields[port, name][0] for name in ("m_dot", "T", "p")}
