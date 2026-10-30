@@ -208,3 +208,37 @@ def test_the_range_error_of_an_unselected_row_is_dropped():
     assert_same_error(
         _vapour_enthalpy_when_wanted, [(1.0, 1e6, 700.0), (1.0, 4e7, 500.0)], PhysicsRangeError
     )
+
+
+def test_flash_state_splits_the_mass_flow():
+    """Water at 450 K and 1 MPa flashed to 0.2 MPa: x = (h - h_f) / h_fg, masses add up."""
+    state = steam.flash_state(10.0, 450.0, 1e6, 2e5)
+    saturation = steam.saturation_properties(2e5)
+    enthalpy = steam.liquid_enthalpy(1e6, 450.0)
+    fraction = (enthalpy - saturation.liquid_enthalpy) / saturation.evaporation_enthalpy
+    assert state.steam_fraction == pytest.approx(fraction)
+    assert state.steam_flow + state.liquid_flow == pytest.approx(10.0)
+    assert state.liquid_temperature == pytest.approx(saturation.temperature)
+    cold = steam.flash_state(10.0, 350.0, 1e6, 2e5)
+    assert (cold.steam_flow, cold.liquid_temperature) == (0, 350)
+
+
+def test_flash_state_and_turbine_balance_match_on_arrays():
+    """Flashing and subcooled rows, and the turbine balance, agree with the traced run."""
+    assert_function_matches(
+        steam.flash_state, [(10.0, 450.0, 1e6), (5.0, 350.0, 1e6)], flash_pressure=2e5
+    )
+    assert_function_matches(
+        steam.turbine_balance,
+        [(2.0, 2.7e6, 2.2e6, 3e5), (0.0, 2.7e6, 2.2e6, 3e5)],
+        generator_efficiency=0.95,
+    )
+
+
+def test_turbine_balance_closes_the_first_law():
+    """Inlet enthalpy flow equals electricity, heat loss and condensate enthalpy flow."""
+    balance = steam.turbine_balance(2.0, 2.7e6, 2.2e6, 3e5, 0.95)
+    assert balance.gross_power == pytest.approx(1e6)
+    assert balance.electricity_generated == pytest.approx(0.95e6)
+    total = balance.electricity_generated + balance.heat_loss + 2.0 * 3e5
+    assert total == pytest.approx(2.0 * 2.7e6)

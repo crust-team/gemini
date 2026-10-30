@@ -109,6 +109,27 @@ def stage_pressure_ratio(pressure_ratio: float, stages: float) -> float:
 
 
 @ops.physics
+def overall_pressure_ratio(discharge_pressure: float, suction_pressure: float) -> float:
+    """Return the overall pressure ratio of a compressor.
+
+    Parameters
+    ----------
+    discharge_pressure, suction_pressure : float
+        Absolute discharge and suction pressure [Pa], suction positive.
+
+    Returns
+    -------
+    float
+        ``r = p_discharge / p_suction`` [-].
+
+    Notes
+    -----
+    Reference: GPSA Engineering Data Book, 14th ed. (2017), Section 13, compression ratio.
+    """
+    return discharge_pressure / suction_pressure
+
+
+@ops.physics
 def specific_compression_work(
     inlet_temperature: float,
     pressure_ratio: float,
@@ -162,6 +183,57 @@ def specific_compression_work(
         isentropic_efficiency,
     )
     return stages * specific_heat * (outlet - inlet_temperature)
+
+
+@ops.physics
+def shaft_power(mass_flow: float, specific_work: float) -> float:
+    """Return the shaft power of a compressor.
+
+    Parameters
+    ----------
+    mass_flow : float
+        Gas mass flow [kg/s].
+    specific_work : float
+        Shaft work per kg of gas [J/kg], from ``specific_compression_work``.
+
+    Returns
+    -------
+    float
+        ``P_shaft = m w`` [W].
+
+    Notes
+    -----
+    Reference: GPSA Engineering Data Book, 14th ed. (2017), Section 13, gas horsepower.
+    """
+    return mass_flow * specific_work
+
+
+@ops.physics
+def heat_rejected(electricity: float, shaft_power: float, stages: float) -> float:
+    """Return the heat an intercooled electric compressor rejects to its surroundings.
+
+    Parameters
+    ----------
+    electricity : float
+        Electricity drawn by the motor [W].
+    shaft_power : float
+        Shaft power of all stages [W].
+    stages : float
+        Number of equal stages [-], at least one.
+
+    Returns
+    -------
+    float
+        ``Q = P_el - P_shaft / N`` [W]: the intercooler duty ``(N - 1) P_shaft / N`` plus the
+        motor loss ``P_el - P_shaft``.
+
+    Notes
+    -----
+    Each of the N equal stages does ``P_shaft / N``; the intercoolers return the gas to the
+    suction temperature, so only the last stage heat stays in the gas (GPSA Engineering Data
+    Book, 14th ed. (2017), Section 13, intercooling).
+    """
+    return electricity - shaft_power / stages
 
 
 def _check_stage(name, inlet_temperature, pressure_ratio):

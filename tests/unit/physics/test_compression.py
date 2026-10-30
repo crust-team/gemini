@@ -99,3 +99,14 @@ def test_stage_pressure_ratio_is_the_root_of_the_overall_ratio():
     assert compression.stage_pressure_ratio(7.0, 1) == 7.0
     rows = [(16.0, 4.0), (7.0, 1.0), (1.0, 3.0), (30.0, 2.0)]
     assert_function_matches(compression.stage_pressure_ratio, rows)
+
+
+def test_overall_ratio_power_and_heat_rejected():
+    """A 4 bar to 12 bar machine has ratio 3; 2 kg/s at 100 kJ/kg is 200 kW and rejects 0.5 P/N."""
+    assert compression.overall_pressure_ratio(12e5, 4e5) == pytest.approx(3)
+    assert compression.shaft_power(2.0, 1e5) == pytest.approx(2e5)
+    assert compression.heat_rejected(250e3, 200e3, 2) == pytest.approx(150e3)
+    rows = [(250e3, 200e3), (0.0, 0.0)]
+    assert_function_matches(compression.heat_rejected, rows, stages=2)
+    assert_function_matches(compression.shaft_power, rows)
+    assert_function_matches(compression.overall_pressure_ratio, [(12e5, 4e5), (1e5, 1e5)])

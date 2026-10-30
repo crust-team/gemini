@@ -27,6 +27,9 @@ from gemini.errors import PhysicsRangeError
 from gemini.ops import Constant
 from gemini.physics import units
 
+DEFAULT_TURBINE_EFFICIENCY = 0.85
+"""Dry isentropic efficiency [-] DiPippo (2016, section 5.5) assumes for geothermal turbines."""
+
 GAS_CONSTANT = Constant(
     "WATER_GAS_CONSTANT", 461.526, "J/kg/K", "IF97 specific gas constant of water R"
 )
@@ -479,6 +482,115 @@ def flash_fraction(enthalpy: float, pressure: float) -> float:
     )
     return ops.maximum(
         0.0, (enthalpy - saturation.liquid_enthalpy) / saturation.evaporation_enthalpy
+    )
+
+
+@dataclass(frozen=True)
+class FlashState:
+    """Result of a flash: the split of the mass flow and the saturation temperature."""
+
+    steam_fraction: float
+    steam_flow: float
+    liquid_flow: float
+    liquid_temperature: float
+    saturation_temperature: float
+
+
+@ops.physics
+def flash_state(
+    mass_flow: float, inlet_temperature: float, inlet_pressure: float, flash_pressure: float
+) -> FlashState:
+    """Return the single-flash split of a liquid into saturated steam and brine.
+
+    Parameters
+    ----------
+    mass_flow : float
+        Inlet mass flow [kg/s], nonnegative.
+    inlet_temperature : float
+        Temperature of the liquid before it flashes [K].
+    inlet_pressure : float
+        Pressure of the liquid [Pa]; when below the saturation pressure of the inlet
+        temperature the enthalpy is taken at that saturation pressure.
+    flash_pressure : float
+        Separator pressure [Pa], from 611.213 Pa to 16.529 MPa, at most the inlet pressure.
+
+    Returns
+    -------
+    FlashState
+        ``steam_fraction`` x [-]; ``steam_flow`` x m and ``liquid_flow`` m - x m [kg/s];
+        ``liquid_temperature`` [K], the saturation temperature when flashing, else the inlet
+        temperature; ``saturation_temperature`` [K] at the flash pressure.
+
+    Notes
+    -----
+    The inlet enthalpy is the IF97 region 1 liquid enthalpy; the fraction follows
+    ``flash_fraction`` (DiPippo, R. (2016), Geothermal Power Plants, 4th ed., section 5.2).
+    """
+    liquid_pressure = ops.maximum(inlet_pressure, saturation_pressure(inlet_temperature))
+    enthalpy = liquid_enthalpy(liquid_pressure, inlet_temperature)
+    fraction = flash_fraction(enthalpy, flash_pressure)
+    saturation = saturation_properties(flash_pressure)
+    steam_flow = fraction * mass_flow
+    return FlashState(
+        steam_fraction=fraction,
+        steam_flow=steam_flow,
+        liquid_flow=mass_flow - steam_flow,
+        liquid_temperature=ops.where(fraction > 0, saturation.temperature, inlet_temperature),
+        saturation_temperature=saturation.temperature,
+    )
+
+
+@dataclass(frozen=True)
+class TurbineBalance:
+    """Powers of a condensing steam turbine with generator (W)."""
+
+    gross_power: float
+    electricity_generated: float
+    condenser_duty: float
+    heat_loss: float
+
+
+@ops.physics
+def turbine_balance(
+    mass_flow: float,
+    inlet_enthalpy: float,
+    outlet_enthalpy: float,
+    condensate_enthalpy: float,
+    generator_efficiency: float,
+) -> TurbineBalance:
+    """Return the enthalpy balance of a condensing turbine, generator and condenser.
+
+    Parameters
+    ----------
+    mass_flow : float
+        Steam mass flow [kg/s].
+    inlet_enthalpy, outlet_enthalpy : float
+        Specific enthalpy of the steam entering and of the exhaust [J/kg].
+    condensate_enthalpy : float
+        Saturated liquid enthalpy at the condenser pressure [J/kg].
+    generator_efficiency : float
+        Generator efficiency [-].
+
+    Returns
+    -------
+    TurbineBalance
+        ``gross_power`` m (h_in - h_out); ``electricity_generated`` the gross power times the
+        generator efficiency; ``condenser_duty`` m (h_out - h_f); ``heat_loss`` the condenser
+        duty plus the generator loss [W].
+
+    Notes
+    -----
+    Steady-flow first law of the turbine and the condenser (DiPippo, R. (2016), Geothermal
+    Power Plants, 4th ed., section 5.5): m h_in = electricity + heat_loss + m h_f.
+    """
+    gross_power = mass_flow * (inlet_enthalpy - outlet_enthalpy)
+    electricity_generated = gross_power * generator_efficiency
+    condenser_duty = mass_flow * (outlet_enthalpy - condensate_enthalpy)
+    return TurbineBalance(
+        gross_power=gross_power,
+        electricity_generated=electricity_generated,
+        condenser_duty=condenser_duty,
+        heat_loss=condenser_duty + gross_power - electricity_generated,
     )
 
 
