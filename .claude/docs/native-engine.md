@@ -1,7 +1,7 @@
 # Native engine: computation graph design
 
-Status: agreed design (2026-10-29). All physics and leaves are written with ops and replay runs
-through the graph by default. Sections 1 to 11 are the design as agreed; section 12 records where
+Status: agreed design (2026-10-29). All physics and leaves are written with ops, and one runner
+evaluates replay, live and simulate through the graph on the selected backend. Sections 1 to 11 are the design as agreed; section 12 records where
 the implementation differs and why, and section 13 how composites and replay work.
 
 ## 1. Why
@@ -219,12 +219,10 @@ Where the implementation differs from sections 1 to 11, and why:
   backend setting is `gemini.backends.settings(backend=...)`, not `gm.where` or
   `gm.runtime.settings(backend=...)`: the curated `gm` names are pinned and the public API is
   unchanged, and `core.runtime` sits above the backends in the dependency order.
-- **`where` branches are plain values; the ops never raise.** Physics authors write
-  `where(condition, a, b)` and both branches are always evaluated. On the Python backend
-  `truediv`, `pow`, `log`, `sqrt`, `exp`, `mod`, `floordiv` and the other ops return `inf` or `nan`
-  silently, like NumPy, for division by zero, a negative logarithm or overflow. One thing cannot be
-  hidden: `/` and `**` on two plain Python floats raise before any op runs, so a division or power
-  that can be invalid in an unselected branch is written `ops.truediv(a, b)` or `ops.pow(a, b)`.
+- **`where` branches are plain values** and both are always evaluated. On the Python backend the
+  ops return `inf` or `nan` silently, like NumPy, for division by zero, a negative logarithm or
+  overflow, and in an eager call plain `/` and `**` do the same (next point). `ops.truediv` stays
+  in one place (`ESP.efficiency_function`, float32) and where a composite divides child results.
 - **Eager calls and branch-aware checks.** A direct call is the same `forward` and ops on the
   Python backend, inside a scope (`gemini/ops/scope.py`), with no graph. Entering the outermost scope
   sets `np.errstate(all="ignore")` and gives exact floats as `np.float64`, so plain `/` and `**` are
@@ -322,41 +320,51 @@ Where the implementation differs from sections 1 to 11, and why:
   another fluid fails. A composite child that cannot be traced, or any child with a marked
   observer, breaks the whole root: its leaves' call records feed the parent, and observers replay
   for the root only. A list of traced values is a vector output, recorded as `name[i]` items.
-- **Observers.** `gemini.utils.hooks.observer(fn)` marks a read-only hook. It is never called on
-  traced values; on the root it goes to `graph.pre_observers` or `graph.observers` and `replay_row`
-  replays it per row. `EventLog` marks both of its hooks.
+- **Hooks.** An ordinary forward hook is called once on traced values and classified: one that
+  writes outputs joins the graph, one that only reads, and any pre-hook, makes its leaf a break
+  or the root a root break, so it runs for real on every row. `EventLog` registers no hook.
 - **Limits.** `Declaration.limits()` gives an `ops.check(..., DeclarationError)` for every traced
   control, boundary and output, attached to every output so a violated bound always fails the
   row, and the root inlets carry the `Stream` limits.
-- **Engine: batch, then the tick loop commits.** `Engine._run` builds a `Batch` after `on_run_start`
-  for `kind == "replay"` unless `gemini.graph.settings(traced=False)` is active. For each twin and
-  each stretch of ticks with one parameter snapshot, `Loader.arrays()` gives the columns, converted
-  with `units.si_conversion` and run through the cached graph (one `GraphCache` per `Engine`). A row
-  is **claimed** when everything is present, finite (NaN only for declared `X | None`) and no check
-  or break reaches an output; `Interpreter.evaluate` returns a failed-row mask. The unchanged tick
-  loop then commits: a claimed row gives a `ModuleResult` of Python scalars and `health`; every
-  other row runs `_evaluate_twin` at its tick. So there is one error path: skips, exact error
-  messages, `StepError`, callbacks, `AutoCheckpoint` and `resume` come from the old code, and the
-  batch can only ever skip work it is sure of. Stateful twins, float32, untraceable twins and runs
-  with a twin below another twin are not batched (`engine.batch.reasons`). This replaces section
-  9's chunked engine callbacks: nothing needs to declare it changes the run.
-- **Not done.** `scan`, float32, `trial_outlets` and `close_loop` in a graph, the unit-check pass,
-  `gm.explain`. `simulate` and `live` stay tick by tick.
+- **One evaluation.** `gemini.graph.evaluate(graph, feeds, rows, context)` runs a graph on the
+  backend of `gemini.backends.settings`: NumPy in one pass over arrays, Python row by row with
+  floats, stacked into the same arrays. That is how to debug; there is no second path. `Evaluation`
+  gives `result`, the `ModuleResult` tree of the trace mapped to arrays with children; `failed`, the
+  rows with an error reaching an output (`Interpreter.reached`, one computation); `error(row)`, the
+  exact exception (`failures.row_error`: `failure()` for a check, `declaration.validate` for a
+  declared limit, the module's own exception for a break); and `states` of a stepped root break.
+- **Root break.** `Tracer.trace` never raises for a root. A root that cannot be traced
+  (`close_loop`, `nodal.py`, float32), or a stepped root with a stateful module, is a graph with
+  one root break that runs the real module per row (`module(streams)` or `module.step`). Its rows are
+  real `ModuleResult` trees, so children, sums and `Output.of` stay exact. `GraphCache` stores
+  graphs only; `stepped` is a guard. The design's "only that module breaks" holds for leaves; a
+  composite that cannot be traced breaks the root, because its parent reads its leaves' records.
+- **One runner.** `Engine._run` builds a `BindingPlan` (one `Twin` per evaluated module: the twins of
+  a replay, the plant in simulate) and gives the `Loader` arrays to `Runner`. A run is chunks of
+  ticks inside stretches that share one dated parameter snapshot. A chunk is the whole stretch, except
+  one tick when a stateful module is stepped, a twin sits below another twin, or a callback sets
+  `changes_run = True`; so stepping in time order and section 9's chunked callbacks are the same
+  loop. Per chunk and twin: `columns.read` converts the bound columns to SI and gives each tick a
+  status in the order a plain call meets its problems (the first missing column is a skip, an
+  inlet the stream limits refuse is an error); `outcome.evaluate_twin` evaluates the cached graph
+  and gives each failing row the check's class and message; `health.assess` runs `Module.health`
+  once on the arrays, or row by row on the Python backend or when the array call raises;
+  `PathColumns` put the columns on the chunk's ticks and `Results.commit` stores them. Callbacks are
+  replayed tick by tick from the results: start, the tick's inputs, commit, position and states,
+  end. `engine.step_results` (twin path to that tick's `ModuleResult` tree) is how `EventLog` reads a
+  tick. `engine.graph_breaks` gives the reasons by twin path. A live call is one chunk over its new
+  rows: the prompt's one-row window gave the same results at ten times the cost per tick, and a
+  call with one new row is one tick anyway.
+- **Results and health.** `Results` is columnar with one way in, `commit(ResultChunk)`; one tick
+  or a month go through the same code and chunks merge on first read. `Health` is a plain slots
+  dataclass of scalars or arrays, and `health` is written with ops; a row a module cannot assess reads
+  like a module without health: score 1, no alarm, `NOT_ASSESSED`, NaN metrics.
+- **A direct call is not a second implementation.** `esp(suction=...)` is the same `forward` and the
+  same ops on the Python backend, without a graph; a break node calls exactly that.
+- **Not done.** `scan`, the unit-check pass, `gm.explain`.
 
-Validation is off the hot path. `Declaration` builds one cheap check at construction that accepts
-only an exact `float` inside its bounds, an exact `bool` or `str`, or `None` for an optional kind
-and returns the value unchanged; everything else, including every failure, takes the unchanged
-full path, so values, coercions and messages are the old ones by construction. Defaults are
-validated once (`default_value()`). This keeps a cheap check on the untraced path rather than
-moving validation to the first call, because a bad output at tick 500 must still be caught there.
-Traced rows are validated by `graph/limits.py` and the claim rule. Validation was only about 4 % of
-an untraced ESP call, so this gained about 8 % there and nothing on the replay.
-
-Measured on the July dataset (2976 ticks, 8 twins, none with a graph break): the replay takes
-1.07 s through the graph against 5.22 s on the old path, with identical frames; the ESP alone
-1.6 ms against 425 ms; CSE takes the ESP graph from 151 to 109 nodes and its call from 2.3 to
-1.6 ms. The graph evaluation is only about 5 % of the replay. The rest is the per-tick commit:
-`ModuleResult` per claimed row 40 %, `health` 25 %, `Results.append` 14 %.
+Validation stays off the hot path: `Declaration` has one cheap check for the common case, and
+everything else takes the unchanged full path. Traced rows are validated by `graph/limits.py`.
 
 Known gap: fluid properties and published correlation coefficients stay inline in the graph, not
 `Parameter` or `Constant` inputs, so a calibration or sensitivity run cannot reach them without a
