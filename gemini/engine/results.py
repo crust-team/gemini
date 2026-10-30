@@ -289,8 +289,10 @@ class Results:
         alarms = fields.get("health_alarm", pd.Series(False, index=fields.index)).eq(True)
         return dict(
             module=path,
-            hours=float(dt[active].sum() / 3600),
-            operating_hours=float(dt[fields.get("operating", active).eq(True)].sum() / 3600),
+            hours=float(dt[active].sum() / units.SECONDS_PER_HOUR),
+            operating_hours=float(
+                dt[fields.get("operating", active).eq(True)].sum() / units.SECONDS_PER_HOUR
+            ),
             errors=sum(error["module"] == path for error in self._failures),
             peaks={
                 field: float(fields[field].max())

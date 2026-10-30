@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.ops import Constant
+from gemini.physics import units
 
 GAS_CONSTANT = Constant(
     "WATER_GAS_CONSTANT", 461.526, "J/kg/K", "IF97 specific gas constant of water R"
@@ -36,7 +37,7 @@ CRITICAL_TEMPERATURE = Constant(
 
 CRITICAL_PRESSURE = Constant("WATER_CRITICAL_PRESSURE", 22.064e6, "Pa", "critical pressure")
 
-MINIMUM_TEMPERATURE = 273.15
+MINIMUM_TEMPERATURE = units.ZERO_CELSIUS
 """Lowest temperature of regions 1, 2 and 4 [K]."""
 
 REGION_1_MAXIMUM_TEMPERATURE = 623.15
@@ -213,8 +214,23 @@ class Expansion:
 def saturation_pressure(temperature: float) -> float:
     """Return the saturation pressure [Pa] of water at a temperature [K].
 
+    Parameters
+    ----------
+    temperature : float
+        Temperature [K], from 273.15 K to 647.096 K (the critical point).
+
+    Returns
+    -------
+    float
+        Saturation pressure [Pa] of liquid water (IAPWS-IF97 region 4).
+
     Notes
     -----
+    This is the IF97 model, the one used with the steam tables of this module (separators, flash
+    and turbines). ``psychrometrics.saturation_pressure`` is a different model, Hyland-Wexler
+    over water and ice for moist air at atmospheric temperatures; the two differ by up to about
+    3e-4 relative and both are kept because each is the standard of its field.
+
     IAPWS-IF97 eq. 30 with theta = T + n9 / (T - n10), A = theta^2 + n1 theta + n2,
     B = n3 theta^2 + n4 theta + n5, C = n6 theta^2 + n7 theta + n8 and
     p / 1 MPa = (2C / (-B + sqrt(B^2 - 4AC)))^4. Valid for 273.15 K <= T <= 647.096 K.
@@ -232,12 +248,22 @@ def saturation_pressure(temperature: float) -> float:
     a = theta**2 + n[0] * theta + n[1]
     b = n[2] * theta**2 + n[3] * theta + n[4]
     c = n[5] * theta**2 + n[6] * theta + n[7]
-    return (2 * c / (-b + ops.sqrt(b**2 - 4 * a * c))) ** 4 * 1e6
+    return (2 * c / (-b + ops.sqrt(b**2 - 4 * a * c))) ** 4 * units.MEGA
 
 
 @ops.physics
 def saturation_temperature(pressure: float) -> float:
     """Return the saturation temperature [K] of water at a pressure [Pa].
+
+    Parameters
+    ----------
+    pressure : float
+        Pressure [Pa], from 611.213 Pa to 22.064 MPa (the critical pressure).
+
+    Returns
+    -------
+    float
+        Saturation temperature [K], the inverse of ``saturation_pressure``.
 
     Notes
     -----
@@ -250,7 +276,7 @@ def saturation_temperature(pressure: float) -> float:
         "saturation_temperature", "pressure", pressure, "Pa", MINIMUM_PRESSURE, CRITICAL_PRESSURE
     )
     n = _REGION_4
-    beta = (pressure / 1e6) ** 0.25
+    beta = (pressure / units.MEGA) ** 0.25
     e = beta**2 + n[2] * beta + n[5]
     f = n[0] * beta**2 + n[3] * beta + n[6]
     g = n[1] * beta**2 + n[4] * beta + n[7]
@@ -262,6 +288,20 @@ def saturation_temperature(pressure: float) -> float:
 def liquid_enthalpy(pressure: float, temperature: float) -> float:
     """Return the specific enthalpy [J/kg] of liquid water in IF97 region 1.
 
+    Parameters
+    ----------
+    pressure : float
+        Absolute pressure [Pa], from the saturation pressure at ``temperature`` to 100 MPa.
+    temperature : float
+        Temperature [K], from 273.15 K to 623.15 K.
+
+    Returns
+    -------
+    float
+        Specific enthalpy h = R T tau gamma_tau [J/kg] (IF97 eq. 7 and table 3).
+
+    Notes
+    -----
     Valid for 273.15 K <= T <= 623.15 K and saturation pressure <= p <= 100 MPa.
     """
     _check_liquid("liquid_enthalpy", pressure, temperature)
@@ -272,6 +312,20 @@ def liquid_enthalpy(pressure: float, temperature: float) -> float:
 def liquid_entropy(pressure: float, temperature: float) -> float:
     """Return the specific entropy [J/kg/K] of liquid water in IF97 region 1.
 
+    Parameters
+    ----------
+    pressure : float
+        Absolute pressure [Pa], from the saturation pressure at ``temperature`` to 100 MPa.
+    temperature : float
+        Temperature [K], from 273.15 K to 623.15 K.
+
+    Returns
+    -------
+    float
+        Specific entropy s = R (tau gamma_tau - gamma) [J/kg/K] (IF97 eq. 7 and table 3).
+
+    Notes
+    -----
     Valid for 273.15 K <= T <= 623.15 K and saturation pressure <= p <= 100 MPa.
     """
     _check_liquid("liquid_entropy", pressure, temperature)
@@ -282,6 +336,20 @@ def liquid_entropy(pressure: float, temperature: float) -> float:
 def vapour_enthalpy(pressure: float, temperature: float) -> float:
     """Return the specific enthalpy [J/kg] of steam in IF97 region 2.
 
+    Parameters
+    ----------
+    pressure : float
+        Absolute pressure [Pa], above 0 and up to the limit given below.
+    temperature : float
+        Temperature [K], from 273.15 K to 1073.15 K.
+
+    Returns
+    -------
+    float
+        Specific enthalpy h = R T tau gamma_tau [J/kg] (IF97 eqs. 15 to 17 and table 12).
+
+    Notes
+    -----
     Valid for 0 < p <= saturation pressure at 273.15 K <= T <= 623.15 K, 0 < p <= B23 pressure
     up to 863.15 K and 0 < p <= 100 MPa up to 1073.15 K.
     """
@@ -293,6 +361,20 @@ def vapour_enthalpy(pressure: float, temperature: float) -> float:
 def vapour_entropy(pressure: float, temperature: float) -> float:
     """Return the specific entropy [J/kg/K] of steam in IF97 region 2.
 
+    Parameters
+    ----------
+    pressure : float
+        Absolute pressure [Pa], above 0 and up to the limit given below.
+    temperature : float
+        Temperature [K], from 273.15 K to 1073.15 K.
+
+    Returns
+    -------
+    float
+        Specific entropy s = R (tau gamma_tau - gamma) [J/kg/K] (IF97 eqs. 15 to 17 and table 12).
+
+    Notes
+    -----
     Valid for 0 < p <= saturation pressure at 273.15 K <= T <= 623.15 K, 0 < p <= B23 pressure
     up to 863.15 K and 0 < p <= 100 MPa up to 1073.15 K.
     """
@@ -302,7 +384,18 @@ def vapour_entropy(pressure: float, temperature: float) -> float:
 
 @ops.physics
 def b23_pressure(temperature: float) -> float:
-    """Return the region 2/3 boundary pressure [Pa] (IF97 eq. 5, 623.15 K to 863.15 K)."""
+    """Return the region 2/3 boundary pressure [Pa] (IF97 eq. 5, 623.15 K to 863.15 K).
+
+    Parameters
+    ----------
+    temperature : float
+        Temperature [K], from 623.15 K to 863.15 K.
+
+    Returns
+    -------
+    float
+        Boundary pressure [Pa], p / 1 MPa = n1 + n2 T + n3 T^2 with the coefficients of table 1.
+    """
     _check_range(
         "b23_pressure",
         "temperature",
@@ -312,13 +405,27 @@ def b23_pressure(temperature: float) -> float:
         B23_MAXIMUM_TEMPERATURE,
     )
     n = _B23
-    return (n[0] + n[1] * temperature + n[2] * temperature**2) * 1e6
+    return (n[0] + n[1] * temperature + n[2] * temperature**2) * units.MEGA
 
 
 @ops.physics
 def saturation_properties(pressure: float) -> SaturationProperties:
     """Return saturated liquid and vapour enthalpy and entropy at a pressure [Pa].
 
+    Parameters
+    ----------
+    pressure : float
+        Saturation pressure [Pa], from 611.213 Pa to 16.529 MPa.
+
+    Returns
+    -------
+    SaturationProperties
+        ``pressure`` [Pa], ``temperature`` [K], ``liquid_enthalpy`` and ``vapour_enthalpy``
+        [J/kg], ``liquid_entropy`` and ``vapour_entropy`` [J/kg/K]; ``evaporation_enthalpy``
+        [J/kg] and ``evaporation_entropy`` [J/kg/K] are their differences.
+
+    Notes
+    -----
     The saturation temperature comes from IF97 eq. 31; the liquid from region 1 and the vapour
     from region 2 at that temperature. Valid for 611.213 Pa <= p <= 16.529 MPa, the saturation
     pressures of 273.15 K and 623.15 K; region 3 above is not implemented.
@@ -341,6 +448,20 @@ def saturation_properties(pressure: float) -> SaturationProperties:
 def flash_fraction(enthalpy: float, pressure: float) -> float:
     """Return the steam mass fraction [-] after isenthalpic flashing to a pressure [Pa].
 
+    Parameters
+    ----------
+    enthalpy : float
+        Specific enthalpy of the fluid before flashing [J/kg].
+    pressure : float
+        Flash pressure [Pa], from 611.213 Pa to 16.529 MPa.
+
+    Returns
+    -------
+    float
+        Steam mass fraction x [-] in [0, 1).
+
+    Notes
+    -----
     x = (h - h_f) / h_fg at the flash pressure, zero for subcooled liquid (h <= h_f).
     An enthalpy at or above saturated vapour raises ``PhysicsRangeError``: the fluid does not
     separate into two phases. Reference: DiPippo, R. (2016), Geothermal Power Plants, 4th ed.,
@@ -379,6 +500,13 @@ def baumann_expansion(
     baumann_factor : float
         Baumann factor a >= 0 [-]: the efficiency falls by a percent per percent of mean
         moisture; a = 1 is the classical Baumann rule.
+
+    Returns
+    -------
+    Expansion
+        ``inlet_enthalpy``, ``isentropic_outlet_enthalpy`` and ``outlet_enthalpy`` [J/kg];
+        ``outlet_quality`` [-], the steam mass fraction of the exhaust; ``efficiency`` [-], the
+        wet isentropic efficiency (h_in - h_out) / (h_in - h_s).
 
     Notes
     -----
@@ -444,7 +572,7 @@ def _region_1(pressure, temperature):
 
 def _region_2(pressure, temperature):
     """Return (h [J/kg], s [J/kg/K]) from the IF97 region 2 Gibbs free energy."""
-    pi = pressure / 1e6
+    pi = pressure / units.MEGA
     tau = 540 / temperature
     gamma = ops.log(pi)
     gamma_tau = 0.0

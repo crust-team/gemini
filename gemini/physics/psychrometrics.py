@@ -8,6 +8,7 @@ humidity ratios (about 0.4 % at sea level); see ``humidity_ratio``.
 
 from gemini import ops
 from gemini.errors import PhysicsRangeError
+from gemini.physics import units
 
 MINIMUM_TEMPERATURE = 173.15
 """Lower validity limit [K] of the Hyland-Wexler equation over ice (-100 degC)."""
@@ -40,6 +41,11 @@ def saturation_pressure(temperature: float) -> float:
 
     Notes
     -----
+    This is the Hyland-Wexler model for moist air at atmospheric temperatures, over ice and
+    over liquid water. ``steam.saturation_pressure`` is a different model, IAPWS-IF97 region 4
+    over liquid water up to the critical point, used with the steam tables; both are kept
+    because each is the standard of its field and they differ by up to about 3e-4 relative.
+
     Hyland, R.W. and Wexler, A. (1983), "Formulations for the thermodynamic properties of the
     saturated phases of H2O from 173.15 K to 473.15 K", ASHRAE Transactions 89(2A), as given in
     ASHRAE Handbook - Fundamentals (2017), chapter 1, equations 5 (ice, -100 to 0 degC) and 6
@@ -53,7 +59,7 @@ def saturation_pressure(temperature: float) -> float:
     _check_temperature("saturation_pressure", temperature)
     ice = ops.exp(_polynomial(_ICE, temperature) + _ICE_LOG * ops.log(temperature))
     water = ops.exp(_polynomial(_WATER, temperature) + _WATER_LOG * ops.log(temperature))
-    return ops.where(temperature < 273.15, ice, water)
+    return ops.where(temperature < units.ZERO_CELSIUS, ice, water)
 
 
 @ops.physics
@@ -199,7 +205,7 @@ def wet_bulb_temperature(temperature: float, relative_humidity: float) -> float:
         temperature=temperature,
         relative_humidity=relative_humidity,
     )
-    celsius = temperature - 273.15
+    celsius = temperature - units.ZERO_CELSIUS
     percent = 100 * relative_humidity
     wet_bulb = (
         celsius * ops.atan(0.151977 * ops.sqrt(percent + 8.313659))
@@ -208,7 +214,7 @@ def wet_bulb_temperature(temperature: float, relative_humidity: float) -> float:
         + 0.00391838 * percent**1.5 * ops.atan(0.023101 * percent)
         - 4.686035
     )
-    return wet_bulb + 273.15
+    return wet_bulb + units.ZERO_CELSIUS
 
 
 def _polynomial(coefficients, temperature):

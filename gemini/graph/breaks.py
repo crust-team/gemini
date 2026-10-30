@@ -22,10 +22,11 @@ from gemini.graph.node import STREAM_FIELDS, row_item, row_streams, stack_column
 from gemini.modules.module import _Call, _current_call
 from gemini.ops import Symbolic, registry
 from gemini.ops.registry import get
+from gemini.physics import units
 from gemini.types.flows import Stream
 from gemini.types.ports import Ports
 
-PROBE = {"m_dot": 1.0, "T": 300.0, "p": 1e5}
+PROBE = {"m_dot": 1.0, "T": 300.0, "p": units.PA_PER_BAR}
 """Representative values of the fields of an inlet that is traced when the fluids are probed."""
 
 PROBE_INPUT = 1.0

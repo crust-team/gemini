@@ -184,3 +184,12 @@ def test_a_quantity_keeps_one_unit():
     units.define_quantity("pressure", "Pa")
     with pytest.raises(UnitError, match="already 'Pa'"):
         units.define_quantity("pressure", "K")
+
+
+def test_table_and_converters_share_one_factor():
+    """The table scale and the converter of a unit read the same constant."""
+    assert units.to_si(2.0, "bar") == units.bar_to_pa(2.0)
+    assert units.to_si(7.0, "m3/h") == units.m3h_to_m3s(7.0)
+    assert units.to_si(7.0, "m3/h/bar") == units.index_to_si(7.0)
+    assert units.kgh_to_kgs is units.m3h_to_m3s and units.dyne_cm_to_nm is units.cp_to_pas
+    assert units.c_to_k(0.0) == units.ZERO_CELSIUS == units.to_si(0.0, "degC")
