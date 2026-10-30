@@ -32,7 +32,7 @@ def assert_same(frame, **kwargs):
     assert numpy.to_frame().dtypes.tolist() == python.to_frame().dtypes.tolist()
     assert numpy.skip_counts == python.skip_counts and numpy.errors() == python.errors()
     pd.testing.assert_frame_equal(
-        pd.DataFrame(numpy.energy_report()), pd.DataFrame(python.energy_report()), check_exact=True
+        numpy.to_frame(table="energy"), python.to_frame(table="energy"), check_exact=True
     )
     assert _persisted(plant) == _persisted(other)
     return engine, numpy
@@ -56,11 +56,10 @@ def test_missing_observations_are_skipped():
     assert results["first"].rise.isna().tolist()[3:6] == [True, False, True]
 
 
-def test_rows_with_a_failing_check_are_recorded_with_their_tick_class_and_message():
+def test_rows_with_a_failing_check_are_recorded_with_their_tick_code_and_message():
     """The other rows of the chunk keep their results."""
     _, results = assert_same(pair_frame({("level", 4): -1.0}))
-    assert results.errors()[0]["module"] == "first"
-    assert results.errors()[0]["type"] == "PhysicsRangeError"
+    assert results.errors()[0]["path"] == "first"
     assert results.errors()[0]["code"] == "physics_range"
     assert results["first"].rise.notna().sum() == len(TICKS) - 1
 
@@ -202,7 +201,7 @@ def test_missing_data_is_a_counted_skip_and_failures_are_recorded_or_raised():
     assert results.skip_counts == {"": {"p": 1}}
     errors = results.errors()
     assert [row["code"] for row in errors] == ["missing_value", "module_error"]
-    assert errors[1]["message"] == "negative flow" and errors[1]["type"] == "ValueError"
+    assert errors[1]["message"] == "negative flow"
     assert results[""].flow.tolist()[0] == 2.0
     with pytest.raises(StepError, match="negative flow") as raised:
         _tank_run(rows, on_error="raise")

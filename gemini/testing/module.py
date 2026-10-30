@@ -62,7 +62,7 @@ def _call(cls, instance, example):
     error = result["errors"][0]
     if not example and error["code"] in _NEEDS_VALUES:
         return None, f"needs example values: {error['message']}"
-    return False, f"{error['class']}: {error['message']}"
+    return False, f"{error['code']}: {error['message']}"
 
 
 def _attempt(name, function, *arguments):

@@ -107,7 +107,9 @@ def test_reference_replay_and_simulate(setup):
     assert len(result) == 24
     for path, field in result._energy:
         total = (actual[path, field] * 3600).sum()
-        assert result.energy_report().loc[(path, field), "energy_J"] == pytest.approx(total)
+        assert result.to_frame(table="energy").loc[(path, field), "energy_J"] == pytest.approx(
+            total
+        )
 
 
 def test_replay_can_skip_outputs(setup):
@@ -180,7 +182,7 @@ def test_interrupt_resume(setup, tmp_path, kind):
     actual = loaded.resume()
     pd.testing.assert_frame_equal(actual.to_frame(), expected.to_frame(), check_exact=True)
     pd.testing.assert_frame_equal(
-        actual.energy_report(), expected.energy_report(), check_exact=True
+        actual.to_frame(table="energy"), expected.to_frame(table="energy"), check_exact=True
     )
     assert loaded.resume() is actual
 
@@ -237,10 +239,10 @@ def test_missing_data_dates_events_and_export(setup, tmp_path):
     path = result.save(tmp_path / "results.npz")
     loaded = Results.load(path)
     pd.testing.assert_frame_equal(loaded.to_frame(), result.to_frame())
-    pd.testing.assert_frame_equal(loaded.energy_report(), result.energy_report())
+    pd.testing.assert_frame_equal(loaded.to_frame(table="energy"), result.to_frame(table="energy"))
     assert loaded.errors() == result.errors()
     assert [row["code"] for row in result.errors()] == ["missing_value"]
-    assert result.errors()[0]["module"] == "doublet.esp"
+    assert result.errors()[0]["path"] == "doublet.esp"
 
 
 def test_autocheckpoint_and_callback_order(setup, tmp_path):
@@ -283,7 +285,7 @@ def test_error_policies_and_missing_columns(setup):
     frame = data.read(data.start, data.end).iloc[:2]
     frame.loc[frame.index[0], "doublet.esp.suction.p"] = -100
     result = gm.Engine(plant, on_error="record").replay(gm.Dataset.from_frame(frame))
-    assert result.errors()[0]["module"] == "doublet.esp"
+    assert result.errors()[0]["path"] == "doublet.esp"
     assert result.errors()[0]["code"] == "invalid_inlet"
     assert result["filters.hot"].pressure_drop.notna().all()
     with pytest.raises(gm.errors.StepError, match="doublet.esp"):
@@ -520,8 +522,8 @@ def test_nan_rows_are_row_errors_and_the_run_continues():
     results = gm.Engine(plant).replay(frame)
     assert len(results) == 4 and results[""].value.isna().tolist() == [False, True, False, False]
     (row,) = results.errors()
-    assert row["code"] == "missing_value" and row["module"] == ""
-    assert row["timestamp"] == "2024-01-01T00:15:00+00:00"
+    assert row["code"] == "missing_value" and row["path"] == ""
+    assert row["time"] == "2024-01-01T00:15:00+00:00"
     assert row["code"] in gm.errors.ROW_CODES
 
 

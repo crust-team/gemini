@@ -26,7 +26,7 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     data = gm.Dataset.from_frame(df, time_column="time")
 
     res = gm.replay(plant, data, checkpoint="runs/replay.ckpt")
-    print(res.energy_report())
+    print(res.to_frame(table="energy"))
     esp_power = res["doublet.esp"].power
     assert len(esp_power) == len(df)
 
@@ -46,7 +46,7 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
     sim = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
-    print(sim.energy_report())
+    print(sim.to_frame(table="energy"))
 
     start = df["time"].iloc[0]
     second = start + pd.Timedelta(days=1)

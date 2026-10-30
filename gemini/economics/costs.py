@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from gemini.analysis.series import energy, leaf_total, window_seconds
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.emissions import source_energies
-from gemini.economics.outcome import outcome
 from gemini.errors import ValidationError
 from gemini.modules.demand import CoolingConsumer, HeatConsumer
 from gemini.physics.units import SECONDS_PER_YEAR
 from gemini.types.cost import total_cost
+from gemini.types.shapes import value
 
 NO_COST = (
     "no module declares a cost: a module declares it by defining capex() that returns a Cost, "
@@ -67,15 +67,16 @@ def capex(plant, assumptions=None):
     Returns
     -------
     dict
-        ``{value, unit, reason, price_year, source}`` as plain JSON. ``value`` is the investment
-        in the currency of the costs (``unit``), with their ``price_year`` and ``source``. With
-        no declared cost ``value``, ``price_year`` and ``source`` are ``None`` and ``reason``
-        says so. Costs in different currencies or price years raise ``ConfigurationError``.
+        ``{value, unit, price_year, source}`` as plain JSON. ``value`` is the investment in the
+        currency of the costs (``unit``), with their ``price_year`` (a value in ``year``) and
+        ``source``. With no declared cost ``value`` is ``None`` with a ``reason`` and there are no
+        other keys. Costs in different currencies or price years raise ``ConfigurationError``.
     """
     cost = total_cost(plant)
     if cost is None:
-        return outcome(None, resolve(assumptions).currency, NO_COST, price_year=None, source=None)
-    return outcome(cost.capex, cost.currency, None, price_year=cost.price_year, source=cost.source)
+        return value(None, resolve(assumptions).currency, NO_COST)
+    year = value(cost.price_year, "year")
+    return value(cost.capex, cost.currency, price_year=year, source=cost.source)
 
 
 def _bill(assumptions, annual):
@@ -86,6 +87,11 @@ def _bill(assumptions, annual):
     if annual.fuel > 0:
         fuel = annual.fuel * require(assumptions, "fuel_price")
     return {"electricity": electricity, "fuel": fuel}
+
+
+def _components(amounts, unit):
+    """Return each amount of a cost as a value."""
+    return {name: value(amount, unit) for name, amount in amounts.items()}
 
 
 def opex(plant, results, assumptions=None):
@@ -109,9 +115,9 @@ def opex(plant, results, assumptions=None):
     Returns
     -------
     dict
-        ``{value, unit, reason, components}`` with ``unit`` the cost currency per year and
-        ``components`` ``{fixed, variable, electricity, fuel}`` in that unit. With no declared
-        cost ``value`` is ``None`` with the ``reason``, and only ``electricity`` and ``fuel``
+        ``{value, unit, components}`` with ``unit`` the cost currency per year and ``components``
+        ``{fixed, variable, electricity, fuel}``, each a value in that unit. With no declared
+        cost ``value`` is ``None`` with a ``reason``, and only ``electricity`` and ``fuel``
         are given. A currency in ``assumptions`` other than the cost's raises
         ``ValidationError``.
     """
@@ -120,7 +126,8 @@ def opex(plant, results, assumptions=None):
     annual = annual_energies(plant, results)
     bill = _bill(assumptions, annual)
     if cost is None:
-        return outcome(None, f"{assumptions.currency}/year", NO_COST, components={**bill})
+        unit = f"{assumptions.currency}/year"
+        return value(None, unit, NO_COST, components=_components(bill, unit))
     if cost.currency != assumptions.currency:
         raise ValidationError(
             f"assumptions.currency = {assumptions.currency!r}; expected the cost currency "
@@ -132,4 +139,5 @@ def opex(plant, results, assumptions=None):
         "variable": cost.opex_variable * (annual.heat + annual.cold),
         **bill,
     }
-    return outcome(sum(components.values()), f"{cost.currency}/year", None, components=components)
+    unit = f"{cost.currency}/year"
+    return value(sum(components.values()), unit, components=_components(components, unit))

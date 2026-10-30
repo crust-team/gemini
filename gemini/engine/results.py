@@ -14,8 +14,9 @@ from gemini.engine.chunks import (
     first_present,
     merge,
 )
-from gemini.errors import UnitError, UnknownResultError
+from gemini.errors import UnitError, UnknownResultError, ValidationError
 from gemini.physics import units
+from gemini.types.shapes import problem, series, statistics, value
 from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
 from gemini.utils.time import to_utc
@@ -142,7 +143,7 @@ class Results:
         for skipped in skips or ():
             _add_skips(self.skip_counts, skipped)
         for row, error in errors:
-            self._failures.append(dict(error, timestamp=times[row].isoformat()))
+            self._failures.append(dict(error, time=times[row].isoformat()))
         self._frame = None
 
     def _register(self, chunk):
@@ -174,8 +175,19 @@ class Results:
             self._frame = assemble(chunk, list(self._order), self._times)
         return self._frame
 
-    def to_frame(self):
-        """Return a copy with one column per field, named ``path.field`` (a root field by name)."""
+    def to_frame(self, table="series"):
+        """Return a table of the results, the one route to a DataFrame.
+
+        ``"series"`` is a copy with one column per field, named ``path.field`` (a root field by
+        name); ``"energy"`` is the table of ``energy_report`` with a row per module and energy
+        output, which ``repr`` prints.
+        """
+        if table == "energy":
+            return self._energy_table()
+        if table != "series":
+            raise ValidationError(
+                f"Results.to_frame: table = {table!r}; expected 'series' or 'energy'", path="table"
+            )
         frame = self._cached_frame().copy()
         frame.columns = [join_path(path, field) for path, field in frame.columns]
         return frame
@@ -192,20 +204,19 @@ class Results:
         return names
 
     def get(self, path, field, start=None, end=None):
-        """Return ``{time, values, unit}`` of one field, from ``start`` to ``end`` inclusive.
+        """Return the series ``{time, value, unit}`` of one field, ``start`` to ``end`` inclusive.
 
-        ``time`` is ISO 8601 UTC text, ``values`` has ``None`` for a missing value and ``unit``
+        ``time`` is ISO 8601 UTC text, ``value`` has ``None`` for a missing value and ``unit``
         is the SI unit of the field. An unknown path or field raises ``UnknownResultError``.
         """
-        series = getattr(self[path], field)
-        series = _window(series, start, end)
-        return to_plain({"time": series.index, "values": series, "unit": self.unit(path, field)})
+        column = _window(getattr(self[path], field), start, end)
+        return series(column.index, column, self.unit(path, field))
 
     def summary(self, path=None, start=None, end=None):
-        """Return ``{path: {field: {min, max, mean, unit}}}`` of the numeric fields.
+        """Return ``{path: {field: {min, max, mean}}}`` of the numeric fields, each a value.
 
-        ``path`` selects one module and ``start`` and ``end`` (inclusive) a window; values are
-        ``None`` where a field has no finite value.
+        ``path`` selects one module and ``start`` and ``end`` (inclusive) a window; a value is
+        ``None`` with a ``reason`` where a field has no finite value.
         """
         frame = _window(self._cached_frame(), start, end)
         paths = list(dict.fromkeys(frame.columns.get_level_values(0)))
@@ -213,57 +224,58 @@ class Results:
             if path not in paths:
                 raise _unknown_path(path, paths)
             paths = [path]
-        return to_plain({name: self._field_summary(name, frame[name]) for name in paths})
+        return {name: self._field_summary(name, frame[name]) for name in paths}
 
     def _field_summary(self, path, fields):
-        """Return the minimum, maximum, mean and unit of each numeric field of one path."""
+        """Return the minimum, maximum and mean of each numeric field of one path."""
         return {
-            field: {
-                "min": fields[field].min(),
-                "max": fields[field].max(),
-                "mean": fields[field].mean(),
-                "unit": self.unit(path, field),
-            }
+            field: statistics(
+                fields[field].min(),
+                fields[field].max(),
+                fields[field].mean(),
+                self.unit(path, field),
+            )
             for field in fields
             if pd.api.types.is_numeric_dtype(fields[field])
             and not pd.api.types.is_bool_dtype(fields[field])
         }
 
     def errors(self):
-        """Return the rows that did not give a result, oldest first, as plain JSON.
+        """Return the rows that did not give a result, oldest first, as problems.
 
-        Each row is ``{timestamp, module, code, type, message}``. A tick where a module raised
-        has its error code from ``gm.errors.ROW_CODES`` and the exception's type and message; a
-        tick skipped for a missing bound value has the code ``missing_value`` and the missing
-        column as message. The run continues after every such row.
+        Each row is ``{path, code, message, suggestions, time}``. A tick where a module raised
+        has its error code from ``gm.errors.ROW_CODES`` and the exception's message; a tick
+        skipped for a missing bound value has the code ``missing_value`` and the missing column
+        as message. The run continues after every such row.
         """
         failed = {}
         for row in self._failures:
-            failed.setdefault(row["timestamp"], []).append(row)
+            failed.setdefault(row["time"], []).append(row)
         rows = []
         for time, skipped in zip(self._times, self._skips):
             stamp = time.isoformat()
             rows.extend(failed.get(stamp, ()))
             rows.extend(_skip_rows(stamp, skipped))
-        return to_plain([_ordered(row) for row in rows])
+        return to_plain(rows)
 
     def to_dict(self):
         """Return everything as plain JSON: ``{time, duration, series, errors, ...}``.
 
-        ``series`` is ``{path: {field: {unit, values}}}`` with one value per entry of ``time``.
+        ``duration`` is a value in s and ``series`` is ``{path: {field: {value, unit}}}``, with one
+        item per entry of ``time``.
         """
         frame = self._cached_frame()
-        series = {}
+        columns = {}
         for path, field in frame.columns:
-            series.setdefault(path, {})[field] = {
+            columns.setdefault(path, {})[field] = {
+                "value": frame[(path, field)],
                 "unit": self.unit(path, field),
-                "values": frame[(path, field)],
             }
         return to_plain(
             {
                 "time": frame.index,
-                "duration": self._dt,
-                "series": series,
+                "duration": value(self._dt, "s"),
+                "series": columns,
                 "errors": self.errors(),
                 "skip_counts": self.skip_counts,
                 "end_state": self.end_state,
@@ -271,17 +283,54 @@ class Results:
         )
 
     def energy_report(self):
-        """Report energy per port (J/MWh), peaks, evaluated hours, alarms and skip reasons."""
+        """Report energy, peaks, evaluated hours, alarms and skip reasons per module and output.
+
+        Returns ``{path: {output: entry}}``, ``output`` being the energy output, or ``""`` for a
+        path without one. An entry has the values ``energy``, ``peak``, ``hours``,
+        ``operating_hours``, ``alarms``, ``alarm_rate``, ``skipped`` and ``errors``, ``peaks`` with
+        the largest value of each numeric field, and ``reasons`` with the count of each skip reason.
+        ``to_frame(table="energy")`` is the same report as a table.
+        """
+        report = {}
+        for row in self._energy_rows():
+            report.setdefault(row["module"], {})[row["port"]] = self._report_entry(row)
+        return report
+
+    def _report_entry(self, row):
+        """Return one row of the energy table with every number as a value."""
+        path = row["module"]
+        return {
+            "energy": value(row["energy_J"], "J"),
+            "peak": value(row["peak_W"], "W"),
+            "hours": value(row["hours"], "h"),
+            "operating_hours": value(row["operating_hours"], "h"),
+            "alarms": value(row["alarms"], "-"),
+            "alarm_rate": value(row["alarm_rate"], "-"),
+            "skipped": value(row["skipped"], "-"),
+            "errors": value(row["errors"], "-"),
+            "peaks": {
+                field: value(peak, self.unit(path, field)) for field, peak in row["peaks"].items()
+            },
+            "reasons": row["reasons"],
+        }
+
+    def _energy_table(self):
+        """Return the energy report as a table, one row per module and energy output."""
+        rows = self._energy_rows()
+        return Summary(pd.DataFrame(rows).set_index(["module", "port"])) if rows else Summary()
+
+    def _energy_rows(self):
+        """Return the rows of the energy report in path order."""
         frame = self._cached_frame().copy()
         recorded = set(frame.columns.get_level_values(0))
-        failed = {error["module"] for error in self._failures}
+        failed = {error["path"] for error in self._failures}
         paths = sorted(recorded | self.skip_counts.keys() | failed)
         dt = pd.Series(self._dt, index=frame.index, dtype=float)
         rows = []
         for path in paths:
             fields = frame[path] if path in recorded else pd.DataFrame(index=frame.index)
             rows.extend(self._summary_rows(path, fields, dt))
-        return Summary(pd.DataFrame(rows).set_index(["module", "port"])) if rows else Summary()
+        return rows
 
     def _module_info(self, path, fields, dt):
         """Return evaluated and operating hours, peaks, alarms, errors and skips of one path."""
@@ -293,7 +342,7 @@ class Results:
             operating_hours=float(
                 dt[fields.get("operating", active).eq(True)].sum() / units.SECONDS_PER_HOUR
             ),
-            errors=sum(error["module"] == path for error in self._failures),
+            errors=sum(error["path"] == path for error in self._failures),
             peaks={
                 field: float(fields[field].max())
                 for field in fields
@@ -333,7 +382,7 @@ class Results:
 
     def __repr__(self):
         """Print the compact energy report."""
-        return str(self.energy_report())
+        return str(self._energy_table())
 
     def _archive(self):
         """Return the table and the metadata that ``save`` and ``to_bytes`` write."""
@@ -413,7 +462,7 @@ class Results:
         for skipped in result._skips:
             _add_skips(result.skip_counts, skipped)
         times = {t.isoformat() for t in result._times}
-        result._failures = [error for error in self._failures if error["timestamp"] in times]
+        result._failures = [error for error in self._failures if error["time"] in times]
         return result
 
 
@@ -450,21 +499,10 @@ def _window(table, start, end):
 def _skip_rows(stamp, skipped):
     """Return the rows of the reasons a tick skipped each path."""
     return [
-        dict(
-            timestamp=stamp,
-            module=path,
-            code="missing_value",
-            type="MissingMeasurementError",
-            message=reason,
-        )
+        problem(path, "missing_value", reason, time=stamp)
         for path, reasons in skipped.items()
         for reason in reasons
     ]
-
-
-def _ordered(row):
-    """Return an error row with its keys in the documented order."""
-    return {key: row[key] for key in ("timestamp", "module", "code", "type", "message")}
 
 
 def _sliced_order(order, chunk):

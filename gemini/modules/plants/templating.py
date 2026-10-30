@@ -25,7 +25,7 @@ from pathlib import Path
 from gemini.errors import ConfigurationError, UnknownNameError, ValidationError
 from gemini.modules.plants import generators, reader
 from gemini.modules.plants.spec import from_spec, validate
-from gemini.modules.serialization import problem
+from gemini.modules.serialization import located
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
@@ -74,7 +74,7 @@ def defaults(template):
 def _unknown_names(template, given):
     declared = template["parameters"]
     return [
-        problem(
+        located(
             f"parameters.{name}",
             UnknownNameError(
                 f"unknown parameter {name!r}; valid: {join_names(declared)}"
@@ -89,7 +89,7 @@ def _unknown_names(template, given):
 
 def _not_flags(given):
     return [
-        problem(
+        located(
             f"parameters.{name}",
             ValidationError(f"{name} = {value!r}; expected true or false", code="invalid_value"),
         )
@@ -191,7 +191,7 @@ def _filled(template, given):
     try:
         return fill(template, given), []
     except ConfigurationError as error:
-        return None, [problem("parameters", ValidationError(str(error), code="out_of_bounds"))]
+        return None, [located("parameters", ValidationError(str(error), code="out_of_bounds"))]
 
 
 def from_template(name, parameters=None):

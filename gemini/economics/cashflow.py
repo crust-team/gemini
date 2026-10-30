@@ -3,7 +3,7 @@
 from gemini.economics.assumptions import discounting, require, resolve
 from gemini.economics.costs import annual_energies, capex, opex
 from gemini.economics.levelised import annuity
-from gemini.economics.outcome import outcome
+from gemini.types.shapes import value
 
 
 def _revenue(assumptions, annual):
@@ -49,23 +49,22 @@ def npv(plant, results, discount_rate=None, lifetime=None, assumptions=None):
     Returns
     -------
     dict
-        ``{value, unit, reason, capex, net_cash_flow, discount_rate, lifetime_years}`` with
-        ``value`` and ``capex`` in the currency (``unit``) and ``net_cash_flow`` in currency per
-        year. ``value`` is ``None`` with the ``reason`` when the plant declares no cost.
+        ``{value, unit, capex, net_cash_flow, discount_rate, lifetime_years}``, the last four each
+        a value, with ``value`` and ``capex`` in the currency (``unit``) and ``net_cash_flow`` in
+        currency per year. ``value`` is ``None`` with a ``reason`` when the plant declares no cost.
     """
     assumptions = resolve(assumptions)
     rate, years = discounting(assumptions, discount_rate, lifetime)
     investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions)
     if investment is None:
-        return outcome(None, unit, reason)
-    return outcome(
+        return value(None, unit, reason)
+    return value(
         flow * annuity(rate, years) - investment,
         unit,
-        None,
-        capex=investment,
-        net_cash_flow=flow,
-        discount_rate=rate,
-        lifetime_years=years,
+        capex=value(investment, unit),
+        net_cash_flow=value(flow, f"{unit}/year"),
+        discount_rate=value(rate, "-"),
+        lifetime_years=value(years, "year"),
     )
 
 
@@ -83,20 +82,16 @@ def payback(plant, results, assumptions=None):
     Returns
     -------
     dict
-        ``{value, unit, reason, capex, net_cash_flow}`` with ``unit`` ``"year"``. ``value`` is
-        ``None`` with the ``reason`` when the plant declares no cost or its yearly revenue does
-        not exceed its yearly cost (it never pays back).
+        ``{value, unit, capex, net_cash_flow}`` with ``unit`` ``"year"`` and the last two each a
+        value. ``value`` is ``None`` with a ``reason`` when the plant declares no cost or its
+        yearly revenue does not exceed its yearly cost (it never pays back).
     """
     assumptions = resolve(assumptions)
-    investment, flow, _, reason = _net_cash_flow(plant, results, assumptions)
+    investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions)
     if investment is None:
-        return outcome(None, "year", reason)
+        return value(None, "year", reason)
+    details = dict(capex=value(investment, unit), net_cash_flow=value(flow, f"{unit}/year"))
     if flow <= 0:
-        return outcome(
-            None,
-            "year",
-            "the yearly revenue does not exceed the yearly cost",
-            capex=investment,
-            net_cash_flow=flow,
-        )
-    return outcome(investment / flow, "year", None, capex=investment, net_cash_flow=flow)
+        reason = "the yearly revenue does not exceed the yearly cost"
+        return value(None, "year", reason, **details)
+    return value(investment / flow, "year", **details)

@@ -232,9 +232,10 @@ def _head_coefficient_guess(module, path, observed, measured, valid):
             "seed the head-curve guess"
         )
     frequencies = observed.values(observed.bindings.controls["frequency"])[valid]
-    return fit_head_coefficients(
+    fitted = fit_head_coefficients(
         flows[valid], frequencies, measured["head"][valid], module.stage_count
     )
+    return fitted["value"]
 
 
 def _initial_guess(module, path, fields, observed, measured, valid):

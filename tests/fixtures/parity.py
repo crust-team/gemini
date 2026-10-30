@@ -175,7 +175,7 @@ def snapshot(engine, plant, recorder, log, failure=None):
         frame=results.to_frame(),
         skips=copy.deepcopy(results.skip_counts),
         errors=copy.deepcopy(results.failures),
-        summary=pd.DataFrame(results.energy_report()),
+        summary=pd.DataFrame(results.to_frame(table="energy")),
         inputs={path: dict(module._input_values) for path, module in plant.named_modules()},
         states=copy.deepcopy(engine.module_states),
         position=engine.position,

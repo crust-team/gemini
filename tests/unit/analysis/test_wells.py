@@ -28,33 +28,37 @@ def test_the_operating_point_reproduces_the_wellhead_pressure_in_the_plant_call(
     point = doublet_curves["cases"][0]["operating_point"]
     doublet = copy.deepcopy(shared_plant).get_module("doublet")
     doublet.get_module("esp").frequency = CASE["frequency"]
-    doublet.get_module("reservoir").production_rate = point["rate"]
+    doublet.get_module("reservoir").production_rate = point["rate"]["value"]
     fluid = doublet.get_module("reservoir").fluid
-    supply = doublet(return_in=Stream(m_dot=point["rate"], T=300.0, p=1e6, fluid=fluid)).outlets
+    supply = doublet(
+        return_in=Stream(m_dot=point["rate"]["value"], T=300.0, p=1e6, fluid=fluid)
+    ).outlets
     assert supply.supply_out.p == pytest.approx(4.6 * BAR, rel=1e-9)
-    assert point["wellhead_pressure"] == pytest.approx(4.6 * BAR)
+    assert point["wellhead_pressure"]["value"] == pytest.approx(4.6 * BAR)
 
 
 def test_the_lift_curve_falls_with_rate_and_the_inflow_curve_too(doublet_curves):
     """Both curves fall with rate, as the well friction and the drawdown grow."""
     case = doublet_curves["cases"][0]
     for curve in (case["ipr"], case["vlp"]):
-        assert len(curve["rate"]) == wells.CURVE_POINTS
-        assert curve["pressure"] == sorted(curve["pressure"], reverse=True)
+        assert len(curve["rate"]["value"]) == wells.CURVE_POINTS
+        assert curve["pressure"]["value"] == sorted(curve["pressure"]["value"], reverse=True)
 
 
 def test_the_inflow_curve_follows_the_linear_productivity_index(shared_plant, doublet_curves):
     """At the first rate, the sandface pressure is reservoir pressure minus flow over index."""
     reservoir = shared_plant.get_module("doublet.reservoir")
-    rate = doublet_curves["cases"][0]["ipr"]["rate"][0]
+    rate = doublet_curves["cases"][0]["ipr"]["rate"]["value"][0]
     density = reservoir.fluid.properties(reservoir.pressure, reservoir.temperature).rho_l
     expected = reservoir.pressure - rate / density / reservoir.productivity_index
-    assert doublet_curves["cases"][0]["ipr"]["pressure"][0] == pytest.approx(expected, rel=1e-12)
+    assert doublet_curves["cases"][0]["ipr"]["pressure"]["value"][0] == pytest.approx(
+        expected, rel=1e-12
+    )
 
 
 def test_a_higher_frequency_lifts_more(doublet_curves):
     """A what-if at a higher pump frequency gives a higher operating rate."""
-    slow, fast = (case["operating_point"]["rate"] for case in doublet_curves["cases"])
+    slow, fast = (case["operating_point"]["rate"]["value"] for case in doublet_curves["cases"])
     assert fast > slow
 
 
@@ -96,10 +100,10 @@ def test_pump_curve_starts_at_the_shut_in_head_of_the_polynomial(shared_plant):
     pump = shared_plant.get_module("doublet.esp")
     curve = wells.pump_curve(shared_plant, "doublet.esp")
     expected = units.ft_head_to_pa(pump.head_coefficients[0] * pump.stage_count)
-    assert curve["curve"]["flow"][0] == 0.0
-    assert curve["curve"]["head"][0] == pytest.approx(expected, rel=1e-12)
-    assert curve["frequency"] == 60.0
-    assert curve["measured"] == [] and curve["correction"] is None
+    assert curve["curve"]["flow"]["value"][0] == 0.0
+    assert curve["curve"]["head"]["value"][0] == pytest.approx(expected, rel=1e-12)
+    assert curve["frequency"] == {"value": 60.0, "unit": "Hz"}
+    assert curve["measured"] == [] and curve["correction"]["value"] is None
 
 
 def test_pump_curve_recovers_a_known_correction(shared_plant):
@@ -110,19 +114,19 @@ def test_pump_curve_recovers_a_known_correction(shared_plant):
         for flow in (0.02, 0.03, 0.04)
     ]
     curve = wells.pump_curve(shared_plant, "doublet.esp", points)
-    assert curve["correction"]["slope"] == pytest.approx(1 / 0.9, rel=1e-9)
-    assert curve["correction"]["offset"] == pytest.approx(-1000 / 0.9, rel=1e-9)
-    assert curve["measured"][0]["theoretical_head"] == pump.head_function(0.02, 55.0)
+    assert curve["correction"]["slope"]["value"] == pytest.approx(1 / 0.9, rel=1e-9)
+    assert curve["correction"]["offset"]["value"] == pytest.approx(-1000 / 0.9, rel=1e-9)
+    assert curve["measured"][0]["theoretical_head"]["value"] == pump.head_function(0.02, 55.0)
 
 
 def test_pump_curve_with_one_point_has_no_correction_and_says_why(shared_plant):
     """One point cannot fix a line; unit strings are read."""
     point = {"flow": "150 m3/h", "frequency": "55 Hz", "head": "20 bar"}
     curve = wells.pump_curve(shared_plant, "doublet.esp", [point])
-    assert curve["correction"] is None
-    assert "two or more" in curve["reason"]
-    assert curve["measured"][0]["flow"] == pytest.approx(150 / 3600)
-    assert curve["measured"][0]["head"] == 20 * BAR
+    assert curve["correction"]["value"] is None
+    assert "two or more" in curve["correction"]["reason"]
+    assert curve["measured"][0]["flow"]["value"] == pytest.approx(150 / 3600)
+    assert curve["measured"][0]["head"]["value"] == 20 * BAR
     json.dumps(curve, allow_nan=False)
 
 

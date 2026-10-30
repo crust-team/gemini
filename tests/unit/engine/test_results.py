@@ -11,6 +11,7 @@ import gemini as gm
 from gemini.engine.chunks import PathColumns, ResultChunk
 from gemini.engine.results import Results
 from gemini.types import Health, ModuleResult, Values
+from gemini.types.shapes import problem
 
 
 def result(**outputs):
@@ -48,7 +49,8 @@ def results():
 
 def test_empty_results_summary():
     """An empty finite run has an empty summary."""
-    assert Results().energy_report().empty and Results().summary() == {}
+    assert Results().energy_report() == {} and Results().summary() == {}
+    assert Results().to_frame(table="energy").empty
 
 
 def test_access_conversion_and_suggestions():
@@ -67,11 +69,32 @@ def test_access_conversion_and_suggestions():
 
 def test_summary_integrates_energy_and_counts_alarms_and_skips():
     """Energy is power times dt; alarms and skip reasons are counted per module."""
-    summary = results().energy_report()
+    summary = results().to_frame(table="energy")
     row = summary.loc[("pump", "electricity")]
     assert row["energy_J"] == 4000.0 * 3600
     assert row["peak_W"] == 3000.0 and row["alarms"] == 2 and row["skipped"] == 2
     assert row["reasons"] == {"pump.suction.p": 2}
+
+
+def test_the_energy_report_is_the_table_as_plain_values():
+    """The report is plain JSON: every number of the table is a value with its unit."""
+    rows = results()
+    report = rows.energy_report()
+    json.dumps(report, allow_nan=False)
+    entry = report["pump"]["electricity"]
+    assert entry["energy"] == {"value": 4000.0 * 3600, "unit": "J"}
+    assert entry["peak"] == {"value": 3000.0, "unit": "W"}
+    assert entry["alarms"] == {"value": 2, "unit": "-"}
+    assert entry["skipped"] == {"value": 2, "unit": "-"}
+    assert entry["reasons"] == {"pump.suction.p": 2}
+    table = rows.to_frame(table="energy").loc[("pump", "electricity")]
+    assert entry["hours"] == {"value": table["hours"], "unit": "h"}
+
+
+def test_an_unknown_table_is_refused():
+    """``to_frame`` names the tables it has."""
+    with pytest.raises(gm.errors.ValidationError, match="'series' or 'energy'"):
+        results().to_frame(table="balance")
 
 
 def test_slice_and_lossless_files(tmp_path):
@@ -82,7 +105,7 @@ def test_slice_and_lossless_files(tmp_path):
     path = rows.save(tmp_path / "results.npz")
     loaded = Results.load(path)
     pd.testing.assert_frame_equal(loaded.to_frame(), rows.to_frame())
-    pd.testing.assert_frame_equal(loaded.energy_report(), rows.energy_report())
+    pd.testing.assert_frame_equal(loaded.to_frame(table="energy"), rows.to_frame(table="energy"))
 
 
 def with_units():
@@ -105,14 +128,14 @@ def test_get_returns_time_values_and_unit_as_json():
     series = rows.get("pump", "electricity")
     assert series == {
         "time": ["2024-01-01T00:00:00+00:00", "2024-01-01T01:00:00+00:00"],
-        "values": [1000.0, 3000.0],
+        "value": [1000.0, 3000.0],
         "unit": "W",
     }
     json.dumps(series, allow_nan=False)
     late = rows.get("pump", "head", start="2024-01-01T01:00:00Z")
-    assert late["time"] == ["2024-01-01T01:00:00+00:00"] and late["values"] == [2e5]
+    assert late["time"] == ["2024-01-01T01:00:00+00:00"] and late["value"] == [2e5]
     assert rows.get("pump", "operating", end=datetime(2024, 1, 1, tzinfo=timezone.utc))[
-        "values"
+        "value"
     ] == [True]
     assert rows.get("pump", "health_score")["unit"] == "-"
     with pytest.raises(gm.errors.UnknownResultError, match="did you mean 'head'"):
@@ -127,22 +150,20 @@ def test_summary_reports_min_max_mean_and_unit_per_numeric_field():
     rows = with_units()
     summary = rows.summary()
     assert summary["pump"]["electricity"] == {
-        "min": 1000.0,
-        "max": 3000.0,
-        "mean": 2000.0,
-        "unit": "W",
+        "min": {"value": 1000.0, "unit": "W"},
+        "max": {"value": 3000.0, "unit": "W"},
+        "mean": {"value": 2000.0, "unit": "W"},
     }
     assert "operating" not in summary["pump"] and "health_message" not in summary["pump"]
-    assert (
-        rows.summary("pump", start="2024-01-01T01:00:00Z")["pump"]["electricity"]["min"] == 3000.0
-    )
+    late = rows.summary("pump", start="2024-01-01T01:00:00Z")
+    assert late["pump"]["electricity"]["min"]["value"] == 3000.0
     json.dumps(summary, allow_nan=False)
     with pytest.raises(gm.errors.UnknownResultError):
         rows.summary("pumps")
 
 
 def test_errors_list_failed_and_skipped_rows_with_their_codes():
-    """Each row has a timestamp, module, code, type and message; skips use missing_value."""
+    """Each row is a problem with its time; skips use missing_value."""
     rows = with_units()
     rows.commit(
         ResultChunk(
@@ -150,7 +171,7 @@ def test_errors_list_failed_and_skipped_rows_with_their_codes():
             [3600.0],
             {},
             [{"pump": {"pump.suction.p": 1}}],
-            [(0, dict(module="pump", message="boom", type="ValueError", code="module_error"))],
+            [(0, problem("pump", "module_error", "boom"))],
         )
     )
     errors = rows.errors()
@@ -159,11 +180,11 @@ def test_errors_list_failed_and_skipped_rows_with_their_codes():
         "missing_value",
     ]
     assert errors[2] == {
-        "timestamp": "2024-01-01T02:00:00+00:00",
-        "module": "pump",
+        "path": "pump",
         "code": "module_error",
-        "type": "ValueError",
         "message": "boom",
+        "suggestions": [],
+        "time": "2024-01-01T02:00:00+00:00",
     }
     assert errors[0]["message"] == "pump.suction.p"
     assert {row["code"] for row in errors} <= set(gm.errors.ROW_CODES)
@@ -176,8 +197,8 @@ def test_to_dict_is_plain_json_with_units():
     rows.end_state = {"position": "2024-01-01T01:00:00+00:00", "module_states": {}}
     data = rows.to_dict()
     json.dumps(data, allow_nan=False)
-    assert data["series"]["pump"]["head"] == {"unit": "Pa", "values": [2e5, 2e5]}
-    assert data["duration"] == [3600.0, 3600.0] and len(data["time"]) == 2
+    assert data["series"]["pump"]["head"] == {"value": [2e5, 2e5], "unit": "Pa"}
+    assert data["duration"] == {"value": [3600.0, 3600.0], "unit": "s"} and len(data["time"]) == 2
     assert data["end_state"] == rows.end_state and len(data["errors"]) == 2
 
 

@@ -2,8 +2,9 @@
 
 Run from the repository root after a change to a shape: ``python scripts/write_schemas.py``. The
 schemas of the plant spec and the profile come from ``gm.plants.spec_schema()`` and
-``gm.profiles.profile_schema()``; the others are written by hand. The samples come from the
-example plant, so other repositories can build against real documents.
+``gm.profiles.profile_schema()`` and those of the three return shapes from
+``gemini.types.shapes``; the others are written by hand. The samples come from the example plant,
+so other repositories can build against real documents.
 """
 
 import json
@@ -12,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 
 import gemini as gm
+from gemini.types import shapes
 
 ROOT = Path(__file__).parents[1]
 SCHEMAS = ROOT / "docs" / "schemas"
@@ -37,12 +39,12 @@ def _profile_sample(results):
         "source": PROFILE_SOURCE,
         "columns": {"heating_demand": {"unit": series["unit"], "quantity": "power"}},
         "time": series["time"],
-        "values": {"heating_demand": series["values"]},
+        "values": {"heating_demand": series["value"]},
     }
 
 
-def _error_sample():
-    """Return the dictionary of a real error."""
+def _problem_sample():
+    """Return the problem of a real error."""
     try:
         gm.modules.get("Boilr")
     except gm.errors.GeminiError as error:
@@ -58,11 +60,14 @@ def documents():
     return {
         "plant_spec.schema.json": gm.plants.spec_schema(),
         "profile.schema.json": gm.profiles.profile_schema(),
+        **{f"{name}.schema.json": schema for name, schema in shapes.SCHEMAS.items()},
         "module_description.sample.json": gm.plants.example("Doublet").describe(),
         "plant_spec.sample.json": spec,
         "results_summary.sample.json": results.summary(),
-        "error.sample.json": _error_sample(),
         "profile.sample.json": _profile_sample(results),
+        "value.sample.json": results.summary()["heat_exchanger"]["duty"]["mean"],
+        "problem.sample.json": _problem_sample(),
+        "check.sample.json": gm.checks.energy_balance(results),
     }
 
 

@@ -1,0 +1,12 @@
+{
+  "limit": {
+    "unit": "W",
+    "value": 1e-09
+  },
+  "name": "energy_balance",
+  "passed": true,
+  "value": {
+    "unit": "W",
+    "value": 0.0
+  }
+}

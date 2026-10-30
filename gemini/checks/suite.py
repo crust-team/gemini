@@ -19,7 +19,7 @@ def run_all(plant, results):
     -------
     dict
         Plain JSON ``{passed, checks}``: ``checks`` lists the results of ``energy_balance``,
-        ``mass_balance`` and ``bounds`` (each ``{name, passed, value, tolerance}``), and
+        ``mass_balance`` and ``bounds`` (each ``{name, passed, value, limit}``), and
         ``passed`` is ``False`` if any check failed, ``True`` if none failed and at least one
         passed, and ``None`` if none could judge.
     """

@@ -12,7 +12,7 @@ import numpy as np
 
 from gemini.analysis.series import energy, leaf_total, results_total, window_seconds
 from gemini.modules.demand import CoolingConsumer, HeatConsumer
-from gemini.utils.jsonable import to_plain
+from gemini.types.shapes import value
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ def names():
 
 
 def kpi(plant, results):
-    """Return the KPIs of a finished run as ``{name: {value, unit, reason}}``, plain JSON.
+    """Return the KPIs of a finished run as ``{name: {value, unit}}``, plain JSON.
 
     Parameters
     ----------
@@ -138,9 +138,9 @@ def kpi(plant, results):
     series = _read(plant, results)
     values = {}
     for name, (unit, compute) in _KPIS.items():
-        value, reason = compute(series)
-        values[name] = {"value": value, "unit": unit, "reason": reason}
-    return to_plain(values)
+        number, reason = compute(series)
+        values[name] = value(number, unit, reason)
+    return values
 
 
 kpi.names = names

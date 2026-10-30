@@ -19,4 +19,4 @@ for frequency in (55, 60, 65):
     }
     results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     assert not results.errors(), results.errors()[0]
-    print(frequency, results.energy_report())
+    print(frequency, results.to_frame(table="energy"))

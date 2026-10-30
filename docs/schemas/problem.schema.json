@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every error, validation result and failed run row: the shape of 422 details and agent tool results. code is one of gm.errors.CODES or gm.errors.ROW_CODES; a run row adds time.",
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "suggestions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "time": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "code",
+    "message",
+    "suggestions"
+  ],
+  "title": "GEMINI problem",
+  "type": "object"
+}

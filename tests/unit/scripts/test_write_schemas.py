@@ -10,7 +10,15 @@ from tests.fixtures.json_schema import check
 from tests.fixtures.parity import RTOL
 
 SCHEMAS = Path(write_schemas.__file__).parents[1] / "docs" / "schemas"
-DOCUMENTS = ("module_description", "plant_spec", "results_summary", "error", "profile")
+DOCUMENTS = (
+    "module_description",
+    "plant_spec",
+    "results_summary",
+    "problem",
+    "value",
+    "check",
+    "profile",
+)
 
 
 def same(first, second):
@@ -47,6 +55,6 @@ def test_every_sample_fits_its_schema(name):
 
 def test_the_checker_finds_problems():
     """A checker that accepts everything proves nothing."""
-    schema = json.loads((SCHEMAS / "error.schema.json").read_text())
+    schema = json.loads((SCHEMAS / "problem.schema.json").read_text())
     problems = check({"class": 1, "extra": 2}, schema)
     assert "$: unexpected extra" in problems and "$: missing message" in problems

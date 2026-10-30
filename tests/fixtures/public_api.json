@@ -139,7 +139,9 @@
    ],
    "to_bytes": [],
    "to_dict": [],
-   "to_frame": []
+   "to_frame": [
+    "table"
+   ]
   }
  },
  "codes": [
@@ -581,11 +583,13 @@
   ]
  },
  "schemas": {
-  "error.schema.json": "86c70a1f0ffb4f65371e401e7a4a571c246c455a54438381edc92189bd24d7f1",
+  "check.schema.json": "8a57d8429749d44399831d8dcedf4288c77070665171246949e55476f138c3b3",
   "module_description.schema.json": "1162b599326e224813c700484e8ca41bba0596fd9d0eced4be43ce8edee48a86",
   "plant_spec.schema.json": "b404fceb9c4124b68b96894ec446f2e73285424de87697d33857c0b7d8aa644e",
+  "problem.schema.json": "98fbbd71c3cdb8b5c55b3cca2d2829999ab8665e4eb7dd1062fcc77d970383b4",
   "profile.schema.json": "1d516189feaf3a16f2ef7090defeebcde7adfa7b0b509e50fdb577db138531ce",
-  "results_summary.schema.json": "40041f2a8dd9d374a37286a3014c3bb1b3bd28665bc65ec4e3087e4c999d37d8"
+  "results_summary.schema.json": "733213574165c3f2dc0176924aeb6eb350c38a75864b9dd1d146353fa442edf8",
+  "value.schema.json": "99da0d9dff87ea775bbd0ebeec60c185376587064f605f9647d7537020d40cc6"
  },
  "streams": [
   "brine",

@@ -107,9 +107,7 @@ class EventLog(Callback):
         for path, result in engine.step_results.items():
             self._calls(engine.plant, path, result)
         for error in engine.results.failures[self._logged_errors :]:
-            self.log(
-                "error", module=error["module"], message=error["message"], error_type=error["type"]
-            )
+            self.log("error", module=error["path"], message=error["message"], code=error["code"])
         self._logged_errors = len(engine.results.failures)
         self.log("step_end", time=sample.t.isoformat(), dt=sample.dt)
 

@@ -8,12 +8,13 @@ import numpy as np
 
 from gemini.errors import InsufficientDataError, UnknownCorrelationError
 from gemini.physics import constants, heat_transfer, units
+from gemini.types.shapes import value
 
 CURVE_COEFFICIENTS = 6
 """Number of ascending polynomial coefficients of an ESP curve, so at least so many flows."""
 
 
-def fit_head_coefficients(flows, frequencies, heads, stage_count) -> list[float]:
+def fit_head_coefficients(flows, frequencies, heads, stage_count):
     """Fit the six ascending US-basis ESP head coefficients from SI observations.
 
     Parameters
@@ -26,8 +27,9 @@ def fit_head_coefficients(flows, frequencies, heads, stage_count) -> list[float]
 
     Returns
     -------
-    list of float
-        Coefficients of ``physics.pumps.head``: ft of head per stage at 60 Hz with flow in bbl/day.
+    dict
+        A value: the six coefficients of ``physics.pumps.head``, ascending, on their own mixed US
+        basis (ft of head per stage at 60 Hz with flow in bbl/day), so the unit is ``"-"``.
 
     Notes
     -----
@@ -44,10 +46,10 @@ def fit_head_coefficients(flows, frequencies, heads, stage_count) -> list[float]
     if len(np.unique(x)) < CURVE_COEFFICIENTS:
         raise InsufficientDataError("ESP: six distinct flow values are required")
     degree = CURVE_COEFFICIENTS - 1
-    return np.polynomial.Polynomial.fit(x, y, degree).convert().coef.tolist()
+    return value(np.polynomial.Polynomial.fit(x, y, degree).convert().coef.tolist(), "-")
 
 
-def fit_head_correction(measured, theoretical) -> tuple[float, float]:
+def fit_head_correction(measured, theoretical):
     """Fit the affine correction ``theoretical = slope * measured + offset`` [-, Pa].
 
     Parameters
@@ -57,17 +59,20 @@ def fit_head_correction(measured, theoretical) -> tuple[float, float]:
 
     Returns
     -------
-    tuple of float
-        Least-squares slope [-] and offset [Pa].
+    dict
+        ``{slope, offset}``: the least-squares slope [-] and offset [Pa], each a value.
     """
     x, y = (np.asarray(value, dtype=float) for value in (measured, theoretical))
     if x.shape != y.shape or len(x) < 2 or not np.isfinite([x, y]).all() or np.var(x) == 0:
         raise InsufficientDataError("ESP: two or more finite, distinct measurements required")
     slope = np.sum((x - x.mean()) * (y - y.mean())) / np.sum((x - x.mean()) ** 2)
-    return float(slope), float(y.mean() - slope * x.mean())
+    return {
+        "slope": value(float(slope), "-"),
+        "offset": value(float(y.mean() - slope * x.mean()), "Pa"),
+    }
 
 
-def estimate_reservoir_pressure(flows, bottomhole_pressures) -> tuple[float, float]:
+def estimate_reservoir_pressure(flows, bottomhole_pressures):
     """Fit the reservoir pressure [Pa] and the R-squared [-] from flow observations.
 
     Parameters
@@ -78,9 +83,10 @@ def estimate_reservoir_pressure(flows, bottomhole_pressures) -> tuple[float, flo
 
     Returns
     -------
-    tuple of float
-        The slope of the least-squares line ``p_bh / Q = p_res (1 / Q) + b``, which is the
-        reservoir pressure of a linear inflow relation, and the R-squared of the line.
+    dict
+        ``{pressure, r_squared}``, each a value: the slope of the least-squares line ``p_bh / Q =
+        p_res (1 / Q) + b``, which is the reservoir pressure of a linear inflow relation, and the
+        R-squared of the line.
     """
     q, p = (np.asarray(value, dtype=float) for value in (flows, bottomhole_pressures))
     if (
@@ -99,7 +105,10 @@ def estimate_reservoir_pressure(flows, bottomhole_pressures) -> tuple[float, flo
     coefficients = np.polyfit(x, y, 1)
     residual = y - np.poly1d(coefficients)(x)
     r_squared = 1 - np.sum(residual**2) / np.sum((y - np.mean(y)) ** 2)
-    return float(coefficients[0]), float(r_squared)
+    return {
+        "pressure": value(float(coefficients[0]), "Pa"),
+        "r_squared": value(float(r_squared), "-"),
+    }
 
 
 def estimate_conductance(
@@ -114,7 +123,7 @@ def estimate_conductance(
     cp_cold=heat_transfer.DEFAULT_CP,
     arrangement="counterflow",
 ):
-    """Estimate the apparent UA [W/K] of an exchanger from measured temperatures and mass flows.
+    """Return the apparent UA of an exchanger as a value in W/K, from temperatures and mass flows.
 
     Temperatures are in K, mass flows in kg/s and heat capacities in J/kg/K. Raises
     ``InsufficientDataError`` when the measurements cannot determine UA: a stopped stream, hot and
@@ -147,4 +156,4 @@ def estimate_conductance(
         )
     if code == heat_transfer.NO_LMTD:
         raise InsufficientDataError(f"HeatExchanger: positive LMTD required; got {delta} K")
-    return apparent
+    return value(apparent, "W/K")

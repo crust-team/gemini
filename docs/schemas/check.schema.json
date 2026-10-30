@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "value": {
+      "anyOf": [
+        {
+          "properties": {
+            "value": {
+              "type": [
+                "number",
+                "boolean",
+                "string",
+                "array"
+              ]
+            }
+          }
+        },
+        {
+          "required": [
+            "reason"
+          ]
+        }
+      ],
+      "description": "A number with its unit: {value, unit}. value is a number, an array or null, and when it is null a reason says why. A time series adds time. An output that is a flag or a text keeps its boolean or string; economics returns add the parts of the result as keys.",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "time": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "number",
+            "boolean",
+            "string",
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "GEMINI value",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A judged quantity: {name, passed, value, limit}. value and limit are values. passed is null, with a reason in value, when there is nothing to judge.",
+  "properties": {
+    "limit": {
+      "$ref": "#/$defs/value"
+    },
+    "name": {
+      "type": "string"
+    },
+    "passed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "value": {
+      "$ref": "#/$defs/value"
+    }
+  },
+  "required": [
+    "name",
+    "passed",
+    "value",
+    "limit"
+  ],
+  "title": "GEMINI check",
+  "type": "object"
+}

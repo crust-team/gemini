@@ -32,27 +32,30 @@ def forecast():
 
 def test_rate_is_the_original_reference_value(forecast):
     """DLM at 50 degC and 3 bar corrodes 6.7 mm/year, the retained original test."""
-    assert forecast["rate"] == pytest.approx(6.7, abs=0.05)
-    assert forecast["units"]["rate"] == "mm/year"
+    assert forecast["rate"]["value"] == pytest.approx(6.7, abs=0.05)
+    assert forecast["rate"]["unit"] == "mm/year"
 
 
 def test_thickness_falls_linearly_with_the_rate(forecast):
     """After each whole year the wall has lost rate times years, in metres."""
-    for years, thickness in enumerate(forecast["thickness"][:-1]):
-        assert thickness == pytest.approx(0.010 - forecast["rate"] / 1000 * years, rel=1e-12)
-    assert len(forecast["time"]) == len(forecast["thickness"]) == 4
-    assert forecast["time"][-1] == "2026-07-01T00:00:00+00:00"
+    wall = forecast["thickness"]
+    rate = forecast["rate"]["value"]
+    for years, thickness in enumerate(wall["value"][:-1]):
+        assert thickness == pytest.approx(0.010 - rate / 1000 * years, rel=1e-12)
+    assert len(wall["time"]) == len(wall["value"]) == 4 and wall["unit"] == "m"
+    assert wall["time"][-1] == "2026-07-01T00:00:00+00:00"
 
 
 def test_years_left_is_the_remaining_wall_over_the_rate(forecast):
     """3 mm of allowance at the rate gives the years to the minimum wall."""
-    assert forecast["years_left"] == pytest.approx(3 / forecast["rate"], rel=1e-9)
+    assert forecast["years_left"]["value"] == pytest.approx(3 / forecast["rate"]["value"], rel=1e-9)
 
 
 def test_a_wall_at_its_minimum_has_no_time_left():
     """Zero years left, not a negative number."""
     worn = dict(MODEL, thickness=0.007)
-    assert integrity.corrosion_forecast(worn, "2025-01-01T00:00:00Z")["years_left"] == 0.0
+    forecast = integrity.corrosion_forecast(worn, "2025-01-01T00:00:00Z")
+    assert forecast["years_left"] == {"value": 0.0, "unit": "year"}
 
 
 def test_the_rate_matches_the_physics_function_in_si(forecast):
@@ -65,7 +68,7 @@ def test_the_rate_matches_the_physics_function_in_si(forecast):
         water_flow_rate=math.pi * 0.1**2 / 4,
         diameter=0.1,
     )
-    assert forecast["rate"] == direct
+    assert forecast["rate"]["value"] == direct
 
 
 def test_inputs_are_checked():

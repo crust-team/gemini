@@ -21,6 +21,6 @@ def test_doublet_heat_replay_is_identical_on_both_backends(shared_plant, fast_fr
     assert traced.to_frame().dtypes.tolist() == plain.to_frame().dtypes.tolist()
     assert traced.skip_counts == plain.skip_counts and traced.errors() == plain.errors()
     pd.testing.assert_frame_equal(
-        pd.DataFrame(traced.energy_report()), pd.DataFrame(plain.energy_report()), check_exact=True
+        traced.to_frame(table="energy"), plain.to_frame(table="energy"), check_exact=True
     )
     assert all(reasons == [] for reasons in engine.graph_breaks.values())

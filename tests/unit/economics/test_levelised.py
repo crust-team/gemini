@@ -26,8 +26,8 @@ def test_lcoh_is_discounted_cost_over_discounted_heat():
     result = gm.economics.lcoh(heating_plant(), day(), 0.05, 20, PRICES)
     assert result["value"] == pytest.approx((1000.0 + OPEX * factor) / (HEAT * factor), rel=1e-12)
     assert result["unit"] == "EUR/J"
-    assert result["capex"] == 1000.0
-    assert result["opex"] == pytest.approx(OPEX, rel=1e-12)
+    assert result["capex"] == {"value": 1000.0, "unit": "EUR"}
+    assert result["opex"]["value"] == pytest.approx(OPEX, rel=1e-12)
 
 
 def test_lcoh_at_zero_rate_spreads_the_cost_over_the_years():

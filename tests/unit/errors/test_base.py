@@ -26,13 +26,12 @@ def test_every_exported_class_has_a_gemini_root():
 
 
 def test_to_dict_gives_the_fixed_shape():
-    """``to_dict`` is plain JSON with the class, message, path, code and suggestions."""
+    """``to_dict`` is the problem: plain JSON with the path, code, message and suggestions."""
     error = errors.UnknownNameError("no such name", path="doublet.esp", suggestions=("esp",))
     assert error.to_dict() == {
-        "class": "UnknownNameError",
-        "message": "no such name",
         "path": "doublet.esp",
         "code": "unknown_name",
+        "message": "no such name",
         "suggestions": ["esp"],
     }
     assert json.dumps(error.to_dict())

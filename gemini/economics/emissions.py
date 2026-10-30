@@ -6,8 +6,8 @@ import numpy as np
 
 from gemini.analysis.series import results_total, window_seconds
 from gemini.economics.assumptions import require, resolve
-from gemini.economics.outcome import outcome
 from gemini.modules.balance import emissions
+from gemini.types.shapes import value
 
 _LEDGER = ("electricity", "fuel", "electricity_generated")
 
@@ -59,8 +59,8 @@ def co2(results, assumptions=None):
     Returns
     -------
     dict
-        ``{value, unit, reason, fuel_energy, grid_energy, window}``: ``value`` in kg over the
-        window of the results, ``fuel_energy`` and ``grid_energy`` in J and ``window`` in s.
+        ``{value, unit, fuel_energy, grid_energy, window}``: ``value`` in kg over the window of
+        the results; ``fuel_energy`` and ``grid_energy`` in J and ``window`` in s, each a value.
         Grid electricity drawn without ``electricity_emission_factor`` raises
         ``ValidationError`` (code ``missing_value``).
     """
@@ -69,11 +69,10 @@ def co2(results, assumptions=None):
     emitted = fuel * assumptions.fuel_emission_factor
     if grid > 0:
         emitted += grid * require(assumptions, "electricity_emission_factor")
-    return outcome(
+    return value(
         emitted,
         "kg",
-        None,
-        fuel_energy=fuel,
-        grid_energy=grid,
-        window=float(window_seconds(results).sum()),
+        fuel_energy=value(fuel, "J"),
+        grid_energy=value(grid, "J"),
+        window=value(float(window_seconds(results).sum()), "s"),
     )

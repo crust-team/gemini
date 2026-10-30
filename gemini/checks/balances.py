@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from gemini.checks.outcome import check
 from gemini.modules.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
+from gemini.types.shapes import check, value
 from gemini.utils.strings import join_path
 
 ENERGY_TOLERANCE = 1e-9
@@ -30,16 +30,17 @@ def _columns(results, wanted):
     return frame[names]
 
 
-def _nonnegative(name, values, tolerance, absent):
-    """Judge that every value is finite-or-missing and at least ``-tolerance``."""
+def _nonnegative(name, values, tolerance, unit, absent):
+    """Judge that every value is finite-or-missing and at least ``-tolerance`` in ``unit``."""
+    limit = value(tolerance, unit)
     if values.shape[1] == 0:
-        return check(name, None, None, tolerance, absent)
+        return check(name, None, value(None, unit, absent), limit)
     array = values.to_numpy(dtype=float)
     if np.isnan(array).all():
-        return check(name, None, None, tolerance, "every value is missing")
+        return check(name, None, value(None, unit, "every value is missing"), limit)
     smallest = float(np.nanmin(array))
     passed = bool(smallest >= -tolerance and not np.isinf(array).any())
-    return check(name, passed, smallest, tolerance)
+    return check(name, passed, value(smallest, unit), limit)
 
 
 def energy_balance(results):
@@ -61,14 +62,14 @@ def energy_balance(results):
     Returns
     -------
     dict
-        ``{name: "energy_balance", passed, value, tolerance}``: ``value`` is the smallest of
-        those powers [W] over all columns and ticks, ``tolerance`` is 1e-9 W and ``passed`` is
-        whether ``value >= -tolerance`` with no infinite value. ``passed`` is ``None`` with a
-        ``reason`` when no such column, or no value, exists.
+        ``{name: "energy_balance", passed, value, limit}``: ``value`` is the smallest of those
+        powers [W] over all columns and ticks, ``limit`` is 1e-9 W and ``passed`` is whether
+        ``value >= -limit`` with no infinite value. ``passed`` is ``None``, with a ``reason`` in
+        ``value``, when no such column, or no value, exists.
     """
     values = _columns(results, lambda path, field: field in _NONNEGATIVE_ENERGY)
     return _nonnegative(
-        "energy_balance", values, ENERGY_TOLERANCE, "results have no energy output column"
+        "energy_balance", values, ENERGY_TOLERANCE, "W", "results have no energy output column"
     )
 
 
@@ -89,9 +90,10 @@ def mass_balance(results):
     Returns
     -------
     dict
-        ``{name: "mass_balance", passed, value, tolerance}``: ``value`` is the smallest mass flow
-        [kg/s], ``tolerance`` 1e-12 kg/s. ``passed`` is ``None`` with a ``reason`` when no
-        output has the unit kg/s, or no value exists.
+        ``{name: "mass_balance", passed, value, limit}``: ``value`` is the smallest mass flow
+        [kg/s], ``limit`` 1e-12 kg/s. ``passed`` is ``None``, with a ``reason`` in ``value``, when
+        no output has the unit kg/s, or no value exists.
     """
     values = _columns(results, lambda path, field: results.unit(path, field) == "kg/s")
-    return _nonnegative("mass_balance", values, MASS_TOLERANCE, "results have no output in kg/s")
+    absent = "results have no output in kg/s"
+    return _nonnegative("mass_balance", values, MASS_TOLERANCE, "kg/s", absent)

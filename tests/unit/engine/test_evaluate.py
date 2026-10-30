@@ -70,7 +70,7 @@ def test_a_failing_call_returns_errors_instead_of_raising(changes, code):
     result = call(**changes)
     assert result["outlets"] == {} and result["outputs"] == {}
     assert [error["code"] for error in result["errors"]] == [code]
-    assert set(result["errors"][0]) == {"class", "message", "path", "code", "suggestions"}
+    assert set(result["errors"][0]) == {"path", "code", "message", "suggestions"}
 
 
 def test_an_unknown_name_comes_with_suggestions():

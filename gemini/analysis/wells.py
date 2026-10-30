@@ -19,6 +19,7 @@ from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import ProductionWell
 from gemini.physics import constants, units
+from gemini.types.shapes import value
 from gemini.utils.jsonable import to_plain
 
 CURVE_POINTS = 21
@@ -96,18 +97,17 @@ def _curves(chain, pressure, rates):
     """Return the IPR, the VLP and the operating point for a rate bracket."""
     low, high = rates
     sampled = np.linspace(low, high, CURVE_POINTS)
-    ipr = {
-        "rate": sampled,
-        "pressure": [chain.reservoir.sandface_stream(rate).p for rate in sampled],
-    }
-    vlp = {"rate": sampled, "pressure": [_lift(chain, rate) for rate in sampled]}
+    inflow = [chain.reservoir.sandface_stream(rate).p for rate in sampled]
+    lift = [_lift(chain, rate) for rate in sampled]
+    ipr = {"rate": value(sampled, "kg/s"), "pressure": value(inflow, "Pa")}
+    vlp = {"rate": value(sampled, "kg/s"), "pressure": value(lift, "Pa")}
     rate = solves.solve_production_rate(
         chain.reservoir, chain.lower, pressure, rates, esp=chain.esp, riser=chain.upper
     )
     point = {
-        "rate": rate,
-        "wellhead_pressure": pressure,
-        "sandface_pressure": chain.reservoir.sandface_stream(rate).p,
+        "rate": value(rate, "kg/s"),
+        "wellhead_pressure": value(pressure, "Pa"),
+        "sandface_pressure": value(chain.reservoir.sandface_stream(rate).p, "Pa"),
     }
     return ipr, vlp, point
 
@@ -159,12 +159,12 @@ def nodal(plant, well, conditions):
     Returns
     -------
     dict
-        Plain JSON ``{well, units, cases}``, ``units`` being ``{rate: "kg/s", pressure: "Pa"}``.
-        Each case holds ``conditions`` as given, ``ipr`` and ``vlp`` as ``{rate, pressure}`` with
-        21 points from the low to the high rate, ``operating_point`` as ``{rate,
-        wellhead_pressure, sandface_pressure}`` and ``error``. A case whose bracket leaves the
-        well model's domain or has no sign change has ``None`` curves and operating point and the
-        ``to_dict()`` of the ``PhysicsRangeError`` in ``error``.
+        Plain JSON ``{well, cases}``. Each case holds ``conditions`` as given, ``ipr`` and ``vlp``
+        as ``{rate, pressure}``, each a value with 21 points from the low to the high rate,
+        ``operating_point`` as ``{rate, wellhead_pressure, sandface_pressure}``, each a value, and
+        ``error``. A case whose bracket leaves the well model's domain or has no sign change has
+        ``None`` curves and operating point and the problem of the ``PhysicsRangeError`` in
+        ``error``.
     """
     chain_plant = deepcopy(plant)
     chain = _chain(chain_plant, well)
@@ -172,7 +172,6 @@ def nodal(plant, well, conditions):
     return to_plain(
         {
             "well": well,
-            "units": {"rate": "kg/s", "pressure": "Pa"},
             "cases": [_case(chain, case) for case in cases],
         }
     )
@@ -219,15 +218,26 @@ def _points(measured):
     ]
 
 
-def _correction(pump, points):
+def _correction(points):
     """Return the affine correction of theoretical head on measured head, or why it has none."""
+    if not points:
+        return value(None, "-", "no measured points")
     try:
-        slope, offset = fit_head_correction(
+        return fit_head_correction(
             [point["head"] for point in points], [point["theoretical_head"] for point in points]
         )
     except InsufficientDataError as error:
-        return None, str(error)
-    return {"slope": slope, "offset": offset}, None
+        return value(None, "-", str(error))
+
+
+def _measured_point(point):
+    """Return one measured point with every number as a value."""
+    return {
+        "flow": value(point["flow"], "m3/s"),
+        "frequency": value(point["frequency"], "Hz"),
+        "head": value(point["head"], "Pa"),
+        "theoretical_head": value(point["theoretical_head"], "Pa"),
+    }
 
 
 def _head_curve(module, frequency, n_points=50):
@@ -268,13 +278,13 @@ def pump_curve(plant, pump, measured=None):
     Returns
     -------
     dict
-        Plain JSON ``{pump, frequency, units, curve, measured, correction, reason}``. ``curve`` is
-        ``{flow, head}``. Each measured point gains ``theoretical_head`` [Pa], the pump's head
-        at its flow and frequency. ``correction`` is ``{slope, offset}`` of the least-squares line
-        ``theoretical_head = slope * head + offset`` (offset in Pa); it is ``None`` with the
-        ``reason`` when fewer than two distinct measured heads are given. This is the retained
-        ``fit_head_correction``; no module applies the correction yet, so it is a diagnosis,
-        not a parameter to set.
+        Plain JSON ``{pump, frequency, curve, measured, correction}``, every number a value.
+        ``curve`` is ``{flow, head}``. Each measured point gains ``theoretical_head`` [Pa], the
+        pump's head at its flow and frequency. ``correction`` is ``{slope, offset}`` of the
+        least-squares line ``theoretical_head = slope * head + offset`` (offset in Pa), or a value
+        ``None`` with a ``reason`` when fewer than two distinct measured heads are given. This is
+        the retained ``fit_head_correction``; no module applies the correction yet, so it is a
+        diagnosis, not a parameter to set.
     """
     module = plant.get_module(pump)
     if not isinstance(module, ESP):
@@ -284,20 +294,15 @@ def pump_curve(plant, pump, measured=None):
     points = _points(measured)
     for point in points:
         point["theoretical_head"] = float(module.head_function(point["flow"], point["frequency"]))
-    correction, reason = _correction(module, points) if points else (None, "no measured points")
     reference = constants.ESP_REFERENCE_FREQUENCY.value
     flows, heads = zip(*_head_curve(module, reference))
-    return to_plain(
-        {
-            "pump": pump,
-            "frequency": reference,
-            "units": {"flow": "m3/s", "head": "Pa", "frequency": "Hz"},
-            "curve": {"flow": flows, "head": heads},
-            "measured": points,
-            "correction": correction,
-            "reason": reason,
-        }
-    )
+    return {
+        "pump": pump,
+        "frequency": value(reference, "Hz"),
+        "curve": {"flow": value(flows, "m3/s"), "head": value(heads, "Pa")},
+        "measured": [_measured_point(point) for point in points],
+        "correction": _correction(points),
+    }
 
 
 def calibrate_pump(plant, pump, measured):

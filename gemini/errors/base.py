@@ -38,6 +38,16 @@ ROW_CODES = {
 """Every row code of ``Results.errors()`` with its meaning."""
 
 
+def problem(path, code, message, suggestions=(), time=None):
+    """Return the shape ``{path, code, message, suggestions}`` of every problem as plain JSON.
+
+    A failed run row adds ``time``. The one helper of the shape, here because ``gemini.errors`` is
+    a leaf package and ``to_dict`` returns one; ``gemini.types.shapes`` exports it with the others.
+    """
+    shape = {"path": path, "code": code, "message": str(message), "suggestions": list(suggestions)}
+    return shape if time is None else shape | {"time": time}
+
+
 class GeminiError(Exception):
     """Base class of every error GEMINI raises on purpose; catch it to handle them all.
 
@@ -63,15 +73,9 @@ class GeminiError(Exception):
             self.suggestions = tuple(suggestions)
 
     def to_dict(self):
-        """Return ``{class, message, path, code, suggestions}`` as plain JSON."""
+        """Return the problem ``{path, code, message, suggestions}`` as plain JSON."""
         message = self.args[0] if isinstance(self, KeyError) and self.args else self
-        return {
-            "class": type(self).__name__,
-            "message": str(message),
-            "path": self.path,
-            "code": self.code,
-            "suggestions": list(self.suggestions),
-        }
+        return problem(self.path, self.code, message, self.suggestions)
 
 
 class GeminiWarning(UserWarning):

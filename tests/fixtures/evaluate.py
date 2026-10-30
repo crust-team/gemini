@@ -138,7 +138,8 @@ def _injectivity(inputs):
 
 def _reservoir_estimate(inputs):
     """Fit the reservoir pressure line through measured flows and bottomhole pressures."""
-    pressure, r_squared = estimate_reservoir_pressure(inputs["flow"], inputs["bottomhole_pressure"])
+    estimate = estimate_reservoir_pressure(inputs["flow"], inputs["bottomhole_pressure"])
+    pressure, r_squared = estimate["pressure"]["value"], estimate["r_squared"]["value"]
     return dict(reservoir_pressure=pressure, r_squared=r_squared)
 
 

@@ -6,7 +6,7 @@ import numpy as np
 
 from gemini.errors import NotImplementedYet, ValidationError
 from gemini.physics import corrosion, units
-from gemini.utils.jsonable import to_plain
+from gemini.types.shapes import series, value
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 from gemini.utils.time import to_utc
 
@@ -77,12 +77,12 @@ def corrosion_forecast(model, until):
     Returns
     -------
     dict
-        Plain JSON ``{correlation, rate, units, time, thickness, minimum_thickness, years_left,
-        reason}``. ``rate`` is the penetration rate [mm/year]; ``time`` is ISO text: the start,
-        each whole year after it and ``until``; ``thickness`` is the wall [m] at those instants
-        (a breached wall is not clipped); ``years_left`` [year] is the time from ``start`` to the
-        minimum wall, 0 when the wall is already at it, and ``None`` with the ``reason`` when the
-        rate is not positive. The rate of a correlation outside its domain raises
+        Plain JSON ``{correlation, rate, thickness, minimum_thickness, years_left}``. ``rate`` is
+        the penetration rate [mm/year], a value; ``thickness`` is the time series of the wall [m]
+        at the start, each whole year after it and ``until`` (a breached wall is not clipped);
+        ``years_left`` [year] is a value: the time from ``start`` to the minimum wall, 0 when the
+        wall is already at it, and ``None`` with a ``reason`` when the rate is not positive. The
+        rate of a correlation outside its domain raises
         ``PhysicsRangeError``.
     """
     start, end = to_utc(model["start"]), to_utc(until)
@@ -100,19 +100,16 @@ def corrosion_forecast(model, until):
     remaining = corrosion.time_to_minimum_wall(
         model["thickness"], model["minimum_thickness"], rate / 1000 / units.SECONDS_PER_YEAR
     )
-    positive = rate > 0
-    return to_plain(
-        {
-            "correlation": model["correlation"],
-            "rate": rate,
-            "units": {"rate": "mm/year", "thickness": "m", "years_left": "year"},
-            "time": times,
-            "thickness": thickness,
-            "minimum_thickness": model["minimum_thickness"],
-            "years_left": remaining / units.SECONDS_PER_YEAR if positive else None,
-            "reason": None if positive else "the corrosion rate is not positive",
-        }
-    )
+    left = value(None, "year", "the corrosion rate is not positive")
+    if rate > 0:
+        left = value(remaining / units.SECONDS_PER_YEAR, "year")
+    return {
+        "correlation": model["correlation"],
+        "rate": value(rate, "mm/year"),
+        "thickness": series(times, thickness, "m"),
+        "minimum_thickness": value(model["minimum_thickness"], "m"),
+        "years_left": left,
+    }
 
 
 def calibrate_corrosion(logs):

@@ -72,13 +72,13 @@ def test_event_log_serialises_a_stream_inlet_as_before():
     }
 
 
-def test_event_log_reports_recorded_errors_with_their_type(tmp_path):
-    """A recorded module failure is logged before its step end with the original type."""
+def test_event_log_reports_recorded_errors_with_their_code(tmp_path):
+    """A recorded module failure is logged before its step end with its row code."""
     events = EventLog(tmp_path / "events.jsonl")
     run([1.0, -1.0], events)
     lines = [json.loads(line) for line in (tmp_path / "events.jsonl").read_text().splitlines()]
     error = next(line for line in lines if line["kind"] == "error")
-    assert error["module"] == "" and error["error_type"] == "ValueError"
+    assert error["module"] == "" and error["code"] == "module_error"
     assert error["message"] == "negative level"
     assert [line["kind"] for line in lines][-3:] == ["error", "step_end", "run_end"]
 

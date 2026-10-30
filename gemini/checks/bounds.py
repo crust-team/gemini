@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from gemini.checks.outcome import check
+from gemini.types.shapes import check, value
 from gemini.utils.strings import join_path
 
 _OUTSIDE = {
@@ -43,9 +43,9 @@ def bounds(plant, results):
     Returns
     -------
     dict
-        ``{name: "bounds", passed, value, tolerance}``: ``value`` is the number of values outside
-        their limits, over all columns and ticks, and ``tolerance`` is 0. ``passed`` is
-        ``None`` with a ``reason`` when no recorded output has a limit.
+        ``{name: "bounds", passed, value, limit}``: ``value`` is the number of values outside
+        their limits, over all columns and ticks, and ``limit`` is 0. ``passed`` is ``None``,
+        with a ``reason`` in ``value``, when no recorded output has a limit.
     """
     frame = results.to_frame()
     judged, violations = 0, 0
@@ -57,6 +57,8 @@ def bounds(plant, results):
             if limits and pd.api.types.is_numeric_dtype(column) and column.dtype != bool:
                 judged += 1
                 violations += _outside(column, limits)
+    limit = value(0, "-")
     if not judged:
-        return check("bounds", None, None, 0, "no recorded output has a declared limit")
-    return check("bounds", violations == 0, violations, 0)
+        reason = "no recorded output has a declared limit"
+        return check("bounds", None, value(None, "-", reason), limit)
+    return check("bounds", violations == 0, value(violations, "-"), limit)

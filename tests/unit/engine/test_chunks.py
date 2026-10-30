@@ -11,6 +11,7 @@ from gemini.engine.chunks import PathColumns, ResultChunk
 from gemini.engine.results import Results
 from gemini.modules import Module
 from gemini.types import Health, ModuleResult, Output, Ports, Ratio, Stream, Values
+from gemini.types.shapes import problem
 from tests.fixtures.frames import path_frame
 
 SIZE = 8
@@ -62,7 +63,7 @@ HEALTH = {
     "tank": None,
 }
 SKIPS = [{}, {}, {}, {}, {"pump": {"pump.suction.p": 1}}, {}, {}, {}]
-ERRORS = [(3, dict(module="pump", message="boom", type="ValueError", code="module_error"))]
+ERRORS = [(3, problem("pump", "module_error", "boom"))]
 CUTS = [[8], [1] * 8, [3, 5], [2, 2, 4], [4, 1, 3], [7, 1]]
 
 
@@ -185,7 +186,7 @@ def test_chunks_equal_the_tick_by_tick_build(cuts):
     """One chunk or several give the same table, column order, dtypes and diagnostics."""
     expected, built = build_by_rows(), build_by_chunks(cuts)
     pd.testing.assert_frame_equal(built.to_frame(), expected.to_frame())
-    pd.testing.assert_frame_equal(built.energy_report(), expected.energy_report())
+    pd.testing.assert_frame_equal(built.to_frame(table="energy"), expected.to_frame(table="energy"))
     assert built.skip_counts == expected.skip_counts and built.errors() == expected.errors()
     assert len(built) == SIZE and built._energy == expected._energy
     pd.testing.assert_series_equal(built["pump"].head, expected["pump"].head)
@@ -205,7 +206,9 @@ def test_save_load_and_slice_equal_the_row_by_row_build(tmp_path):
         tail, reference = built.slice(start), expected.slice(start)
         pd.testing.assert_frame_equal(tail.to_frame(), reference.to_frame())
         assert tail.skip_counts == reference.skip_counts and tail.errors() == reference.errors()
-        pd.testing.assert_frame_equal(tail.energy_report(), reference.energy_report())
+        pd.testing.assert_frame_equal(
+            tail.to_frame(table="energy"), reference.to_frame(table="energy")
+        )
 
 
 def test_list_columns_and_none_cells_follow_the_row_rules():

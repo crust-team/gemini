@@ -27,6 +27,7 @@ from gemini.errors import (
     SolverError,
     StepError,
 )
+from gemini.types.shapes import problem
 
 
 class Failure:
@@ -233,10 +234,8 @@ def row_code(error, inlet=False):
 
 
 def error_record(path, error, inlet=False):
-    """Return the recorded form of the exception of a twin, with its row code."""
-    return dict(
-        module=path, message=str(error), type=type(error).__name__, code=row_code(error, inlet)
-    )
+    """Return the problem of the exception of a twin, with its row code."""
+    return problem(path, row_code(error, inlet), error)
 
 
 def _add_skips(skips, outcome, count):

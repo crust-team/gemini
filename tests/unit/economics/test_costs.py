@@ -20,8 +20,7 @@ def test_capex_is_the_declared_cost_with_its_source():
     assert result == {
         "value": 1000.0,
         "unit": "EUR",
-        "reason": None,
-        "price_year": 2024,
+        "price_year": {"value": 2024, "unit": "year"},
         "source": "test fixture",
     }
 
@@ -55,7 +54,8 @@ def test_opex_adds_fixed_variable_and_energy_bill():
     """10 EUR fixed, 1e-9 EUR/J of heat and the electricity at 2e-8 EUR/J."""
     values = gm.economics.Assumptions(electricity_price=2e-8)
     result = gm.economics.opex(heating_plant(), day(), values)
-    components = result["components"]
+    components = {name: item["value"] for name, item in result["components"].items()}
+    assert {item["unit"] for item in result["components"].values()} == {"EUR/year"}
     assert components["fixed"] == 10.0
     assert components["variable"] == pytest.approx(1e-9 * HEAT_PER_YEAR, rel=1e-12)
     assert components["electricity"] == pytest.approx(2e-8 * GRID_PER_YEAR, rel=1e-12)
@@ -76,7 +76,9 @@ def test_opex_without_declared_costs_reports_only_the_bill():
     values = gm.economics.Assumptions(electricity_price=2e-8)
     result = gm.economics.opex(heating_plant(costed=False), day(), values)
     assert result["value"] is None and result["reason"] == costs.NO_COST
-    assert result["components"]["electricity"] == pytest.approx(2e-8 * GRID_PER_YEAR, rel=1e-12)
+    assert result["components"]["electricity"]["value"] == pytest.approx(
+        2e-8 * GRID_PER_YEAR, rel=1e-12
+    )
 
 
 def test_opex_refuses_prices_in_another_currency():

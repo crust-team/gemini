@@ -12,7 +12,7 @@ from gemini.modules.serialization import (
     SECTIONS,
     Report,
     format_error,
-    problem,
+    located,
     read_params,
     read_sections,
 )
@@ -46,14 +46,14 @@ def _shape(spec, report):
                 code="invalid_format",
                 suggestions=close_matches(key, KEYS),
             )
-            report.items.append(problem("", error))
+            report.items.append(located("", error))
         elif key in TYPES and not isinstance(value, TYPES[key]):
             error = ValidationError(
                 f"{key} = {type(value).__name__}; expected {TYPES[key].__name__}",
                 path=key,
                 code="invalid_format",
             )
-            report.items.append(problem("", error))
+            report.items.append(located("", error))
         else:
             clean[key] = value
     return clean
@@ -154,7 +154,7 @@ def build(cls, spec):
     report = Report()
     error = format_error(spec)
     if error is not None:
-        report.items.append(problem("", error))
+        report.items.append(located("", error))
         return None, report.items
     spec = _shape(spec, report)
     if "type" in spec:
@@ -166,7 +166,7 @@ def build(cls, spec):
 
 
 def problems(cls, spec):
-    """Return every problem of ``spec`` as ``[{path, message, code, suggestions}]``."""
+    """Return every problem of ``spec`` as ``[{path, code, message, suggestions}]``."""
     return build(cls, spec)[1]
 
 

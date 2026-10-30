@@ -48,10 +48,10 @@ def test_names_are_fixed():
 def test_values_equal_the_hand_computed_ratios(plant, results):
     """Heating 300/500, cooling 60/80, COP 300/150 and the two peaks."""
     kpis = gm.kpi(plant, results)
-    assert kpis["heating_coverage"] == {"value": 0.6, "unit": "-", "reason": None}
+    assert kpis["heating_coverage"] == {"value": 0.6, "unit": "-"}
     assert kpis["cooling_coverage"]["value"] == 0.75
     assert kpis["cop"]["value"] == 2.0
-    assert kpis["peak_heat"] == {"value": 200.0, "unit": "W", "reason": None}
+    assert kpis["peak_heat"] == {"value": 200.0, "unit": "W"}
     assert kpis["peak_cold"]["value"] == 30.0
 
 

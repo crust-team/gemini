@@ -19,7 +19,8 @@ def test_npv_is_the_discounted_net_cash_flow_less_the_investment():
     result = gm.economics.npv(heating_plant(), day(), 0.05, 20, SELLING)
     assert result["value"] == pytest.approx(NET * factor - 1000.0, rel=1e-12)
     assert result["unit"] == "EUR"
-    assert result["net_cash_flow"] == pytest.approx(NET, rel=1e-12)
+    assert result["net_cash_flow"]["value"] == pytest.approx(NET, rel=1e-12)
+    assert result["net_cash_flow"]["unit"] == "EUR/year"
 
 
 def test_payback_is_the_investment_over_the_net_cash_flow():

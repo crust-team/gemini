@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "boolean",
+            "string",
+            "array"
+          ]
+        }
+      }
+    },
+    {
+      "required": [
+        "reason"
+      ]
+    }
+  ],
+  "description": "A number with its unit: {value, unit}. value is a number, an array or null, and when it is null a reason says why. A time series adds time. An output that is a flag or a text keeps its boolean or string; economics returns add the parts of the result as keys.",
+  "properties": {
+    "reason": {
+      "type": "string"
+    },
+    "time": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "unit": {
+      "type": "string"
+    },
+    "value": {
+      "type": [
+        "number",
+        "boolean",
+        "string",
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "value",
+    "unit"
+  ],
+  "title": "GEMINI value",
+  "type": "object"
+}

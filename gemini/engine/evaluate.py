@@ -4,7 +4,7 @@ from gemini.errors import GeminiError, ValidationError
 from gemini.modules import registry
 from gemini.modules.module import Module
 from gemini.types.flows import STREAM_FIELDS
-from gemini.utils.jsonable import to_plain
+from gemini.types.shapes import value
 
 STREAM_UNITS = {"m_dot": "kg/s", "T": "K", "p": "Pa"}
 """The SI unit of each numeric stream field."""
@@ -58,10 +58,7 @@ def _failed(error):
 def _outlets(outlets):
     """Return each outlet stream as ``{field: {value, unit}}`` in SI."""
     return {
-        port: {
-            name: {"value": to_plain(getattr(stream, name)), "unit": STREAM_UNITS[name]}
-            for name in STREAM_FIELDS
-        }
+        port: {name: value(getattr(stream, name), STREAM_UNITS[name]) for name in STREAM_FIELDS}
         for port, stream in outlets.items()
     }
 
@@ -70,9 +67,6 @@ def _outputs(instance, outputs):
     """Return each output as ``{value, unit}``; an output without a declared unit is ``"-"``."""
     declarations = instance.outputs(recurse=False)
     return {
-        name: {
-            "value": to_plain(value),
-            "unit": (declarations[name].unit if name in declarations else None) or "-",
-        }
-        for name, value in outputs.items()
+        name: value(number, (declarations[name].unit if name in declarations else None) or "-")
+        for name, number in outputs.items()
     }

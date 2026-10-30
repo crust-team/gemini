@@ -19,10 +19,10 @@ def test_co2_is_fuel_and_grid_electricity_times_their_factors():
     values = gm.economics.Assumptions(electricity_emission_factor=1e-7)
     result = gm.economics.co2(day(electricity=100.0, generated=40.0, fuel=1000.0), values)
     assert result["unit"] == "kg"
-    assert result["fuel_energy"] == 1000.0 * DAY
-    assert result["grid_energy"] == 60.0 * DAY
+    assert result["fuel_energy"] == {"value": 1000.0 * DAY, "unit": "J"}
+    assert result["grid_energy"] == {"value": 60.0 * DAY, "unit": "J"}
     assert result["value"] == pytest.approx(1000.0 * DAY * 56.1e-9 + 60.0 * DAY * 1e-7, rel=1e-12)
-    assert result["window"] == DAY
+    assert result["window"] == {"value": DAY, "unit": "s"}
 
 
 def test_co2_is_the_balance_emissions_rate_times_the_tick():
@@ -41,7 +41,7 @@ def test_co2_is_the_balance_emissions_rate_times_the_tick():
 def test_a_surplus_of_generation_earns_no_credit():
     """Generation above consumption draws no grid electricity, and the factor is not needed."""
     result = gm.economics.co2(day(electricity=10.0, generated=50.0, fuel=0.0))
-    assert result["grid_energy"] == 0.0
+    assert result["grid_energy"]["value"] == 0.0
     assert result["value"] == 0.0
 
 

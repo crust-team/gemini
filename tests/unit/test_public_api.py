@@ -7,7 +7,7 @@ from pathlib import Path
 import gemini as gm
 from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
-SNAPSHOTS = {"0.1.0": "031f05106283e44ea2a521f5f825c7ed7be16ecf068cbfc9e974cb01551a2974"}
+SNAPSHOTS = {"0.1.0": "3b4d1f4ce54b5e5fec85f2a719788d32af91e86ff97d25d0b9a5965eef88d287"}
 """Hash of the snapshot per ``gm.__version__``: an entry never changes, a new version adds one."""
 
 

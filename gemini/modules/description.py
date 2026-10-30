@@ -8,6 +8,7 @@ from copy import deepcopy
 
 from gemini.errors import DeclarationError, MissingValueError, UnitError
 from gemini.types.declarations import UNSET
+from gemini.types.shapes import problem
 from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import close_matches, did_you_mean, first_paragraph
 
@@ -259,26 +260,20 @@ def parameter_schema(module):
     }
 
 
-def _problem(path, message, code, suggestions=()):
-    problem = {"path": path, "message": message, "code": code}
-    if suggestions:
-        problem["suggestions"] = list(suggestions)
-    return problem
-
-
 def _check_value(name, declaration, value):
     try:
         declaration.validate(value)
     except (DeclarationError, UnitError) as error:
-        return _problem(name, str(error), error.code)
+        return problem(name, error.code, error)
     return None
 
 
 def validate_params(module, params):
-    """Return every problem of ``params`` as ``[{path, message, code}]``; never raises for them.
+    """Return every problem of ``params`` as ``[{path, code, message, suggestions}]``.
 
-    ``params`` maps a parameter name (dotted for a child's) to a number, a unit string or a
-    value of the declared kind. The codes are ``unknown_name`` (with ``suggestions``),
+    It never raises for them. ``params`` maps a parameter name (dotted for a child's) to a number,
+    a unit string or a value of the declared kind. The codes are ``unknown_name`` (with
+    ``suggestions``),
     ``invalid_unit``, ``out_of_bounds`` and ``invalid_value``. The module is not changed.
     """
     declarations = dict(module.named_parameters())
@@ -287,10 +282,10 @@ def validate_params(module, params):
         if name not in declarations:
             message = f"{module.path}: unknown parameter {name!r}{did_you_mean(name, declarations)}"
             problems.append(
-                _problem(name, message, "unknown_name", close_matches(name, declarations))
+                problem(name, "unknown_name", message, close_matches(name, declarations))
             )
             continue
-        problem = _check_value(name, declarations[name], value)
-        if problem is not None:
-            problems.append(problem)
+        found = _check_value(name, declarations[name], value)
+        if found is not None:
+            problems.append(found)
     return problems

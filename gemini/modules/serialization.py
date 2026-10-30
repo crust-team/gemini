@@ -21,6 +21,7 @@ from gemini.errors import (
 from gemini.modules import design
 from gemini.types.bindings import DatedParams, ModuleBindings
 from gemini.types.fluid import Fluid
+from gemini.types.shapes import problem
 from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import close_matches, did_you_mean
 
@@ -49,19 +50,14 @@ class Report:
         except GeminiError as error:
             if self.strict:
                 raise
-            self.items.append(problem(path, error))
+            self.items.append(located(path, error))
 
 
-def problem(path, error):
-    """Return ``{path, message, code, suggestions}`` for an error raised at spec ``path``."""
+def located(path, error):
+    """Return the problem of an error raised at spec ``path``."""
     inner = getattr(error, "path", None)
     full = f"{path}.{inner}" if path and inner else path or inner or ""
-    return {
-        "path": full,
-        "message": str(error),
-        "code": error.code,
-        "suggestions": list(error.suggestions),
-    }
+    return problem(full, error.code, error, error.suggestions)
 
 
 def format_error(data):

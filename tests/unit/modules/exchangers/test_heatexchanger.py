@@ -64,7 +64,7 @@ def test_measured_heat_exchanger_performance():
     rows = pd.read_csv(DATA / "doublet_2024_old.csv", sep=";", nrows=5)
     for _, row in rows.iterrows():
         measured = measured_row(row)
-        ua = gm.analysis.estimate_conductance(**measured)
+        ua = gm.analysis.estimate_conductance(**measured)["value"]
         exchanger, streams = exchanger_for(row, measured, ua)
         result = exchanger(**streams)
         out = result.outputs

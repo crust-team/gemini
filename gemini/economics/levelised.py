@@ -2,7 +2,7 @@
 
 from gemini.economics.assumptions import discounting, resolve
 from gemini.economics.costs import annual_energies, capex, opex
-from gemini.economics.outcome import outcome
+from gemini.types.shapes import value
 
 
 def annuity(rate, years):
@@ -19,29 +19,28 @@ def _levelised(plant, results, product, rate, years, assumptions):
     investment = capex(plant, assumptions)
     unit = f"{investment['unit']}/J"
     if investment["value"] is None:
-        return outcome(None, unit, investment["reason"])
+        return value(None, unit, investment["reason"])
     annual = annual_energies(plant, results)
     delivered, other = (
         (annual.heat, annual.cold) if product == "heat" else (annual.cold, annual.heat)
     )
     if delivered <= 0:
-        return outcome(None, unit, f"the run delivers no {product}")
+        return value(None, unit, f"the run delivers no {product}")
     if other > 0:
-        return outcome(
+        return value(
             None, unit, "the plant delivers heat and cold; the split of its cost is not defined"
         )
     yearly = opex(plant, results, assumptions)["value"]
     factor = annuity(rate, years)
-    value = (investment["value"] + yearly * factor) / (delivered * factor)
-    return outcome(
-        value,
+    cost = investment["value"] + yearly * factor
+    return value(
+        cost / (delivered * factor),
         unit,
-        None,
-        capex=investment["value"],
-        opex=yearly,
-        energy=delivered,
-        discount_rate=rate,
-        lifetime_years=years,
+        capex=value(investment["value"], investment["unit"]),
+        opex=value(yearly, f"{investment['unit']}/year"),
+        energy=value(delivered, "J/year"),
+        discount_rate=value(rate, "-"),
+        lifetime_years=value(years, "year"),
     )
 
 
@@ -70,10 +69,9 @@ def lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None):
     Returns
     -------
     dict
-        ``{value, unit, reason, capex, opex, energy, discount_rate, lifetime_years}``; ``value``
-        in currency/J (multiply by 3.6e9 for currency/MWh), ``None``
-        with the ``reason`` when the plant declares no cost, delivers no heat or also delivers
-        cold.
+        ``{value, unit, capex, opex, energy, discount_rate, lifetime_years}``, the last five each
+        a value; ``value`` in currency/J (multiply by 3.6e9 for currency/MWh), ``None`` with a
+        ``reason`` when the plant declares no cost, delivers no heat or also delivers cold.
     """
     return _levelised(plant, results, "heat", discount_rate, lifetime, assumptions)
 

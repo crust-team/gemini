@@ -11,13 +11,18 @@ ENERGY = {"electricity": [10.0, 5.0], "heat_loss": [1.0, 0.5], "heat_accumulatio
 def test_energy_ledger_passes_and_reports_the_smallest_power():
     """Signed storage is not judged; the smallest of the other columns is 0.5 W."""
     result = gm.checks.energy_balance(make_results({"leaf": ENERGY}))
-    assert result == {"name": "energy_balance", "passed": True, "value": 0.5, "tolerance": 1e-9}
+    assert result == {
+        "name": "energy_balance",
+        "passed": True,
+        "value": {"value": 0.5, "unit": "W"},
+        "limit": {"value": 1e-9, "unit": "W"},
+    }
 
 
 def test_a_negative_nonnegative_output_fails():
     """A heat loss of -2 W breaks the sign convention."""
     result = gm.checks.energy_balance(make_results({"leaf": {"heat_loss": [1.0, -2.0]}}))
-    assert result["passed"] is False and result["value"] == -2.0
+    assert result["passed"] is False and result["value"]["value"] == -2.0
 
 
 def test_noise_below_the_tolerance_and_missing_values_are_accepted():
@@ -35,9 +40,10 @@ def test_an_infinite_power_fails():
 def test_nothing_to_judge_is_undecided_with_a_reason():
     """No energy column, or only missing values, gives ``passed`` None."""
     other = gm.checks.energy_balance(make_results({"leaf": {"head": [1.0]}}))
-    assert other["passed"] is None and other["reason"] == "results have no energy output column"
+    assert other["passed"] is None
+    assert other["value"]["reason"] == "results have no energy output column"
     empty = gm.checks.energy_balance(make_results({"leaf": {"fuel": [math.nan]}}))
-    assert empty["passed"] is None and empty["reason"] == "every value is missing"
+    assert empty["passed"] is None and empty["value"]["reason"] == "every value is missing"
 
 
 def test_mass_ledger_reads_the_columns_in_kg_per_second():
@@ -45,7 +51,12 @@ def test_mass_ledger_reads_the_columns_in_kg_per_second():
     columns = {"degasser": {"gas_mass_flow": [0.2, 0.0], "pressure_drop": [-5.0, -5.0]}}
     units = {"degasser": {"gas_mass_flow": "kg/s", "pressure_drop": "Pa"}}
     result = gm.checks.mass_balance(make_results(columns, units=units))
-    assert result == {"name": "mass_balance", "passed": True, "value": 0.0, "tolerance": 1e-12}
+    assert result == {
+        "name": "mass_balance",
+        "passed": True,
+        "value": {"value": 0.0, "unit": "kg/s"},
+        "limit": {"value": 1e-12, "unit": "kg/s"},
+    }
     negative = make_results({"degasser": {"gas_mass_flow": [-0.1]}}, units=units)
     assert gm.checks.mass_balance(negative)["passed"] is False
 
@@ -53,7 +64,8 @@ def test_mass_ledger_reads_the_columns_in_kg_per_second():
 def test_mass_ledger_without_a_mass_flow_is_undecided():
     """No output in kg/s: nothing to judge."""
     result = gm.checks.mass_balance(make_results({"leaf": {"head": [1.0]}}))
-    assert result["passed"] is None and result["reason"] == "results have no output in kg/s"
+    assert result["passed"] is None
+    assert result["value"]["reason"] == "results have no output in kg/s"
 
 
 def test_the_example_plant_run_passes_both_ledgers(fresh_plant, fast_dataset):
