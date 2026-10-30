@@ -171,7 +171,10 @@ reason it is needed:
 - Operator overloading on `gemini.ops.Operators`: a `Constant` (`core/physics/constants.py`)
   and a traced `gemini.graph.Proxy` route `+`, `*`, `<`, ... through `gemini.ops.dispatch`, so
   one physics source runs on floats, arrays and traced values. A constant acts as its float on
-  concrete values and becomes a named graph input in a trace.
+  concrete values and becomes a named graph input in a trace. The math functions (`ops.log`,
+  `ops.sqrt`, `ops.maximum`, ...) and `ops.truediv`/`ops.pow` never raise or warn on an operand
+  that is invalid in the branch a `where` does not select: they return `inf` or `nan` as NumPy
+  does. `where` branches are plain values, never callables; `None` is allowed as a branch.
 - During a trace the `_Call` record carries the traced parameter values, which
   `Module.__getattr__` returns instead of the stored values, and records outputs without
   validating them (`gemini/graph/tracer.py`).

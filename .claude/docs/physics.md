@@ -147,11 +147,16 @@ stage:
   cube of the frequency ratio (affinity laws).
 - `ESP.efficiency_function(Q, H, P)` = `(q / 135773) (H / P) (745.7 / 2988.30167)` [-], a
   fraction, and 0 when `P < 0.1` W (it is in `modules/pumps/esp.py`).
-- `ESP_REFERENCE_FREQUENCY`, `ESP_EFFICIENCY_FLOW_FACTOR` and the ESP's `MIN_EFFICIENCY_POWER`
-  are `gemini.ops.Constant` objects: plain floats on concrete values (bit for bit, float32
-  promotion included) and named graph inputs when the ESP is traced. The ESP's validity check
-  and branch are `ops.check` and `ops.where`, so the same code is traced (see
-  [native-engine.md](native-engine.md)).
+- Every constant of `constants.py` (`G`, `G_FT`, `CO2_MOLAR_MASS`, `MIN_PATH_PRESSURE`,
+  `ESP_REFERENCE_FREQUENCY`, `ESP_EFFICIENCY_FLOW_FACTOR`) and the ESP's `MIN_EFFICIENCY_POWER`
+  are `gemini.ops.Constant` objects: plain floats in arithmetic and comparisons on concrete
+  values (bit for bit, float32 promotion included) and named graph inputs when traced. A
+  `Constant` is not a `float`: use `float(constant)` or `.value` where a float is needed, and
+  `ops.maximum`/`ops.minimum` instead of `max`/`min` (the builtins would return the object).
+  The ESP's validity check and branch are `ops.check` and `ops.where`, so the same code is
+  traced (see [native-engine.md](native-engine.md)). The efficiency branch divides with
+  `ops.truediv(head, power)` because `where` evaluates both branches and the power curve may be
+  zero: `/` on two Python floats would raise before `where` is reached.
 
 The polynomials are only valid inside the flow range of the manufacturer curve; the functions
 do not check it and raise nothing. Any number of coefficients is accepted.

@@ -12,6 +12,12 @@ import numpy as np
 from gemini.backends.base import Backend
 
 
+def quiet(function, *values):
+    """Return ``function`` of ``values`` with floating-point warnings silenced."""
+    with np.errstate(all="ignore"):
+        return function(*values)
+
+
 class NumpyBackend(Backend):
     """Evaluate ops on NumPy arrays and scalars."""
 
@@ -89,3 +95,146 @@ class NumpyBackend(Backend):
     def getitem(self, value, index):
         """Return item ``index`` of the last axis of a vector value."""
         return np.asarray(value)[..., index]
+
+    def mod(self, left, right):
+        """Return ``left % right``; a zero divisor gives ``nan``."""
+        return quiet(np.mod, left, right)
+
+    def floordiv(self, left, right):
+        """Return ``left // right``; a zero divisor gives ``inf`` or ``nan``."""
+        return quiet(np.floor_divide, left, right)
+
+    def abs(self, value):
+        """Return the absolute value per row."""
+        return np.absolute(value)
+
+    def sign(self, value):
+        """Return 1, -1 or 0 per row; ``nan`` stays ``nan``."""
+        return np.sign(value)
+
+    def round(self, value, digits):
+        """Return every item rounded to ``digits`` decimals by Python's own ``round``.
+
+        NOTE(refactor): ``numpy.round`` rounds ties differently from Python's ``round``, so every
+        item goes through Python's own rounding to give the same values as the scalar path.
+        """
+        array = np.asarray(value, dtype=float)
+        return np.array([round(item, digits) for item in array.ravel().tolist()]).reshape(
+            array.shape
+        )
+
+    def maximum(self, left, right):
+        """Return the larger value per row; ``nan`` propagates."""
+        return np.maximum(left, right)
+
+    def minimum(self, left, right):
+        """Return the smaller value per row; ``nan`` propagates."""
+        return np.minimum(left, right)
+
+    def clip(self, value, low, high):
+        """Return ``value`` limited to ``[low, high]`` per row."""
+        return np.minimum(np.maximum(value, low), high)
+
+    def isnan(self, value):
+        """Return whether each value is ``nan``."""
+        return np.isnan(value)
+
+    def isinf(self, value):
+        """Return whether each value is infinite."""
+        return np.isinf(value)
+
+    def isfinite(self, value):
+        """Return whether each value is finite."""
+        return np.isfinite(value)
+
+    def logical_or(self, left, right):
+        """Return whether either condition holds, per row."""
+        return np.logical_or(left, right)
+
+    def logical_not(self, value):
+        """Return whether the condition does not hold, per row."""
+        return np.logical_not(value)
+
+    def exp(self, value):
+        """Return ``e ** value``; an overflow gives ``inf``."""
+        return quiet(np.exp, value)
+
+    def expm1(self, value):
+        """Return ``exp(value) - 1``."""
+        return quiet(np.expm1, value)
+
+    def log(self, value):
+        """Return the natural logarithm; zero gives ``-inf`` and a negative value ``nan``."""
+        return quiet(np.log, value)
+
+    def log10(self, value):
+        """Return the base-10 logarithm; zero gives ``-inf`` and a negative value ``nan``."""
+        return quiet(np.log10, value)
+
+    def sqrt(self, value):
+        """Return the square root; a negative value gives ``nan``."""
+        return quiet(np.sqrt, value)
+
+    def sin(self, value):
+        """Return the sine in radians."""
+        return quiet(np.sin, value)
+
+    def cos(self, value):
+        """Return the cosine in radians."""
+        return quiet(np.cos, value)
+
+    def tan(self, value):
+        """Return the tangent in radians."""
+        return quiet(np.tan, value)
+
+    def asin(self, value):
+        """Return the arc sine in radians; ``nan`` outside ``[-1, 1]``."""
+        return quiet(np.arcsin, value)
+
+    def acos(self, value):
+        """Return the arc cosine in radians; ``nan`` outside ``[-1, 1]``."""
+        return quiet(np.arccos, value)
+
+    def atan(self, value):
+        """Return the arc tangent in radians."""
+        return np.arctan(value)
+
+    def atan2(self, y, x):
+        """Return the angle of the point ``(x, y)`` in radians."""
+        return np.arctan2(y, x)
+
+    def sinh(self, value):
+        """Return the hyperbolic sine."""
+        return quiet(np.sinh, value)
+
+    def cosh(self, value):
+        """Return the hyperbolic cosine."""
+        return quiet(np.cosh, value)
+
+    def tanh(self, value):
+        """Return the hyperbolic tangent."""
+        return np.tanh(value)
+
+    def floor(self, value):
+        """Return the largest integer not above each value, as floats."""
+        return np.floor(value)
+
+    def ceil(self, value):
+        """Return the smallest integer not below each value, as floats."""
+        return np.ceil(value)
+
+    def sum(self, values):
+        """Return the sum over the last axis."""
+        return quiet(np.sum, values, -1)
+
+    def mean(self, values):
+        """Return the mean over the last axis."""
+        return quiet(np.mean, values, -1)
+
+    def cumsum(self, values):
+        """Return the running sums over the last axis."""
+        return quiet(np.cumsum, values, -1)
+
+    def interp(self, x, xp, fp):
+        """Return the linear interpolation of ``(xp, fp)`` at ``x``."""
+        return np.interp(x, xp, fp)

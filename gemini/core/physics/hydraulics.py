@@ -11,6 +11,7 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from gemini import ops
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
 
 from . import corrosion, erosion, geometry, heat_transfer, units
@@ -377,9 +378,9 @@ def pipe_path_profile(
             section, p, T, flow, fluid, u_value, ambient_temperature
         )
         if direction == "down":
-            p, T = max(MIN_PATH_PRESSURE, p + friction + gravity), T + delta_T
+            p, T = ops.maximum(MIN_PATH_PRESSURE, p + friction + gravity), T + delta_T
         else:
-            p, T = max(MIN_PATH_PRESSURE, p - friction - gravity), T - delta_T
+            p, T = ops.maximum(MIN_PATH_PRESSURE, p - friction - gravity), T - delta_T
         pressures.append(p)
         temperatures.append(T)
         dp_friction += friction

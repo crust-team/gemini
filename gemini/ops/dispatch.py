@@ -76,9 +76,29 @@ class Operators:
         """Return ``other ** self``."""
         return dispatch("pow", other, self)
 
+    def __mod__(self, other):
+        """Return ``self % other``."""
+        return dispatch("mod", self, other)
+
+    def __rmod__(self, other):
+        """Return ``other % self``."""
+        return dispatch("mod", other, self)
+
+    def __floordiv__(self, other):
+        """Return ``self // other``."""
+        return dispatch("floordiv", self, other)
+
+    def __rfloordiv__(self, other):
+        """Return ``other // self``."""
+        return dispatch("floordiv", other, self)
+
     def __neg__(self):
         """Return ``-self``."""
         return dispatch("neg", self)
+
+    def __abs__(self):
+        """Return ``abs(self)``."""
+        return dispatch("abs", self)
 
     def __lt__(self, other):
         """Return ``self < other``."""
