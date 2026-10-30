@@ -10,6 +10,7 @@ from time import perf_counter
 from pydantic_core import to_jsonable_python
 
 from gemini.errors import ConfigurationError
+from gemini.utils.hooks import observer
 from gemini.utils.time import parse_duration
 
 
@@ -45,7 +46,8 @@ def _jsonable(value):
 class EventLog(Callback):
     """Append events to a JSON-lines file, or retain them in memory when no path is supplied.
 
-    Every module is observed through a forward pre-hook and a forward hook, attached at run
+    Every module is observed through a forward pre-hook and a forward hook, both marked as
+    observers so the graph engine replays them per row, attached at run
     start and removed when the run ends or fails. Logging never changes a run: non-finite
     floats are written as ``NaN``/``Infinity`` and other unknown values as strings.
     """
@@ -75,10 +77,10 @@ class EventLog(Callback):
         self.detach()
         for path, module in plant.named_modules():
             module_path = path or plant.path
-            self._handles.append(
-                module.register_forward_pre_hook(partial(self._before, module_path))
-            )
-            self._handles.append(module.register_forward_hook(partial(self._after, module_path)))
+            before = observer(partial(self._before, module_path))
+            after = observer(partial(self._after, module_path))
+            self._handles.append(module.register_forward_pre_hook(before))
+            self._handles.append(module.register_forward_hook(after))
         return self
 
     def _before(self, path, module, inlets):

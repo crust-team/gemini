@@ -6,6 +6,7 @@ import pytest
 import gemini as gm
 from gemini.errors import PhysicsRangeError
 from gemini.graph import GraphCache, Proxy, run
+from gemini.utils.hooks import observer
 
 
 def _rows(gain, inlet, frequency):
@@ -62,3 +63,29 @@ def test_structural_parameter_decides_the_traced_shape(stepper, inlet):
         result = run(stepper, {"inlet": inlet}, cache=cache)
         assert result.outlets["outlet"]["p"].tolist() == (inlet.p + steps * increment).tolist()
     assert cache.traces == 2
+
+
+def test_module_without_inlets_takes_its_row_count_from_the_inputs(source):
+    """The control array sets the rows; a graph break gives the same values row by row."""
+    controls = np.array([1.0, 2.0, 3.0])
+    result = run(source, {}, {"rate": controls})
+    assert result.outputs["double"].tolist() == [2.0, 4.0, 6.0]
+    assert result.outlets["outlet"]["m_dot"].tolist() == [1.0, 2.0, 3.0]
+    assert result.outlets["outlet"]["T"].tolist() == [300.0] * 3
+    source.register_forward_pre_hook(lambda module, inlets: None)
+    assert run(source, {}, {"rate": controls}).outputs["double"].tolist() == [2.0, 4.0, 6.0]
+
+
+def test_module_without_inlets_or_arrays_has_one_row(source):
+    """Scalar inputs and no inlets give a single row."""
+    assert run(source, {}, {"rate": 5.0}).outputs["double"].tolist() == [10.0]
+
+
+def test_marked_hooks_are_never_called_on_traced_values(gain, inlet):
+    """Marked pre-hooks and forward hooks only see rows, pre-hooks first, and keep the graph."""
+    seen = []
+    gain.register_forward_pre_hook(observer(lambda module, inlets: seen.append("pre")))
+    gain.register_forward_hook(observer(lambda module, inlets, outlets: seen.append(module.rise)))
+    result = run(gain, {"inlet": inlet}, {"gain": 1.0})
+    assert result.graph is not None and result.breaks == []
+    assert seen == ["pre", 6.0, "pre", 6.0, "pre", 6.0]

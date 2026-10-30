@@ -7,6 +7,8 @@ whose ``Fluid`` is the concrete, static one), controls, boundaries, numeric para
 constants the physics uses become named graph inputs; non-numeric and structural parameter
 values are trace guards (see ``cache``). A forward hook that writes an
 output is part of the graph; one that only reads is an observer, replayed per row after a run.
+A hook marked with ``gemini.utils.hooks.observer`` is never called on traced values: it is an
+observer by declaration, and so are marked pre-hooks. Any other pre-hook is a graph break.
 Anything the trace cannot follow raises ``TraceError``, which makes the module a graph break.
 """
 
@@ -18,6 +20,7 @@ from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
 from gemini.errors import TraceError
 from gemini.graph.graph import Graph
+from gemini.utils.hooks import is_observer
 
 STREAM_FIELDS = (("m_dot", "kg/s"), ("T", "K"), ("p", "Pa"))
 """Stream fields of every inlet and outlet in the graph, with their units."""
@@ -34,6 +37,7 @@ class Tracer:
             {name: _inlet(graph, name, fluids[name]) for name in module._inlets},
             path=module.path,
         )
+        graph.pre_observers.extend(module._pre_hooks.values())
         call = _Call(
             module=module,
             inputs=_inputs(graph, module),
@@ -64,7 +68,7 @@ def _check_traceable(module):
         reasons.append("a composite (the engine links leaf graphs)")
     if module.stateful:
         reasons.append("stateful (needs scan)")
-    if module._pre_hooks:
+    if not all(is_observer(hook) for hook in module._pre_hooks.values()):
         reasons.append("has forward pre-hooks")
     if runtime.get_precision() != "float64":
         reasons.append("runtime precision is not float64")
@@ -135,6 +139,9 @@ def _trace_outputs(graph, module, call, inlets, outlets):
     module._compute_outputs(inlets, outlets)
     module._compute_formula_outputs(call)
     for hook in tuple(module._hooks.values()):
+        if is_observer(hook):
+            graph.observers.append(hook)
+            continue
         before = dict(call.outputs)
         try:
             hook(module, inlets, outlets)

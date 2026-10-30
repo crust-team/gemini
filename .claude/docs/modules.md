@@ -282,6 +282,12 @@ Hook return values are ignored. Any non-fixed hook signature fails at registrati
 `DeclarationError`. Remove a hook with `handle.remove()`; removing twice does nothing. Assigning a
 control inside a hook changes only the running call.
 
+A hook that only reads can be marked with `gemini.utils.hooks.observer(fn)` (also for a
+`functools.partial`). The graph engine never calls an observer on traced values: on a root leaf it
+replays the pre-hooks and then the forward hooks for each row of a batch with that row's values.
+`EventLog` marks both its hooks. An unmarked pre-hook makes its module a graph break; an unmarked
+forward hook is called once on traced values and classified as writing or reading.
+
 ## Per-call values
 
 The values of one call (resolved controls and boundaries, recorded outputs and the results of

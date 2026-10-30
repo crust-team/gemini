@@ -12,7 +12,7 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
   `did_you_mean`.
 - `time.py`: `to_utc`, `to_utc_index`, `parse_duration`, `median_step`, `interval_seconds`,
   `DEFAULT_STEP`.
-- `hooks.py`: `RemovableHandle` (ordered hook dicts, safe double `remove()`), `has_signature`.
+- `hooks.py`: `RemovableHandle` (ordered hook dicts, safe double `remove()`), `has_signature`, `observer` and `is_observer` (the read-only mark of a hook).
 - `mappings.py`: `AttributeMapping` (base of `Ports` and `Values`), `get_nested`, `set_nested`.
 - `context.py`: `ContextSetting`, a context variable change usable as `with` and as a decorator.
 - `files.py`: `read_json`, `write_json` and the lossless JSON-cell tables (`encode_cell`,

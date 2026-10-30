@@ -5,7 +5,8 @@ are ``Stream`` objects whose fields are arrays over time (validated when built);
 ``inputs`` maps control and boundary names to arrays or scalars, and the module's persisted
 values fill the rest. Parameters and constants come from the module and the graph. A module
 that cannot be traced runs untraced, one call per row, with the same results, and the reason
-is reported in ``Run.breaks``. Observer hooks are replayed per row after a traced run.
+is reported in ``Run.breaks``. Observer hooks are replayed per row after a traced run, pre-hooks
+first. The row count is the longest array among the inlet fields and inputs, one without arrays.
 """
 
 from dataclasses import dataclass
@@ -35,7 +36,7 @@ class Run:
 def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
     """Evaluate ``module`` on every row of ``inlets`` and ``inputs`` and return a ``Run``."""
     inputs = dict(inputs or {})
-    rows = len(np.atleast_1d(next(iter(inlets.values())).m_dot))
+    rows = _row_count(inlets, inputs)
     fluids = {name: inlets[name].fluid for name in module._inlets}
     try:
         graph = (cache or GraphCache()).graph(module, fluids)
@@ -53,6 +54,15 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
     }
     _replay_observers(graph, module, inlets, inputs, outputs, outlets, rows)
     return Run(outputs=outputs, outlets=outlets, breaks=[], graph=graph)
+
+
+def _row_count(inlets, inputs):
+    """Return the longest array among the inlet fields and inputs; one row if all are scalars."""
+    sizes = [
+        np.size(getattr(stream, field)) for stream in inlets.values() for field, _ in STREAM_FIELDS
+    ]
+    sizes += [np.size(value) for value in inputs.values()]
+    return max(sizes, default=1)
 
 
 def _evaluate(graph, feeds, backend, rows):
@@ -125,7 +135,7 @@ def _untraced(module, inlets, inputs, rows, reason):
 
 def _replay_observers(graph, module, inlets, inputs, outputs, outlets, rows):
     """Call every observer hook once per row with that row's inlets, outlets and outputs."""
-    for row in range(rows if graph.observers else 0):
+    for row in range(rows if graph.observers or graph.pre_observers else 0):
         call = _Call(
             module=module,
             inputs=module._resolve_inputs({k: _row(v, row) for k, v in inputs.items()}),
@@ -145,6 +155,8 @@ def _replay_observers(graph, module, inlets, inputs, outputs, outlets, rows):
         )
         token = _current_call.set(call)
         try:
+            for pre_hook in graph.pre_observers:
+                pre_hook(module, row_inlets)
             for hook in graph.observers:
                 hook(module, row_inlets, row_outlets)
         finally:

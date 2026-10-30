@@ -16,8 +16,9 @@ class Graph:
     ``inputs`` maps names to input nodes, ``outputs`` maps ``outputs.<name>`` and
     ``outlets.<port>.<field>`` to the node (or literal) that computes them, ``checks`` lists the
     check nodes (their codes are their position plus one), ``constants`` the ``Constant``
-    objects behind the constant inputs, ``outlet_fluids`` the fixed fluid of every outlet and
-    ``observers`` the forward hooks that only read and are replayed per row after a run.
+    objects behind the constant inputs, ``outlet_fluids`` the fixed fluid of every outlet,
+    ``pre_observers`` the marked read-only pre-hooks and ``observers`` the forward hooks that
+    only read, replayed per row after a run.
     """
 
     def __init__(self, module_path):
@@ -29,6 +30,7 @@ class Graph:
         self.checks = []
         self.constants = {}
         self.outlet_fluids = {}
+        self.pre_observers = []
         self.observers = []
 
     def input(self, name, role, unit=None, shape=()):
@@ -118,6 +120,7 @@ class Graph:
             lines.append(f"  code {node.code}: {error} at {node.source}")
         lines.append("outputs:")
         lines.extend(f"  {name} = {_describe(value)}" for name, value in self.outputs.items())
+        lines.extend(f"pre-observer: {hook!r}" for hook in self.pre_observers)
         lines.extend(f"observer: {hook!r}" for hook in self.observers)
         return "\n".join(lines)
 

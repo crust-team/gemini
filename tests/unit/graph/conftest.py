@@ -106,3 +106,36 @@ class Stepper(Module):
 def stepper():
     """Return a configured ``Stepper`` module."""
     return Stepper()
+
+
+class Source(Module):
+    """Emit a stream of fixed state whose mass flow is the ``rate`` control; it has no inlet."""
+
+    def __init__(self):
+        """Declare a control, an output and an outlet."""
+        super().__init__()
+
+        # Controls
+        self.rate = Control(float)
+
+        # Outputs
+        self.double = Output(float)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Emit the stream."""
+
+        # Outlets
+        outlet = Stream(m_dot=self.rate, T=300.0, p=1e5, fluid=self.fluid)
+        return dict(outlet=outlet)
+
+    def _compute_outputs(self, inlets, outlets):
+        self.double = 2 * outlets.outlet.m_dot
+
+
+@pytest.fixture
+def source():
+    """Return a ``Source`` module."""
+    return Source()
