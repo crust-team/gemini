@@ -148,3 +148,14 @@ def test_text_of_a_stream_lists_its_fields():
     stream = Stream(m_dot=1, T=300, p=1e5, fluid=BRINE)
     assert str(stream) == f"m_dot=1.0 T=300.0 p=100000.0 fluid={stream.fluid!r}"
     assert isinstance(BRINE.gas_mass_fraction, float)
+
+
+def test_heat_capacity_rate_is_mass_flow_times_liquid_heat_capacity():
+    """The rate keeps the sign of the flow and works on arrays."""
+    stream = Stream(m_dot=-2, T=300, p=1e5, fluid=BRINE)
+    assert stream.heat_capacity_rate() == -2 * BRINE.properties(1e5, 300).cp_l
+    rows = Stream(m_dot=np.array([1.0, 2.0]), T=300, p=1e5, fluid=BRINE)
+    assert rows.heat_capacity_rate().tolist() == [
+        1.0 * BRINE.properties(1e5, 300).cp_l,
+        2.0 * BRINE.properties(1e5, 300).cp_l,
+    ]

@@ -225,21 +225,19 @@ Where the implementation differs from sections 1 to 11, and why:
   silently, like NumPy, for division by zero, a negative logarithm or overflow. One thing cannot be
   hidden: `/` and `**` on two plain Python floats raise before any op runs, so a division or power
   that can be invalid in an unselected branch is written `ops.truediv(a, b)` or `ops.pow(a, b)`.
-- **A check's error travels with the values passed to it.** `check(condition, error, message,
-  **values)` attaches its error code to the traced `values` (or to the condition when none is
-  traced); codes then flow along data dependencies and `where` keeps the selected branch's
-  code. A check inside a branch must therefore name a value of that branch; a check on a value
-  shared by both branches reaches the output whichever branch is selected. The message is a
-  `str.format` template filled with the failing row's values, so it equals the former
-  f-string; the error carries a note with the check's source line.
-- **`Constant` lives in `gemini.ops`**, because physics (below `core.modules`) uses it;
-  `parameter.py` re-exports it. It is not a `float` subclass: NumPy 2 does not treat float
-  subclasses as weak scalars, which would change the float32 golden path. Its operators compute
-  on `value` in plain Python unless the other operand is `Symbolic`, and the `ops` functions
-  take a fast path for plain scalars unless `backends.settings(backend=...)` is active.
-- **Literals in a graph** are numbers, `None` (a `where` branch without a value, NaN on arrays,
-  read back as `None` for an `X | None` output) and tuples of numbers (the fixed table of an
-  `interp`).
+- **Eager calls and branch-aware checks.** A direct call is the same `forward` and ops on the
+  Python backend, inside a scope (`gemini/ops/scope.py`), with no graph. Entering the outermost scope
+  sets `np.errstate(all="ignore")` and gives exact floats as `np.float64`, so plain `/` and `**` are
+  silent; leaving converts to `float` and `bool`. A failing `ops.check` on concrete scalars raises a
+  marked error, which `@ops.physics` returns as a `Failed` value at the function boundary; `where`
+  drops the unselected branch's `Failed` and an op over two keeps the earlier. In a trace the rule is
+  the same: **a check guards all results of its physics function** (reaching outer functions through
+  data) and a check outside any physics function, which raises at once on an eager call, guards
+  every output. This replaces "the error travels with the values named in the check"; `check`'s
+  values only fill the message, a `str.format` template with the failing row's values. Float32
+  is honoured by the ESP alone (`Module._scalar_mode`), which keeps `ops.truediv(head, power)`: an
+  `np.float64` is not weak under NEP 50, so its float32 call runs unwrapped. The scope costs an
+  eager ESP call about 40 % more CPU; replay does not use it.
 - **Solvers.** `ops.brentq` and `ops.newton` (kind `solver`) record one node whose operands are
   the bounds or start plus `args` and whose attributes hold the function and settings. The
   function is module-level, written with ops, takes no traced closure and holds no check that

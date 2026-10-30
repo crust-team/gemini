@@ -95,6 +95,10 @@ class Stream:
         """Return signed mixture volume flow [m3/s] using the stream fluid."""
         return self.m_dot / self.fluid.properties(self.p, self.T).density
 
+    def heat_capacity_rate(self):
+        """Return the signed heat capacity rate ``m_dot * cp_l`` [W/K] of the stream."""
+        return self.m_dot * self.fluid.properties(self.p, self.T).cp_l
+
     def with_(self, **changes) -> "Stream":
         """Return a copy with updated SI stream fields.
 

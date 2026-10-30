@@ -18,6 +18,8 @@ import numpy as np
 import pytest
 
 from gemini.core.types import Stream
+from gemini.core.types.ports import Ports
+from gemini.core.types.results import ModuleResult, Values
 from gemini.graph import run, run_function
 
 RTOL = 1e-12
@@ -67,6 +69,46 @@ def assert_same_error(function, rows, error, **fixed):
             assert str(on_arrays.value) == str(on_floats)
             return
     pytest.fail(f"{function.__name__}: no row failed on Python floats")
+
+
+def _stacked_result(module, results):
+    """Return one ``ModuleResult`` of arrays holding the rows of per-row ``results``."""
+    names = results[0].outputs.keys()
+    outputs = {name: np.array([r.outputs[name] for r in results]) for name in names}
+    ports = {
+        section: Ports(
+            {
+                name: _stacked_stream([getattr(r, section)[name] for r in results])
+                for name in getattr(results[0], section)
+            },
+            path=module.path,
+        )
+        for section in ("inlets", "outlets")
+    }
+    return ModuleResult(
+        outputs=Values(outputs, module._outputs),
+        outlets=ports["outlets"],
+        inlets=ports["inlets"],
+        inputs={k: np.array([r.inputs[k] for r in results]) for k in results[0].inputs},
+    )
+
+
+def assert_health_matches(module, results, measured):
+    """Assert ``health`` on stacked arrays equals one call per row: every field, every row.
+
+    ``results`` are per-row ``ModuleResult`` objects and ``measured`` one dict per row.
+    """
+    expected = [module.health(result, row) for result, row in zip(results, measured)]
+    stacked = {key: np.array([row[key] for row in measured]) for key in measured[0]}
+    actual = module.health(_stacked_result(module, results), stacked)
+    rows = len(results)
+    for field in ("assessed", "alarm", "message"):
+        values = np.broadcast_to(np.asarray(getattr(actual, field)), (rows,)).tolist()
+        assert values == [getattr(row, field) for row in expected], field
+    assert_close(actual.score, [row.score for row in expected], "score")
+    assert actual.metrics.keys() == expected[0].metrics.keys()
+    for name, value in actual.metrics.items():
+        assert_close(value, [row.metrics[name] for row in expected], name)
 
 
 def _stacked_stream(streams):
