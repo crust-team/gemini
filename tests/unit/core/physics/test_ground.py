@@ -6,8 +6,9 @@ import numpy as np
 import pytest
 from scipy.special import exp1
 
+from gemini import ops
 from gemini.core.physics import ground
-from gemini.errors import PhysicsRangeError
+from gemini.errors import ConfigurationError, PhysicsRangeError
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 
@@ -183,3 +184,30 @@ def test_ramey_relations_match_on_arrays():
         rows + [(300.0, 283.0, 0.03, -1.0, 800.0)],
         PhysicsRangeError,
     )
+
+
+def test_a_failing_check_is_dropped_by_the_branch_that_does_not_select_it():
+    """Rows with a zero or too early time take the fallback, with no safe input, on arrays too."""
+
+    @ops.physics
+    def after_start(time, diffusivity, radius):
+        late = time >= 1e5
+        return ops.where(late, ground.ramey_time_function(time, diffusivity, radius), -1.0)
+
+    rows = [(3e7, 1e-6, 0.1), (0.0, 1e-6, 0.1), (10.0, 1e-6, 0.1), (1e9, 1.2e-6, 0.15)]
+    assert_function_matches(after_start, rows)
+    assert after_start(0.0, 1e-6, 0.1) == -1.0
+
+
+def test_ground_relations_raise_the_error_class_of_their_caller():
+    """The context prefix and error class name the module that rejects its own configuration."""
+    with pytest.raises(ConfigurationError, match="^field: borehole cell: steady_flux_resistance"):
+        ground.steady_flux_resistance(
+            2.0, 0.075, 0.05, error=ConfigurationError, context="field: borehole cell: "
+        )
+    with pytest.raises(ConfigurationError, match="^field: shape: vertical_cylinder_conductance"):
+        ground.vertical_cylinder_conductance(
+            2.0, 10.0, 40.0, error=ConfigurationError, context="field: shape: "
+        )
+    with pytest.raises(ConfigurationError, match="^well: ramey_time_function: time = 0"):
+        ground.ramey_time_function(0.0, 1e-6, 0.1, error=ConfigurationError, context="well: ")

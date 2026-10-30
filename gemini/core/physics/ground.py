@@ -30,6 +30,7 @@ _ANGLE_MARGIN = 1e-12
 """Relative distance [-] from 0 and pi of the streamline-angle root bracket."""
 
 
+@ops.physics
 def aquifer_volumetric_heat_capacity(
     porosity: float, fluid_heat_capacity: float, rock_heat_capacity: float
 ) -> float:
@@ -59,6 +60,7 @@ def aquifer_volumetric_heat_capacity(
     return porosity * fluid_heat_capacity + (1 - porosity) * rock_heat_capacity
 
 
+@ops.physics
 def doublet_breakthrough_volume(
     well_spacing: float,
     thickness: float,
@@ -95,6 +97,7 @@ def doublet_breakthrough_volume(
     return math.pi * well_spacing**2 * thickness * aquifer_heat_capacity / (3 * fluid_heat_capacity)
 
 
+@ops.physics
 def doublet_cold_fraction(volume_ratio: float) -> float:
     """Return the share [-] of the produced flow that arrives at the injection temperature.
 
@@ -137,6 +140,7 @@ def doublet_cold_fraction(volume_ratio: float) -> float:
     )
 
 
+@ops.physics
 def cylinder_store_conductance(
     conductivity: float, diffusivity: float, volume: float, height: float, period: float
 ) -> float:
@@ -184,7 +188,15 @@ def cylinder_store_conductance(
     return 2 * conductivity * area / ops.sqrt(math.pi * diffusivity * period)
 
 
-def vertical_cylinder_conductance(conductivity: float, length: float, diameter: float) -> float:
+@ops.physics
+def vertical_cylinder_conductance(
+    conductivity: float,
+    length: float,
+    diameter: float,
+    *,
+    error: type[Exception] = PhysicsRangeError,
+    context: str = "",
+) -> float:
     """Return the steady conductance [W/K] of a vertical cylinder below an isothermal surface.
 
     Parameters
@@ -193,6 +205,11 @@ def vertical_cylinder_conductance(conductivity: float, length: float, diameter: 
         Positive thermal conductivity of the ground [W/m/K].
     length, diameter : float
         Positive depth and diameter of the cylinder whose top is at the surface [m].
+    error : type of Exception, optional
+        Class raised for an invalid input; a caller that reports the failure as its own
+        configuration error passes it with a ``context`` prefix for the message.
+    context : str, optional
+        Text placed before the function name in the message of an error.
 
     Returns
     -------
@@ -205,15 +222,17 @@ def vertical_cylinder_conductance(conductivity: float, length: float, diameter: 
     cylinder in a semi-infinite medium, derived for L >> D. Raises ``PhysicsRangeError`` for
     ln(4 L / D) < 1 (L < 0.68 D), where the shape factor no longer applies.
     """
-    _require_positive("vertical_cylinder_conductance", conductivity=conductivity)
-    _require_positive("vertical_cylinder_conductance", length=length)
-    _require_positive("vertical_cylinder_conductance", diameter=diameter)
+    function = f"{context}vertical_cylinder_conductance"
+    _require_positive(function, error, conductivity=conductivity)
+    _require_positive(function, error, length=length)
+    _require_positive(function, error, diameter=diameter)
     logarithm = ops.log(4 * length / diameter)
     ops.check(
         ops.logical_not(logarithm < 1),
-        PhysicsRangeError,
-        "vertical_cylinder_conductance: length = {length} m, diameter = {diameter} m; "
+        error,
+        "{function}: length = {length} m, diameter = {diameter} m; "
         "expected ln(4 length / diameter) >= 1",
+        function=function,
         length=length,
         diameter=diameter,
         logarithm=logarithm,
@@ -221,8 +240,14 @@ def vertical_cylinder_conductance(conductivity: float, length: float, diameter: 
     return conductivity * 2 * math.pi * length / logarithm
 
 
+@ops.physics
 def steady_flux_resistance(
-    conductivity: float, borehole_radius: float, cell_radius: float
+    conductivity: float,
+    borehole_radius: float,
+    cell_radius: float,
+    *,
+    error: type[Exception] = PhysicsRangeError,
+    context: str = "",
 ) -> float:
     """Return the ground resistance [m K/W] between a borehole wall and its cell's mean.
 
@@ -232,6 +257,11 @@ def steady_flux_resistance(
         Positive ground thermal conductivity [W/m/K].
     borehole_radius, cell_radius : float
         Borehole radius and the larger equivalent radius of its ground cell [m].
+    error : type of Exception, optional
+        Class raised for an invalid input; a caller that reports the failure as its own
+        configuration error passes it with a ``context`` prefix for the message.
+    context : str, optional
+        Text placed before the function name in the message of an error.
 
     Returns
     -------
@@ -247,13 +277,15 @@ def steady_flux_resistance(
     a uniform heat sink; for r_b << r_e it reduces to Hellstrom's (ln(r_e / r_b) - 3/4) /
     (2 pi k). The regime is reached after about r_e**2 / (4 alpha).
     """
-    _require_positive("steady_flux_resistance", conductivity=conductivity)
-    _require_positive("steady_flux_resistance", borehole_radius=borehole_radius)
+    function = f"{context}steady_flux_resistance"
+    _require_positive(function, error, conductivity=conductivity)
+    _require_positive(function, error, borehole_radius=borehole_radius)
     ops.check(
         ops.logical_not(cell_radius <= borehole_radius),
-        PhysicsRangeError,
-        "steady_flux_resistance: cell_radius = {cell_radius} m; expected more than "
+        error,
+        "{function}: cell_radius = {cell_radius} m; expected more than "
         "borehole_radius = {borehole_radius} m",
+        function=function,
         cell_radius=cell_radius,
         borehole_radius=borehole_radius,
     )
@@ -262,6 +294,7 @@ def steady_flux_resistance(
     return shape / (2 * math.pi * conductivity)
 
 
+@ops.physics
 def ramey_time_function(
     time: float,
     diffusivity: float,
@@ -316,6 +349,7 @@ def ramey_time_function(
     return ops.log(2 * ops.sqrt(fourier)) - EULER_GAMMA / 2
 
 
+@ops.physics
 def ramey_fluid_temperature(
     inlet_temperature: float,
     top_temperature: float,
