@@ -1,7 +1,5 @@
 """Shallow closed-loop borehole field with a lumped ground temperature."""
 
-import math
-
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
@@ -101,7 +99,7 @@ class BoreholeField(Module):
         inlet = inlets.inlet
         capacity_rate = self._capacity_rate(inlet)
         rate = self._extraction_rate(inlet)
-        outlet_T = ops.where(capacity_rate != 0, inlet.T + rate / capacity_rate, inlet.T)
+        outlet_T = inlet.T + heat_transfer.temperature_change(rate, capacity_rate)
         outlet = inlet.with_(T=outlet_T)
 
         outlets = dict(outlet=outlet)
@@ -111,19 +109,22 @@ class BoreholeField(Module):
         inlet = inlets.inlet
         rate = self._extraction_rate(inlet)
         self.heat_extraction_rate = rate
-        self.fluid_mean_T = (inlet.T + outlets.outlet.T) / 2
+        self.fluid_mean_T = ground.mean_fluid_temperature(inlet.T, outlets.outlet.T)
         self.ground_T = self._ground_temperature()
         self.outlet_T = outlets.outlet.T
         self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.inlet
-        exchange = self._effective_conductance(inlet)
-        surroundings = self._surroundings_conductance()
-        total = exchange + surroundings
-        equilibrium = exchange * (inlet.T - self.undisturbed_ground_temperature) / total
-        decay = ops.exp(-total * dt / self._ground_heat_capacity())
-        change = equilibrium + (self.ground_temperature_change - equilibrium) * decay
+        change = ground.borehole_field_temperature_change(
+            self.ground_temperature_change,
+            self._effective_conductance(inlet),
+            self._surroundings_conductance(),
+            inlet.T,
+            self.undisturbed_ground_temperature,
+            dt,
+            self._ground_heat_capacity(),
+        )
         return {"ground_temperature_change": change}
 
     @property
@@ -133,7 +134,9 @@ class BoreholeField(Module):
 
     def _extraction_rate(self, inlet):
         """Return the heat [W] the loop draws from the ground at the start of the step."""
-        return self._effective_conductance(inlet) * (self._ground_temperature() - inlet.T)
+        return heat_transfer.heat_rate(
+            self._effective_conductance(inlet), self._ground_temperature() - inlet.T
+        )
 
     def _ground_temperature(self):
         """Return the mean field ground temperature [K] at the start of the step."""
@@ -141,35 +144,37 @@ class BoreholeField(Module):
 
     def _effective_conductance(self, inlet):
         """Return K = eps m_dot cp [W/K], the inlet-to-ground conductance of the loop."""
-        capacity_rate = self._capacity_rate(inlet)
-        cell = ground.steady_flux_resistance(
-            self.ground_conductivity,
+        return ground.borehole_loop_conductance(
+            self._capacity_rate(inlet),
+            self.borehole_count,
+            self.borehole_depth,
             self.borehole_radius,
-            self.borehole_spacing / math.sqrt(math.pi),
+            self.borehole_spacing,
+            self.ground_conductivity,
+            self.borehole_resistance,
             error=ConfigurationError,
             context=self._rejection,
         )
-        length = self.borehole_count * self.borehole_depth
-        conductance = length / (self.borehole_resistance + cell)
-        exchange = -ops.expm1(-conductance / capacity_rate) * capacity_rate
-        return ops.where(capacity_rate == 0, 0.0, exchange)
 
     def _surroundings_conductance(self):
         """Return the conductance [W/K] between the field volume and the undisturbed ground."""
-        area = self.borehole_count * self.borehole_spacing**2
-        diameter = 2 * ops.sqrt(area / math.pi)
-        return ground.vertical_cylinder_conductance(
-            self.ground_conductivity,
+        return ground.borehole_field_surroundings_conductance(
+            self.borehole_count,
+            self.borehole_spacing,
             self.borehole_depth,
-            diameter,
+            self.ground_conductivity,
             error=ConfigurationError,
             context=self._rejection,
         )
 
     def _ground_heat_capacity(self):
         """Return the heat capacity [J/K] of the lumped field volume."""
-        volume = self.borehole_count * self.borehole_spacing**2 * self.borehole_depth
-        return self.ground_volumetric_heat_capacity * volume
+        return ground.borehole_field_capacity(
+            self.ground_volumetric_heat_capacity,
+            self.borehole_count,
+            self.borehole_spacing,
+            self.borehole_depth,
+        )
 
     def _capacity_rate(self, inlet):
         """Return m_dot cp [W/K] of the loop flow; reverse flow is outside the model."""

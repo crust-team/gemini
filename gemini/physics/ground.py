@@ -12,6 +12,7 @@ import math
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.ops import Constant
+from gemini.physics import heat_transfer, units
 
 EULER_GAMMA = 0.5772156649015329
 """Euler-Mascheroni constant [-] of the line-source long-time asymptote."""
@@ -22,6 +23,9 @@ MIN_RAMEY_FOURIER = Constant(
     "-",
     "smallest dimensionless time alpha*t/r**2 for which the Ramey asymptote is within 1 %",
 )
+
+HALF_YEAR = 182.625 * units.SECONDS_PER_DAY
+"""Default storage period [s] of an aquifer store: one charge or discharge season of seasonal ATES."""
 
 _SMALL_ANGLE = 0.1
 """Streamline angle [rad] below which ``sin - theta*cos`` uses its Taylor series."""
@@ -396,6 +400,524 @@ def ramey_fluid_temperature(
     decay = ops.exp(-length / relaxation_length)
     rock = top_temperature + gradient * length
     return rock - offset + (inlet_temperature - top_temperature + offset) * decay
+
+
+@ops.physics
+def injected_volume(volume_flow: float, duration: float) -> float:
+    """Return the liquid volume that flows through a well during a step.
+
+    Parameters
+    ----------
+    volume_flow : float
+        Liquid volume flow [m3/s], nonnegative.
+    duration : float
+        Step length [s], nonnegative.
+
+    Returns
+    -------
+    float
+        ``V = q dt`` [m3], exact for a flow that is constant over the step.
+
+    Notes
+    -----
+    Definition of the volume flow; the cumulative injected volume of a balanced doublet
+    equals its produced volume.
+    """
+    return volume_flow * duration
+
+
+@ops.physics
+def doublet_temperature_drop(
+    injected: float, breakthrough: float, reservoir_temperature: float, injection_temperature: float
+) -> float:
+    """Return the drop of the produced temperature of a doublet after thermal breakthrough.
+
+    Parameters
+    ----------
+    injected, breakthrough : float
+        Cumulative injected volume [m3], nonnegative, and breakthrough volume V_B [m3], positive
+        (``doublet_breakthrough_volume``).
+    reservoir_temperature, injection_temperature : float
+        Temperature carried by the produced water before the front arrives, and the
+        injection temperature [K].
+
+    Returns
+    -------
+    float
+        ``dT = f(V / V_B) (T_res - T_inj)`` [K], with the cold share ``f`` of
+        ``doublet_cold_fraction``.
+
+    Notes
+    -----
+    Reference: Gringarten and Sauty (1975, J. Geophys. Res. 80(35), 4956-4962): the share of
+    the flow on streamlines whose thermal travel time has passed arrives at the injection
+    temperature. An upper bound of the decline: no heat recharge from confining beds.
+    """
+    return doublet_cold_fraction(injected / breakthrough) * (
+        reservoir_temperature - injection_temperature
+    )
+
+
+@ops.physics
+def doublet_breakthrough_time(breakthrough: float, volume_flow: float) -> float | None:
+    """Return the time for a doublet's thermal front to reach the producer; ``None`` at no flow.
+
+    Parameters
+    ----------
+    breakthrough : float
+        Breakthrough volume V_B [m3] (``doublet_breakthrough_volume``).
+    volume_flow : float
+        Liquid volume flow Q [m3/s], nonnegative.
+
+    Returns
+    -------
+    float or None
+        ``t_B = V_B / Q`` [s], counted from the start of injection; ``None`` for zero flow.
+
+    Notes
+    -----
+    Reference: Gringarten and Sauty (1975, J. Geophys. Res. 80(35), 4956-4962), at the current
+    constant flow.
+    """
+    return ops.where(volume_flow != 0, breakthrough / volume_flow, None)
+
+
+@ops.physics
+def store_conductance(
+    volume: float,
+    conductivity: float,
+    porosity: float,
+    water_heat_capacity: float,
+    rock_heat_capacity: float,
+    height: float,
+    period: float,
+) -> float:
+    """Return the conduction conductance [W/K] of an aquifer store of injected water volume.
+
+    Parameters
+    ----------
+    volume : float
+        Injected water volume of the store [m3], nonnegative.
+    conductivity : float
+        Positive thermal conductivity of the aquifer and its surroundings [W/m/K].
+    porosity : float
+        Porosity in (0, 1) [-].
+    water_heat_capacity, rock_heat_capacity : float
+        Volumetric heat capacities of the water and of the rock matrix [J/m3/K].
+    height, period : float
+        Positive aquifer thickness [m] and storage period [s].
+
+    Returns
+    -------
+    float
+        ``UA`` of ``cylinder_store_conductance`` for the diffusivity ``k / (rho c)_a`` and the
+        thermal volume ``V (rho c)_w / (rho c)_a`` [W/K], with ``aquifer_volumetric_heat_capacity``
+        for ``(rho c)_a``.
+
+    Notes
+    -----
+    Reference: Bloemendal and Hartog (2018, Geothermics 71, 306-319) for the area-to-volume
+    scaling of ATES losses; Carslaw and Jaeger (1959) for the conduction (see
+    ``cylinder_store_conductance``).
+    """
+    aquifer = aquifer_volumetric_heat_capacity(porosity, water_heat_capacity, rock_heat_capacity)
+    return cylinder_store_conductance(
+        conductivity,
+        conductivity / aquifer,
+        volume * water_heat_capacity / aquifer,
+        height,
+        period,
+    )
+
+
+@ops.physics
+def mix_store(
+    volume: float, change: float, added_volume: float, added_change: float
+) -> tuple[float, float]:
+    """Return a fully mixed store after water is injected into it.
+
+    Parameters
+    ----------
+    volume, change : float
+        Store water volume [m3] and temperature change [K] before the injection.
+    added_volume, added_change : float
+        Injected volume [m3], nonnegative, and its temperature change [K] against the aquifer.
+
+    Returns
+    -------
+    tuple of float
+        ``(V + v, (V theta + v theta_i) / (V + v))``; the inputs unchanged for ``v = 0``.
+
+    Notes
+    -----
+    Energy balance of an ideal mixture of one liquid at constant volumetric heat capacity,
+    so the volumes weight the temperatures.
+    """
+    mixed = volume + added_volume
+    blended = (volume * change + added_volume * added_change) / mixed
+    return (
+        ops.where(added_volume > 0, mixed, volume),
+        ops.where(added_volume > 0, blended, change),
+    )
+
+
+@ops.physics
+def store_relaxation(
+    change: float, volume: float, conductance: float, duration: float, water_heat_capacity: float
+) -> float:
+    """Return a store's temperature change after conduction towards the aquifer temperature.
+
+    Parameters
+    ----------
+    change : float
+        Temperature change of the store against the aquifer [K].
+    volume : float
+        Store water volume [m3], nonnegative.
+    conductance : float
+        Conduction conductance of the store [W/K], nonnegative (``store_conductance``).
+    duration : float
+        Step length [s], nonnegative.
+    water_heat_capacity : float
+        Volumetric heat capacity (rho c)_w of the water [J/m3/K].
+
+    Returns
+    -------
+    float
+        ``theta exp(-UA dt / ((rho c)_w V))`` [K]; zero for an empty store.
+
+    Notes
+    -----
+    Reference: Incropera et al., Fundamentals of Heat and Mass Transfer, lumped capacitance
+    method (``heat_transfer.relaxation_factor``) towards the aquifer temperature, whose change
+    is zero. An empty store holds no excess heat.
+    """
+    factor = ops.where(
+        volume == 0,
+        0.0,
+        heat_transfer.relaxation_factor(conductance, duration, water_heat_capacity * volume),
+    )
+    return heat_transfer.exponential_relaxation(change, 0.0, factor)
+
+
+@ops.physics
+def stored_heat(water_heat_capacity: float, volume: float, change: float) -> float:
+    """Return the excess heat of a water volume at a temperature change.
+
+    Parameters
+    ----------
+    water_heat_capacity : float
+        Volumetric heat capacity (rho c)_w [J/m3/K].
+    volume : float
+        Water volume [m3].
+    change : float
+        Temperature change against the aquifer [K].
+
+    Returns
+    -------
+    float
+        ``E = (rho c)_w V theta`` [J].
+
+    Notes
+    -----
+    Sensible heat of a liquid at constant volumetric heat capacity.
+    """
+    return water_heat_capacity * volume * change
+
+
+@ops.physics
+def aquifer_stored_energy(
+    water_heat_capacity: float,
+    warm_volume: float,
+    warm_change: float,
+    cold_volume: float,
+    cold_change: float,
+) -> float:
+    """Return the net excess heat of the warm and the cold store of a well pair.
+
+    Parameters
+    ----------
+    water_heat_capacity : float
+        Volumetric heat capacity (rho c)_w [J/m3/K].
+    warm_volume, cold_volume : float
+        Water volumes of the stores [m3].
+    warm_change, cold_change : float
+        Temperature changes of the stores against the aquifer [K]; negative for a cold store.
+
+    Returns
+    -------
+    float
+        ``(rho c)_w (V_w theta_w + V_c theta_c)`` [J]; the cold store counts negative.
+
+    Notes
+    -----
+    Sum of the sensible excess heats of the two stores at one volumetric heat capacity.
+    """
+    return water_heat_capacity * (warm_volume * warm_change + cold_volume * cold_change)
+
+
+@ops.physics
+def thermal_recovery(recovered_heat: float, charged_heat: float) -> float | None:
+    """Return the thermal recovery efficiency of a store; ``None`` until heat has been charged.
+
+    Parameters
+    ----------
+    recovered_heat, charged_heat : float
+        Heat produced from and injected into the store, both relative to the aquifer
+        temperature [J].
+
+    Returns
+    -------
+    float or None
+        ``eta = E_recovered / E_charged`` [-]; ``None`` while ``E_charged <= 0``.
+
+    Notes
+    -----
+    Reference: Bloemendal and Hartog (2018, Geothermics 71, 306-319), definition of the
+    thermal recovery efficiency of ATES.
+    """
+    return ops.where(charged_heat > 0, recovered_heat / charged_heat, None)
+
+
+@ops.physics
+def borehole_loop_conductance(
+    capacity_rate: float,
+    count: float,
+    depth: float,
+    radius: float,
+    spacing: float,
+    conductivity: float,
+    borehole_resistance: float,
+    *,
+    error: type[Exception] = PhysicsRangeError,
+    context: str = "",
+) -> float:
+    """Return the inlet-to-ground conductance of the loops of a borehole field.
+
+    Parameters
+    ----------
+    capacity_rate : float
+        Heat capacity rate ``m cp`` of the loop flow [W/K], nonnegative.
+    count, depth, radius, spacing : float
+        Number of boreholes [-], their depth, radius and spacing [m]; each borehole owns a
+        ground cell of equivalent radius ``s / sqrt(pi)``.
+    conductivity : float
+        Positive ground conductivity [W/m/K].
+    borehole_resistance : float
+        Fluid-to-wall resistance R_b of a borehole [m K/W].
+    error, context : optional
+        Error class and message prefix of an invalid field geometry
+        (``steady_flux_resistance``).
+
+    Returns
+    -------
+    float
+        ``K = eps C`` [W/K] with ``eps = 1 - exp(-UA / C)`` and
+        ``UA = N H / (R_b + R_sf)``; zero for a stopped loop, whose geometry is not evaluated
+        (a failed check of the cell is dropped there).
+
+    Notes
+    -----
+    Plug flow along a loop against a constant ground temperature
+    (``heat_transfer.ambient_effectiveness``), with the steady-flux ground resistance of
+    Hellstrom (1991, Ground Heat Storage, Lund University).
+    """
+    cell = steady_flux_resistance(
+        conductivity, radius, spacing / math.sqrt(math.pi), error=error, context=context
+    )
+    length = count * depth
+    conductance = length / (borehole_resistance + cell)
+    exchange = heat_transfer.ambient_effectiveness(conductance, capacity_rate) * capacity_rate
+    return ops.where(capacity_rate == 0, 0.0, exchange)
+
+
+@ops.physics
+def borehole_field_surroundings_conductance(
+    count: float,
+    spacing: float,
+    depth: float,
+    conductivity: float,
+    *,
+    error: type[Exception] = PhysicsRangeError,
+    context: str = "",
+) -> float:
+    """Return the conductance [W/K] between a borehole field volume and the undisturbed ground.
+
+    Parameters
+    ----------
+    count, spacing, depth : float
+        Number of boreholes [-], their spacing [m] and depth [m]; the plan area is ``N s**2``.
+    conductivity : float
+        Positive ground conductivity [W/m/K].
+    error, context : optional
+        Error class and message prefix of an invalid geometry
+        (``vertical_cylinder_conductance``).
+
+    Returns
+    -------
+    float
+        ``UA_s`` of ``vertical_cylinder_conductance`` for the plan diameter
+        ``D = 2 sqrt(N s**2 / pi)`` [W/K].
+
+    Notes
+    -----
+    Reference: Incropera et al., Fundamentals of Heat and Mass Transfer, table 4.1; the
+    field is the vertical cylinder of equal plan area below an isothermal surface.
+    """
+    area = count * spacing**2
+    diameter = 2 * ops.sqrt(area / math.pi)
+    return vertical_cylinder_conductance(
+        conductivity, depth, diameter, error=error, context=context
+    )
+
+
+@ops.physics
+def borehole_field_capacity(
+    volumetric_heat_capacity: float, count: float, spacing: float, depth: float
+) -> float:
+    """Return the heat capacity [J/K] of the lumped ground volume of a borehole field.
+
+    Parameters
+    ----------
+    volumetric_heat_capacity : float
+        Ground volumetric heat capacity (rho c)_g [J/m3/K].
+    count, spacing, depth : float
+        Number of boreholes [-], their spacing [m] and depth [m].
+
+    Returns
+    -------
+    float
+        ``C = (rho c)_g N s**2 H`` [J/K].
+
+    Notes
+    -----
+    Volume of the field: one ``s`` by ``s`` cell of depth ``H`` per borehole.
+    """
+    volume = count * spacing**2 * depth
+    return volumetric_heat_capacity * volume
+
+
+@ops.physics
+def borehole_field_temperature_change(
+    change: float,
+    exchange: float,
+    surroundings: float,
+    inlet_temperature: float,
+    undisturbed_temperature: float,
+    duration: float,
+    capacity: float,
+) -> float:
+    """Return the ground temperature change of a borehole field after one step.
+
+    Parameters
+    ----------
+    change : float
+        Mean ground temperature change theta against the undisturbed ground [K].
+    exchange, surroundings : float
+        Loop conductance K (``borehole_loop_conductance``) and conductance UA_s to the
+        undisturbed ground [W/K].
+    inlet_temperature, undisturbed_temperature : float
+        Loop inlet temperature and undisturbed ground temperature [K].
+    duration, capacity : float
+        Step length [s] and field heat capacity C [J/K], positive.
+
+    Returns
+    -------
+    float
+        ``theta_eq + (theta - theta_eq) exp(-(K + UA_s) dt / C)`` [K] with
+        ``theta_eq = K (T_in - T_u) / (K + UA_s)``.
+
+    Notes
+    -----
+    Exact solution of ``C dtheta/dt = -Q - UA_s theta`` for a constant inlet over the step
+    (Incropera et al., lumped capacitance method).
+    """
+    total = exchange + surroundings
+    equilibrium = exchange * (inlet_temperature - undisturbed_temperature) / total
+    factor = heat_transfer.relaxation_factor(total, duration, capacity)
+    return heat_transfer.exponential_relaxation(change, equilibrium, factor)
+
+
+@ops.physics
+def mean_fluid_temperature(inlet_temperature: float, outlet_temperature: float) -> float:
+    """Return the arithmetic mean fluid temperature of a loop.
+
+    Parameters
+    ----------
+    inlet_temperature, outlet_temperature : float
+        Loop inlet and outlet temperatures [K].
+
+    Returns
+    -------
+    float
+        ``T_m = (T_in + T_out) / 2`` [K].
+
+    Notes
+    -----
+    The usual design convention for the fluid temperature of a borehole loop.
+    """
+    return (inlet_temperature + outlet_temperature) / 2
+
+
+@ops.physics
+def ramey_rock_resistance(
+    time: float,
+    diffusivity: float,
+    borehole_radius: float,
+    conductivity: float,
+    *,
+    error: type[Exception] = PhysicsRangeError,
+    context: str = "",
+) -> float:
+    """Return the transient rock resistance [m K/W] of a well at an operating time.
+
+    Parameters
+    ----------
+    time, diffusivity, borehole_radius : float
+        Operating time [s], rock diffusivity [m2/s] and borehole radius [m]
+        (``ramey_time_function``).
+    conductivity : float
+        Positive rock conductivity [W/m/K].
+    error, context : optional
+        Error class and message prefix of an operating time too early for the asymptote.
+
+    Returns
+    -------
+    float
+        ``R_r = f(t) / (2 pi k)`` [m K/W] with Ramey's time function ``f``.
+
+    Notes
+    -----
+    Reference: Ramey (1962, Wellbore heat transmission, J. Petroleum Technology 14(4),
+    427-435).
+    """
+    function = ramey_time_function(time, diffusivity, borehole_radius, error=error, context=context)
+    return function / (2 * math.pi * conductivity)
+
+
+@ops.physics
+def ramey_relaxation_length(
+    capacity_rate: float, borehole_resistance: float, rock_resistance: float
+) -> float:
+    """Return Ramey's relaxation length of the circuit fluid.
+
+    Parameters
+    ----------
+    capacity_rate : float
+        Heat capacity rate ``m cp`` [W/K], nonnegative.
+    borehole_resistance, rock_resistance : float
+        Fluid-to-wall and transient rock resistances per unit length [m K/W].
+
+    Returns
+    -------
+    float
+        ``A = m cp (R_b + R_r)`` [m].
+
+    Notes
+    -----
+    Reference: Ramey (1962, J. Petroleum Technology 14(4), 427-435): steady energy balance
+    ``m cp dT/dz = (T_rock - T) / R``.
+    """
+    return capacity_rate * (borehole_resistance + rock_resistance)
 
 
 def _travel_time_residual(theta, volume_ratio):

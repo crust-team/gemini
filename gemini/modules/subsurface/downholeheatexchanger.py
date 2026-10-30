@@ -1,11 +1,9 @@
 """Deep closed-loop downhole heat exchanger in a linear geothermal gradient."""
 
-import math
-
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import ground
+from gemini.physics import ground, heat_transfer
 from gemini.types import (
     Duration,
     HeatAbsorbed,
@@ -91,11 +89,10 @@ class DownholeHeatExchanger(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         outlet = outlets.outlet
-        rate = inlet.heat_capacity_rate() * (outlet.T - inlet.T)
+        rate = heat_transfer.heat_rate(inlet.heat_capacity_rate(), outlet.T - inlet.T)
         self.heat_extraction_rate = rate
         self.outlet_T = outlet.T
-        self.heat_absorbed = ops.maximum(rate, 0)
-        self.heat_loss = ops.maximum(-rate, 0)
+        self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 
     def _outlet_temperature(self, inlet):
         """Return the bottom-hole fluid temperature [K] from Ramey's profile.
@@ -110,8 +107,8 @@ class DownholeHeatExchanger(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        relaxation = inlet.heat_capacity_rate() * (
-            self.borehole_resistance + self._rock_resistance()
+        relaxation = ground.ramey_relaxation_length(
+            inlet.heat_capacity_rate(), self.borehole_resistance, self._rock_resistance()
         )
         profile = ground.ramey_fluid_temperature(
             inlet.T,
@@ -128,11 +125,11 @@ class DownholeHeatExchanger(Module):
         An operating time that is too early for Ramey's asymptote is a configuration error,
         except at zero flow, whose profile never uses the resistance.
         """
-        function = ground.ramey_time_function(
+        return ground.ramey_rock_resistance(
             self.operating_time,
             self.rock_diffusivity,
             self.borehole_radius,
+            self.rock_conductivity,
             error=ConfigurationError,
             context=f"{self.path}: operating_time rejected: ",
         )
-        return function / (2 * math.pi * self.rock_conductivity)

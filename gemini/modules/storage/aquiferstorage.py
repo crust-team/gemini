@@ -5,7 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import ground, heat_transfer
+from gemini.physics import fluid, ground, heat_transfer
 from gemini.types import (
     Control,
     Dimensionless,
@@ -28,9 +28,6 @@ from gemini.types import (
     Volume,
     VolumetricHeatCapacity,
 )
-
-HALF_YEAR = 182.625 * 24 * 3600
-"""Default storage period [s]: one charge or discharge season of seasonal ATES."""
 
 STORES = ("warm", "cold")
 """The two stores of the well pair, in state order."""
@@ -108,7 +105,7 @@ class AquiferStorage(Module):
         self.porosity = Parameter(Fraction, gt=0, lt=1)
         self.rock_volumetric_heat_capacity = Parameter(VolumetricHeatCapacity)
         self.ground_conductivity = Parameter(ThermalConductivity, calibratable=True)
-        self.storage_period = Parameter(Duration, default=HALF_YEAR, gt=0)
+        self.storage_period = Parameter(Duration, default=ground.HALF_YEAR, gt=0)
 
         # Inlets
         self.injection_in = Inlet(Stream, stream="brine")
@@ -149,43 +146,74 @@ class AquiferStorage(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        fluid = self._fluid_heat_capacity(inlets.injection_in)
+        injection = inlets.injection_in
+        water = self._fluid_heat_capacity(injection)
         losses = [
-            self._store_conductance(self._volume(store), inlets.injection_in) * self._change(store)
+            heat_transfer.heat_rate(
+                ground.store_conductance(
+                    self._volume(store),
+                    self.ground_conductivity,
+                    self.porosity,
+                    water,
+                    self.rock_volumetric_heat_capacity,
+                    self.aquifer_thickness,
+                    self.storage_period,
+                ),
+                self._change(store),
+            )
             for store in STORES
         ]
-        stored = sum(self._volume(store) * self._change(store) for store in STORES)
-        self.stored_energy = fluid * stored
+        self.stored_energy = ground.aquifer_stored_energy(
+            water,
+            self.warm_volume,
+            self.warm_temperature_change,
+            self.cold_volume,
+            self.cold_temperature_change,
+        )
         self.production_T = outlets.production_out.T
-        charged = self.charged_heat
-        self.recovery_efficiency = ops.where(charged > 0, self.recovered_heat / charged, None)
+        self.recovery_efficiency = ground.thermal_recovery(self.recovered_heat, self.charged_heat)
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
         parts = [heat_transfer.signed_parts(loss) for loss in losses]
         self.heat_loss = sum(loss for loss, _ in parts)
         self.heat_absorbed = sum(absorbed for _, absorbed in parts)
         self.heat_accumulation = (
-            _enthalpy_flow(inlets.injection_in)
-            - _enthalpy_flow(outlets.production_out)
+            heat_transfer.heat_rate(injection.heat_capacity_rate(), injection.T)
+            - heat_transfer.heat_rate(
+                outlets.production_out.heat_capacity_rate(), outlets.production_out.T
+            )
             - sum(losses)
         )
 
     def _advance_states(self, inlets, outlets, dt):
         injection = inlets.injection_in
-        volume = self._volume_flow(injection) * dt
+        volume = ground.injected_volume(self._volume_flow(injection), dt)
         injected_change = injection.T - self.aquifer_temperature
-        heat = self._fluid_heat_capacity(injection) * volume
+        water = self._fluid_heat_capacity(injection)
         states = {}
         for store in STORES:
             store_volume, change = self._moved_store(store, volume, injected_change)
-            decay = self._decay(store_volume, injection, dt)
+            conductance = ground.store_conductance(
+                store_volume,
+                self.ground_conductivity,
+                self.porosity,
+                water,
+                self.rock_volumetric_heat_capacity,
+                self.aquifer_thickness,
+                self.storage_period,
+            )
             states[f"{store}_volume"] = store_volume
-            states[f"{store}_temperature_change"] = change * decay
-        charging = self.mode == "charge"
-        states["charged_heat"] = self.charged_heat + (heat * injected_change if charging else 0)
-        discharging = self.mode == "discharge"
-        recovered = heat * self.warm_temperature_change if discharging else 0
-        states["recovered_heat"] = self.recovered_heat + recovered
+            states[f"{store}_temperature_change"] = ground.store_relaxation(
+                change, store_volume, conductance, dt, water
+            )
+        charged = self.charged_heat
+        if self.mode == "charge":
+            charged = charged + ground.stored_heat(water, volume, injected_change)
+        states["charged_heat"] = charged
+        recovered = self.recovered_heat
+        if self.mode == "discharge":
+            recovered = recovered + ground.stored_heat(water, volume, self.warm_temperature_change)
+        states["recovered_heat"] = recovered
         return states
 
     def production_temperature(self):
@@ -206,37 +234,10 @@ class AquiferStorage(Module):
         store_volume, change = self._volume(store), self._change(store)
         source, target = self._source_and_target()
         if store == target:
-            mixed = store_volume + volume
-            blended = (store_volume * change + volume * injected_change) / mixed
-            return ops.where(volume > 0, mixed, store_volume), ops.where(
-                volume > 0, blended, change
-            )
+            return ground.mix_store(store_volume, change, volume, injected_change)
         if store == source:
             return ops.maximum(store_volume - volume, 0.0), change
         return store_volume, change
-
-    def _decay(self, store_volume, injection, dt):
-        """Return exp(-dt UA / ((rho c)_w V)) [-] of a store; an empty store has no excess."""
-        conductance = self._store_conductance(store_volume, injection)
-        return ops.where(
-            store_volume == 0,
-            0.0,
-            ops.exp(-dt * conductance / (self._fluid_heat_capacity(injection) * store_volume)),
-        )
-
-    def _store_conductance(self, store_volume, injection):
-        """Return the conduction conductance [W/K] of a store of water volume [m3]."""
-        fluid = self._fluid_heat_capacity(injection)
-        aquifer = ground.aquifer_volumetric_heat_capacity(
-            self.porosity, fluid, self.rock_volumetric_heat_capacity
-        )
-        return ground.cylinder_store_conductance(
-            self.ground_conductivity,
-            self.ground_conductivity / aquifer,
-            store_volume * fluid / aquifer,
-            self.aquifer_thickness,
-            self.storage_period,
-        )
 
     def _source_and_target(self):
         """Return the stores the running mode takes water from and puts it into, else ``None``."""
@@ -253,8 +254,8 @@ class AquiferStorage(Module):
     @staticmethod
     def _fluid_heat_capacity(stream):
         """Return the volumetric heat capacity (rho c)_w [J/m3/K] of the circuit liquid."""
-        fluid = stream.fluid.properties(stream.p, stream.T)
-        return fluid.liquid_volumetric_heat_capacity
+        properties = stream.fluid.properties(stream.p, stream.T)
+        return properties.liquid_volumetric_heat_capacity
 
     def _volume_flow(self, injection):
         """Return the injected liquid volume flow [m3/s] after checking it against the mode."""
@@ -274,9 +275,5 @@ class AquiferStorage(Module):
                 path=self.path,
                 m_dot=injection.m_dot,
             )
-        return injection.m_dot / injection.fluid.properties(injection.p, injection.T).rho_l
-
-
-def _enthalpy_flow(stream):
-    """Return the sensible enthalpy flow m_dot cp T [W] of a stream, as ``energy_balance``."""
-    return stream.heat_capacity_rate() * stream.T
+        density = injection.fluid.properties(injection.p, injection.T).rho_l
+        return fluid.volume_flow(injection.m_dot, density)

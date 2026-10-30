@@ -9,6 +9,7 @@ from gemini import ops
 from gemini.modules import Module, energy_balance, mass_balance
 from gemini.modules.heating import Boiler
 from gemini.modules.storage import AquiferStorage
+from gemini.physics import ground
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
@@ -222,10 +223,18 @@ def test_store_arithmetic_matches_on_arrays():
 
     @ops.physics
     def numbers(volume, dt):
-        return dict(
-            conductance=module._store_conductance(volume, WARM),
-            decay=module._decay(volume, WARM, dt),
+        water = module._fluid_heat_capacity(WARM)
+        conductance = ground.store_conductance(
+            volume,
+            module.ground_conductivity,
+            module.porosity,
+            water,
+            module.rock_volumetric_heat_capacity,
+            module.aquifer_thickness,
+            module.storage_period,
         )
+        decay = ground.store_relaxation(1.0, volume, conductance, dt, water)
+        return dict(conductance=conductance, decay=decay)
 
     rows = [(0.0, HOUR), (1e4, HOUR), (3e5, 24 * HOUR)]
     assert_function_matches(numbers, rows)

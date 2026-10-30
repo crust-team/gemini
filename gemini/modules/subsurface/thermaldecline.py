@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import ground
+from gemini.physics import fluid, ground
 from gemini.types import (
     Boundary,
     Duration,
@@ -99,24 +99,28 @@ class ThermalDecline(Module):
         inlet = inlets.inlet
         flow = self._liquid_flow(inlet)
         volume = self._breakthrough_volume(inlet)
-        self.breakthrough_time = ops.where(flow != 0, volume / flow, None)
+        self.breakthrough_time = ground.doublet_breakthrough_time(volume, flow)
         self.temperature_drop = self._temperature_drop(inlet)
         self.outlet_T = outlets.outlet.T
 
     def _advance_states(self, inlets, outlets, dt):
         flow = self._liquid_flow(inlets.inlet)
-        return {"injected_volume": self.injected_volume + flow * dt}
+        return {"injected_volume": self.injected_volume + ground.injected_volume(flow, dt)}
 
     def _temperature_drop(self, inlet):
         """Return the produced temperature drop [K] at the start-of-step injected volume."""
         self._liquid_flow(inlet)
-        ratio = self.injected_volume / self._breakthrough_volume(inlet)
-        return ground.doublet_cold_fraction(ratio) * (inlet.T - self.injection_temperature)
+        return ground.doublet_temperature_drop(
+            self.injected_volume,
+            self._breakthrough_volume(inlet),
+            inlet.T,
+            self.injection_temperature,
+        )
 
     def _breakthrough_volume(self, inlet):
         """Return the Gringarten-Sauty breakthrough volume V_B [m3] for the inlet fluid."""
-        fluid = inlet.fluid.properties(inlet.p, inlet.T)
-        water = fluid.liquid_volumetric_heat_capacity
+        properties = inlet.fluid.properties(inlet.p, inlet.T)
+        water = properties.liquid_volumetric_heat_capacity
         aquifer = ground.aquifer_volumetric_heat_capacity(
             self.porosity, water, self.rock_volumetric_heat_capacity
         )
@@ -133,4 +137,4 @@ class ThermalDecline(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        return inlet.m_dot / inlet.fluid.properties(inlet.p, inlet.T).rho_l
+        return fluid.volume_flow(inlet.m_dot, inlet.fluid.properties(inlet.p, inlet.T).rho_l)

@@ -211,3 +211,100 @@ def test_ground_relations_raise_the_error_class_of_their_caller():
         )
     with pytest.raises(ConfigurationError, match="^well: ramey_time_function: time = 0"):
         ground.ramey_time_function(0.0, 1e-6, 0.1, error=ConfigurationError, context="well: ")
+
+
+def test_doublet_drop_and_time_by_hand():
+    """No drop before breakthrough; half the contrast at three breakthrough volumes."""
+    assert ground.injected_volume(0.02, 3600) == pytest.approx(72.0)
+    assert ground.doublet_temperature_drop(10, 100, 370, 300) == 0
+    assert ground.doublet_temperature_drop(300, 100, 370, 300) == pytest.approx(35, abs=1e-9)
+    assert ground.doublet_breakthrough_time(1000, 0.5) == 2000
+    assert ground.doublet_breakthrough_time(1000, 0) is None
+    rows = [(10.0, 100.0, 370.0, 300.0), (300.0, 100.0, 370.0, 300.0), (1e5, 100.0, 370.0, 300.0)]
+    assert_function_matches(ground.doublet_temperature_drop, rows)
+    assert_function_matches(ground.doublet_breakthrough_time, [(1000.0, 0.5), (1000.0, 0.0)])
+    assert_function_matches(ground.injected_volume, [(0.02, 3600.0), (0.0, 1.0)])
+
+
+def test_aquifer_store_relations_by_hand():
+    """Mixing weights by volume, an empty store keeps no excess, conduction decays exactly."""
+    assert ground.HALF_YEAR == 182.625 * 24 * 3600
+    assert ground.mix_store(100, 10, 100, 0) == (200, 5)
+    assert ground.mix_store(100, 10, 0, 0) == (100, 10)
+    assert ground.stored_heat(4e6, 10, 5) == 2e8
+    assert ground.aquifer_stored_energy(4e6, 10, 5, 20, -2) == 4e6 * (50 - 40)
+    assert ground.thermal_recovery(1.0, 4.0) == 0.25
+    assert ground.thermal_recovery(1.0, 0.0) is None
+    assert ground.store_relaxation(8.0, 0.0, 0.0, 10.0, 4e6) == 0
+    assert ground.store_relaxation(8.0, 1.0, 4e6, 1.0, 4e6) == pytest.approx(8.0 / math.e)
+    assert ground.store_conductance(1e5, 2.0, 0.2, 4.2e6, 2.5e6, 50, 1.5e7) == pytest.approx(
+        ground.cylinder_store_conductance(
+            2.0, 2.0 / (0.2 * 4.2e6 + 0.8 * 2.5e6), 1e5 * 4.2e6 / 2.84e6, 50, 1.5e7
+        )
+    )
+
+
+def test_aquifer_store_relations_match_on_arrays():
+    """Every branch of the mixing, decay and recovery relations agrees on arrays."""
+    assert_function_matches(ground.mix_store, [(100.0, 10.0, 100.0, 0.0), (100.0, 10.0, 0.0, 3.0)])
+    assert_function_matches(
+        ground.store_relaxation,
+        [(8.0, 0.0, 1e3, 10.0, 4e6), (8.0, 1e5, 1e3, 1e5, 4e6), (-3.0, 2e5, 0.0, 10.0, 4e6)],
+    )
+    assert_function_matches(ground.thermal_recovery, [(1.0, 4.0), (1.0, 0.0), (1.0, -1.0)])
+    assert_function_matches(ground.stored_heat, [(4e6, 10.0, 5.0)])
+    assert_function_matches(ground.aquifer_stored_energy, [(4e6, 10.0, 5.0, 20.0, -2.0)])
+    assert_function_matches(
+        ground.store_conductance,
+        [(0.0, 2.0, 0.2, 4.2e6, 2.5e6, 50.0, 1.5e7), (1e5, 2.0, 0.2, 4.2e6, 2.5e6, 50.0, 1.5e7)],
+    )
+
+
+BOREHOLE = (100.0, 150.0, 0.075, 6.0, 2.0, 0.1)
+
+
+def test_borehole_field_relations_by_hand():
+    """Conductance of the loops, surroundings and capacity follow their closed forms."""
+    cell = ground.steady_flux_resistance(2.0, 0.075, 6.0 / math.sqrt(math.pi))
+    unit = 100 * 150 / (0.1 + cell)
+    expected = -math.expm1(-unit / 30.0) * 30.0
+    assert ground.borehole_loop_conductance(30.0, *BOREHOLE) == pytest.approx(expected)
+    assert ground.borehole_loop_conductance(0.0, *BOREHOLE) == 0
+    diameter = 2 * math.sqrt(100 * 36 / math.pi)
+    assert ground.borehole_field_surroundings_conductance(100, 6.0, 150.0, 2.0) == pytest.approx(
+        ground.vertical_cylinder_conductance(2.0, 150.0, diameter)
+    )
+    assert ground.borehole_field_capacity(2.2e6, 100, 6.0, 150.0) == 2.2e6 * 100 * 36 * 150
+    assert ground.mean_fluid_temperature(280.0, 284.0) == 282.0
+    far = ground.borehole_field_temperature_change(0.0, 50.0, 10.0, 290.0, 283.0, 1e12, 1e12)
+    assert far == pytest.approx(50.0 * 7.0 / 60.0, rel=1e-3)
+    assert ground.borehole_field_temperature_change(2.0, 50.0, 10.0, 283.0, 283.0, 0.0, 1e9) == 2.0
+
+
+def test_borehole_field_relations_match_on_arrays():
+    """Stopped and flowing loops, and the step update, agree on arrays."""
+    assert_function_matches(
+        ground.borehole_loop_conductance,
+        [(30.0, *BOREHOLE), (1e3, *BOREHOLE), (0.0, *BOREHOLE)],
+    )
+    assert_function_matches(
+        ground.borehole_field_surroundings_conductance, [(100.0, 6.0, 150.0, 2.0)]
+    )
+    assert_function_matches(ground.borehole_field_capacity, [(2.2e6, 100.0, 6.0, 150.0)])
+    assert_function_matches(ground.mean_fluid_temperature, [(280.0, 284.0)])
+    assert_function_matches(
+        ground.borehole_field_temperature_change,
+        [(0.0, 50.0, 10.0, 290.0, 283.0, 3600.0, 1e12), (2.0, 0.0, 10.0, 283.0, 283.0, 1e5, 1e9)],
+    )
+
+
+def test_ramey_resistance_and_relaxation_length_by_hand():
+    """R_r = f / (2 pi k) and A = m cp (R_b + R_r)."""
+    function = ground.ramey_time_function(1e7, 1e-6, 0.1)
+    resistance = ground.ramey_rock_resistance(1e7, 1e-6, 0.1, 2.5)
+    assert resistance == pytest.approx(function / (2 * math.pi * 2.5))
+    assert ground.ramey_relaxation_length(20.0, 0.1, 0.3) == pytest.approx(8.0)
+    assert_function_matches(
+        ground.ramey_rock_resistance, [(1e7, 1e-6, 0.1, 2.5), (1e9, 1e-6, 0.1, 3.0)]
+    )
+    assert_function_matches(ground.ramey_relaxation_length, [(20.0, 0.1, 0.3), (0.0, 0.1, 0.3)])
