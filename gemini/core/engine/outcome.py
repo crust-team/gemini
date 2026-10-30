@@ -87,7 +87,10 @@ def _prepare(twin, block, selected, cache):
 
 
 def _streams(twin, block, selected):
-    """Return the inlet streams of the selected ticks: arrays, or the plant's constants."""
+    """Return the inlet streams of the selected ticks: arrays, or the plant's constants.
+
+    An inlet with neither is refused as the module refuses a call without it.
+    """
     streams = {}
     for port in twin.module._inlets:
         if port in block.fluids:
@@ -95,8 +98,10 @@ def _streams(twin, block, selected):
                 block.fields[port, name][selected] for name in STREAM_FIELDS
             )
             streams[port] = Stream._trusted(m_dot, temperature, pressure, block.fluids[port])
-            continue
-        streams[port] = _constant(twin, port, len(selected))
+        elif port in twin.constants:
+            streams[port] = _constant(twin, port, len(selected))
+    if len(streams) < len(twin.module._inlets):
+        twin.module._split_call_args((), streams)
     return streams
 
 
