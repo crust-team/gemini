@@ -12,6 +12,39 @@ from gemini.errors import PhysicsRangeError
 from gemini.physics import heat_transfer
 from gemini.physics.units import k_to_c
 
+DEFAULT_CARNOT_FRACTION = 0.5
+"""Carnot fraction of a water-to-water heat pump or chiller [-]: Arpagaus et al. (2018), "High
+temperature heat pumps: Market overview, state of the art, research status, refrigerants, and
+application potentials", Energy 152, 985-1010, report about 0.4 to 0.6."""
+
+DEFAULT_LORENZ_FRACTION = 0.5
+"""Lorenz fraction of a water-to-water heat pump [-]; the same range as the Carnot fraction
+(Arpagaus et al. 2018)."""
+
+DEFAULT_MINIMUM_LIFT = 10.0
+"""Floor of the temperature lift in a COP [K]: the lowest lift of the water-to-water machines
+summarised by Arpagaus et al. (2018), which bounds the COP of nearly equal temperatures."""
+
+DEFAULT_ABSORPTION_THERMAL_COP = 0.7
+"""Thermal COP of a single-effect water/LiBr absorption chiller [-] (Herold, Radermacher and
+Klein 2016, Absorption Chillers and Heat Pumps, 2nd ed.: about 0.7)."""
+
+DEFAULT_ABSORPTION_MINIMUM_DRIVING_TEMPERATURE = 353.15
+"""Generator inlet temperature [K] (80 degC) below which a LiBr absorption chiller is off; within
+the driving range of about 70 to 120 degC of single-effect machines (GEMINI default)."""
+
+DEFAULT_ADSORPTION_THERMAL_COP = 0.55
+"""Cycle-averaged thermal COP of a silica-gel/water adsorption chiller [-] (Wang and Oliveira
+2006, Progress in Energy and Combustion Science 32, 424-458: about 0.5 to 0.6)."""
+
+DEFAULT_ADSORPTION_MINIMUM_DRIVING_TEMPERATURE = 328.15
+"""Generator inlet temperature [K] (55 degC) below which an adsorption chiller is off (GEMINI
+default for low-temperature silica-gel machines)."""
+
+DEFAULT_ADSORPTION_MAXIMUM_DRIVING_TEMPERATURE = 363.15
+"""Generator inlet temperature [K] (90 degC) above which the adsorption characteristic map is not
+valid (GEMINI default)."""
+
 
 @ops.physics
 def carnot_cop_heating(
@@ -368,6 +401,7 @@ def sorption_evaporator_capacity(
         auxiliary_power_ratio=auxiliary_power_ratio,
     )
     generator_ratio = 1 / thermal_cop
+    rejection_ratio = sorption_rejection_ratio(thermal_cop, auxiliary_power_ratio)
     driving = characteristic_temperature_difference(
         generator_temperature,
         rejection_temperature,
@@ -380,11 +414,123 @@ def sorption_evaporator_capacity(
         rejection_rate,
         evaporator_rate,
         generator_ratio,
-        1 + generator_ratio + auxiliary_power_ratio,
+        rejection_ratio,
         rejection_coefficient,
         evaporator_coefficient,
     )
     return characteristic_evaporator_duty(driving, minimum_driving_difference, slope, sensitivity)
+
+
+@ops.physics
+def sorption_rejection_ratio(thermal_cop: float, auxiliary_power_ratio: float) -> float:
+    """Return the heat-rejection duty of a sorption machine per unit evaporator duty.
+
+    Parameters
+    ----------
+    thermal_cop : float
+        Thermal COP Q_E / Q_G [-], positive.
+    auxiliary_power_ratio : float
+        Pump and auxiliary electricity per unit evaporator duty [-], nonnegative.
+
+    Returns
+    -------
+    float
+        Q_AC / Q_E = 1 + 1 / COP + auxiliary_power_ratio [-].
+
+    Notes
+    -----
+    First-law closure of a sorption machine (Herold, Radermacher and Klein 2016, Absorption
+    Chillers and Heat Pumps, 2nd ed.): the absorber and condenser reject the evaporator,
+    generator and auxiliary energy.
+    """
+    return 1 + 1 / thermal_cop + auxiliary_power_ratio
+
+
+@ops.physics
+def sorption_delivered_duty(
+    requested: float, available: float, capacity: float, useful_ratio: float
+) -> tuple:
+    """Return the evaporator duty a sorption machine delivers and whether it falls short.
+
+    Parameters
+    ----------
+    requested : float
+        Useful duty [W] asked for by the setpoint.
+    available : float
+        Evaporator duty [W] the characteristic equation allows.
+    capacity : float
+        Cap on the useful duty [W].
+    useful_ratio : float
+        Useful duty per unit evaporator duty [-]: 1 for cooling, the rejection ratio for heating.
+
+    Returns
+    -------
+    tuple of float
+        ``(Q_E, is_capped)``: ``Q_E = min(min(requested / ratio, available), capacity / ratio)``
+        [W], and whether it is below ``requested / ratio``.
+
+    Notes
+    -----
+    Retained GEMINI throttling: the machine follows the request at an unchanged COP until the
+    characteristic equation or the capacity limits it.
+    """
+    wanted = requested / useful_ratio
+    delivered = ops.minimum(ops.minimum(wanted, available), capacity / useful_ratio)
+    return delivered, delivered < wanted
+
+
+@ops.physics
+def coefficient_of_performance(useful_duty: float, input_duty: float) -> float:
+    """Return the coefficient of performance of a machine.
+
+    Parameters
+    ----------
+    useful_duty : float
+        Useful heating or cooling duty [W].
+    input_duty : float
+        Driving heat or electricity [W], positive.
+
+    Returns
+    -------
+    float
+        COP = useful duty / input duty [-].
+
+    Notes
+    -----
+    Definition, Moran and Shapiro, Fundamentals of Engineering Thermodynamics, chapter 10; for
+    a sorption machine the input is the generator duty (the thermal COP).
+    """
+    return useful_duty / input_duty
+
+
+@ops.physics
+def sorption_duties(
+    evaporator_duty: float, thermal_cop: float, auxiliary_power_ratio: float
+) -> tuple:
+    """Return the generator duty, auxiliary electricity and rejected heat of a sorption machine.
+
+    Parameters
+    ----------
+    evaporator_duty : float
+        Evaporator duty Q_E [W].
+    thermal_cop : float
+        Thermal COP Q_E / Q_G [-], positive.
+    auxiliary_power_ratio : float
+        Auxiliary electricity per unit evaporator duty [-], nonnegative.
+
+    Returns
+    -------
+    tuple of float
+        ``(Q_G, P, Q_AC)`` [W]: ``Q_G = Q_E / COP``, ``P = ratio * Q_E`` and
+        ``Q_AC = Q_G + Q_E + P``.
+
+    Notes
+    -----
+    Constant thermal COP with the first-law closure of ``sorption_rejection_ratio``.
+    """
+    generator = evaporator_duty / thermal_cop
+    electricity = evaporator_duty * auxiliary_power_ratio
+    return generator, electricity, generator + evaporator_duty + electricity
 
 
 @ops.physics
@@ -475,3 +621,374 @@ def _lift(function, sink_temperature, source_temperature, minimum_lift):
         minimum_lift=minimum_lift,
     )
     return floored
+
+
+@ops.physics
+def carnot_fraction_cop_heating(
+    efficiency: float,
+    minimum_lift: float,
+    sink_inlet: float,
+    sink_outlet: float,
+    source_inlet: float,
+    source_outlet: float,
+) -> float:
+    """Return the heating COP as a fraction of the Carnot COP at the outlet temperatures.
+
+    Parameters
+    ----------
+    efficiency : float
+        Carnot fraction [-].
+    minimum_lift : float
+        Lift floor [K].
+    sink_inlet, sink_outlet, source_inlet, source_outlet : float
+        Absolute temperatures [K] of the circuits; only the outlets enter.
+
+    Returns
+    -------
+    float
+        COP = efficiency * ``carnot_cop_heating(sink_outlet, source_outlet, minimum_lift)`` [-].
+
+    Notes
+    -----
+    Same signature as ``carnot_fraction_cop_cooling`` and ``lorenz_fraction_cop_heating``, so a
+    module picks the COP model structurally. Carnot fraction: Arpagaus et al. (2018).
+    """
+    return efficiency * carnot_cop_heating(sink_outlet, source_outlet, minimum_lift)
+
+
+@ops.physics
+def carnot_fraction_cop_cooling(
+    efficiency: float,
+    minimum_lift: float,
+    sink_inlet: float,
+    sink_outlet: float,
+    source_inlet: float,
+    source_outlet: float,
+) -> float:
+    """Return the cooling COP as a fraction of the Carnot COP at the outlet temperatures.
+
+    Parameters
+    ----------
+    efficiency : float
+        Carnot fraction [-].
+    minimum_lift : float
+        Lift floor [K].
+    sink_inlet, sink_outlet, source_inlet, source_outlet : float
+        Absolute temperatures [K] of the circuits; only the outlets enter.
+
+    Returns
+    -------
+    float
+        COP = efficiency * ``carnot_cop_cooling(sink_outlet, source_outlet, minimum_lift)`` [-].
+
+    Notes
+    -----
+    See ``carnot_fraction_cop_heating``.
+    """
+    return efficiency * carnot_cop_cooling(sink_outlet, source_outlet, minimum_lift)
+
+
+@ops.physics
+def lorenz_fraction_cop_heating(
+    efficiency: float,
+    minimum_lift: float,
+    sink_inlet: float,
+    sink_outlet: float,
+    source_inlet: float,
+    source_outlet: float,
+) -> float:
+    """Return the heating COP as a fraction of the Lorenz COP at the circuit glides.
+
+    Parameters
+    ----------
+    efficiency : float
+        Lorenz fraction [-].
+    minimum_lift : float
+        Lift floor [K] on the log-mean temperature difference.
+    sink_inlet, sink_outlet, source_inlet, source_outlet : float
+        Absolute temperatures [K] of the circuits.
+
+    Returns
+    -------
+    float
+        COP = efficiency * ``lorenz_cop_heating`` [-].
+
+    Notes
+    -----
+    See ``carnot_fraction_cop_heating`` and ``lorenz_cop_heating`` (Lorenz 1894).
+    """
+    cop = lorenz_cop_heating(sink_inlet, sink_outlet, source_inlet, source_outlet, minimum_lift)
+    return efficiency * cop
+
+
+@ops.physics
+def heating_evaporator_duty(condenser_duty: float, cop: float) -> float:
+    """Return the evaporator duty of a heat pump from its condenser duty and heating COP.
+
+    Parameters
+    ----------
+    condenser_duty : float
+        Useful heating duty [W].
+    cop : float
+        Heating COP [-].
+
+    Returns
+    -------
+    float
+        ``Q_E = Q_C - Q_C / COP`` [W]; the difference is the compressor electricity.
+
+    Notes
+    -----
+    First law of a steady vapour-compression cycle, Moran and Shapiro, Fundamentals of
+    Engineering Thermodynamics, chapter 10.
+    """
+    return condenser_duty - condenser_duty / cop
+
+
+@ops.physics
+def cooling_condenser_duty(evaporator_duty: float, cop: float) -> float:
+    """Return the condenser duty of a chiller from its evaporator duty and cooling COP.
+
+    Parameters
+    ----------
+    evaporator_duty : float
+        Useful cooling duty [W].
+    cop : float
+        Cooling COP [-].
+
+    Returns
+    -------
+    float
+        ``Q_C = Q_E + Q_E / COP`` [W]; the sum is the evaporator duty and the electricity.
+
+    Notes
+    -----
+    First law of a steady vapour-compression cycle, Moran and Shapiro, Fundamentals of
+    Engineering Thermodynamics, chapter 10.
+    """
+    return evaporator_duty + evaporator_duty / cop
+
+
+@ops.physics
+def carnot_heating_source_outlet(
+    source_inlet: float,
+    temperature_change: float,
+    sink_outlet: float,
+    efficiency: float,
+    minimum_lift: float,
+) -> float:
+    """Return the source outlet temperature that closes the balance of a Carnot-fraction pump.
+
+    Parameters
+    ----------
+    source_inlet : float
+        Source inlet temperature [K].
+    temperature_change : float
+        Duty over source capacity rate Q / C [K], nonnegative.
+    sink_outlet : float
+        Sink outlet temperature [K].
+    efficiency : float
+        Carnot fraction [-].
+    minimum_lift : float
+        Lift floor [K].
+
+    Returns
+    -------
+    float
+        x [K] solving C (T_in - x) = Q (1 - 1 / COP) with COP = eta T_h / max(T_h - x, lift): with
+        the floored lift x = T_in - dT (1 - lift / (eta T_h)), which applies when it leaves the
+        lift within the floor; otherwise x = (T_in - dT (1 - 1 / eta)) / (1 + dT / (eta T_h)).
+
+    Notes
+    -----
+    Closed form of a linear balance; first law of ``heating_evaporator_duty``.
+    """
+    floored = source_inlet - temperature_change * (1 - minimum_lift / (efficiency * sink_outlet))
+    unfloored = (source_inlet - temperature_change * (1 - 1 / efficiency)) / (
+        1 + temperature_change / (efficiency * sink_outlet)
+    )
+    return ops.where(sink_outlet - floored > minimum_lift, unfloored, floored)
+
+
+@ops.physics
+def heating_cop_minimum_source(sink_outlet: float, efficiency: float) -> float:
+    """Return the source temperature below which a Carnot-fraction heating COP is at most 1.
+
+    Parameters
+    ----------
+    sink_outlet : float
+        Sink outlet temperature [K].
+    efficiency : float
+        Carnot fraction [-].
+
+    Returns
+    -------
+    float
+        ``(1 - eta) T_h`` [K]: COP = eta T_h / (T_h - T_s) exceeds 1 above it.
+
+    Notes
+    -----
+    Valid for a lift above the floor.
+    """
+    return (1 - efficiency) * sink_outlet
+
+
+@ops.physics
+def carnot_cooling_sink_outlet(
+    sink_inlet: float,
+    temperature_change: float,
+    source_outlet: float,
+    efficiency: float,
+    minimum_lift: float,
+) -> tuple:
+    """Return the sink outlet temperature that closes the balance of a Carnot-fraction chiller.
+
+    Parameters
+    ----------
+    sink_inlet : float
+        Sink inlet temperature [K].
+    temperature_change : float
+        Duty over sink capacity rate Q / C [K], nonnegative.
+    source_outlet : float
+        Chilled outlet temperature [K].
+    efficiency : float
+        Carnot fraction [-].
+    minimum_lift : float
+        Lift floor [K].
+
+    Returns
+    -------
+    tuple
+        ``(y, within_floor, denominator)``: y [K] solving C (y - T_in) = Q (1 + 1 / COP) with
+        COP = eta T_c / max(y - T_c, lift); with the floored lift
+        y = T_in + dT (1 + lift / (eta T_c)) when that is within the floor, otherwise
+        y = (T_in + dT (1 - 1 / eta)) / denominator. ``denominator = 1 - dT / (eta T_c)`` must be
+        positive for the second form (a sink capacity rate above Q / (eta T_c)).
+
+    Notes
+    -----
+    Closed form of a linear balance; first law of ``cooling_condenser_duty``. The caller checks
+    the denominator where the floor does not apply.
+    """
+    floored = sink_inlet + temperature_change * (1 + minimum_lift / (efficiency * source_outlet))
+    within_floor = floored - source_outlet <= minimum_lift
+    denominator = 1 - temperature_change / (efficiency * source_outlet)
+    unfloored = (sink_inlet + temperature_change * (1 - 1 / efficiency)) / denominator
+    return ops.where(within_floor, floored, unfloored), within_floor, denominator
+
+
+@ops.physics
+def cooling_minimum_sink_rate(duty: float, efficiency: float, source_outlet: float) -> float:
+    """Return the sink capacity rate [W/K] a Carnot-fraction chiller needs to reject its duty.
+
+    Parameters
+    ----------
+    duty : float
+        Cooling duty [W].
+    efficiency : float
+        Carnot fraction [-].
+    source_outlet : float
+        Chilled outlet temperature [K].
+
+    Returns
+    -------
+    float
+        ``Q / (eta T_c)`` [W/K], the bound of ``carnot_cooling_sink_outlet``'s denominator.
+
+    Notes
+    -----
+    Valid for a lift above the floor.
+    """
+    return duty / (efficiency * source_outlet)
+
+
+@ops.physics
+def lorenz_source_surplus(
+    source_outlet: float,
+    source_rate: float,
+    source_inlet: float,
+    sink_inlet: float,
+    sink_outlet: float,
+    duty: float,
+    efficiency: float,
+    minimum_lift: float,
+) -> float:
+    """Return the evaporator balance surplus [W] of a Lorenz-fraction pump at a source outlet.
+
+    Parameters
+    ----------
+    source_outlet : float
+        Trial source outlet temperature x [K].
+    source_rate : float
+        Source capacity rate C [W/K].
+    source_inlet, sink_inlet, sink_outlet : float
+        Circuit temperatures [K].
+    duty : float
+        Heating duty Q [W].
+    efficiency : float
+        Lorenz fraction [-].
+    minimum_lift : float
+        Lift floor [K].
+
+    Returns
+    -------
+    float
+        ``C (T_in - x) - Q (1 - 1 / COP(x))`` [W], zero at the balanced source outlet.
+
+    Notes
+    -----
+    A root-finding function of ``ops.brentq``; ``lorenz_fraction_cop_heating`` gives the COP.
+    """
+    cop = lorenz_fraction_cop_heating(
+        efficiency, minimum_lift, sink_inlet, sink_outlet, source_inlet, source_outlet
+    )
+    return source_rate * (source_inlet - source_outlet) - duty * (1 - 1 / cop)
+
+
+@ops.physics
+def source_limit_shortfall(
+    cop_function,
+    useful_duty: float,
+    sink_inlet: float,
+    sink_rate: float,
+    source_inlet: float,
+    source_limit: float,
+    available: float,
+    efficiency: float,
+    minimum_lift: float,
+) -> float:
+    """Return the evaporator demand minus the available source heat [W] at a heating duty.
+
+    Parameters
+    ----------
+    cop_function : callable
+        Structural choice of the COP model: ``carnot_fraction_cop_heating`` or
+        ``lorenz_fraction_cop_heating``.
+    useful_duty : float
+        Trial heating duty Q [W].
+    sink_inlet, sink_rate : float
+        Sink inlet temperature [K] and capacity rate [W/K].
+    source_inlet, source_limit : float
+        Source inlet temperature and its lowest allowed outlet [K].
+    available : float
+        Heat C_source (T_in - T_min) the source can give [W].
+    efficiency : float
+        Carnot or Lorenz fraction [-].
+    minimum_lift : float
+        Lift floor [K].
+
+    Returns
+    -------
+    float
+        ``Q (1 - 1 / COP) - available`` [W], with the sink outlet T_sink_in + Q / C_sink and the
+        source outlet at its limit; zero at the duty that cools the source exactly to the limit.
+
+    Notes
+    -----
+    A root-finding function of ``ops.brentq``, bound with ``functools.partial``.
+    """
+    sink_outlet = sink_inlet + heat_transfer.temperature_change(useful_duty, sink_rate)
+    cop = cop_function(
+        efficiency, minimum_lift, sink_inlet, sink_outlet, source_inlet, source_limit
+    )
+    return useful_duty * (1 - 1 / cop) - available

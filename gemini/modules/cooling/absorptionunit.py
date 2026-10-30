@@ -5,6 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.modules.cooling import _sorption as sorption
 from gemini.modules.module import Module
+from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
     Control,
     Dimensionless,
@@ -66,9 +67,13 @@ class AbsorptionUnit(Module):
         self.minimum_driving_difference = Parameter(TemperatureDifference)
         self.rejection_coefficient = Parameter(Dimensionless)
         self.evaporator_coefficient = Parameter(Dimensionless)
-        self.thermal_cop = Parameter(Ratio, default=0.7, gt=0)
+        self.thermal_cop = Parameter(
+            Ratio, default=refrigeration.DEFAULT_ABSORPTION_THERMAL_COP, gt=0
+        )
         self.auxiliary_power_ratio = Parameter(Ratio)
-        self.minimum_driving_temperature = Parameter(Temperature, default=353.15)
+        self.minimum_driving_temperature = Parameter(
+            Temperature, default=refrigeration.DEFAULT_ABSORPTION_MINIMUM_DRIVING_TEMPERATURE
+        )
 
         # Inlets
         self.generator_in = Inlet(Stream, stream="hot_water")
@@ -120,33 +125,35 @@ class AbsorptionUnit(Module):
             inlets.cooling_in,
         )
         rates = sorption.rates(self.path, inlets)
-        rejection_ratio = 1 + 1 / self.thermal_cop + self.auxiliary_power_ratio
         if self.mode == "chiller":
             useful_ratio = 1.0
-            requested = rates["chilled_in"] * ops.maximum(
-                0, chilled_in.T - self.temperature_setpoint
+            requested = heat_transfer.setpoint_duty(
+                rates["chilled_in"], chilled_in.T - self.temperature_setpoint
             )
         else:
-            useful_ratio = rejection_ratio
-            requested = rates["cooling_in"] * ops.maximum(
-                0, self.temperature_setpoint - cooling_in.T
+            useful_ratio = refrigeration.sorption_rejection_ratio(
+                self.thermal_cop, self.auxiliary_power_ratio
             )
-        evaporator = ops.minimum(
-            ops.minimum(requested / useful_ratio, self._available_duty(inlets, rates)),
-            self.capacity / useful_ratio,
+            requested = heat_transfer.setpoint_duty(
+                rates["cooling_in"], self.temperature_setpoint - cooling_in.T
+            )
+        evaporator, is_capped = refrigeration.sorption_delivered_duty(
+            requested, self._available_duty(inlets, rates), self.capacity, useful_ratio
         )
-        generator = evaporator / self.thermal_cop
-        electricity = evaporator * self.auxiliary_power_ratio
-        rejection = generator + evaporator + electricity
+        generator, electricity, rejection = refrigeration.sorption_duties(
+            evaporator, self.thermal_cop, self.auxiliary_power_ratio
+        )
         useful = evaporator if self.mode == "chiller" else rejection
         return {
-            "cop": ops.where(evaporator != 0, useful / generator, None),
+            "cop": ops.where(
+                evaporator != 0, refrigeration.coefficient_of_performance(useful, generator), None
+            ),
             "useful_duty": useful,
             "generator_duty": generator,
             "evaporator_duty": evaporator,
             "absorber_condenser_duty": rejection,
             "electricity": electricity,
-            "is_capped": evaporator < requested / useful_ratio,
+            "is_capped": is_capped,
             "generator_out_T": sorption.outlet_T(generator_in, rates["generator_in"], -generator),
             "chilled_out_T": sorption.outlet_T(chilled_in, rates["chilled_in"], -evaporator),
             "cooling_out_T": sorption.outlet_T(cooling_in, rates["cooling_in"], rejection),

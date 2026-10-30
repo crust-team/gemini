@@ -2,7 +2,7 @@
 
 from gemini import ops
 from gemini.errors import PhysicsRangeError
-from gemini.physics import refrigeration
+from gemini.physics import heat_transfer, refrigeration
 
 
 def rates(path, inlets):
@@ -23,7 +23,7 @@ def rates(path, inlets):
 
 def outlet_T(stream, rate, duty):
     """Return the outlet temperature [K] after adding ``duty`` [W] at capacity rate ``rate``."""
-    return ops.where(duty == 0, stream.T, stream.T + duty / rate)
+    return ops.where(duty == 0, stream.T, stream.T + heat_transfer.temperature_change(duty, rate))
 
 
 def outlet_streams(inlets, values):
@@ -40,9 +40,9 @@ def assign_outputs(module, inlets, outlets, values):
     for name, value in values.items():
         setattr(module, name, value)
     module.driving_temperature_difference = refrigeration.characteristic_temperature_difference(
-        (inlets.generator_in.T + outlets.generator_out.T) / 2,
-        (inlets.cooling_in.T + outlets.cooling_out.T) / 2,
-        (inlets.chilled_in.T + outlets.chilled_out.T) / 2,
+        heat_transfer.mean_temperature(inlets.generator_in.T, outlets.generator_out.T),
+        heat_transfer.mean_temperature(inlets.cooling_in.T, outlets.cooling_out.T),
+        heat_transfer.mean_temperature(inlets.chilled_in.T, outlets.chilled_out.T),
         module.rejection_coefficient,
         module.evaporator_coefficient,
     )

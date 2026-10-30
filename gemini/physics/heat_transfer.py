@@ -453,6 +453,28 @@ def mixed_temperature(
 
 
 @ops.physics
+def mean_temperature(first: float, second: float) -> float:
+    """Return the arithmetic mean of two temperatures.
+
+    Parameters
+    ----------
+    first, second : float
+        Temperatures [K], for example the inlet and the outlet of a stream.
+
+    Returns
+    -------
+    float
+        ``(first + second) / 2`` [K].
+
+    Notes
+    -----
+    Mean circuit temperature of a characteristic-equation machine (Hellmann, Schweigler and
+    Ziegler 1999).
+    """
+    return (first + second) / 2
+
+
+@ops.physics
 def terminal_differences(
     hot_in: float, hot_out: float, cold_in: float, cold_out: float, counterflow: bool
 ) -> tuple:

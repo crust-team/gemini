@@ -4,6 +4,7 @@ from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.cooling import _sorption as sorption
 from gemini.modules.module import Module
+from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
     Control,
     Dimensionless,
@@ -63,10 +64,16 @@ class AdsorptionChiller(Module):
         self.minimum_driving_difference = Parameter(TemperatureDifference)
         self.rejection_coefficient = Parameter(Dimensionless)
         self.evaporator_coefficient = Parameter(Dimensionless)
-        self.thermal_cop = Parameter(Ratio, default=0.55, gt=0)
+        self.thermal_cop = Parameter(
+            Ratio, default=refrigeration.DEFAULT_ADSORPTION_THERMAL_COP, gt=0
+        )
         self.auxiliary_power_ratio = Parameter(Ratio)
-        self.minimum_driving_temperature = Parameter(Temperature, default=328.15)
-        self.maximum_driving_temperature = Parameter(Temperature, default=363.15)
+        self.minimum_driving_temperature = Parameter(
+            Temperature, default=refrigeration.DEFAULT_ADSORPTION_MINIMUM_DRIVING_TEMPERATURE
+        )
+        self.maximum_driving_temperature = Parameter(
+            Temperature, default=refrigeration.DEFAULT_ADSORPTION_MAXIMUM_DRIVING_TEMPERATURE
+        )
 
         # Inlets
         self.generator_in = Inlet(Stream, stream="hot_water")
@@ -117,20 +124,26 @@ class AdsorptionChiller(Module):
             inlets.cooling_in,
         )
         rates = sorption.rates(self.path, inlets)
-        requested = rates["chilled_in"] * ops.maximum(0, chilled_in.T - self.temperature_setpoint)
-        evaporator = ops.minimum(
-            ops.minimum(requested, self._available_duty(inlets, rates)), self.capacity
+        requested = heat_transfer.setpoint_duty(
+            rates["chilled_in"], chilled_in.T - self.temperature_setpoint
         )
-        generator = evaporator / self.thermal_cop
-        electricity = evaporator * self.auxiliary_power_ratio
-        rejection = generator + evaporator + electricity
+        evaporator, is_capped = refrigeration.sorption_delivered_duty(
+            requested, self._available_duty(inlets, rates), self.capacity, 1
+        )
+        generator, electricity, rejection = refrigeration.sorption_duties(
+            evaporator, self.thermal_cop, self.auxiliary_power_ratio
+        )
         return {
-            "cop": ops.where(evaporator != 0, evaporator / generator, None),
+            "cop": ops.where(
+                evaporator != 0,
+                refrigeration.coefficient_of_performance(evaporator, generator),
+                None,
+            ),
             "generator_duty": generator,
             "evaporator_duty": evaporator,
             "adsorber_condenser_duty": rejection,
             "electricity": electricity,
-            "is_capped": evaporator < requested,
+            "is_capped": is_capped,
             "generator_out_T": sorption.outlet_T(generator_in, rates["generator_in"], -generator),
             "chilled_out_T": sorption.outlet_T(chilled_in, rates["chilled_in"], -evaporator),
             "cooling_out_T": sorption.outlet_T(cooling_in, rates["cooling_in"], rejection),
