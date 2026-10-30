@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.optimize import least_squares
 
+from gemini.core.data.dataset import bound_unit
 from gemini.core.engine.engine import Engine
 from gemini.core.modules.heat import HeatExchanger
 from gemini.core.modules.pumps import ESP
@@ -180,7 +181,7 @@ class _Observed:
 
     def unit(self, binding):
         """Return the unit of a bound column; dataset metadata wins over the binding."""
-        return self.dataset.unit(binding.column, binding.unit)
+        return bound_unit(self.dataset, binding)
 
     def values(self, binding):
         """Return a bound column converted to SI."""

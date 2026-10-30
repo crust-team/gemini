@@ -8,6 +8,8 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.core.data.dataset import bound_unit
+from gemini.core.types.bindings import Binding
 
 
 def test_constructors_fingerprint_bounds_and_types():
@@ -100,3 +102,11 @@ def test_core_data_has_no_file_or_network_readers():
     source = "\n".join(path.read_text() for path in root.glob("*.py"))
     for forbidden in ("read_csv", "requests", "influx", "aveva", "sqlalchemy"):
         assert forbidden not in source.lower()
+
+
+def test_the_dataset_unit_beats_the_binding_unit():
+    """A column with metadata gives its unit; a column without keeps the binding's."""
+    time = pd.date_range("2024-01-01", periods=2, freq="15min", tz="UTC")
+    data = gm.Dataset.from_dict({"flow": [1, 2], "other": [3, 4]}, time, units={"flow": "m3/h"})
+    assert bound_unit(data, Binding(column="flow", unit="kg/s")) == "m3/h"
+    assert bound_unit(data, Binding(column="other", unit="kg/s")) == "kg/s"

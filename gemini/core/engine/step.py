@@ -9,6 +9,7 @@ over chunks of ticks.
 from copy import deepcopy
 from dataclasses import dataclass, field
 
+from gemini.core.data.dataset import bound_unit
 from gemini.core.types.bindings import Binding, ModuleBindings
 from gemini.core.types.declarations import UNSET
 from gemini.errors import BindingError
@@ -265,7 +266,7 @@ def _input_binding(plant, dataset, input_path, module, declaration):
     if binding is None or binding.column not in dataset.names:
         return None
     binding = binding.model_copy(deep=True)
-    binding.unit = dataset.unit(binding.column, binding.unit)
+    binding.unit = bound_unit(dataset, binding)
     return binding
 
 
@@ -298,7 +299,7 @@ def _compile_entry(plant, dataset, kind, path, original):
 def _resolve_units(group, dataset):
     """Take each binding's unit from the dataset metadata; return the bound columns."""
     for binding in group.values():
-        binding.unit = dataset.unit(binding.column, binding.unit)
+        binding.unit = bound_unit(dataset, binding)
     return {binding.column for binding in group.values()}
 
 

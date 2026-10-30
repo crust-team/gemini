@@ -206,3 +206,8 @@ class Dataset:
             for name, profile in profiles.items()
         }
         return Dataset(frame, units)
+
+
+def bound_unit(dataset, binding):
+    """Return the unit of a bound column: the dataset's metadata beats the binding's own unit."""
+    return dataset.unit(binding.column, binding.unit)
