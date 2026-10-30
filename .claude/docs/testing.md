@@ -37,7 +37,9 @@ changed files and of every module that imports a changed module, directly or tra
 3. every affected `gemini/<path>/<name>.py` runs `tests/unit/<path>/test_<name>.py`, and every
    affected test file runs; imports made by `conftest.py` files are not followed;
 4. a changed numbered example selects `tests/e2e/test_examples.py`;
-5. any other changed file selects the tests (or `conftest.py` scopes) whose source names its path.
+5. any other changed file selects the tests (or `conftest.py` scopes) whose source names its path;
+6. `tests/unit/test_code_quality.py` always runs, whatever changed and also when nothing else is
+   selected, and its reason is printed.
 
 It prints what it chose and why, then runs `pytest -n auto -m "not slow" --dataset=fast
 --profile=development` on the selection. Tests marked `slow` belong to the release profile.

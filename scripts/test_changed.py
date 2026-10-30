@@ -19,6 +19,8 @@ Selection rules, applied to the changed files:
 4. A changed numbered example script selects ``tests/e2e/test_examples.py``.
 5. Any other changed file selects the tests whose source, or whose ``conftest.py``, names its
    repository path.
+6. ``tests/unit/test_code_quality.py`` always runs, whatever changed, because the structure and
+   style rules apply to every edit.
 
 The selection runs in parallel on the fast dataset and skips tests marked ``slow``; those belong
 to the release profile. The import graph is cached in ``.tmp/test_changed/imports.json``.
@@ -37,6 +39,8 @@ PACKAGES = ("gemini", "examples", "tests", "scripts")
 SELECT_ALL = {"pyproject.toml", "tests/conftest.py", "tests/xdist_plugin.py"}
 EXAMPLE_SCRIPT = re.compile(r"^examples/.*/\d\d_[^/]+\.py$")
 EXAMPLES_TEST = "tests/e2e/test_examples.py"
+QUALITY_TEST = "tests/unit/test_code_quality.py"
+QUALITY_REASON = "always runs: code-quality rules apply to every change"
 CACHE = ROOT / ".tmp/test_changed/imports.json"
 
 
@@ -195,6 +199,8 @@ def select_tests(changed, graph, root=ROOT):
             selected.setdefault(mirror, f"mirror of {path} (imports {origin})")
         if is_test_file(path):
             selected.setdefault(path, f"imports {origin}")
+    if QUALITY_TEST in tests:
+        selected.setdefault(QUALITY_TEST, QUALITY_REASON)
     return dict(sorted(selected.items()))
 
 

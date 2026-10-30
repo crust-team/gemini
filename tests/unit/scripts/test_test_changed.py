@@ -105,6 +105,19 @@ def test_test_files_examples_and_data_files(repository):
     assert select(repository, "docs/index.rst") == {}
 
 
+def test_code_quality_tests_always_run(repository):
+    """The code-quality test is selected with its reason, also when nothing else is."""
+    quality = test_changed.QUALITY_TEST
+    (repository / quality).parent.mkdir(parents=True, exist_ok=True)
+    (repository / quality).write_text("")
+    assert select(repository, "docs/index.rst") == {quality: test_changed.QUALITY_REASON}
+    assert select(repository) == {quality: test_changed.QUALITY_REASON}
+    chosen = select(repository, "gemini/core/other.py")
+    assert chosen[quality] == test_changed.QUALITY_REASON
+    assert "tests/unit/core/test_other.py" in chosen
+    assert select(repository, quality)[quality] == "changed test file"
+
+
 def test_deleted_module_still_selects_its_importers(repository):
     """Importers of a deleted module are selected so their failures show up."""
     (repository / "gemini/core/base.py").unlink()
