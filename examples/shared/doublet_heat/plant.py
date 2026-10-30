@@ -1,62 +1,16 @@
-"""Example doublet heat plant with every connection written explicitly."""
+"""Transitional ``DoubletHeatPlant``: a ``Plant`` that builds the shipped spec of that name.
 
-from gemini.core.modules import Module, ModuleDict
-from gemini.core.modules.heat import HeatExchanger
-from gemini.core.modules.plants import Doublet
-from gemini.core.modules.pumps import InjectionPump
-from gemini.core.modules.treatment import Degasser, Filter
-from gemini.core.types import (
-    Electricity,
-    HeatLoss,
-    Inlet,
-    Outlet,
-    Output,
-    Stream,
-)
+``DoubletHeatPlant()`` and ``DoubletHeatPlant.load(path)`` keep working for the stored plant file
+while the plant moves to ``gm.plants``; the wiring lives in the spec file, not in this class.
+"""
+
+from gemini.core.modules.plants import Plant, library
 
 
-class DoubletHeatPlant(Module):
-    """Doublet, degasser, filters, heat exchanger and injection pump in diagram order."""
+class DoubletHeatPlant(Plant):
+    """Doublet, degasser, filters, heat exchanger and injection pump built from their spec."""
 
     def __init__(self):
-        """Declare the complete plant tree, ports and outputs."""
-        super().__init__()
-
-        # Modules
-        self.doublet = Doublet()
-        self.degasser = Degasser()
-        self.filters = ModuleDict({"hot": Filter(), "cold": Filter()})
-        self.heat_exchanger = HeatExchanger()
-        self.injection_pump = InjectionPump()
-
-        # Inlets
-        self.secondary_in = Inlet(Stream)
-
-        # Outputs
-        self.thermal_power = Output.of(self.heat_exchanger.duty)
-        self.electricity = Output(Electricity)
-        self.cop = Output.ratio(self.thermal_power, self.electricity)
-        self.heat_loss = Output(HeatLoss)
-
-        # Outlets
-        self.secondary_out = Outlet(Stream)
-        self.gas = Outlet(Stream)
-
-    def forward(self, inlets):
-        """Connect the doublet limbs through the modeled surface equipment."""
-
-        # Modules
-        supply = self.doublet.produce()
-        degassed = self.degasser(inlet=supply)
-        filtered = self.filters.hot(inlet=degassed.outlets.liquid)
-        exchanged = self.heat_exchanger(hot_in=filtered.outlets.outlet, cold_in=inlets.secondary_in)
-        returned = self.filters.cold(inlet=exchanged.outlets.hot_out)
-        pumped = self.injection_pump(suction=returned.outlets.outlet)
-        self.doublet.inject(pumped.outlets.discharge)
-
-        # Outlets
-        secondary_out = exchanged.outlets.cold_out
-        gas = degassed.outlets.gas
-
-        outlets = dict(secondary_out=secondary_out, gas=gas)
-        return outlets
+        """Add the modules, wiring and outputs of the shipped spec."""
+        super().__init__("DoubletHeatPlant")
+        library.fill(self, "DoubletHeatPlant")

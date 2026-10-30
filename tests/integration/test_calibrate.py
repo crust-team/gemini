@@ -38,15 +38,15 @@ def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
     )
     assert fit.success and fit.rms_after < fit.rms_before / 100
     assert plant.state_dict() == before and not fit.applied
-    count = len(plant.heat_exchanger.param_history)
+    count = len(plant.heat_exchanger._param_history)
     fitted = gm.optim.calibrate(plant, dataset, params=[plant.get_parameter("heat_exchanger.ua")])
     gm.Engine(plant).replay(dataset)
     assert plant.heat_exchanger.ua == fitted.fitted["ua"]
-    assert len(plant.heat_exchanger.param_history) == count
+    assert len(plant.heat_exchanger._param_history) == count
     plant.save(tmp_path / "plant.json")
     loaded = DoubletHeatPlant.load(tmp_path / "plant.json")
     assert loaded.state_dict() == plant.state_dict()
-    assert loaded.heat_exchanger.param_history == plant.heat_exchanger.param_history
+    assert loaded.heat_exchanger._param_history == plant.heat_exchanger._param_history
     assert loaded.bindings == plant.bindings
     with pytest.raises(ValueError, match="calibratable"):
         gm.optim.calibrate(
@@ -142,8 +142,8 @@ def test_esp_head_guess_names_too_few_flows(fresh_plant, fast_dataset):
 
 def test_window_before_the_first_snapshot_is_rejected(fresh_plant, reference_dataset):
     """A window starting before every dated design snapshot names the first date."""
-    history = fresh_plant.heat_exchanger.param_history
-    fresh_plant.heat_exchanger.param_history = [
+    history = fresh_plant.heat_exchanger._param_history
+    fresh_plant.heat_exchanger._param_history = [
         history[0].model_copy(update={"valid_from": pd.Timestamp("2024-06-07T01:00Z")})
     ]
     ua = fresh_plant.get_parameter("heat_exchanger.ua")

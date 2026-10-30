@@ -109,7 +109,7 @@ def _owner(plant, params):
 def _check_single_snapshot(module, path, index):
     """Reject windows that start before every dated snapshot or span a snapshot change."""
     start, end = index[0], index[-1]
-    dates = [item.valid_from for item in module.param_history]
+    dates = [item.valid_from for item in module._param_history]
     if all(date is not None and date > start for date in dates):
         first = min(dates, default=None)
         raise ConfigurationError(
@@ -321,7 +321,7 @@ def calibrate(plant, dataset, params, start=None, end=None, backend="numpy", app
     _check_single_snapshot(original, path, data.index)
     trial = deepcopy(plant)
     target = trial.get_submodule(path)
-    target.update_params(**original.params_at(data.index[0]))
+    target.update_params(**original._params_at(data.index[0]))
     observed = _Observed(dataset, data, plant.bindings[path])
     targets = _fit_targets(original, path, observed.bindings.measured, fields)
     measured = {name: observed.values(observed.bindings.measured[name]) for name in targets}

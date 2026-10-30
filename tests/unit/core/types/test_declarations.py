@@ -92,7 +92,7 @@ def test_parameter_history_projects_module_snapshots():
     """A parameter exposes its values from the module's canonical dated snapshots."""
     module = Declared()
     changed = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    module.param_history.extend(
+    module._param_history.extend(
         [
             DatedParams(params={"length": 1, "coefficients": [1, 2]}),
             DatedParams(valid_from=changed, params={"length": 2, "coefficients": [3, 4]}),

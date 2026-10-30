@@ -25,12 +25,17 @@ installed dependencies and themselves, never another part of `gemini`
 the order. `core.physics.hydraulics` imports `Stream` and `Fluid` for type checking only, and
 `Stream.__init__` in `core.types.flows` imports `core.runtime` inside the function to read the
 default fluid, because a module-level import would form a cycle through `core.types.fluid`.
+`Plant.simulate` imports `core.engine.engine.Engine` inside the function, because the engine
+imports the module package that defines `Plant`.
 `core.data` imports no module or engine code and `core.legacy` imports no engine code.
 
 Core packages outside `core.legacy` never interpret old project names, tags, tables or node
 mappings. Old-format knowledge stays in `gemini.core.legacy`, publicly available as `gm.legacy`.
 Equipment performs no file or database access. Calibration predicts only through public replay.
-Plants are handwritten; plant files fill a tree but do not construct runtime wiring.
+A plant is data: a `Plant` (`gm.Plant`) is built from `add` and `connect` or read from a format 2
+spec (`gm.plants.from_spec`), and the spec file is the stored plant file. Only leaf modules and the
+documented special cases (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) are handwritten
+`Module` subclasses; a handwritten root is written to the same format with its class as `type`.
 
 ## Module rules
 
@@ -178,7 +183,11 @@ reason it is needed:
   `_ClassOrInstance` in `gemini/core/modules/module.py`: on a class they run on a new instance,
   because a module's declarations exist only once `__init__` has run.
 - `class_path`/`import_class` in `gemini/core/modules/module.py` are the only import-by-string.
-  Plant files and checkpoints must name the handwritten plant class that rebuilds the tree.
+  Only checkpoints use them: a checkpoint names the plant class (`Plant`, or a handwritten root)
+  whose `from_dict` rebuilds the tree from the spec it stores. A plant file names registry types.
+- A plant child that sits in a cycle of composites but not of leaves is *opened*: the parent's
+  `forward` calls its children directly, in the order the connections give (see
+  [native-engine.md](native-engine.md), section 14). The call order is never configured by hand.
 - Attribute access on mappings: `Ports` and `Values` derive from
   `gemini.utils.mappings.AttributeMapping`, so `result.outlets.discharge` equals
   `result.outlets["discharge"]`, and `Results[path].field` returns a pandas Series through

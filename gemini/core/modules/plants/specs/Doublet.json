@@ -1,0 +1,26 @@
+{
+  "format": 2,
+  "name": "Doublet",
+  "modules": {
+    "reservoir": {"type": "ProductionReservoir", "params": {}},
+    "well": {"type": "ProductionWell", "params": {}},
+    "esp": {"type": "ESP", "params": {}},
+    "riser": {"type": "ProductionWell", "params": {}},
+    "injector": {"type": "InjectionWell", "params": {}},
+    "sink": {"type": "InjectionReservoir", "params": {}}
+  },
+  "connections": [
+    {"source": "injector.bottom", "target": "sink.sandface"},
+    {"source": "reservoir.sandface", "target": "well.bottom"},
+    {"source": "well.wellhead", "target": "esp.suction"},
+    {"source": "esp.discharge", "target": "riser.bottom"}
+  ],
+  "inlets": {"return_in": "injector.wellhead"},
+  "outlets": {"supply_out": "riser.wellhead"},
+  "outputs": {
+    "electricity": {"sum": "electricity"},
+    "heat_loss": {"sum": "heat_loss"}
+  },
+  "bindings": {},
+  "param_history": {}
+}

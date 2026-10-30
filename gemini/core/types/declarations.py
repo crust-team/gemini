@@ -266,11 +266,11 @@ class Parameter(Declaration):
     @property
     def history(self):
         """Project the owner's dated snapshots onto this parameter."""
-        if self.owner is None or not getattr(self.owner, "param_history", None):
+        if self.owner is None or not getattr(self.owner, "_param_history", None):
             return deepcopy(self._history)
         return [
             (snapshot.valid_from, self.validate(snapshot.params[self.name]))
-            for snapshot in self.owner.param_history
+            for snapshot in self.owner._param_history
             if self.name in snapshot.params
         ]
 

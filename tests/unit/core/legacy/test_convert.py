@@ -39,7 +39,7 @@ def test_to_plant_uses_the_in_memory_project(project):
     edited.params[_node_id(edited, "heat_exchanger")]["heat_transfer_coeff"].values = [1.0]
     plant = gm.legacy.to_plant(edited, DoubletHeatPlant())
     assert plant.heat_exchanger.ua == 1.0
-    assert plant.heat_exchanger.param_history[-1].params["ua"] == 1.0
+    assert plant.heat_exchanger._param_history[-1].params["ua"] == 1.0
 
 
 def test_to_plant_fills_parameters_bindings_and_boundary(converted):
@@ -49,7 +49,7 @@ def test_to_plant_fills_parameters_bindings_and_boundary(converted):
     assert converted.doublet.well.segment == "below_esp"
     assert converted.doublet.riser.segment == "above_esp"
     assert converted.injection_pump.efficiency == 0.8
-    assert str(converted.heat_exchanger.param_history[0].valid_from) == "2020-01-01 00:00:00+00:00"
+    assert str(converted.heat_exchanger._param_history[0].valid_from) == "2020-01-01 00:00:00+00:00"
     assert converted.bindings["doublet.reservoir"].controls["production_rate"].column == (
         "doublet.reservoir.production_rate"
     )

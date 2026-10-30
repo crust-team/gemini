@@ -164,7 +164,7 @@ def dated_pair_plant():
     """Return a pair whose gain changes from 2 to 5 at the seventh tick."""
     plant = pair_plant()
     for module in (plant.first, plant.second):
-        module.param_history = [
+        module._param_history = [
             DatedParams(params={"gain": 2.0}),
             DatedParams(valid_from=TICKS[6], params={"gain": 5.0}),
         ]

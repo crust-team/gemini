@@ -26,9 +26,9 @@ from pydantic_core import to_jsonable_python
 
 from gemini import backends, ops
 from gemini.core import runtime
-from gemini.core.modules import description
+from gemini.core.modules import description, design, serialization
 from gemini.core.physics import units
-from gemini.core.types.bindings import DatedParams, ModuleBindings
+from gemini.core.types.bindings import DatedParams
 from gemini.core.types.declarations import (
     UNSET,
     Boundary,
@@ -69,7 +69,6 @@ from gemini.utils.strings import (
     snake_case,
     split_path,
 )
-from gemini.utils.time import EARLIEST, to_utc
 
 _current_call = ContextVar("module_call", default=None)
 _outputs_enabled = ContextVar("module_outputs_enabled", default=True)
@@ -288,13 +287,18 @@ class Module:
         object.__setattr__(self, "_fluid", runtime.get_default_fluid())
         object.__setattr__(self, "bindings", {})
         object.__setattr__(self, "boundary", {})
-        object.__setattr__(self, "param_history", [DatedParams(params={})])
+        object.__setattr__(self, "_param_history", [DatedParams(params={})])
         object.__setattr__(self, "_param_overrides", {})
 
     @property
     def name(self):
         """Return the snake_case class name, for example ``heat_exchanger``."""
         return snake_case(type(self).__name__)
+
+    @property
+    def _type_label(self):
+        """Return the name ``repr`` shows for this module."""
+        return type(self).__name__
 
     @property
     def path(self):
@@ -349,7 +353,7 @@ class Module:
             self._check_formula_references(name, declaration.formula)
         registry[name] = declaration.bind(self, name)
         if isinstance(declaration, Parameter) and declaration.initialized:
-            initial = self.param_history[0].params
+            initial = self._param_history[0].params
             initial[name] = to_jsonable_python(deepcopy(declaration.value))
 
     def _check_formula_references(self, name, formula):
@@ -543,6 +547,8 @@ class Module:
             )
         return module
 
+    get_module = get_submodule
+
     def _find_submodule(self, path):
         """Return the descendant at a dotted path, or ``None`` when there is none."""
         module = self
@@ -674,19 +680,12 @@ class Module:
             self.get_parameter(name).set(value)
         return self
 
-    def params_at(self, at):
+    def _params_at(self, at):
         """Return the complete validated parameter mapping active at an instant.
 
         ``at=None`` selects the latest snapshot. Explicit overrides win over every snapshot.
         """
-        eligible = [
-            item
-            for item in self.param_history
-            if at is None or item.valid_from is None or item.valid_from <= to_utc(at)
-        ]
-        if not eligible:
-            raise ConfigurationError(f"{self.path}: no parameters valid at {at}")
-        selected = max(eligible, key=lambda item: item.valid_from or EARLIEST)
+        selected = design.snapshot_at(self, at)
         values = selected.params | self._param_overrides
         return {name: self._parameters[name].validate(value) for name, value in values.items()}
 
@@ -698,19 +697,10 @@ class Module:
         """Return whether control or boundary ``name`` has a persisted value."""
         return name in self._input_values
 
-    def _latest_snapshot_date(self):
-        """Return the newest snapshot date as ISO text, or ``None`` for undated designs.
-
-        Plant files store it as ``active_from``; loading ignores it because the snapshots
-        already contain it.
-        """
-        dates = [item.valid_from for item in self.param_history if item.valid_from is not None]
-        return max(dates).isoformat() if dates else None
-
     def apply_params_at(self, at):
         """Apply dated parameter snapshots recursively while retaining explicit overrides."""
         for module in self.modules():
-            for name, value in module.params_at(at).items():
+            for name, value in module._params_at(at).items():
                 module._parameters[name].set(value, explicit=False)
 
     def forward(self, inlets):
@@ -1172,7 +1162,7 @@ class Module:
         """Return JSON-safe parameter and fluid snapshots for the complete tree."""
         return {
             path: {
-                "type": module.name,
+                "type": snake_case(module.name),
                 "params": {
                     name: to_jsonable_python(parameter.value)
                     for name, parameter in module._parameters.items()
@@ -1209,65 +1199,43 @@ class Module:
             object.__setattr__(module, "_fluid", fluid)
         return self
 
+    def to_spec(self):
+        """Return the plant file of this tree: format 2, a root ``type`` and flat ``params``."""
+        return serialization.module_spec(self)
+
     def to_dict(self):
-        """Return portable design, histories, bindings and boundary defaults."""
-        state = self.state_dict()
-        modules = {}
-        for path, module in self.named_modules():
-            modules[path] = {
-                "class": class_path(type(module)),
-                "type": module.name,
-                "params": state[path]["params"],
-                "fluid": module._fluid.model_dump(mode="json"),
-                "param_history": [item.model_dump(mode="json") for item in module.param_history],
-                "param_overrides": to_jsonable_python(module._param_overrides),
-                "active_from": module._latest_snapshot_date(),
-                "bindings": {
-                    key: value.model_dump(mode="json") for key, value in module.bindings.items()
-                },
-                "boundary": to_jsonable_python(module.boundary),
-            }
-        return {"version": 1, "plant_type": class_path(type(self)), "modules": modules}
+        """Return the plant file, the same document as ``to_spec``."""
+        return self.to_spec()
 
     @classmethod
     def from_dict(cls, data):
-        """Construct the self-building tree, then fill its state and run metadata."""
-        if data.get("version") != 1:
-            raise PlantFormatError(f"Unsupported plant format version {data.get('version')!r}")
-        expected = class_path(cls)
-        if data.get("plant_type") != expected:
-            raise PlantFormatError(
-                f"Stored plant type {data.get('plant_type')!r} does not match {expected!r}"
-            )
-        root = cls()
-        entries = data.get("modules", {})
-        modules = dict(root.named_modules())
-        if entries.keys() != modules.keys():
-            raise PlantFormatError(
-                f"Stored module paths differ; missing={modules.keys() - entries.keys()}, "
-                f"unexpected={entries.keys() - modules.keys()}"
-            )
-        root.load_state_dict(
-            {
-                path: {"params": entry.get("params", {}), "fluid": entry.get("fluid", {})}
-                for path, entry in entries.items()
-            }
-        )
-        for path, module in modules.items():
-            module._load_run_metadata(entries[path])
-        return root
+        """Build this class and fill it from a format 2 plant file."""
+        return serialization.module_from_spec(cls, data)
 
-    def _load_run_metadata(self, entry):
-        """Restore dated history, overrides, bindings and boundary defaults from a plant file."""
-        self.param_history = [
-            DatedParams.model_validate(item) for item in entry.get("param_history", [])
-        ] or [DatedParams(params=entry.get("params", {}))]
-        self._param_overrides = dict(entry.get("param_overrides", {}))
-        self.bindings = {
-            key: ModuleBindings.model_validate(value)
-            for key, value in entry.get("bindings", {}).items()
-        }
-        self.boundary = dict(entry.get("boundary", {}))
+    def set_params(self, path, params, valid_from=None):
+        """Store validated parameters of the module at ``path`` as a dated snapshot.
+
+        The snapshot is the values in force at ``valid_from`` merged with ``params``; without a
+        date the undated base entry and the current values change. Names may be dotted and
+        values unit strings. Returns the module.
+        """
+        return design.set_params(self, path, params, valid_from)
+
+    def params_at(self, path, time=None):
+        """Return the parameter values of the module at ``path`` in force at ``time``."""
+        return design.params_at(self, path, time)
+
+    def param_history(self, path):
+        """Return the dated parameter snapshots of the module at ``path``."""
+        return design.param_history(self, path)
+
+    def bindable(self, path):
+        """Return what can be bound at ``path``, by section."""
+        return design.bindable(self, path)
+
+    def set_bindings(self, path, bindings):
+        """Replace the bindings of the module at ``path``; units are checked. Returns the module."""
+        return design.set_bindings(self, path, bindings)
 
     def save(self, path):
         """Save the complete portable module tree as JSON."""
@@ -1297,8 +1265,8 @@ class Module:
         """Render a compact recursive module tree."""
         extra = self.extra_repr()
         if not self._children:
-            return f"{type(self).__name__}({extra})"
-        rows = [f"{type(self).__name__}({extra}"]
+            return f"{self._type_label}({extra})"
+        rows = [f"{self._type_label}({extra}"]
         for name, child in self.named_children():
             rows.append("  (" + name + "): " + repr(child).replace("\n", "\n  "))
         return "\n".join(rows + [")"])

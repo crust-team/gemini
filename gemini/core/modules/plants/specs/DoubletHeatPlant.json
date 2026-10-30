@@ -1,0 +1,35 @@
+{
+  "format": 2,
+  "name": "DoubletHeatPlant",
+  "modules": {
+    "doublet": {"type": "Doublet", "params": {}},
+    "degasser": {"type": "Degasser", "params": {}},
+    "filters": {
+      "type": "ModuleDict",
+      "modules": {
+        "hot": {"type": "Filter", "params": {}},
+        "cold": {"type": "Filter", "params": {}}
+      }
+    },
+    "heat_exchanger": {"type": "HeatExchanger", "params": {}},
+    "injection_pump": {"type": "InjectionPump", "params": {}}
+  },
+  "connections": [
+    {"source": "doublet.supply_out", "target": "degasser.inlet"},
+    {"source": "degasser.liquid", "target": "filters.hot.inlet"},
+    {"source": "filters.hot.outlet", "target": "heat_exchanger.hot_in"},
+    {"source": "heat_exchanger.hot_out", "target": "filters.cold.inlet"},
+    {"source": "filters.cold.outlet", "target": "injection_pump.suction"},
+    {"source": "injection_pump.discharge", "target": "doublet.return_in"}
+  ],
+  "inlets": {"secondary_in": "heat_exchanger.cold_in"},
+  "outlets": {"secondary_out": "heat_exchanger.cold_out", "gas": "degasser.gas"},
+  "outputs": {
+    "thermal_power": {"of": "heat_exchanger.duty"},
+    "electricity": {"sum": "electricity"},
+    "cop": {"ratio": ["thermal_power", "electricity"]},
+    "heat_loss": {"sum": "heat_loss"}
+  },
+  "bindings": {},
+  "param_history": {}
+}

@@ -78,8 +78,8 @@ def _filled_module(plant, path, item):
             f"{path}: module type = {type(module).__name__}; expected {expected.__name__} for "
             f"old kind {item.type!r}"
         )
-    module.param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
-    values = module.params_at(None)
+    module._param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
+    values = module._params_at(None)
     module.clear_param_overrides()
     return {"params": values, "fluid": item.fluid.model_dump()}
 
@@ -138,7 +138,7 @@ def _si_column(column, unit):
 
 def _export_dates(owner, legacy_param):
     """Return the dates to export: the owner's history, or the old dates when they agree."""
-    dates = [snapshot.valid_from for snapshot in owner.param_history] or legacy_param.timestamps
+    dates = [snapshot.valid_from for snapshot in owner._param_history] or legacy_param.timestamps
     old = legacy_param.timestamps
     if len(dates) == len(old) and all(map(_same_time, dates, old)):
         return list(old)
@@ -168,7 +168,7 @@ def from_plant(plant, template):
             values = []
             for index, at in enumerate(dates):
                 original = legacy_param.values[min(index, len(legacy_param.values) - 1)]
-                values.append(_legacy_property(name, source.params_at(at), original))
+                values.append(_legacy_property(name, source._params_at(at), original))
             legacy_param.values, legacy_param.timestamps = values, dates
     return converted
 

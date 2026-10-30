@@ -369,3 +369,56 @@ it. A live call is dominated by the checkpoint, about 150 of 190 ms, which rewri
 Known gap: fluid properties and published correlation coefficients stay inline in the graph, not
 `Parameter` or `Constant` inputs, so a calibration or sensitivity run cannot reach them without a
 retrace. Named physical constants and module-level model constants are `Constant`s.
+
+## 14. The plant builder and the plant spec
+
+A plant is a normal composite `Module` built from data (`gemini/core/modules/plants/`). There is
+one representation: the format 2 spec, which is also the stored plant file. `gm.plants.from_spec`
+and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one method.
+
+- **Spec keys.** `format` (2), `name`, `modules`, `connections`, `bindings` and `param_history` are
+  always written. `inlets`, `outlets` (plant port name to `"path.port"`), `outputs`, `fluids`,
+  `boundary` are written when non-empty. A module entry is `{type, params}`, a group
+  (`ModuleDict`, `ModuleList`) `{type, modules}`; `type` is a registry name, which may be a
+  shipped plant (a nested spec). Fluids, boundary, bindings and history are keyed by dotted path
+  from the root (`""`). A handwritten root writes its class as `type` and flat dotted `params`.
+- **Files.** `builder.py` (`Plant`: `add`, `connect`, `summary`, `validate`, `simulate`,
+  `to_spec`), `ports.py` (port lookup and the connection rules), `plan.py` (order and wiring of
+  the steps), `outputs.py` (sum, copy and ratio outputs), `reader.py` and `writer.py` (spec in and
+  out), `spec.py`, `schema.py`, `migration.py`, `library.py` (shipped spec files in `specs/`,
+  registered with `registry.register_plant`), `factory.py` (a registry type or a group to a module).
+  The dated parameters and bindings of `Module` are `core/modules/design.py`; the sections every
+  tree shares are `core/modules/serialization.py`.
+- **Rules.** Only `connect` wires. An inlet has one source and an outlet one target
+  (`port_in_use`); a bare module takes its only fitting free port, several raise `ambiguous_port`
+  with the candidates; different stream types raise `stream_mismatch`; a loop of leaves without a
+  `kind: "state"` connection raises `loop_without_state` at `connect`. A connection never reaches
+  into a plant child (`doublet.esp.discharge` is `invalid_connection`) but passes through groups
+  (`filters.hot.outlet`). Free ports of the children are the plant's own ports, named in
+  `inlets`/`outlets` or `<path_with_underscores>_<port>`; `connect("secondary_in",
+  "heat_exchanger.cold_in")` names one. In a spec a connection end must name a port.
+- **Order decides bits.** `forward` runs a plan computed once and dropped by `add`/`connect`: the
+  modules in topological order (Kahn), ties broken by first appearance in the connection list and
+  then child order. Composite sums add in call order, so the shipped specs list their connections
+  to reproduce the handwritten order: the `Doublet` spec starts with the injection limb, and the
+  heat plant sums to the same bits as the class it replaced (`tests/integration/test_plant_parity.py`).
+- **Opened plants.** A plant child is one step unless it sits in a cycle of the composite graph
+  with no cycle between leaves (the doublet between `supply_out` and `return_in` of the surface
+  equipment); then it is opened and its children are steps of the parent, recorded as
+  `doublet.reservoir`, ...; its own outputs are not computed. The check repeats until no plant
+  child is in a false cycle. A group is never called.
+- **State connections** stay in the spec, the schema and validation; running such a plant raises
+  `NotImplementedYet`, because the first step has no previous value until scan exists.
+- **Round trip.** `to_spec(from_spec(x)) == x`. The plant keeps what the spec stated: a stated
+  parameter, fluid, binding or history stays as written while it equals the current value,
+  otherwise the current SI value replaces it; a value that now differs from its starting value is
+  added; unstated defaults stay out. A single undated history entry is not written (it is the
+  `params`).
+- **Validation.** `gm.plants.validate(spec)` reads the spec the way `from_spec` does and collects
+  every problem as `{path, message, code, suggestions}` (`connections[1].target`); a module that
+  failed to build hides the problems that only follow from it. Parameter problems use
+  `invalid_unit`, `out_of_bounds`, `unknown_name`.
+- **Migration.** `gm.plants.migrate(old)` converts format 1 files; a root class that is a shipped
+  plant takes that plant's wiring with the stored values that differ from the starting values,
+  any other root becomes a handwritten root. `scripts/migrate_plants.py` runs it over files.
+  Loading an old file raises `PlantFormatError` with code `old_format`, naming the function.

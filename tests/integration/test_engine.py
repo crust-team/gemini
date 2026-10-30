@@ -212,8 +212,10 @@ def test_missing_data_dates_events_and_export(setup, tmp_path):
     frame = data.read(data.start, data.end).iloc[:12]
     frame.loc[frame.index[0], "doublet.esp.suction.p"] = np.nan
     module = plant.filters.hot
-    module.param_history.append(
-        DatedParams(valid_from=frame.index[1], params=module.params_at(None) | {"dp_nominal": 3200})
+    module._param_history.append(
+        DatedParams(
+            valid_from=frame.index[1], params=module._params_at(None) | {"dp_nominal": 3200}
+        )
     )
     events = EventLog(tmp_path / "events.jsonl")
     result = gm.Engine(plant, callbacks=[events], on_error="raise").replay(

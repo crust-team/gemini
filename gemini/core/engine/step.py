@@ -214,7 +214,7 @@ def _parameter_dates(plant):
         {
             snapshot.valid_from
             for module in plant.modules()
-            for snapshot in module.param_history
+            for snapshot in module._param_history
             if snapshot.valid_from is not None
         }
     )
