@@ -4,8 +4,10 @@ import json
 import math
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+from gemini import ops
 from gemini.core.physics import erosion, units
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
@@ -167,3 +169,34 @@ def test_api_functions_match_arrays():
     comparison = [(1.0, 2.0), (3.0, 2.0), (2.0, 2.0)]
     assert_function_matches(erosion.api_velocity_comparison, comparison)
     assert_same_error(erosion.api_velocity_comparison, [(1.0, 2.0), (1.0, 0.0)], PhysicsRangeError)
+
+
+@pytest.mark.parametrize("model", ["DNV", "OKA", "TULSA"])
+@pytest.mark.parametrize("cast", [float, int, np.float64])
+def test_erosion_rate_returns_a_float(model, cast):
+    """The outermost call gives a Python float whatever the numeric type of the inputs."""
+    rate = erosion.erosion_rate(model, flow_rate=cast(1), rho_fluid=cast(1068), diameter=cast(1))
+    assert type(rate) is float
+
+
+@pytest.mark.parametrize("model", ["DNV", "OKA", "TULSA"])
+def test_nan_input_passes_through_and_a_negative_flow_is_complex(model):
+    """A NaN input gives NaN as before; only finite inputs with a negative flow are rejected."""
+    nan = float("nan")
+    assert math.isnan(erosion.erosion_rate(model, **(FLOW | {"flow_rate": nan})))
+    assert math.isnan(erosion.erosion_rate(model, **(FLOW | {"rho_fluid": nan})))
+    with pytest.raises(PhysicsRangeError, match="complex rate"):
+        erosion.erosion_rate(model, **(FLOW | {"flow_rate": -0.04}))
+
+
+def test_a_stopped_row_drops_the_complex_rate_error():
+    """A negative flow behind a ``where`` on a stopped row does not fail the other rows."""
+
+    @ops.physics
+    def guarded(flow_rate, stopped):
+        rate = erosion.erosion_rate("DNV", **(FLOW | {"flow_rate": flow_rate}))
+        return ops.where(stopped > 0, 0.0, rate)
+
+    rows = [(0.04, 0.0), (-0.04, 1.0), (0.01, 0.0), (float("nan"), 0.0)]
+    assert_function_matches(guarded, rows)
+    assert_same_error(guarded, [(0.04, 0.0), (-0.04, 0.0)], PhysicsRangeError)

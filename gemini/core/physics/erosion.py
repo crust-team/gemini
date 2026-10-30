@@ -32,8 +32,8 @@ be true.
 """
 
 _OKA_PARTICLES = {
-    "SIO2": (104, 326, -0.12, lambda hardness: 2.3 * ops.pow(hardness, 0.038), 0.19, 65),
-    "SIC": (99, 326, -0.05, lambda hardness: 3 * ops.pow(hardness, 0.085), 0.19, 45),
+    "SIO2": (104, 326, -0.12, lambda hardness: 2.3 * hardness**0.038, 0.19, 65),
+    "SIC": (99, 326, -0.05, lambda hardness: 3 * hardness**0.085, 0.19, 45),
     "GLASS": (100, 200, -0.16, lambda hardness: 2.1, 0.19, 27),
 }
 """OKA particle constants: reference velocity [m/s], reference diameter, k1, k2(Hv), k3, K.
@@ -99,7 +99,7 @@ def _dnv_rate(alpha_deg, material, rho_fluid, diameter, flow_rate_m3h):
         units.ms_to_mm_year(1)
         * mass_flow
         * constant
-        * ops.pow(velocity, exponent)
+        * velocity**exponent
         * angle_function
         / (rho_pipe * impact_area)
     )
@@ -133,9 +133,9 @@ def _oka_rate(
     impact_area = units.m2_to_mm2(area) / ops.sin(angle)
     erosion_per_mass = (
         constant
-        * ops.pow(hardness_gpa, k1)
-        * ops.pow(velocity / reference_velocity, k2(hardness_gpa))
-        * ops.pow(particle_diameter_mm / reference_diameter, k3)
+        * hardness_gpa**k1
+        * (velocity / reference_velocity) ** k2(hardness_gpa)
+        * (particle_diameter_mm / reference_diameter) ** k3
     )
     return units.SECONDS_PER_YEAR * mass_flow / impact_area * erosion_per_mass
 
@@ -155,10 +155,20 @@ def _tulsa_rate(
     )
     impact_area = area / ops.sin(angle)
     brinell = hardness_gpa / _GPA_PER_HV * 0.95057 - 0.03743
-    erosion_per_mass = (
-        2.17e-7 * ops.pow(brinell, -0.59) * shape_factor * ops.pow(velocity, 2.41) * angle_function
-    )
+    erosion_per_mass = 2.17e-7 * brinell**-0.59 * shape_factor * velocity**2.41 * angle_function
     return units.ms_to_mm_year(1) * erosion_per_mass * mass_flow / (rho_pipe * impact_area)
+
+
+def _any_nan(*values):
+    """Return whether any of the numeric ``values`` is NaN.
+
+    A NaN rate from a NaN input is passed through; a NaN rate from finite inputs is a negative
+    base of a fractional power, which was a complex number.
+    """
+    missing = ops.isnan(values[0])
+    for value in values[1:]:
+        missing = ops.logical_or(missing, ops.isnan(value))
+    return missing
 
 
 def _particle_model_rate(name, alpha_deg, hardness_gpa, particle, pipe, flow):
@@ -171,6 +181,7 @@ def _particle_model_rate(name, alpha_deg, hardness_gpa, particle, pipe, flow):
     return _tulsa_rate(alpha_deg, hardness_gpa, shape_factor, rho_pipe, *flow)
 
 
+@ops.physics
 def erosion_rate(
     model: str,
     *,
@@ -236,8 +247,11 @@ def erosion_rate(
             (shape_factor, rho_pipe),
             (rho_fluid, diameter, flow_rate_m3h),
         )
+    nan_input = _any_nan(
+        flow_rate, rho_fluid, diameter, alpha, hardness, particle_diameter, rho_pipe, shape_factor
+    )
     ops.check(
-        ops.logical_not(ops.isnan(rate)),
+        ops.logical_or(ops.logical_not(ops.isnan(rate)), nan_input),
         PhysicsRangeError,
         "erosion_rate {name}: flow_rate = {flow_rate} m3/s gives a complex rate; "
         "expected a nonnegative flow",
@@ -247,6 +261,7 @@ def erosion_rate(
     return rate
 
 
+@ops.physics
 def api_erosional_velocity(rho_fluid: float) -> float:
     """Evaluate the API erosional velocity limit.
 
@@ -273,6 +288,7 @@ def api_erosional_velocity(rho_fluid: float) -> float:
     return units.API_VELOCITY_FACTOR * _API_C_FACTOR / ops.sqrt(rho_fluid)
 
 
+@ops.physics
 def api_velocity_comparison(actual: float, limit: float) -> dict:
     """Compare actual and limiting flow velocities.
 
