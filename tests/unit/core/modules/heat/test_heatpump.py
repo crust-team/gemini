@@ -8,6 +8,7 @@ from gemini.core.physics import refrigeration
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import Fluid
 from gemini.errors import ConfigurationError, PhysicsRangeError
+from tests.fixtures.equivalence import assert_module_matches
 
 CP = 4217.4
 
@@ -188,3 +189,62 @@ def test_minimum_source_outlet_switches_off_or_raises_a_cooling_setpoint():
     assert result.outputs.is_capped
     assert result.outputs.useful_duty == pytest.approx(20 * CP * 2)
     assert energy_balance(chiller, result)["relative_residual"] < 1e-12
+
+
+def _rows(cases):
+    return [
+        dict(
+            source_in=Stream(m_dot=source_flow, T=source_T, p=3e5),
+            sink_in=Stream(m_dot=sink_flow, T=sink_T, p=3e5),
+            temperature_setpoint=setpoint,
+        )
+        for source_flow, source_T, sink_flow, sink_T, setpoint in cases
+    ]
+
+
+HEATING_CASES = [
+    (20, 300, 10, 320, 340),
+    (20, 300, 10, 320, 330),
+    (40, 330, 10, 320, 330),
+    (20, 300, 10, 320, 321),
+    (20, 300, 10, 320, 310),
+    (0, 300, 10, 320, 340),
+    (20, 300, 0, 320, 340),
+    (100, 305, 10, 320, 350),
+]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        dict(),
+        dict(capacity=5e5),
+        dict(minimum_part_load=0.3),
+        dict(cop_model="lorenz"),
+        dict(minimum_source_outlet_temperature=295),
+        dict(cop_model="lorenz", minimum_source_outlet_temperature=295),
+        dict(minimum_source_outlet_temperature=300),
+    ],
+    ids=["carnot", "capped", "part-load", "lorenz", "carnot-limit", "lorenz-limit", "at-limit"],
+)
+def test_heating_traced_call_matches_one_call_per_row(params):
+    """Running, capped, floored-lift, off, stopped and source-limited rows trace and agree."""
+    assert_module_matches(heat_pump("heating", **params), _rows(HEATING_CASES))
+
+
+@pytest.mark.parametrize(
+    "params",
+    [dict(), dict(capacity=5e5), dict(minimum_source_outlet_temperature=283)],
+    ids=["chiller", "capped", "limit"],
+)
+def test_cooling_traced_call_matches_one_call_per_row(params):
+    """Running, capped, floored-lift, off, stopped and raised-setpoint rows trace and agree."""
+    cases = [
+        (20, 285, 30, 300, 280),
+        (20, 300, 200, 290, 295),
+        (20, 285, 30, 300, 290),
+        (0, 285, 30, 300, 280),
+        (20, 285, 0, 300, 280),
+        (20, 285, 30, 300, 270),
+    ]
+    assert_module_matches(heat_pump("cooling", **params), _rows(cases))
