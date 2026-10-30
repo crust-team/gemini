@@ -63,3 +63,23 @@ def test_estimate_conductance_is_the_mean_duty_over_the_lmtd():
         analysis.estimate_conductance(350, 340, 300, 340, 10, 10)
     with raises(ValidationError, "unknown_name", match="arrangement"):
         analysis.estimate_conductance(350, 340, 300, 310, 10, 10, arrangement="cross")
+
+
+def test_fits_take_units_for_what_has_a_quantity():
+    """The offset and the pressure convert; the slope has no unit to convert."""
+    fitted = analysis.fit_head_correction(
+        [1e5, 2e5, 3e5], [3e5, 5e5, 7e5], units={"pressure": "bar"}
+    )
+    assert fitted["offset"]["unit"] == "bar" and fitted["slope"]["unit"] == "-"
+    flows = np.array([0.01, 0.02, 0.04])
+    estimate = analysis.estimate_reservoir_pressure(
+        flows, 2e7 - 1e8 * flows, units={"pressure": "bar"}
+    )
+    assert estimate["pressure"]["value"] == pytest.approx(200.0)
+    assert estimate["pressure"]["unit"] == "bar"
+    conductance = analysis.estimate_conductance(
+        350, 340, 300, 310, 10, 10, cp_hot=4000, cp_cold=4000, units={"thermal_conductance": "W/K"}
+    )
+    assert conductance["unit"] == "W/K"
+    with pytest.raises(ValidationError):
+        analysis.fit_head_coefficients([1], [1], [1], 1, units={"powr": "kW"})

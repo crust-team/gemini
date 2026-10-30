@@ -405,6 +405,12 @@ def array_to_si(values, unit, quantity=None):
     return np.asarray(values, dtype=float) * scale + offset
 
 
+def array_convert(values, from_unit, to_unit, quantity=None):
+    """Convert an array-like between units of one dimension, element for element as ``convert``."""
+    si = array_to_si(values, from_unit, quantity)
+    return (si - _offset(to_unit, quantity)) / _entry(to_unit, "units.convert")[1]
+
+
 def split_quantity(value):
     """Return ``(number, unit)`` for a ``Quantity`` or ``"<number> <unit>"`` text.
 
@@ -480,6 +486,16 @@ def _quantity_si_unit(quantity):
             code="unknown_name",
         )
     return _QUANTITY_UNITS[quantity]
+
+
+def family(quantity):
+    """Return the first quantity defined with the SI unit of ``quantity``, the head of its family.
+
+    ``power`` for ``duty`` or ``electricity``, ``pressure`` for ``pressure_difference``,
+    ``temperature`` for ``temperature_difference`` and ``length`` for ``elevation``.
+    """
+    target = _quantity_si_unit(quantity)
+    return next(name for name, unit in _QUANTITY_UNITS.items() if unit == target)
 
 
 def names(quantity=None):

@@ -86,3 +86,22 @@ def test_a_failing_call_raises_by_default():
 def test_an_unknown_name_comes_with_suggestions():
     """The registry's close matches reach the error."""
     assert call(module="ESp", on_error="record")["errors"][0]["suggestions"] == ["ESP"]
+
+
+def test_units_convert_outlets_and_outputs():
+    """Stream fields and outputs say the unit used; the numbers are those of SI."""
+    plain = call()
+    converted = call(units={"pressure": "bar", "temperature": "degC", "power": "kW"})
+    outlet, stored = converted["outlets"]["discharge"], plain["outlets"]["discharge"]
+    assert outlet["p"] == {"value": stored["p"]["value"] / 1e5, "unit": "bar"}
+    assert outlet["T"]["value"] == pytest.approx(stored["T"]["value"] - 273.15)
+    assert outlet["m_dot"] == stored["m_dot"]
+    assert converted["outputs"]["power"]["unit"] == "kW"
+    assert converted["outputs"]["head"]["unit"] == "bar"
+
+
+def test_a_wrong_map_of_units_follows_on_error():
+    """It is wrong input: raised by default, in ``errors`` when recorded."""
+    with raises(gm.errors.ValidationError, "unknown_name"):
+        call(units={"powr": "kW"})
+    assert call(units={"powr": "kW"}, on_error="record")["errors"][0]["code"] == "unknown_name"

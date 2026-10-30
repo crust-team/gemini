@@ -94,7 +94,7 @@ def test_the_energy_report_is_the_table_as_plain_values():
 
 def test_an_unknown_table_is_refused():
     """``to_frame`` names the tables it has."""
-    with pytest.raises(gm.errors.ValidationError, match="'series' or 'energy'"):
+    with pytest.raises(gm.errors.ValidationError, match="expected 'series'"):
         results().to_frame(table="balance")
 
 
@@ -240,3 +240,89 @@ def test_slices_keep_units_and_end_state():
     tail = rows.slice(1)
     assert tail.units == rows.units and tail.end_state == rows.end_state
     assert tail.get("pump", "head")["unit"] == "Pa" and len(tail.errors()) == 1
+
+
+def with_quantities():
+    """Return the two-row pump results with the quantities a plant would declare."""
+    rows = with_units()
+    rows.quantities = {"pump": {"head": "pressure_difference", "electricity": "electricity"}}
+    return rows
+
+
+UNITS = {"power": "kW", "pressure": "bar"}
+
+
+def test_get_converts_on_the_way_out_and_says_the_unit():
+    """A map from quantity to unit reaches the field through its family."""
+    rows = with_quantities()
+    assert rows.get("pump", "electricity", units=UNITS)["value"] == [1.0, 3.0]
+    assert rows.get("pump", "electricity", units=UNITS)["unit"] == "kW"
+    assert rows.get("pump", "head", units=UNITS) == {
+        "time": rows.get("pump", "head")["time"],
+        "value": [2.0, 2.0],
+        "unit": "bar",
+    }
+    assert rows.get("pump", "health_score", units=UNITS)["unit"] == "-"
+    assert rows.get("pump", "electricity")["value"] == [1000.0, 3000.0]
+
+
+def test_summary_and_to_dict_convert_too():
+    """Statistics and series name the unit used; nothing stored changes."""
+    rows = with_quantities()
+    electricity = rows.summary(units=UNITS)["pump"]["electricity"]
+    assert electricity["mean"] == {"value": 2.0, "unit": "kW"}
+    series = rows.to_dict(units={**UNITS, "duration": "h"})
+    assert series["series"]["pump"]["head"] == {"value": [2.0, 2.0], "unit": "bar"}
+    assert series["duration"] == {"value": [1.0, 1.0], "unit": "h"}
+    assert rows.summary()["pump"]["electricity"]["mean"] == {"value": 2000.0, "unit": "W"}
+
+
+def test_to_frame_converts_and_lists_the_units():
+    """Column names stay; ``attrs["units"]`` says the unit of each column."""
+    rows = with_quantities()
+    frame = rows.to_frame(units=UNITS)
+    assert frame["pump.electricity"].tolist() == [1.0, 3.0]
+    assert frame.attrs["units"]["pump.electricity"] == "kW"
+    assert frame.attrs["units"]["pump.head"] == "bar"
+    plain = rows.to_frame()
+    assert plain["pump.electricity"].tolist() == [1000.0, 3000.0]
+    assert plain.attrs["units"]["pump.electricity"] == "W"
+    pd.testing.assert_index_equal(frame.columns, plain.columns)
+
+
+def test_the_energy_report_converts_too():
+    """The dict takes ``units``; the table has fixed columns and refuses them."""
+    rows = with_quantities()
+    entry = rows.energy_report(units={"energy": "kWh", "power": "kW"})["pump"]["electricity"]
+    assert entry["energy"] == {"value": 4.0, "unit": "kWh"}
+    assert entry["peak"] == {"value": 3.0, "unit": "kW"}
+    with pytest.raises(gm.errors.ValidationError, match="without units"):
+        rows.to_frame(UNITS, table="energy")
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda rows, units: rows.get("pump", "head", units=units),
+        lambda rows, units: rows.summary(units=units),
+        lambda rows, units: rows.to_dict(units=units),
+        lambda rows, units: rows.to_frame(units=units),
+        lambda rows, units: rows.energy_report(units=units),
+    ],
+)
+def test_a_wrong_map_raises_on_every_view(call):
+    """An unknown quantity and a unit that does not fit it are wrong input."""
+    rows = with_quantities()
+    with raises(gm.errors.ValidationError, "unknown_name"):
+        call(rows, {"powr": "kW"})
+    with raises(gm.errors.ValidationError, "invalid_unit"):
+        call(rows, {"power": "bar"})
+
+
+def test_quantities_survive_files_and_slices(tmp_path):
+    """A loaded result and a live slice convert as the run did."""
+    rows = with_quantities()
+    loaded = Results.load(rows.save(tmp_path / "results.npz"))
+    assert loaded.quantities == rows.quantities
+    assert loaded.get("pump", "head", units=UNITS)["unit"] == "bar"
+    assert rows.slice(1).get("pump", "head", units=UNITS)["unit"] == "bar"

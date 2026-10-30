@@ -145,3 +145,23 @@ def test_injectivity_and_pump_calibration_are_not_built_yet():
         wells.injectivity(None, "doublet.injector")
     with pytest.raises(gm.errors.NotImplementedYet):
         wells.calibrate_pump(None, "doublet.esp", None)
+
+
+def test_nodal_takes_units_for_its_curves_and_point(shared_plant):
+    """Every number of a case is converted; ``units`` has no separate map."""
+    plain = wells.nodal(shared_plant, "doublet", CASE)["cases"][0]
+    case = wells.nodal(shared_plant, "doublet", CASE, units={"pressure": "bar"})["cases"][0]
+    assert case["ipr"]["pressure"]["unit"] == "bar"
+    assert case["ipr"]["pressure"]["value"][0] == pytest.approx(
+        plain["ipr"]["pressure"]["value"][0] / BAR, rel=1e-12
+    )
+    assert case["operating_point"]["wellhead_pressure"]["unit"] == "bar"
+    assert case["ipr"]["rate"] == plain["ipr"]["rate"]
+
+
+def test_pump_curve_takes_units(shared_plant):
+    """Head is a pressure difference, reached by ``pressure``."""
+    curve = wells.pump_curve(shared_plant, "doublet.esp", units={"pressure": "bar"})
+    assert curve["curve"]["head"]["unit"] == "bar" and curve["frequency"]["unit"] == "Hz"
+    with raises(gm.errors.ValidationError, "invalid_unit"):
+        wells.pump_curve(shared_plant, "doublet.esp", units={"pressure": "kW"})

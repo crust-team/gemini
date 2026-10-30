@@ -87,3 +87,11 @@ def test_calibration_and_erosion_are_not_built_yet():
         integrity.calibrate_corrosion([])
     with pytest.raises(gm.errors.NotImplementedYet):
         integrity.erosion(None, "doublet")
+
+
+def test_the_forecast_takes_units_for_the_wall():
+    """The rate stays in its literature unit."""
+    forecast = integrity.corrosion_forecast(MODEL, "2026-07-01T00:00:00Z", units={"length": "mm"})
+    assert forecast["thickness"]["unit"] == "mm" and forecast["minimum_thickness"]["unit"] == "mm"
+    assert forecast["thickness"]["value"][0] == pytest.approx(10.0)
+    assert forecast["rate"]["unit"] == "mm/year"

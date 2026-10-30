@@ -12,10 +12,15 @@ assembles a shape by hand. Each shape has a JSON Schema, written to ``docs/schem
   check is an answer, not an error.
 """
 
-from gemini.errors.base import problem
-from gemini.utils.jsonable import to_plain
+import numpy as np
 
-__all__ = ["value", "series", "statistics", "problem", "check", "SCHEMAS"]
+from gemini.errors import ValidationError
+from gemini.errors.base import problem
+from gemini.physics import units
+from gemini.utils.jsonable import to_plain
+from gemini.utils.strings import close_matches, did_you_mean, join_names
+
+__all__ = ["value", "series", "statistics", "problem", "check", "OutputUnits", "SCHEMAS"]
 
 NO_VALUE = "no value"
 """The ``reason`` of a value that is ``None`` when the caller gives none."""
@@ -120,3 +125,76 @@ def check(name, passed, measured, limit):
     reason in ``measured``.
     """
     return {"name": name, "passed": passed, "value": measured, "limit": limit}
+
+
+def _converted(number, unit, target, quantity):
+    """Return a number, an array or a nested list in ``target``; what is no number stays."""
+    if number is None or isinstance(number, (bool, str)):
+        return number
+    if isinstance(number, np.ndarray):
+        return units.array_convert(number, unit, target, quantity)
+    if isinstance(number, (list, tuple)):
+        return [_converted(item, unit, target, quantity) for item in number]
+    return units.convert(number, unit, target, quantity)
+
+
+class OutputUnits:
+    """The ``units`` argument of a public return: a map from quantity to unit, used on the way out.
+
+    Outputs are SI unless a call asks otherwise, and nothing inside a run changes. A key names a
+    quantity; it also reaches the quantities of its family (``units.family``), so ``"power"``
+    reaches ``duty`` and ``"pressure"`` a pressure difference, unless the map names them too. A
+    difference converts by scale only. An unknown quantity or a unit that does not fit it raises
+    ``ValidationError`` with suggestions, here at the start of the call. The ``value``, ``series``
+    and ``statistics`` of this class are the helpers of the module, in the unit actually used.
+    """
+
+    def __init__(self, map_of_units=None):
+        """Check every quantity and unit of the map."""
+        self.units = dict(map_of_units or {})
+        for quantity, unit in self.units.items():
+            if not units.fits(unit, quantity):
+                raise _wrong_unit(quantity, unit)
+
+    def target(self, quantity):
+        """Return the unit the map asks for ``quantity``, or ``None`` to keep the stored one."""
+        if not self.units or quantity is None:
+            return None
+        return self.units.get(quantity) or self.units.get(units.family(quantity))
+
+    def number(self, number, unit, quantity):
+        """Return ``(number, unit)`` in the unit the map asks for ``quantity``."""
+        target = self.target(quantity)
+        if target is None:
+            return number, unit
+        return _converted(number, unit, target, quantity), target
+
+    def value(self, number, unit, quantity, reason=None, **details):
+        """Return the value of a number in ``unit``, a stored unit of ``quantity``."""
+        converted, used = self.number(number, unit, quantity)
+        return value(converted, used, reason, **details)
+
+    def series(self, time, number, unit, quantity):
+        """Return the time series of ``number``, stored in ``unit``."""
+        converted, used = self.number(number, unit, quantity)
+        return series(time, converted, used)
+
+    def statistics(self, minimum, maximum, mean, unit, quantity):
+        """Return ``{min, max, mean}`` of numbers stored in ``unit``."""
+        return {
+            "min": self.value(minimum, unit, quantity),
+            "max": self.value(maximum, unit, quantity),
+            "mean": self.value(mean, unit, quantity),
+        }
+
+
+def _wrong_unit(quantity, unit):
+    """Return the error of a unit that does not fit ``quantity``, with the closest units."""
+    valid = units.names(quantity)
+    return ValidationError(
+        f"units: {quantity} = {unit!r}; expected one of {join_names(valid)}"
+        f"{did_you_mean(unit, valid)}",
+        path=f"units.{quantity}",
+        suggestions=close_matches(unit, valid),
+        code="invalid_unit",
+    )

@@ -13,8 +13,9 @@ from gemini.modules.plants import nodal as solves
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import ProductionWell
-from gemini.physics import constants, units
-from gemini.types.shapes import value
+from gemini.physics import constants
+from gemini.physics import units as physics_units
+from gemini.types.shapes import OutputUnits, value
 from gemini.utils.jsonable import to_plain
 
 CURVE_POINTS = 21
@@ -65,16 +66,16 @@ def _required(conditions, name):
 
 def _case_inputs(chain, conditions):
     """Return the SI wellhead pressure [Pa], rate bracket [kg/s] and ESP frequency [Hz]."""
-    pressure = units.value_in_si(
+    pressure = physics_units.value_in_si(
         _required(conditions, "wellhead_pressure"), "Pa", "conditions.wellhead_pressure", "pressure"
     )
     low, high = (
-        units.value_in_si(value, "kg/s", "conditions.rates", "mass_flow")
+        physics_units.value_in_si(value, "kg/s", "conditions.rates", "mass_flow")
         for value in _required(conditions, "rates")
     )
     frequency = None
     if chain.esp is not None:
-        frequency = units.value_in_si(
+        frequency = physics_units.value_in_si(
             _required(conditions, "frequency"), "Hz", "conditions.frequency", "frequency"
         )
     return float(pressure), (float(low), float(high)), frequency
@@ -89,26 +90,34 @@ def _lift(chain, rate):
     return stream.p
 
 
-def _curves(chain, pressure, rates):
+def _curve(rates, pressures, output):
+    """Return one curve of 21 points, each list a value."""
+    return {
+        "rate": output.value(rates, "kg/s", "mass_flow"),
+        "pressure": output.value(pressures, "Pa", "pressure"),
+    }
+
+
+def _curves(chain, pressure, rates, output):
     """Return the IPR, the VLP and the operating point for a rate bracket."""
     low, high = rates
     sampled = np.linspace(low, high, CURVE_POINTS)
     inflow = [chain.reservoir.sandface_stream(rate).p for rate in sampled]
     lift = [_lift(chain, rate) for rate in sampled]
-    ipr = {"rate": value(sampled, "kg/s"), "pressure": value(inflow, "Pa")}
-    vlp = {"rate": value(sampled, "kg/s"), "pressure": value(lift, "Pa")}
     rate = solves.solve_production_rate(
         chain.reservoir, chain.lower, pressure, rates, esp=chain.esp, riser=chain.upper
     )
     point = {
-        "rate": value(rate, "kg/s"),
-        "wellhead_pressure": value(pressure, "Pa"),
-        "sandface_pressure": value(chain.reservoir.sandface_stream(rate).p, "Pa"),
+        "rate": output.value(rate, "kg/s", "mass_flow"),
+        "wellhead_pressure": output.value(pressure, "Pa", "pressure"),
+        "sandface_pressure": output.value(
+            chain.reservoir.sandface_stream(rate).p, "Pa", "pressure"
+        ),
     }
-    return ipr, vlp, point
+    return _curve(sampled, inflow, output), _curve(sampled, lift, output), point
 
 
-def _case(chain, conditions, on_error):
+def _case(chain, conditions, on_error, output):
     """Return the curves and the operating point of one set of conditions."""
     case = {
         "conditions": conditions,
@@ -121,7 +130,7 @@ def _case(chain, conditions, on_error):
         pressure, rates, frequency = _case_inputs(chain, conditions)
         if chain.esp is not None:
             chain.esp.frequency = frequency
-        case["ipr"], case["vlp"], case["operating_point"] = _curves(chain, pressure, rates)
+        case["ipr"], case["vlp"], case["operating_point"] = _curves(chain, pressure, rates, output)
     except GeminiError as error:
         if on_error == "raise":
             raise
@@ -129,7 +138,7 @@ def _case(chain, conditions, on_error):
     return case
 
 
-def nodal(plant, well, conditions, on_error="raise"):
+def nodal(plant, well, conditions, on_error="raise", units=None):
     """Return the IPR and VLP curves and the operating point of a production well.
 
     The IPR (inflow performance) is the sandface pressure the reservoir delivers at each rate.
@@ -155,6 +164,8 @@ def nodal(plant, well, conditions, on_error="raise"):
         are SI; unit strings such as ``"3 bar"`` are accepted.
     on_error : {"raise", "record"}, optional
         A case that fails raises; ``"record"`` puts its problem in ``error`` and runs the others.
+    units : dict, optional
+        A map from quantity to unit for the returned values, such as ``{"pressure": "bar"}``.
 
     Returns
     -------
@@ -166,18 +177,19 @@ def nodal(plant, well, conditions, on_error="raise"):
         or has no sign change has ``None`` curves and operating point and its problem in ``error``.
     """
     check_on_error(on_error)
+    output = OutputUnits(units)
     chain_plant = deepcopy(plant)
     chain = _chain(chain_plant, well)
     cases = [conditions] if isinstance(conditions, dict) else list(conditions)
     return to_plain(
         {
             "well": well,
-            "cases": [_case(chain, case, on_error) for case in cases],
+            "cases": [_case(chain, case, on_error, output) for case in cases],
         }
     )
 
 
-def injectivity(data, well):
+def injectivity(data, well, units=None):
     """Return the Hall integral, its derivative and the skin lines of an injection well.
 
     Parameters
@@ -187,6 +199,8 @@ def injectivity(data, well):
         injection rate [m3/s].
     well : str
         Dotted path of the injection well in the plant the data belongs to.
+    units : dict, optional
+        A map from quantity to unit for the returned values.
 
     Returns
     -------
@@ -206,37 +220,45 @@ def _points(measured):
     """Return the measured head points in SI as a list of ``{flow, frequency, head}``."""
     return [
         {
-            "flow": float(units.value_in_si(point["flow"], "m3/s", "measured.flow", "volume_flow")),
+            "flow": float(
+                physics_units.value_in_si(point["flow"], "m3/s", "measured.flow", "volume_flow")
+            ),
             "frequency": float(
-                units.value_in_si(point["frequency"], "Hz", "measured.frequency", "frequency")
+                physics_units.value_in_si(
+                    point["frequency"], "Hz", "measured.frequency", "frequency"
+                )
             ),
             "head": float(
-                units.value_in_si(point["head"], "Pa", "measured.head", "pressure_difference")
+                physics_units.value_in_si(
+                    point["head"], "Pa", "measured.head", "pressure_difference"
+                )
             ),
         }
         for point in measured or ()
     ]
 
 
-def _correction(points):
+def _correction(points, units):
     """Return the affine correction of theoretical head on measured head, or why it has none."""
     if not points:
         return value(None, "-", "no measured points")
     try:
         return fit_head_correction(
-            [point["head"] for point in points], [point["theoretical_head"] for point in points]
+            [point["head"] for point in points],
+            [point["theoretical_head"] for point in points],
+            units,
         )
     except PhysicsError as error:
         return value(None, "-", str(error))
 
 
-def _measured_point(point):
+def _measured_point(point, output):
     """Return one measured point with every number as a value."""
     return {
-        "flow": value(point["flow"], "m3/s"),
-        "frequency": value(point["frequency"], "Hz"),
-        "head": value(point["head"], "Pa"),
-        "theoretical_head": value(point["theoretical_head"], "Pa"),
+        "flow": output.value(point["flow"], "m3/s", "volume_flow"),
+        "frequency": output.value(point["frequency"], "Hz", "frequency"),
+        "head": output.value(point["head"], "Pa", "pressure_difference"),
+        "theoretical_head": output.value(point["theoretical_head"], "Pa", "pressure_difference"),
     }
 
 
@@ -259,7 +281,7 @@ def _head_curve(module, frequency, n_points=50):
     ]
 
 
-def pump_curve(plant, pump, measured=None):
+def pump_curve(plant, pump, measured=None, units=None):
     """Return an ESP's head curve at the reference frequency and the fit of measured points.
 
     The curve is the pump's polynomial head curve (``_head_curve``) at the reference
@@ -275,6 +297,8 @@ def pump_curve(plant, pump, measured=None):
         Dotted path of an ``ESP``, for example ``"doublet.esp"``.
     measured : list of dict, optional
         Points ``{flow, frequency, head}`` in m3/s, Hz and Pa (unit strings accepted).
+    units : dict, optional
+        A map from quantity to unit for the returned values.
 
     Returns
     -------
@@ -287,6 +311,7 @@ def pump_curve(plant, pump, measured=None):
         the retained ``fit_head_correction``; no module applies the correction yet, so it is a
         diagnosis, not a parameter to set.
     """
+    output = OutputUnits(units)
     module = plant.get_module(pump)
     if not isinstance(module, ESP):
         raise ValidationError(
@@ -299,10 +324,13 @@ def pump_curve(plant, pump, measured=None):
     flows, heads = zip(*_head_curve(module, reference))
     return {
         "pump": pump,
-        "frequency": value(reference, "Hz"),
-        "curve": {"flow": value(flows, "m3/s"), "head": value(heads, "Pa")},
-        "measured": [_measured_point(point) for point in points],
-        "correction": _correction(points),
+        "frequency": output.value(reference, "Hz", "frequency"),
+        "curve": {
+            "flow": output.value(flows, "m3/s", "volume_flow"),
+            "head": output.value(heads, "Pa", "pressure_difference"),
+        },
+        "measured": [_measured_point(point, output) for point in points],
+        "correction": _correction(points, units),
     }
 
 

@@ -117,7 +117,9 @@
    ]
   },
   "Results": {
-   "energy_report": [],
+   "energy_report": [
+    "units"
+   ],
    "errors": [],
    "from_bytes": [
     "data"
@@ -126,7 +128,8 @@
     "path",
     "field",
     "start",
-    "end"
+    "end",
+    "units"
    ],
    "load": [
     "path"
@@ -138,11 +141,15 @@
    "summary": [
     "path",
     "start",
-    "end"
+    "end",
+    "units"
    ],
    "to_bytes": [],
-   "to_dict": [],
+   "to_dict": [
+    "units"
+   ],
    "to_frame": [
+    "units",
     "table"
    ]
   }
@@ -194,7 +201,8 @@
   "parameters",
   "inlets",
   "controls",
-  "on_error"
+  "on_error",
+  "units"
  ],
  "kpi_names": [
   "heating_coverage",
@@ -294,11 +302,13 @@
    ],
    "corrosion_forecast": [
     "model",
-    "until"
+    "until",
+    "units"
    ],
    "erosion": [
     "plant",
-    "well"
+    "well",
+    "units"
    ],
    "estimate_conductance": [
     "hot_in_T",
@@ -309,36 +319,43 @@
     "m_dot_cold",
     "cp_hot",
     "cp_cold",
-    "arrangement"
+    "arrangement",
+    "units"
    ],
    "estimate_reservoir_pressure": [
     "flows",
-    "bottomhole_pressures"
+    "bottomhole_pressures",
+    "units"
    ],
    "fit_head_coefficients": [
     "flows",
     "frequencies",
     "heads",
-    "stage_count"
+    "stage_count",
+    "units"
    ],
    "fit_head_correction": [
     "measured",
-    "theoretical"
+    "theoretical",
+    "units"
    ],
    "injectivity": [
     "data",
-    "well"
+    "well",
+    "units"
    ],
    "nodal": [
     "plant",
     "well",
     "conditions",
-    "on_error"
+    "on_error",
+    "units"
    ],
    "pump_curve": [
     "plant",
     "pump",
-    "measured"
+    "measured",
+    "units"
    ]
   },
   "checks": {

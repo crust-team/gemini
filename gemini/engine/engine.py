@@ -11,7 +11,7 @@ from gemini import backends
 from gemini.backends import runtime
 from gemini.engine import checkpoint as storage
 from gemini.engine.clock import Clock
-from gemini.engine.results import Results, declared_units
+from gemini.engine.results import Results, declared_quantities, declared_units
 from gemini.engine.runner import Runner
 from gemini.engine.step import BindingPlan
 from gemini.errors import RunError, ValidationError
@@ -200,6 +200,7 @@ class Engine:
         if not continuing:
             self._begin(state)
         self.results.units = declared_units(plant)
+        self.results.quantities = declared_quantities(plant)
         self.run_kind = kind
         self.dataset = dataset
         self.clock = clock

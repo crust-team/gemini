@@ -16,8 +16,8 @@ from gemini.engine.chunks import (
 )
 from gemini.errors import ValidationError
 from gemini.errors.lookup import UnknownKey
-from gemini.physics import units
-from gemini.types.shapes import problem, series, statistics, value
+from gemini.physics import units as physics_units
+from gemini.types.shapes import OutputUnits, problem, series, value
 from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
 from gemini.utils.time import to_utc
@@ -95,7 +95,7 @@ class ModuleSeries:
                 code="invalid_unit",
             )
         source, quantity = SERIES_UNITS[field]
-        return series.map(lambda value: units.convert(value, source, unit, quantity))
+        return series.map(lambda value: physics_units.convert(value, source, unit, quantity))
 
 
 def _add_skips(skip_counts, skips):
@@ -112,8 +112,10 @@ class Results:
     Results are columnar. ``commit(chunk)`` is the one way in: a ``ResultChunk`` of any length,
     one tick included. Chunks concatenate lazily in ``to_frame``. ``units`` maps
     ``{path: {field: unit}}`` to the SI unit of each output field, as the plant declares it
-    (a field without an entry is dimensionless, ``"-"``), and ``end_state`` is the plain JSON
-    state a following replay starts from (``replay(..., state=results.end_state)``).
+    (a field without an entry is dimensionless, ``"-"``), ``quantities`` likewise to its quantity
+    (``None`` when it has none, and then ``units=`` leaves it alone), and ``end_state`` is the plain
+    JSON state a following replay starts from (``replay(..., state=results.end_state)``). Every
+    view takes ``units``, a map from quantity to unit (``OutputUnits``): nothing stored changes.
     """
 
     def __init__(self, units=None):
@@ -125,6 +127,7 @@ class Results:
         self._skips = []
         self._frame = None
         self.units = dict(units or {})
+        self.quantities = {}
         self.end_state = None
 
     @property
@@ -177,26 +180,53 @@ class Results:
             self._frame = assemble(chunk, list(self._order), self._times)
         return self._frame
 
-    def to_frame(self, table="series"):
+    def to_frame(self, units=None, table="series"):
         """Return a table of the results, the one route to a DataFrame.
 
         ``"series"`` is a copy with one column per field, named ``path.field`` (a root field by
-        name); ``"energy"`` is the table of ``energy_report`` with a row per module and energy
-        output, which ``repr`` prints.
+        name), in SI or in ``units``, with the unit of each column in ``frame.attrs["units"]``.
+        ``"energy"`` is the table of ``energy_report`` with a row per module and energy output,
+        which ``repr`` prints; its columns state their units and it takes no ``units``.
         """
-        if table == "energy":
-            return self._energy_table()
-        if table != "series":
+        if table not in ("series", "energy") or (table == "energy" and units):
             raise ValidationError(
-                f"Results.to_frame: table = {table!r}; expected 'series' or 'energy'", path="table"
+                f"Results.to_frame: table = {table!r}, units = {units!r}; expected 'series', or "
+                "'energy' without units",
+                path="table",
             )
+        return self._energy_table() if table == "energy" else self._series_table(units)
+
+    def _series_table(self, units):
+        """Return the table of the series, with the unit of each column in ``attrs``."""
+        output = OutputUnits(units)
         frame = self._cached_frame().copy()
-        frame.columns = [join_path(path, field) for path, field in frame.columns]
+        stated = {}
+        for key in list(frame.columns):
+            column, stated[join_path(*key)] = self._column(frame[key], *key, output)
+            if units:
+                frame[key] = column
+        frame.columns = list(stated)
+        frame.attrs["units"] = stated
         return frame
+
+    def _column(self, column, path, field, output):
+        """Return one column and its unit in the unit ``output`` asks for its quantity."""
+        unit, quantity = self.unit(path, field), self.quantity(path, field)
+        target = output.target(quantity)
+        if target is None:
+            return column, unit
+        if pd.api.types.is_numeric_dtype(column) and not pd.api.types.is_bool_dtype(column):
+            numbers = physics_units.array_convert(column, unit, target, quantity)
+            return pd.Series(numbers, index=column.index, name=column.name), target
+        return column.map(lambda cell: output.number(cell, unit, quantity)[0]), target
 
     def unit(self, path, field):
         """Return the SI unit of a field; a field the plant gives no unit is ``"-"``."""
         return self.units.get(path, {}).get(field, "-")
+
+    def quantity(self, path, field):
+        """Return the quantity of a field, or ``None`` for one the plant gives none."""
+        return self.quantities.get(path, {}).get(field)
 
     def names(self):
         """Return ``{path: [field, ...]}`` of everything ``get`` can read, in column order."""
@@ -205,37 +235,42 @@ class Results:
             names.setdefault(path, []).append(field)
         return names
 
-    def get(self, path, field, start=None, end=None):
+    def get(self, path, field, start=None, end=None, units=None):
         """Return the series ``{time, value, unit}`` of one field, ``start`` to ``end`` inclusive.
 
         ``time`` is ISO 8601 UTC text, ``value`` has ``None`` for a missing value and ``unit``
-        is the SI unit of the field. An unknown path or field raises ``ValidationError``.
+        is the unit used, SI unless ``units`` asks otherwise. An unknown path or field raises
+        ``ValidationError``.
         """
+        output = OutputUnits(units)
         column = _window(getattr(self[path], field), start, end)
-        return series(column.index, column, self.unit(path, field))
+        converted, unit = self._column(column, path, field, output)
+        return series(column.index, converted, unit)
 
-    def summary(self, path=None, start=None, end=None):
+    def summary(self, path=None, start=None, end=None, units=None):
         """Return ``{path: {field: {min, max, mean}}}`` of the numeric fields, each a value.
 
         ``path`` selects one module and ``start`` and ``end`` (inclusive) a window; a value is
-        ``None`` with a ``reason`` where a field has no finite value.
+        ``None`` with a ``reason`` where a field has no finite value. ``units`` converts them.
         """
+        output = OutputUnits(units)
         frame = _window(self._cached_frame(), start, end)
         paths = list(dict.fromkeys(frame.columns.get_level_values(0)))
         if path is not None:
             if path not in paths:
                 raise _unknown_path(path, paths)
             paths = [path]
-        return {name: self._field_summary(name, frame[name]) for name in paths}
+        return {name: self._field_summary(name, frame[name], output) for name in paths}
 
-    def _field_summary(self, path, fields):
+    def _field_summary(self, path, fields, output):
         """Return the minimum, maximum and mean of each numeric field of one path."""
         return {
-            field: statistics(
+            field: output.statistics(
                 fields[field].min(),
                 fields[field].max(),
                 fields[field].mean(),
                 self.unit(path, field),
+                self.quantity(path, field),
             )
             for field in fields
             if pd.api.types.is_numeric_dtype(fields[field])
@@ -260,23 +295,22 @@ class Results:
             rows.extend(_skip_rows(stamp, skipped))
         return to_plain(rows)
 
-    def to_dict(self):
+    def to_dict(self, units=None):
         """Return everything as plain JSON: ``{time, duration, series, errors, ...}``.
 
-        ``duration`` is a value in s and ``series`` is ``{path: {field: {value, unit}}}``, with one
-        item per entry of ``time``.
+        ``duration`` is a value and ``series`` is ``{path: {field: {value, unit}}}``, with one item
+        per entry of ``time``, in SI or in ``units``.
         """
+        output = OutputUnits(units)
         frame = self._cached_frame()
         columns = {}
         for path, field in frame.columns:
-            columns.setdefault(path, {})[field] = {
-                "value": frame[(path, field)],
-                "unit": self.unit(path, field),
-            }
+            column, unit = self._column(frame[(path, field)], path, field, output)
+            columns.setdefault(path, {})[field] = {"value": column, "unit": unit}
         return to_plain(
             {
                 "time": frame.index,
-                "duration": value(self._dt, "s"),
+                "duration": output.value(self._dt, "s", "duration"),
                 "series": columns,
                 "errors": self.errors(),
                 "skip_counts": self.skip_counts,
@@ -284,34 +318,36 @@ class Results:
             }
         )
 
-    def energy_report(self):
+    def energy_report(self, units=None):
         """Report energy, peaks, evaluated hours, alarms and skip reasons per module and output.
 
         Returns ``{path: {output: entry}}``, ``output`` being the energy output, or ``""`` for a
         path without one. An entry has the values ``energy``, ``peak``, ``hours``,
         ``operating_hours``, ``alarms``, ``alarm_rate``, ``skipped`` and ``errors``, ``peaks`` with
         the largest value of each numeric field, and ``reasons`` with the count of each skip reason.
-        ``to_frame(table="energy")`` is the same report as a table.
+        ``to_frame(table="energy")`` is the same report as a table. ``units`` converts them.
         """
+        output = OutputUnits(units)
         report = {}
         for row in self._energy_rows():
-            report.setdefault(row["module"], {})[row["port"]] = self._report_entry(row)
+            report.setdefault(row["module"], {})[row["port"]] = self._report_entry(row, output)
         return report
 
-    def _report_entry(self, row):
+    def _report_entry(self, row, output):
         """Return one row of the energy table with every number as a value."""
         path = row["module"]
         return {
-            "energy": value(row["energy_J"], "J"),
-            "peak": value(row["peak_W"], "W"),
-            "hours": value(row["hours"], "h"),
-            "operating_hours": value(row["operating_hours"], "h"),
+            "energy": output.value(row["energy_J"], "J", "energy"),
+            "peak": output.value(row["peak_W"], "W", "power"),
+            "hours": output.value(row["hours"], "h", "duration"),
+            "operating_hours": output.value(row["operating_hours"], "h", "duration"),
             "alarms": value(row["alarms"], "-"),
             "alarm_rate": value(row["alarm_rate"], "-"),
             "skipped": value(row["skipped"], "-"),
             "errors": value(row["errors"], "-"),
             "peaks": {
-                field: value(peak, self.unit(path, field)) for field, peak in row["peaks"].items()
+                field: output.value(peak, self.unit(path, field), self.quantity(path, field))
+                for field, peak in row["peaks"].items()
             },
             "reasons": row["reasons"],
         }
@@ -340,9 +376,9 @@ class Results:
         alarms = fields.get("health_alarm", pd.Series(False, index=fields.index)).eq(True)
         return dict(
             module=path,
-            hours=float(dt[active].sum() / units.SECONDS_PER_HOUR),
+            hours=float(dt[active].sum() / physics_units.SECONDS_PER_HOUR),
             operating_hours=float(
-                dt[fields.get("operating", active).eq(True)].sum() / units.SECONDS_PER_HOUR
+                dt[fields.get("operating", active).eq(True)].sum() / physics_units.SECONDS_PER_HOUR
             ),
             errors=sum(error["path"] == path for error in self._failures),
             peaks={
@@ -395,6 +431,7 @@ class Results:
             skips=self._skips,
             energy=sorted(self._energy),
             units=self.units,
+            quantities=self.quantities,
             end_state=self.end_state,
         )
         return self._cached_frame(), metadata
@@ -446,12 +483,14 @@ class Results:
         result._skips = metadata["skips"]
         result._energy = {tuple(key) for key in metadata["energy"]}
         result.units = metadata["units"]
+        result.quantities = metadata["quantities"]
         result.end_state = metadata["end_state"]
         return result
 
     def slice(self, start):
         """Return the new rows of a live call, with matching durations and diagnostics."""
         result = Results(self.units)
+        result.quantities = self.quantities
         result.end_state = self.end_state
         if self._chunks:
             self._chunks = [merge(self._chunks)]
@@ -473,6 +512,17 @@ def declared_units(plant):
     return {
         path: {
             name: declaration.unit or "-"
+            for name, declaration in module.outputs(recurse=False).items()
+        }
+        for path, module in plant.named_modules()
+    }
+
+
+def declared_quantities(plant):
+    """Return ``{path: {field: quantity}}``: the quantity each module declares per output."""
+    return {
+        path: {
+            name: declaration.quantity
             for name, declaration in module.outputs(recurse=False).items()
         }
         for path, module in plant.named_modules()

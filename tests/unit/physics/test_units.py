@@ -196,3 +196,19 @@ def test_table_and_converters_share_one_factor():
     assert units.to_si(7.0, "m3/h/bar") == units.index_to_si(7.0)
     assert units.kgh_to_kgs is units.m3h_to_m3s and units.dyne_cm_to_nm is units.cp_to_pas
     assert units.c_to_k(0.0) == units.ZERO_CELSIUS == units.to_si(0.0, "degC")
+
+
+def test_a_family_is_led_by_the_first_quantity_of_its_si_unit():
+    """The quantities of the public ``units`` argument."""
+    assert units.family("duty") == units.family("electricity") == "power"
+    assert units.family("pressure_difference") == "pressure"
+    assert units.family("temperature_difference") == "temperature"
+    assert units.family("elevation") == "length"
+
+
+def test_array_convert_gives_the_bits_of_the_scalar_conversion():
+    """One column at once, element for element."""
+    values = [1.5, 300.0, 1e-3]
+    for source, target, quantity in (("K", "degC", None), ("Pa", "barg", "pressure_difference")):
+        expected = [units.convert(value, source, target, quantity) for value in values]
+        assert units.array_convert(values, source, target, quantity).tolist() == expected

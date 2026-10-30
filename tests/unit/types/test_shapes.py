@@ -3,11 +3,13 @@
 import json
 import math
 
+import numpy as np
 import pytest
 
 import gemini as gm
 from gemini.types import shapes
 from tests.fixtures import ROOT
+from tests.fixtures.errors import raises
 from tests.fixtures.json_schema import check
 
 SCHEMAS = ROOT / "docs" / "schemas"
@@ -112,3 +114,71 @@ def test_the_problem_of_an_error_is_the_shape():
 def test_the_shapes_export_the_one_problem_helper():
     """``gemini.errors`` is a leaf, so the helper is defined there and exported here."""
     assert shapes.problem is gm.errors.base.problem
+
+
+def test_output_units_convert_a_value_and_say_the_unit_used():
+    """The returned unit is the one actually used."""
+    output = shapes.OutputUnits({"power": "MW", "temperature": "degC"})
+    assert output.value(2e6, "W", "power") == {"value": 2.0, "unit": "MW"}
+    assert output.value(373.15, "K", "temperature")["value"] == pytest.approx(100.0)
+    assert output.value(373.15, "K", "temperature")["unit"] == "degC"
+
+
+def test_a_key_reaches_its_family_and_an_exact_key_wins():
+    """``power`` reaches a duty; a duty named in the map keeps its own unit."""
+    assert shapes.OutputUnits({"power": "MW"}).value(1e6, "W", "duty")["unit"] == "MW"
+    both = shapes.OutputUnits({"power": "MW", "duty": "kW"})
+    assert both.value(1e6, "W", "duty") == {"value": 1000.0, "unit": "kW"}
+    assert both.value(1e6, "W", "electricity")["unit"] == "MW"
+
+
+def test_a_difference_converts_by_scale_only():
+    """A temperature difference has no offset and a pressure difference no gauge offset."""
+    output = shapes.OutputUnits({"temperature": "degC", "pressure": "barg"})
+    assert output.value(5.0, "K", "temperature_difference") == {"value": 5.0, "unit": "degC"}
+    assert output.value(5e5, "Pa", "pressure_difference") == {"value": 5.0, "unit": "barg"}
+    absolute = output.value(5e5, "Pa", "pressure")["value"]
+    assert absolute == pytest.approx((5e5 - 101325) / 1e5)
+
+
+def test_without_a_map_nothing_changes():
+    """Outputs stay SI by default, the same object included."""
+    numbers = [1.0, 2.0]
+    assert shapes.OutputUnits().number(numbers, "W", "power") == (numbers, "W")
+    assert shapes.OutputUnits({"pressure": "bar"}).number(1.0, "W", "power") == (1.0, "W")
+    assert shapes.OutputUnits({"pressure": "bar"}).number(1.0, "-", None) == (1.0, "-")
+
+
+def test_arrays_lists_and_gaps_convert_item_by_item():
+    """A null and a text stay; a nested list keeps its shape."""
+    output = shapes.OutputUnits({"power": "kW"})
+    assert output.number([1000.0, None, [2000.0]], "W", "power")[0] == [1.0, None, [2.0]]
+    assert output.number(np.array([1000.0]), "W", "power")[0].tolist() == [1.0]
+    assert output.number("text", "W", "power")[0] == "text"
+
+
+def test_a_series_and_statistics_take_the_unit_too():
+    """Every shape helper has its converting form."""
+    output = shapes.OutputUnits({"power": "kW"})
+    assert output.series(["t"], [1000.0], "W", "power") == {
+        "time": ["t"],
+        "value": [1.0],
+        "unit": "kW",
+    }
+    assert output.statistics(1e3, 2e3, 1.5e3, "W", "power")["mean"] == {"value": 1.5, "unit": "kW"}
+
+
+def test_an_unknown_quantity_raises_with_suggestions():
+    """The map is checked at the start of a call."""
+    with raises(gm.errors.ValidationError, "unknown_name") as caught:
+        shapes.OutputUnits({"powr": "MW"})
+    assert "power" in caught.value.suggestions
+
+
+def test_a_unit_that_does_not_fit_raises_with_suggestions():
+    """A unit of another dimension names the units of the quantity."""
+    with raises(gm.errors.ValidationError, "invalid_unit", match="units: power = 'bar'"):
+        shapes.OutputUnits({"power": "bar"})
+    with raises(gm.errors.ValidationError, "invalid_unit") as caught:
+        shapes.OutputUnits({"power": "MWW"})
+    assert "MW" in caught.value.suggestions

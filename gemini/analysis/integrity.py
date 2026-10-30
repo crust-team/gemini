@@ -5,8 +5,9 @@ from datetime import timedelta
 import numpy as np
 
 from gemini.errors import NotImplementedYet, ValidationError
-from gemini.physics import corrosion, units
-from gemini.types.shapes import series, value
+from gemini.physics import corrosion
+from gemini.physics import units as physics_units
+from gemini.types.shapes import OutputUnits, value
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 from gemini.utils.time import to_utc
 
@@ -43,18 +44,20 @@ def _conditions(model):
 def _si(name, value):
     """Return one condition in SI, converting a unit string."""
     unit, quantity = _CONDITIONS[name]
-    return units.value_in_si(value, unit, f"model.conditions.{name}", quantity)
+    return physics_units.value_in_si(value, unit, f"model.conditions.{name}", quantity)
 
 
 def _times(start, end):
     """Return the forecast instants: the start, each whole year after it, and the end."""
     times = [start]
-    while (next_year := start + timedelta(seconds=len(times) * units.SECONDS_PER_YEAR)) < end:
+    while (
+        next_year := start + timedelta(seconds=len(times) * physics_units.SECONDS_PER_YEAR)
+    ) < end:
         times.append(next_year)
     return times + [end]
 
 
-def corrosion_forecast(model, until):
+def corrosion_forecast(model, until, units=None):
     """Return the wall thickness over time and the years left of a corroding wall.
 
     The penetration rate is constant: ``co2_corrosion_rate`` of the model's correlation at its
@@ -73,6 +76,9 @@ def corrosion_forecast(model, until):
         ``bicarb_concentration`` and ``ionic_strength`` [kg/m3].
     until : str or datetime
         End of the forecast, after ``start``.
+    units : dict, optional
+        A map from quantity to unit for the thickness; ``rate`` stays in mm/year, the literature
+        unit of the correlations, and ``years_left`` in years.
 
     Returns
     -------
@@ -85,6 +91,7 @@ def corrosion_forecast(model, until):
         rate of a correlation outside its domain raises
         ``PhysicsError``.
     """
+    output = OutputUnits(units)
     start, end = to_utc(model["start"]), to_utc(until)
     if end <= start:
         raise ValidationError(
@@ -98,16 +105,16 @@ def corrosion_forecast(model, until):
     loss = corrosion.wall_loss([rate] * len(seconds), seconds)
     thickness = model["thickness"] - np.concatenate([[0.0], loss]) / 1000
     remaining = corrosion.time_to_minimum_wall(
-        model["thickness"], model["minimum_thickness"], rate / 1000 / units.SECONDS_PER_YEAR
+        model["thickness"], model["minimum_thickness"], rate / 1000 / physics_units.SECONDS_PER_YEAR
     )
     left = value(None, "year", "the corrosion rate is not positive")
     if rate > 0:
-        left = value(remaining / units.SECONDS_PER_YEAR, "year")
+        left = value(remaining / physics_units.SECONDS_PER_YEAR, "year")
     return {
         "correlation": model["correlation"],
         "rate": value(rate, "mm/year"),
-        "thickness": series(times, thickness, "m"),
-        "minimum_thickness": value(model["minimum_thickness"], "m"),
+        "thickness": output.series(times, thickness, "m", "length"),
+        "minimum_thickness": output.value(model["minimum_thickness"], "m", "length"),
         "years_left": left,
     }
 
@@ -135,7 +142,7 @@ def calibrate_corrosion(logs):
     raise NotImplementedYet("analysis.calibrate_corrosion")
 
 
-def erosion(plant, well):
+def erosion(plant, well, units=None):
     """Return the erosion wear of the pump and the tubing of a production well.
 
     Parameters
@@ -144,6 +151,8 @@ def erosion(plant, well):
         A plant with parameter values.
     well : str
         Dotted path of the production well chain, as for ``nodal``.
+    units : dict, optional
+        A map from quantity to unit for the returned values.
 
     Returns
     -------
