@@ -1,8 +1,8 @@
 """Fully mixed hot or chilled water storage tank with a charge and a discharge circuit."""
 
-import math
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
@@ -62,6 +62,9 @@ class ThermalStorage(Module):
     properties at the start-of-step temperature, constant effectiveness independent of flow,
     and inlet temperatures constant over a step (use steps short against the tank time
     constant ``rho cp V / b`` when the inlets vary).
+
+    NOTE(refactor): the tank temperature is a state, so the module is a graph break until
+    ``scan`` exists; its arithmetic is written with ops all the same.
     """
 
     def __init__(self):
@@ -126,8 +129,8 @@ class ThermalStorage(Module):
         self.charge_duty = sign * charge
         self.discharge_duty = -sign * discharge
         self.heat_accumulation = charge + discharge - ambient
-        self.heat_loss = max(ambient, 0.0)
-        self.heat_absorbed = max(-ambient, 0.0)
+        self.heat_loss = ops.maximum(ambient, 0.0)
+        self.heat_absorbed = ops.maximum(-ambient, 0.0)
 
     def _advance_states(self, inlets, outlets, dt):
         terms = [
@@ -139,11 +142,11 @@ class ThermalStorage(Module):
             (self.heat_loss_coefficient, self.ambient_temperature),
         ]
         total = sum(conductance for conductance, _ in terms)
-        if total == 0:
-            return {"temperature": self.temperature}
-        equilibrium = sum(conductance * temperature for conductance, temperature in terms) / total
-        decay = math.exp(-total * dt / self._capacity(inlets.charge_in))
-        return {"temperature": equilibrium + (self.temperature - equilibrium) * decay}
+        weighted = sum(conductance * temperature for conductance, temperature in terms)
+        equilibrium = ops.truediv(weighted, total)
+        decay = ops.exp(-total * dt / self._capacity(inlets.charge_in))
+        relaxed = equilibrium + (self.temperature - equilibrium) * decay
+        return {"temperature": ops.where(total == 0, self.temperature, relaxed)}
 
     def _capacity(self, charge_in):
         """Return the tank heat capacity rho * cp * V [J/K] of ``module.fluid``."""
@@ -152,11 +155,13 @@ class ThermalStorage(Module):
 
     def _conductance(self, stream, effectiveness):
         """Return the circuit conductance e * m_dot * cp [W/K]; reject reverse flow."""
-        if stream.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: circuit m_dot = {stream.m_dot} kg/s; expected >= 0 (reverse flow "
-                "is not modelled)"
-            )
+        ops.check(
+            stream.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: circuit m_dot = {m_dot} kg/s; expected >= 0 (reverse flow " "is not modelled)",
+            path=self.path,
+            m_dot=stream.m_dot,
+        )
         return effectiveness * stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l
 
     def _circuit_heat(self, stream, effectiveness):
@@ -165,6 +170,8 @@ class ThermalStorage(Module):
 
     def _outlet_temperature(self, stream, effectiveness):
         """Return a circuit's outlet temperature [K]; a stopped circuit keeps its inlet value."""
-        if self._conductance(stream, effectiveness) == 0:
-            return stream.T
-        return stream.T - effectiveness * (stream.T - self.temperature)
+        return ops.where(
+            self._conductance(stream, effectiveness) == 0,
+            stream.T,
+            stream.T - effectiveness * (stream.T - self.temperature),
+        )

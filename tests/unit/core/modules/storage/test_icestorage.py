@@ -1,7 +1,9 @@
 """Lumped ice store: coil duty, piecewise exact phase segments, balances and limits."""
 
 import math
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 import gemini as gm
@@ -15,6 +17,7 @@ from gemini.core.types import (
     Output,
     Stream,
 )
+from tests.fixtures.equivalence import assert_close, assert_module_matches
 
 MASS = 1000.0
 UA = 2000.0
@@ -161,3 +164,49 @@ def test_composite_step_freezes_both_stores():
     assert audit["relative_residual"] < 1e-12
     assert audit["heat_accumulation"] == pytest.approx(result.outputs.duty, rel=1e-14)
     assert mass_balance(line, result)["residual"] == 0
+
+
+STORE_STATES = [
+    (0.0, 280.15, COLD),
+    (0.0, 273.15, COLD),
+    (0.4, 273.15, WARM),
+    (0.4, 273.15, COLD),
+    (1.0, 265.15, WARM),
+    (1.0, 265.15, COLD),
+    (0.0, 273.15, WARM),
+    (0.0, 278.15, COLD.with_(m_dot=0)),
+]
+
+
+def test_ice_storage_matches_per_row():
+    """Outputs and outlet of the initial store equal one call per row; the states are a break."""
+    rows = [dict(inlet=glycol) for glycol in (COLD, WARM, COLD.with_(m_dot=0))]
+    assert_module_matches(_store(), rows, breaks=True)
+
+
+@pytest.mark.xfail(
+    raises=TypeError, reason="needs heat_transfer.ntu rewritten with ops; remove at the merge"
+)
+@pytest.mark.parametrize("dt", [600, 20000, 400000])
+def test_ice_storage_advance_matches_per_row(monkeypatch, dt):
+    """The piecewise phase integration on stacked states equals one step per row."""
+    store = _store()
+
+    def advance(fraction, temperature, glycol):
+        monkeypatch.setattr(IceStorage, "ice_fraction", fraction, raising=False)
+        monkeypatch.setattr(IceStorage, "temperature", temperature, raising=False)
+        states = store._advance_states(SimpleNamespace(inlet=glycol), None, dt)
+        return states["ice_fraction"], states["temperature"]
+
+    expected = [advance(x, t, g) for x, t, g in STORE_STATES]
+    stacked = Stream(
+        **{f: np.array([getattr(g, f) for *_, g in STORE_STATES]) for f in ("m_dot", "T", "p")},
+        fluid=GLYCOL_30,
+    )
+    fractions, temperatures = advance(
+        np.array([x for x, _, _ in STORE_STATES]),
+        np.array([t for _, t, _ in STORE_STATES]),
+        stacked,
+    )
+    assert_close(fractions, [e[0] for e in expected], "ice_fraction")
+    assert_close(temperatures, [e[1] for e in expected], "temperature")

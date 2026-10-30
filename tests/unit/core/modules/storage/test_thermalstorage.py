@@ -1,7 +1,9 @@
 """Fully mixed storage tank: duties, exact lumped solution, balances and limits."""
 
 import math
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 import gemini as gm
@@ -14,6 +16,7 @@ from gemini.core.types import (
     Output,
     Stream,
 )
+from tests.fixtures.equivalence import assert_close, assert_module_matches
 
 CP = 4217.4
 """Default fluid heat capacity [J/kg/K]."""
@@ -191,3 +194,46 @@ def test_composite_step_charges_the_tank():
     audit = energy_balance(plant, result)
     assert audit["relative_residual"] < 1e-12
     assert mass_balance(plant, result)["residual"] == 0
+
+
+def _rows():
+    return [
+        dict(
+            charge_in=Stream(m_dot=charge, T=353.15, p=3e5),
+            discharge_in=Stream(m_dot=discharge, T=313.15, p=3e5),
+            ambient_temperature=ambient,
+        )
+        for charge, discharge, ambient in [(1.0, 0.5, 293.15), (0, 0.5, 303.15), (0, 0, 273.15)]
+    ]
+
+
+@pytest.mark.parametrize("service", ["hot", "chilled"])
+def test_thermal_storage_matches_per_row(service):
+    """Duties, outlets and the audit outputs equal one call per row; the state is a graph break."""
+    assert_module_matches(_tank(service, charge_effectiveness=0.8), _rows(), breaks=True)
+
+
+def test_thermal_storage_advance_matches_per_row(monkeypatch):
+    """The exact exponential step on stacked temperatures equals one step per row."""
+    tank = _tank(heat_loss_coefficient=0.0)
+    rows = _rows()
+    temperatures = [343.15, 303.15, 283.15]
+
+    def advance(temperature, charge, discharge, ambient):
+        monkeypatch.setattr(ThermalStorage, "temperature", temperature, raising=False)
+        monkeypatch.setattr(ThermalStorage, "ambient_temperature", ambient, raising=False)
+        inlets = SimpleNamespace(charge_in=charge, discharge_in=discharge)
+        return tank._advance_states(inlets, None, 600)["temperature"]
+
+    expected = [
+        advance(t, row["charge_in"], row["discharge_in"], row["ambient_temperature"])
+        for t, row in zip(temperatures, rows)
+    ]
+    stacked = [
+        Stream(**{f: np.array([getattr(row[n], f) for row in rows]) for f in ("m_dot", "T", "p")})
+        for n in ("charge_in", "discharge_in")
+    ]
+    ambient = np.array([row["ambient_temperature"] for row in rows])
+    actual = advance(np.array(temperatures), *stacked, ambient)
+    assert_close(actual, expected, "temperature")
+    assert expected[2] == 283.15

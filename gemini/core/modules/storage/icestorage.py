@@ -1,7 +1,6 @@
 """Lumped ice-on-coil or encapsulated ice store on one glycol circuit."""
 
-import math
-
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import heat_transfer
 from gemini.core.types import (
@@ -69,6 +68,11 @@ class IceStorage(Module):
     ASHRAE Handbook, HVAC Applications, chapter Thermal Storage), constant properties, no
     supercooling or nucleation delay, no ambient heat gain and no pressure loss. Suitable for
     hourly or 15-minute dispatch studies of the store's state of charge, not for coil design.
+
+    NOTE(refactor): the ice fraction and the temperature are states, so the module is a graph
+    break until ``scan`` exists; its arithmetic is written with ops all the same, and the segment
+    loop of ``_advance_states`` runs its fixed ``MAX_SEGMENTS`` passes, a finished pass keeping
+    its state.
     """
 
     def __init__(self):
@@ -124,31 +128,36 @@ class IceStorage(Module):
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.inlet
         conductance = self._conductance(inlet)
-        fraction, temperature, remaining = self.ice_fraction, self.temperature, dt
+        state = (self.ice_fraction, self.temperature, dt)
         for _ in range(MAX_SEGMENTS):
-            if remaining <= 0 or conductance == 0:
-                break
-            fraction, temperature, remaining = self._segment(
-                fraction, temperature, inlet.T, conductance, remaining
-            )
+            finished = ops.logical_or(state[2] <= 0, conductance == 0)
+            advanced = self._segment(*state, inlet.T, conductance)
+            state = self._select(finished, state, advanced)
+        fraction, temperature, _ = state
         return {"ice_fraction": fraction, "temperature": temperature}
+
+    @staticmethod
+    def _select(condition, if_true, if_false):
+        """Return the tuple of ``if_true`` where ``condition`` holds, else of ``if_false``."""
+        return tuple(ops.where(condition, a, b) for a, b in zip(if_true, if_false))
 
     def _rate(self, inlet):
         """Return the glycol capacity rate m_dot * cp [W/K]; reject reverse flow."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0 (reverse flow is "
-                "not modelled)"
-            )
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         return inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
 
     def _effectiveness(self, inlet):
         """Return the coil effectiveness 1 - exp(-UA / C) [-] after checking the store state."""
         self._check_state()
         rate = self._rate(inlet)
-        if rate == 0:
-            return 0.0
-        return heat_transfer.effectiveness_counterflow(heat_transfer.ntu(self.ua, rate), 0)
+        transfer_units = heat_transfer.ntu(self.ua, ops.where(rate == 0, 1.0, rate))
+        return ops.where(rate == 0, 0.0, heat_transfer.effectiveness_counterflow(transfer_units, 0))
 
     def _conductance(self, inlet):
         """Return the coil conductance e * m_dot * cp [W/K]."""
@@ -158,51 +167,72 @@ class IceStorage(Module):
         """Require the store temperature to match its phase (see the class docstring)."""
         fraction, temperature = self.ice_fraction, self.temperature
         freezing = self.freezing_temperature
-        consistent = (
-            temperature == freezing
-            or (fraction == 0 and temperature > freezing)
-            or (fraction == 1 and temperature < freezing)
+        consistent = ops.logical_or(
+            ops.logical_or(
+                temperature == freezing,
+                ops.logical_and(fraction == 0, temperature > freezing),
+            ),
+            ops.logical_and(fraction == 1, temperature < freezing),
         )
-        if not consistent:
-            raise ConfigurationError(
-                f"{self.path}: temperature = {temperature} K with ice_fraction = {fraction}; "
-                f"expected {freezing} K while partly frozen, above it only with no ice and "
-                "below it only when fully frozen"
-            )
+        ops.check(
+            consistent,
+            ConfigurationError,
+            "{path}: temperature = {temperature} K with ice_fraction = {fraction}; "
+            "expected {freezing} K while partly frozen, above it only with no ice and "
+            "below it only when fully frozen",
+            path=self.path,
+            temperature=temperature,
+            fraction=fraction,
+            freezing=freezing,
+        )
 
-    def _segment(self, fraction, temperature, inlet_T, conductance, duration):
+    def _segment(self, fraction, temperature, duration, inlet_T, conductance):
         """Advance one phase segment; return the fraction, temperature and time left [s]."""
         freezing = self.freezing_temperature
-        if temperature > freezing or (fraction == 0 and inlet_T > freezing):
-            capacity = self.water_mass * self.water_heat_capacity
-            return self._sensible(fraction, temperature, inlet_T, capacity / conductance, duration)
-        if temperature < freezing or (fraction == 1 and inlet_T < freezing):
-            capacity = self.water_mass * self.ice_heat_capacity
-            return self._sensible(fraction, temperature, inlet_T, capacity / conductance, duration)
-        return self._latent(fraction, conductance * (inlet_T - freezing), duration)
+        liquid = ops.logical_or(
+            temperature > freezing, ops.logical_and(fraction == 0, inlet_T > freezing)
+        )
+        solid = ops.logical_or(
+            temperature < freezing, ops.logical_and(fraction == 1, inlet_T < freezing)
+        )
+        water = self.water_mass * self.water_heat_capacity
+        ice = self.water_mass * self.ice_heat_capacity
+        args = (fraction, temperature, inlet_T)
+        return self._select(
+            liquid,
+            self._sensible(*args, ops.truediv(water, conductance), duration),
+            self._select(
+                solid,
+                self._sensible(*args, ops.truediv(ice, conductance), duration),
+                self._latent(fraction, conductance * (inlet_T - freezing), duration),
+            ),
+        )
 
     def _sensible(self, fraction, temperature, inlet_T, time_constant, duration):
         """Relax an all-liquid or all-ice store towards the inlet, stopping at freezing."""
         freezing = self.freezing_temperature
         crosses = (temperature - freezing) * (inlet_T - freezing) < 0
-        if crosses:
-            reach = time_constant * math.log((temperature - inlet_T) / (freezing - inlet_T))
-            if reach < duration:
-                return fraction, freezing, duration - reach
-        relaxed = inlet_T + (temperature - inlet_T) * math.exp(-duration / time_constant)
-        if crosses and (relaxed - freezing) * (temperature - freezing) <= 0:
-            relaxed = freezing
-        return fraction, relaxed, 0.0
+        reach = time_constant * ops.log(ops.truediv(temperature - inlet_T, freezing - inlet_T))
+        stops = ops.logical_and(crosses, reach < duration)
+        relaxed = inlet_T + (temperature - inlet_T) * ops.exp(-duration / time_constant)
+        overshoots = ops.logical_and(crosses, (relaxed - freezing) * (temperature - freezing) <= 0)
+        return (
+            fraction,
+            ops.where(ops.logical_or(stops, overshoots), freezing, relaxed),
+            ops.where(stops, duration - reach, 0.0),
+        )
 
     def _latent(self, fraction, heat, duration):
         """Freeze (heat < 0) or melt (heat > 0) at constant duty until full, empty or done."""
         freezing = self.freezing_temperature
-        if heat == 0:
-            return fraction, freezing, 0.0
         latent_capacity = self.water_mass * self.latent_heat
-        target = 0.0 if heat > 0 else 1.0
-        reach = latent_capacity * abs(target - fraction) / abs(heat)
-        if reach < duration:
-            return target, freezing, duration - reach
+        target = ops.where(heat > 0, 0.0, 1.0)
+        reach = ops.truediv(latent_capacity * ops.abs(target - fraction), ops.abs(heat))
         changed = fraction - heat * duration / latent_capacity
-        return min(1.0, max(0.0, changed)), freezing, 0.0
+        reached = reach < duration
+        moved = (
+            ops.where(reached, target, ops.minimum(1.0, ops.maximum(0.0, changed))),
+            freezing,
+            ops.where(reached, duration - reach, 0.0),
+        )
+        return self._select(heat == 0, (fraction, freezing, 0.0), moved)
