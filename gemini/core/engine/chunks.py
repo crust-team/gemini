@@ -96,12 +96,19 @@ def _result_columns(result, health, length):
     if health is None:
         return columns
     columns["health_assessed"] = _column(health.assessed, length)
-    columns["health_score"] = _column(health.score, length)
+    columns["health_score"] = _column(_number(health.score), length)
     columns["health_alarm"] = _column(health.alarm, length)
     columns["health_message"] = _column(health.message, length)
     for name, value in health.metrics.items():
-        columns["health_metric_" + name] = _column(value, length)
+        columns["health_metric_" + name] = _column(_number(value), length)
     return columns
+
+
+def _number(value):
+    """Return a health score or metric as ``float`` or a float array, as the Python backend does."""
+    if np.ndim(value) == 0:
+        return float(value)
+    return np.asarray(value, dtype=float)
 
 
 def _with_none(value, nullable):

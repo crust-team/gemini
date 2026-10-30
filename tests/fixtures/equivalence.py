@@ -22,9 +22,7 @@ from gemini.core.types.flows import STREAM_FIELDS
 from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult, Values
 from gemini.graph import run, run_function
-from tests.fixtures.parity import REFERENCE, on_each_backend, others
-
-RTOL = 1e-12
+from tests.fixtures.parity import REFERENCE, RTOL, on_each_backend, others
 
 
 def flatten(value):

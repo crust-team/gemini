@@ -8,7 +8,7 @@ from gemini import backends
 from gemini.core.modules.pumps import ESP
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
-from tests.fixtures.equivalence import assert_health_matches
+from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 
 ESP_PARAMS = {
     "pump_type": "HC27000",
@@ -93,3 +93,12 @@ def test_health_on_arrays_equals_one_call_per_row():
     assert_health_matches(pump, results, measured)
     assert_health_matches(pump, results, [{"power": row["power"]} for row in measured])
     assert_health_matches(pump, results, [{} for _ in measured])
+
+
+def test_traced_call_matches_one_call_per_row_on_every_backend():
+    """Low, nominal and high flow, a trickle and a low frequency, on every backend."""
+    rows = [
+        dict(suction=Stream(m_dot=m_dot, T=300, p=1e5), frequency=frequency)
+        for m_dot, frequency in ((5, 60), (60, 60), (200, 50), (500, 60), (1e-3, 60), (60, 35))
+    ]
+    assert_module_matches(ESP().update_params(**ESP_PARAMS), rows)
