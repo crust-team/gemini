@@ -119,16 +119,21 @@ def to_dataset(project, frame):
         raise LegacyFormatError(f"old CSV: bound tag columns {missing} are missing")
     converted, metadata = {}, {}
     for name, source in sources.items():
-        converted[name] = frame[source.column].map(lambda value: units.to_si(value, source.unit))
+        converted[name] = _si_column(frame[source.column], source.unit)
         metadata[name] = _si_unit(source.unit)
     for name in frame.filter(like="status").columns:
         converted[name] = frame[name]
     for old, (name, unit) in tables.EXTRA_COLUMNS.items():
         if old in frame:
-            converted[name] = frame[old].map(lambda value: units.to_si(value, unit))
+            converted[name] = _si_column(frame[old], unit)
             metadata[name] = _si_unit(unit)
     columns = {name: values.to_numpy() for name, values in converted.items()}
     return Dataset.from_frame(pd.DataFrame(columns, index=index), units=metadata)
+
+
+def _si_column(column, unit):
+    """Return a pandas column of old-unit numbers converted to SI."""
+    return pd.Series(units.array_to_si(column, unit), index=column.index)
 
 
 def _export_dates(owner, legacy_param):

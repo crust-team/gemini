@@ -76,7 +76,7 @@ class Profile(BaseModel):
             quantity=quantity,
             unit=si_unit,
             index=index.to_pydatetime().tolist(),
-            values=[units.to_si(value, unit) for value in series.to_numpy()],
+            values=units.array_to_si(series.to_numpy(), unit).tolist(),
         )
 
     @classmethod
@@ -92,7 +92,7 @@ class Profile(BaseModel):
             quantity=quantity,
             unit=si_unit,
             index=ticks,
-            values=[units.to_si(value, unit)] * len(ticks),
+            values=units.array_to_si(np.full(len(ticks), value), unit).tolist(),
         )
 
     def at(self, t: datetime) -> float:

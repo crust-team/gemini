@@ -11,7 +11,7 @@ from gemini.core.engine.engine import Engine
 from gemini.core.modules.heat import HeatExchanger
 from gemini.core.modules.pumps import ESP
 from gemini.core.physics import heat_transfer
-from gemini.core.physics.units import to_si
+from gemini.core.physics.units import array_to_si
 from gemini.errors import BindingError, ConfigurationError, InsufficientDataError
 from gemini.utils.strings import join_names, join_path
 
@@ -185,7 +185,7 @@ class _Observed:
     def values(self, binding):
         """Return a bound column converted to SI."""
         unit = self.unit(binding)
-        return np.array([to_si(value, unit) for value in self.data[binding.column]])
+        return array_to_si(self.data[binding.column], unit)
 
 
 def _ua_guess(module, observed, measured, valid):

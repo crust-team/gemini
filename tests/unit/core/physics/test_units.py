@@ -118,5 +118,6 @@ def test_si_conversion_gives_the_bits_of_to_si_on_arrays(unit, quantity):
     scale, offset = units.si_conversion(unit, quantity)
     expected = [units.to_si(value, unit, quantity) for value in values.tolist()]
     assert (values * scale + offset).tolist() == expected
+    assert units.array_to_si(values, unit, quantity).tolist() == expected
     with pytest.raises(UnitError, match="units.si_conversion"):
         units.si_conversion("furlong")

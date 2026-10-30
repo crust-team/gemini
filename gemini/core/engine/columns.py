@@ -89,9 +89,8 @@ def _defaults(twin, port):
 
 
 def _convert(source, raw):
-    """Return a column in SI as ``units.to_si`` computes one value."""
-    scale, offset = units.si_conversion(source.binding.unit, source.quantity)
-    return raw * scale + offset
+    """Return a column in SI."""
+    return units.array_to_si(raw, source.binding.unit, source.quantity)
 
 
 def _mark_missing(block, source, present):

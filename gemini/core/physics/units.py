@@ -10,6 +10,8 @@ import math
 import re
 from dataclasses import dataclass
 
+import numpy as np
+
 from gemini.errors import UnitError
 from gemini.utils.strings import did_you_mean
 
@@ -348,6 +350,12 @@ def to_si(value: float, unit: str, quantity: str | None = None) -> float:
     """Convert a bound scalar to SI; volume flow remains [m3/s] until density is known."""
     scale, offset = si_conversion(unit, quantity)
     return float(value) * scale + offset
+
+
+def array_to_si(values, unit, quantity=None):
+    """Convert an array-like of ``unit`` values to SI, element for element as ``to_si`` does."""
+    scale, offset = si_conversion(unit, quantity)
+    return np.asarray(values, dtype=float) * scale + offset
 
 
 def split_quantity(value):
