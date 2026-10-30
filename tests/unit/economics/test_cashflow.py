@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from gemini.core.physics.units import SECONDS_PER_YEAR
+from gemini.physics.units import SECONDS_PER_YEAR
 from tests.fixtures.costed_plants import day, heating_plant
 
 HEAT = 1000.0 * SECONDS_PER_YEAR

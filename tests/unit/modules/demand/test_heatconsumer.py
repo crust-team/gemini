@@ -1,0 +1,81 @@
+"""Heat delivery, return-temperature floor, zero flow and balances of the heat consumer."""
+
+import pytest
+
+from gemini.errors import DeclarationError, MissingValueError, PhysicsRangeError
+from gemini.modules import HeatConsumer, energy_balance, mass_balance
+from gemini.types import Stream
+from tests.fixtures.equivalence import assert_module_matches
+
+CP = 4217.4
+SUPPLY = Stream(m_dot=2.0, T=343.15, p=3e5)
+
+
+def _consumer():
+    return HeatConsumer().update_params(minimum_return_temperature="40 C")
+
+
+def test_met_demand_sets_the_return_temperature():
+    """A demand below the available heat is met and cools the stream by Q / (m_dot cp)."""
+    consumer = _consumer()
+    result = consumer(supply_in=SUPPLY, heat_demand="100 kW")
+    out, return_out = result.outputs, result.outlets.return_out
+    assert out.heat_supplied == 100e3 and out.unmet_demand == 0 and not out.is_unmet
+    assert out.return_out_T == pytest.approx(343.15 - 100e3 / (2 * CP))
+    assert out.temperature_difference == pytest.approx(100e3 / (2 * CP))
+    assert return_out.m_dot == SUPPLY.m_dot and return_out.p == SUPPLY.p
+    assert return_out.T == out.return_out_T
+    assert energy_balance(consumer, result)["relative_residual"] < 1e-12
+    assert energy_balance(consumer, result)["heat_supplied"] == 100e3
+    assert mass_balance(consumer, result)["residual"] == 0
+
+
+def test_return_floor_caps_the_delivered_heat():
+    """Demand beyond m_dot cp (T_supply - T_min) is unmet and the return sits at the floor."""
+    consumer = _consumer()
+    result = consumer(supply_in=SUPPLY, heat_demand=1e6)
+    out = result.outputs
+    assert out.heat_supplied == pytest.approx(2 * CP * 30)
+    assert out.unmet_demand == pytest.approx(1e6 - 2 * CP * 30) and out.is_unmet
+    assert out.return_out_T == 313.15 and out.temperature_difference == pytest.approx(30)
+    assert energy_balance(consumer, result)["relative_residual"] < 1e-12
+
+
+def test_zero_flow_cold_supply_and_zero_demand_deliver_nothing():
+    """No flow, a supply below the floor or no demand leave the stream unchanged."""
+    consumer = _consumer()
+    for supply, demand in [(SUPPLY.with_(m_dot=0), 5e4), (SUPPLY.with_(T=303.15), 5e4)]:
+        result = consumer(supply_in=supply, heat_demand=demand)
+        assert result.outputs.heat_supplied == 0 and result.outputs.unmet_demand == demand
+        assert result.outputs.is_unmet and result.outlets.return_out.T == supply.T
+        assert energy_balance(consumer, result)["relative_residual"] < 1e-12
+    out = consumer(supply_in=SUPPLY, heat_demand=0).outputs
+    assert out.heat_supplied == 0 and not out.is_unmet and out.temperature_difference == 0
+
+
+def test_invalid_inputs_raise():
+    """Reverse flow, negative demand and a missing demand or floor are rejected."""
+    consumer = _consumer()
+    with pytest.raises(PhysicsRangeError, match="supply_in.m_dot = -1"):
+        consumer(supply_in=SUPPLY.with_(m_dot=-1), heat_demand=1e4)
+    with pytest.raises(DeclarationError):
+        consumer(supply_in=SUPPLY, heat_demand=-1)
+    with pytest.raises(MissingValueError):
+        consumer(supply_in=SUPPLY)
+    with pytest.raises(MissingValueError):
+        HeatConsumer()(supply_in=SUPPLY, heat_demand=1e4)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Met, short, cold-supply, no-demand and stopped rows trace and equal per-row calls."""
+    rows = [
+        dict(supply_in=Stream(m_dot=m_dot, T=T, p=3e5), heat_demand=demand)
+        for m_dot, T, demand in [
+            (2.0, 343.15, 100e3),
+            (2.0, 343.15, 1e6),
+            (2.0, 300.0, 100e3),
+            (2.0, 343.15, 0.0),
+            (0.0, 343.15, 100e3),
+        ]
+    ]
+    assert_module_matches(_consumer(), rows)

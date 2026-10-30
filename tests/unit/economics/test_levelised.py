@@ -3,9 +3,9 @@
 import pytest
 
 import gemini as gm
-from gemini.core.modules import CoolingConsumer
-from gemini.core.physics.units import SECONDS_PER_YEAR
 from gemini.economics import levelised
+from gemini.modules import CoolingConsumer
+from gemini.physics.units import SECONDS_PER_YEAR
 from tests.fixtures.costed_plants import cooling_plant, day, heating_plant
 
 PRICES = gm.economics.Assumptions(electricity_price=2e-8)

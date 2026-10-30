@@ -3,9 +3,9 @@
 import inspect
 import json
 
-from gemini.core.engine.evaluate import evaluate
-from gemini.core.modules.module import Module
-from gemini.core.modules.registry import CATEGORIES
+from gemini.engine.evaluate import evaluate
+from gemini.modules.module import Module
+from gemini.modules.registry import CATEGORIES
 from gemini.utils.jsonable import to_plain
 
 _NUMERIC = ("number", "integer")

@@ -9,10 +9,10 @@ import json
 
 import pytest
 
-from gemini.core.modules.pumps import ESP
-from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
-from gemini.core.modules.wells import InjectionWell, ProductionWell
-from gemini.core.physics import (
+from gemini.modules.pumps import ESP
+from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.modules.wells import InjectionWell, ProductionWell
+from gemini.physics import (
     chemistry,
     corrosion,
     erosion,
@@ -21,7 +21,7 @@ from gemini.core.physics import (
     hydraulics,
     units,
 )
-from gemini.core.types.flows import Stream
+from gemini.types.flows import Stream
 from tests.fixtures import FIXTURES
 
 GOLDEN_VALUES = FIXTURES / "golden_values.json"

@@ -5,9 +5,9 @@ from types import SimpleNamespace
 import numpy as np
 
 from gemini.analysis.series import results_total, window_seconds
-from gemini.core.modules.balance import emissions
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.outcome import outcome
+from gemini.modules.balance import emissions
 
 _LEDGER = ("electricity", "fuel", "electricity_generated")
 
@@ -34,7 +34,7 @@ def source_energies(results):
     """Return the fuel energy and the grid electricity energy [J] drawn over the run.
 
     Grid electricity is the consumption not covered by on-site generation, tick by tick, as
-    ``gemini.core.modules.balance.emissions`` counts it.
+    ``gemini.modules.balance.emissions`` counts it.
     """
     return _weighted_energy(results, 1.0, 0.0), _weighted_energy(results, 0.0, 1.0)
 
@@ -42,7 +42,7 @@ def source_energies(results):
 def co2(results, assumptions=None):
     """Return the CO2 emitted over the run [kg] from the fuel burnt and the grid electricity.
 
-    This is ``gemini.core.modules.balance.emissions`` summed over the ticks: fuel energy times
+    This is ``gemini.modules.balance.emissions`` summed over the ticks: fuel energy times
     ``fuel_emission_factor`` plus grid electricity energy times ``electricity_emission_factor``.
     On-site generation offsets consumption before grid electricity is counted and a surplus
     earns no credit. Gas vented by a ``Vent`` is not included.

@@ -18,8 +18,8 @@ import pandas as pd
 
 import gemini as gm
 from gemini import backends
-from gemini.core.types.flows import Stream
 from gemini.graph import GraphCache, run
+from gemini.types.flows import Stream
 
 ROOT = Path(__file__).resolve().parents[1]
 

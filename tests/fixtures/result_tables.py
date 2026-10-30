@@ -4,8 +4,8 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
-from gemini.core.engine.chunks import PathColumns, ResultChunk
-from gemini.core.engine.results import Results
+from gemini.engine.chunks import PathColumns, ResultChunk
+from gemini.engine.results import Results
 
 START = datetime(2024, 1, 1, tzinfo=timezone.utc)
 

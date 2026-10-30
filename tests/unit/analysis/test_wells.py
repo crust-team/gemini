@@ -7,8 +7,8 @@ import pytest
 
 import gemini as gm
 from gemini.analysis import wells
-from gemini.core.physics import units
-from gemini.core.types.flows import Stream
+from gemini.physics import units
+from gemini.types.flows import Stream
 
 BAR = 1e5
 CASE = {"wellhead_pressure": "4.6 bar", "rates": [20, 45], "frequency": 55.484}

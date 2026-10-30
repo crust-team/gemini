@@ -7,13 +7,13 @@ from typing import Any
 import numpy as np
 from scipy.optimize import least_squares
 
-from gemini.core.data.dataset import as_dataset, bound_unit
-from gemini.core.engine.engine import Engine
-from gemini.core.modules.exchangers import HeatExchanger
-from gemini.core.modules.pumps import ESP
-from gemini.core.physics import heat_transfer
-from gemini.core.physics.units import array_to_si
+from gemini.engine.engine import Engine
 from gemini.errors import BindingError, ConfigurationError, InsufficientDataError
+from gemini.modules.exchangers import HeatExchanger
+from gemini.modules.pumps import ESP
+from gemini.physics import heat_transfer
+from gemini.physics.units import array_to_si
+from gemini.utils.data.dataset import as_dataset, bound_unit
 from gemini.utils.strings import join_names, join_path
 
 _MASS_FLOW_UNITS = {"kg/s", "t/h"}

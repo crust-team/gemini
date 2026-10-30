@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini.core.engine.callbacks import Callback
+from gemini.engine.callbacks import Callback
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.frames import path_frame
 

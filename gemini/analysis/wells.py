@@ -6,11 +6,6 @@ from typing import Any
 
 import numpy as np
 
-from gemini.core.modules.plants import nodal as solves
-from gemini.core.modules.pumps import ESP
-from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
-from gemini.core.modules.wells import ProductionWell
-from gemini.core.physics import constants, units
 from gemini.errors import (
     ConfigurationError,
     InsufficientDataError,
@@ -18,6 +13,11 @@ from gemini.errors import (
     PhysicsRangeError,
     ValidationError,
 )
+from gemini.modules.plants import nodal as solves
+from gemini.modules.pumps import ESP
+from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.modules.wells import ProductionWell
+from gemini.physics import constants, units
 from gemini.utils.jsonable import to_plain
 
 CURVE_POINTS = 21

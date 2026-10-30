@@ -1,7 +1,7 @@
 """A small valid module in a file of its own, as a user would write and load one."""
 
-from gemini.core.modules.module import Module
-from gemini.core.types import Inlet, Outlet, Output, Parameter, Pressure, PressureDifference, Stream
+from gemini.modules.module import Module
+from gemini.types import Inlet, Outlet, Output, Parameter, Pressure, PressureDifference, Stream
 
 
 class Booster(Module):

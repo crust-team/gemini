@@ -7,11 +7,11 @@ import numpy as np
 import pytest
 
 from gemini import backends, ops
-from gemini.core.types.flows import Stream
-from gemini.core.types.fluid import BRINE
 from gemini.errors import PhysicsRangeError
 from gemini.graph import run_function
 from gemini.ops import Constant
+from gemini.types.flows import Stream
+from gemini.types.fluid import BRINE
 
 LIMIT = Constant("LIMIT", 2.0, "-", "a test constant")
 

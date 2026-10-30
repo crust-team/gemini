@@ -18,17 +18,17 @@ when the run is ``stepped``: ``Module.step`` is the one implementation of a step
 import numbers
 
 from gemini import ops
-from gemini.core import runtime
-from gemini.core.modules.module import _Call, _current_call, outputs_enabled
-from gemini.core.types.flows import Stream
-from gemini.core.types.ports import Ports
-from gemini.core.types.results import ModuleResult
+from gemini.backends import runtime
 from gemini.errors import TraceError
 from gemini.graph.breaks import record_break
 from gemini.graph.graph import Graph
 from gemini.graph.limits import certain, check_declared_limits
 from gemini.graph.node import STREAM_FIELDS
 from gemini.graph.rootbreak import root_break_graph
+from gemini.modules.module import _Call, _current_call, outputs_enabled
+from gemini.types.flows import Stream
+from gemini.types.ports import Ports
+from gemini.types.results import ModuleResult
 from gemini.utils.strings import join_path
 
 

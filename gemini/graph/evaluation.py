@@ -22,13 +22,13 @@ import dataclasses
 import numpy as np
 
 from gemini import backends
-from gemini.core.types.results import Values
 from gemini.graph.failures import RowView, row_error
 from gemini.graph.interpreter import Interpreter
 from gemini.graph.node import Node, stack_column
 from gemini.graph.proxy import Proxy
 from gemini.graph.rootbreak import run_rows, stacked
 from gemini.ops import Constant
+from gemini.types.results import Values
 
 DTYPES = {"number": float, "boolean": bool, "integer": np.int64}
 """The NumPy type of an output by the JSON type of its declaration."""

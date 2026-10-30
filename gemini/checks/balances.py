@@ -3,7 +3,7 @@
 import numpy as np
 
 from gemini.checks.outcome import check
-from gemini.core.modules.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
+from gemini.modules.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
 from gemini.utils.strings import join_path
 
 ENERGY_TOLERANCE = 1e-9
@@ -46,7 +46,7 @@ def energy_balance(results):
     """Check the energy ledger of a finished run: the energy outputs have their sign.
 
     Results store the leaf output columns, not the streams that cross the leaves, so the
-    enthalpy closure of ``gemini.core.modules.balance.energy_balance`` (sum in minus sum out
+    enthalpy closure of ``gemini.modules.balance.energy_balance`` (sum in minus sum out
     per call) cannot be recomputed from them. This check covers the ledger of
     ``ENERGY_INPUTS`` and ``ENERGY_OUTPUTS`` of that module: it reads every leaf column named
     ``electricity``, ``fuel``, ``heat_absorbed``, ``heat_loss``, ``heat_supplied`` or
@@ -76,7 +76,7 @@ def mass_balance(results):
     """Check the mass-flow ledger of a finished run: no mass flow is negative or infinite.
 
     Results store leaf output columns, not the streams that cross the leaves, so the mass
-    closure of ``gemini.core.modules.balance.mass_balance`` (inflow minus outflow per call)
+    closure of ``gemini.modules.balance.mass_balance`` (inflow minus outflow per call)
     cannot be recomputed from them. This check covers the leaf outputs whose unit in
     ``results.units`` is kg/s (for example a degasser's ``gas_mass_flow``): each value must be
     finite or missing and not negative beyond the tolerance.

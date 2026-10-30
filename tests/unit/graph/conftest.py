@@ -4,8 +4,10 @@ import numpy as np
 import pytest
 
 from gemini import ops
-from gemini.core.modules import Module
-from gemini.core.types import (
+from gemini.errors import PhysicsRangeError
+from gemini.modules import Module
+from gemini.ops import Constant
+from gemini.types import (
     BRINE,
     WATER,
     Boundary,
@@ -21,8 +23,6 @@ from gemini.core.types import (
     Stream,
     Temperature,
 )
-from gemini.errors import PhysicsRangeError
-from gemini.ops import Constant
 
 REFERENCE = Constant("REFERENCE", 2.0, "Pa", "pressure rise per unit gain and scale")
 

@@ -3,8 +3,8 @@
 import pandas as pd
 
 import gemini as gm
-from gemini.core.modules import Module
-from gemini.core.types import (
+from gemini.modules import Module
+from gemini.types import (
     Control,
     Inlet,
     MassFlow,
@@ -15,7 +15,7 @@ from gemini.core.types import (
     Stream,
     Temperature,
 )
-from gemini.core.types.bindings import Binding, ModuleBindings
+from gemini.types.bindings import Binding, ModuleBindings
 
 TIME = pd.Timestamp("2024-01-01", tz="UTC")
 

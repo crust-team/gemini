@@ -7,11 +7,11 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.core.data.loader import Aligned
-from gemini.core.engine.columns import read
-from gemini.core.engine.step import BindingPlan
-from gemini.core.types import Binding, Stream
+from gemini.engine.columns import read
+from gemini.engine.step import BindingPlan
 from gemini.errors import ConfigurationError, InsufficientDataError
+from gemini.types import Binding, Stream
+from gemini.utils.data.loader import Aligned
 
 
 def _kwargs(plant, path, row):

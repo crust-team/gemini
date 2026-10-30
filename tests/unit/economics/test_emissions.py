@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 import gemini as gm
-from gemini.core.modules.balance import emissions
 from gemini.economics import emissions as module
+from gemini.modules.balance import emissions
 from tests.fixtures.costed_plants import HOURS, day
 from tests.fixtures.result_tables import make_results
 

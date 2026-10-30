@@ -1,6 +1,6 @@
 """A class per shipped spec plant, so tests written for module classes run on every plant."""
 
-from gemini.core.modules.plants import Plant, library
+from gemini.modules.plants import Plant, library
 
 
 def spec_plant_class(name):

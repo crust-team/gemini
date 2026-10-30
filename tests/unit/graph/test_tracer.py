@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini.core.types.declarations import UNSET
 from gemini.errors import MissingValueError, OutputError, PhysicsRangeError
 from gemini.graph import Tracer, run
 from gemini.graph.tracer import parameter_shape
+from gemini.types.declarations import UNSET
 
 
 def test_trace_names_inputs_by_role_and_records_outputs(gain):

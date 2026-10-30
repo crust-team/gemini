@@ -3,8 +3,8 @@
 import json
 
 import gemini as gm
-from gemini.core.modules.module import Module
-from gemini.core.types import Output, Parameter
+from gemini.modules.module import Module
+from gemini.types import Output, Parameter
 from tests.fixtures.booster_module import EXAMPLE, Booster
 
 

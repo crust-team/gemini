@@ -9,11 +9,11 @@ import pytest
 
 import gemini as gm
 from gemini import backends
-from gemini.core.engine import checkpoint
-from gemini.core.engine.callbacks import AutoCheckpoint, Callback, EventLog
-from gemini.core.engine.results import Results
-from gemini.core.types import Control, Output
-from gemini.core.types.bindings import Binding, DatedParams, ModuleBindings
+from gemini.engine import checkpoint
+from gemini.engine.callbacks import AutoCheckpoint, Callback, EventLog
+from gemini.engine.results import Results
+from gemini.types import Control, Output
+from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from tests.fixtures.frames import path_frame
 
 ROOT = Path(__file__).parents[2]

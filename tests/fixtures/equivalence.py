@@ -17,11 +17,11 @@ from collections.abc import Mapping
 import numpy as np
 import pytest
 
-from gemini.core.types import Stream
-from gemini.core.types.flows import STREAM_FIELDS
-from gemini.core.types.ports import Ports
-from gemini.core.types.results import ModuleResult, Values
 from gemini.graph import run, run_function
+from gemini.types import Stream
+from gemini.types.flows import STREAM_FIELDS
+from gemini.types.ports import Ports
+from gemini.types.results import ModuleResult, Values
 from tests.fixtures.parity import REFERENCE, RTOL, on_each_backend, others
 
 

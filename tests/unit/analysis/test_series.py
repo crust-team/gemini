@@ -6,7 +6,7 @@ import pytest
 
 import gemini as gm
 from gemini.analysis import series
-from gemini.core.modules import CoolingConsumer, HeatConsumer
+from gemini.modules import CoolingConsumer, HeatConsumer
 from tests.fixtures.result_tables import make_results
 
 

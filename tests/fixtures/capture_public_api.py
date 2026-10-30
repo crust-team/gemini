@@ -99,7 +99,7 @@ def _methods(owner, names):
 
 
 def _schemas():
-    folder = ROOT / "gemini" / "schemas"
+    folder = ROOT / "docs" / "schemas"
     return {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(folder.glob("*.schema.json"))

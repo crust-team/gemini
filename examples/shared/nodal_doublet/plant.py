@@ -1,11 +1,11 @@
 """Doublet produced against a wellhead pressure and injected through a solved pump head."""
 
-from gemini.core.modules import Module
-from gemini.core.modules.plants import nodal
-from gemini.core.modules.pumps import ESP, InjectionPump
-from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
-from gemini.core.modules.wells import InjectionWell, ProductionWell
-from gemini.core.types import (
+from gemini.modules import Module
+from gemini.modules.plants import nodal
+from gemini.modules.pumps import ESP, InjectionPump
+from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.modules.wells import InjectionWell, ProductionWell
+from gemini.types import (
     Boundary,
     Electricity,
     HeatLoss,

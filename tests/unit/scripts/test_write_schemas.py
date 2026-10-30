@@ -1,4 +1,4 @@
-"""The generated schemas and samples of ``gemini/schemas`` are up to date."""
+"""The generated schemas and samples of ``docs/schemas`` are up to date."""
 
 import json
 from pathlib import Path
@@ -9,7 +9,7 @@ from scripts import write_schemas
 from tests.fixtures.json_schema import check
 from tests.fixtures.parity import RTOL
 
-SCHEMAS = Path(write_schemas.__file__).parents[1] / "gemini" / "schemas"
+SCHEMAS = Path(write_schemas.__file__).parents[1] / "docs" / "schemas"
 DOCUMENTS = ("module_description", "plant_spec", "results_summary", "error", "profile")
 
 

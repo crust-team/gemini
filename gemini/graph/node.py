@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
-from gemini.core.types import flows
-from gemini.core.types.flows import Stream
+from gemini.types import flows
+from gemini.types.flows import Stream
 
 _TRACING_PACKAGES = tuple(
     str(Path(__file__).parents[1] / package) for package in ("graph", "ops", "backends")

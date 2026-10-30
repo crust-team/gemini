@@ -9,7 +9,7 @@ round numbers chosen so that every unit runs.
 import pandas as pd
 
 import gemini as gm
-from gemini.core.modules.plants import templating
+from gemini.modules.plants import templating
 
 SIZES = {
     "heat_exchanger.ua": 1e5,

@@ -3,13 +3,13 @@
 from dataclasses import dataclass
 
 from gemini.analysis.series import energy, leaf_total, window_seconds
-from gemini.core.modules.demand import CoolingConsumer, HeatConsumer
-from gemini.core.physics.units import SECONDS_PER_YEAR
-from gemini.core.types.cost import total_cost
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.emissions import source_energies
 from gemini.economics.outcome import outcome
 from gemini.errors import ValidationError
+from gemini.modules.demand import CoolingConsumer, HeatConsumer
+from gemini.physics.units import SECONDS_PER_YEAR
+from gemini.types.cost import total_cost
 
 NO_COST = (
     "no module declares a cost: a module declares it by defining capex() that returns a Cost, "
@@ -53,7 +53,7 @@ def annual_energies(plant, results):
 def capex(plant, assumptions=None):
     """Return the investment of a plant: the sum of the costs its modules declare.
 
-    One implementation: ``gemini.core.types.cost.total_cost``. A module declares its cost by
+    One implementation: ``gemini.types.cost.total_cost``. A module declares its cost by
     defining ``capex()`` that returns a ``Cost``; no built-in module does, so a plant of built-in
     modules has none, and nothing is estimated or defaulted.
 

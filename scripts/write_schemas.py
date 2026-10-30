@@ -1,4 +1,4 @@
-"""Write the generated schemas and every sample file of ``gemini/schemas/``.
+"""Write the generated schemas and every sample file of ``docs/schemas/``.
 
 Run from the repository root after a change to a shape: ``python scripts/write_schemas.py``. The
 schemas of the plant spec and the profile come from ``gm.plants.spec_schema()`` and
@@ -14,7 +14,7 @@ import pandas as pd
 import gemini as gm
 
 ROOT = Path(__file__).parents[1]
-SCHEMAS = ROOT / "gemini" / "schemas"
+SCHEMAS = ROOT / "docs" / "schemas"
 DATA = ROOT / "examples" / "shared" / "doublet_heat" / "doublet_2024_15min_month.csv"
 ROWS = 4
 PROFILE_SOURCE = (

@@ -1,4 +1,4 @@
-"""A small JSON Schema checker for the keywords of ``gemini/schemas``; no new dependency."""
+"""A small JSON Schema checker for the keywords of ``docs/schemas``; no new dependency."""
 
 import re
 

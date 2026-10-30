@@ -4,8 +4,8 @@ from datetime import timedelta
 
 import numpy as np
 
-from gemini.core.physics import corrosion, units
 from gemini.errors import NotImplementedYet, ValidationError
+from gemini.physics import corrosion, units
 from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 from gemini.utils.time import to_utc

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from gemini.core.modules.module import Module
+from gemini.modules.module import Module
 from gemini.utils.strings import join_path
 
 

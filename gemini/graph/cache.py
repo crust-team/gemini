@@ -14,10 +14,10 @@ is, for benchmarks and debugging.
 
 import weakref
 
-from gemini.core import runtime
-from gemini.core.modules.module import outputs_enabled
+from gemini.backends import runtime
 from gemini.graph.passes import eliminate_common_subexpressions
 from gemini.graph.tracer import Tracer, traced_shape
+from gemini.modules.module import outputs_enabled
 
 
 class GraphCache:

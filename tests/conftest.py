@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.core.modules import Module
+from gemini.modules import Module
 from tests.cpu_budget import BUDGET_S, exceeds_budget, measure_cpu
 from tests.fixtures.plant_classes import spec_plant_classes
 

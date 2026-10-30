@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 
 from gemini.analysis.series import energy, leaf_total, results_total, window_seconds
-from gemini.core.modules.demand import CoolingConsumer, HeatConsumer
+from gemini.modules.demand import CoolingConsumer, HeatConsumer
 from gemini.utils.jsonable import to_plain
 
 

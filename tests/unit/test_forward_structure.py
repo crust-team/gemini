@@ -6,8 +6,8 @@ import io
 import textwrap
 import tokenize
 
-from gemini.core.modules.module import Module
-from gemini.core.types import Stream
+from gemini.modules.module import Module
+from gemini.types import Stream
 
 FORWARD_SECTIONS = ("# Modules", "# Outlets")
 LIFECYCLE = ("__init__", "forward", "_compute_outputs", "_advance_states")

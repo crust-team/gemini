@@ -3,9 +3,9 @@
 import numpy as np
 
 import gemini as gm
-from gemini.core.types.ports import Ports
 from gemini.graph import Graph
 from gemini.graph.breaks import PROBE, evaluate_break, record_break
+from gemini.types.ports import Ports
 from tests.fixtures.graph_run import graph_outputs
 
 

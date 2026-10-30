@@ -1,0 +1,108 @@
+"""Injection pump using supplied curves or a discharge-pressure setpoint."""
+
+from gemini import ops
+from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.modules.module import Module
+from gemini.physics import pumps
+from gemini.types import (
+    Control,
+    Count,
+    Efficiency,
+    Electricity,
+    Frequency,
+    Inlet,
+    Outlet,
+    Output,
+    Parameter,
+    Power,
+    Pressure,
+    PressureDifference,
+    Stream,
+)
+
+
+class InjectionPump(Module):
+    """Raise brine pressure with a simple hydraulic-power estimate."""
+
+    repr_fields = ("no_stages", "efficiency", "pump_type")
+
+    def __init__(self):
+        """Declare injection pump design data, ports and controls."""
+        super().__init__()
+
+        # Parameters
+        self.no_stages = Parameter(Count | None, default=None)
+        self.pump_type = Parameter(str, default="unspecified")
+        self.efficiency = Parameter(Efficiency, default=0.7, calibratable=True)
+        self.head_coeff = Parameter(list[float] | None, default=None, shape=(6,))
+        self.power_coeff = Parameter(list[float] | None, default=None, shape=(6,))
+
+        # Inlets
+        self.suction = Inlet(Stream, stream="brine")
+
+        # Controls
+        self.pressure_setpoint = Control(Pressure | None, default=None)
+        self.frequency = Control(Frequency, default=60)
+
+        # Outputs
+        self.head = Output(PressureDifference, soft_sensor=True)
+        self.power = Output(Power, soft_sensor=True)
+        self.discharge_pressure = Output(Pressure, soft_sensor=True)
+        self.electricity = Output(Electricity)
+
+        # Outlets
+        self.discharge = Outlet(Stream, stream="brine")
+
+    def forward(self, inlets):
+        """Raise pressure from a supplied curve or discharge-pressure setpoint."""
+
+        # Outlets
+        suction = inlets.suction
+        head = self._head(suction)
+        ops.check(
+            head >= 0,
+            PhysicsRangeError,
+            "{path}: head = {head} Pa; discharge pressure is below suction pressure",
+            path=self.path,
+            head=head,
+        )
+
+        discharge = suction.with_(p=suction.p + head)
+
+        outlets = dict(discharge=discharge)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        suction = inlets.suction
+        discharge = outlets.discharge
+        flow = suction.volumetric_flow()
+        self.head = discharge.p - suction.p
+        if self.head_coeff is not None and self.power_coeff is not None:
+            self.power = pumps.power(flow, self.frequency, self.no_stages, self.power_coeff)
+        else:
+            self.power = flow * self.head / self.efficiency
+        self.discharge_pressure = discharge.p
+        self.electricity = self.power
+
+    def _head(self, suction):
+        """Return the pressure rise [Pa] from the head curve, else from the pressure setpoint.
+
+        A ``power_coeff`` curve is used for power only together with a ``head_coeff`` curve.
+        """
+        flow = suction.volumetric_flow()
+        ops.check(
+            flow >= 0,
+            PhysicsRangeError,
+            "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
+            path=self.path,
+            flow=flow,
+        )
+        if self.head_coeff is not None:
+            if self.no_stages is None:
+                raise ConfigurationError(f"{self.path}: head_coeff curves require no_stages")
+            return pumps.head(flow, self.frequency, self.no_stages, self.head_coeff)
+        if self.pressure_setpoint is not None:
+            return self.pressure_setpoint - suction.p
+        raise ConfigurationError(
+            f"{self.path}: supply the pressure_setpoint control or head_coeff and no_stages"
+        )

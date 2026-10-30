@@ -9,8 +9,9 @@ import numpy as np
 import pandas as pd
 
 from gemini import ops
-from gemini.core.modules import Module
-from gemini.core.types import (
+from gemini.errors import PhysicsRangeError
+from gemini.modules import Module
+from gemini.types import (
     Control,
     Electricity,
     Health,
@@ -22,8 +23,7 @@ from gemini.core.types import (
     State,
     Stream,
 )
-from gemini.core.types.bindings import Binding, DatedParams, ModuleBindings
-from gemini.errors import PhysicsRangeError
+from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 
 TICKS = pd.date_range("2024-01-01", periods=12, freq="15min", tz="UTC")
 

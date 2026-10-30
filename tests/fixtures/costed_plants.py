@@ -4,8 +4,8 @@ The consumers join the plant with ``add_module``, so the test classes stay out o
 """
 
 import gemini as gm
-from gemini.core.modules import CoolingConsumer, HeatConsumer
-from gemini.core.types.cost import Cost
+from gemini.modules import CoolingConsumer, HeatConsumer
+from gemini.types.cost import Cost
 from tests.fixtures.result_tables import make_results
 
 HOURS = 24

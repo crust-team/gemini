@@ -17,13 +17,13 @@ row whose outlet fluid differs from the probed one counts as failed.
 import numpy as np
 
 from gemini import backends
-from gemini.core.modules.module import _Call, _current_call
-from gemini.core.types.flows import Stream
-from gemini.core.types.ports import Ports
 from gemini.errors import MissingValueError, TraceError
 from gemini.graph.node import STREAM_FIELDS, row_item, row_streams, stack_column
+from gemini.modules.module import _Call, _current_call
 from gemini.ops import Symbolic, registry
 from gemini.ops.registry import get
+from gemini.types.flows import Stream
+from gemini.types.ports import Ports
 
 PROBE = {"m_dot": 1.0, "T": 300.0, "p": 1e5}
 """Representative values of the fields of an inlet that is traced when the fluids are probed."""

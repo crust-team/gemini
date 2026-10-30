@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.core.types.bindings import DatedParams
+from gemini.types.bindings import DatedParams
 from gemini.utils.files import read_json
 from tests.fixtures import ROOT
 from tests.fixtures.parity import BACKENDS, on_each_backend, run_engine
