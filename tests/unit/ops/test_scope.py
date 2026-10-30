@@ -151,3 +151,8 @@ def test_a_stream_of_traced_values_keeps_the_frames_of_nested_functions():
 
     values = run_function(outer, np.array([1.0, -1.0]))
     assert values.tolist() == [1.0, 0.0]
+
+
+def test_a_zero_dimensional_array_is_a_scalar_for_the_scope():
+    """A forced NumPy backend gives 0-d arrays; they must not turn a call into an array call."""
+    assert kinds(np.array(1.0), 2.0)[1] == "float64"

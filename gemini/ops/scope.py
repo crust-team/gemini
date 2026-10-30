@@ -121,6 +121,8 @@ def _plain_dataclass(value):
 def _wrapped(values):
     """Return ``values`` with exact numbers as NumPy scalars; ``None`` if any is array or traced.
 
+    A 0-d array, what ops give under a forced NumPy backend, counts as a scalar.
+
     ``values`` is a sequence; ``None`` also stands for "leave the call unwrapped".
     """
     converted = []
@@ -128,6 +130,9 @@ def _wrapped(values):
         kind = type(value)
         if kind in _NUMBERS or kind is dict:
             converted.append(wrap(value))
+            continue
+        if kind is np.ndarray and value.ndim == 0:
+            converted.append(value)
             continue
         if kind not in _PASS and (kind is np.ndarray or isinstance(value, Symbolic)):
             return None

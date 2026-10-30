@@ -8,6 +8,7 @@ from copy import deepcopy
 import pytest
 
 import gemini as gm
+from gemini import backends, ops
 from gemini.core.modules import Module, ModuleDict
 from gemini.core.types import (
     Boundary,
@@ -942,3 +943,23 @@ def test_an_eager_call_divides_silently_and_returns_plain_python_values():
     assert result.inlets.inlet is stream and type(stream.m_dot) is float
     assert type(result.inputs["divisor"]) is float
     assert "np.float64" not in str(result.outlets.outlet) and "np.float64" not in str(stream)
+
+
+def test_a_forced_numpy_backend_keeps_plain_division_silent():
+    """Ops give 0-d arrays under a forced NumPy backend; a call on them still wraps its scalars."""
+
+    class Divider(Module):
+        def __init__(self):
+            super().__init__()
+            self.gain = Parameter(float, default=1.0)
+            self.ratio = Output(float)
+
+        def forward(self, inlets):
+            outlets = dict()
+            return outlets
+
+        def _compute_outputs(self, inlets, outlets):
+            self.ratio = ops.where(self.gain > 2.0, self.gain / 0.0, ops.add(self.gain, 1.0))
+
+    with backends.settings(backend="numpy"):
+        assert Divider()().outputs.ratio == 2.0

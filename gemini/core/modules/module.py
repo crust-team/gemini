@@ -173,12 +173,15 @@ class _ScalarParameters(dict):
 
 
 def _has_arrays(inlets, inputs):
-    """Return whether a call holds arrays, which leaves its scope unwrapped."""
+    """Return whether a call holds arrays over rows, which leaves its scope unwrapped.
+
+    A 0-d array is a scalar: ops give one under a forced NumPy backend.
+    """
     for stream in inlets.values():
         for value in (stream.m_dot, stream.T, stream.p):
-            if isinstance(value, np.ndarray):
+            if isinstance(value, np.ndarray) and value.ndim:
                 return True
-    return any(isinstance(value, np.ndarray) for value in inputs.values())
+    return any(isinstance(value, np.ndarray) and value.ndim for value in inputs.values())
 
 
 def _numpy_ports(inlets):
