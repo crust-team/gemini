@@ -7,11 +7,13 @@ import math
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from gemini import ops
 from gemini.errors import PhysicsRangeError
 
 from . import units
 
 
+@ops.physics
 def circle_area(diameter: float) -> float:
     """Return the area [m2] of a circle with ``diameter`` [m], ``pi * d**2 / 4``.
 
