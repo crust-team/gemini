@@ -40,6 +40,10 @@ class AttributeMapping(Mapping):
         except KeyError as exc:
             raise self.attribute_error(self._unknown(name)) from exc
 
+    def __contains__(self, name):
+        """Return whether ``name`` is a key, without building an unknown-key message."""
+        return name in self._values
+
     def __iter__(self) -> Iterator[str]:
         """Iterate keys in insertion order."""
         return iter(self._values)

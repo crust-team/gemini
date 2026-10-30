@@ -32,6 +32,22 @@ def test_unknown_keys_raise_the_described_error():
         Named({}).x
 
 
+def test_membership_does_not_describe_unknown_keys():
+    """``in`` answers from the keys alone, without building an unknown-key message."""
+
+    class Counting(AttributeMapping):
+        described = []
+
+        def _unknown(self, name):
+            self.described.append(name)
+            return name
+
+    values = Counting({"a": 1})
+    assert "a" in values
+    assert "b" not in values
+    assert Counting.described == []
+
+
 def test_nested_get_and_set():
     """Nested lookups fall back to a default; nested sets create intermediate dicts."""
     data = {"stream_defaults": {"esp": {"suction": {"T": 300.0}}}}
