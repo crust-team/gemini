@@ -339,10 +339,19 @@ class PythonBackend(Backend):
         """Return the root of ``function(x, *args)`` in ``[low, high]`` by ``scipy`` Brent.
 
         A bracket without a sign change, or no convergence, gives NaN instead of an error.
+        ``function`` is given ``np.float64`` values with warnings silenced, so a plain division
+        or power in it gives ``inf`` or ``nan`` like NumPy instead of raising.
         """
         try:
-            return optimize.brentq(
-                function, low, high, args=args, xtol=xtol, rtol=rtol, maxiter=maxiter
+            return numpy_result(
+                optimize.brentq,
+                lambda value, *rest: function(np.float64(value), *rest),
+                low,
+                high,
+                args,
+                xtol,
+                rtol,
+                maxiter,
             )
         except (ValueError, RuntimeError):
             return math.nan
@@ -352,13 +361,12 @@ class PythonBackend(Backend):
 
         The loop stops when a step is below ``tolerance`` times the current value, or at
         iteration ``max_iterations``, and returns the value before that step without a warning.
+        ``function`` and ``derivative`` are given ``np.float64`` values with warnings silenced.
         """
-        value = start
-        for iteration in itertools.count():
-            try:
+        value = np.float64(start)
+        with np.errstate(all="ignore"):
+            for iteration in itertools.count():
                 following = value - function(value, *args) / derivative(value, *args)
-            except (ZeroDivisionError, OverflowError):
-                return math.nan
-            if abs(following - value) < tolerance * value or iteration >= max_iterations:
-                return value if math.isfinite(value) else math.nan
-            value = following
+                if abs(following - value) < tolerance * value or iteration >= max_iterations:
+                    return float(value) if math.isfinite(value) else math.nan
+                value = following
