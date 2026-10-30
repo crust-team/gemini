@@ -8,6 +8,7 @@ from gemini import backends
 from gemini.core.modules.pumps import ESP
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_health_matches
 
 ESP_PARAMS = {
     "pump_type": "HC27000",
@@ -73,3 +74,22 @@ def test_the_esp_alone_asks_for_a_plain_scope_under_float32_precision():
         assert esp._scalar_mode() == backends.PLAIN
         assert esp(**stopped).outputs.efficiency == reference == 0.0
     assert backends.scope_mode() is None
+
+
+def _health_rows(pump, flows_kg_s):
+    return [pump(frequency=60, suction=Stream(m_dot=m_dot, T=300, p=1e5)) for m_dot in flows_kg_s]
+
+
+def test_health_on_arrays_equals_one_call_per_row():
+    """Worst key, drift, window and message of every row match, with and without drifts."""
+    pump = ESP().update_params(**ESP_PARAMS, max_flow=0.05)
+    results = _health_rows(pump, [20.0, 40.0, 40.0, 60.0, 30.0])
+    outputs = [result.outputs for result in results]
+    scales = [(1.0, 1.3), (1.2, 0.5), (1.0, 1.0), (0.8, 1.5), (1.05, 0.99)]
+    measured = [
+        {"power": out.power * a, "head": out.head * b, "discharge_pressure": out.discharge_pressure}
+        for out, (a, b) in zip(outputs, scales)
+    ]
+    assert_health_matches(pump, results, measured)
+    assert_health_matches(pump, results, [{"power": row["power"]} for row in measured])
+    assert_health_matches(pump, results, [{} for _ in measured])

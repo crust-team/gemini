@@ -89,9 +89,8 @@ class CentrifugalPump(Module):
         # Outlets
         suction = inlets.suction
         performance = self._performance(suction)
-        cp = suction.fluid.properties(suction.p, suction.T).cp_l
         losses = performance["shaft_power"] - performance["hydraulic_power"]
-        rise = ops.where(suction.m_dot > 0, ops.truediv(losses, suction.m_dot * cp), 0.0)
+        rise = ops.where(suction.m_dot > 0, losses / suction.heat_capacity_rate(), 0.0)
 
         discharge = suction.with_(p=suction.p + performance["head"], T=suction.T + rise)
 
@@ -119,7 +118,7 @@ class CentrifugalPump(Module):
         speed = self.frequency / self.rated_frequency
         c0, c1, c2 = self.head_coeff
         head = c0 * speed**2 + c1 * speed * flow + c2 * flow**2
-        load = ops.truediv(flow, speed * self.best_efficiency_flow)
+        load = flow / (speed * self.best_efficiency_flow)
         ops.check(
             ops.logical_or(flow == 0, ops.logical_not(ops.logical_or(head < 0, load >= 2))),
             PhysicsRangeError,
@@ -139,6 +138,6 @@ class CentrifugalPump(Module):
             flow=ops.where(stopped, 0.0, flow),
             head=ops.where(stopped, 0.0, head),
             hydraulic_power=ops.where(stopped, 0.0, hydraulic_power),
-            shaft_power=ops.where(stopped, 0.0, ops.truediv(hydraulic_power, efficiency)),
+            shaft_power=ops.where(stopped, 0.0, hydraulic_power / efficiency),
             efficiency=ops.where(stopped, 0.0, efficiency),
         )

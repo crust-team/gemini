@@ -40,6 +40,11 @@ MIN_EFFICIENCY_POWER = Constant(
 HYDRAULIC_POWER_PER_HEAD = units.bhp_to_w(1) / units.ft_head_to_pa(1)
 """Unit factor of the efficiency: [W per bhp] over [Pa per ft of head], computed once."""
 
+HEALTH_KEYS = ("power", "head", "discharge_pressure")
+"""Measured quantities whose relative drift from the prediction is scored."""
+
+NO_MEASUREMENTS_OUTSIDE = "No performance measurements; outside operating window"
+
 DRIFT_FLOOR = 1e-12
 """Smallest prediction magnitude used as a drift denominator, so a zero prediction is finite."""
 
@@ -152,25 +157,44 @@ class ESP(Module):
         )
 
     def health(self, result, measured):
-        """Score the worst available relative drift and the operating window."""
+        """Score the worst available relative drift and the operating window.
+
+        Runs on scalars and on arrays over a chunk: the worst drift key and the message are
+        selected with ``ops.where`` over complete strings, the first key winning a tie.
+        """
         predicted = result.outputs
+        window = predicted.in_operating_window
         drifts = {
             key: (measured[key] - getattr(predicted, key))
-            / max(abs(getattr(predicted, key)), DRIFT_FLOOR)
-            for key in ("power", "head", "discharge_pressure")
+            / ops.maximum(ops.abs(getattr(predicted, key)), DRIFT_FLOOR)
+            for key in HEALTH_KEYS
             if key in measured
         }
-        worst = max(drifts, key=lambda key: abs(drifts[key])) if drifts else None
-        drift = abs(drifts[worst]) if worst else 0
-        message = f"Worst drift: {worst}" if worst else "No performance measurements"
-        if not predicted.in_operating_window:
-            message += "; outside operating window"
+        worst, message = self._worst_drift(drifts, window)
         return Health(
-            score=max(0, 1 - drift),
-            alarm=drift > self.drift_threshold or not predicted.in_operating_window,
+            score=ops.maximum(0, 1 - worst),
+            alarm=ops.logical_or(worst > self.drift_threshold, ops.logical_not(window)),
             message=message,
             metrics=drifts,
         )
+
+    @staticmethod
+    def _worst_drift(drifts, window):
+        """Return the largest absolute drift and the message naming it and the window."""
+        if not drifts:
+            return 0, ops.where(window, "No performance measurements", NO_MEASUREMENTS_OUTSIDE)
+        worst, message = None, None
+        for key, drift in drifts.items():
+            text = ops.where(
+                window, f"Worst drift: {key}", f"Worst drift: {key}; outside operating window"
+            )
+            magnitude = ops.abs(drift)
+            if worst is None:
+                worst, message = magnitude, text
+                continue
+            larger = magnitude > worst
+            worst, message = ops.where(larger, magnitude, worst), ops.where(larger, text, message)
+        return worst, message
 
     @classmethod
     def fit_head_coefficients(cls, flows, frequencies, heads, no_stages: int) -> list[float]:

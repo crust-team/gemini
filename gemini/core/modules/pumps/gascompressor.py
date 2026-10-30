@@ -86,7 +86,7 @@ class GasCompressor(Module):
 
         # Outlets
         suction = inlets.suction
-        stage_ratio = ops.pow(self._pressure_ratio(suction), ops.truediv(1, self.stage_count))
+        stage_ratio = self._pressure_ratio(suction) ** (1 / self.stage_count)
         discharge_T = compression.stage_outlet_temperature(
             suction.T, stage_ratio, self.heat_capacity_ratio, self.isentropic_efficiency
         )
@@ -131,4 +131,4 @@ class GasCompressor(Module):
             setpoint=self.pressure_setpoint,
             p=suction.p,
         )
-        return ops.truediv(self.pressure_setpoint, suction.p)
+        return self.pressure_setpoint / suction.p

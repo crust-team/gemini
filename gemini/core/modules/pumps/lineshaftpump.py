@@ -120,7 +120,7 @@ class LineShaftPump(Module):
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction
         self.efficiency = ops.where(
-            pump_power >= MIN_EFFICIENCY_POWER, ops.truediv(flow * self.head, pump_power), 0.0
+            pump_power >= MIN_EFFICIENCY_POWER, flow * self.head / pump_power, 0.0
         )
         self.electricity = self.shaft_power / self.motor_efficiency
 
