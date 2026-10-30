@@ -143,7 +143,7 @@ class AquiferStorage(Module):
         # Outlets
         injection_in = inlets.injection_in
         self._volume_flow(injection_in)
-        production_out = injection_in.with_(T=self._production_temperature(self._start_states()))
+        production_out = injection_in.with_(T=self.production_temperature())
 
         outlets = dict(production_out=production_out)
         return outlets
@@ -161,8 +161,9 @@ class AquiferStorage(Module):
         self.recovery_efficiency = ops.where(charged > 0, self.recovered_heat / charged, None)
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
-        self.heat_loss = sum(ops.maximum(loss, 0) for loss in losses)
-        self.heat_absorbed = sum(ops.maximum(-loss, 0) for loss in losses)
+        parts = [ground.signed_parts(loss) for loss in losses]
+        self.heat_loss = sum(loss for loss, _ in parts)
+        self.heat_absorbed = sum(absorbed for _, absorbed in parts)
         self.heat_accumulation = (
             _enthalpy_flow(inlets.injection_in)
             - _enthalpy_flow(outlets.production_out)
@@ -195,12 +196,15 @@ class AquiferStorage(Module):
         a call without a ``mode`` keyword (persisted value, then default). Plants call this
         before the module to evaluate the equipment between production and injection.
         """
-        return self._production_temperature(self.start_states())
+        source, _ = self._source_and_target()
+        if source is None:
+            return self.aquifer_temperature
+        return self.aquifer_temperature + self.start_states()[f"{source}_temperature_change"]
 
     def _moved_store(self, store, volume, injected_change):
         """Return a store's volume [m3] and temperature change [K] after this step's flow."""
         store_volume, change = self._volume(store), self._change(store)
-        source, target = SOURCE_AND_TARGET.get(self.mode, (None, None))
+        source, target = self._source_and_target()
         if store == target:
             mixed = store_volume + volume
             blended = (store_volume * change + volume * injected_change) / mixed
@@ -220,13 +224,6 @@ class AquiferStorage(Module):
             ops.exp(-dt * conductance / (self._fluid_heat_capacity(injection) * store_volume)),
         )
 
-    def _production_temperature(self, states):
-        """Return the temperature [K] of the store produced from in the current mode."""
-        source, _ = SOURCE_AND_TARGET.get(self.mode, (None, None))
-        if source is None:
-            return self.aquifer_temperature
-        return self.aquifer_temperature + states[f"{source}_temperature_change"]
-
     def _store_conductance(self, store_volume, injection):
         """Return the conduction conductance [W/K] of a store of water volume [m3]."""
         fluid = self._fluid_heat_capacity(injection)
@@ -241,9 +238,9 @@ class AquiferStorage(Module):
             self.storage_period,
         )
 
-    def _start_states(self):
-        """Return the store temperature changes [K] at the start of the running step."""
-        return {f"{store}_temperature_change": self._change(store) for store in STORES}
+    def _source_and_target(self):
+        """Return the stores the running mode takes water from and puts it into, else ``None``."""
+        return SOURCE_AND_TARGET.get(self.mode, (None, None))
 
     def _volume(self, store):
         """Return a store's water volume [m3] at the start of the step."""

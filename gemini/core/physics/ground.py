@@ -31,6 +31,11 @@ _ANGLE_MARGIN = 1e-12
 
 
 @ops.physics
+def signed_parts(value):
+    """Return ``(max(value, 0), max(-value, 0))``: the positive part and the negative one."""
+    return ops.maximum(value, 0), ops.maximum(-value, 0)
+
+
 def aquifer_volumetric_heat_capacity(
     porosity: float, fluid_heat_capacity: float, rock_heat_capacity: float
 ) -> float:

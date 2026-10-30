@@ -100,7 +100,7 @@ class BoreholeField(Module):
         # Outlets
         inlet = inlets.inlet
         capacity_rate = self._capacity_rate(inlet)
-        rate = self._effective_conductance(inlet) * (self._ground_temperature() - inlet.T)
+        rate = self._extraction_rate(inlet)
         outlet_T = ops.where(capacity_rate != 0, inlet.T + rate / capacity_rate, inlet.T)
         outlet = inlet.with_(T=outlet_T)
 
@@ -109,13 +109,12 @@ class BoreholeField(Module):
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
-        rate = self._effective_conductance(inlet) * (self._ground_temperature() - inlet.T)
+        rate = self._extraction_rate(inlet)
         self.heat_extraction_rate = rate
         self.fluid_mean_T = (inlet.T + outlets.outlet.T) / 2
         self.ground_T = self._ground_temperature()
         self.outlet_T = outlets.outlet.T
-        self.heat_absorbed = ops.maximum(rate, 0)
-        self.heat_loss = ops.maximum(-rate, 0)
+        self.heat_absorbed, self.heat_loss = ground.signed_parts(rate)
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.inlet
@@ -131,6 +130,10 @@ class BoreholeField(Module):
     def _rejection(self):
         """Return the message prefix of a field geometry outside the range of its relations."""
         return f"{self.path}: field geometry rejected: "
+
+    def _extraction_rate(self, inlet):
+        """Return the heat [W] the loop draws from the ground at the start of the step."""
+        return self._effective_conductance(inlet) * (self._ground_temperature() - inlet.T)
 
     def _ground_temperature(self):
         """Return the mean field ground temperature [K] at the start of the step."""
