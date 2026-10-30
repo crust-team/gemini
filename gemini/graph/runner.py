@@ -43,11 +43,14 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
     except TraceError as error:
         return _untraced(module, inlets, inputs, rows, str(error))
     values = _evaluate(graph, _feeds(graph, module, inlets, inputs), backend, rows)
-    outputs = {
-        name.removeprefix("outputs."): value
-        for name, value in values.items()
-        if name.startswith("outputs.")
-    }
+    outputs = _stacked_vectors(
+        graph,
+        {
+            name.removeprefix("outputs."): value
+            for name, value in values.items()
+            if name.startswith("outputs.")
+        },
+    )
     outlets = {
         port: {field: values[f"outlets.{port}.{field}"] for field, _ in STREAM_FIELDS}
         for port in module._outlets
@@ -99,6 +102,15 @@ def _feeds(graph, module, inlets, inputs):
     for name, constant in graph.constants.items():
         feeds[name] = constant.value
     return feeds
+
+
+def _stacked_vectors(graph, outputs):
+    """Replace the items of every list-valued output by one array of shape ``(rows, length)``."""
+    for name, length in graph.vectors.items():
+        key = name.removeprefix("outputs.")
+        items = [outputs.pop(f"{key}[{index}]") for index in range(length)]
+        outputs[key] = np.stack(items, axis=1)
+    return outputs
 
 
 def _owner(module, name):

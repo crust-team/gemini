@@ -8,7 +8,7 @@ from gemini.errors import PhysicsRangeError, TraceError
 from gemini.graph import GraphCache, Proxy, run
 from gemini.utils.hooks import observer
 
-from .conftest import Chain, Gain, Opaque, Stubborn, Switcher, Tank
+from .conftest import Chain, Gain, Opaque, Stubborn, Switcher, Tank, Vectored
 
 
 def _rows(gain, inlet, frequency):
@@ -219,3 +219,13 @@ def test_a_row_whose_outlet_fluid_differs_from_the_probe_fails(chain_inlet):
     chain = Chain(Switcher())
     with pytest.raises(TraceError, match="fluid differs from the traced one"):
         run(chain, {"inlet": chain_inlet}, {"drive": 1.0})
+
+
+def test_list_outputs_are_stacked_per_row(chain_inlet):
+    """A list-valued output comes back as one array of shape (rows, length)."""
+    middle = Vectored()
+    result = run(middle, {"inlet": chain_inlet})
+    assert result.breaks == [] and result.outputs["profile"].shape == (3, 2)
+    assert result.outputs["profile"].tolist() == [[1e5, 1e5 + 1], [2e5, 2e5 + 1], [3e5, 3e5 + 1]]
+    row = middle(inlet=gm.Stream(m_dot=1.0, T=300.0, p=2e5, fluid=gm.WATER))
+    assert row.outputs.profile == [2e5, 2e5 + 1]

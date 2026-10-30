@@ -430,3 +430,30 @@ class Switcher(Module):
 
     def _advance_states(self, inlets, outlets, dt):
         return dict(level=self.seen)
+
+
+class Vectored(Module):
+    """Pass the stream on and report the inlet pressure and one pascal more as a list."""
+
+    def __init__(self):
+        """Declare an inlet, a list output and an outlet."""
+        super().__init__()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outputs
+        self.profile = Output(list[float])
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Pass the stream."""
+
+        # Outlets
+        outlets = dict(outlet=inlets.inlet)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.profile = [inlets.inlet.p, inlets.inlet.p + 1.0]

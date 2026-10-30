@@ -78,3 +78,13 @@ def test_rollback_drops_nodes_inputs_constants_checks_and_their_guards():
     assert list(graph.inputs) == ["p"] and graph.constants == {} and graph.checks == []
     assert kept.node.guards == []
     assert graph.mark() == mark
+
+
+def test_a_list_of_traced_values_is_a_vector_output():
+    """Each item is its own output; the graph remembers the length under the list's name."""
+    graph = Graph("test")
+    pressure = graph.input("p", "inlet", "Pa")
+    graph.output("outputs.profile", [pressure, pressure + 1.0, 5.0])
+    assert graph.vectors == {"outputs.profile": 3}
+    assert list(graph.outputs) == ["outputs.profile[0]", "outputs.profile[1]", "outputs.profile[2]"]
+    assert graph.outputs["outputs.profile[2]"] == 5.0

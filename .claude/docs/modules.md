@@ -317,6 +317,10 @@ failed row is NaN and carries an error code that raises the child's own exceptio
 child that cannot be recorded, and any child with a marked observer, make the whole root a graph
 break (`graph.breaks` lists the leaf breaks with their reasons).
 
+An output of a list or tuple of traced values (the per-section profiles of the wells) is a vector
+output of fixed length: `Graph.output` records each item as `<name>[<index>]`, `graph.vectors`
+keeps the length, and `gemini.graph.run` returns one array of shape `(rows, length)`.
+
 ## Skipping outputs
 
 `gm.no_outputs()` is a nestable, context-local context manager and decorator. It skips

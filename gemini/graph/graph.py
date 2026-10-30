@@ -19,7 +19,7 @@ class Graph:
     objects behind the constant inputs, ``outlet_fluids`` the fixed fluid of every outlet,
     ``pre_observers`` the marked read-only pre-hooks and ``observers`` the forward hooks that
     only read, replayed per row after a run. ``breaks`` lists the children that run untraced, as
-    ``(module path, reason)``.
+    ``(module path, reason)`` and ``vectors`` the length of every list-valued output.
     """
 
     def __init__(self, module_path):
@@ -31,6 +31,7 @@ class Graph:
         self.checks = []
         self.constants = {}
         self.outlet_fluids = {}
+        self.vectors = {}
         self.breaks = []
         self.breaks = []
         self.pre_observers = []
@@ -56,7 +57,16 @@ class Graph:
         return None
 
     def output(self, name, value):
-        """Name a graph output; ``value`` is a traced value or a literal number."""
+        """Name a graph output; ``value`` is a traced value, a literal number or a list of them.
+
+        A list or tuple is a vector output of fixed length: every item is its own output named
+        ``<name>[<index>]`` and ``vectors`` keeps the length under ``name``.
+        """
+        if isinstance(value, (list, tuple)):
+            self.vectors[name] = len(value)
+            for index, item in enumerate(value):
+                self.outputs[f"{name}[{index}]"] = self._operand(item)
+            return
         self.outputs[name] = self._operand(value)
 
     def mark(self):

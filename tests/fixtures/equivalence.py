@@ -33,9 +33,13 @@ def flatten(value):
 
 
 def assert_close(actual, expected, label):
-    """Compare per-row Python values ``expected`` with an array or scalar ``actual``."""
-    actual = np.broadcast_to(np.asarray(actual, dtype=float), (len(expected),))
+    """Compare per-row Python values ``expected`` with an array or scalar ``actual``.
+
+    A row may be a list of numbers (a vector output); ``actual`` is then an array of shape
+    ``(rows, length)``.
+    """
     reference = np.array([math.nan if item is None else item for item in expected], dtype=float)
+    actual = np.broadcast_to(np.asarray(actual, dtype=float), reference.shape)
     np.testing.assert_allclose(actual, reference, rtol=RTOL, atol=0, equal_nan=True, err_msg=label)
 
 

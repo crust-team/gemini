@@ -8,7 +8,7 @@ from gemini.core.legacy import tables as mapping
 from gemini.core.modules.subsurface import InjectionWell
 from gemini.core.types.flows import Stream
 from gemini.graph import run
-from tests.fixtures.equivalence import assert_function_matches
+from tests.fixtures.equivalence import assert_function_matches, assert_module_matches
 
 
 def test_injection_flow_sign_and_pressure():
@@ -70,10 +70,20 @@ def test_injection_traversal_matches_on_arrays():
     assert_function_matches(traversal, rows)
 
 
-def test_injection_well_is_a_graph_break_only_for_its_section_profiles():
-    """The per-section pressure and temperature lists have no graph form yet."""
-    stream = Stream(
-        m_dot=np.array([40.0, 10.0]), T=np.array([300.0, 310.0]), p=np.array([5e6, 6e6])
+def test_injection_well_traces_with_its_section_profiles():
+    """The per-section lists are vector outputs: the module traces and equals one call per row."""
+    rows = [
+        {"wellhead": Stream(m_dot=40.0, T=353.15, p=25e6)},
+        {"wellhead": Stream(m_dot=10.0, T=340.0, p=20e6)},
+        {"wellhead": Stream(m_dot=25.0, T=300.0, p=5e6)},
+    ]
+    assert_module_matches(_well(), rows)
+    traced = run(
+        _well(),
+        {
+            "wellhead": Stream(
+                m_dot=np.array([40.0, 10.0]), T=np.array([353.15, 340.0]), p=np.array([25e6, 20e6])
+            )
+        },
     )
-    reasons = run(_well(), {"wellhead": stream}).breaks
-    assert len(reasons) == 1 and "type list cannot be traced" in reasons[0]
+    assert traced.breaks == [] and traced.outputs["section_pressure"].shape[0] == 2

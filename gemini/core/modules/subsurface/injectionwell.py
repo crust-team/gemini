@@ -20,9 +20,8 @@ class InjectionWell(_Well):
     NOTE(refactor): legacy injection DPDT uses negative flow; the traversal retains that sign
     convention internally while the ports preserve the incoming mass-flow sign.
 
-    NOTE(refactor): the physics is written with ops and runs on arrays, but the module is a
-    graph break while the graph cannot carry the ``section_pressure`` and ``section_temperature``
-    list outputs.
+    NOTE(refactor): the ``section_pressure`` and ``section_temperature`` list outputs are vector
+    outputs of the graph, one item per section.
     """
 
     flow_direction = "down"
