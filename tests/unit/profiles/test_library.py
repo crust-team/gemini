@@ -1,22 +1,12 @@
-"""The profile catalogue: names, the missing data and the profile file reader."""
-
-import json
+"""The profile catalogue: the organiser demand files read as run input."""
 
 import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.profiles import library
 from tests.fixtures.errors import raises
 
-PROFILE = {
-    "name": "heating_demand",
-    "description": "Two hours of a test profile.",
-    "source": "written by the test",
-    "columns": {"heating_consumer.heat_demand": {"unit": "W", "quantity": "power"}},
-    "time": ["2024-01-01T00:00:00Z", "2024-01-01T02:00:00+01:00"],
-    "values": {"heating_consumer.heat_demand": [1.5e5, None]},
-}
+HOURS_PER_DAY = 24
 
 
 def test_names_are_the_heating_and_cooling_profiles():
@@ -24,10 +14,31 @@ def test_names_are_the_heating_and_cooling_profiles():
     assert gm.profiles.names() == ["heating_demand", "cooling_demand"]
 
 
-def test_a_profile_without_data_says_which_file_is_missing():
-    """No demand data ships, so get raises NotImplementedYet naming the file to add."""
-    with pytest.raises(gm.errors.NotImplementedYet, match="profiles/data/cooling_demand.json"):
-        gm.profiles.get("cooling_demand")
+@pytest.mark.parametrize(
+    "name, peak_mw, peak_day, energy_gwh, file",
+    [
+        ("heating_demand", 30.0, "2027-01-28", 111.67, "GEMINI_Heating_Demand_Daily_2027.csv"),
+        ("cooling_demand", 10.0, "2027-07-19", 23.74, "GEMINI_Cooling_Demand_Daily_2027.csv"),
+    ],
+)
+def test_the_key_figures_of_the_challenge(name, peak_mw, peak_day, energy_gwh, file):
+    """365 UTC days in W with the peak, its date and the annual energy of the challenge text."""
+    frame = gm.profiles.get(name)
+    assert isinstance(frame.index, pd.DatetimeIndex) and str(frame.index.tz) == "UTC"
+    assert frame.index.name == "time" and list(frame.columns) == [name] and len(frame) == 365
+    assert frame.index[0] == pd.Timestamp("2027-01-01", tz="UTC")
+    assert frame.index[-1] == pd.Timestamp("2027-12-31", tz="UTC")
+    assert (frame.index[1:] - frame.index[:-1] == pd.Timedelta(days=1)).all()
+    assert frame.attrs["units"] == {name: "W"} and frame.attrs["quantities"] == {name: "power"}
+    assert file in frame.attrs["source"]
+    assert frame[name].max() == pytest.approx(peak_mw * 1e6)
+    assert frame[name].idxmax() == pd.Timestamp(peak_day, tz="UTC")
+    assert (frame[name].sum() * HOURS_PER_DAY / 1e9).round(2) == energy_gwh
+
+
+def test_a_profile_is_a_run_input():
+    """A frame of ``get`` is accepted as run input."""
+    assert len(gm.Dataset(gm.profiles.get("cooling_demand"))) == 365
 
 
 def test_an_unknown_profile_has_close_matches():
@@ -35,24 +46,3 @@ def test_an_unknown_profile_has_close_matches():
     with raises(gm.errors.ValidationError, "unknown_name") as unknown:
         gm.profiles.get("heating_demnd")
     assert unknown.value.suggestions[0] == "heating_demand"
-
-
-def test_a_profile_file_becomes_a_run_input_frame(tmp_path, monkeypatch):
-    """The frame has a UTC time index, a column per quantity and its units in attrs."""
-    (tmp_path / "heating_demand.json").write_text(json.dumps(PROFILE))
-    monkeypatch.setattr(library, "DATA", tmp_path)
-    frame = gm.profiles.get("heating_demand")
-    assert isinstance(frame.index, pd.DatetimeIndex) and str(frame.index.tz) == "UTC"
-    assert frame.index.name == "time" and frame.index[1] == pd.Timestamp("2024-01-01T01:00:00Z")
-    assert list(frame.columns) == ["heating_consumer.heat_demand"]
-    assert frame.attrs["units"] == {"heating_consumer.heat_demand": "W"}
-    assert frame["heating_consumer.heat_demand"].iloc[0] == 1.5e5
-    assert pd.isna(frame["heating_consumer.heat_demand"].iloc[1])
-
-
-def test_a_profile_file_with_missing_keys_is_refused(tmp_path):
-    """Every key of the format is required; the error lists the missing ones."""
-    path = tmp_path / "broken.json"
-    path.write_text(json.dumps({"name": "broken"}))
-    with pytest.raises(gm.errors.ValidationError, match="columns, time, values"):
-        library.read(path)

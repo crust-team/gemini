@@ -205,8 +205,8 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 | Name | Returns | Status |
 | --- | --- | --- |
 | `gm.profiles.names()` | `heating_demand`, `cooling_demand` | real |
-| `gm.profiles.get(name)` | run input, a UTC DataFrame with units in `attrs["units"]`, the one DataFrame outside `to_frame` | later: no demand data ships yet |
-| `gm.profiles.profile_schema()` | JSON Schema of a profile file | real |
+| `gm.profiles.get(name)` | run input, a UTC daily DataFrame of 365 rows in W, with `units` and the source file in `attrs`, the one DataFrame outside `to_frame` | real |
+| `gm.profiles.profile_schema()` | JSON Schema of what `get` returns, as a document | real |
 
 ## Analysis
 

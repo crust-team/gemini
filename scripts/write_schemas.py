@@ -19,9 +19,7 @@ ROOT = Path(__file__).parents[1]
 SCHEMAS = ROOT / "docs" / "schemas"
 DATA = ROOT / "examples" / "shared" / "doublet_heat" / "doublet_2024_15min_month.csv"
 ROWS = 4
-PROFILE_SOURCE = (
-    "Format sample, not demand data: the replayed heat exchanger duty of the example plant."
-)
+PROFILE = "heating_demand"
 
 
 def _results(plant):
@@ -30,16 +28,21 @@ def _results(plant):
     return gm.replay(plant, gm.Dataset.from_frame(frame, time_column="time"))
 
 
-def _profile_sample(results):
-    """Return a document in the profile file format, marked as a sample."""
-    series = results.get("heat_exchanger", "duty")
+def _profile_sample():
+    """Return the first rows of a real profile, in the document form of ``gm.profiles.get``."""
+    frame = gm.profiles.get(PROFILE).iloc[:ROWS]
     return {
-        "name": "format_sample",
-        "description": "Shape of a demand profile file.",
-        "source": PROFILE_SOURCE,
-        "columns": {"heating_demand": {"unit": series["unit"], "quantity": "power"}},
-        "time": series["time"],
-        "values": {"heating_demand": series["value"]},
+        "name": PROFILE,
+        "description": frame.attrs["description"],
+        "source": frame.attrs["source"],
+        "columns": {
+            PROFILE: {
+                "unit": frame.attrs["units"][PROFILE],
+                "quantity": frame.attrs["quantities"][PROFILE],
+            }
+        },
+        "time": [time.isoformat() for time in frame.index],
+        "values": {PROFILE: frame[PROFILE].tolist()},
     }
 
 
@@ -64,7 +67,7 @@ def documents():
         "module_description.sample.json": gm.plants.example("Doublet").describe(),
         "plant_spec.sample.json": spec,
         "results_summary.sample.json": results.summary(),
-        "profile.sample.json": _profile_sample(results),
+        "profile.sample.json": _profile_sample(),
         "value.sample.json": results.summary()["heat_exchanger"]["duty"]["mean"],
         "problem.sample.json": _problem_sample(),
         "check.sample.json": gm.checks.energy_balance(results),

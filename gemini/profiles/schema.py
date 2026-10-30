@@ -1,12 +1,12 @@
-"""The JSON Schema of a demand profile file."""
+"""The JSON Schema of a demand profile as a document."""
 
 
 def profile_schema():
-    """Return the JSON Schema (draft 2020-12) of the profile files in ``profiles/data/``.
+    """Return the JSON Schema (draft 2020-12) of what ``profiles.get`` returns, as plain JSON.
 
-    A profile has a ``name``, a ``description``, its ``source``, the ``columns`` with their ``unit``
-    and ``quantity``, the UTC ``time`` stamps and ``values`` per column, as long as ``time``.
-    ``profiles.get`` turns it into a DataFrame with a UTC index.
+    The document carries a frame of ``get`` to another repository: its ``name``, the ``description``
+    and ``source`` of ``attrs``, the ``columns`` with their ``unit`` and ``quantity`` of ``attrs``,
+    the UTC ``time`` stamps of the index and the ``values`` per column, as long as ``time``.
     """
     column = {
         "type": "object",

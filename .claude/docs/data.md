@@ -62,14 +62,15 @@ convert in-memory raw values to SI. Profiles combined into a dataset must share 
 
 ## Demand profiles
 
-`gm.profiles` is the home of the heating and cooling design-year demand profiles.
-`names()` lists them (`heating_demand`, `cooling_demand`), `get(name)` returns a DataFrame in the
-run-input format (a UTC `DatetimeIndex` called `time`, one column per quantity, units in
-`frame.attrs["units"]`) and `profile_schema()` is the JSON Schema of the profile file in
-`gemini/profiles/data/<name>.json`: `name`, `description`, `source`, `columns` (unit and quantity),
-`time` and `values`. No demand data is in the repository, so `get` raises `NotImplementedYet`
-naming the file to add; a profile column becomes a run input when a plant binding names it as its
-`column` with the same unit.
+`gm.profiles` holds the two demand profiles of the challenge. `names()` lists them
+(`heating_demand`, `cooling_demand`). `get(name)` returns a DataFrame in the run-input format: 365
+UTC days of 2027, a `DatetimeIndex` called `time`, one column named after the profile in W, and
+`frame.attrs` with `units`, `quantities`, `description` and `source`, which names the organiser
+file. The two files in `gemini/profiles/data/` are the organisers' CSV files, unchanged; their
+name, unit and description live in Python in `PROFILES` of `profiles/library.py`. `profile_schema()`
+is the JSON Schema of the same frame as a document: `name`, `description`, `source`, `columns` (unit
+and quantity), `time` and `values`. A profile column becomes a run input when a plant binding names
+it as its `column`.
 
 The committed example CSVs under `examples/shared/doublet_heat/` are immutable source data. Two
 of their naming choices predate the naming rule and stay: columns named `*.m_dot` hold volumetric
