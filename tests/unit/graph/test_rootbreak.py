@@ -41,9 +41,10 @@ def test_a_composite_root_break_gives_real_trees(backend):
     assert evaluation.result.children["middle"].children.keys() == {"meter"}
     row = chain(gm.Stream(m_dot=2.0, T=300.0, p=1e5, fluid=gm.WATER))
     assert evaluation.result.row(1).outputs.electricity == row.outputs.electricity
-    assert evaluation.result.row(1).children["last"].outlets.outlet.p == row.children[
-        "last"
-    ].outlets.outlet.p
+    assert (
+        evaluation.result.row(1).children["last"].outlets.outlet.p
+        == row.children["last"].outlets.outlet.p
+    )
 
 
 def test_failed_rows_keep_their_exception_and_are_nan():

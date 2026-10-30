@@ -166,9 +166,7 @@ def _typed(result, done=None):
     if id(result) in done:
         return done[id(result)]
     declarations = result.outputs._declarations
-    values = {
-        name: _cast(value, declarations.get(name)) for name, value in result.outputs.items()
-    }
+    values = {name: _cast(value, declarations.get(name)) for name, value in result.outputs.items()}
     typed = dataclasses.replace(
         result,
         outputs=Values._trusted(values, declarations),

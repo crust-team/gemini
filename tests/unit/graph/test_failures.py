@@ -2,11 +2,11 @@
 
 import numpy as np
 
+from gemini import backends
 from gemini.errors import PhysicsRangeError
 from gemini.graph import GraphCache
 from gemini.graph.failures import RowView, row_error
 from gemini.graph.interpreter import Interpreter
-from gemini import backends
 
 
 def test_row_view_reads_rows_parameters_and_literals(gain):
