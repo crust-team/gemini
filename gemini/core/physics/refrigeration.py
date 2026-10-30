@@ -12,6 +12,7 @@ from gemini.core.physics.units import k_to_c
 from gemini.errors import PhysicsRangeError
 
 
+@ops.physics
 def carnot_cop_heating(
     sink_temperature: float, source_temperature: float, minimum_lift: float = 0.0
 ) -> float:
@@ -39,6 +40,7 @@ def carnot_cop_heating(
     return sink_temperature / lift
 
 
+@ops.physics
 def carnot_cop_cooling(
     sink_temperature: float, source_temperature: float, minimum_lift: float = 0.0
 ) -> float:
@@ -65,6 +67,7 @@ def carnot_cop_cooling(
     return source_temperature / lift
 
 
+@ops.physics
 def log_mean_temperature(inlet_temperature: float, outlet_temperature: float) -> float:
     """Return the logarithmic mean (thermodynamic mean) temperature of a sensible glide.
 
@@ -85,7 +88,7 @@ def log_mean_temperature(inlet_temperature: float, outlet_temperature: float) ->
     Shapiro, Fundamentals of Engineering Thermodynamics, chapter 6). It lies between the
     geometric and the arithmetic mean of the two temperatures.
     """
-    _check_numbers(
+    ops.check_numbers(
         "log_mean_temperature",
         inlet_temperature=inlet_temperature,
         outlet_temperature=outlet_temperature,
@@ -102,10 +105,11 @@ def log_mean_temperature(inlet_temperature: float, outlet_temperature: float) ->
     return ops.where(
         inlet_temperature == outlet_temperature,
         inlet_temperature,
-        ops.truediv(glide, ops.log(ops.truediv(inlet_temperature, outlet_temperature))),
+        glide / ops.log(inlet_temperature / outlet_temperature),
     )
 
 
+@ops.physics
 def lorenz_cop_heating(
     sink_inlet: float,
     sink_outlet: float,
@@ -143,6 +147,7 @@ def lorenz_cop_heating(
     return sink / _lift("lorenz_cop_heating", sink, source, minimum_lift)
 
 
+@ops.physics
 def characteristic_temperature_difference(
     generator_temperature: float,
     rejection_temperature: float,
@@ -174,7 +179,7 @@ def characteristic_temperature_difference(
     form a = 1 + B and r = B (B about 1.1 to 1.2 for water/LiBr); fitted values differ, so the
     equation is evaluated on the Celsius basis of the published fits.
     """
-    _check_numbers(
+    ops.check_numbers(
         "characteristic_temperature_difference",
         generator_temperature=generator_temperature,
         rejection_temperature=rejection_temperature,
@@ -189,6 +194,7 @@ def characteristic_temperature_difference(
     )
 
 
+@ops.physics
 def characteristic_evaporator_duty(
     driving_difference: float,
     minimum_driving_difference: float,
@@ -221,7 +227,7 @@ def characteristic_evaporator_duty(
     mean temperatures move linearly with the duties, ddt_mean = ddt_in - k * Q_E, and the
     equation is solved here in closed form from the inlet temperatures.
     """
-    _check_numbers(
+    ops.check_numbers(
         "characteristic_evaporator_duty",
         driving_difference=driving_difference,
         minimum_driving_difference=minimum_driving_difference,
@@ -239,12 +245,11 @@ def characteristic_evaporator_duty(
     return ops.where(
         ops.logical_or(ops.isinf(sensitivity), driving_difference <= minimum_driving_difference),
         0.0,
-        slope
-        * (driving_difference - minimum_driving_difference)
-        / (1 + ops.mul(slope, sensitivity)),
+        slope * (driving_difference - minimum_driving_difference) / (1 + slope * sensitivity),
     )
 
 
+@ops.physics
 def characteristic_sensitivity(
     generator_rate: float,
     rejection_rate: float,
@@ -278,7 +283,7 @@ def characteristic_sensitivity(
     circuit cools, the heat-rejection circuit warms and the chilled circuit cools as the
     evaporator duty rises; all three lower ddt for positive coefficients.
     """
-    _check_numbers(
+    ops.check_numbers(
         "characteristic_sensitivity",
         generator_rate=generator_rate,
         rejection_rate=rejection_rate,
@@ -298,12 +303,13 @@ def characteristic_sensitivity(
     return ops.where(
         smallest == 0,
         math.inf,
-        ops.truediv(generator_ratio, 2 * generator_rate)
-        + ops.truediv(rejection_coefficient * rejection_ratio, 2 * rejection_rate)
-        + ops.truediv(evaporator_coefficient, 2 * evaporator_rate),
+        generator_ratio / (2 * generator_rate)
+        + rejection_coefficient * rejection_ratio / (2 * rejection_rate)
+        + evaporator_coefficient / (2 * evaporator_rate),
     )
 
 
+@ops.physics
 def sorption_evaporator_capacity(
     generator_temperature: float,
     rejection_temperature: float,
@@ -378,6 +384,7 @@ def sorption_evaporator_capacity(
     return characteristic_evaporator_duty(driving, minimum_driving_difference, slope, sensitivity)
 
 
+@ops.physics
 def part_load_duty(requested: float, capacity: float, minimum_part_load: float) -> float:
     """Return the duty [W] a capacity-limited machine with a minimum part load delivers.
 
@@ -402,7 +409,7 @@ def part_load_duty(requested: float, capacity: float, minimum_part_load: float) 
     machine. EN 14825 (seasonal performance of heat pumps and chillers) describes the cycling
     alternative with a degradation coefficient.
     """
-    _check_numbers(
+    ops.check_numbers(
         "part_load_duty",
         requested=requested,
         capacity=capacity,
@@ -427,7 +434,7 @@ def part_load_duty(requested: float, capacity: float, minimum_part_load: float) 
 
 def _lift(function, sink_temperature, source_temperature, minimum_lift):
     """Return the floored temperature lift [K]; reject nonpositive temperatures and lifts."""
-    _check_numbers(
+    ops.check_numbers(
         function,
         sink_temperature=sink_temperature,
         source_temperature=source_temperature,
@@ -458,16 +465,3 @@ def _lift(function, sink_temperature, source_temperature, minimum_lift):
         minimum_lift=minimum_lift,
     )
     return floored
-
-
-def _check_numbers(function, **values):
-    """Reject NaN inputs, which would otherwise return NaN as if it were a valid result."""
-    for name, value in values.items():
-        ops.check(
-            ops.logical_not(ops.isnan(value)),
-            PhysicsRangeError,
-            "{function}: {name} = nan; expected a number",
-            function=function,
-            name=name,
-            value=value,
-        )
