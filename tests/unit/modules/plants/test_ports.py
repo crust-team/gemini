@@ -40,14 +40,16 @@ def test_a_port_name_that_is_taken_is_refused(plant):
     assert caught.value.code == "invalid_connection"
 
 
-def test_port_map_lists_named_then_free_ports(plant):
-    """Named ports first, then every free port named from its path."""
+def test_port_map_lists_only_named_ports(plant):
+    """A free port of a child is not a plant port; it is an unconnected port."""
     plant.connect("feed", "filter.inlet")
-    assert plant._port_map("inlets") == {
-        "feed": ("filter", "inlet"),
-        "pipe_inlet": ("pipe", "inlet"),
-    }
-    assert list(plant._port_map("outlets")) == ["filter_outlet", "pipe_outlet"]
+    assert plant._port_map("inlets") == {"feed": ("filter", "inlet")}
+    assert plant._port_map("outlets") == {}
+    assert plant._unconnected_ports() == [
+        ("outlets", "filter", "outlet"),
+        ("outlets", "pipe", "outlet"),
+        ("inlets", "pipe", "inlet"),
+    ]
 
 
 def test_bad_ends_raise_validation_errors(plant):

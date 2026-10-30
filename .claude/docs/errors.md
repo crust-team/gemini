@@ -91,6 +91,7 @@ code is never renamed without raising the minor number of `gm.__version__`.
 | `stream_mismatch` | `ValidationError` | The two ends of a connection carry different stream types |
 | `ambiguous_port` | `ValidationError` | Automatic port matching found no port or more than one |
 | `port_in_use` | `ValidationError` | An inlet already has a source, or an outlet already has a target |
+| `unconnected_port` | `ValidationError` | A port of a module has no connection and no plant name |
 | `loop_without_state` | `ValidationError` | A cycle has no connection of kind `state` |
 | `invalid_binding` | `ValidationError` | A binding does not fit the plant or the data |
 | `missing_column` | `ValidationError` | A bound column is not in the run input |

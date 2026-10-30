@@ -22,7 +22,8 @@ class Plant(PortResolver, Module):
     """A plant built from named modules and connections, a normal composite ``Module``.
 
     ``add`` registers a module, ``connect`` wires an outlet to an inlet and ``to_spec`` writes the
-    plant file. Free ports of the children are the plant's own ports. ``name`` is the name given.
+    plant file. Every port of a child is connected or named as a plant port; a plant port exists
+    only when named. ``name`` is the name given.
     """
 
     def __init__(self, name="plant"):

@@ -201,15 +201,32 @@ def _convert(old):
     return _handwritten(name, entries)
 
 
+def _named_ports(spec):
+    """Return a format 2 spec with the ports that were automatic plant ports before 0.2.0 named.
+
+    Each free port keeps the name it had, ``<path with underscores>_<port>``, so a stored plant
+    keeps its bindings. A spec that does not read is returned as it is, for ``validate`` to report.
+    """
+    plant, _ = reader.build(Plant, spec)
+    if not isinstance(plant, Plant):
+        return spec
+    for side, path, port in plant._unconnected_ports():
+        name = f"{path.replace('.', '_')}_{port}"
+        spec.setdefault(side, {})[name] = join_path(path, port)
+    return spec
+
+
 def migrate(old):
     """Convert a format 1 plant file to a format 2 spec; a spec is returned as a copy.
+
+    A format 2 spec written before 0.2.0 gets explicit names for its free ports.
 
     A tree whose root class is a shipped plant takes that plant's wiring, with the stored
     values filled in; any other root is written as a handwritten root with flat dotted params.
     Failures raise ``ValidationError`` with code ``migration_failed``.
     """
     if isinstance(old, dict) and old.get("format") == FORMAT:
-        return deepcopy(old)
+        return _named_ports(deepcopy(old))
     try:
         return _convert(old)
     except GeminiError:

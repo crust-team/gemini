@@ -37,6 +37,12 @@ stream type; a port without a stream type fits anything. If several pairs fit, a
 with code `ambiguous_port` lists them. A bare word that names no module is a plant port, as in
 `return_in` above. Only `connect` wires modules; there is no call syntax.
 
+Every inlet and outlet of every module is connected to another module or to a named plant port. A
+plant port exists only when it is named; there are no automatic ports. An unconnected port is an
+error with code `unconnected_port` and the port path: `p.validate()`, `gm.plants.validate` and
+`from_dict` report it, and a plant with one does not run. While you build, `add` and `connect` do
+not check it.
+
 ## Level 2: the spec
 
 The same plant as JSON. This is the stored plant file, the input of geomind's `build_plant`
@@ -85,8 +91,7 @@ assert plant.to_spec() == spec
   `doublet.supply_out` is right, `doublet.esp.discharge` is an error.
 - An inlet has one source and an outlet feeds one inlet (`port_in_use`). Splitting and mixing are
   `Splitter` and `Mixer`.
-- A port no connection uses is a plant port, named in `inlets` / `outlets` or else
-  `<path with underscores>_<port>`.
+- A port no connection uses is named in `inlets` / `outlets`, or it is `unconnected_port`.
 - Without `outputs` a plant has the automatic sum of each energy output its leaves declare.
 - The order of connections sets the order of the calls where the wiring leaves it open, which is
   what a composite's float sum depends on. The key order of a dictionary carries no meaning for
@@ -108,7 +113,8 @@ are not computed.
 ### Files and migration
 
 `plant.save(path)` and `gm.Plant.load(path)` read and write the spec. `gm.plants.migrate(old)`
-converts every older stored format, and `scripts/migrate_plants.py` runs it over files. Loading an
+converts every older stored format (a format 2 file written before 0.2.0 gets explicit names for
+its free ports, `<path with underscores>_<port>`, the automatic names it relied on), and `scripts/migrate_plants.py` runs it over files. Loading an
 old file without it raises `ValidationError` with code `old_format`, naming `gm.plants.migrate`.
 
 ## Level 3: subclassing

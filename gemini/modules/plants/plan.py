@@ -10,7 +10,7 @@ import heapq
 from collections import deque
 from dataclasses import dataclass
 
-from gemini.errors import NotImplementedYet
+from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules.container import ModuleDict, ModuleList
 from gemini.utils.strings import join_path
 
@@ -222,8 +222,19 @@ class Plan:
     outlets: dict
 
 
+def unconnected_port(path):
+    """Return the error of a port with no connection and no plant name."""
+    return ValidationError(
+        f"{path}: unconnected port; connect it to a module or name a plant port",
+        path=path,
+        code="unconnected_port",
+    )
+
+
 def compile_plan(root):
-    """Return the ``Plan`` of ``root``; a state connection cannot run yet."""
+    """Return the ``Plan`` of ``root``; a dangling port or a state connection cannot run."""
+    for _, path, port in root._unconnected_ports():
+        raise unconnected_port(join_path(path, port))
     links = all_links(root)
     if any(link.kind == STATE for link in links):
         raise NotImplementedYet(

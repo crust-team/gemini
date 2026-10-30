@@ -67,3 +67,23 @@ def test_loading_an_old_file_names_the_migration(old):
     with raises(ValidationError, "old_format") as caught:
         gm.plants.from_spec(old)
     assert caught.value.code == "old_format" and "gm.plants.migrate" in str(caught.value)
+
+
+def test_a_format_2_spec_with_free_ports_keeps_their_old_names():
+    """A spec written before 0.2.0 relied on automatic ports; migrate names them."""
+    old = {
+        "format": 2,
+        "name": "Free",
+        "modules": {"pipe": {"type": "Pipe", "params": {}}},
+        "connections": [],
+        "bindings": {},
+        "param_history": {},
+    }
+    assert [item["code"] for item in gm.plants.validate(old, on_error="record")] == [
+        "unconnected_port",
+        "unconnected_port",
+    ]
+    spec = gm.plants.migrate(old)
+    assert spec["inlets"] == {"pipe_inlet": "pipe.inlet"}
+    assert spec["outlets"] == {"pipe_outlet": "pipe.outlet"}
+    assert gm.plants.validate(spec) == []

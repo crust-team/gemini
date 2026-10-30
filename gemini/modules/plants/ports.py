@@ -151,14 +151,15 @@ class PortResolver:
         )
 
     def _port_map(self, side):
-        """Return the plant's ``inlets`` or ``outlets`` as ``{name: (path, port)}``.
+        """Return the plant's named ``inlets`` or ``outlets`` as ``{name: (path, port)}``."""
+        return dict(self._listed[side])
 
-        Ports named in the plant come first, then every free port of a child, named
-        ``<path with underscores>_<port>``.
-        """
-        result = dict(self._listed[side])
-        for path, module in members(self):
-            for port in getattr(module, side)():
-                if not self._in_use(path, port, side):
-                    result[f"{path.replace('.', '_')}_{port}"] = (path, port)
-        return result
+    def _unconnected_ports(self):
+        """Return ``(side, path, port)`` of every port with no connection and no plant name."""
+        return [
+            (side, path, port)
+            for side in SIDE_OF.values()
+            for path, module in members(self)
+            for port in getattr(module, side)()
+            if not self._in_use(path, port, side)
+        ]

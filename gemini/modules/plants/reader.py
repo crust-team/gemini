@@ -7,7 +7,7 @@ from gemini.errors.base import reported
 from gemini.modules import registry
 from gemini.modules.plants import outputs
 from gemini.modules.plants.factory import make_module
-from gemini.modules.plants.plan import is_group
+from gemini.modules.plants.plan import is_group, unconnected_port
 from gemini.modules.plants.writer import baseline_of
 from gemini.modules.serialization import (
     SECTIONS,
@@ -121,6 +121,23 @@ def _outputs(plant, specs, report):
             plant._output_specs[name] = deepcopy(spec)
 
 
+def _ends(spec):
+    """Return every port the spec names, also those of an entry that failed to read."""
+    connections = [item for item in spec.get("connections", []) if isinstance(item, dict)]
+    ends = {item.get(end) for item in connections for end in ("source", "target")}
+    return ends | set(spec.get("inlets", {}).values()) | set(spec.get("outlets", {}).values())
+
+
+def _check_ports(plant, spec, report):
+    """Report each port no entry of ``spec`` names; a named port that failed has its problem."""
+    named = _ends(spec)
+    for _, path, port in plant._unconnected_ports():
+        end = join_path(path, port)
+        if end not in named and not report.skips(end):
+            with report.guard(""):
+                raise unconnected_port(end)
+
+
 def populate(plant, spec, report):
     """Add the modules, connections, ports, outputs and sections of ``spec`` to ``plant``."""
     for name, entry in spec.get("modules", {}).items():
@@ -132,6 +149,7 @@ def populate(plant, spec, report):
         for name, end in spec.get(side, {}).items():
             with report.guard(f"{side}.{name}"):
                 _port(plant, side, name, end, report)
+    _check_ports(plant, spec, report)
     if "outputs" in spec:
         _outputs(plant, spec["outputs"], report)
     read_sections(plant, spec, report)

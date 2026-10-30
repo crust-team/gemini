@@ -17,8 +17,11 @@ def chain():
     plant.add("Degasser", "degasser")
     plant.add("Filter", "first")
     plant.add("Filter", "second")
+    plant.connect("feed", "degasser.inlet")
     plant.connect("degasser", "first")
     plant.connect("first.outlet", "second.inlet")
+    plant.connect("degasser.gas", "gas")
+    plant.connect("second.outlet", "product")
     return plant
 
 
@@ -34,20 +37,37 @@ def test_a_plant_is_a_module_in_the_plant_category():
     assert gm.Plant().name == "plant"
 
 
-def test_names_follow_the_type_and_free_ports_become_plant_ports(chain):
-    """An unconnected child port is a plant port named from its path."""
-    assert list(chain.inlets()) == ["degasser_inlet"]
-    assert list(chain.outlets()) == ["degasser_gas", "second_outlet"]
+def test_names_follow_the_type_and_plant_ports_exist_only_when_named(chain):
+    """Only a named port is a plant port; an added module does not add one."""
+    assert list(chain.inlets()) == ["feed"]
+    assert list(chain.outlets()) == ["gas", "product"]
     assert chain.add("Filter").name == "filter"
     assert "filter_2" not in dict(chain.named_children())
     assert chain.add("Filter") is chain.get_module("filter_2")
+    assert list(chain.inlets()) == ["feed"]
 
 
 def test_a_built_plant_runs_in_connection_order(chain):
-    """The degasser feeds the filters; the plant outlets are the free outlets."""
-    result = chain(degasser_inlet=stream())
+    """The degasser feeds the filters; the plant outlets are the named outlets."""
+    result = chain(feed=stream())
     assert [name for name, _ in result.call_records] == ["degasser", "first", "second"]
-    assert result.outlets.degasser_gas.m_dot < 10.0
+    assert result.outlets.gas.m_dot < 10.0
+
+
+def test_an_unconnected_port_is_reported_with_its_path():
+    """``validate`` lists every dangling port and the plant does not run."""
+    plant = gm.Plant("Open")
+    plant.add("Degasser", "degasser")
+    plant.connect("feed", "degasser.inlet")
+    plant.connect("degasser.liquid", "product")
+    assert [
+        (item["path"], item["code"]) for item in plant.validate(on_error="record")
+    ] == [("degasser.gas", "unconnected_port")]
+    with raises(ValidationError, "unconnected_port"):
+        plant.validate()
+    with raises(ValidationError, "unconnected_port") as caught:
+        plant(feed=stream())
+    assert caught.value.path == "degasser.gas"
 
 
 def test_a_bare_word_names_a_plant_port(chain):
@@ -112,21 +132,26 @@ def test_ambiguous_matches_list_the_candidates():
 
 def test_a_stream_type_mismatch_is_refused(chain):
     """A gas outlet cannot feed a brine inlet."""
+    chain.add("Degasser", "other")
     chain.add("Filter", "third")
     with pytest.raises(ValidationError) as caught:
-        chain.connect("degasser.gas", "third.inlet")
+        chain.connect("other.gas", "third.inlet")
     assert caught.value.code == "stream_mismatch"
 
 
-def test_a_loop_needs_a_state_connection(chain):
+def test_a_loop_needs_a_state_connection():
     """A cycle raises ``loop_without_state``; the same wire as state is accepted."""
+    plant = gm.Plant("Loop")
+    plant.add("Filter", "first")
+    plant.add("Filter", "second")
+    plant.connect("first.outlet", "second.inlet")
     with pytest.raises(ValidationError) as caught:
-        chain.connect("second.outlet", "degasser.inlet")
+        plant.connect("second.outlet", "first.inlet")
     assert caught.value.code == "loop_without_state"
-    assert len(chain._connection_list()) == 2
-    chain.connect("second.outlet", "degasser.inlet", kind="state")
+    assert len(plant._connection_list()) == 1
+    plant.connect("second.outlet", "first.inlet", kind="state")
     with pytest.raises(NotImplementedYet):
-        chain(**{name: stream() for name in chain.inlets()})
+        plant()
 
 
 def test_unknown_names_come_with_suggestions(chain):
@@ -179,8 +204,10 @@ def test_a_plant_child_outside_a_cycle_is_called_as_one_unit():
     """Alone, the nested doublet is a single step and a record named after it."""
     plant = gm.Plant("Nested")
     plant.add("Doublet", "doublet")
+    plant.connect("return_in", "doublet.return_in")
+    plant.connect("doublet.supply_out", "supply_out")
     assert [step.path for step in plant._compiled().steps] == ["doublet"]
-    assert list(plant.inlets()) == ["doublet_return_in"]
+    assert list(plant.inlets()) == ["return_in"]
 
 
 def test_the_doublet_runs_injection_before_production():

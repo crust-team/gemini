@@ -36,6 +36,7 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
         },
         "connections": [{"source": "pipe.outlet", "target": "valve.inlet"}],
         "inlets": {"feed": "pipe.inlet"},
+        "outlets": {"product": "valve.outlet"},
         "bindings": {"pipe": {"heat_loss": {"column": "q", "unit": "kW"}, "velocity": "v"}},
         "param_history": {
             "pipe": [
@@ -64,6 +65,8 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
             "filters": {"type": "ModuleDict", "modules": {"hot": {"type": "Filter", "params": {}}}},
         },
         "connections": [{"source": "doublet.supply_out", "target": "filters.hot.inlet"}],
+        "inlets": {"return_in": "doublet.return_in"},
+        "outlets": {"product": "filters.hot.outlet"},
         "bindings": {},
         "param_history": {},
     }
@@ -84,6 +87,8 @@ def test_params_set_since_and_validation_agree_with_the_builder():
     """``Plant.validate()`` is ``gm.plants.validate`` of its spec."""
     plant = gm.Plant("Same")
     plant.add("Pipe", "pipe", params={"length": 5.0})
+    plant.connect("feed", "pipe.inlet")
+    plant.connect("pipe.outlet", "product")
     assert plant.validate() == gm.plants.validate(plant.to_spec()) == []
     with pytest.raises(gm.errors.ValidationError):
         plant.add("Pipe", "bad", params={"length": "5 bar"})
@@ -96,6 +101,8 @@ def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
         "name": "broken",
         "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe", "params": {"length": -5.0}}},
         "connections": [],
+        "inlets": {"feed": "pipe.inlet"},
+        "outlets": {"product": "pipe.outlet"},
         "bindings": {},
         "param_history": {},
     }
@@ -144,4 +151,6 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
         "modules.a.type",
         "connections[0].target",
         "connections[1].target",
+        "pipe.inlet",
+        "pipe.outlet",
     }

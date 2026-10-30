@@ -36,7 +36,7 @@
     }
   ],
   "controls": {},
-  "doc": "A plant built from named modules and connections, a normal composite ``Module``.\n\n    ``add`` registers a module, ``connect`` wires an outlet to an inlet and ``to_spec`` writes the\n    plant file. Free ports of the children are the plant's own ports. ``name`` is the name given.",
+  "doc": "A plant built from named modules and connections, a normal composite ``Module``.\n\n    ``add`` registers a module, ``connect`` wires an outlet to an inlet and ``to_spec`` writes the\n    plant file. Every port of a child is connected or named as a plant port; a plant port exists\n    only when named. ``name`` is the name given.",
   "inlets": {
     "return_in": {
       "fields": {
