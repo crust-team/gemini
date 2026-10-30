@@ -10,6 +10,8 @@ from gemini.utils.strings import did_you_mean, join_names
 
 _BACKENDS = {}
 _selected = ContextVar("gemini_backend", default=None)
+forced_name = _selected.get
+"""Return the name set by ``settings(backend=...)``, else ``None``; a bound ``ContextVar.get``."""
 
 
 class Backend:

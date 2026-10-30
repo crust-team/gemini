@@ -20,10 +20,12 @@ register("check", "check", 1)
 
 def check(condition, error, message, **values):
     """Raise ``error(message.format(**values))`` where ``condition`` fails; record it if traced."""
-    traced = [value for value in (condition, *values.values()) if isinstance(value, Symbolic)]
-    if traced:
+    traced = condition if isinstance(condition, Symbolic) else _first_traced(values)
+    if traced is not None:
         attributes = {"error": error, "message": message, "values": values}
-        traced[0].record(get("check"), (condition,), attributes)
+        traced.record(get("check"), (condition,), attributes)
+        return
+    if condition is True:
         return
     if not isinstance(condition, np.ndarray):
         if condition:
@@ -39,6 +41,13 @@ def failure(error, message, values, row):
     """Return the ``error`` instance of one failing ``row``, its message filled from ``values``."""
     filled = {name: _row_value(value, row) for name, value in values.items()}
     return error(message.format(**filled))
+
+
+def _first_traced(values):
+    for value in values.values():
+        if isinstance(value, Symbolic):
+            return value
+    return None
 
 
 def _concrete(value):

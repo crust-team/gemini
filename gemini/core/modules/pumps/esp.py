@@ -37,6 +37,9 @@ MIN_EFFICIENCY_POWER = Constant(
     "shaft power below which the pump is treated as stopped and its efficiency as zero",
 )
 
+HYDRAULIC_POWER_PER_HEAD = units.bhp_to_w(1) / units.ft_head_to_pa(1)
+"""Unit factor of the efficiency: [W per bhp] over [Pa per ft of head], computed once."""
+
 DRIFT_FLOOR = 1e-12
 """Smallest prediction magnitude used as a drift denominator, so a zero prediction is finite."""
 
@@ -135,7 +138,7 @@ class ESP(Module):
             units.m3s_to_bbl_per_day(flow)
             / constants.ESP_EFFICIENCY_FLOW_FACTOR
             * ops.truediv(head, power)
-            * (units.bhp_to_w(1) / units.ft_head_to_pa(1)),
+            * HYDRAULIC_POWER_PER_HEAD,
         )
 
     def health(self, result, measured):

@@ -175,6 +175,10 @@ reason it is needed:
   `ops.sqrt`, `ops.maximum`, ...) and `ops.truediv`/`ops.pow` never raise or warn on an operand
   that is invalid in the branch a `where` does not select: they return `inf` or `nan` as NumPy
   does. `where` branches are plain values, never callables; `None` is allowed as a branch.
+  For speed the op functions evaluate plain scalars (`float`, `int`, `bool`, `None`, NumPy
+  `float64`/`bool_`) directly on the Python backend and a `Constant` computes its operators on its
+  value without `dispatch`; arrays, other NumPy scalars, traced values and an active
+  `backends.settings(backend=...)` take the full `dispatch` path. A `Constant` is not a `float`.
 - During a trace the `_Call` record carries the traced parameter values, which
   `Module.__getattr__` returns instead of the stored values, and records outputs without
   validating them (`gemini/graph/tracer.py`).

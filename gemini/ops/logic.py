@@ -8,49 +8,19 @@ silently instead of raising on Python floats. A branch may be ``None``: it stays
 Python values and is NaN in arrays and graphs.
 """
 
-from gemini.ops.dispatch import dispatch
-from gemini.ops.registry import register
+from gemini.ops.dispatch import elementwise_op
 
-for _name in ("lt", "le", "gt", "ge", "eq", "ne", "logical_and"):
-    register(_name, "elementwise", 2)
-register("where", "elementwise", 3)
-
-
-def lt(left, right):
-    """Return ``left < right``."""
-    return dispatch("lt", left, right)
-
-
-def le(left, right):
-    """Return ``left <= right``."""
-    return dispatch("le", left, right)
-
-
-def gt(left, right):
-    """Return ``left > right``."""
-    return dispatch("gt", left, right)
-
-
-def ge(left, right):
-    """Return ``left >= right``."""
-    return dispatch("ge", left, right)
-
-
-def eq(left, right):
-    """Return ``left == right``."""
-    return dispatch("eq", left, right)
-
-
-def ne(left, right):
-    """Return ``left != right``."""
-    return dispatch("ne", left, right)
-
-
-def logical_and(left, right):
-    """Return whether both conditions hold; use it instead of ``and`` or ``a <= b <= c``."""
-    return dispatch("logical_and", left, right)
-
-
-def where(condition, if_true, if_false):
-    """Return ``if_true`` where ``condition`` holds and ``if_false`` elsewhere."""
-    return dispatch("where", condition, if_true, if_false)
+lt = elementwise_op("lt", 2, "Return ``left < right``.")
+le = elementwise_op("le", 2, "Return ``left <= right``.")
+gt = elementwise_op("gt", 2, "Return ``left > right``.")
+ge = elementwise_op("ge", 2, "Return ``left >= right``.")
+eq = elementwise_op("eq", 2, "Return ``left == right``.")
+ne = elementwise_op("ne", 2, "Return ``left != right``.")
+logical_and = elementwise_op(
+    "logical_and",
+    2,
+    "Return whether both conditions hold; use it instead of ``and`` or ``a <= b <= c``.",
+)
+where = elementwise_op(
+    "where", 3, "Return ``if_true`` where ``condition`` holds and ``if_false`` elsewhere."
+)

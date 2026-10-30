@@ -18,6 +18,7 @@ import numpy as np
 from gemini.backends.base import Backend
 
 PLAIN_NUMBERS = frozenset({float, int})
+DIVISIBLE = PLAIN_NUMBERS | {np.float64}
 
 
 def numpy_result(function, *values):
@@ -50,7 +51,7 @@ class PythonBackend(Backend):
 
     def truediv(self, left, right):
         """Return ``left / right``; a zero divisor gives ``inf`` or ``nan`` as in IEEE 754."""
-        if type(left) not in PLAIN_NUMBERS or type(right) not in PLAIN_NUMBERS:
+        if type(left) not in DIVISIBLE or type(right) not in DIVISIBLE:
             return numpy_result(np.true_divide, left, right)
         if right != 0:
             return left / right
