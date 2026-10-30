@@ -121,3 +121,11 @@ def test_a_list_of_traced_values_is_a_vector_output():
     assert graph.vectors == {"outputs.profile": 3}
     assert list(graph.outputs) == ["outputs.profile[0]", "outputs.profile[1]", "outputs.profile[2]"]
     assert graph.outputs["outputs.profile[2]"] == 5.0
+
+
+def test_a_concrete_zero_dimensional_array_is_a_literal_number():
+    """A backend forced to NumPy gives ``ops`` on constants 0-d arrays; they stay literals."""
+    graph = Graph("test")
+    x = graph.input("x", "inlet")
+    assert (x + np.array(2.5)).node.operands[1] == 2.5
+    assert (x > np.array(True)).node.operands[1] is True

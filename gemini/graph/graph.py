@@ -192,6 +192,8 @@ class Graph:
             return value.node
         if isinstance(value, Constant):
             return self._constant(value)
+        if isinstance(value, np.ndarray) and value.ndim == 0:
+            return value.item()
         if value is None or isinstance(value, (numbers.Number, np.number, np.bool_)):
             return value
         if isinstance(value, (list, tuple, np.ndarray)) and not _holds_traced(value):
