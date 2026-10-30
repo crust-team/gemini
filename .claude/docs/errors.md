@@ -45,7 +45,7 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
   cannot be resolved.
 - `TraceError(TypeError)`: a module cannot be traced into a computation graph: Python control
   flow or a conversion on a traced value (`if`, `and`, `float()`, formatting), a stateful root,
-  float32 precision, a pre-hook on the root, an observer on a child, or a composite child that
+  float32 precision, a pre-hook on the root, a forward hook that only reads, or a composite child that
   cannot be recorded. The graph runner catches it and runs that module untraced (a graph break,
   `gemini/graph/runner.py`); a leaf child of a composite that raises it becomes a break node
   instead. Break nodes also use it for a probe or row that fails to build the traced fluids, and
