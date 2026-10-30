@@ -99,15 +99,14 @@ basis (`gemini.physics.pumps`).
   - `head_coefficients`, `power_coefficients` (`list[float]`, shape 6, calibratable, required): ft of head
     and bhp per stage at 60 Hz with flow in bbl/day (mixed legacy units, see
     [types.md](types.md#quantities-and-declarations)).
-  - `pump_type` (`str | None`, default `None`): metadata.
-  - `setting_depth` (`Length`, default 0).
+  - `pump_type` (`str | None`, default `None`) and `setting_depth` (`Length`, default 0): read only
+    by the legacy import and export.
   - `motor_efficiency` (`Efficiency`, default 1, which preserves every legacy power number).
   - `minimum_flow` (default 0), `maximum_flow` (default 1 m3/s), `best_efficiency_flow` (default 0.04 m3/s):
     operating window and best-efficiency flow at 60 Hz, scaled by `frequency / 60 Hz`.
-  - `correction_factors` (`(Dimensionless, PressureDifference)`, default `(1, 0)`): affine VLP
-    correction, used by the inferred-discharge helpers, not by the polynomial head.
-  - `tubing` (`Length | None`, default `None`), `drift_threshold` (`Fraction`, default 0.10):
-    health alarm limit on relative drift.
+  - `correction_factors` (`(Dimensionless, PressureDifference)`, default `(1, 0)`) and `tubing`
+    (`Length | None`, default `None`): read only by the legacy import and export.
+  - `drift_threshold` (`Fraction`, default 0.10): health alarm limit on relative drift.
 - **Controls**: `frequency` (`Frequency`, required). **Boundaries, states**: none.
 - **Outputs**: `head`, `power` (shaft), `efficiency` (`Dimensionless`, may exceed one),
   `discharge_pressure` (all soft sensors), `flow`, `is_in_operating_window`, `best_efficiency_ratio`,
@@ -117,11 +116,15 @@ basis (`gemini.physics.pumps`).
   `electricity = P / motor_efficiency`. Efficiency is the retained hydraulic-efficiency
   formula, zero below 0.1 W shaft power. Under `runtime.set_precision("float32")` the
   coefficients use NumPy float32 for golden parity.
+- **Physics**: `diagnostics.relative_drift`, `diagnostics.remaining_margin`, `energy.input_power`,
+  `pumps.best_efficiency_ratio`, `pumps.esp_efficiency`, `pumps.head`,
+  `pumps.is_in_operating_window`, `pumps.power`, `pumps.speed_ratio`
 - **Health**: worst relative drift of measured `power`, `head` and `discharge_pressure`, alarm
   above `drift_threshold` or outside the operating window.
 - **Assumptions and validity**: isothermal; empirical curves valid on their fitted flow range.
-  Reverse flow raises `PhysicsRangeError`. Fitting helpers: `fit_head_coefficients`,
-  `fit_head_correction`, `head_curve`.
+  Reverse flow raises `PhysicsRangeError`. The fits
+  (`gm.analysis.fit_head_coefficients`, `gm.analysis.fit_head_correction`) are in `gm.analysis`;
+  `head_curve` is the private helper of `gm.analysis.pump_curve`.
 - **Energy audit**: unresolved pump power. The pump is isothermal and allocates no
   electricity to work or loss, so `residual == unresolved_power == electricity` and
   `thermal_residual` closes. See [refactor-notes.md](refactor-notes.md).
@@ -148,8 +151,9 @@ Injection (booster) pump that raises the brine to a discharge pressure.
 
 - **Ports**: `suction` -> `discharge`.
 - **Parameters**: `stage_count` (`Count | None`, default `None`), `pump_type` (default
-  `"unspecified"`), `efficiency` (`Efficiency`, default 0.7, calibratable; the example plant
-  selects 0.8, see [refactor-notes.md](refactor-notes.md)), `head_coefficients`, `power_coefficients`
+  `"unspecified"`, read only by the legacy import and export), `efficiency` (`Efficiency`,
+  default 0.7, calibratable; the example plant selects 0.8, see
+  [refactor-notes.md](refactor-notes.md)), `head_coefficients`, `power_coefficients`
   (`list[float] | None`, shape 6, default `None`, ESP basis).
 - **Controls**: `pressure_setpoint` (`Pressure | None`, default `None`), `frequency`
   (`Frequency`, default 60 Hz, used with curves).
@@ -157,6 +161,7 @@ Injection (booster) pump that raises the brine to a discharge pressure.
 - **Model**: with `head_coefficients` (and `stage_count`) the head is the ESP polynomial; otherwise
   `head = pressure_setpoint - suction.p`. Power is `pumps.power` when both curves are given,
   else `Q head / efficiency`; `electricity = power`.
+- **Physics**: `energy.input_power`, `pumps.head`, `pumps.hydraulic_power`, `pumps.power`
 - **Validity**: a negative head (setpoint below suction) and reverse flow raise
   `PhysicsRangeError`; neither a setpoint nor a head curve raises `ConfigurationError`.
 - **Energy audit**: unresolved pump power, as `ESP`.
@@ -195,6 +200,9 @@ quadratic head curve and affinity-law speed scaling. It replaces the former `Boo
     `heat_loss = electricity - P_shaft`;
   - `discharge.p = suction.p + H`, `discharge.T = suction.T + (P_shaft - P_hydraulic) / (m_dot
     cp)`: pump losses heat the liquid, motor losses go to the room.
+- **Physics**: `energy.input_power`, `heat_transfer.temperature_change`,
+  `pumps.best_efficiency_ratio`, `pumps.centrifugal_head`, `pumps.hydraulic_power`,
+  `pumps.parabolic_efficiency`, `pumps.speed_ratio`
 - **Assumptions**: incompressible liquid, constant `cp`, efficiency independent of speed
   (affinity laws, about 0.5 to 1.1 of rated speed), no leakage or recirculation.
 - **Validity**: zero flow is a stopped pump (no head, no power). `x >= 2`, a negative head or
@@ -235,6 +243,8 @@ Downhole multistage (vertical turbine) pump driven by a surface motor through a 
   60 Hz` (constant bearing friction torque, the form of manufacturer line-shaft friction
   tables; ANSI/HI 2.3); `P_shaft = P_pump + P_friction`, `electricity = P_shaft /
   motor_efficiency`; `discharge.T = suction.T`.
+- **Physics**: `energy.input_power`, `pumps.head`, `pumps.line_shaft_friction_power`, `pumps.power`,
+  `pumps.pump_efficiency`, `pumps.speed_ratio`
 - **Assumptions**: isothermal like `ESP`, because the empirical polynomials do not guarantee
   `P_pump >= Q H`. Thrust bearing, shaft stretch and column friction are not modelled.
 - **Validity**: reverse flow, a negative head or a negative pump power raise
@@ -275,6 +285,9 @@ intercooled stages.
   `T_2 = T_1 + T_1 (r^((k-1)/(k N)) - 1) / eta_s`, `P_shaft = m_dot N cp (T_2 - T_1)`,
   `electricity = P_shaft / eta_motor`, `heat_loss = electricity - P_shaft / N` (intercooler
   duty plus motor loss). The gas leaves the last stage at `T_2` (no aftercooler).
+- **Physics**: `compression.heat_rejected`, `compression.overall_pressure_ratio`,
+  `compression.shaft_power`, `compression.specific_compression_work`,
+  `compression.stage_outlet_temperature`, `compression.stage_pressure_ratio`, `energy.input_power`
 - **Assumptions and validity**: ideal gas with constant `k` and `cp`, perfect intercooling to
   the suction temperature without pressure loss; stage ratios up to about 4. A setpoint below
   the suction pressure or reverse flow raises `PhysicsRangeError`; zero flow draws no power.
@@ -327,6 +340,10 @@ surroundings.
   - `p_out = p_in - friction_pressure_drop - rho g dz`;
   - `T_out = T_amb + (T_in - T_amb) exp(-NTU)`, `NTU = U pi d L / (m_dot cp)` (Incropera et al.
     2007, Section 8.3), the exact profile for constant U, cp and ambient.
+- **Physics**: `geometry.mean_velocity`, `heat_transfer.ambient_effectiveness`,
+  `heat_transfer.effectiveness_outlet_temperature`, `heat_transfer.heat_rate`,
+  `heat_transfer.signed_parts`, `hydraulics.hydrostatic_dp`, `hydraulics.pipe_conductance`,
+  `hydraulics.pipe_friction_drop`
 - **Assumptions**: steady (no heat capacity or transit time), constant properties, uniform U
   and ambient, no separate fitting losses. The legacy `heat_transfer.pipe_temperature_change`
   is its first-order expansion and is not used because it overshoots ambient for NTU > 1.
@@ -365,6 +382,7 @@ Control valve; isenthalpic, so the temperature is unchanged.
   Kv_eff)^2` with `q = m_dot / rho`; inherent characteristic (IEC 60534-2-4) with `Phi_0 = 1/R`:
   linear `Phi_0 + (1 - Phi_0) h`, equal percentage `R^(h - 1)`; `Kv_eff = Phi(h) Kv` for
   `h > 0` and 0 at `h = 0`.
+- **Physics**: `hydraulics.valve_flow_coefficient`, `hydraulics.valve_pressure_drop`
 - **Assumptions**: no choked flow or cavitation (check the outlet against the vapour pressure),
   no installed characteristic or Reynolds correction, constant density; the throttling
   temperature rise (about 0.024 K per bar of water) is neglected.
@@ -392,6 +410,7 @@ Ideal tee that divides a feed into two branches.
 - **Parameters, boundaries, states, outputs**: none; read the branch flows from the outlets,
   for example `Output.of(self.splitter.second_out.field("m_dot"))` in a composite.
 - **Model**: `m_second = x m_feed`, `m_first = m_feed - m_second`, both at feed T, p and fluid.
+- **Physics**: `separation.split_flow`
 - **Assumptions**: no tee loss or heat exchange; the commanded split stands for the balancing
   valves or branch resistances that set it; no hydraulic network solution.
 - **Validity**: reverse flow raises `PhysicsRangeError` (a reversed splitter is a `Mixer`).
@@ -416,6 +435,7 @@ Adiabatic junction mixing two streams of the same fluid.
   throttled by its own resistance, which a sequential model cannot represent, and the lower
   pressure never creates pressure energy. A large `pressure_imbalance` flags unbalanced
   upstream branches.
+- **Physics**: `heat_transfer.mixed_temperature`
 - **Validity**: different fluids raise `ConfigurationError`; reverse flow raises
   `PhysicsRangeError`; zero total flow gives the mean inlet temperature, which carries no
   energy.
@@ -445,6 +465,7 @@ Pressure-maintenance (expansion) vessel that holds a closed circuit at its press
 - **Model**: the outlet leaves at `pressure_setpoint` with the inlet flow, temperature and
   fluid. Stateless by decision: at hourly or 15-minute steps the vessel holds its setpoint, and
   a water-volume state would change the vessel level but no circuit pressure or temperature.
+- **Physics**: none.
 - **Assumptions**: make-up and spill flows and the station's pump electricity are not
   modelled. Any flow direction is accepted.
 - **Energy audit**: closed.
@@ -470,6 +491,8 @@ Filter with a quadratic clean-filter pressure loss and a clogging diagnostic.
   at 1068 kg/m3 = 44.2 kg/s), both from the example plant; `clogging_pressure_drop` (default 0.5 bar).
 - **Outputs**: `pressure_drop` (soft sensor).
 - **Model**: `pressure_drop = nominal_pressure_drop (m_dot / nominal_mass_flow)^2`.
+- **Physics**: `diagnostics.performance_ratio`, `diagnostics.remaining_margin`,
+  `hydraulics.quadratic_pressure_drop`
 - **Health**: alarm when the measured `pressure_drop` exceeds `clogging_pressure_drop`.
 - **Assumptions**: solids loading and particle capture are not modelled. The quadratic law
   also scales reverse flow.
@@ -489,15 +512,17 @@ assert round(result.outputs.get("pressure_drop", unit="bar"), 9) == 0.016
 Separates a share of the free gas carried by the brine and applies the vessel pressure.
 
 - **Ports**: `inlet` -> `liquid`, `gas`.
-- **Parameters**: `outlet_pressure` (`Pressure | None`, default `None`: use `nominal_pressure_drop`), `nominal_pressure_drop` (default
-  14 900 Pa, Sep_Pin/Sep_Pout of the example plant), `heat_transfer_coefficient` (default 0, legacy
-  metadata without physical meaning, unused), `separation_efficiency` (`Fraction`, default 0;
+- **Parameters**: `outlet_pressure` (`Pressure | None`, default `None`: use
+  `nominal_pressure_drop`), `nominal_pressure_drop` (default 14 900 Pa, Sep_Pin/Sep_Pout of the
+  example plant), `heat_transfer_coefficient` (default 0, read only by the legacy import and
+  export), `separation_efficiency` (`Fraction`, default 0;
   no industry-typical value, set it from design data or a measured gas flow).
 - **Outputs**: `gas_mass_flow`, `pressure_drop` (soft sensors).
 - **Model**: with `eta = separation_efficiency` and `x = inlet.fluid.gas_mass_fraction`:
   `gas.m_dot = eta x m_dot`, `liquid.m_dot = m_dot - gas.m_dot`, liquid gas fraction
   `(1 - eta) x / (1 - eta x)`; both outlets at `outlet_pressure` (or `p_in - nominal_pressure_drop`) and the inlet
   temperature. The default `eta = 0` reproduces the former liquid-only model exactly.
+- **Physics**: `separation.degasser_split`
 - **Assumptions**: isothermal, no exsolution of dissolved gas, no latent or expansion heat, a
   lumped efficiency (no residence time, level or Henry's law). The `gas` stream carries the gas
   mass flow, but its `fluid` is the liquid's, so its property snapshot does not describe the
@@ -529,6 +554,7 @@ Systems and Equipment, "Cooling Towers").
   out of the plant through its port.
 - **Model**: `blowdown_out.m_dot = f m_dot`, `retained_out.m_dot = m_dot - f m_dot`, both at
   feed T, p and fluid.
+- **Physics**: `separation.split_flow`
 - **Assumptions and validity**: ideal split, no valve loss or flash; reverse flow raises
   `PhysicsRangeError`.
 - **Energy audit**: closed.
@@ -555,6 +581,8 @@ Hydrocyclone sand separator ahead of heat exchangers and injection.
   `residual_sand_concentration`.
 - **Model**: `Q = m_dot (1 - x_gas) / rho`, `sand_removal_rate = eta c Q`, residual `(1 - eta)
   c`, `pressure_drop = nominal_pressure_drop (m_dot / nominal_mass_flow)^2`.
+- **Physics**: `fluid.liquid_volume_flow`, `hydraulics.quadratic_pressure_drop`,
+  `separation.cyclone_sand`
 - **Assumptions**: one constant efficiency lumps the grade-efficiency curve (Svarovsky 2000,
   *Solid-Liquid Separation*, 4th ed., "Hydrocyclones"); streams carry no solids, so the sand is
   only reported.
@@ -585,6 +613,7 @@ Scale or corrosion inhibitor injection proportional to the treated flow.
   *Geothermics* 38, 326-334).
 - **Outputs**: `product_mass_flow = dose m_dot`, `active_mass_flow = product_concentration
   product_mass_flow`.
+- **Physics**: `separation.dosing_flows`
 - **Assumptions**: the dosed mass is not added to the stream (it is below flowmeter
   resolution, and adding it would need a product inlet), so the neglected mass is
   `product_mass_flow`, a relative error equal to `dose`. Pump power, quill loss and cost are not
@@ -617,6 +646,7 @@ Vent stack or flare releasing separated non-condensable gas, with CO2 and methan
   `heat_loss` (zero when venting).
 - **Model**: burnt methane `m_b = eta_c x_CH4 m` when flaring; `co2_emission = x_CO2 m + m_b
   M_CO2 / M_CH4`; `methane_emission = x_CH4 m - m_b`; `fuel = heat_loss = m_b heating_value`.
+- **Physics**: `combustion.flare_emissions`
 - **Assumptions and validity**: H2S and other combustibles are not burnt; the inert rest
   passes. `co2_mass_fraction + methane_mass_fraction > 1` raises `ConfigurationError`; reverse
   flow raises `PhysicsRangeError`.
@@ -649,8 +679,12 @@ Two-stream effectiveness-NTU heat exchanger with fouling diagnostics.
   `heat_transfer.effectiveness_counterflow` or `effectiveness_parallel`;
   `duty = eps C_min (T_h,in - T_c,in)`; each side loses `nominal_pressure_drop (m_dot / nominal_mass_flow)^2`.
   A stopped stream transfers nothing.
-- **Health**: apparent UA from measured outlet temperatures (`ua_from_measurements`), alarm
-  below `1 - fouling_threshold` of the design UA.
+- **Physics**: `diagnostics.below_limit`, `diagnostics.bounded_score`,
+  `diagnostics.performance_ratio`, `heat_transfer.apparent_conductance`,
+  `heat_transfer.exchanger_balance`, `heat_transfer.lmtd`, `heat_transfer.terminal_differences`,
+  `hydraulics.quadratic_pressure_drop`
+- **Health**: apparent UA from measured temperatures (`heat_transfer.apparent_conductance`; the
+  fit is `gm.analysis.estimate_conductance`), alarm below `1 - fouling_threshold` of the design UA.
 - **Validity**: a hot inlet below the cold inlet or negative flow raise `PhysicsRangeError`.
 - **Energy audit**: closed.
 
@@ -687,6 +721,8 @@ Dry or wet (evaporative) closed-circuit cooler rejecting heat to ambient air.
 - **Model**: target `max(T_set, T_ref + approach)` with `T_ref` the dry bulb (dry) or wet bulb
   (wet); `duty = min(m_dot cp max(0, T_in - target), capacity)`; `electricity = sfp duty`;
   `heat_loss = duty + electricity`; `evaporation_rate = duty / latent_heat` (wet).
+- **Physics**: `heat_transfer.fan_power`, `heat_transfer.setpoint_duty`,
+  `heat_transfer.temperature_change`, `psychrometrics.evaporation_rate`
 - **Assumptions**: closed circuit (the process stream keeps its mass); the evaporation rate is
   an upper bound (all heat taken as latent; 80 to 90 % in practice); fixed approach at every
   load; fan power proportional to duty; ambient about -20 to 45 degC.
@@ -747,6 +783,14 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
   the log-mean temperatures of the sink and source glides (`refrigeration.lorenz_cop_heating`,
   Lorenz 1894); the source outlet is then found by `brentq` between `T_in - Q / C` and `T_in`.
   `cop_model="lorenz"` with `mode="cooling"` raises `ConfigurationError`.
+- **Physics**: `heat_transfer.heat_rate`, `heat_transfer.setpoint_duty`,
+  `heat_transfer.temperature_change`, `refrigeration.carnot_cooling_sink_outlet`,
+  `refrigeration.carnot_fraction_cop_cooling`, `refrigeration.carnot_fraction_cop_heating`,
+  `refrigeration.carnot_heating_source_outlet`, `refrigeration.cooling_condenser_duty`,
+  `refrigeration.cooling_minimum_sink_rate`, `refrigeration.heating_cop_minimum_source`,
+  `refrigeration.heating_evaporator_duty`, `refrigeration.lorenz_fraction_cop_heating`,
+  `refrigeration.lorenz_source_surplus`, `refrigeration.part_load_duty`,
+  `refrigeration.source_limit_shortfall`
 - **Minimum source outlet**: when heating would cool the source below
   `minimum_source_outlet_temperature`, the duty is reduced (`brentq` on `Q (1 - 1/COP) = C_source
   (T_in - T_min)`) so the source leaves at the minimum and the sink outlet drops; a source inlet at
@@ -792,6 +836,8 @@ Auxiliary gas or electric boiler heating a stream to a setpoint.
   one is zero), `heat_loss` (conversion loss).
 - **Model**: `duty = min(m_dot cp max(0, T_set - T_in), capacity)`, `fuel_or_power = duty /
   efficiency`, `heat_loss = fuel_or_power - duty`.
+- **Physics**: `energy.input_power`, `heat_transfer.setpoint_duty`,
+  `heat_transfer.temperature_change`
 - **Validity**: negative flow raises `PhysicsRangeError`.
 - **Energy audit**: closed.
 
@@ -820,6 +866,8 @@ Gas-engine combined heat and power unit heating a water circuit.
 - **Model**: Willans line (Heywood 1988) `F = (P_cap / eta_el) (f0 + (1 - f0) L)` for L > 0;
   `P = L P_cap`; `heat_recovered = min(eta_th F, m_dot cp (T_max - T_in))`; the rest of the
   engine heat is `dumped_heat`; `heat_loss = F - P - heat_recovered`.
+- **Physics**: `combustion.engine_energy_flows`, `combustion.willans_fuel_input`,
+  `heat_transfer.setpoint_duty`, `heat_transfer.temperature_change`
 - **Validity**: `electric_efficiency + thermal_efficiency > 1` raises `ConfigurationError`. No
   minimum stable load or start-up losses; with no water flow all engine heat is dumped.
 - **Energy audit**: closed.
@@ -867,6 +915,11 @@ Single-effect water/LiBr absorption chiller or heat pump driven by hot water.
   (`refrigeration.sorption_evaporator_capacity`); delivered `Q_E` is the least of that, the
   request and the capacity; `Q_G = Q_E / thermal_cop`, `electricity = aux Q_E`, `Q_AC = Q_G +
   Q_E + electricity`.
+- **Physics**: `heat_transfer.mean_temperature`, `heat_transfer.setpoint_duty`,
+  `heat_transfer.temperature_change`, `refrigeration.characteristic_temperature_difference`,
+  `refrigeration.coefficient_of_performance`, `refrigeration.sorption_delivered_duty`,
+  `refrigeration.sorption_duties`, `refrigeration.sorption_evaporator_capacity`,
+  `refrigeration.sorption_rejection_ratio`
 - **Validity**: driving water about 70 to 120 degC, cooling water 20 to 40 degC, chilled water
   above 4 degC, flows near the rated flows of the fit. Constant COP, no crystallisation limit.
 - **Energy audit**: closed.
@@ -905,6 +958,10 @@ Silica-gel/water adsorption chiller driven by hot water of 55 to 90 degC; a chil
 - **Model**: the closed-form characteristic equation of `AbsorptionUnit` with the adsorption
   machine's own coefficients; cycle-averaged duties, which suit steps much longer than the
   batch cycle.
+- **Physics**: `heat_transfer.mean_temperature`, `heat_transfer.setpoint_duty`,
+  `heat_transfer.temperature_change`, `refrigeration.characteristic_temperature_difference`,
+  `refrigeration.coefficient_of_performance`, `refrigeration.sorption_delivered_duty`,
+  `refrigeration.sorption_duties`, `refrigeration.sorption_evaporator_capacity`
 - **Validity**: a driving temperature above the maximum raises `PhysicsRangeError`; a minimum
   at or above the maximum raises `ConfigurationError`. Cooling water 20 to 35 degC, chilled
   water above 5 degC.
@@ -952,6 +1009,11 @@ the injected stream as a sink.
   radius), `hydrostatic_pressure_drop`.
 - **Model**: linear IPR `p_bh = p_res - Q / PI` (production) and `p_bh = p_res + Q / II`
   (injection); radial Darcy diagnostics through `hydraulics.radial_pressure_drops`.
+- **Physics**: `diagnostics.below_limit`, `diagnostics.bounded_score`,
+  `diagnostics.performance_ratio`, `fluid.volume_flow`, `hydraulics.hydrostatic_dp`,
+  `hydraulics.injectivity_index`, `hydraulics.injectivity_pressure`,
+  `hydraulics.productivity_index`, `hydraulics.productivity_pressure`,
+  `hydraulics.radial_pressure_drops`
 - **Health**: alarm when the measured index falls below `1 - decline_threshold` of design.
 - **Helpers**: `ProductionReservoir.sandface_stream(production_rate)` and
   `InjectionReservoir.required_pressure(sandface)` evaluate the IPR without a call; `forward` and
@@ -990,6 +1052,9 @@ injector reaches the producer; placed between a `ProductionReservoir` sandface a
   theta - theta cos theta) / sin^3 theta`, so the cold share `f = theta / pi`
   (`ground.doublet_cold_fraction`) gives `outlet_T = T_in - f (T_in - T_inj)`; f = 1/2 at
   `V = 3 V_B`.
+- **Physics**: `fluid.volume_flow`, `ground.aquifer_volumetric_heat_capacity`,
+  `ground.doublet_breakthrough_time`, `ground.doublet_breakthrough_volume`,
+  `ground.doublet_temperature_drop`, `ground.injected_volume`
 - **Assumptions**: homogeneous confined aquifer, fully penetrating wells, no regional flow,
   piston displacement with local equilibrium, no recharge from cap and base rock (an upper
   bound of the decline), the current injection temperature for all injected water.
@@ -1031,6 +1096,10 @@ ground temperature.
   (`ground.vertical_cylinder_conductance`, Incropera table 4.1) with the plan diameter
   `D = 2 sqrt(N s^2 / pi)`; `C dtheta/dt = -Q - UA_s theta` is solved exactly for a constant
   inlet.
+- **Physics**: `ground.borehole_field_capacity`, `ground.borehole_field_surroundings_conductance`,
+  `ground.borehole_field_temperature_change`, `ground.borehole_loop_conductance`,
+  `heat_transfer.heat_rate`, `heat_transfer.mean_temperature`, `heat_transfer.signed_parts`,
+  `heat_transfer.temperature_change`
 - **Assumptions and validity**: a simplification of g-functions (Eskilson 1987): long-term
   balance, depletion and recovery, but not the short-term borehole response or field
   interaction; suits monthly to seasonal behaviour (peak-hour temperatures are optimistic).
@@ -1065,6 +1134,8 @@ Deep coaxial closed-loop heat exchanger in a linear geothermal gradient (steady)
   `R = R_b + f(t) / (2 pi k)` with Ramey's `f(t) = ln(2 sqrt(alpha t) / r_b) - gamma/2`
   (Ramey 1962, J. Pet. Technol. 14(4), 427-435); Ramey's steady profile with `A = m_dot cp R`
   gives `outlet_T = T(depth)`.
+- **Physics**: `ground.ramey_fluid_temperature`, `ground.ramey_relaxation_length`,
+  `ground.ramey_rock_resistance`, `heat_transfer.heat_rate`, `heat_transfer.signed_parts`
 - **Validity**: `alpha t / r_b^2 >= 25`, typically a few days of operation, else
   `ConfigurationError`. Steady state, no load history, perfectly insulated return pipe.
 - **Energy audit**: closed.
@@ -1102,6 +1173,9 @@ Swamee–Jain friction, Beggs–Brill two-phase flow and explicit heat loss
   injection traversal uses the legacy negative flow internally, while its ports keep the
   incoming sign. Helpers: `intake_conditions`, `wellhead_from_discharge`,
   `discharge_from_wellhead`, `corrosion_profile` (mm/year), `erosion_check`.
+- **Physics**: `fluid.heat_capacity_rate`, `heat_transfer.heat_rate`,
+  `hydraulics.affine_correction`, `hydraulics.corrosion_profile`, `hydraulics.erosion_check`,
+  `hydraulics.pipe_path_profile`
 - **Energy audit**: closed; `heat_loss` is signed here (negative when the soil heats the brine).
 
 ```python
@@ -1139,6 +1213,9 @@ Fully mixed hot or chilled water tank with a charge and a discharge circuit.
   (T_i,in - T)` and leaves at `T_i,in - e_i (T_i,in - T)`; `Q_amb = UA (T - T_amb)`;
   `C dT/dt = Q_c + Q_d - Q_amb` (Duffie and Beckman 2013, section 8.3) solved exactly over `dt`
   for constant inlets; outlets and outputs use the start-of-step temperature.
+- **Physics**: `heat_transfer.effectiveness_outlet_temperature`, `heat_transfer.heat_rate`,
+  `heat_transfer.signed_parts`, `storage.circuit_conductance`, `storage.tank_capacity`,
+  `storage.tank_relaxation`, `storage.tank_service_report`
 - **Assumptions**: no stratification (a stratified tank delivers hotter water), constant
   properties and effectiveness, inlets constant within a step.
 - **Energy audit**: closed with the stored-heat term: `heat_accumulation` is the rate of
@@ -1178,6 +1255,9 @@ tracking.
 - **Model**: `e = 1 - exp(-UA / (m_dot cp))` against a uniform store; `duty = e C (T_in - T)`;
   an exact piecewise enthalpy integration crosses at most three segments (sensible liquid,
   latent, sensible ice) per step.
+- **Physics**: `heat_transfer.ambient_effectiveness`,
+  `heat_transfer.effectiveness_outlet_temperature`, `heat_transfer.heat_rate`,
+  `storage.circuit_conductance`, `storage.ice_advance`, `storage.ice_stored_cold`
 - **Assumptions**: constant coil UA (real UA falls as ice thickens; ASHRAE Handbook, HVAC
   Applications, Thermal Storage), no supercooling, perfectly insulated.
 - **Energy audit**: the store declares no `heat_accumulation`, so the residual equals `duty`
@@ -1220,6 +1300,9 @@ as in [Subsurface](#subsurface).
   Geothermics 71, 306-319). A step mixes the injected volume, removes the produced volume
   (an empty store produces native water), then decays each store exactly at its end volume
   (operator splitting, first order in `dt` with flow).
+- **Physics**: `fluid.volume_flow`, `ground.aquifer_stored_energy`, `ground.injected_volume`,
+  `ground.mix_store`, `ground.store_conductance`, `ground.store_relaxation`, `ground.stored_heat`,
+  `ground.thermal_recovery`, `heat_transfer.heat_rate`, `heat_transfer.signed_parts`
 - **Assumptions and validity**: no regional flow, dispersion or buoyancy (stores below about
   30 degC), no well interaction, a mixed store instead of a thermal fringe, a conduction layer
   thin against R and H. Negative flow, or flow in idle mode, raise `PhysicsRangeError`.
@@ -1263,6 +1346,8 @@ parent cannot run under `gm.no_outputs()`.
   uses start-of-step states (a one-step lag of the integral). The integral is frozen while the
   unclamped command is at or beyond a limit and the error drives it further. A plain call
   returns the proportional command only.
+- **Physics**: `control.anti_windup_increment`, `control.pid_command`, `control.pid_derivative`,
+  `control.pid_error`, `control.pid_integral_increment`
 - **Energy audit**: not applicable (no streams, no energy outputs).
 
 ```python
@@ -1298,6 +1383,8 @@ Binary organic Rankine cycle plant heated by brine, with an air-cooled condenser
   working-fluid temperatures `T_a = T_in - pinch`, `T_b = T_out - pinch`; Lorenz work `W_rev =
   Q (1 - T_c ln(T_a/T_b) / (T_a - T_b))`; gross `= fraction W_rev` (DiPippo 2007, Geothermics 36,
   276-285); above `capacity` part of the brine bypasses and mixes adiabatically.
+- **Physics**: `heat_transfer.effectiveness_outlet_temperature`, `heat_transfer.heat_rate`,
+  `power_cycles.cycle_design`, `power_cycles.plant_balance`
 - **Assumptions and validity**: single-phase brine, constant efficiency at part load, bypass
   control. The parasitic load is supplied from the generator, so it is `parasitic_power`, not
   `electricity`. An inlet no hotter than `T_out` produces nothing.
@@ -1328,6 +1415,7 @@ Plants*, 4th ed., section 5.2).
 - **Model**: `h_in` from IF97 region 1 at `max(p_in, p_sat(T_in))` and `T_in`; `x = (h_in -
   h_f) / h_fg` at the setpoint (`steam.flash_fraction`, zero when subcooled); both outlets at
   the setpoint and `T_sat` (a subcooled liquid keeps its temperature).
+- **Physics**: `steam.flash_state`
 - **Assumptions and validity**: pure-water properties, perfect separation, adiabatic vessel;
   the inlet temperature is that of the liquid before flashing. Inlet 273.15 K to 623.15 K,
   setpoint 611.213 Pa to 16.529 MPa. Reverse flow, a steam inlet or a setpoint above the inlet
@@ -1361,6 +1449,7 @@ Single-flash condensing steam turbine with generator and condenser.
   exhaust from `s_g(p_in)`; Baumann wet efficiency `eta = eta_d (1 - a (1 - x_out) / 2)` solved
   in closed form (`steam.baumann_expansion`; Baumann 1921); `gross = m (h_in - h_out)`;
   `condenser_duty = m (h_out - h_f(p_cond))`.
+- **Physics**: `steam.baumann_expansion`, `steam.saturation_properties`, `steam.turbine_balance`
 - **Validity**: pressures within 611.213 Pa to 16.529 MPa, a wet exhaust. A non-steam inlet,
   reverse flow, an inlet at or below the condenser pressure or a dry exhaust raise
   `PhysicsRangeError`. No non-condensable gases or gland losses.
@@ -1391,6 +1480,7 @@ Electricity exchange of a plant with the public grid.
   `is_import_limited`, `is_export_limited`, `cost_rate` (`MoneyRate`, negative is revenue).
 - **Model**: import `max(0, consumption - generation)` and export `max(0, generation -
   consumption)`, each capped by its limit; `cost_rate = p_import import - p_export export`.
+- **Physics**: `electricity.net_exchange`
 - **Energy audit**: not applicable: it declares none of the audited energy outputs, so plant
   electricity is not counted twice.
 
@@ -1420,6 +1510,7 @@ delivered heat at the imposed flow.
   `is_unmet`.
 - **Model**: `Q = min(heat_demand, m_dot cp max(0, T_supply - T_min))`, `T_return = T_supply -
   Q / (m_dot cp)` (ASHRAE Handbook, HVAC Systems and Equipment 2020, chapter 13).
+- **Physics**: `heat_transfer.setpoint_duty`, `heat_transfer.temperature_change`
 - **Assumptions**: steady, no emitter characteristic beyond the return floor, no pressure drop;
   a supply colder than the floor delivers nothing.
 - **Energy audit**: closed.
@@ -1450,6 +1541,8 @@ and a dew-point test.
   T_supply)`; the sensible load is served first; the latent load only when `T_supply <= T_dew -
   margin` (`psychrometrics.dew_point`; ASHRAE Handbook, HVAC Systems and Equipment 2020,
   chapter 23).
+- **Physics**: `heat_transfer.sensible_latent_loads`, `heat_transfer.setpoint_duty`,
+  `heat_transfer.temperature_change`, `psychrometrics.dew_point`
 - **Validity**: indoor air 173.15 K to 473.15 K, relative humidity in (0, 1].
 - **Energy audit**: closed.
 

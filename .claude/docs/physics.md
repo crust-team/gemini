@@ -1,13 +1,521 @@
 # Physics rules
 
-`gemini/physics` contains reusable correlations: unit conversions, constants, fluid
-properties, geometry, hydraulics, heat transfer, pumps, chemistry, corrosion and erosion, and for
-the equipment catalogue ([equipment.md](equipment.md)) gas compression, refrigeration cycles,
-IAPWS-IF97 steam, ground heat transport and psychrometrics (sections below, the original GEMINI
-correlations first).
+`gemini/physics` holds every formula of the package. Modules declare parameters and wire streams;
+they call physics and write no correlation of their own. The files cover unit conversions,
+constants, fluid properties, geometry, hydraulics, heat transfer, pumps, chemistry, corrosion and
+erosion, gas compression, refrigeration cycles, IAPWS-IF97 steam, ground heat transport,
+psychrometrics, separation, combustion, thermal storage, PID control, power cycles, grid
+electricity, energy conversion and health diagnostics. The equipment catalogue
+([equipment.md](equipment.md)) lists the functions each module calls. The sections after the file
+list state the rules, then each subject (the original GEMINI correlations first).
+
+## What each file holds
+
+One heading per file of `gemini/physics/`, one line per public function with its arguments and
+what it computes. Public default constants (`DEFAULT_*` and similar) are not listed. Every
+function carries `@ops.physics` except those named under "Functions without `@ops.physics`".
+
+### `constants.py`
+
+Physical constants retained from the original GEMINI correlations. It holds constants and no
+functions.
+
+### `units.py`
+
+Unit conversions at package and correlation boundaries; historical factors retained.
+
+- `si_unit(unit)`: SI unit that `unit` converts to, or `None` for an unknown unit.
+- `si_conversion(unit, quantity)`: `(scale, offset)` with `to_si(value) == float(value) * scale +
+  offset`.
+- `to_si(value, unit, quantity)`: convert a bound scalar to SI; volume flow remains [m3/s] until
+  density is known.
+- `array_to_si(values, unit, quantity)`: convert an array-like of `unit` values to SI, element for
+  element as `to_si` does.
+- `split_quantity(value)`: `(number, unit)` for a `Quantity` or `"<number> <unit>"` text.
+- `value_in_si(value, expected_unit, path, quantity)`: convert a unit string or `Quantity` to a
+  declaration's SI unit.
+- `convert(value, from_unit, to_unit, quantity)`: convert a scalar between units of the same
+  dimension through SI.
+- `define_quantity(name, unit)`: record that the quantity `name` is stored in the SI unit `unit`.
+- `names(quantity)`: sorted unit names, or those of one quantity such as `"pressure"`.
+- `parse(text)`: `(value, unit)` of `"<number> <unit>"` text such as `"150 m3/h"`.
+- `fits(unit, quantity)`: whether `unit` is a known unit of the named `quantity` (`"pressure"`,
+  `"power"`).
+- `bar_to_pa(x)`: convert [bar] to [Pa]: `x * 1e5`.
+- `pa_to_bar(x)`: convert [Pa] to [bar]: `x / 1e5`.
+- `c_to_k(x)`: convert [degC] to [K]: `x + 273.15`.
+- `k_to_c(x)`: convert [K] to [degC]: `x - 273.15`.
+- `m3h_to_m3s(x)`: convert [m3/h] to [m3/s]: `x / 3600`.
+- `m3s_to_m3h(x)`: convert [m3/s] to [m3/h]: `x * 3600`.
+- `md_to_m2(x)`: convert [mD] to [m2]: `x * 9.869233e-16`.
+- `m2_to_md(x)`: convert [m2] to [mD]: `x / 9.869233e-16`.
+- `m3s_to_bbl_per_day(x)`: convert [m3/s] to [bbl/day]: `x * 543439.650564`.
+- `bbl_per_day_to_m3s(x)`: convert [bbl/day] to [m3/s]: `x / 543439.650564`.
+- `ft_head_to_pa(x)`: convert [ft head] to [Pa]: `x * 2988.30167`.
+- `pa_to_ft_head(x)`: convert [Pa] to [ft head]: `x / 2988.30167`.
+- `bhp_to_w(x)`: convert [bhp] to [W]: `x * 745.7`.
+- `w_to_bhp(x)`: convert [W] to [bhp]: `x / 745.7`.
+- `m_to_ft(x)`: convert [m] to [ft]: `x / 0.3048`.
+- `ft_to_m(x)`: convert [ft] to [m]: `x * 0.3048`.
+- `kgm3_to_lbmft3(x)`: convert [kg/m3] to [lbm/ft3]: `x / 16.01846`.
+- `lbmft3_to_kgm3(x)`: convert [lbm/ft3] to [kg/m3]: `x * 16.01846`.
+- `pas_to_cp(x)`: convert [Pa s] to [cP]: `x / 1e-3`.
+- `cp_to_pas(x)`: convert [cP] to [Pa s]: `x * 1e-3`.
+- `inch_to_m(x)`: convert [inch] to [m]: `x * 0.0254`.
+- `m_to_inch(x)`: convert [m] to [inch]: `x / 0.0254`.
+- `m_to_mm(x)`: convert [m] to [mm]: `x * 1000`.
+- `mm_to_m(x)`: convert [mm] to [m]: `x / 1000`.
+- `m3s_to_m3day(x)`: convert [m3/s] to [m3/day]: `x * 86400`.
+- `m3day_to_m3s(x)`: convert [m3/day] to [m3/s]: `x / 86400`.
+- `index_to_si(x)`: convert [m3/h/bar] to [m3/s/Pa]: `x / 3600 / 1e5`.
+- `index_from_si(x)`: convert [m3/s/Pa] to [m3/h/bar]: `x * 3600 * 1e5`.
+- `c_to_f(x)`: convert [degC] to [degF]: `x * 1.8 + 32`.
+- `bar_to_psi(x)`: convert [bar] to [psi]: `x * 14.503774`.
+- `pa_to_gpa(x)`: convert [Pa] to [GPa]: `x / 1e9`.
+- `gpa_to_pa(x)`: convert [GPa] to [Pa]: `x * 1e9`.
+- `rad_to_deg(x)`: convert [rad] to [deg]: `x * 180 / pi`.
+- `deg_to_rad(x)`: convert [deg] to [rad]: `x * pi / 180`.
+- `m2_to_mm2(x)`: convert [m2] to [mm2]: `x * 1e6`.
+- `ms_to_mm_year(x)`: convert penetration speed [m/s] to [mm/year]: `x * 1000 * 31557600`.
+- `mol_l_bar_to_mol_m3_pa(x)`: convert Henry solubility constant [mol/l/bar] to [mol/m3/Pa]:
+  `x * 0.01`.
+- `kgh_to_kgs(x)`: alias of `m3h_to_m3s`; converts [kg/h] to [kg/s]: `x / 3600`.
+- `nm_to_dyne_cm(x)`: alias of `pas_to_cp`; converts [N/m] to [dyne/cm]: `x / 1e-3`.
+- `dyne_cm_to_nm(x)`: alias of `cp_to_pas`; converts [dyne/cm] to [N/m]: `x * 1e-3`.
+
+### `fluid.py`
+
+Constant fluid properties inherited from GEMINI's PVTConstantSTP model.
+
+- `mixture_density(liquid_density, gas_density, gas_mass_fraction)`: homogeneous mixture density
+  [kg/m3] of a gas mass fraction [-].
+- `volume_flow(mass_flow, density)`: volume flow [m3/s] of a mass flow at a density, `q = m / rho`.
+- `liquid_volume_flow(mass_flow, gas_mass_fraction, liquid_density)`: liquid volume flow [m3/s] of a
+  mixture, `q_l = m (1 - x) / rho_l`.
+- `heat_capacity_rate(mass_flow, heat_capacity)`: heat capacity rate [W/K] of a stream, `C = m cp`.
+
+### `geometry.py`
+
+Pure in-memory pipe geometry calculations.
+
+- `circle_area(diameter)`: area [m2] of a circle, `A = pi * d**2 / 4`.
+- `lateral_area(diameter, length)`: lateral area [m2] of a cylinder, `A = pi d L`.
+- `mean_velocity(mass_flow, density, diameter)`: mean velocity [m/s] of a flow through a circular
+  section, `m / rho / A`.
+- `build_path(trajectory_table, tally_table)`: build a path from SI trajectory and optional SI tally
+  intervals.
+
+### `hydraulics.py`
+
+Pipe hydraulics: Darcy–Weisbach with Swamee–Jain, Beggs–Brill, path marching, radial inflow.
+
+- `reynolds_number(velocity, density, diameter, viscosity)`: Reynolds number [-] of a flow in a
+  pipe, `Re = u rho D / mu`.
+- `darcy_weisbach_dp(velocity, rho, inclination, mu, diameter, roughness, length)`: signed friction
+  and gravity pressure drops [Pa] of one pipe interval.
+- `pipe_friction_drop(velocity, rho, mu, diameter, roughness, length)`: friction pressure drop [Pa]
+  of a liquid in a straight pipe, any regime.
+- `pipe_conductance(heat_transfer_coefficient, diameter, length)`: conductance `UA` [W/K] of a pipe
+  wall, `U pi D L`.
+- `valve_flow_coefficient(rated, opening, rangeability, equal_percentage)`: effective flow
+  coefficient of a control valve at an opening.
+- `affine_correction(pressure, slope, offset)`: a pressure with the affine calibration correction,
+  `a p + b`.
+- `productivity_pressure(reservoir_pressure, flow, productivity)`: bottomhole pressure [Pa] of a
+  producer on a linear IPR, `p - q / PI`.
+- `injectivity_pressure(reservoir_pressure, flow, injectivity)`: bottomhole pressure [Pa] of an
+  injector on a linear law, `p + q / II`.
+- `productivity_index(flow, reservoir_pressure, bottomhole_pressure)`: productivity index [m3/s/Pa]
+  of one measurement, `q / (p_res - p_bh)`.
+- `injectivity_index(flow, reservoir_pressure, bottomhole_pressure)`: injectivity index [m3/s/Pa] of
+  one measurement, `q / (p_bh - p_res)`.
+- `beggs_brill_dp(us_g, us_l, rho_g, rho_l, inclination, mu_g, mu_l, sigma, diameter, roughness,
+  length)`: two-phase friction and gravity pressure drops [Pa] of one pipe interval.
+- `quadratic_pressure_drop(reference_drop, flow, reference_flow)`: pressure drop [Pa] of a fixed
+  resistance: `dp_ref * (q / q_ref)^2`.
+- `valve_pressure_drop(mass_flow, density, flow_coefficient)`: liquid pressure drop [Pa] of a valve:
+  `dp = (rho / rho_0) (q / Kv)^2`.
+- `hydrostatic_dp(rho, height, inclination_sine)`: hydrostatic pressure difference [Pa] of a fluid
+  column, `dp = rho g h s`.
+- `pipe_path_profile(path, stream, fluid, direction, heat_transfer_coefficient, ambient_temperature,
+  correlation, correlation_2p)`: march the pressure and temperature of a stream along a pipe path.
+- `radial_pressure_drops(volume_flow, viscosity, permeability, thickness, drainage_radius,
+  wellbore_radius, skin)`: radial Darcy and skin pressure drops [Pa] of an inflow to a well (Akin
+  2019).
+- `corrosion_profile(path, stream, fluid, direction, heat_transfer_coefficient, ambient_temperature,
+  chemistry, model)`: CO2 corrosion rate [mm/year] of each section along the hydraulic profile.
+- `erosion_check(path, stream, fluid)`: compare section velocities with the API erosional velocity
+  limit.
+
+### `heat_transfer.py`
+
+Pipe heat loss and standard heat-exchanger effectiveness relations.
+
+- `pipe_temperature_change(inlet_temperature, heat_transfer_coefficient, area, liquid_mass_flow,
+  gas_mass_flow, liquid_heat_capacity, gas_heat_capacity, ambient_temperature)`: legacy explicit
+  heat-loss increment [K] using SI inputs.
+- `lmtd(dt1, dt2)`: logarithmic mean temperature difference; reject a temperature cross.
+- `ntu(ua, c_min)`: number of transfer units.
+- `effectiveness_counterflow(transfer_units, c_ratio)`: counterflow heat-exchanger effectiveness.
+- `effectiveness_parallel(transfer_units, c_ratio)`: parallel-flow heat-exchanger effectiveness.
+- `logarithmic_mean(first, second)`: logarithmic mean of two positive values, without guards.
+- `signed_parts(value)`: positive part and the negative part of a signed value.
+- `heat_rate(capacity_rate, temperature_difference)`: sensible heat rate of a stream.
+- `setpoint_duty(capacity_rate, temperature_gap)`: heat needed to close a temperature gap; zero when
+  there is no gap.
+- `temperature_change(duty, capacity_rate)`: temperature change of a stream that receives a duty;
+  zero when stopped.
+- `effectiveness_outlet_temperature(inlet_temperature, effectiveness, reference_temperature)`:
+  outlet temperature of a stream from the effectiveness definition.
+- `ambient_effectiveness(conductance, capacity_rate)`: effectiveness of a stream exchanging heat
+  with a constant temperature.
+- `relaxation_factor(conductance, duration, heat_capacity)`: decay factor of a lumped body relaxing
+  towards its surroundings.
+- `exponential_relaxation(start, equilibrium, factor)`: value after an exponential approach to an
+  equilibrium.
+- `mixed_temperature(first_rate, first_temperature, second_rate, second_temperature)`: adiabatic
+  mixing temperature of two streams of the same fluid.
+- `sensible_latent_loads(available, sensible_demand, latent_demand, is_dry)`: sensible and latent
+  loads a cooling circuit takes up, sensible served first.
+- `fan_power(duty, specific_fan_power)`: fan electricity of a cooler that is proportional to its
+  duty.
+- `mean_temperature(first, second)`: arithmetic mean of two temperatures.
+- `exchanger_balance(hot_inlet, cold_inlet, hot_rate, cold_rate, conductance, counterflow)`:
+  effectiveness-NTU balance of a two-stream heat exchanger.
+- `terminal_differences(hot_in, hot_out, cold_in, cold_out, counterflow)`: two terminal temperature
+  differences of a two-stream exchanger.
+- `apparent_conductance(arrangement, hot_in_T, hot_out_T, cold_in_T, cold_out_T, m_dot_hot,
+  m_dot_cold, cp_hot, cp_cold)`: `(UA, code, hot duty, cold duty, LMTD)` from measured temperatures
+  and flows.
+
+### `ground.py`
+
+Ground and aquifer heat transport: doublet breakthrough, conduction shapes, Ramey profiles.
+
+- `aquifer_volumetric_heat_capacity(porosity, fluid_heat_capacity, rock_heat_capacity)`: bulk
+  volumetric heat capacity [J/m3/K] of a saturated aquifer.
+- `doublet_breakthrough_volume(well_spacing, thickness, aquifer_heat_capacity,
+  fluid_heat_capacity)`: injected volume [m3] at which the cold front reaches the producer.
+- `doublet_cold_fraction(volume_ratio)`: share [-] of the produced flow that arrives at the
+  injection temperature.
+- `cylinder_store_conductance(conductivity, diffusivity, volume, height, period)`: period-mean
+  conduction conductance [W/K] of a cylindrical heat store.
+- `vertical_cylinder_conductance(conductivity, length, diameter)`: steady conductance [W/K] of a
+  vertical cylinder below an isothermal surface.
+- `steady_flux_resistance(conductivity, borehole_radius, cell_radius)`: ground resistance [m K/W]
+  between a borehole wall and its cell's mean.
+- `ramey_time_function(time, diffusivity, radius)`: Ramey's dimensionless transient conduction
+  function f(t) [-].
+- `ramey_fluid_temperature(inlet_temperature, top_temperature, gradient, length,
+  relaxation_length)`: temperature [K] of a fluid after flowing `length` down a geothermal gradient.
+- `injected_volume(volume_flow, duration)`: liquid volume that flows through a well during a step.
+- `doublet_temperature_drop(injected, breakthrough, reservoir_temperature, injection_temperature)`:
+  drop of the produced temperature of a doublet after thermal breakthrough.
+- `doublet_breakthrough_time(breakthrough, volume_flow)`: time for a doublet's thermal front to
+  reach the producer; `None` at no flow.
+- `store_conductance(volume, conductivity, porosity, water_volumetric_heat_capacity,
+  rock_heat_capacity, height, period)`: conduction conductance [W/K] of an aquifer store of injected
+  water volume.
+- `mix_store(volume, change, added_volume, added_change)`: a fully mixed store after water is
+  injected into it.
+- `store_relaxation(change, volume, conductance, duration, water_volumetric_heat_capacity)`: a
+  store's temperature change after conduction towards the aquifer temperature.
+- `stored_heat(water_volumetric_heat_capacity, volume, change)`: excess heat of a water volume at a
+  temperature change.
+- `aquifer_stored_energy(water_volumetric_heat_capacity, warm_volume, warm_change, cold_volume,
+  cold_change)`: net excess heat of the warm and the cold store of a well pair.
+- `thermal_recovery(recovered_heat, charged_heat)`: thermal recovery efficiency of a store; `None`
+  until heat has been charged.
+- `borehole_loop_conductance(capacity_rate, count, depth, radius, spacing, conductivity,
+  borehole_resistance)`: inlet-to-ground conductance of the loops of a borehole field.
+- `borehole_field_surroundings_conductance(count, spacing, depth, conductivity)`: conductance [W/K]
+  between a borehole field volume and the undisturbed ground.
+- `borehole_field_capacity(volumetric_heat_capacity, count, spacing, depth)`: heat capacity [J/K] of
+  the lumped ground volume of a borehole field.
+- `borehole_field_temperature_change(change, exchange, surroundings, inlet_temperature,
+  undisturbed_temperature, duration, capacity)`: ground temperature change of a borehole field after
+  one step.
+- `ramey_rock_resistance(time, diffusivity, borehole_radius, conductivity)`: transient rock
+  resistance [m K/W] of a well at an operating time.
+- `ramey_relaxation_length(capacity_rate, borehole_resistance, rock_resistance)`: Ramey's relaxation
+  length of the circuit fluid.
+
+### `pumps.py`
+
+Pump relations: TNO R11363 polynomials on the US basis, affinity-law curves, efficiencies.
+
+- `head(volume_flow, frequency, stages, coefficients)`: pressure rise [Pa] from flow [m3/s],
+  frequency [Hz], stages and ft coefficients.
+- `power(volume_flow, frequency, stages, coefficients)`: power [W] from flow [m3/s], frequency [Hz],
+  stages and bhp coefficients.
+- `speed_ratio(frequency, rated_frequency)`: speed ratio of a variable-speed pump.
+- `centrifugal_head(flow, speed, coefficients)`: pressure rise of a centrifugal pump from its
+  quadratic curve and the speed.
+- `best_efficiency_ratio(flow, speed, best_efficiency_flow)`: flow relative to the speed-scaled
+  best-efficiency flow.
+- `parabolic_efficiency(best_efficiency, load)`: hydraulic efficiency of the parabola through the
+  origin.
+- `hydraulic_power(flow, head)`: power given to the liquid by a pump.
+- `pump_efficiency(flow, head, power)`: SI efficiency of a pump from a measured or modelled power;
+  zero when stopped.
+- `esp_efficiency(flow, head, power)`: retained US-basis ESP efficiency; zero for a stopped pump.
+- `is_in_operating_window(flow, minimum_flow, maximum_flow, speed)`: whether a flow lies inside the
+  speed-scaled operating window of a pump.
+- `line_shaft_friction_power(friction_loss, depth, speed)`: mechanical friction power of a line
+  shaft.
+
+### `compression.py`
+
+Ideal-gas adiabatic compression with an isentropic efficiency and intercooled stages.
+
+- `isentropic_outlet_temperature(inlet_temperature, pressure_ratio, heat_capacity_ratio)`: ideal-gas
+  isentropic outlet temperature [K] of one compression stage.
+- `stage_outlet_temperature(inlet_temperature, pressure_ratio, heat_capacity_ratio,
+  isentropic_efficiency)`: adiabatic outlet temperature [K] of one stage with an isentropic
+  efficiency.
+- `stage_pressure_ratio(pressure_ratio, stages)`: pressure ratio of each of several equal stages.
+- `overall_pressure_ratio(discharge_pressure, suction_pressure)`: overall pressure ratio of a
+  compressor.
+- `specific_compression_work(inlet_temperature, pressure_ratio, heat_capacity_ratio, specific_heat,
+  isentropic_efficiency, stages)`: shaft work per kg of gas [J/kg] of an intercooled multistage
+  compressor.
+- `shaft_power(mass_flow, specific_work)`: shaft power of a compressor.
+- `heat_rejected(electricity, shaft_power, stages)`: heat an intercooled electric compressor rejects
+  to its surroundings.
+
+### `refrigeration.py`
+
+Heat pump and chiller relations: Carnot and Lorenz COPs, sorption equations, part load.
+
+- `carnot_cop_heating(sink_temperature, source_temperature, minimum_lift)`: Carnot heating COP of a
+  heat pump.
+- `carnot_cop_cooling(sink_temperature, source_temperature, minimum_lift)`: Carnot cooling COP
+  (energy efficiency ratio) of a chiller.
+- `log_mean_temperature(inlet_temperature, outlet_temperature)`: logarithmic mean (thermodynamic
+  mean) temperature of a sensible glide.
+- `lorenz_cop_heating(sink_inlet, sink_outlet, source_inlet, source_outlet, minimum_lift)`: Lorenz
+  (gliding-temperature) heating COP of a heat pump.
+- `characteristic_temperature_difference(generator_temperature, rejection_temperature,
+  evaporator_temperature, rejection_coefficient, evaporator_coefficient)`: characteristic
+  temperature difference of a sorption machine.
+- `characteristic_evaporator_duty(driving_difference, minimum_driving_difference, slope,
+  sensitivity)`: evaporator duty [W] of a sorption machine from its characteristic equation.
+- `characteristic_sensitivity(generator_rate, rejection_rate, evaporator_rate, generator_ratio,
+  rejection_ratio, rejection_coefficient, evaporator_coefficient)`: how much the mean-temperature
+  ddt falls per watt of evaporator duty [K/W].
+- `sorption_evaporator_capacity(generator_temperature, rejection_temperature,
+  evaporator_temperature, generator_rate, rejection_rate, evaporator_rate, slope,
+  minimum_driving_difference, rejection_coefficient, evaporator_coefficient, thermal_cop,
+  auxiliary_power_ratio)`: largest evaporator duty [W] a sorption chiller delivers at these inlets.
+- `sorption_rejection_ratio(thermal_cop, auxiliary_power_ratio)`: heat-rejection duty of a sorption
+  machine per unit evaporator duty.
+- `sorption_delivered_duty(requested, available, capacity, useful_ratio)`: evaporator duty a
+  sorption machine delivers and whether it falls short.
+- `coefficient_of_performance(useful_duty, input_duty)`: coefficient of performance of a machine.
+- `sorption_duties(evaporator_duty, thermal_cop, auxiliary_power_ratio)`: generator duty, auxiliary
+  electricity and rejected heat of a sorption machine.
+- `part_load_duty(requested, capacity, minimum_part_load)`: duty [W] a capacity-limited machine with
+  a minimum part load delivers.
+- `carnot_fraction_cop_heating(efficiency, minimum_lift, sink_inlet, sink_outlet, source_inlet,
+  source_outlet)`: heating COP as a fraction of the Carnot COP at the outlet temperatures.
+- `carnot_fraction_cop_cooling(efficiency, minimum_lift, sink_inlet, sink_outlet, source_inlet,
+  source_outlet)`: cooling COP as a fraction of the Carnot COP at the outlet temperatures.
+- `lorenz_fraction_cop_heating(efficiency, minimum_lift, sink_inlet, sink_outlet, source_inlet,
+  source_outlet)`: heating COP as a fraction of the Lorenz COP at the circuit glides.
+- `heating_evaporator_duty(condenser_duty, cop)`: evaporator duty of a heat pump from its condenser
+  duty and heating COP.
+- `cooling_condenser_duty(evaporator_duty, cop)`: condenser duty of a chiller from its evaporator
+  duty and cooling COP.
+- `carnot_heating_source_outlet(source_inlet, temperature_change, sink_outlet, efficiency,
+  minimum_lift)`: source outlet temperature that closes the balance of a Carnot-fraction pump.
+- `heating_cop_minimum_source(sink_outlet, efficiency)`: source temperature below which a
+  Carnot-fraction heating COP is at most 1.
+- `carnot_cooling_sink_outlet(sink_inlet, temperature_change, source_outlet, efficiency,
+  minimum_lift)`: sink outlet temperature that closes the balance of a Carnot-fraction chiller.
+- `cooling_minimum_sink_rate(duty, efficiency, source_outlet)`: sink capacity rate [W/K] a
+  Carnot-fraction chiller needs to reject its duty.
+- `lorenz_source_surplus(source_outlet, source_rate, source_inlet, sink_inlet, sink_outlet, duty,
+  efficiency, minimum_lift)`: evaporator balance surplus [W] of a Lorenz-fraction pump at a source
+  outlet.
+- `source_limit_shortfall(cop_function, useful_duty, sink_inlet, sink_rate, source_inlet,
+  source_limit, available, efficiency, minimum_lift)`: evaporator demand minus the available source
+  heat [W] at a heating duty.
+
+### `steam.py`
+
+Saturated water and steam properties from IAPWS-IF97 and wet steam expansion.
+
+- `saturation_pressure(temperature)`: saturation pressure [Pa] of water at a temperature [K].
+- `saturation_temperature(pressure)`: saturation temperature [K] of water at a pressure [Pa].
+- `liquid_enthalpy(pressure, temperature)`: specific enthalpy [J/kg] of liquid water in IF97 region
+  1.
+- `liquid_entropy(pressure, temperature)`: specific entropy [J/kg/K] of liquid water in IF97 region
+  1.
+- `vapour_enthalpy(pressure, temperature)`: specific enthalpy [J/kg] of steam in IF97 region 2.
+- `vapour_entropy(pressure, temperature)`: specific entropy [J/kg/K] of steam in IF97 region 2.
+- `b23_pressure(temperature)`: region 2/3 boundary pressure [Pa] (IF97 eq. 5, 623.15 K to 863.15 K).
+- `saturation_properties(pressure)`: saturated liquid and vapour enthalpy and entropy at a pressure
+  [Pa].
+- `flash_fraction(enthalpy, pressure)`: steam mass fraction [-] after isenthalpic flashing to a
+  pressure [Pa].
+- `flash_state(mass_flow, inlet_temperature, inlet_pressure, flash_pressure)`: single-flash split of
+  a liquid into saturated steam and brine.
+- `turbine_balance(mass_flow, inlet_enthalpy, outlet_enthalpy, condensate_enthalpy,
+  generator_efficiency)`: enthalpy balance of a condensing turbine, generator and condenser.
+- `baumann_expansion(inlet_pressure, outlet_pressure, dry_efficiency, baumann_factor)`: expansion of
+  dry saturated steam into the wet region with the Baumann rule.
+
+### `psychrometrics.py`
+
+Moist-air psychrometrics: saturation pressure, dew point, humidity ratio and wet bulb.
+
+- `saturation_pressure(temperature)`: saturation pressure of water vapour [Pa] over ice or liquid
+  water.
+- `dew_point(temperature, relative_humidity)`: dew-point temperature [K] of moist air.
+- `evaporation_rate(duty, latent_heat)`: water evaporated when a duty is rejected as latent heat.
+- `humidity_ratio(temperature, relative_humidity, pressure)`: humidity ratio [kg water vapour per kg
+  dry air] of moist air.
+- `wet_bulb_temperature(temperature, relative_humidity)`: psychrometric wet-bulb temperature [K] at
+  standard sea-level pressure.
+
+### `chemistry.py`
+
+Henry-law CO2 partition model retained from GEMINI water-analysis workflows.
+
+- `henry_constant(temperature)`: temperature-dependent Henry solubility constant.
+- `co2_solubility_liquid(co2_fraction, temperature, pressure)`: evaluate dissolved CO2 using Henry's
+  law.
+- `co2_solubility_gas(co2_fraction, gas_water_ratio, gas_density, gas_molecular_weight)`: evaluate
+  CO2 contained in the gas per unit water volume.
+- `co2_partial_pressure(co2_fraction, gas_pressure, gas_water_ratio, gas_density,
+  gas_molecular_weight, temperature_sample, temperature_system)`: CO2 partial pressure [Pa] from SI
+  sample and system conditions.
+
+### `corrosion.py`
+
+CO2 corrosion correlations (NORSOK M-506, de Waard–Lotz 1991/1995) and wall-loss helpers.
+
+- `co2_corrosion_rate(model, fitted, temperature, pressure, water_flow_rate, water_density,
+  water_viscosity, diameter, roughness, co2_fraction, co2_partial_pressure, bicarb_concentration,
+  ionic_strength, coefficients)`: CO2 wall penetration rate [mm/year] of the NORSOK, DLM or DLD
+  correlation.
+- `wall_loss(rates_mm_per_year, durations_s)`: cumulative radial wall loss [mm] of
+  piecewise-constant corrosion rates.
+- `remaining_wall_thickness(outer_radius, inner_radius, loss)`: remaining wall thickness [m], `t =
+  r_o - (r_i + loss)`.
+- `time_to_minimum_wall(thickness, minimum, rate)`: time [s] to a minimum wall thickness, `t = (w -
+  w_min) / rate`.
+
+### `erosion.py`
+
+Erosion correlations: DNV RP O501, OKA, E/CRC Tulsa and API RP 14E.
+
+- `erosion_rate(model, flow_rate, rho_fluid, diameter, alpha, material, hardness, particle_material,
+  particle_diameter, rho_pipe, shape_factor)`: erosion rate [mm/year] of the DNV, OKA or E/CRC Tulsa
+  correlation.
+- `api_erosional_velocity(rho_fluid)`: API erosional velocity limit [m/s], `u_e = C / sqrt(rho)`.
+- `api_velocity_comparison(actual, limit)`: compare actual and limiting flow velocities.
+
+### `separation.py`
+
+Flow splitting, gas separation, cyclone sand removal, chemical dosing and filter defaults.
+
+- `split_flow(mass_flow, fraction)`: remainder and the branch of a mass flow split, `(m - f m, f
+  m)`.
+- `degasser_split(mass_flow, gas_mass_fraction, efficiency)`: liquid flow, the separated gas flow
+  and the gas fraction left in the liquid.
+- `cyclone_sand(efficiency, sand_concentration, liquid_flow)`: sand removal rate and the residual
+  sand concentration of a cyclone.
+- `dosing_flows(dose, mass_flow, product_concentration)`: product and the active mass flow of a
+  chemical dosing.
+
+### `combustion.py`
+
+Fuel-fired heat and power: fuel input of a boiler or engine, flare emissions.
+
+- `willans_fuel_input(load, electric_capacity, electric_efficiency, no_load_fraction)`: fuel power
+  of an engine on its Willans line; zero when the engine is off.
+- `engine_energy_flows(fuel, load, electric_capacity, thermal_efficiency)`: recoverable engine heat
+  and the electric output of a combined heat and power unit.
+- `flare_emissions(gas_flow, co2_fraction, methane_fraction, combustion_efficiency, heating_value)`:
+  CO2 and methane emissions and the fuel power of a flared gas.
+
+### `storage.py`
+
+Thermal storage: mixed water tanks, coil conductance and the phase segments of an ice store.
+
+- `circuit_conductance(effectiveness, capacity_rate)`: conductance of a circuit exchanging heat with
+  a store at uniform temperature.
+- `tank_capacity(volumetric_heat_capacity, volume)`: heat capacity of a tank of liquid.
+- `tank_service_report(hot, capacity, temperature, reference_temperature, charge_heat,
+  discharge_heat)`: stored energy and the two circuit duties of a tank, signed by its service.
+- `tank_relaxation(temperature, capacity, duration, charge_conductance, charge_temperature,
+  discharge_conductance, discharge_temperature, loss_conductance, ambient_temperature)`: temperature
+  of a fully mixed tank after a step with constant inlets.
+- `ice_stored_cold(water_mass, latent_heat, fraction)`: latent cold stored in an ice store.
+- `ice_advance(fraction, temperature, duration, inlet_temperature, conductance, water_mass,
+  latent_heat, freezing_temperature, water_specific_heat, ice_specific_heat)`: frozen fraction and
+  the temperature of an ice store after a step.
+- `ice_step(fraction, temperature, duration, inlet_temperature, conductance, water_mass,
+  latent_heat, freezing_temperature, water_specific_heat, ice_specific_heat)`: advances an ice store
+  through one phase segment.
+
+### `control.py`
+
+Discrete PID control: the error, the ideal-form command and the clamped integral.
+
+- `pid_error(setpoint, measurement, reverse)`: control error in the sense of the controller
+  direction.
+- `pid_derivative(gain, derivative_time, error_change, previous_step)`: derivative term of the ideal
+  PID form.
+- `pid_command(gain, error, integral, derivative)`: unclamped command of the ideal PID form.
+- `pid_integral_increment(gain, duration, integral_time, error)`: increase of the integral term over
+  one step.
+- `anti_windup_increment(increment, unclamped, minimum_output, maximum_output)`: integral increment,
+  zero while the output is clamped and driven further out.
+
+### `power_cycles.py`
+
+Binary organic Rankine cycle plant relations: Lorenz efficiency, capacity cap, energy balance.
+
+- `lorenz_efficiency(hot_temperature, cold_temperature, condensing_temperature)`: reversible
+  efficiency of a sensible heat glide rejected at a temperature.
+- `cycle_design(brine_temperature, brine_mass_flow, brine_heat_capacity, ambient_temperature,
+  condenser_approach, pinch, minimum_outlet_temperature, carnot_fraction, capacity)`: design point
+  of an air-cooled binary cycle fed by brine.
+- `plant_balance(heat_input, cycle_efficiency, parasitic_fraction)`: energy balance of a binary
+  plant from its heat input.
+
+### `electricity.py`
+
+Electricity exchange of a plant with a grid connection of limited capacity.
+
+- `net_exchange(consumption, generation, import_limit, export_limit, import_price, export_price)`:
+  import and export of a plant through a limited grid connection.
+
+### `energy.py`
+
+Energy conversion through an efficiency, shared by pumps, compressors, motors and burners.
+
+- `input_power(useful_power, efficiency)`: power a converter draws for a useful power, `P_in = P_out
+  / eta`.
+
+### `diagnostics.py`
+
+Health-scoring relations shared by the modules: drift, bounded score, margin, limit test.
+
+- `relative_drift(measured, predicted)`: relative deviation of a measurement from its prediction.
+- `bounded_score(ratio)`: a ratio clipped to [0, 1], a health score.
+- `remaining_margin(ratio)`: margin left before a ratio reaches one.
+- `below_limit(ratio, threshold)`: whether a ratio fell by more than the threshold.
+- `performance_ratio(measured, reference)`: a measured performance over its reference value,
+  `measured / reference` [-].
+
+## Rules
 
 - Use plain typed functions and SI inputs/outputs; small structured return models are allowed.
-- Every function runs on floats, arrays and traced values. Public functions carry `@ops.physics`:
+- Every function runs on floats, arrays and traced values. Public functions carry `@ops.physics`
+  (exceptions: see "Functions without `@ops.physics`"):
   it gives scalars NumPy types, so plain `/` and `**` are silent in an eager call as they are on
   arrays and in a graph. A value-dependent `if` is `ops.where`, a `raise` is `ops.check` with the
   same class and message, and `math.*` is an op (see [native-engine.md](native-engine.md)). A check
@@ -54,8 +562,8 @@ returns one cached snapshot per complete `Fluid` value.
   `gmf` = 0, `mu_l` = 0.001 Pa s, `mu_g` = 21.29e-6 Pa s, `cp_l` = 4217.4 J/kg/K, `cp_g` =
   819 J/kg/K, `k_l` = 1.6 W/m/K, `k_g` = 0.0147 W/m/K, `sigma` = 0.0728 N/m.
 - `density` = `1 / (gmf / rho_g + (1 - gmf) / rho_l)` [kg/m3], the homogeneous mixture density
-  from the gas mass fraction `gmf`; `mixture_density(rho_l, rho_g, gmf)` is the same formula
-  for floats, arrays and traced values.
+  from the gas mass fraction `gmf`; `fluid.mixture_density(liquid_density, gas_density,
+  gas_mass_fraction)` is the same formula for floats, arrays and traced values.
 - `kind` is `brine` (default), `water`, `glycol_water` or `steam`. `glycol_water` replaces the
   liquid values by DOWFROST HD, 30 % propylene glycol by volume at 40 degC: `rho_l` = 1029.85,
   `cp_l` = 3841, `k_l` = 0.4622, `mu_l` = 0.0016295 (SI). `liquid_density`, `liquid_viscosity`,
@@ -82,9 +590,10 @@ horizontal, positive when descending in surface-to-bottom order. Friction and gr
 signed so that the pressure rises by both when flowing down and falls by both when flowing up.
 
 - `darcy_weisbach_dp(u, rho, theta, mu, D, K, L)` = friction `f rho L / D |u| u / 2` and
-  gravity `rho g L sin(theta)` [Pa], with `Re = |u| rho D / mu` and the Swamee and Jain (1976)
-  friction factor `f = 0.25 / log10(K / (3.7 D) + 5.74 / Re^0.9)^2`; `g` = 9.81 m/s2. Zero
-  velocity gives zero friction.
+  gravity `rho g L sin(theta)` [Pa], the gravity term being `hydrostatic_dp(rho, L, sin(theta))`.
+  `Re = hydraulics.reynolds_number(|u|, rho, D, mu)` = `|u| rho D / mu` and `f` is the Swamee and
+  Jain (1976) friction factor `0.25 / log10(K / (3.7 D) + 5.74 / Re^0.9)^2`; `g` = 9.81 m/s2.
+  Zero velocity gives zero friction.
 - `beggs_brill_dp(us_g, us_l, ...)`: two-phase friction and gravity drops (Beggs and Brill 1973,
   as in Shoham 2006, p. 59). The regime and holdup use the US basis (ft/s, lbm/ft3, dyne/cm,
   ft, `g` = 32.17405 ft/s2). With no-slip holdup `lambda = us_l / (us_g + us_l)`, liquid
@@ -105,13 +614,15 @@ signed so that the pressure rises by both when flowing down and falls by both wh
   ln Re - 3.8215) / Re + K / (3.71 D)))^-2`, friction `0.5 rho_m u_m |u_m| f_n exp(s) L / D`
   and gravity `(H_l rho_l + (1 - H_l) rho_g) g L sin(theta)` [Pa]. The SI terms use inputs
   converted to the US basis and back, which changes the last bits and is kept for the goldens.
-- `pipe_path_profile(path, stream, fluid, direction, heat_transfer_coefficient, T_ambient)` takes each section
-  from `Fluid.properties`: `Q = m_dot / density`, `us_l = (1 - gmf) m / rho_l / A` and, with
-  `A = pi D^2 / 4`, Darcy-Weisbach when the gas mass flow is zero, otherwise Beggs-Brill with
-  `us_g = gmf / rho_g / A`; the gas velocity keeps the original form, which ignores the flow
-  rate. Pressures are floored at 0.001 Pa. `direction` is `up` or `down`; zero flow gives zero
-  drops (gravity too). The marched outlet is uncorrected; the affine correction
-  `p = a p_out + b` belongs to the `Well` module.
+- `pipe_path_profile(path, stream, fluid, direction, heat_transfer_coefficient,
+  ambient_temperature)` takes each section from `Fluid.properties`: `Q = fluid.volume_flow(m_dot,
+  density)`, the velocities `geometry.mean_velocity(m, rho, D)` = `m / rho / A` with `A =
+  pi D^2 / 4`, `us_l` from `(1 - gmf) m` and `rho_l`, and Darcy-Weisbach when the gas mass
+  fraction is zero, otherwise Beggs-Brill with `us_g = mean_velocity(gmf, rho_g, D)`; the gas
+  velocity keeps the original form, which ignores the flow rate. Pressures are floored at 0.001
+  Pa. `direction` is `up` or `down`; zero flow gives zero drops (gravity too). The marched outlet
+  is uncorrected; the affine correction `p = a p_out + b` is `hydraulics.affine_correction`,
+  applied by the `Well` module.
 - `geometry.build_path(trajectory, tally)` makes one section per trajectory interval:
   `sin(theta) = delta_TVD / delta_MD`, rounded to 0.01 degree as in WIMS, with the diameter and
   roughness of the interval's end point, split at tally joints (a tally interval covering the
@@ -135,17 +646,24 @@ conditions, `Q = m_dot / rho_l`.
 - Production: `p_bh = p_res - Q / PI` [Pa], `PI` the productivity index [m3/s/Pa].
 - Injection: `p_bh = p_res + Q / II` [Pa], `II` the injectivity index [m3/s/Pa] and `Q` the
   absolute volume flow of the arriving stream.
-- `productivity_from_measurements` = `Q / (p_res - p_bh)` and `injectivity_from_measurements`
-  = `Q / (p_bh - p_res)`; equal pressures raise `PhysicsRangeError`.
-- `estimate_pressure(Q_i, p_bh,i)` fits `p_bh / Q = p_res (1 / Q) + b` by least squares: the
+- `hydraulics.productivity_index(Q, p_res, p_bh)` = `Q / (p_res - p_bh)` and
+  `hydraulics.injectivity_index` = `Q / (p_bh - p_res)`. The reservoir methods
+  `productivity_from_measurements` and `injectivity_from_measurements` call them and raise
+  `PhysicsRangeError` for equal pressures, a check the physics functions do not make; the
+  functions then return infinity. `productivity_pressure` and `injectivity_pressure` are the two
+  inflow relations above.
+- `gm.analysis.estimate_reservoir_pressure(flows, bottomhole_pressures)` (not in `physics`) fits
+  `p_bh / Q = p_res (1 / Q) + b` by least squares: the
   slope is the reservoir pressure and the second return value is the R-squared of the fit.
 - `radial_pressure_drops(Q, mu, k, h, r_e, r_w, S)` = flow drop `Q mu ln(r_e / r_w) / (2 pi k
   h)` and skin drop `Q mu S / (2 pi k h)` [Pa]; the radial bottomhole pressure is `p_res +
   flow drop + skin drop`.
-- `hydrostatic_dp(rho, height)` = `rho g height` [Pa] with `g` = 9.81 m/s2; the reservoir
-  reports it for `rho_l` and the top depth.
+- `hydrostatic_dp(rho, height, inclination_sine=1.0)` = `rho g height s` [Pa] with `g` = 9.81
+  m/s2; the reservoir reports it for `rho_l` and the top depth, the pipe and the path functions
+  pass `s = sin(theta)`.
 
-A nonpositive `k`, `h`, `r_e` or `r_w` raises `PhysicsRangeError`; `estimate_pressure` needs at
+A nonpositive `k`, `h`, `r_e` or `r_w` raises `PhysicsRangeError`;
+`estimate_reservoir_pressure` needs at
 least two finite, nonzero, varying samples (`InsufficientDataError`). Both indices default to
 `None` and a missing one raises `ConfigurationError`. The linear relations take the viscosity
 and density only through the flow; `mu_l` and `rho_l` come from the reservoir fluid with its
@@ -164,21 +682,53 @@ stage:
   `745.7` W/bhp converts it.
 - `q = Q * 543439.650564` bbl/day for a flow `Q` in m3/s. Head follows the square and power the
   cube of the frequency ratio (affinity laws).
-- `ESP.efficiency_function(Q, H, P)` = `(q / 135773) (H / P) (745.7 / 2988.30167)` [-], a
-  fraction, and 0 when `P < 0.1` W (it is in `modules/pumps/esp.py`).
+- `esp_efficiency(Q, H, P)` = `(q / 135773) (H / P) (745.7 / 2988.30167)` [-], a fraction, and
+  0 when `P < ESP_MIN_EFFICIENCY_POWER` = 0.1 W.
 - Every constant of `constants.py` (`G`, `G_FT`, `CO2_MOLAR_MASS`, `MIN_PATH_PRESSURE`,
-  `ESP_REFERENCE_FREQUENCY`, `ESP_EFFICIENCY_FLOW_FACTOR`) and the ESP's `MIN_EFFICIENCY_POWER`
+  `ESP_REFERENCE_FREQUENCY`, `ESP_EFFICIENCY_FLOW_FACTOR`, `VALVE_REFERENCE_DENSITY`) and the
+  pump thresholds `ESP_MIN_EFFICIENCY_POWER` and `LINE_SHAFT_MIN_EFFICIENCY_POWER` of `pumps.py`
   are `gemini.ops.Constant` objects: plain floats in arithmetic and comparisons on concrete
   values (bit for bit, float32 promotion included) and named graph inputs when traced. A
   `Constant` is not a `float`: use `float(constant)` or `.value` where a float is needed, and
   `ops.maximum`/`ops.minimum` instead of `max`/`min` (the builtins would return the object).
-  The ESP's validity check and branch are `ops.check` and `ops.where`, so the same code is
-  traced (see [native-engine.md](native-engine.md)). The efficiency branch divides with
-  `ops.truediv(head, power)` because `where` evaluates both branches and the power curve may be
-  zero: `/` on two Python floats would raise before `where` is reached.
+  The ESP module's validity check and the branch of `esp_efficiency` are `ops.check` and
+  `ops.where`, so the same code is traced (see [native-engine.md](native-engine.md)). The
+  efficiency branch divides with `ops.truediv(head, power)` because `where` evaluates both
+  branches and the power curve may be zero: `/` on two Python floats would raise before
+  `where` is reached.
 
 The polynomials are only valid inside the flow range of the manufacturer curve; the functions
 do not check it and raise nothing. Any number of coefficients is accepted.
+
+### Centrifugal pump
+
+`pumps.py` also holds the SI curves of `CentrifugalPump`: a quadratic head curve with a parabolic
+efficiency, scaled by the speed ratio.
+
+- `speed_ratio(f, f_rated)` = `s = f / f_rated` [-]; the speed follows the supply frequency of an
+  induction motor.
+- `centrifugal_head(Q, s, c)` = `c0 s^2 + c1 s Q + c2 Q^2` [Pa] for the rated-speed curve `H = c0 +
+  c1 Q + c2 Q^2` (three coefficients in Pa, Pa s/m3, Pa s2/m6); the affinity laws `Q ~ s`,
+  `H ~ s^2`, valid for speed ratios of about 0.5 to 1.1 (Karassik et al., Pump Handbook, 4th ed.,
+  chapter 2).
+- `best_efficiency_ratio(Q, s, Q_bep)` = `x = Q / (s Q_bep)` [-], one at the best-efficiency
+  point; the best-efficiency flow scales with speed.
+- `parabolic_efficiency(eta_bep, x)` = `eta_bep x (2 - x)` [-] (Ulanicki, Kahler and Coulbeck
+  2008); the 2 is the shape of the parabola, zero slope at `x = 1`.
+- `hydraulic_power(Q, H)` = `Q H` [W], the power given to the liquid.
+- `is_in_operating_window(Q, Q_min, Q_max, s)` = `s Q_min <= Q <= s Q_max`; `ESP` uses the same
+  function.
+
+### Line shaft pump
+
+`LineShaftPump` uses the ESP polynomials `head` and `power` and adds a shaft term and an SI
+efficiency.
+
+- `line_shaft_friction_power(k, L, s)` = `k L s` [W]: the friction per shaft length `k` [W/m] at
+  catalogue speed grows in proportion to speed (constant bearing friction torque; the form of
+  the ANSI/HI 2.3 tables).
+- `pump_efficiency(Q, H, P)` = `Q H / P` [-], 0 when `P < LINE_SHAFT_MIN_EFFICIENCY_POWER` = 0.1 W.
+  It is not bitwise the expression of `esp_efficiency`, which keeps the US-basis factors.
 
 ## Chemistry
 
@@ -345,6 +895,11 @@ J/kg/K), not fits, used by `Separator` and `FlashTurbine`:
   region with the Baumann rule `eta = eta_dry (1 - a (1 - x_mean))`, solved in closed form and
   returned as a frozen `Expansion`; a dry exhaust raises.
 
+`steam.saturation_pressure` (IF97 region 4, over liquid water up to the critical point) and
+`psychrometrics.saturation_pressure` (Hyland and Wexler over ice and water) are two models, not one
+function in two places. Each is the standard of its field and they differ by up to about 3e-4
+relative. Use the steam one with the steam tables and the psychrometric one with moist air.
+
 The unit tests reproduce the IF97 verification tables 5, 15, 35 and 36 to a relative 1e-8 and
 the IF97 steam tables at 0.1 MPa and 1 MPa. States on the saturation line pass the region checks
 within a relative pressure tolerance of 1e-9. Properties are those of pure water; salts and
@@ -383,6 +938,12 @@ the borehole radius, `ln(4L/D) < 1`, Ramey below `alpha t / r^2 = 25`) raise
 - `ramey_fluid_temperature(T_in, T_top, G, z, A)`: Ramey's exact steady profile in a linear
   gradient with the relaxation length `A = m_dot cp R_total`.
 
+The aquifer store, borehole field and doublet-state functions of the file list
+(`store_conductance`, `mix_store`, `store_relaxation`, `borehole_loop_conductance`,
+`borehole_field_temperature_change`, `ramey_rock_resistance`, ...) are lumped balances of the
+modules that use them. The positive and negative parts of a signed duty are
+`heat_transfer.signed_parts`.
+
 ## Psychrometrics
 
 `psychrometrics.py` holds moist-air relations in SI (K, fraction, Pa) for an ideal mixture of
@@ -403,6 +964,8 @@ dry air and water vapour without the enhancement factor, used by `CoolingConsume
   2267-2269, fitted at 101.325 kPa; valid for -20 to 50 degC and relative humidity 0.05 to 0.99
   (error -1 to +0.65 K); inputs outside raise.
 
+`psychrometrics.saturation_pressure` is not `steam.saturation_pressure`; see Steam.
+
 ```python
 from gemini.physics import psychrometrics
 
@@ -410,3 +973,153 @@ assert round(psychrometrics.saturation_pressure(293.15), 1) == 2338.8
 assert round(psychrometrics.dew_point(297.15, 0.5) - 273.15, 2) == 12.95
 assert round(psychrometrics.humidity_ratio(293.15, 0.5, 101325), 6) == 0.007262
 ```
+
+## Separation
+
+`separation.py` holds the lumped splits of the treatment and piping modules (`Splitter`,
+`Blowdown`, `Degasser`, `Desander`, `InhibitorDosing`). No relation has a residence time, a level
+or a size distribution.
+
+- `split_flow(m, f)` = `(m - f m, f m)` [kg/s]: an ideal tee or bleed with a commanded share and no
+  pressure loss; the parts sum to the feed up to rounding. A reverse flow scales both parts.
+- `degasser_split(m, x, eta)`: gas `eta x m`, liquid `m - eta x m` and the gas fraction left in
+  the liquid `(1 - eta) x / (1 - eta x)`; the free gas is conserved and dissolved gas stays in the
+  liquid (no Henry's law).
+- `cyclone_sand(eta, c, Q_l)`: removal rate `eta c Q_l` [kg/s] and residual concentration `(1 -
+  eta) c` [kg/m3], `Q_l = fluid.liquid_volume_flow(...)`. The grade-efficiency curve is one constant
+  efficiency (Svarovsky 2000), so the cut size does not follow the flow.
+- `dosing_flows(dose, m, w)`: product `dose m` and active substance `w dose m` [kg/s]; the dosed
+  mass is not added to the stream (Gallup 2009).
+- Defaults of the filter and the degasser are `FILTER_NOMINAL_DROP` = 1600 Pa,
+  `FILTER_NOMINAL_MASS_FLOW` = 149 / 3600 * 1068 kg/s, `FILTER_CLOGGING_BAR` = 0.5 and
+  `DEFAULT_DEGASSER_DROP` = 14900 Pa.
+
+## Combustion
+
+`combustion.py` holds the fuel side of `CHP`, `Boiler` and `Vent`. Boiler fuel is
+`energy.input_power`.
+
+- `willans_fuel_input(L, P_el, eta_el, f0)` = `F_full (f0 + (1 - f0) L)` [W] with `F_full = P_el /
+  eta_el` on the lower heating value, and 0 at `L = 0`: fuel at constant speed is close to linear
+  in load (Heywood 1988).
+- `engine_energy_flows(F, L, P_el, eta_th)` = `(eta_th F, L P_el)` [W]: recoverable heat and
+  electric output; the rest of the fuel is the heat loss.
+- `flare_emissions(m, x_CO2, x_CH4, eta_c, H)`: with `m_b = eta_c x_CH4 m` the CO2 emission is
+  `x_CO2 m + m_b M_CO2 / M_CH4`, the methane emission `x_CH4 m - m_b` [kg/s] and the fuel
+  `m_b H` [W]. `eta_c` = 0 is a vent. Defaults: `FLARE_EFFICIENCY` = 0.98, `METHANE_HEATING_VALUE` =
+  50e6 J/kg.
+
+## Storage
+
+`storage.py` holds lumped stores at one uniform temperature, used by `ThermalStorage` and
+`IceStorage`.
+
+- `circuit_conductance(e, C)` = `G = e C` [W/K]: a circuit exchanging heat with a store at uniform
+  temperature takes `G (T_in - T)` (effectiveness-NTU, Incropera et al.).
+- `tank_capacity(rho cp, V)` = `rho cp V` [J/K].
+- `tank_relaxation(...)`: the fully mixed tank `C dT/dt = G_c (T_c - T) + G_d (T_d - T) - UA (T -
+  T_amb)` solved exactly for constant inlets, `T_eq + (T - T_eq) exp(-b dt / C)` with `b = G_c +
+  G_d + UA` (Duffie and Beckman 2013, section 8.3); unchanged for `b = 0`.
+- `tank_service_report(hot, C, T, T_ref, Q_c, Q_d)` = `(E, Q_charge, Q_discharge)` with `E = C (T -
+  T_ref)` for a hot tank; every sign flips for a chilled tank.
+- `ice_stored_cold(M, L, x)` = `M L x` [J], the latent cold of frozen fraction `x`.
+- `ice_advance(...)` returns the frozen fraction and temperature after a step, integrated exactly
+  and piecewise for a constant inlet: the latent segment has the constant duty `G (T_in - T_f)`
+  and `x` changes linearly; a sensible segment relaxes with the time constant `M c / G` and stops
+  at the freezing temperature. `ice_step` is one segment, and at most `MAX_SEGMENTS` = 3
+  segments run per step.
+- Defaults: `DEFAULT_LATENT_HEAT` = 333550 J/kg, `DEFAULT_FREEZING_TEMPERATURE` = 273.15 K,
+  `DEFAULT_WATER_HEAT_CAPACITY` = 4219.9 and `DEFAULT_ICE_HEAT_CAPACITY` = 2096.8 J/kg/K,
+  `DEFAULT_TANK_TEMPERATURE` = 293.15 K.
+
+## Control
+
+`control.py` holds the ideal (ISA) PID form of `PIDController`, discretised as in Astrom and
+Hagglund (2006, chapter 3): explicit rectangular integral, backward-difference derivative on the
+error, and anti-windup by clamping (conditional integration).
+
+- `pid_error(setpoint, y, reverse)` = `setpoint - y` for reverse action, `y - setpoint` for direct
+  action.
+- `pid_derivative(K, Td, de, h_prev)` = `K Td de / h_prev`, unfiltered, exact for a uniform clock.
+- `pid_command(K, e, I, D)` = `K e + I + D`, before the output limits.
+- `pid_integral_increment(K, h, Ti, e)` = `K h e / Ti`, in command units.
+- `anti_windup_increment(inc, u, u_min, u_max)` = 0 when `u >= u_max` and `inc > 0`, or `u <= u_min`
+  and `inc < 0`, otherwise `inc`.
+
+## Power cycles
+
+`power_cycles.py` holds the binary organic Rankine cycle of `ORC`. The reversible work of a heat
+source cooled from `T_in` to `T_out` and rejected at the condensing temperature is the Lorenz
+(triangular-cycle) work, and the plant delivers a fraction of it (DiPippo 2007, 2016, chapter 8).
+
+- `lorenz_efficiency(T_a, T_b, T_c)` = `1 - T_c ln(T_a / T_b) / (T_a - T_b)` [-], that is `1 - T_c /
+  T_lm`. It is not written with `refrigeration.log_mean_temperature`: that function checks its
+  arguments and returns the inlet for equal temperatures, this one keeps the retained
+  floating-point order.
+- `cycle_design(...)`: `T_c = T_amb + approach`, `T_out = max(T_min, T_c + pinch)`, the cycle
+  efficiency `carnot_fraction` times the Lorenz efficiency between `T_in - pinch` and `T_out -
+  pinch`, and the uncapped gross power `eta m cp (T_in - T_out)`. Above `capacity` the processed
+  share of the brine is `capacity / uncapped power` and `is_capped` is true. Efficiency, share and
+  flag are zero when `T_in <= T_out`. Part-load degradation is not modelled.
+- `plant_balance(Q, eta, f)`: gross power `eta Q`, parasitic power `f` times gross, net
+  `gross - parasitic`, condenser duty `Q - gross`, heat loss condenser duty plus parasitic power
+  (the parasitic power ends as heat in the air); `thermal_efficiency` is net over `Q`, `None`
+  without heat input.
+
+## Electricity
+
+`electricity.py` holds net metering at one connection point with one tariff per direction, for
+`GridConnection`, without reactive power, losses or demand charges.
+
+- `net_exchange(C, G, import_limit, export_limit, import_price, export_price)` returns `net_import`
+  `min(max(0, C - G), limit)` and `net_export` `min(max(0, G - C), limit)` [W], the parts above the
+  limits as `unserved_consumption` and `curtailed_generation`, and `cost_rate = import price *
+  net_import - export price * net_export` [currency/s], negative for a revenue. A limit of `None`
+  means unlimited; whether a limit exists is a configuration, so it is a Python test.
+
+## Energy
+
+`energy.py` has one relation, the efficiency of a steady converter: `input_power(P_out, eta)` =
+`P_out / eta` [W], the shaft power, electricity or fuel a pump, compressor, motor or burner draws
+for a useful power at the operating point its efficiency belongs to.
+
+## Diagnostics
+
+`diagnostics.py` holds the health scoring that every module uses against a prediction. These are
+plain ratio formulas and conventions without a published source, in one place so that all
+modules score alike.
+
+- `relative_drift(measured, predicted)` = `(measured - predicted) / max(|predicted|, DRIFT_FLOOR)`,
+  finite for a zero prediction; `DRIFT_FLOOR` = 1e-12.
+- `bounded_score(r)` = `min(1, max(0, r))`: one is healthy, zero is failed.
+- `remaining_margin(r)` = `max(0, 1 - r)`.
+- `below_limit(r, threshold)` = `r < 1 - threshold`, the alarm of a decline or fouling test.
+- `performance_ratio(measured, reference)` = `measured / reference`, valid for a nonzero reference.
+- Default thresholds: `DEFAULT_DRIFT_THRESHOLD` = 0.10, `DEFAULT_DECLINE_THRESHOLD` = 0.15,
+  `DEFAULT_FOULING_THRESHOLD` = 0.15.
+
+## Units
+
+`units.py` converts at the package and correlation boundaries.
+
+- Each conversion factor is declared once as a named module constant (`PA_PER_BAR`,
+  `M_PER_FOOT`, `SECONDS_PER_HOUR`, `PA_PER_FOOT_HEAD`, `W_PER_BHP`, ...). The table `_UNITS` and
+  the `*_to_*` converters both read that constant.
+- A converter whose body equals that of another quantity's converter is an alias of it:
+  `kgh_to_kgs = m3h_to_m3s`, `nm_to_dyne_cm = pas_to_cp`, `dyne_cm_to_nm = cp_to_pas`.
+- A converter is valid for any finite number and does no range check. NIST SP 811 (2008) gives
+  the exact definitions (bar, inch, foot, psi, hour, degree Celsius); the millidarcy, barrel per
+  day, foot of head, brake horsepower, lbm/ft3 and psi factors are retained numbers of the
+  original GEMINI, kept bit for bit.
+- `to_si`, `convert`, `value_in_si`, `si_unit`, `names`, `parse`, `fits` and the unit sets of
+  `Profile` and `Stream` all read `_UNITS`; `define_quantity` records the SI unit of each named
+  quantity.
+
+## Functions without `@ops.physics`
+
+- `fluid.mixture_density`, `volume_flow`, `liquid_volume_flow` and `heat_capacity_rate`: `Stream`
+  and `FluidProperties` call them on every eager step, the decorator would make those calls about
+  3.5 times slower, and they divide only by validated positive properties, so they need no eager
+  scope.
+- `units.py`: the converters sit on the hot path of every binding and plain operators work on
+  every backend, so the registry wrapper would only add cost.

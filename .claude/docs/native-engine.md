@@ -223,7 +223,7 @@ Where the implementation differs from sections 1 to 11, and why:
 - **`where` branches are plain values** and both are always evaluated. On the Python backend the
   ops return `inf` or `nan` silently, like NumPy, for division by zero, a negative logarithm or
   overflow, and in an eager call plain `/` and `**` do the same (next point). `ops.truediv` stays
-  in one place (`ESP.efficiency_function`, float32) and where a composite divides child results.
+  in one place (`pumps.esp_efficiency`, float32) and where a composite divides child results.
 - **Eager calls and branch-aware checks.** A direct call is the same `forward` and ops on the
   Python backend, inside a scope (`gemini/ops/scope.py`), with no graph. Entering the outermost scope
   sets `np.errstate(all="ignore")` and gives exact floats as `np.float64`, so plain `/` and `**` are

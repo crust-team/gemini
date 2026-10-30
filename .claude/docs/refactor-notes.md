@@ -250,3 +250,14 @@ ported into the refactored structure; only missing behaviour was added.
   the **source inlet** without a lift floor (COP 4.4144 in its test case), the refactored model at
   both outlets with a 10 K floor (3.1012 for the same inputs).
 
+## Physics in physics/
+
+Formulas moved from the modules into `gemini/physics/`; see [physics.md](physics.md). Three
+decisions outlast the move.
+
+- `IceStorage` uses `heat_transfer.ambient_effectiveness`, written with `-expm1`, instead of
+  `1 - exp(...)`. The worst recorded difference is 3.4e-16.
+- `Pipe` velocity is `geometry.mean_velocity`, `m / rho / A`, in that order of operations. The
+  worst recorded difference is 1.7e-16.
+- The dataset column `heat_exchanger.dp_hot` keeps its name through `tables.DATA_COLUMNS`,
+  although the output is now `hot_pressure_drop`.
