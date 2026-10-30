@@ -11,6 +11,7 @@ SNAPSHOTS = {
     1: "7d24bb659c94ff3f5717c4eb116a7c44ca2eb77972f96e6515a52350c28a07b0",
     2: "91dce79b8d07942960e637da063bbbac465426e883ba15cc172c9f76b6ccc15d",
     3: "1c47ff0cb57d8ef77cc41816ec42a140a304965686a577c82b2af664c8817cc9",
+    4: "ab0daaad0daa4fd0692f97507e808292f7d9c544c82cd2e14a1c04c8e26f88e8",
 }
 """Hash of the snapshot per ``API_VERSION``: an entry never changes, a new version adds one."""
 

@@ -15,7 +15,7 @@ from gemini.types import BRINE, WATER, Fluid, Ports, Profile, Quantity, Stream, 
 from gemini.utils.data.dataset import Dataset
 
 __version__ = "1.0.3"
-API_VERSION = 3
+API_VERSION = 4
 __all__ = [
     "Engine",
     "Plant",

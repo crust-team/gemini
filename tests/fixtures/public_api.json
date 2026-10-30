@@ -1,5 +1,5 @@
 {
- "api_version": 3,
+ "api_version": 4,
  "categories": [
   "subsurface",
   "wells",
@@ -318,6 +318,31 @@
    "erosion": [
     "plant",
     "well"
+   ],
+   "estimate_conductance": [
+    "hot_in_T",
+    "hot_out_T",
+    "cold_in_T",
+    "cold_out_T",
+    "m_dot_hot",
+    "m_dot_cold",
+    "cp_hot",
+    "cp_cold",
+    "arrangement"
+   ],
+   "estimate_reservoir_pressure": [
+    "flows",
+    "bottomhole_pressures"
+   ],
+   "fit_head_coefficients": [
+    "flows",
+    "frequencies",
+    "heads",
+    "stage_count"
+   ],
+   "fit_head_correction": [
+    "measured",
+    "theoretical"
    ],
    "injectivity": [
     "data",

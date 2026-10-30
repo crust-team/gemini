@@ -1,6 +1,6 @@
 # Public API
 
-Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.API_VERSION = 3`,
+Use `import gemini as gm`. This page lists **every public name**, frozen at `gm.API_VERSION = 4`,
 and is the page the other repositories build against. Names not listed here (a helper method such
 as `Results.commit`, anything in `gm.utils`, any import of an internal path such as
 `gemini.engine.results`) are internal and may change. `tests/unit/test_public_api.py` pins the names, their parameter names and the schema files.
@@ -168,6 +168,10 @@ Details, inputs and units are in the docstrings and [economics.md](economics.md)
 | `gm.analysis.calibrate_pump(plant, pump, measured)` | correction factors for `set_params` | later |
 | `gm.analysis.calibrate_corrosion(logs)` | a model for `corrosion_forecast` | later |
 | `gm.analysis.erosion(plant, well)` | wear of pump and tubing | later |
+| `gm.analysis.fit_head_coefficients(flows, frequencies, heads, stage_count)` | six ESP head coefficients | real |
+| `gm.analysis.fit_head_correction(measured, theoretical)` | `(slope, offset)` of the head correction | real |
+| `gm.analysis.estimate_reservoir_pressure(flows, bottomhole_pressures)` | `(pressure, r_squared)` | real |
+| `gm.analysis.estimate_conductance(hot_in_T, hot_out_T, cold_in_T, cold_out_T, m_dot_hot, m_dot_cold, *, cp_hot, cp_cold, arrangement)` | apparent UA of an exchanger | real |
 
 ## Economics, KPIs and checks
 
@@ -211,3 +215,4 @@ Pass parameter objects declared `calibratable=True`, such as
 | 1 | 2026-10-30 | First frozen list. |
 | 2 | 2026-10-30 | One classification: `category` is the module's folder. `gm.modules.categories()` and `describe()["category"]` change: `heat_exchange` → `exchangers`, `heat_pump` and `boiler` → `heating`, `chiller` → `cooling`, `network` → `piping`, `well` → `wells`, `pump` → `pumps`, `separation` → `treatment`, `consumer` → `demand`, `plant` → `plants`; `subsurface` and `storage` stay; `power` and `control` are new. Exceptions to that mapping: `ORC`, `FlashTurbine` (`heat_exchange`), `GridConnection` (`network`) and `Separator` (`separation`) are `power`; `PIDController` (`network`) is `control`. |
 | 3 | 2026-10-30 | `gm.legacy` is removed: the bridge moved to the internal `gemini.utils.legacy`. The old-project import stays public through `gm.plants.convert_legacy(folder)` only. Checkpoints written before version 3 do not load. |
+| 4 | 2026-10-30 | The fits move out of the modules into `gm.analysis`: `fit_head_coefficients`, `fit_head_correction`, `estimate_reservoir_pressure`, `estimate_conductance`. |
