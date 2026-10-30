@@ -1,0 +1,256 @@
+"""Synthetic modules and plants of the engine tests: boosters, a reservoir, a pair and a holder.
+
+``Booster`` is a stateless leaf with a health, ``Reservoir`` a stateful one, ``Pair`` two boosters
+(and a reservoir) bound as twins, ``Duo`` a composite and ``Holder`` a plant whose twin is a
+``Duo``. ``pair_frame`` is the measured data they read.
+"""
+
+import numpy as np
+import pandas as pd
+
+from gemini import ops
+from gemini.core.modules import Module
+from gemini.core.types import (
+    Control,
+    Electricity,
+    Health,
+    Inlet,
+    Outlet,
+    Output,
+    Parameter,
+    Ratio,
+    State,
+    Stream,
+)
+from gemini.core.types.bindings import Binding, DatedParams, ModuleBindings
+from gemini.errors import PhysicsRangeError
+
+TICKS = pd.date_range("2024-01-01", periods=12, freq="15min", tz="UTC")
+
+
+class Booster(Module):
+    """Raise the pressure by ``level * gain``; refuse a negative level; report a health."""
+
+    def __init__(self):
+        """Declare a parameter, an inlet, a control, outputs and an outlet."""
+        super().__init__()
+
+        # Parameters
+        self.gain = Parameter(float, default=2.0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.level = Control(float)
+
+        # Outputs
+        self.rise = Output(float)
+        self.power = Output(Electricity)
+        self.share = Output(Ratio | None, soft_sensor=True)
+        self.inverse = Output(float)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Raise the pressure."""
+
+        # Outlets
+        ops.check(
+            self.level >= 0,
+            PhysicsRangeError,
+            "{path}: level = {level}",
+            path=self.path,
+            level=self.level,
+        )
+        outlet = inlets.inlet.with_(p=inlets.inlet.p + self.level * self.gain)
+        outlets = dict(outlet=outlet)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.rise = outlets.outlet.p - inlets.inlet.p
+        self.power = self.rise * inlets.inlet.m_dot
+        self.share = ops.where(self.level == 0, None, self.rise / ops.maximum(self.level, 1e-9))
+        self.inverse = ops.truediv(1.0, self.level)
+
+    def health(self, result, measured):
+        """Compare the rise with the measured one."""
+        error = abs(result.outputs.rise - measured["rise"])
+        return Health(score=1 / (1 + error / 100), alarm=error > 5e4, message="rise")
+
+
+class Reservoir(Module):
+    """A stateful leaf: it carries the sum of the flows it saw."""
+
+    def __init__(self):
+        """Declare a state, an inlet, an output and an outlet."""
+        super().__init__()
+
+        # States
+        self.total = State(float, default=0.0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outputs
+        self.content = Output(float)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Pass the stream."""
+
+        # Outlets
+        outlets = dict(outlet=inlets.inlet)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.content = self.total + inlets.inlet.m_dot
+
+    def _advance_states(self, inlets, outlets, dt):
+        return dict(total=self.content)
+
+
+class Pair(Module):
+    """Two boosters side by side, each a twin; the root is only a container."""
+
+    def __init__(self):
+        """Declare the children and the bindings of both twins."""
+        super().__init__()
+
+        # Modules
+        self.first = Booster()
+        self.second = Booster()
+        self.tank = Reservoir()
+
+
+def inlet_bindings():
+    """Return the bindings of an inlet stream: volumetric flow, Celsius and bar."""
+    return {
+        "m_dot": Binding(column="flow", unit="m3/h"),
+        "T": Binding(column="temperature", unit="°C"),
+        "p": Binding(column="pressure", unit="bar"),
+    }
+
+
+def pair_bindings(path_prefix=""):
+    """Return the bindings of both twins of a pair below ``path_prefix``."""
+    return {
+        f"{path_prefix}first": ModuleBindings(
+            controls={"level": Binding(column="level", unit="bar")},
+            inlets={"inlet": inlet_bindings()},
+            measured={"rise": Binding(column="rise", unit="bar")},
+        ),
+        f"{path_prefix}second": ModuleBindings(
+            controls={"level": Binding(column="level2", unit="Pa")},
+            inlets={"inlet": inlet_bindings()},
+            measured={"rise": Binding(column="rise", unit="bar")},
+        ),
+    }
+
+
+def pair_plant(with_tank=False):
+    """Return a pair, with a reservoir twin when ``with_tank``."""
+    plant = Pair()
+    plant.bindings = pair_bindings()
+    if with_tank:
+        plant.bindings["tank"] = ModuleBindings(inlets={"inlet": inlet_bindings()})
+    return plant
+
+
+def dated_pair_plant():
+    """Return a pair whose gain changes from 2 to 5 at the seventh tick."""
+    plant = pair_plant()
+    for module in (plant.first, plant.second):
+        module.param_history = [
+            DatedParams(params={"gain": 2.0}),
+            DatedParams(valid_from=TICKS[6], params={"gain": 5.0}),
+        ]
+    return plant
+
+
+def pair_frame(changes=None):
+    """Return the 12 ticks of measured data, with ``changes`` a map of (column, row) to a value."""
+    rows = len(TICKS)
+    frame = pd.DataFrame(
+        {
+            "flow": np.linspace(10.0, 20.0, rows),
+            "temperature": np.linspace(60.0, 70.0, rows),
+            "pressure": np.linspace(5.0, 6.0, rows),
+            "level": np.linspace(0.1, 1.3, rows),
+            "level2": np.linspace(1e4, 3e5, rows),
+            "rise": np.linspace(0.1, 1.3, rows),
+        },
+        index=TICKS,
+    )
+    for (column, row), value in (changes or {}).items():
+        frame[column] = frame[column].astype(object if isinstance(value, str) else float)
+        frame.loc[TICKS[row], column] = value
+    return frame
+
+
+class Duo(Module):
+    """Two boosters in series: a composite twin with a formula output and an automatic sum."""
+
+    def __init__(self):
+        """Declare the children, the inlet, the outputs and the outlet."""
+        super().__init__()
+
+        # Modules
+        self.front = Booster()
+        self.back = Booster()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.level = Control(float)
+
+        # Outputs
+        self.rise = Output.of(self.back.rise)
+        self.power = Output(Electricity)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Both boosters get the duo's level."""
+
+        # Modules
+        first = self.front(inlet=inlets.inlet, level=self.level)
+        second = self.back(inlet=first.outlets.outlet, level=self.level)
+
+        # Outlets
+        outlets = dict(outlet=second.outlets.outlet)
+        return outlets
+
+
+class Holder(Module):
+    """A container whose child ``duo`` is a composite twin."""
+
+    def __init__(self):
+        """Declare the child."""
+        super().__init__()
+
+        # Modules
+        self.duo = Duo()
+
+
+def holder_plant(nested=False):
+    """Return a holder; ``nested`` binds the first booster of the duo as a twin below it."""
+    plant = Holder()
+    plant.bindings = {
+        "duo": ModuleBindings(
+            controls={"level": Binding(column="level", unit="bar")},
+            inlets={"inlet": inlet_bindings()},
+        )
+    }
+    if nested:
+        plant.bindings["duo.front"] = ModuleBindings(
+            controls={"level": Binding(column="level", unit="bar")},
+            inlets={"inlet": inlet_bindings()},
+            measured={"rise": Binding(column="rise", unit="bar")},
+        )
+    return plant
