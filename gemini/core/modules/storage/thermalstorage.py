@@ -143,7 +143,7 @@ class ThermalStorage(Module):
         ]
         total = sum(conductance for conductance, _ in terms)
         weighted = sum(conductance * temperature for conductance, temperature in terms)
-        equilibrium = ops.truediv(weighted, total)
+        equilibrium = weighted / total
         decay = ops.exp(-total * dt / self._capacity(inlets.charge_in))
         relaxed = equilibrium + (self.temperature - equilibrium) * decay
         return {"temperature": ops.where(total == 0, self.temperature, relaxed)}

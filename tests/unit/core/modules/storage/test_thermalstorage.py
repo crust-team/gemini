@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import gemini as gm
+from gemini import ops
 from gemini.core.modules import Boiler, Module, energy_balance, mass_balance
 from gemini.core.modules.storage import ThermalStorage
 from gemini.core.types import (
@@ -220,10 +221,15 @@ def test_thermal_storage_advance_matches_per_row(monkeypatch):
     temperatures = [343.15, 303.15, 283.15]
 
     def advance(temperature, charge, discharge, ambient):
-        monkeypatch.setattr(ThermalStorage, "temperature", temperature, raising=False)
-        monkeypatch.setattr(ThermalStorage, "ambient_temperature", ambient, raising=False)
-        inlets = SimpleNamespace(charge_in=charge, discharge_in=discharge)
-        return tank._advance_states(inlets, None, 600)["temperature"]
+        monkeypatch.setattr(
+            ThermalStorage, "temperature", ops.scope.wrap(temperature), raising=False
+        )
+        monkeypatch.setattr(
+            ThermalStorage, "ambient_temperature", ops.scope.wrap(ambient), raising=False
+        )
+        inlets = SimpleNamespace(charge_in=charge._numpy(), discharge_in=discharge._numpy())
+        with ops.scope.Scope():
+            return tank._advance_states(inlets, None, 600)["temperature"]
 
     expected = [
         advance(t, row["charge_in"], row["discharge_in"], row["ambient_temperature"])

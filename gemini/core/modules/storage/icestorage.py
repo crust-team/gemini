@@ -150,13 +150,13 @@ class IceStorage(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        return inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
+        return inlet.heat_capacity_rate()
 
     def _effectiveness(self, inlet):
         """Return the coil effectiveness 1 - exp(-UA / C) [-] after checking the store state."""
         self._check_state()
         rate = self._rate(inlet)
-        transfer_units = heat_transfer.ntu(self.ua, ops.where(rate == 0, 1.0, rate))
+        transfer_units = heat_transfer.ntu(self.ua, rate)
         return ops.where(rate == 0, 0.0, heat_transfer.effectiveness_counterflow(transfer_units, 0))
 
     def _conductance(self, inlet):
@@ -200,10 +200,10 @@ class IceStorage(Module):
         args = (fraction, temperature, inlet_T)
         return self._select(
             liquid,
-            self._sensible(*args, ops.truediv(water, conductance), duration),
+            self._sensible(*args, water / conductance, duration),
             self._select(
                 solid,
-                self._sensible(*args, ops.truediv(ice, conductance), duration),
+                self._sensible(*args, ice / conductance, duration),
                 self._latent(fraction, conductance * (inlet_T - freezing), duration),
             ),
         )
@@ -212,7 +212,7 @@ class IceStorage(Module):
         """Relax an all-liquid or all-ice store towards the inlet, stopping at freezing."""
         freezing = self.freezing_temperature
         crosses = (temperature - freezing) * (inlet_T - freezing) < 0
-        reach = time_constant * ops.log(ops.truediv(temperature - inlet_T, freezing - inlet_T))
+        reach = time_constant * ops.log((temperature - inlet_T) / (freezing - inlet_T))
         stops = ops.logical_and(crosses, reach < duration)
         relaxed = inlet_T + (temperature - inlet_T) * ops.exp(-duration / time_constant)
         overshoots = ops.logical_and(crosses, (relaxed - freezing) * (temperature - freezing) <= 0)
@@ -227,7 +227,7 @@ class IceStorage(Module):
         freezing = self.freezing_temperature
         latent_capacity = self.water_mass * self.latent_heat
         target = ops.where(heat > 0, 0.0, 1.0)
-        reach = ops.truediv(latent_capacity * ops.abs(target - fraction), ops.abs(heat))
+        reach = latent_capacity * ops.abs(target - fraction) / ops.abs(heat)
         changed = fraction - heat * duration / latent_capacity
         reached = reach < duration
         moved = (

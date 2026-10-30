@@ -3,10 +3,10 @@
 import math
 from types import SimpleNamespace
 
-import numpy as np
 import pytest
 
 import gemini as gm
+from gemini import ops
 from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.storage import IceStorage
 from gemini.core.types import (
@@ -17,7 +17,7 @@ from gemini.core.types import (
     Output,
     Stream,
 )
-from tests.fixtures.equivalence import assert_close, assert_module_matches
+from tests.fixtures.equivalence import assert_function_matches, assert_module_matches
 
 MASS = 1000.0
 UA = 2000.0
@@ -186,24 +186,16 @@ def test_ice_storage_matches_per_row():
 
 @pytest.mark.parametrize("dt", [600, 20000, 400000])
 def test_ice_storage_advance_matches_per_row(monkeypatch, dt):
-    """The piecewise phase integration on stacked states equals one step per row."""
+    """The piecewise phase integration on stacked states equals one step per row, stopped too."""
     store = _store()
 
-    def advance(fraction, temperature, glycol):
+    @ops.physics
+    def advance(fraction, temperature, m_dot, glycol_T, pressure):
         monkeypatch.setattr(IceStorage, "ice_fraction", fraction, raising=False)
         monkeypatch.setattr(IceStorage, "temperature", temperature, raising=False)
-        states = store._advance_states(SimpleNamespace(inlet=glycol), None, dt)
+        glycol = Stream(m_dot=m_dot, T=glycol_T, p=pressure, fluid=GLYCOL_30)
+        states = store._advance_states(SimpleNamespace(inlet=glycol._numpy()), None, dt)
         return states["ice_fraction"], states["temperature"]
 
-    expected = [advance(x, t, g) for x, t, g in STORE_STATES]
-    stacked = Stream(
-        **{f: np.array([getattr(g, f) for *_, g in STORE_STATES]) for f in ("m_dot", "T", "p")},
-        fluid=GLYCOL_30,
-    )
-    fractions, temperatures = advance(
-        np.array([x for x, _, _ in STORE_STATES]),
-        np.array([t for _, t, _ in STORE_STATES]),
-        stacked,
-    )
-    assert_close(fractions, [e[0] for e in expected], "ice_fraction")
-    assert_close(temperatures, [e[1] for e in expected], "temperature")
+    rows = [(x, t, g.m_dot, g.T, g.p) for x, t, g in STORE_STATES]
+    assert_function_matches(advance, rows)
