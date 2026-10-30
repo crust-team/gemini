@@ -80,7 +80,12 @@ class Interpreter:
         return method(*operands)
 
     def _errors(self, values):
-        """Return the error codes of every node that some check reaches."""
+        """Return the error codes of every node that some check reaches.
+
+        Errors start at the checks, so no failing row anywhere means no codes at all.
+        """
+        if not any(np.any(values[check]) for check in self.graph.checks):
+            return {}
         errors = {}
         for node in self.graph.nodes:
             if node.op == "where":

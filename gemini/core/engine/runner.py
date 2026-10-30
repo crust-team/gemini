@@ -4,10 +4,10 @@
 run is a list of twins (the equipment twins of a replay, the plant of a simulation) evaluated
 over **chunks** of ticks, each inside a stretch of ticks that share one dated parameter
 snapshot. A chunk is the whole stretch, except that it is one tick when a stateful module is
-stepped, a twin sits below another twin, the run is live or a callback declares
-``changes_run``. For each chunk and twin: the bound columns become SI arrays (``columns``), the
-graph is evaluated on the selected backend (``outcome``), the health is assessed and the
-columns of the twin join one ``ResultChunk``.
+stepped, a twin sits below another twin or a callback declares ``changes_run``. For each chunk
+and twin: the bound columns become SI arrays (``columns``), the graph is evaluated on the
+selected backend (``outcome``), the health is assessed and the columns of the twin join one
+``ResultChunk``.
 
 Callbacks are replayed from the results of a chunk, tick by tick, seeing the engine as a tick
 loop would have left it: ``on_step_start``, the inputs of the tick, the results, the position and
@@ -40,7 +40,7 @@ class Runner:
         self.engine, self.plan, self.aligned = engine, plan, aligned
         self.callbacks = engine.callbacks
         changes_run = any(getattr(callback, "changes_run", False) for callback in self.callbacks)
-        self.single = plan.one_tick or changes_run or engine.run_kind == "live"
+        self.single = plan.one_tick or changes_run
 
     def run(self):
         """Evaluate and commit every tick, stretch by stretch."""
