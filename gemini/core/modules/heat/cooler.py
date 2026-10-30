@@ -87,7 +87,7 @@ class Cooler(Module):
         # Outlets
         inlet = inlets.inlet
         duty, rate, _ = self._duty(inlet)
-        outlet = inlet.with_(T=ops.where(duty == 0, inlet.T, inlet.T - ops.truediv(duty, rate)))
+        outlet = inlet.with_(T=ops.where(duty == 0, inlet.T, inlet.T - duty / rate))
 
         outlets = dict(outlet=outlet)
         return outlets
@@ -111,7 +111,7 @@ class Cooler(Module):
             m_dot=inlet.m_dot,
         )
         target = ops.maximum(self.temperature_setpoint, self._air_temperature() + self.approach)
-        rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
+        rate = inlet.heat_capacity_rate()
         requested = rate * ops.maximum(0, inlet.T - target)
         return ops.minimum(requested, self.capacity), rate, requested
 

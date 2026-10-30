@@ -1,5 +1,6 @@
 """Electric vapour-compression heat pump or chiller with a Carnot- or Lorenz-fraction COP."""
 
+from functools import partial
 from typing import Literal
 
 from gemini import ops
@@ -59,7 +60,7 @@ class HeatPump(Module):
     below it to the minimum.
 
     Every branch of the operating point is evaluated and selected with ``where``; a stopped
-    circuit runs the formulas on a unit capacity rate so that no row divides by zero. The two
+    circuit has a zero capacity rate, whose temperature change ``_load`` takes as zero. The two
     ``ops.brentq`` solves (the Lorenz source outlet and the source-limited duty) are module-level
     functions of their ``args``; a solve that fails gives NaN and raises ``PhysicsRangeError``
     where its row is selected.
@@ -134,9 +135,9 @@ class HeatPump(Module):
         cop = self._cop(source_in, sink_in, source_T, sink_T)
         evaporator, condenser = duty, duty
         if heating:
-            evaporator = ops.where(running, duty - ops.truediv(duty, cop), duty)
+            evaporator = ops.where(running, duty - duty / cop, duty)
         if not heating:
-            condenser = ops.where(running, duty + ops.truediv(duty, cop), duty)
+            condenser = ops.where(running, duty + duty / cop, duty)
         return {
             "cop": ops.where(running, cop, None),
             "useful_duty": duty,
@@ -160,9 +161,8 @@ class HeatPump(Module):
         """
         requested = sink_rate * ops.maximum(0, self.temperature_setpoint - sink_in.T)
         duty = self._duty(requested, source_rate, sink_rate)
-        safe_source_rate, safe_sink_rate = _safe_rate(source_rate), _safe_rate(sink_rate)
-        sink_T = sink_in.T + duty / safe_sink_rate
-        source_T = self._source_outlet_T(source_in, sink_in, safe_source_rate, sink_T, duty)
+        sink_T = sink_in.T + _load(duty, sink_rate)
+        source_T = self._source_outlet_T(source_in, sink_in, source_rate, sink_T, duty)
         capped = requested > self.capacity
         limit = self.minimum_source_outlet_temperature
         if limit is not None:
@@ -171,7 +171,7 @@ class HeatPump(Module):
                 source_in,
                 sink_in,
                 source_rate,
-                safe_sink_rate,
+                sink_rate,
                 duty,
                 ops.logical_and(below, duty != 0),
             )
@@ -179,7 +179,7 @@ class HeatPump(Module):
             duty = ops.where(below, limited_duty, duty)
             capped = ops.where(below, True, capped)
             source_T = ops.where(below, limit, source_T)
-            sink_T = ops.where(below, sink_in.T + duty / safe_sink_rate, sink_T)
+            sink_T = ops.where(below, sink_in.T + _load(duty, sink_rate), sink_T)
         stopped = duty == 0
         return (
             ops.where(stopped, 0.0, duty),
@@ -203,8 +203,8 @@ class HeatPump(Module):
             setpoint = ops.where(is_limited, limit, setpoint)
         requested = source_rate * ops.maximum(0, source_in.T - setpoint)
         duty = self._duty(requested, source_rate, sink_rate)
-        source_T = source_in.T - duty / _safe_rate(source_rate)
-        sink_T = self._sink_outlet_T(sink_in.T, _safe_rate(sink_rate), source_T, duty)
+        source_T = source_in.T - _load(duty, source_rate)
+        sink_T = self._sink_outlet_T(sink_in.T, sink_rate, source_T, duty)
         stopped = duty == 0
         capped = ops.logical_or(requested > self.capacity, is_limited)
         return (
@@ -234,9 +234,8 @@ class HeatPump(Module):
         """
         limit = self.minimum_source_outlet_temperature
         available = source_rate * (source_in.T - limit)
-        shortfall = _lorenz_shortfall if self.cop_model == "lorenz" else _carnot_shortfall
         root = ops.brentq(
-            shortfall,
+            partial(_shortfall, self._cop_function()),
             0.0,
             duty,
             args=(
@@ -266,15 +265,17 @@ class HeatPump(Module):
             return self.lorenz_efficiency
         return self.carnot_efficiency
 
+    def _cop_function(self):
+        """Return the COP function of the mode and COP model, which all take the same arguments."""
+        if self.cop_model == "lorenz":
+            return _lorenz_cop
+        if self.mode == "heating":
+            return _carnot_heating_cop
+        return _carnot_cooling_cop
+
     def _cop(self, source_in, sink_in, source_T, sink_T):
         """Return the COP [-] of the mode and COP model at the given outlet temperatures [K]."""
-        if self.cop_model == "lorenz":
-            cop_function = _lorenz_cop
-        elif self.mode == "heating":
-            cop_function = _carnot_heating_cop
-        else:
-            cop_function = _carnot_cooling_cop
-        return cop_function(
+        return self._cop_function()(
             self._efficiency(),
             self.minimum_temperature_lift,
             sink_in.T,
@@ -294,12 +295,13 @@ class HeatPump(Module):
         if self.cop_model == "lorenz":
             return self._lorenz_source_outlet_T(source_in, sink_in, rate, sink_T, duty)
         inlet_T = source_in.T
-        eta, lift, load = self.carnot_efficiency, self.minimum_temperature_lift, duty / rate
+        eta, lift = self.carnot_efficiency, self.minimum_temperature_lift
+        load = _load(duty, rate)
         floored = inlet_T - load * (1 - lift / (eta * sink_T))
         unfloored = (inlet_T - load * (1 - 1 / eta)) / (1 + load / (eta * sink_T))
         outlet_T = ops.where(sink_T - floored > lift, unfloored, floored)
         ops.check(
-            ops.logical_or(duty == 0, self._cop(source_in, sink_in, outlet_T, sink_T) > 1),
+            ops.where(duty == 0, True, self._cop(source_in, sink_in, outlet_T, sink_T) > 1),
             PhysicsRangeError,
             "{path}: source_in.T = {inlet_T} K; expected above {minimum} K for a heating COP "
             "above 1 at sink outlet {sink_T} K",
@@ -327,10 +329,10 @@ class HeatPump(Module):
             self.lorenz_efficiency,
             self.minimum_temperature_lift,
         )
-        lower = source_in.T - duty / rate
+        lower = source_in.T - _load(duty, rate)
         at_inlet = _lorenz_surplus(source_in.T, *arguments)
         ops.check(
-            ops.logical_or(duty == 0, ops.logical_and(lower > 0, at_inlet < 0)),
+            ops.where(duty == 0, True, ops.logical_and(lower > 0, at_inlet < 0)),
             PhysicsRangeError,
             "{path}: source_in.T = {inlet_T} K, source_in.m_dot * cp = {rate} W/K; expected a "
             "source that supplies the duty {duty} W with a heating COP above 1 at sink outlet "
@@ -372,7 +374,8 @@ class HeatPump(Module):
         otherwise y = (T_in + Q/C * (1 - 1/eta)) / (1 - Q / (C * eta * T_c)), which needs a sink
         capacity rate C above Q / (eta * T_c).
         """
-        eta, lift, load = self.carnot_efficiency, self.minimum_temperature_lift, duty / rate
+        eta, lift = self.carnot_efficiency, self.minimum_temperature_lift
+        load = _load(duty, rate)
         floored = inlet_T + load * (1 + lift / (eta * source_T))
         within_floor = floored - source_T <= lift
         denominator = 1 - load / (eta * source_T)
@@ -386,7 +389,7 @@ class HeatPump(Module):
             minimum=duty / (eta * source_T),
             duty=duty,
         )
-        unfloored = ops.truediv(inlet_T + load * (1 - 1 / eta), denominator)
+        unfloored = (inlet_T + load * (1 - 1 / eta)) / denominator
         return ops.where(within_floor, floored, unfloored)
 
 
@@ -400,16 +403,15 @@ def _rate(path, port, stream):
         port=port,
         m_dot=stream.m_dot,
     )
-    return stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l
+    return stream.heat_capacity_rate()
 
 
-def _safe_rate(rate):
-    """Return a heat capacity rate [W/K] with a stopped circuit's zero replaced by one.
+def _load(duty, rate):
+    """Return the temperature change duty / rate [K] of a circuit, zero for a stopped one.
 
-    Divisions by the rate are then finite in every row; a stopped row's duty is zero and its
-    results are replaced by ``where``.
+    A stopped circuit carries no duty, so its zero rate has no change to divide.
     """
-    return ops.where(rate == 0, 1.0, rate)
+    return ops.where(rate == 0, 0.0, duty / rate)
 
 
 def _carnot_heating_cop(efficiency, lift, sink_inlet, sink_outlet, source_inlet, source_outlet):
@@ -433,22 +435,17 @@ def _lorenz_cop(efficiency, lift, sink_inlet, sink_outlet, source_inlet, source_
 def _lorenz_surplus(outlet_T, rate, source_inlet, sink_inlet, sink_outlet, duty, efficiency, lift):
     """Return the evaporator balance C (T_in - x) - Q (1 - 1 / COP(x)) [W] at source outlet x."""
     cop = _lorenz_cop(efficiency, lift, sink_inlet, sink_outlet, source_inlet, outlet_T)
-    return rate * (source_inlet - outlet_T) - duty * (1 - ops.truediv(1, cop))
+    return rate * (source_inlet - outlet_T) - duty * (1 - 1 / cop)
 
 
-def _carnot_shortfall(
-    useful, sink_inlet, sink_rate, source_inlet, limit, available, efficiency, lift
+def _shortfall(
+    cop_function, useful, sink_inlet, sink_rate, source_inlet, limit, available, efficiency, lift
 ):
-    """Return the evaporator demand minus the available heat [W] at a Carnot-fraction COP."""
-    sink_outlet = sink_inlet + useful / sink_rate
-    cop = _carnot_heating_cop(efficiency, lift, sink_inlet, sink_outlet, source_inlet, limit)
-    return useful * (1 - ops.truediv(1, cop)) - available
+    """Return the evaporator demand minus the available heat [W] at a COP function's COP.
 
-
-def _lorenz_shortfall(
-    useful, sink_inlet, sink_rate, source_inlet, limit, available, efficiency, lift
-):
-    """Return the evaporator demand minus the available heat [W] at a Lorenz-fraction COP."""
-    sink_outlet = sink_inlet + useful / sink_rate
-    cop = _lorenz_cop(efficiency, lift, sink_inlet, sink_outlet, source_inlet, limit)
-    return useful * (1 - ops.truediv(1, cop)) - available
+    ``cop_function`` is the structural choice of the COP model (``_carnot_heating_cop`` or
+    ``_lorenz_cop``); the solver binds it with ``partial`` and varies ``useful``.
+    """
+    sink_outlet = sink_inlet + _load(useful, sink_rate)
+    cop = cop_function(efficiency, lift, sink_inlet, sink_outlet, source_inlet, limit)
+    return useful * (1 - 1 / cop) - available

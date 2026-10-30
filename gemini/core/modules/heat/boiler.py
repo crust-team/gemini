@@ -64,11 +64,9 @@ class Boiler(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        duty = ops.minimum(self._requested_duty(inlet, cp), self.capacity)
-        outlet_T = ops.where(
-            inlet.m_dot == 0, inlet.T, inlet.T + ops.truediv(duty, inlet.m_dot * cp)
-        )
+        rate = inlet.heat_capacity_rate()
+        duty = ops.minimum(self._requested_duty(inlet, rate), self.capacity)
+        outlet_T = ops.where(inlet.m_dot == 0, inlet.T, inlet.T + duty / rate)
 
         outlet = inlet.with_(T=outlet_T)
 
@@ -78,8 +76,7 @@ class Boiler(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         outlet = outlets.outlet
-        cp = inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        requested = self._requested_duty(inlet, cp)
+        requested = self._requested_duty(inlet, inlet.heat_capacity_rate())
         self.duty = ops.minimum(requested, self.capacity)
         self.fuel_or_power = self.duty / self.efficiency
         self.outlet_T = outlet.T
@@ -88,6 +85,6 @@ class Boiler(Module):
         self.fuel = self.fuel_or_power if self.fuel_type == "gas" else 0
         self.heat_loss = self.fuel_or_power - self.duty
 
-    def _requested_duty(self, inlet, cp):
+    def _requested_duty(self, inlet, rate):
         """Return the heat flow [W] that would lift the inlet to the setpoint, without the cap."""
-        return inlet.m_dot * cp * ops.maximum(0, self.temperature_setpoint - inlet.T)
+        return rate * ops.maximum(0, self.temperature_setpoint - inlet.T)

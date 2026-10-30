@@ -108,7 +108,7 @@ class CHP(Module):
         share = self.no_load_fuel_fraction + (1 - self.no_load_fuel_fraction) * load
         fuel = ops.where(load != 0, share * self.electric_capacity / self.electric_efficiency, 0.0)
         engine_heat = self.thermal_efficiency * fuel
-        rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
+        rate = inlet.heat_capacity_rate()
         recovered = ops.minimum(
             engine_heat, rate * ops.maximum(0, self.maximum_outlet_temperature - inlet.T)
         )
@@ -119,5 +119,5 @@ class CHP(Module):
             "heat_recovered": recovered,
             "dumped_heat": engine_heat - recovered,
             "heat_loss": fuel - generated - recovered,
-            "outlet_T": ops.where(recovered != 0, inlet.T + ops.truediv(recovered, rate), inlet.T),
+            "outlet_T": ops.where(recovered != 0, inlet.T + recovered / rate, inlet.T),
         }

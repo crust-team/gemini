@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -11,7 +12,7 @@ from gemini.core.modules.heat import HeatExchanger
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import WATER
-from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
 BRINE_DENSITY = 1050
@@ -159,3 +160,52 @@ def test_traced_call_matches_one_call_per_row(arrangement):
         ]
     ]
     assert_module_matches(exchanger, rows)
+
+
+def _health_exchanger(arrangement):
+    return HeatExchanger().update_params(
+        ua=100000,
+        arrangement=arrangement,
+        dp_hot_nominal=1000,
+        dp_cold_nominal=2000,
+        m_dot_hot_nominal=10,
+        m_dot_cold_nominal=10,
+        fouling_threshold=0.15,
+    )
+
+
+@pytest.mark.parametrize("arrangement", ["parallel", "counterflow"])
+def test_health_on_arrays_matches_one_call_per_row(arrangement):
+    """Fouled, clean and better-than-design rows give the scores, alarms and messages per row."""
+    exchanger = _health_exchanger(arrangement)
+    streams = dict(hot_in=Stream(m_dot=10, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6))
+    result = exchanger(**streams)
+    clean = result.outputs
+    rows = [
+        dict(hot_out_T=clean.hot_out_T, cold_out_T=clean.cold_out_T),
+        dict(hot_out_T=clean.hot_out_T + 8, cold_out_T=clean.cold_out_T - 8),
+        dict(hot_out_T=clean.hot_out_T - 0.05, cold_out_T=clean.cold_out_T + 0.05),
+        dict(hot_out_T=clean.hot_out_T + 3, cold_out_T=clean.cold_out_T - 3),
+    ]
+    assert_health_matches(exchanger, [result] * len(rows), rows)
+    alarms = [exchanger.health(result, row).alarm for row in rows]
+    assert alarms.count(True) >= 1 and alarms.count(False) >= 1
+
+
+def test_health_on_arrays_marks_undetermined_rows_not_assessed():
+    """A row with a gross duty mismatch is not assessed; a chunk without any gives None."""
+    exchanger = _health_exchanger("counterflow")
+    result = exchanger(
+        hot_in=Stream(m_dot=10, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6)
+    )
+    outputs = result.outputs
+    measured = dict(
+        hot_out_T=np.array([outputs.hot_out_T, outputs.hot_out_T]),
+        cold_out_T=np.array([outputs.cold_out_T, 340.0]),
+    )
+    health = exchanger.health(result, measured)
+    assert health.assessed.tolist() == [True, False]
+    assert health.score[1] == 0.0 and not health.alarm[1]
+    assert health.message[1] == "Apparent UA not determined"
+    assert health.score[0] == exchanger.health(result, {k: v[0] for k, v in measured.items()}).score
+    assert exchanger.health(result, {k: v[1:] for k, v in measured.items()}) is None

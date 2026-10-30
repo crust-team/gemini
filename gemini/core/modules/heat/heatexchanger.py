@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+import numpy as np
+
 from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import heat_transfer
@@ -22,6 +24,9 @@ from gemini.core.types import (
     ThermalConductance,
 )
 from gemini.errors import InsufficientDataError, PhysicsRangeError, UnknownCorrelationError
+
+_DETERMINED, _NONPOSITIVE_INPUT, _DISAGREEING_DUTIES, _NO_LMTD = 0, 1, 2, 3
+"""Codes of ``_apparent_conductance``: determined, or the first reason that it is not."""
 
 DEFAULT_CP = 4217.4
 """Liquid heat capacity [J/kg/K] assumed when measurements give none; the ``Fluid`` default."""
@@ -115,7 +120,7 @@ class HeatExchanger(Module):
             "duty": duty,
             "effectiveness": effectiveness,
             "ntu": ntu,
-            "lmtd": heat_transfer.lmtd(ops.maximum(0, dt1), ops.maximum(0, dt2)),
+            "lmtd": heat_transfer.lmtd(ops.maximum(0.0, dt1), ops.maximum(0.0, dt2)),
             "hot_out_T": hot_T,
             "cold_out_T": cold_T,
             "dp_hot": dp_hot,
@@ -128,23 +133,19 @@ class HeatExchanger(Module):
 
         A stopped stream (zero heat capacity rate) transfers no heat.
         """
-        cp_h = hot_in.fluid.properties(hot_in.p, hot_in.T).cp_l
-        cp_c = cold_in.fluid.properties(cold_in.p, cold_in.T).cp_l
-        c_hot, c_cold = hot_in.m_dot * cp_h, cold_in.m_dot * cp_c
+        c_hot, c_cold = hot_in.heat_capacity_rate(), cold_in.heat_capacity_rate()
         c_min, c_max = ops.minimum(c_hot, c_cold), ops.maximum(c_hot, c_cold)
         stopped = c_min == 0
-        safe_c_min = ops.where(stopped, 1.0, c_min)
-        safe_c_max = ops.where(stopped, 1.0, c_max)
-        ntu = heat_transfer.ntu(self.ua, safe_c_min)
+        ntu = heat_transfer.ntu(self.ua, c_min)
         method = (
             heat_transfer.effectiveness_counterflow
             if self.arrangement == "counterflow"
             else heat_transfer.effectiveness_parallel
         )
-        effectiveness = method(ntu, safe_c_min / safe_c_max)
-        duty = effectiveness * safe_c_min * (hot_in.T - cold_in.T)
-        hot_T = hot_in.T - ops.truediv(duty, c_hot)
-        cold_T = cold_in.T + ops.truediv(duty, c_cold)
+        effectiveness = method(ntu, c_min / c_max)
+        duty = effectiveness * c_min * (hot_in.T - cold_in.T)
+        hot_T = hot_in.T - duty / c_hot
+        cold_T = cold_in.T + duty / c_cold
         return (
             ops.where(stopped, 0.0, effectiveness),
             ops.where(stopped, 0.0, ntu),
@@ -177,53 +178,107 @@ class HeatExchanger(Module):
             raise UnknownCorrelationError(
                 f"{name}: unknown arrangement {arrangement!r}; expected counterflow or parallel"
             )
-        if min(m_dot_hot, m_dot_cold, cp_hot, cp_cold) <= 0:
+        apparent, code, qh, qc, delta = _apparent_conductance(
+            arrangement,
+            hot_in_T,
+            hot_out_T,
+            cold_in_T,
+            cold_out_T,
+            m_dot_hot,
+            m_dot_cold,
+            cp_hot,
+            cp_cold,
+        )
+        if code == _NONPOSITIVE_INPUT:
             raise InsufficientDataError(f"{name}: mass flows and heat capacities must be positive")
-        qh = m_dot_hot * cp_hot * (hot_in_T - hot_out_T)
-        qc = m_dot_cold * cp_cold * (cold_out_T - cold_in_T)
-        if min(qh, qc) <= 0 or abs(qh - qc) / max(qh, qc) > 0.05:
+        if code == _DISAGREEING_DUTIES:
             raise InsufficientDataError(
                 f"{name}: hot/cold duties must agree within 5%; got {qh} W and {qc} W"
             )
-        if arrangement == "counterflow":
-            dt1, dt2 = hot_in_T - cold_out_T, hot_out_T - cold_in_T
-        else:
-            dt1, dt2 = hot_in_T - cold_in_T, hot_out_T - cold_out_T
-        delta = heat_transfer.lmtd(dt1, dt2)
-        if delta <= 0:
+        if code == _NO_LMTD:
             raise InsufficientDataError(f"{name}: positive LMTD required; got {delta} K")
-        return (qh + qc) / 2 / delta
+        return apparent
 
     def health(self, result, measured):
         """Alarm when apparent conductance falls below the configured design fraction.
 
         With measured outlet temperatures, the inlet temperatures, mass flows and heat capacities
         come from the call's inlet streams. Returns ``None`` (not assessed) when a measurement is
-        missing, the design UA is zero, or the measurements cannot determine an apparent UA (see
-        ``ua_from_measurements``).
+        missing, the design UA is zero, or no row of the measurements can determine an apparent
+        UA (see ``ua_from_measurements``). On arrays the rows that cannot are not ``assessed``,
+        with score 0, no alarm and zero metrics.
         """
         if {"hot_out_T", "cold_out_T"} <= measured.keys():
             measured = measured | _inlet_measurements(result.inlets)
         keys = ("hot_in_T", "hot_out_T", "cold_in_T", "cold_out_T", "m_dot_hot", "m_dot_cold")
         if not set(keys) <= measured.keys() or not self.ua:
             return None
-        try:
-            apparent = self.ua_from_measurements(
-                **{key: measured[key] for key in keys},
-                cp_hot=measured.get("cp_hot", DEFAULT_CP),
-                cp_cold=measured.get("cp_cold", DEFAULT_CP),
-                arrangement=self.arrangement,
-            )
-        except InsufficientDataError:
+        apparent, code, _, _, _ = _apparent_conductance(
+            self.arrangement,
+            *(measured[key] for key in keys),
+            measured.get("cp_hot", DEFAULT_CP),
+            measured.get("cp_cold", DEFAULT_CP),
+        )
+        assessed = code == _DETERMINED
+        if not np.any(assessed):
             return None
         ratio = apparent / self.ua
         alarm = ratio < 1 - self.fouling_threshold
         return Health(
-            score=min(1, max(0, ratio)),
-            alarm=alarm,
-            message="Apparent UA below fouling limit" if alarm else "Apparent UA within limit",
-            metrics={"apparent_ua": apparent, "ua_ratio": ratio},
+            assessed=assessed,
+            score=ops.where(assessed, ops.minimum(1, ops.maximum(0, ratio)), 0.0),
+            alarm=ops.where(assessed, alarm, False),
+            message=ops.where(
+                assessed,
+                ops.where(alarm, "Apparent UA below fouling limit", "Apparent UA within limit"),
+                "Apparent UA not determined",
+            ),
+            metrics={
+                "apparent_ua": ops.where(assessed, apparent, 0.0),
+                "ua_ratio": ops.where(assessed, ratio, 0.0),
+            },
         )
+
+
+@ops.physics
+def _apparent_conductance(
+    arrangement,
+    hot_in_T,
+    hot_out_T,
+    cold_in_T,
+    cold_out_T,
+    m_dot_hot,
+    m_dot_cold,
+    cp_hot,
+    cp_cold,
+):
+    """Return ``(UA, code, hot duty, cold duty, LMTD)`` from measured temperatures and flows.
+
+    The temperatures [K] are those of the hot and cold inlets and outlets, with the hot and cold
+    mass flows [kg/s] and heat capacities [J/kg/K]. ``code`` is ``_DETERMINED`` when
+    the measurements fix an apparent UA [W/K], else the first reason that they do not: a
+    nonpositive flow or capacity, duties that disagree by more than 5 %, or no positive LMTD.
+    A row that is already undetermined gives LMTD zero terminal differences, so an invalid
+    temperature of such a row raises nothing, as it does not when one row is evaluated alone.
+    """
+    smallest = ops.minimum(ops.minimum(ops.minimum(m_dot_hot, m_dot_cold), cp_hot), cp_cold)
+    qh = m_dot_hot * cp_hot * (hot_in_T - hot_out_T)
+    qc = m_dot_cold * cp_cold * (cold_out_T - cold_in_T)
+    disagree = ops.logical_or(
+        ops.minimum(qh, qc) <= 0, ops.abs(qh - qc) / ops.maximum(qh, qc) > 0.05
+    )
+    if arrangement == "counterflow":
+        dt1, dt2 = hot_in_T - cold_out_T, hot_out_T - cold_in_T
+    else:
+        dt1, dt2 = hot_in_T - cold_in_T, hot_out_T - cold_out_T
+    determined = ops.logical_not(ops.logical_or(smallest <= 0, disagree))
+    delta = heat_transfer.lmtd(ops.where(determined, dt1, 0.0), ops.where(determined, dt2, 0.0))
+    code = ops.where(
+        smallest <= 0,
+        _NONPOSITIVE_INPUT,
+        ops.where(disagree, _DISAGREEING_DUTIES, ops.where(delta <= 0, _NO_LMTD, _DETERMINED)),
+    )
+    return (qh + qc) / 2 / delta, code, qh, qc, delta
 
 
 def _inlet_measurements(inlets):

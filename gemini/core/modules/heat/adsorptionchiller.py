@@ -1,6 +1,7 @@
 """Silica-gel/water adsorption chiller driven by low-temperature hot water."""
 
 from gemini import ops
+from gemini.core.modules.heat import _sorption as sorption
 from gemini.core.modules.module import Module
 from gemini.core.physics import refrigeration
 from gemini.core.types import (
@@ -125,7 +126,7 @@ class AdsorptionChiller(Module):
             inlets.chilled_in,
             inlets.cooling_in,
         )
-        rates = _rates(self.path, inlets)
+        rates = sorption.rates(self.path, inlets)
         requested = rates["chilled_in"] * ops.maximum(0, chilled_in.T - self.temperature_setpoint)
         evaporator = ops.minimum(
             ops.minimum(requested, self._available_duty(inlets, rates)), self.capacity
@@ -134,15 +135,15 @@ class AdsorptionChiller(Module):
         electricity = evaporator * self.auxiliary_power_ratio
         rejection = generator + evaporator + electricity
         return {
-            "cop": ops.where(evaporator != 0, ops.truediv(evaporator, generator), None),
+            "cop": ops.where(evaporator != 0, evaporator / generator, None),
             "generator_duty": generator,
             "evaporator_duty": evaporator,
             "adsorber_condenser_duty": rejection,
             "electricity": electricity,
             "is_capped": evaporator < requested,
-            "generator_out_T": _outlet_T(generator_in, rates["generator_in"], -generator),
-            "chilled_out_T": _outlet_T(chilled_in, rates["chilled_in"], -evaporator),
-            "cooling_out_T": _outlet_T(cooling_in, rates["cooling_in"], rejection),
+            "generator_out_T": sorption.outlet_T(generator_in, rates["generator_in"], -generator),
+            "chilled_out_T": sorption.outlet_T(chilled_in, rates["chilled_in"], -evaporator),
+            "cooling_out_T": sorption.outlet_T(cooling_in, rates["cooling_in"], rejection),
         }
 
     def _available_duty(self, inlets, rates):
@@ -181,24 +182,3 @@ class AdsorptionChiller(Module):
             auxiliary_power_ratio=self.auxiliary_power_ratio,
         )
         return ops.where(driving_T < self.minimum_driving_temperature, 0.0, capacity)
-
-
-def _rates(path, inlets):
-    """Return each inlet's heat capacity rate m_dot * cp [W/K]; reject negative flow."""
-    rates = {}
-    for port, stream in inlets.items():
-        ops.check(
-            stream.m_dot >= 0,
-            PhysicsRangeError,
-            "{path}: {port}.m_dot = {m_dot} kg/s; expected >= 0",
-            path=path,
-            port=port,
-            m_dot=stream.m_dot,
-        )
-        rates[port] = stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l
-    return rates
-
-
-def _outlet_T(stream, rate, duty):
-    """Return the outlet temperature [K] after adding ``duty`` [W] at capacity rate ``rate``."""
-    return ops.where(duty == 0, stream.T, stream.T + ops.truediv(duty, rate))
