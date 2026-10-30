@@ -54,3 +54,28 @@ def test_structural_parameter_values_are_guards(stepper):
     assert cache.graph(module, fluids) is first and cache.traces == 1
     module.update_params(steps=3)
     assert cache.graph(module, fluids) is not first and cache.traces == 2
+
+
+def test_a_change_deep_in_the_tree_retraces(line):
+    """Guards cover every module: a text parameter or a fluid below the root retrace."""
+    cache = GraphCache()
+    fluids = {"inlet": line.fluid}
+    first = cache.graph(line, fluids)
+    line.gain.update_params(scale=9.0)
+    line.second.update_params(scale=9.0)
+    assert cache.graph(line, fluids) is first and cache.traces == 1
+    line.gain.update_params(label="y")
+    assert cache.graph(line, fluids) is not first and cache.traces == 2
+    line.first.fluid = gm.WATER
+    cache.graph(line, fluids)
+    assert cache.traces == 3
+
+
+def test_a_hook_below_the_root_is_a_guard(line):
+    """Adding a writing hook to a child retraces the composite."""
+    cache = GraphCache()
+    fluids = {"inlet": line.fluid}
+    cache.graph(line, fluids)
+    line.gain.register_forward_hook(lambda module, inlets, outlets: setattr(module, "rise", 1.0))
+    cache.graph(line, fluids)
+    assert cache.traces == 2

@@ -4,10 +4,11 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini.core.modules.plants import Doublet
-from gemini.errors import OutputError, PhysicsRangeError, TraceError
+from gemini.core.types.declarations import UNSET
+from gemini.errors import MissingValueError, OutputError, PhysicsRangeError, TraceError
 from gemini.graph import Tracer, run
 from gemini.graph.tracer import parameter_shape
+from gemini.utils.hooks import observer
 
 
 def test_trace_names_inputs_by_role_and_records_outputs(gain):
@@ -72,10 +73,10 @@ def test_unassigned_outputs_fail_at_trace_time(gain):
         Tracer().trace(module, {"inlet": module.fluid})
 
 
-def test_untraceable_modules_name_every_reason(gain):
-    """Composites, pre-hooks and float32 precision are graph breaks."""
-    with pytest.raises(TraceError, match="composite"):
-        Tracer().trace(Doublet(), {"return_in": gain.fluid})
+def test_untraceable_modules_name_every_reason(gain, tank):
+    """Stateful modules, pre-hooks and float32 precision are graph breaks."""
+    with pytest.raises(TraceError, match="stateful"):
+        Tracer().trace(tank, {"inlet": gain.fluid})
     gain.register_forward_pre_hook(lambda module, inlets: None)
     with gm.runtime.settings(precision="float32"):
         with pytest.raises(TraceError, match="pre-hooks; runtime precision"):
@@ -112,3 +113,70 @@ def test_a_stream_built_in_forward_traces_and_keeps_its_limits(gain):
     ]
     with pytest.raises(PhysicsRangeError, match="p = -800000.0 Pa"):
         run(module, {"inlet": stream}, {"gain": 1.0})
+
+
+def test_composite_inputs_are_named_by_relative_path(line):
+    """Child controls, boundaries and parameters are prefixed; the root's are not."""
+    graph = Tracer().trace(line, {"inlet": line.fluid})
+    roles = {name: node.role for name, node in graph.inputs.items()}
+    assert roles == {
+        "inlet.m_dot": "inlet",
+        "inlet.T": "inlet",
+        "inlet.p": "inlet",
+        "boost": "control",
+        "first.scale": "parameter",
+        "gain.scale": "parameter",
+        "REFERENCE": "constant",
+        "second.draw": "control",
+        "second.scale": "parameter",
+    }
+    assert list(graph.outputs)[3:] == [
+        "outputs.rise",
+        "outputs.pressure",
+        "outputs.electricity",
+        "outputs.efficiency",
+    ]
+
+
+def test_a_child_called_twice_reuses_its_inputs(twice):
+    """The second call finds the first call's graph inputs."""
+    graph = Tracer().trace(twice, {"inlet": twice.fluid})
+    assert [name for name in graph.inputs if name.startswith("gain")] == ["gain.gain", "gain.scale"]
+
+
+def test_composite_without_outputs_traces_the_fluid_step(line):
+    """Under ``no_outputs()`` a composite graph has outlet fields only."""
+    with gm.no_outputs():
+        graph = Tracer().trace(line, {"inlet": line.fluid})
+    assert all(name.startswith("outlets.") for name in graph.outputs)
+
+
+def test_uninitialized_parameters_of_the_tree_are_refused(line):
+    """A parameter without a value anywhere below the root cannot be traced."""
+    line.gain._parameters["scale"].value = UNSET
+    with pytest.raises(MissingValueError, match="line: uninitialized parameters"):
+        Tracer().trace(line, {"inlet": line.fluid})
+
+
+def test_observers_on_a_child_are_a_graph_break(line):
+    """A read-only hook on a child cannot be replayed per row at the root."""
+    line.gain.register_forward_hook(lambda module, inlets, outlets: module.rise)
+    with pytest.raises(TraceError, match="gain: forward hook .*cannot be replayed"):
+        Tracer().trace(line, {"inlet": line.fluid})
+    line.gain._hooks.clear()
+    line.gain.register_forward_hook(observer(lambda module, inlets, outlets: None))
+    with pytest.raises(TraceError, match="gain: forward hook"):
+        Tracer().trace(line, {"inlet": line.fluid})
+
+
+def test_writing_hooks_on_a_child_join_the_graph(line):
+    """A hook that writes an output of a child is part of the graph."""
+
+    def doubles(module, inlets, outlets):
+        module.rise = module.rise * 2
+
+    line.gain.register_forward_hook(doubles)
+    inlet = gm.Stream(m_dot=np.ones(3), T=np.full(3, 300.0), p=np.full(3, 1e5), fluid=line.fluid)
+    result = run(line, {"inlet": inlet}, {"boost": np.array([1.0, 2.0, 3.0])})
+    assert result.graph is not None
+    assert result.outputs["rise"].tolist() == [12.0, 24.0, 36.0]

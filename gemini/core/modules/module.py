@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 
 from pydantic_core import to_jsonable_python
 
+from gemini import ops
 from gemini.core import runtime
 from gemini.core.physics import units
 from gemini.core.types.bindings import DatedParams, ModuleBindings
@@ -163,7 +164,9 @@ class _Call:
     every child call made during this call, in call order. ``parent`` is the enclosing call.
     ``states`` holds the module's own state values and ``step`` the running ``_Step``, if any.
     A traced call (``gemini.graph``) sets ``parameters`` to the traced parameter values that
-    replace the stored ones, and records outputs without validating them.
+    replace the stored ones, and records outputs without validating them. ``trace`` is the
+    running trace of ``gemini.graph``: a call made while it is set is recorded in the graph
+    through ``trace.child`` instead of being evaluated.
     """
 
     module: "Module"
@@ -174,6 +177,7 @@ class _Call:
     step: _Step | None = None
     call_records: list = field(default_factory=list)
     parameters: dict | None = None
+    trace: object | None = None
 
     def owned_by(self, module):
         """Return the innermost call of ``module`` in this chain, or ``None``."""
@@ -649,6 +653,8 @@ class Module:
         self._resolve_formula_outputs()
         inlets, supplied = self._split_call_args(args, kwargs)
         parent = _current_call.get()
+        if parent is not None and parent.trace is not None:
+            return parent.trace.child(self, inlets, supplied, parent)
         call = _Call(
             module=self,
             inputs=self._resolve_inputs(supplied),
@@ -902,9 +908,9 @@ class Module:
     def _output_ratio(self, numerator, denominator):
         """Divide two earlier outputs; ``None`` when either is ``None`` or the divisor is zero."""
         top, bottom = getattr(self, numerator), getattr(self, denominator)
-        if top is None or bottom is None or bottom == 0:
+        if top is None or bottom is None:
             return None
-        return top / bottom
+        return ops.where(ops.eq(bottom, 0), None, ops.truediv(top, bottom))
 
     def _check_outputs(self, recorded):
         missing = sorted(self._outputs.keys() - recorded.keys())

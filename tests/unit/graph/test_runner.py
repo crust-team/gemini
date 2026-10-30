@@ -89,3 +89,41 @@ def test_marked_hooks_are_never_called_on_traced_values(gain, inlet):
     result = run(gain, {"inlet": inlet}, {"gain": 1.0})
     assert result.graph is not None and result.breaks == []
     assert seen == ["pre", 6.0, "pre", 6.0, "pre", 6.0]
+
+
+def _line_rows(line, inlet, boosts, draws):
+    rows = []
+    for row in range(3):
+        line.second.draw = draws[row]
+        stream = gm.Stream(m_dot=1.0, T=inlet.T[row], p=inlet.p[row], fluid=inlet.fluid)
+        rows.append(line(inlet=stream, boost=boosts[row]))
+    return rows
+
+
+def test_composite_run_matches_untraced_calls(line, inlet):
+    """Output.of, outlet fields, automatic sums, ratios and outlets equal the row-by-row calls."""
+    boosts, draws = [1.0, 2.0, 3.0], np.array([2.0, 0.0, 5.0])
+    line.first.update_params(scale=0.0)
+    result = run(line, {"inlet": inlet}, {"boost": np.array(boosts), "second.draw": draws})
+    expected = _line_rows(line, inlet, boosts, draws)
+    assert result.graph is not None and result.breaks == []
+    for name in ("rise", "pressure", "electricity"):
+        assert result.outputs[name].tolist() == [row.outputs[name] for row in expected]
+    ratios = [row.outputs.efficiency for row in expected]
+    assert ratios[1] is None
+    assert np.isnan(result.outputs["efficiency"][1])
+    assert result.outputs["efficiency"][[0, 2]].tolist() == [ratios[0], ratios[2]]
+    assert result.outlets["outlet"]["p"].tolist() == [row.outlets.outlet.p for row in expected]
+
+
+def test_composite_child_inputs_come_from_the_tree(line, inlet):
+    """A child control not supplied by the root is fed from the child's persisted value."""
+    line.second.draw = 4.0
+    result = run(line, {"inlet": inlet}, {"boost": 1.0})
+    assert result.outputs["electricity"].tolist() == [10.0] * 3
+
+
+def test_composite_errors_raise_the_child_error(line, inlet):
+    """A negative control of a child raises the child's error class and message."""
+    with pytest.raises(PhysicsRangeError, match="gain: gain = -1.0"):
+        run(line, {"inlet": inlet}, {"boost": np.array([1.0, -1.0, 2.0])})

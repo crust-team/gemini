@@ -5,7 +5,16 @@ import pytest
 
 from gemini import ops
 from gemini.core.modules import Module
-from gemini.core.types import Control, Inlet, Outlet, Output, Parameter, Stream
+from gemini.core.types import (
+    Control,
+    Electricity,
+    Inlet,
+    Outlet,
+    Output,
+    Parameter,
+    State,
+    Stream,
+)
 from gemini.errors import PhysicsRangeError
 from gemini.ops import Constant
 
@@ -139,3 +148,158 @@ class Source(Module):
 def source():
     """Return a ``Source`` module."""
     return Source()
+
+
+class Meter(Module):
+    """Pass the stream on and draw ``draw * scale`` watts; a leaf with an additive output."""
+
+    def __init__(self):
+        """Declare a parameter, a control, an inlet, an additive output and an outlet."""
+        super().__init__()
+
+        # Parameters
+        self.scale = Parameter(float, default=2.0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.draw = Control(float, ge=0)
+
+        # Outputs
+        self.electricity = Output(Electricity)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Pass the stream."""
+
+        # Outlets
+        outlets = dict(outlet=inlets.inlet)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.electricity = self.draw * self.scale
+
+
+class Line(Module):
+    """A meter, then a gain, then a second meter: a composite with every output formula."""
+
+    def __init__(self):
+        """Declare the children, the output formulas and the ports."""
+        super().__init__()
+
+        # Modules
+        self.first = Meter()
+        self.gain = Gain().update_params(scale=3.0)
+        self.second = Meter()
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Controls
+        self.boost = Control(float, default=1.0)
+
+        # Outputs
+        self.rise = Output.of(self.gain.rise)
+        self.pressure = Output.of(self.gain.outlet.field("p"))
+        self.electricity = Output(Electricity)
+        self.efficiency = Output.ratio(self.rise, self.electricity)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Connect the children in series; the second meter draws the line's own control."""
+
+        # Modules
+        metered = self.first(inlet=inlets.inlet, draw=1.0)
+        raised = self.gain(inlet=metered.outlets.outlet, gain=self.boost)
+        metered_again = self.second(inlet=raised.outlets.outlet)
+
+        # Outlets
+        outlets = dict(outlet=metered_again.outlets.outlet)
+        return outlets
+
+
+@pytest.fixture
+def line():
+    """Return a ``Line`` composite with its second meter drawing 2 W."""
+    line = Line()
+    line.second.draw = 2.0
+    return line
+
+
+class Tank(Module):
+    """Pass the stream on and carry a level that rises by the inlet mass flow each step."""
+
+    def __init__(self):
+        """Declare a state, an inlet, an output and an outlet."""
+        super().__init__()
+
+        # States
+        self.level = State(float, default=0.0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outputs
+        self.content = Output(float)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Pass the stream."""
+
+        # Outlets
+        outlets = dict(outlet=inlets.inlet)
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.content = self.level + inlets.inlet.m_dot
+
+    def _advance_states(self, inlets, outlets, dt):
+        return dict(level=self.content)
+
+
+class Twice(Module):
+    """Call one gain twice on the same inlet and add the two pressures."""
+
+    def __init__(self):
+        """Declare the child, an inlet and an outlet."""
+        super().__init__()
+
+        # Modules
+        self.gain = Gain().update_params(scale=3.0)
+
+        # Inlets
+        self.inlet = Inlet(Stream)
+
+        # Outlets
+        self.outlet = Outlet(Stream)
+
+    def forward(self, inlets):
+        """Call the child twice; both calls share its inputs."""
+
+        # Modules
+        first = self.gain(inlet=inlets.inlet)
+        second = self.gain(inlet=inlets.inlet)
+
+        # Outlets
+        outlet = inlets.inlet.with_(p=first.outlets.outlet.p + second.outlets.outlet.p)
+        outlets = dict(outlet=outlet)
+        return outlets
+
+
+@pytest.fixture
+def twice():
+    """Return a ``Twice`` composite."""
+    return Twice()
+
+
+@pytest.fixture
+def tank():
+    """Return a stateful ``Tank`` module."""
+    return Tank()

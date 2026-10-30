@@ -91,12 +91,20 @@ def _feeds(graph, module, inlets, inputs):
             f"{name}.{field}": np.asarray(getattr(stream, field)) for field, _ in STREAM_FIELDS
         }
     for name in graph.by_role("control") | graph.by_role("boundary"):
-        feeds[name] = np.asarray(inputs[name] if name in inputs else module._input_value(name))
+        owner, local = _owner(module, name)
+        feeds[name] = np.asarray(inputs[name] if name in inputs else owner._input_value(local))
     for name in graph.by_role("parameter"):
-        feeds[name] = np.asarray(module._parameter_value(name), dtype=float)
+        owner, local = _owner(module, name)
+        feeds[name] = np.asarray(owner._parameter_value(local), dtype=float)
     for name, constant in graph.constants.items():
         feeds[name] = constant.value
     return feeds
+
+
+def _owner(module, name):
+    """Return the module that owns the graph input ``name`` and the input's local name."""
+    path, _, local = name.rpartition(".")
+    return (module.get_submodule(path) if path else module), local
 
 
 def _row(value, row):

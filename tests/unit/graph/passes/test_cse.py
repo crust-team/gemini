@@ -306,3 +306,17 @@ def test_cache_merges_by_default_and_not_when_disabled(esp):
     plain = GraphCache(optimize=False).graph(esp, fluids)
     assert len(merged.nodes) < len(plain.nodes)
     assert [node.index for node in merged.nodes] == list(range(len(merged.nodes)))
+
+
+def test_composite_graph_shrinks_and_keeps_its_results(twice):
+    """A child called twice on the same inlet is computed once; every output stays exact."""
+    stream = gm.Stream(
+        m_dot=np.ones(3), T=np.full(3, 300.0), p=np.array([1e5, 2e5, 3e5]), fluid=twice.fluid
+    )
+    plain, merged = GraphCache(optimize=False), GraphCache()
+    expected = run(twice, {"inlet": stream}, {"gain.gain": np.array([1.0, 2.0, 3.0])}, cache=plain)
+    actual = run(twice, {"inlet": stream}, {"gain.gain": np.array([1.0, 2.0, 3.0])}, cache=merged)
+    assert len(actual.graph.nodes) < len(expected.graph.nodes)
+    assert len(actual.graph.checks) < len(expected.graph.checks)
+    np.testing.assert_array_equal(actual.outlets["outlet"]["p"], expected.outlets["outlet"]["p"])
+    assert actual.outlets["outlet"]["p"].tolist() == [2e5 + 12, 4e5 + 24, 6e5 + 36]

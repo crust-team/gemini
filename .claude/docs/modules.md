@@ -298,6 +298,18 @@ running call, and port declarations otherwise. Child calls made from pre-hooks a
 the module whose call is running. A module keeps no result after the call returns: use the
 returned `ModuleResult`.
 
+## Traced calls
+
+While `gemini.graph` traces a module, its `_Call` carries the running `Trace` (`call.trace`) and a
+child call made inside it, from `forward` or from a helper method such as `Doublet.produce()`,
+is recorded in the graph by `Trace.child` instead of evaluated: the child's controls, boundaries
+and numeric parameters become graph inputs named `<path below the root>.<name>`, supplied keyword
+values win without validation, and the `ModuleResult` of traced values joins the parent's call
+records, so `Output.of`, automatic sums, `Output.ratio` and `ModuleResult.leaves()` work
+unchanged. `Output.ratio` is `where(bottom == 0, None, top / bottom)` with the division written as
+`ops.truediv`, which gives today's `None` on plain floats. A child that is stateful or has a
+pre-hook, and a child with an observer or a read-only hook, cannot be recorded.
+
 ## Skipping outputs
 
 `gm.no_outputs()` is a nestable, context-local context manager and decorator. It skips

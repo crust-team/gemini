@@ -1,9 +1,10 @@
 """``GraphCache``: one traced graph per module, retraced only when a guard changes.
 
-The guards are what the trace bakes in: the module class and its declaration names, the
-values of non-numeric and structural parameters and the shapes of numeric ones, the registered
-hooks, whether outputs are enabled, the runtime precision, the module's own fluid and the inlet
-fluids. Numeric parameter values, constants and inputs are graph inputs, so changing them never
+The guards are what the trace bakes in, for every module of the tree (a change anywhere below
+the root retraces): the module class and its declaration names, the values of non-numeric and
+structural parameters and the shapes of numeric ones, the registered hooks and the module's own
+fluid; and, once, whether outputs are enabled, the runtime precision and the inlet fluids.
+Numeric parameter values, constants and inputs are graph inputs, so changing them never
 retraces. A module that cannot be traced is remembered with its ``TraceError`` until a guard
 changes. Every graph is traced once and then merged by ``eliminate_common_subexpressions``;
 ``GraphCache(optimize=False)`` keeps the traced graph as it is, for benchmarks and debugging.
@@ -50,6 +51,16 @@ class GraphCache:
 
 
 def _guards(module, fluids):
+    tree = tuple((path, _module_guards(member)) for path, member in module.named_modules())
+    return (
+        tree,
+        outputs_enabled(),
+        runtime.get_precision(),
+        tuple(fluids[name] for name in module._inlets),
+    )
+
+
+def _module_guards(module):
     parameters = tuple(
         (name, _parameter_guard(declaration)) for name, declaration in module._parameters.items()
     )
@@ -59,10 +70,7 @@ def _guards(module, fluids):
         parameters,
         tuple(module._hooks.values()),
         tuple(module._pre_hooks.values()),
-        outputs_enabled(),
-        runtime.get_precision(),
         module.fluid,
-        tuple(fluids[name] for name in module._inlets),
     )
 
 
