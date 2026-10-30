@@ -17,6 +17,7 @@ Read every file in `.claude/docs/` before changing the repository:
 - [Errors](.claude/docs/errors.md): the `gm.errors` classes and when each is raised.
 - [Legacy](.claude/docs/legacy.md): the old-format boundary and conversion rules.
 - [Modules](.claude/docs/modules.md): declarations, listings, calls, outputs, hooks and state.
+- [Native engine](.claude/docs/native-engine.md): the computation-graph design and its status.
 - [Physics](.claude/docs/physics.md): SI correlations and numerical constraints.
 - [Refactor notes](.claude/docs/refactor-notes.md): retained numbers and known limitations.
 - [Runtime](.claude/docs/runtime.md): context-local process settings.
