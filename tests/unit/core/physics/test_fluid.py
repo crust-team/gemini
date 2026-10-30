@@ -1,15 +1,17 @@
 """Constant fluid property snapshot: original defaults, mixture density and validation."""
 
+from dataclasses import FrozenInstanceError, asdict
+
 import numpy as np
 import pytest
-from pydantic import ValidationError
 
 from gemini.core.physics.fluid import FluidProperties, mixture_density
+from gemini.errors import PhysicsRangeError
 
 
 def test_original_defaults():
     """The snapshot retains all ten properties returned by PVTConstantSTP."""
-    assert FluidProperties().model_dump() == dict(
+    assert asdict(FluidProperties()) == dict(
         rho_g=1.976,
         rho_l=1000,
         gmf=0,
@@ -28,10 +30,15 @@ def test_mixture_density_and_validation():
     assert FluidProperties(rho_l=1068).density == 1068
     assert FluidProperties(gmf=0.5).density == pytest.approx(1 / (0.5 / 1.976 + 0.5 / 1000))
     for override in ({"rho_l": -1}, {"gmf": 1}, {"mu_l": 0}):
-        with pytest.raises(ValidationError):
+        with pytest.raises(PhysicsRangeError):
             FluidProperties(**override)
-    with pytest.raises(ValidationError):
+    with pytest.raises(FrozenInstanceError):
         FluidProperties().rho_l = 1
+
+
+def test_numbers_become_floats():
+    """Integer inputs are stored as ``float``."""
+    assert type(FluidProperties(cp_l=3841).cp_l) is float
 
 
 def test_mixture_density_is_the_snapshot_density():

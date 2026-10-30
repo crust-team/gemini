@@ -4,23 +4,46 @@ The defaults are the original constant-water values; pressure and temperature do
 them. ``gemini.core.types.Fluid`` builds and caches one snapshot per fluid.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from dataclasses import dataclass, fields
+
+from gemini.errors import PhysicsRangeError
 
 
-class FluidProperties(BaseModel):
-    """Immutable liquid/gas property snapshot in SI units."""
+@dataclass(frozen=True, slots=True)
+class FluidProperties:
+    """Immutable liquid/gas property snapshot in SI units.
 
-    model_config = ConfigDict(frozen=True)
-    rho_l: float = Field(1000, gt=0, description="Liquid density [kg/m3]")
-    rho_g: float = Field(1.976, gt=0, description="Gas density [kg/m3]")
-    gmf: float = Field(0, ge=0, lt=1, description="Gas mass fraction [-]")
-    mu_l: float = Field(0.001, gt=0, description="Liquid viscosity [Pa s]")
-    mu_g: float = Field(21.29e-6, gt=0, description="Gas viscosity [Pa s]")
-    cp_l: float = Field(4217.4, gt=0, description="Liquid heat capacity [J/kg/K]")
-    cp_g: float = Field(819, gt=0, description="Gas heat capacity [J/kg/K]")
-    k_l: float = Field(1.6, gt=0, description="Liquid thermal conductivity [W/m/K]")
-    k_g: float = Field(0.0147, gt=0, description="Gas thermal conductivity [W/m/K]")
-    sigma: float = Field(0.0728, gt=0, description="Surface tension [N/m]")
+    Every field is converted to ``float``. Densities, viscosities, heat capacities,
+    conductivities and surface tension must be positive; the gas mass fraction lies in
+    ``[0, 1)``. A violation raises ``PhysicsRangeError``.
+
+    Fields: ``rho_l`` and ``rho_g`` densities [kg/m3], ``gmf`` gas mass fraction [-], ``mu_l`` and
+    ``mu_g`` viscosities [Pa s], ``cp_l`` and ``cp_g`` heat capacities [J/kg/K], ``k_l`` and
+    ``k_g`` conductivities [W/m/K], ``sigma`` surface tension [N/m].
+    """
+
+    rho_l: float = 1000.0
+    rho_g: float = 1.976
+    gmf: float = 0.0
+    mu_l: float = 0.001
+    mu_g: float = 21.29e-6
+    cp_l: float = 4217.4
+    cp_g: float = 819.0
+    k_l: float = 1.6
+    k_g: float = 0.0147
+    sigma: float = 0.0728
+
+    def __post_init__(self):
+        """Convert the fields to ``float`` and enforce the physical bounds."""
+        for field in fields(self):
+            value = float(getattr(self, field.name))
+            object.__setattr__(self, field.name, value)
+            valid = 0 <= value < 1 if field.name == "gmf" else value > 0
+            if not valid:
+                expected = "0 <= gmf < 1" if field.name == "gmf" else f"{field.name} > 0"
+                raise PhysicsRangeError(
+                    f"FluidProperties: {field.name} = {value}; expected {expected}"
+                )
 
     @property
     def density(self) -> float:
