@@ -11,6 +11,7 @@ from gemini.core.modules.heat import HeatExchanger
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import WATER
+from tests.fixtures.equivalence import assert_module_matches
 
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
 BRINE_DENSITY = 1050
@@ -132,3 +133,29 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
     assert exchanger.health(running, measured) is None
     with pytest.raises(gm.errors.UnknownCorrelationError, match="arrangement"):
         HeatExchanger.ua_from_measurements(350, 340, 300, 310, 10, 10, arrangement="cross")
+
+
+@pytest.mark.parametrize("arrangement", ["parallel", "counterflow"])
+def test_traced_call_matches_one_call_per_row(arrangement):
+    """Unequal, equal, stopped and pinched rows trace and equal one call per row."""
+    exchanger = HeatExchanger().update_params(
+        ua=100000,
+        arrangement=arrangement,
+        dp_hot_nominal=1000,
+        dp_cold_nominal=2000,
+        m_dot_hot_nominal=10,
+        m_dot_cold_nominal=10,
+    )
+    rows = [
+        dict(hot_in=Stream(m_dot=hot, T=hot_T, p=1e6), cold_in=Stream(m_dot=cold, T=300, p=1e6))
+        for hot, cold, hot_T in [
+            (10, 10, 350),
+            (5, 12, 360),
+            (12, 5, 340),
+            (0, 10, 350),
+            (10, 0, 350),
+            (0, 0, 350),
+            (10, 10, 300),
+        ]
+    ]
+    assert_module_matches(exchanger, rows)

@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import heat_transfer
 from gemini.core.types import (
@@ -85,16 +86,24 @@ class HeatExchanger(Module):
             setattr(self, name, value)
 
     def _performance(self, hot_in, cold_in):
-        if hot_in.m_dot < 0 or cold_in.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: negative mass flow hot_in.m_dot = {hot_in.m_dot} kg/s, "
-                f"cold_in.m_dot = {cold_in.m_dot} kg/s; expected >= 0"
-            )
-        if hot_in.T < cold_in.T:
-            raise PhysicsRangeError(
-                f"{self.path}: hot inlet is below cold inlet: hot_in.T = {hot_in.T} K, "
-                f"cold_in.T = {cold_in.T} K"
-            )
+        ops.check(
+            ops.logical_and(hot_in.m_dot >= 0, cold_in.m_dot >= 0),
+            PhysicsRangeError,
+            "{path}: negative mass flow hot_in.m_dot = {hot_m_dot} kg/s, "
+            "cold_in.m_dot = {cold_m_dot} kg/s; expected >= 0",
+            path=self.path,
+            hot_m_dot=hot_in.m_dot,
+            cold_m_dot=cold_in.m_dot,
+        )
+        ops.check(
+            hot_in.T >= cold_in.T,
+            PhysicsRangeError,
+            "{path}: hot inlet is below cold inlet: hot_in.T = {hot_T} K, "
+            "cold_in.T = {cold_T} K",
+            path=self.path,
+            hot_T=hot_in.T,
+            cold_T=cold_in.T,
+        )
         effectiveness, ntu, duty, hot_T, cold_T = self._heat_balance(hot_in, cold_in)
         dp_hot = self.dp_hot_nominal * (hot_in.m_dot / self.m_dot_hot_nominal) ** 2
         dp_cold = self.dp_cold_nominal * (cold_in.m_dot / self.m_dot_cold_nominal) ** 2
@@ -106,12 +115,12 @@ class HeatExchanger(Module):
             "duty": duty,
             "effectiveness": effectiveness,
             "ntu": ntu,
-            "lmtd": heat_transfer.lmtd(max(0, dt1), max(0, dt2)),
+            "lmtd": heat_transfer.lmtd(ops.maximum(0, dt1), ops.maximum(0, dt2)),
             "hot_out_T": hot_T,
             "cold_out_T": cold_T,
             "dp_hot": dp_hot,
             "dp_cold": dp_cold,
-            "approach_T": min(dt1, dt2),
+            "approach_T": ops.minimum(dt1, dt2),
         }
 
     def _heat_balance(self, hot_in, cold_in):
@@ -122,18 +131,27 @@ class HeatExchanger(Module):
         cp_h = hot_in.fluid.properties(hot_in.p, hot_in.T).cp_l
         cp_c = cold_in.fluid.properties(cold_in.p, cold_in.T).cp_l
         c_hot, c_cold = hot_in.m_dot * cp_h, cold_in.m_dot * cp_c
-        c_min, c_max = min(c_hot, c_cold), max(c_hot, c_cold)
-        if c_min == 0:
-            return 0.0, 0.0, 0.0, hot_in.T, cold_in.T
-        ntu = heat_transfer.ntu(self.ua, c_min)
+        c_min, c_max = ops.minimum(c_hot, c_cold), ops.maximum(c_hot, c_cold)
+        stopped = c_min == 0
+        safe_c_min = ops.where(stopped, 1.0, c_min)
+        safe_c_max = ops.where(stopped, 1.0, c_max)
+        ntu = heat_transfer.ntu(self.ua, safe_c_min)
         method = (
             heat_transfer.effectiveness_counterflow
             if self.arrangement == "counterflow"
             else heat_transfer.effectiveness_parallel
         )
-        effectiveness = method(ntu, c_min / c_max)
-        duty = effectiveness * c_min * (hot_in.T - cold_in.T)
-        return effectiveness, ntu, duty, hot_in.T - duty / c_hot, cold_in.T + duty / c_cold
+        effectiveness = method(ntu, safe_c_min / safe_c_max)
+        duty = effectiveness * safe_c_min * (hot_in.T - cold_in.T)
+        hot_T = hot_in.T - ops.truediv(duty, c_hot)
+        cold_T = cold_in.T + ops.truediv(duty, c_cold)
+        return (
+            ops.where(stopped, 0.0, effectiveness),
+            ops.where(stopped, 0.0, ntu),
+            ops.where(stopped, 0.0, duty),
+            ops.where(stopped, hot_in.T, hot_T),
+            ops.where(stopped, cold_in.T, cold_T),
+        )
 
     @classmethod
     def ua_from_measurements(
