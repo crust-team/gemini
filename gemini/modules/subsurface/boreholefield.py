@@ -5,7 +5,7 @@ import math
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import ground
+from gemini.physics import ground, heat_transfer
 from gemini.types import (
     Count,
     HeatAbsorbed,
@@ -114,7 +114,7 @@ class BoreholeField(Module):
         self.fluid_mean_T = (inlet.T + outlets.outlet.T) / 2
         self.ground_T = self._ground_temperature()
         self.outlet_T = outlets.outlet.T
-        self.heat_absorbed, self.heat_loss = ground.signed_parts(rate)
+        self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.inlet

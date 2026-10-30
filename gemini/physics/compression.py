@@ -85,6 +85,30 @@ def stage_outlet_temperature(
 
 
 @ops.physics
+def stage_pressure_ratio(pressure_ratio: float, stages: float) -> float:
+    """Return the pressure ratio of each of several equal stages.
+
+    Parameters
+    ----------
+    pressure_ratio : float
+        Overall discharge over suction absolute pressure [-], positive.
+    stages : float
+        Number of equal stages [-], positive.
+
+    Returns
+    -------
+    float
+        ``r_stage = r ** (1 / N)`` [-].
+
+    Notes
+    -----
+    Equal stage ratios minimise the work of an ideal intercooled compressor (GPSA Engineering
+    Data Book, 14th ed. (2017), Section 13, multistage compression).
+    """
+    return pressure_ratio ** (1 / stages)
+
+
+@ops.physics
 def specific_compression_work(
     inlet_temperature: float,
     pressure_ratio: float,
@@ -97,8 +121,14 @@ def specific_compression_work(
 
     Parameters
     ----------
-    inlet_temperature, pressure_ratio, heat_capacity_ratio, isentropic_efficiency : float
-        As in ``stage_outlet_temperature``; ``pressure_ratio`` is the overall ratio.
+    inlet_temperature : float
+        Suction temperature [K], positive.
+    pressure_ratio : float
+        Overall discharge over suction absolute pressure [-], at least one.
+    heat_capacity_ratio : float
+        Constant ``k = cp / cv`` [-], greater than one.
+    isentropic_efficiency : float
+        Isentropic efficiency of each stage [-], in (0, 1].
     specific_heat : float
         Constant gas heat capacity at constant pressure ``cp`` [J/kg/K], positive.
     stages : int
@@ -127,7 +157,7 @@ def specific_compression_work(
     _check_stage("specific_compression_work", inlet_temperature, pressure_ratio)
     outlet = stage_outlet_temperature(
         inlet_temperature,
-        pressure_ratio ** (1 / stages),
+        stage_pressure_ratio(pressure_ratio, stages),
         heat_capacity_ratio,
         isentropic_efficiency,
     )

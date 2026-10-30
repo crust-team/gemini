@@ -11,6 +11,11 @@ def head(volume_flow, frequency, stages, coefficients):
 
     The polynomial sum(c_i q^i) uses q in bbl/day and gives ft of head per stage at 60 Hz;
     head scales with the square of the frequency ratio.
+
+    Valid for the fitted flow range of the coefficients and positive frequency and stages. The
+    affinity law follows Takacs, Electrical Submersible Pumps Manual (2009); the polynomial
+    form is the TNO R11363 pump correlation. The builtin ``sum`` over the coefficients is kept:
+    it works on floats, arrays and traced values.
     """
     q = units.m3s_to_bbl_per_day(volume_flow)
     value = stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 2
@@ -24,6 +29,11 @@ def power(volume_flow, frequency, stages, coefficients):
 
     The polynomial sum(c_i q^i) uses q in bbl/day and gives bhp per stage at 60 Hz; power
     scales with the cube of the frequency ratio.
+
+    Valid for the fitted flow range of the coefficients and positive frequency and stages. The
+    affinity law follows Takacs, Electrical Submersible Pumps Manual (2009); the polynomial
+    form is the TNO R11363 pump correlation. The builtin ``sum`` over the coefficients is kept:
+    it works on floats, arrays and traced values.
     """
     q = units.m3s_to_bbl_per_day(volume_flow)
     value = stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 3

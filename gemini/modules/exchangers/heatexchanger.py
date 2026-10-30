@@ -26,12 +26,6 @@ from gemini.types import (
 )
 from gemini.types.results import NOT_ASSESSED
 
-_DETERMINED, _NONPOSITIVE_INPUT, _DISAGREEING_DUTIES, _NO_LMTD = 0, 1, 2, 3
-"""Codes of ``_apparent_conductance``: determined, or the first reason that it is not."""
-
-DEFAULT_CP = 4217.4
-"""Liquid heat capacity [J/kg/K] assumed when measurements give none; the ``Fluid`` default."""
-
 
 class HeatExchanger(Module):
     """Two-stream heat exchanger with thermal and fouling diagnostics."""
@@ -169,8 +163,8 @@ class HeatExchanger(Module):
         m_dot_hot,
         m_dot_cold,
         *,
-        cp_hot=DEFAULT_CP,
-        cp_cold=DEFAULT_CP,
+        cp_hot=heat_transfer.DEFAULT_CP,
+        cp_cold=heat_transfer.DEFAULT_CP,
         arrangement="counterflow",
     ):
         """Estimate apparent UA [W/K] from measured temperatures and mass flows.
@@ -183,7 +177,7 @@ class HeatExchanger(Module):
             raise UnknownCorrelationError(
                 f"{name}: unknown arrangement {arrangement!r}; expected counterflow or parallel"
             )
-        apparent, code, qh, qc, delta = _apparent_conductance(
+        apparent, code, qh, qc, delta = heat_transfer.apparent_conductance(
             arrangement,
             hot_in_T,
             hot_out_T,
@@ -194,13 +188,13 @@ class HeatExchanger(Module):
             cp_hot,
             cp_cold,
         )
-        if code == _NONPOSITIVE_INPUT:
+        if code == heat_transfer.NONPOSITIVE_INPUT:
             raise InsufficientDataError(f"{name}: mass flows and heat capacities must be positive")
-        if code == _DISAGREEING_DUTIES:
+        if code == heat_transfer.DISAGREEING_DUTIES:
             raise InsufficientDataError(
                 f"{name}: hot/cold duties must agree within 5%; got {qh} W and {qc} W"
             )
-        if code == _NO_LMTD:
+        if code == heat_transfer.NO_LMTD:
             raise InsufficientDataError(f"{name}: positive LMTD required; got {delta} K")
         return apparent
 
@@ -218,13 +212,13 @@ class HeatExchanger(Module):
         keys = ("hot_in_T", "hot_out_T", "cold_in_T", "cold_out_T", "m_dot_hot", "m_dot_cold")
         if not set(keys) <= measured.keys() or not self.ua:
             return None
-        apparent, code, _, _, _ = _apparent_conductance(
+        apparent, code, _, _, _ = heat_transfer.apparent_conductance(
             self.arrangement,
             *(measured[key] for key in keys),
-            measured.get("cp_hot", DEFAULT_CP),
-            measured.get("cp_cold", DEFAULT_CP),
+            measured.get("cp_hot", heat_transfer.DEFAULT_CP),
+            measured.get("cp_cold", heat_transfer.DEFAULT_CP),
         )
-        assessed = code == _DETERMINED
+        assessed = code == heat_transfer.DETERMINED
         if not np.any(assessed):
             return None
         ratio = apparent / self.ua
@@ -243,47 +237,6 @@ class HeatExchanger(Module):
                 "ua_ratio": ops.where(assessed, ratio, float("nan")),
             },
         )
-
-
-@ops.physics
-def _apparent_conductance(
-    arrangement,
-    hot_in_T,
-    hot_out_T,
-    cold_in_T,
-    cold_out_T,
-    m_dot_hot,
-    m_dot_cold,
-    cp_hot,
-    cp_cold,
-):
-    """Return ``(UA, code, hot duty, cold duty, LMTD)`` from measured temperatures and flows.
-
-    The temperatures [K] are those of the hot and cold inlets and outlets, with the hot and cold
-    mass flows [kg/s] and heat capacities [J/kg/K]. ``code`` is ``_DETERMINED`` when
-    the measurements fix an apparent UA [W/K], else the first reason that they do not: a
-    nonpositive flow or capacity, duties that disagree by more than 5 %, or no positive LMTD.
-    A row that is already undetermined gives LMTD zero terminal differences, so an invalid
-    temperature of such a row raises nothing, as it does not when one row is evaluated alone.
-    """
-    smallest = ops.minimum(ops.minimum(ops.minimum(m_dot_hot, m_dot_cold), cp_hot), cp_cold)
-    qh = m_dot_hot * cp_hot * (hot_in_T - hot_out_T)
-    qc = m_dot_cold * cp_cold * (cold_out_T - cold_in_T)
-    disagree = ops.logical_or(
-        ops.minimum(qh, qc) <= 0, ops.abs(qh - qc) / ops.maximum(qh, qc) > 0.05
-    )
-    if arrangement == "counterflow":
-        dt1, dt2 = hot_in_T - cold_out_T, hot_out_T - cold_in_T
-    else:
-        dt1, dt2 = hot_in_T - cold_in_T, hot_out_T - cold_out_T
-    determined = ops.logical_not(ops.logical_or(smallest <= 0, disagree))
-    delta = heat_transfer.lmtd(ops.where(determined, dt1, 0.0), ops.where(determined, dt2, 0.0))
-    code = ops.where(
-        smallest <= 0,
-        _NONPOSITIVE_INPUT,
-        ops.where(disagree, _DISAGREEING_DUTIES, ops.where(delta <= 0, _NO_LMTD, _DETERMINED)),
-    )
-    return (qh + qc) / 2 / delta, code, qh, qc, delta
 
 
 def _inlet_measurements(inlets):

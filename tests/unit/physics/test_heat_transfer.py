@@ -1,6 +1,7 @@
 """Pipe heat loss and heat-exchanger effectiveness relations."""
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -104,3 +105,113 @@ def test_effectiveness_on_arrays_matches_floats(function):
     assert_same_error(function, [(1.0, 0.5), (1.0, 2.0)], PhysicsRangeError)
     assert_same_error(function, [(1.0, 0.5), (-1.0, 0.5)], PhysicsRangeError)
     assert_same_error(function, [(1.0, 0.5), (1.0, float("nan"))], PhysicsRangeError)
+
+
+def test_signed_parts_split_a_value_into_its_positive_and_negative_sizes():
+    """A positive value has no negative part, a negative one no positive part, zero neither."""
+    assert heat_transfer.signed_parts(3.0) == (3.0, 0)
+    assert heat_transfer.signed_parts(-2.0) == (0, 2.0)
+    assert heat_transfer.signed_parts(0.0) == (0.0, -0.0)
+    assert_function_matches(heat_transfer.signed_parts, [(3.0,), (-2.0,), (0.0,)])
+
+
+def test_logarithmic_mean_by_hand():
+    """The mean of 20 and 10 is 10 / ln 2."""
+    assert heat_transfer.logarithmic_mean(20.0, 10.0) == pytest.approx(10 / math.log(2))
+    assert_function_matches(heat_transfer.logarithmic_mean, [(20.0, 10.0), (3.0, 40.0)])
+
+
+def test_heat_rate_and_setpoint_duty():
+    """A 2 kW/K stream heated 5 K takes 10 kW; a gap below zero needs no heat."""
+    assert heat_transfer.heat_rate(2000.0, 5.0) == 10000.0
+    assert heat_transfer.setpoint_duty(2000.0, 5.0) == 10000.0
+    assert heat_transfer.setpoint_duty(2000.0, -3.0) == 0.0
+    rows = [(2000.0, 5.0), (2000.0, -3.0), (0.0, 4.0), (10.0, 0.0)]
+    assert_function_matches(heat_transfer.setpoint_duty, rows)
+    assert_function_matches(heat_transfer.heat_rate, rows)
+
+
+def test_temperature_change_is_duty_over_capacity_rate_and_zero_when_stopped():
+    """10 kW into 2 kW/K gives 5 K; a stopped stream gives zero."""
+    assert heat_transfer.temperature_change(10000.0, 2000.0) == 5.0
+    assert heat_transfer.temperature_change(10000.0, 0.0) == 0.0
+    rows = [(10000.0, 2000.0), (-500.0, 100.0), (10.0, 0.0), (0.0, 0.0)]
+    assert_function_matches(heat_transfer.temperature_change, rows)
+
+
+def test_effectiveness_outlet_temperature_by_hand():
+    """Half effectiveness moves a 350 K stream halfway to 300 K."""
+    assert heat_transfer.effectiveness_outlet_temperature(350.0, 0.5, 300.0) == 325.0
+    rows = [(350.0, 0.5, 300.0), (280.0, 1.0, 300.0), (300.0, 0.0, 350.0)]
+    assert_function_matches(heat_transfer.effectiveness_outlet_temperature, rows)
+
+
+def test_ambient_effectiveness_is_one_minus_exp_of_minus_ntu_and_zero_when_stopped():
+    """UA = C gives 1 - 1/e; a stopped stream, even with conductance, gives zero."""
+    assert heat_transfer.ambient_effectiveness(100.0, 100.0) == pytest.approx(1 - math.exp(-1))
+    assert heat_transfer.ambient_effectiveness(100.0, 0.0) == 0.0
+    rows = [(100.0, 100.0), (0.0, 50.0), (100.0, 0.0), (1e6, 1.0), (5.0, 1e-3)]
+    assert_function_matches(heat_transfer.ambient_effectiveness, rows)
+    assert_same_error(
+        heat_transfer.ambient_effectiveness, [(1.0, 2.0), (-1.0, 3.0)], PhysicsRangeError
+    )
+
+
+def test_relaxation_matches_the_lumped_capacitance_solution():
+    """After one time constant the gap to equilibrium is 1/e of the start."""
+    factor = heat_transfer.relaxation_factor(10.0, 100.0, 1000.0)
+    assert factor == pytest.approx(math.exp(-1))
+    assert heat_transfer.exponential_relaxation(310.0, 300.0, factor) == pytest.approx(
+        300.0 + 10.0 * math.exp(-1)
+    )
+    rows = [(10.0, 100.0, 1000.0), (0.0, 100.0, 1000.0), (5.0, 0.0, 10.0)]
+    assert_function_matches(heat_transfer.relaxation_factor, rows)
+    assert_function_matches(
+        heat_transfer.exponential_relaxation, [(310.0, 300.0, 0.5), (280.0, 300.0, 0.0)]
+    )
+
+
+def test_mixed_temperature_weights_by_capacity_rate_and_averages_when_stopped():
+    """Equal 1 kW/K streams at 300 and 320 K mix at 310 K; stopped streams give the mean."""
+    assert heat_transfer.mixed_temperature(1000.0, 300.0, 1000.0, 320.0) == 310.0
+    assert heat_transfer.mixed_temperature(3000.0, 300.0, 1000.0, 340.0) == 310.0
+    assert heat_transfer.mixed_temperature(0.0, 300.0, 0.0, 320.0) == 310.0
+    rows = [(1000.0, 300.0, 1000.0, 320.0), (3000.0, 300.0, 0.0, 340.0), (0.0, 300.0, 0.0, 320.0)]
+    assert_function_matches(heat_transfer.mixed_temperature, rows)
+
+
+def test_terminal_differences_for_both_arrangements():
+    """Counterflow pairs the hot inlet with the cold outlet; parallel flow with the cold inlet."""
+    assert heat_transfer.terminal_differences(350.0, 330.0, 300.0, 320.0, True) == (30.0, 30.0)
+    assert heat_transfer.terminal_differences(350.0, 330.0, 300.0, 320.0, False) == (50.0, 10.0)
+    for flag in (True, False):
+        rows = [(350.0, 330.0, 300.0, 320.0), (340.0, 310.0, 290.0, 300.0)]
+        assert_function_matches(heat_transfer.terminal_differences, rows, counterflow=flag)
+
+
+def test_apparent_conductance_by_hand_and_every_code():
+    """A 20 kW exchanger with 30 K terminal differences has UA = 20000 / 30."""
+    good = (350.0, 330.0, 300.0, 320.0, 0.5, 0.5, 2000.0, 2000.0)
+    result = heat_transfer.apparent_conductance("counterflow", *good)
+    assert result[0] == pytest.approx(20000.0 / 30.0)
+    assert result[1] == heat_transfer.DETERMINED
+    rows = [
+        good,
+        (350.0, 330.0, 300.0, 320.0, 0.0, 0.5, 2000.0, 2000.0),
+        (350.0, 330.0, 300.0, 320.0, 0.5, 0.25, 2000.0, 2000.0),
+        (350.0, 330.0, 330.0, 350.0, 0.5, 0.5, 2000.0, 2000.0),
+    ]
+    codes = [heat_transfer.apparent_conductance("counterflow", *row)[1] for row in rows]
+    assert codes == [
+        heat_transfer.DETERMINED,
+        heat_transfer.NONPOSITIVE_INPUT,
+        heat_transfer.DISAGREEING_DUTIES,
+        heat_transfer.NO_LMTD,
+    ]
+    for arrangement in ("counterflow", "parallel"):
+
+        def apparent(*row, arrangement=arrangement):
+            return heat_transfer.apparent_conductance(arrangement, *row)
+
+        apparent.__name__ = f"apparent_conductance_{arrangement}"
+        assert_function_matches(apparent, rows if arrangement == "counterflow" else rows[:3])

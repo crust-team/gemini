@@ -91,3 +91,11 @@ def test_a_failing_check_in_an_unselected_branch_is_dropped():
     """A stopped row with an invalid heat capacity gives zero on floats and on arrays."""
     rows = [(1.0, 1005.0), (0.0, 0.0), (0.0, -1.0)]
     assert_function_matches(_work_when_running, rows)
+
+
+def test_stage_pressure_ratio_is_the_root_of_the_overall_ratio():
+    """Four equal stages of ratio 2 give an overall ratio of 16."""
+    assert compression.stage_pressure_ratio(16.0, 4) == pytest.approx(2.0)
+    assert compression.stage_pressure_ratio(7.0, 1) == 7.0
+    rows = [(16.0, 4.0), (7.0, 1.0), (1.0, 3.0), (30.0, 2.0)]
+    assert_function_matches(compression.stage_pressure_ratio, rows)

@@ -9,6 +9,7 @@ import math
 
 from gemini import ops
 from gemini.errors import PhysicsRangeError
+from gemini.physics import heat_transfer
 from gemini.physics.units import k_to_c
 
 
@@ -36,8 +37,7 @@ def carnot_cop_heating(
     Fundamentals of Engineering Thermodynamics, chapter 5. Valid for any positive temperatures
     whose (floored) lift is positive; the floor bounds the COP of nearly equal temperatures.
     """
-    lift = _lift("carnot_cop_heating", sink_temperature, source_temperature, minimum_lift)
-    return sink_temperature / lift
+    return _heating_cop("carnot_cop_heating", sink_temperature, source_temperature, minimum_lift)
 
 
 @ops.physics
@@ -101,11 +101,10 @@ def log_mean_temperature(inlet_temperature: float, outlet_temperature: float) ->
         inlet_temperature=inlet_temperature,
         outlet_temperature=outlet_temperature,
     )
-    glide = inlet_temperature - outlet_temperature
     return ops.where(
         inlet_temperature == outlet_temperature,
         inlet_temperature,
-        glide / ops.log(inlet_temperature / outlet_temperature),
+        heat_transfer.logarithmic_mean(inlet_temperature, outlet_temperature),
     )
 
 
@@ -140,11 +139,12 @@ def lorenz_cop_heating(
     Energieumwandlung", Zeitschrift fuer die gesamte Kaelte-Industrie 1, 1-11. The Lorenz cycle
     is the reversible cycle between two streams of finite heat capacity; it reduces to the
     Carnot COP when both glides vanish. It suits water-to-water machines whose circuits change
-    temperature by several kelvin.
+    temperature by several kelvin. Valid for positive temperatures whose floored log-mean lift
+    is positive and for glides of constant heat capacity.
     """
     sink = log_mean_temperature(sink_inlet, sink_outlet)
     source = log_mean_temperature(source_inlet, source_outlet)
-    return sink / _lift("lorenz_cop_heating", sink, source, minimum_lift)
+    return _heating_cop("lorenz_cop_heating", sink, source, minimum_lift)
 
 
 @ops.physics
@@ -177,7 +177,8 @@ def characteristic_temperature_difference(
     (2005), "Operational results of a 10 kW absorption chiller and adaptation of the
     characteristic equation", Proc. 1st Int. Conf. Solar Air Conditioning. For the ideal Duehring
     form a = 1 + B and r = B (B about 1.1 to 1.2 for water/LiBr); fitted values differ, so the
-    equation is evaluated on the Celsius basis of the published fits.
+    equation is evaluated on the Celsius basis of the published fits. Valid for the fitted
+    machine range of the published coefficients, with ``a`` and ``r`` nonnegative.
     """
     ops.check_numbers(
         "characteristic_temperature_difference",
@@ -281,7 +282,9 @@ def characteristic_sensitivity(
     -----
     Each circuit's mean temperature moves by half its temperature change Q / C. The driving
     circuit cools, the heat-rejection circuit warms and the chilled circuit cools as the
-    evaporator duty rises; all three lower ddt for positive coefficients.
+    evaporator duty rises; all three lower ddt for positive coefficients. The half-change
+    mean follows Hellmann, Schweigler and Ziegler (1999), who define the characteristic
+    equation on the arithmetic mean circuit temperatures.
     """
     ops.check_numbers(
         "characteristic_sensitivity",
@@ -407,7 +410,8 @@ def part_load_duty(requested: float, capacity: float, minimum_part_load: float) 
     Below the minimum part load the machine is taken as switched off for the step rather than
     cycling on and off; at hourly steps this underestimates the delivered heat of a cycling
     machine. EN 14825 (seasonal performance of heat pumps and chillers) describes the cycling
-    alternative with a degradation coefficient.
+    alternative with a degradation coefficient. This on/off cutoff is a retained GEMINI
+    simplification, not a published relation.
     """
     ops.check_numbers(
         "part_load_duty",
@@ -430,6 +434,12 @@ def part_load_duty(requested: float, capacity: float, minimum_part_load: float) 
     )
     duty = ops.minimum(requested, capacity)
     return ops.where(duty < minimum_part_load * capacity, 0.0, duty)
+
+
+def _heating_cop(function, sink_temperature, source_temperature, minimum_lift):
+    """Return ``T_sink / max(T_sink - T_source, minimum_lift)``, the reversible heating COP."""
+    lift = _lift(function, sink_temperature, source_temperature, minimum_lift)
+    return sink_temperature / lift
 
 
 def _lift(function, sink_temperature, source_temperature, minimum_lift):

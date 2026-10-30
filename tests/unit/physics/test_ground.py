@@ -211,10 +211,3 @@ def test_ground_relations_raise_the_error_class_of_their_caller():
         )
     with pytest.raises(ConfigurationError, match="^well: ramey_time_function: time = 0"):
         ground.ramey_time_function(0.0, 1e-6, 0.1, error=ConfigurationError, context="well: ")
-
-
-def test_signed_parts_split_a_value_into_its_positive_and_negative_sizes():
-    """A positive value has no negative part, a negative one no positive part, zero neither."""
-    assert ground.signed_parts(3.0) == (3.0, 0)
-    assert ground.signed_parts(-2.0) == (0, 2.0)
-    assert ground.signed_parts(0.0) == (0.0, -0.0)

@@ -5,7 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import ground
+from gemini.physics import ground, heat_transfer
 from gemini.types import (
     Control,
     Dimensionless,
@@ -161,7 +161,7 @@ class AquiferStorage(Module):
         self.recovery_efficiency = ops.where(charged > 0, self.recovered_heat / charged, None)
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
-        parts = [ground.signed_parts(loss) for loss in losses]
+        parts = [heat_transfer.signed_parts(loss) for loss in losses]
         self.heat_loss = sum(loss for loss, _ in parts)
         self.heat_absorbed = sum(absorbed for _, absorbed in parts)
         self.heat_accumulation = (
