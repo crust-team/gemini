@@ -818,7 +818,7 @@ class Module:
                 f"{self.path}: missing required inlet(s) {', '.join(missing)}; "
                 f"valid names: {join_names(inlet_names)}"
             )
-        inlets = Ports(self._validated_inlets(inlet_values), path=self.path)
+        inlets = self._validated_ports("inlet", self._inlets, inlet_values, CallError)
         inputs = {
             name: kwargs[name] for name in self._controls | self._boundaries if name in kwargs
         }
@@ -868,17 +868,23 @@ class Module:
         values.update({name: kwargs[name] for name in inlet_names if name in kwargs})
         return values
 
-    def _validated_inlets(self, values):
+    def _validated_ports(self, kind, declarations, values, error, prepare=lambda value: value):
+        """Return the ``Ports`` of ``values`` validated by ``declarations``, else raise ``error``.
+
+        ``kind`` is ``"inlet"`` or ``"outlet"`` in the message; ``prepare`` is applied to each value
+        before it is validated.
+        """
         validated = []
-        for name, declaration in self._inlets.items():
+        for name, declaration in declarations.items():
+            value = prepare(values[name])
             try:
-                validated.append((name, declaration.validate(values[name])))
+                validated.append((name, declaration.validate(value)))
             except (TypeError, ValueError) as exc:
-                raise CallError(
-                    f"{self.path}: invalid inlet {name!r}; "
-                    f"valid names: {join_names(self._inlets)}: {exc}"
+                raise error(
+                    f"{self.path}: invalid {kind} {name!r}; "
+                    f"valid names: {join_names(declarations)}: {exc}"
                 ) from exc
-        return validated
+        return Ports(validated, path=self.path)
 
     def _check_outlet_names(self, returned):
         """Reject a ``forward`` result that is not a dict of exactly the declared outlets."""
@@ -894,17 +900,7 @@ class Module:
 
     def _check_outlets(self, returned):
         self._check_outlet_names(returned)
-        validated = []
-        for name, declaration in self._outlets.items():
-            outlet = _plain_outlet(returned[name])
-            try:
-                validated.append((name, declaration.validate(outlet)))
-            except (TypeError, ValueError) as exc:
-                raise OutletError(
-                    f"{self.path}: invalid outlet {name!r}; "
-                    f"valid names: {join_names(self._outlets)}: {exc}"
-                ) from exc
-        return Ports(validated, path=self.path)
+        return self._validated_ports("outlet", self._outlets, returned, OutletError, _plain_outlet)
 
     def _resolve_inputs(self, supplied):
         """Return validated controls and boundaries: supplied, persisted, then default values."""
