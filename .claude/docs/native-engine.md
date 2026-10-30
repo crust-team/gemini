@@ -144,7 +144,7 @@ Nothing that computes outputs today is lost; the user does not mark anything in 
 - **Forward hooks** are traced too, after the formula outputs. Hooks always return None, so the
   engine looks at what a hook does during the trace:
   - it writes outputs with `gm` ops -> it goes into the graph;
-  - it only reads -> it is an observer, replayed per row from the results after the run;
+  - it only reads -> its module is a graph break, so it runs for real on every row;
   - it cannot be traced and writes outputs -> **only its module** runs in plain Python tick by
     tick (graph break); the rest of the plant stays in the graph.
 - Pre-hooks follow the same rules.
@@ -202,10 +202,10 @@ Implemented for one leaf module, the ESP, and everything its call needs:
 - `gemini/ops`: the registry (name, kind, arity), `dispatch`, `Operators`, `Constant`,
   `where`, `check`, `logical_and`, comparisons, arithmetic, `getitem` and the `scan` definition.
 - `gemini/graph`: `Node` (op, kind, operands, name, role, unit, shape, source line, guards),
-  `Graph` (inputs by role, outputs, checks, constants, outlet fluids, observers,
+  `Graph` (inputs by role, outputs, checks, constants, outlet fluids,
   `describe()`), `Proxy`, `Tracer` (one leaf module), `Interpreter` (value pass, then error
   pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
-  row on a graph break, then observer replay).
+  row on a graph break).
 - `core/modules/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
   ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `Stream` is one
   slots dataclass used on every path.
@@ -267,8 +267,8 @@ Where the implementation differs from sections 1 to 11, and why:
   coefficient, on the last axis so a scenario axis can lead.
 - **No `named_constants` or `named_states`.** A module's constants are known only by tracing
   its physics (`graph.by_role("constant")`); `states()` already lists states.
-- **`Stream` and `FluidProperties` are plain slots dataclasses.** `StreamState` and the `rho_l`,
-  `rho_g` and `gmf` graph inputs are gone. Validation happens at the boundary and raises
+- **`Stream` and `FluidProperties` are plain slots dataclasses.** The `rho_l`, `rho_g` and `gmf` graph
+  inputs are gone. Validation happens at the boundary and raises
   `gm.errors`: numbers become `float`; `m_dot` must be finite, `T > 0`, `p >= 0`
   (`PhysicsRangeError`). When a field is an array or a traced value the same limits are
   `ops.check` calls, so an invalid row raises the same class. `with_` is a trusted copy
@@ -284,10 +284,6 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Graph breaks** are stateful modules (no `scan` yet), modules with pre-hooks, float32 precision
   and any `TraceError` from Python control flow or conversions; section 13 says at which level.
   The Python solves `close_loop` and `plants/nodal.py` break their whole composite.
-- **An unmarked hook runs once during the trace** on traced values (that is how a reading hook is
-  told from a writing one), so anything an observer stores then is a `Proxy`; afterwards they
-  are replayed per row. A hook that raises `TraceError` is a graph break even when it would
-  only have read, because the trace cannot tell.
 - **Common-subexpression elimination** (`gemini/graph/passes/cse.py`,
   `eliminate_common_subexpressions(graph)`, in place) runs once per trace in `GraphCache`;
   `GraphCache(optimize=False)` turns it off. It merges `elementwise`, `index` and `check` nodes
@@ -306,7 +302,7 @@ Where the implementation differs from sections 1 to 11, and why:
 ## 13. Composites and replay through the graph
 
 - **Composites.** `Module._run` hands a call made while a trace runs (`_Call.trace`) to
-  `Trace.child`. A child's controls, boundaries and numeric parameters are graph inputs named
+  `Trace.child`, and `Trace.run` goes through `Module._evaluate`, the one call sequence. A child's controls, boundaries and numeric parameters are graph inputs named
   `<relative path>.<name>` (the root keeps plain names); a child called twice reuses them; supplied
   keywords win without validation. The `ModuleResult` of traced values joins the parent's
   `call_records`, so `Output.of`, automatic sums, `Output.ratio` (now `where(bottom == 0, None,
@@ -317,9 +313,8 @@ Where the implementation differs from sections 1 to 11, and why:
   per row; a stateful child starts from its initial states, as a call outside `Module.step` does.
   Outputs and outlet fields are `break_output` nodes; a failing row is NaN with an error code, and
   `run` re-raises the child's exception. Outlet fluids come from a probe of `forward`; a row with
-  another fluid fails. A composite child that cannot be traced, or any child with a marked
-  observer, breaks the whole root: its leaves' call records feed the parent, and observers replay
-  for the root only. A list of traced values is a vector output, recorded as `name[i]` items.
+  another fluid fails. A composite child that cannot be traced breaks the whole root: its
+  leaves' call records feed the parent. A list of traced values is a vector output, recorded as `name[i]` items.
 - **Hooks.** An ordinary forward hook is called once on traced values and classified: one that
   writes outputs joins the graph, one that only reads, and any pre-hook, makes its leaf a break
   or the root a root break, so it runs for real on every row. `EventLog` registers no hook.
@@ -365,6 +360,11 @@ Where the implementation differs from sections 1 to 11, and why:
 
 Validation stays off the hot path: `Declaration` has one cheap check for the common case, and
 everything else takes the unchanged full path. Traced rows are validated by `graph/limits.py`.
+
+Measured (`.tmp/native-engine/step3-benchmark.md`), CPU on the July dataset: replay 1.13 s to 0.058 s
+and simulate 0.27 s to 0.044 s on NumPy, both identical to the old tick loop. An eager ESP call
+costs 53 % more than in step 2, from `np.float64` arithmetic, and only direct calls and breaks pay
+it. A live call is dominated by the checkpoint, about 150 of 190 ms, which rewrites all results.
 
 Known gap: fluid properties and published correlation coefficients stay inline in the graph, not
 `Parameter` or `Constant` inputs, so a calibration or sensitivity run cannot reach them without a

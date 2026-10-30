@@ -112,12 +112,16 @@ def simulate(dataset):
     return engine
 
 
-def live(dataset, folder):
-    """Evaluate ``dataset`` one new row at a time through ``Engine.live`` and return the engine."""
+def live(frame):
+    """Evaluate ``frame`` one new row at a time through ``Engine.live``; return the engine."""
     plant, engine = DoubletHeatPlant.load(PLANT), gm.Engine()
-    checkpoint = Path(folder) / "live.json"
-    for row in range(len(dataset)):
-        engine.live(plant, dataset.window(end=dataset.frame.index[row]), checkpoint)
+    views = [
+        gm.Dataset.from_frame(frame.iloc[: row + 1], time_column="time")
+        for row in range(len(frame))
+    ]
+    with tempfile.TemporaryDirectory() as folder:
+        for view in views:
+            engine.live(plant, view, Path(folder) / "live.json")
     return engine
 
 
@@ -126,15 +130,13 @@ def benchmark_plant(repeat):
     frame = pd.read_csv(DATASET, parse_dates=["time"])
     month = gm.Dataset.from_frame(frame, time_column="time")
     day = gm.Dataset.from_frame(frame.iloc[:96], time_column="time")
-    ticks = gm.Dataset.from_frame(frame.iloc[:48], time_column="time")
-    with tempfile.TemporaryDirectory() as folder:
-        cases = (
-            ("replay month", lambda: replay(month), len(month)),
-            ("simulate day", lambda: simulate(day), len(day)),
-            ("live, per tick", lambda: live(ticks, folder), len(ticks)),
-        )
-        for name, function, rows in cases:
-            run_case(name, function, rows, repeat)
+    cases = (
+        ("replay month", lambda: replay(month), len(month)),
+        ("simulate day", lambda: simulate(day), len(day)),
+        ("live, per tick", lambda: live(frame.iloc[:48]), 48),
+    )
+    for name, function, rows in cases:
+        run_case(name, function, rows, repeat)
 
 
 def run_case(name, function, rows, repeat):
