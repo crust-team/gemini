@@ -5,12 +5,12 @@ import math
 import numpy as np
 import pytest
 
-from gemini import backends
 from gemini.core.physics import psychrometrics
 from gemini.errors import PhysicsRangeError
-from gemini.graph import Graph, Interpreter
+from gemini.graph import Graph
 from gemini.graph.limits import certain
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.graph_run import graph_outputs
 
 C = 273.15
 
@@ -156,16 +156,17 @@ def test_dew_point_in_a_graph_runs_the_solver_and_raises_the_check_error():
     humidity = graph.input("humidity", "inlet")
     graph.output("dew", psychrometrics.dew_point(temperature, humidity))
     certain(graph, graph.unframed)
-    run = Interpreter(graph, backends.get("numpy")).run
     rows = DEW_POINT_ROWS
     columns = {
         "temperature": np.array([r[0] for r in rows]),
         "humidity": np.array([r[1] for r in rows]),
     }
     expected = [psychrometrics.dew_point(*row) for row in rows]
-    np.testing.assert_allclose(run(columns)["dew"], expected, rtol=1e-12, atol=0)
+    np.testing.assert_allclose(graph_outputs(graph, columns)["dew"], expected, rtol=1e-12, atol=0)
     with pytest.raises(PhysicsRangeError, match="expected a dew point above"):
-        run({"temperature": np.array([300.0, 300.0]), "humidity": np.array([0.5, 1e-9])})
+        graph_outputs(
+            graph, {"temperature": np.array([300.0, 300.0]), "humidity": np.array([0.5, 1e-9])}
+        )
 
 
 def test_humidity_ratio_and_wet_bulb_on_arrays_match_floats():

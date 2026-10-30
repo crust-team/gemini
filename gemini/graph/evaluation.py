@@ -51,6 +51,11 @@ class Evaluation:
         """Return the exception of a failed ``row``: the check's class with its exact message."""
         return self._errors(row)
 
+    def raise_first(self):
+        """Raise the exception of the first failed row, if any."""
+        if self.failed.any():
+            raise self._errors(int(np.flatnonzero(self.failed)[0]))
+
     def output(self, name):
         """Return the array of the graph output ``outputs.<name>`` or ``outlets.<port>.<field>``."""
         return self._convert(self.graph.outputs[name])

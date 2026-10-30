@@ -7,11 +7,12 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini import backends, ops
+from gemini import ops
 from gemini.errors import PhysicsRangeError
-from gemini.graph import Graph, GraphCache, Interpreter, run
+from gemini.graph import Graph, GraphCache, run
 from gemini.graph.limits import certain
 from gemini.graph.passes import eliminate_common_subexpressions
+from tests.fixtures.graph_run import graph_outputs
 
 COLUMNS = ["suction.m_dot", "suction.T", "suction.p", "frequency"]
 XS = np.array([-3.0, -1.0, 0.5, 2.0])
@@ -20,7 +21,7 @@ XS = np.array([-3.0, -1.0, 0.5, 2.0])
 def _outcome(graph, xs=XS):
     """Return the outputs of ``graph`` over ``xs``, or the error it raises as (class, text)."""
     try:
-        values = Interpreter(graph, backends.get("numpy")).run({"x": xs})
+        values = graph_outputs(graph, {"x": xs})
     except PhysicsRangeError as error:
         return type(error), str(error)
     return {name: np.asarray(value).tolist() for name, value in values.items()}

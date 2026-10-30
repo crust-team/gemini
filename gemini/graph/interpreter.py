@@ -4,10 +4,10 @@ The value pass runs every node in creation order on the backend (missing ops fal
 ``None`` branch of ``where`` is NaN, as it is on arrays). The error pass then gives every node the
 per-row error code of its operands and of the checks guarding it (``0`` means no error; of
 several, the lowest code, the check that ran first, wins), except that ``where`` keeps only the
-code of the branch it selected on each row. The first row whose code reaches an output raises, in
-``run``, the exception ``failures.row_error`` builds. ``evaluation.evaluate`` is the form that
-keeps every row. A break node runs its module row by row; a failed row has the code of the node's
-check and its exception is re-raised.
+code of the branch it selected on each row. ``reached`` gives the rows whose code reaches an
+output and ``evaluation.evaluate`` turns them into exceptions with ``failures.row_error``. A
+break node runs its module row by row; a failed row has the code of the node's check and its
+exception is re-raised.
 """
 
 import math
@@ -17,7 +17,6 @@ import numpy as np
 from gemini import backends
 from gemini.errors import CallError
 from gemini.graph.breaks import evaluate_break
-from gemini.graph.failures import RowView, row_error
 from gemini.graph.node import Node
 
 
@@ -28,21 +27,6 @@ class Interpreter:
         """Prepare to run ``graph`` on the backend object ``backend``."""
         self.graph = graph
         self.backend = backend
-
-    def run(self, feeds):
-        """Return every graph output by name for the input values ``feeds``.
-
-        The first row whose error reaches an output raises the exception ``failures.row_error``
-        builds for it: ``evaluation.evaluate`` plus a raise.
-        """
-        values, errors = self.execute(feeds)
-        outputs = {name: _value(operand, values) for name, operand in self.graph.outputs.items()}
-        codes = self.reached(errors)
-        if codes is None:
-            return outputs
-        row = int(np.flatnonzero(codes)[0])
-        check = self.graph.checks[int(codes[row]) - 1]
-        raise row_error(check, RowView(values, row, feeds))
 
     def execute(self, feeds):
         """Run the value pass, then the error pass; return the node values and error codes."""

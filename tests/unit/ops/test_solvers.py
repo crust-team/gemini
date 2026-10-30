@@ -6,11 +6,12 @@ import numpy as np
 import pytest
 from scipy import optimize
 
-from gemini import backends, ops
+from gemini import ops
 from gemini.errors import ConfigurationError
-from gemini.graph import Graph, Interpreter
+from gemini.graph import Graph
 from gemini.graph.passes.cse import eliminate_common_subexpressions
 from tests.fixtures.equivalence import RTOL
+from tests.fixtures.graph_run import graph_outputs
 
 
 def _cubic(x, shift):
@@ -103,11 +104,11 @@ def test_brentq_in_a_graph_records_one_solver_node_and_matches_arrays():
     assert [node.op for node in solvers] == ["brentq"]
     assert solvers[0].attributes["function"] is _cubic
     feeds = np.array([0.25, 1.0, 100.0])
-    root = Interpreter(graph, backends.get("numpy")).run({"shift": feeds})["root"]
+    root = graph_outputs(graph, {"shift": feeds})["root"]
     expected = [ops.brentq(_cubic, 0.0, 5.0, args=(2 * s,)) for s in feeds.tolist()]
     np.testing.assert_allclose(root, expected, rtol=RTOL, atol=0, equal_nan=True)
     assert np.isnan(root[2])
-    assert Interpreter(graph, backends.get("python")).run({"shift": 1.0})["root"] == expected[1]
+    assert graph_outputs(graph, {"shift": 1.0}, "python")["root"] == expected[1]
 
 
 def test_newton_in_a_graph_and_common_subexpressions_keep_solver_nodes():
@@ -121,7 +122,7 @@ def test_newton_in_a_graph_and_common_subexpressions_keep_solver_nodes():
     eliminate_common_subexpressions(graph)
     assert sum(node.kind == "solver" for node in graph.nodes) == 2
     feeds = np.array([1.0, 8.0])
-    values = Interpreter(graph, backends.get("numpy")).run({"shift": feeds})
+    values = graph_outputs(graph, {"shift": feeds})
     np.testing.assert_allclose(
         values["first"], ops.newton(_cubic, np.full(2, 3.0), _cubic_slope, args=(feeds,))
     )

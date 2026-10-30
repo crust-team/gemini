@@ -51,7 +51,7 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
     feeds = graph_feeds(graph, module, inlets, inputs)
     with backends.settings(backend=backend):
         evaluation = evaluate(graph, feeds, rows)
-    _raise_first(evaluation)
+    evaluation.raise_first()
     result = evaluation.result
     outlets = {
         port: {field: getattr(result.outlets[port], field) for field, _ in STREAM_FIELDS}
@@ -59,12 +59,6 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
     }
     breaks = [reason for _, reason in graph.breaks] if graph.root is not None else []
     return Run(outputs=dict(result.outputs.items()), outlets=outlets, breaks=breaks, graph=graph)
-
-
-def _raise_first(evaluation):
-    """Raise the exception of the first failed row of ``evaluation``, if any."""
-    if evaluation.failed.any():
-        raise evaluation.error(int(np.flatnonzero(evaluation.failed)[0]))
 
 
 def _row_count(inlets, inputs):
@@ -140,7 +134,7 @@ def run_function(function, *args, backend="numpy", **fixed):
     rows = max([np.size(value) for value in feeds.values()], default=1)
     with backends.settings(backend=backend):
         evaluation = evaluate(graph, feeds, rows)
-    _raise_first(evaluation)
+    evaluation.raise_first()
     scalar = all(np.ndim(value) == 0 for value in feeds.values())
     values = {
         name: evaluation.output(name)[0] if scalar else evaluation.output(name)

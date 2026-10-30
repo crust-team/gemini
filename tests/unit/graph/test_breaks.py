@@ -3,10 +3,10 @@
 import numpy as np
 
 import gemini as gm
-from gemini import backends
 from gemini.core.types.ports import Ports
-from gemini.graph import Graph, Interpreter
+from gemini.graph import Graph
 from gemini.graph.breaks import PROBE, evaluate_break, record_break
+from tests.fixtures.graph_run import graph_outputs
 
 
 def _break_graph(tank):
@@ -52,5 +52,5 @@ def test_interpreter_gives_scalar_results_for_scalar_operands(tank):
     """On the Python backend the break node returns plain numbers."""
     graph = _break_graph(tank)
     feeds = {"inlet.m_dot": 2.0, "inlet.T": 300.0, "inlet.p": 1e5}
-    values = Interpreter(graph, backends.get("python")).run(feeds)
+    values = graph_outputs(graph, feeds, "python")
     assert values["content"] == 2.0 and values["p"] == 1e5

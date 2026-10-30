@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini import backends
 from gemini.errors import DeclarationError, PhysicsRangeError
-from gemini.graph import Interpreter, Tracer, run
+from gemini.graph import Tracer, run
+from tests.fixtures.graph_run import graph_outputs
 
 
 def _inlet(pressures):
@@ -83,7 +83,7 @@ def test_inlet_limits_fail_the_row_with_the_stream_error(gain):
         "REFERENCE": 2.0,
     }
     with pytest.raises(PhysicsRangeError, match="Stream: T = 0.0 K"):
-        Interpreter(graph, backends.get("numpy")).run(feeds)
+        graph_outputs(graph, feeds)
 
 
 def test_not_a_number_against_a_bound_fails_like_the_untraced_call(bounded):

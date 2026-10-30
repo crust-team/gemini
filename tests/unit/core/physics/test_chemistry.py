@@ -6,10 +6,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gemini import backends, ops
+from gemini import ops
 from gemini.core.physics import chemistry, units
-from gemini.graph import Graph, Interpreter
+from gemini.graph import Graph
 from tests.fixtures.equivalence import RTOL, assert_function_matches
+from tests.fixtures.graph_run import graph_outputs
 
 GOLDEN = json.loads((Path(__file__).parents[3] / "fixtures/golden_values.json").read_text())
 
@@ -82,7 +83,7 @@ def test_henry_constant_in_a_graph():
     graph = Graph("henry")
     graph.output("henry", chemistry.henry_constant(graph.input("temperature", "inlet")))
     values = [280.0, 293.15, 350.0]
-    traced = Interpreter(graph, backends.get("numpy")).run({"temperature": np.array(values)})
+    traced = graph_outputs(graph, {"temperature": np.array(values)})
     expected = [chemistry.henry_constant(value) for value in values]
     np.testing.assert_allclose(traced["henry"], expected, rtol=RTOL, atol=0)
     assert ops.exp(0.0) == 1.0

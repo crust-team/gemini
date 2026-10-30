@@ -7,7 +7,7 @@ output and outlet field is a ``break_output`` node of it. ``evaluate_break`` run
 by row on the plain path (``module(**arguments)``, so a stateful module starts from its initial
 states, exactly like a call outside ``Module.step``) and stacks the results. A row that raises
 is NaN and fails a check guarding every output of the node: the row carries an error code like
-any failed check, and ``Interpreter.run`` re-raises the exception of the first failing row.
+any failed check, and ``Evaluation.raise_first`` re-raises the exception of the first failing row.
 
 The outlet fluids are static in a trace but unknown until the module has run. The recorder
 therefore probes ``forward`` once on representative concrete inlets (never the hooks), and a
