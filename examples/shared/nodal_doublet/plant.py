@@ -3,12 +3,8 @@
 from gemini.core.modules import Module
 from gemini.core.modules.plants import nodal
 from gemini.core.modules.pumps import ESP, InjectionPump
-from gemini.core.modules.subsurface import (
-    InjectionReservoir,
-    InjectionWell,
-    ProductionReservoir,
-    ProductionWell,
-)
+from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.core.modules.wells import InjectionWell, ProductionWell
 from gemini.core.types import (
     Boundary,
     Electricity,

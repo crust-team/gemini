@@ -216,7 +216,7 @@ in `tests/fixtures/json_schema.py`.
 
 Old-format files are read only by `tests/unit/core/legacy/`, `tests/e2e/test_legacy_bridge.py`,
 the `check_wiring` audit in `tests/e2e/test_full_replay.py`, and the golden reconstructions that
-build equipment from the original `.param` files: the subsurface and heat-exchanger unit tests,
+build equipment from the original `.param` files: the subsurface, wells and exchangers unit tests,
 `tests/unit/core/physics/test_geometry.py`, `tests/integration/test_plant.py` and the historical
 `tests/fixtures/capture_golden.py`. Shared paths live in `tests/fixtures/__init__.py` (`ROOT`,
 `FIXTURES`, `SHARED`, `OLD_PROJECT`).

@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.core.modules.heat import Boiler
+from gemini.core.modules.heating import Boiler
 from gemini.core.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
 

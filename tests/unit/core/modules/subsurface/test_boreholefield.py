@@ -7,7 +7,7 @@ import pytest
 import gemini as gm
 from gemini import ops
 from gemini.core.modules import Module, energy_balance, mass_balance
-from gemini.core.modules.heat import Boiler
+from gemini.core.modules.heating import Boiler
 from gemini.core.modules.subsurface import BoreholeField
 from gemini.core.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error

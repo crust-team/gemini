@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from gemini.core.modules.subsurface.well import _Well
+from gemini.core.modules.wells.well import _Well
 from gemini.core.types import (
     HeatLoss,
     Inlet,

@@ -1,7 +1,7 @@
 """Injection well from the wellhead down to the sandface."""
 
 from gemini import ops
-from gemini.core.modules.subsurface.well import _Well
+from gemini.core.modules.wells.well import _Well
 from gemini.core.types import (
     HeatLoss,
     Inlet,

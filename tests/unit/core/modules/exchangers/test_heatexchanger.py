@@ -8,7 +8,7 @@ import pytest
 
 import gemini as gm
 from gemini.core.legacy import tables as mapping
-from gemini.core.modules.heat import HeatExchanger
+from gemini.core.modules.exchangers import HeatExchanger
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import WATER

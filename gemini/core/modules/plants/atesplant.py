@@ -1,9 +1,10 @@
 """Low-temperature ATES plant: well pair, well pump, cooling heat exchanger and heat pump."""
 
-from gemini.core.modules.heat import HeatExchanger, HeatPump
+from gemini.core.modules.exchangers import HeatExchanger
+from gemini.core.modules.heating import HeatPump
 from gemini.core.modules.module import Module
 from gemini.core.modules.pumps import CentrifugalPump
-from gemini.core.modules.subsurface import AquiferStorage
+from gemini.core.modules.storage import AquiferStorage
 from gemini.core.types import (
     Control,
     Electricity,

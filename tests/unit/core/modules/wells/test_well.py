@@ -7,7 +7,7 @@ import pytest
 
 import gemini as gm
 from gemini.core.legacy import tables as mapping
-from gemini.core.modules.subsurface import InjectionWell, ProductionWell
+from gemini.core.modules.wells import InjectionWell, ProductionWell
 from gemini.core.types.flows import Stream
 
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"

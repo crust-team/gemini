@@ -8,7 +8,8 @@ import numpy as np
 
 from gemini.core.modules.plants import nodal as solves
 from gemini.core.modules.pumps import ESP
-from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir, ProductionWell
+from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.core.modules.wells import ProductionWell
 from gemini.core.physics import constants, units
 from gemini.errors import (
     ConfigurationError,

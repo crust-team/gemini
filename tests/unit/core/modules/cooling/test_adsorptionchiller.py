@@ -3,7 +3,7 @@
 import pytest
 
 from gemini.core.modules.balance import energy_balance, mass_balance
-from gemini.core.modules.heat import AdsorptionChiller
+from gemini.core.modules.cooling import AdsorptionChiller
 from gemini.core.types.flows import Stream
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from tests.fixtures.equivalence import assert_module_matches

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gemini.core.modules.heat import _sorption as sorption
+from gemini.core.modules.cooling import _sorption as sorption
 from gemini.core.types.flows import Stream
 from gemini.errors import PhysicsRangeError
 

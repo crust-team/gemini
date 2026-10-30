@@ -15,12 +15,8 @@ import pandas as pd
 import gemini as gm
 from gemini.core.legacy import tables
 from gemini.core.modules.pumps import ESP
-from gemini.core.modules.subsurface import (
-    InjectionReservoir,
-    InjectionWell,
-    ProductionReservoir,
-    ProductionWell,
-)
+from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.core.modules.wells import InjectionWell, ProductionWell
 from gemini.core.physics import geometry, units
 from gemini.core.types.flows import Stream
 from tests.fixtures import FIXTURES, OLD_PROJECT

@@ -5,7 +5,7 @@ import pytest
 
 from gemini.core.modules import Module
 from gemini.core.modules.balance import collect_flows, emissions, energy_balance, mass_balance
-from gemini.core.modules.heat import CHP, Boiler
+from gemini.core.modules.heating import CHP, Boiler
 from gemini.core.modules.pumps import ESP, InjectionPump
 from gemini.core.types import (
     HeatLoss,

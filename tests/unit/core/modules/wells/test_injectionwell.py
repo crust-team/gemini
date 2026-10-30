@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from gemini.core.legacy import tables as mapping
-from gemini.core.modules.subsurface import InjectionWell
+from gemini.core.modules.wells import InjectionWell
 from gemini.core.types.flows import Stream
 from gemini.graph import run
 from tests.fixtures.equivalence import assert_function_matches, assert_module_matches

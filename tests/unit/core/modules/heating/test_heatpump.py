@@ -3,7 +3,7 @@
 import pytest
 
 from gemini.core.modules.balance import energy_balance, mass_balance
-from gemini.core.modules.heat import HeatPump
+from gemini.core.modules.heating import HeatPump
 from gemini.core.physics import refrigeration
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import Fluid

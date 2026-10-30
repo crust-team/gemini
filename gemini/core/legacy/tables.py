@@ -9,16 +9,12 @@ import csv
 import io
 from pathlib import Path
 
-from gemini.core.modules.heat import HeatExchanger
+from gemini.core.modules.exchangers import HeatExchanger
 from gemini.core.modules.pumps import ESP, InjectionPump
-from gemini.core.modules.subsurface import (
-    InjectionReservoir,
-    InjectionWell,
-    ProductionReservoir,
-    ProductionWell,
-)
+from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.core.modules.treatment import Degasser, Filter
 from gemini.core.modules.treatment.filter import DEFAULT_CLOGGING_BAR
+from gemini.core.modules.wells import InjectionWell, ProductionWell
 from gemini.core.physics import geometry, units
 from gemini.errors import LegacyFormatError
 from gemini.utils.files import read_json

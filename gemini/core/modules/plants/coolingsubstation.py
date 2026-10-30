@@ -1,7 +1,7 @@
 """Building cooling substation: network valve, heat exchanger and the building's cooling loads."""
 
 from gemini.core.modules.demand import CoolingConsumer
-from gemini.core.modules.heat import HeatExchanger
+from gemini.core.modules.exchangers import HeatExchanger
 from gemini.core.modules.module import Module
 from gemini.core.modules.piping import Valve
 from gemini.core.modules.plants import loops

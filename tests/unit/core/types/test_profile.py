@@ -44,7 +44,7 @@ def test_series_previous_and_resample():
 
 def test_profiles_drive_scenario():
     """Dotted profile inputs drive an ordinary handwritten module without configuration."""
-    from gemini.core.modules.heat.boiler import Boiler
+    from gemini.core.modules.heating.boiler import Boiler
     from gemini.core.types.bindings import Binding, ModuleBindings
 
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)

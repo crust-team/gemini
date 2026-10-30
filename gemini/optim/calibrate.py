@@ -9,7 +9,7 @@ from scipy.optimize import least_squares
 
 from gemini.core.data.dataset import as_dataset, bound_unit
 from gemini.core.engine.engine import Engine
-from gemini.core.modules.heat import HeatExchanger
+from gemini.core.modules.exchangers import HeatExchanger
 from gemini.core.modules.pumps import ESP
 from gemini.core.physics import heat_transfer
 from gemini.core.physics.units import array_to_si

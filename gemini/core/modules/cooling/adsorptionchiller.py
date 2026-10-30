@@ -1,7 +1,7 @@
 """Silica-gel/water adsorption chiller driven by low-temperature hot water."""
 
 from gemini import ops
-from gemini.core.modules.heat import _sorption as sorption
+from gemini.core.modules.cooling import _sorption as sorption
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,

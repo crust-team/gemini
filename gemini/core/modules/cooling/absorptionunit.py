@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.core.modules.heat import _sorption as sorption
+from gemini.core.modules.cooling import _sorption as sorption
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Control,

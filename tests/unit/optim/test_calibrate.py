@@ -20,7 +20,7 @@ def test_parameters_must_be_one_calibratable_set_of_the_plant(fresh_plant, refer
         gm.optim.calibrate(plant, data, [ua, head])
     with pytest.raises(ConfigurationError, match="heat_exchanger.ua.*twice"):
         gm.optim.calibrate(plant, data, [ua, ua])
-    foreign = gm.modules.heat.HeatExchanger()
+    foreign = gm.modules.exchangers.HeatExchanger()
     with pytest.raises(ConfigurationError, match="supplied plant"):
         gm.optim.calibrate(plant, data, [foreign.get_parameter("ua")])
 
