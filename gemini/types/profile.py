@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 
-from gemini.errors import DatasetError, UnitError
+from gemini.errors import RunError, ValidationError
 from gemini.physics import units
 from gemini.utils.time import to_utc_index
 
@@ -32,7 +32,10 @@ def _quantity_and_si_unit(unit):
     """Return the quantity name and SI unit of a supported raw profile unit."""
     si_unit = units.si_unit(unit)
     if si_unit not in _QUANTITIES:
-        raise UnitError(f"Profile: unit = {unit!r}; expected a unit of {', '.join(_QUANTITIES)}")
+        raise ValidationError(
+            f"Profile: unit = {unit!r}; expected a unit of {', '.join(_QUANTITIES)}",
+            code="invalid_unit",
+        )
     return _QUANTITIES[si_unit], si_unit
 
 
@@ -100,25 +103,28 @@ class Profile(BaseModel):
         target = pd.to_datetime(t, utc=True)
         position = self._times.searchsorted(target, side="right") - 1
         if position < 0:
-            raise DatasetError(
+            raise RunError(
                 f"Profile {self.name}: time = {target}; expected a time at or after the "
-                f"first sample {self._times[0]}"
+                f"first sample {self._times[0]}",
+                code="invalid_data",
             )
         return self.values[position]
 
     def resample(self, step: timedelta, how: Literal["mean", "sum", "first"]):
         """Aggregate in UTC left-closed bins; reject empty bins rather than filling them."""
         if step.total_seconds() <= 0 or how not in {"mean", "sum", "first"}:
-            raise DatasetError(
+            raise RunError(
                 f"Profile.resample: step = {step}, how = {how!r}; expected a positive step and "
-                "'mean', 'sum' or 'first'"
+                "'mean', 'sum' or 'first'",
+                code="invalid_data",
             )
         groups = self.to_series().resample(step)
         series = groups.sum(min_count=1) if how == "sum" else getattr(groups, how)()
         if series.isna().any():
-            raise DatasetError(
+            raise RunError(
                 f"Profile {self.name}: resample bin at {series.index[series.isna()][0]} is "
-                "empty; expected at least one sample in every bin"
+                "empty; expected at least one sample in every bin",
+                code="invalid_data",
             )
         return type(self)(
             name=self.name,

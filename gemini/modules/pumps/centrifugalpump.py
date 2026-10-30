@@ -1,7 +1,7 @@
 """Variable-speed centrifugal pump with a quadratic head curve and affinity-law scaling."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import energy, heat_transfer, pumps
 from gemini.types import (
@@ -47,7 +47,7 @@ class CentrifugalPump(Module):
     efficiency that does not change with speed (affinity laws, adequate for speed ratios of
     about 0.5 to 1.1), no leakage or recirculation. Valid on the curve between zero flow and
     the run-out: a flow at or beyond twice the scaled best-efficiency flow, or one that gives
-    a negative head, raises ``PhysicsRangeError``, as does reverse flow. Zero mass flow means
+    a negative head, raises ``PhysicsError``, as does reverse flow. Zero mass flow means
     the pump is stopped: no head, no power. A running pump against a closed valve (deadhead),
     whose shaft power would heat a trapped volume without bound, is outside the steady model.
     """
@@ -113,7 +113,7 @@ class CentrifugalPump(Module):
         flow = suction.volumetric_flow()
         ops.check(
             flow >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
             path=self.path,
             flow=flow,
@@ -125,7 +125,7 @@ class CentrifugalPump(Module):
             ops.logical_or(
                 flow == 0, ops.logical_not(ops.logical_or(head < 0, load >= pumps.RUNOUT_LOAD))
             ),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: flow = {flow} m3/s at frequency = {frequency} Hz gives "
             "head = {head} Pa at {load} times the best-efficiency flow; expected a "
             "nonnegative head below twice the best-efficiency flow (pump off its curve)",

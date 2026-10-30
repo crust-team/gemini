@@ -11,6 +11,7 @@ from gemini.modules.heating import Boiler
 from gemini.modules.subsurface import BoreholeField
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.errors import raises
 
 BRINE = Stream(m_dot=3, T=273.15, p=3e5)
 CP = 4217.4
@@ -128,12 +129,12 @@ def test_heat_rejection_recovery_and_zero_flow():
 
 def test_invalid_flow_and_geometry():
     """Reverse flow and geometries outside the cell and shape-factor ranges are rejected."""
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot = -1"):
         field()(inlet=BRINE.with_(m_dot=-1))
-    with pytest.raises(gm.errors.ConfigurationError, match="field geometry rejected"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="field geometry rejected"):
         field().update_params(borehole_spacing=0.1)(inlet=BRINE)
     shallow = field().update_params(borehole_count=400, borehole_depth=10)
-    with pytest.raises(gm.errors.ConfigurationError, match="expected ln"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="expected ln"):
         shallow.step(None, DAY, {"inlet": BRINE})
 
 
@@ -161,7 +162,7 @@ def test_field_arithmetic_matches_on_arrays():
 
     rows = [(3.0, 273.15, 3e5), (0.0, 273.15, 3e5), (0.05, 300.0, 3e5)]
     assert_function_matches(numbers, rows)
-    assert_same_error(numbers, rows + [(-1.0, 273.15, 3e5)], gm.errors.PhysicsRangeError)
+    assert_same_error(numbers, rows + [(-1.0, 273.15, 3e5)], gm.errors.PhysicsError)
 
 
 def test_zero_flow_does_not_evaluate_the_cell_geometry():
@@ -169,5 +170,5 @@ def test_zero_flow_does_not_evaluate_the_cell_geometry():
     module = field().update_params(borehole_spacing=0.1)
     conductance = ops.physics(module._effective_conductance)
     assert conductance(BRINE.with_(m_dot=0)) == 0
-    with pytest.raises(gm.errors.ConfigurationError, match="field geometry rejected"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="field geometry rejected"):
         conductance(BRINE)

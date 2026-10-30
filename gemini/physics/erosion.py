@@ -8,7 +8,7 @@ SI boundary and returns mm/year, the explicit literature-unit exception of the p
 import math
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.utils.strings import did_you_mean, join_names
 
 from . import geometry, units
@@ -70,9 +70,10 @@ def _dnv_rate(alpha_deg, material, rho_fluid, diameter, flow_rate_m3h):
     Source: https://wiki.pengtools.com/images/9/91/RP_O501_EROSIVE_WEAR_IN_PIPING_SYSTEMS.pdf
     """
     if material.lower() not in _DNV_MATERIALS:
-        raise UnknownCorrelationError(
+        raise ValidationError(
             f"erosion_rate DNV: material = {material!r}; expected one of "
-            f"{join_names(_DNV_MATERIALS)}{did_you_mean(material.lower(), _DNV_MATERIALS)}"
+            f"{join_names(_DNV_MATERIALS)}{did_you_mean(material.lower(), _DNV_MATERIALS)}",
+            code="unknown_name",
         )
     constant, exponent, rho_pipe = _DNV_MATERIALS[material.lower()]
     mass_flow, velocity, area = _particle_flow(flow_rate_m3h, rho_fluid, diameter)
@@ -122,9 +123,10 @@ def _oka_rate(
     """
     key = particle_material.upper()
     if key not in _OKA_PARTICLES:
-        raise UnknownCorrelationError(
+        raise ValidationError(
             f"erosion_rate OKA: particle_material = {particle_material!r}; expected one of "
-            f"{join_names(_OKA_PARTICLES)}{did_you_mean(key, _OKA_PARTICLES)}"
+            f"{join_names(_OKA_PARTICLES)}{did_you_mean(key, _OKA_PARTICLES)}",
+            code="unknown_name",
         )
     reference_velocity, reference_diameter, k1, k2, k3, constant = _OKA_PARTICLES[key]
     mass_flow, velocity, area = _particle_flow(flow_rate_m3h, rho_fluid, diameter)
@@ -223,13 +225,12 @@ def erosion_rate(
     spelling = str(model).strip().upper()
     name = _MODELS.get(spelling)
     if name is None:
-        raise UnknownCorrelationError(
-            f"erosion_rate: model = {model!r}; expected DNV, OKA or TULSA"
-            + ("; API is a velocity limit, use api_erosional_velocity" if spelling == "API" else "")
-        )
+        hint = "; API is a velocity limit, use api_erosional_velocity" if spelling == "API" else ""
+        message = f"erosion_rate: model = {model!r}; expected DNV, OKA or TULSA{hint}"
+        raise ValidationError(message, code="unknown_name")
     ops.check(
         ops.ne(alpha, 0),
-        PhysicsRangeError,
+        PhysicsError,
         "erosion_rate: alpha = {alpha} rad; expected a nonzero angle",
         alpha=alpha,
     )
@@ -251,7 +252,7 @@ def erosion_rate(
     )
     ops.check(
         ops.logical_or(ops.logical_not(ops.isnan(rate)), nan_input),
-        PhysicsRangeError,
+        PhysicsError,
         "erosion_rate {name}: flow_rate = {flow_rate} m3/s gives a complex rate; "
         "expected a nonnegative flow",
         name=name,
@@ -284,7 +285,7 @@ def api_erosional_velocity(rho_fluid: float) -> float:
     """
     ops.check(
         rho_fluid > 0,
-        PhysicsRangeError,
+        PhysicsError,
         "api_erosional_velocity: rho_fluid = {rho_fluid} kg/m3; expected a positive density",
         rho_fluid=rho_fluid,
     )
@@ -312,7 +313,7 @@ def api_velocity_comparison(actual: float, limit: float) -> dict:
     """
     ops.check(
         limit > 0,
-        PhysicsRangeError,
+        PhysicsError,
         "api_velocity_comparison: limit = {limit} m/s; expected a positive velocity limit",
         limit=limit,
     )

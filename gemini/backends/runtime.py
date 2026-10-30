@@ -7,7 +7,7 @@ or runs it in ``contextvars.copy_context()``.
 
 from contextvars import ContextVar
 
-from gemini.errors import UnknownNameError
+from gemini.errors import ValidationError
 from gemini.types.fluid import BRINE, Fluid
 from gemini.utils.context import ContextSetting
 from gemini.utils.strings import did_you_mean, join_names
@@ -34,14 +34,16 @@ def _check_names(names, required=False):
     """Reject unknown setting names and, if ``required``, missing ones."""
     for name in names:
         if name not in _DEFAULTS:
-            raise UnknownNameError(
+            raise ValidationError(
                 f"runtime: setting {name!r} is unknown; expected one of "
-                f"{join_names(_DEFAULTS)}{did_you_mean(name, _DEFAULTS)}"
+                f"{join_names(_DEFAULTS)}{did_you_mean(name, _DEFAULTS)}",
+                code="unknown_name",
             )
     missing = [name for name in _DEFAULTS if name not in names]
     if required and missing:
-        raise UnknownNameError(
-            f"runtime: state is missing {join_names(missing)}; expected every setting"
+        raise ValidationError(
+            f"runtime: state is missing {join_names(missing)}; expected every setting",
+            code="unknown_name",
         )
 
 
@@ -49,8 +51,9 @@ def _validated(values):
     """Return complete settings with a validated fluid; reject values outside the choices."""
     for name, choices in _CHOICES.items():
         if values[name] not in choices:
-            raise UnknownNameError(
-                f"runtime: {name} = {values[name]!r}; expected one of {join_names(choices)}"
+            raise ValidationError(
+                f"runtime: {name} = {values[name]!r}; expected one of {join_names(choices)}",
+                code="unknown_name",
             )
     return values | {"default_fluid": Fluid.model_validate(values["default_fluid"])}
 

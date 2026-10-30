@@ -1,6 +1,6 @@
 """The plant catalogue: which plants exist and how to get one."""
 
-from gemini.errors import NotImplementedYet, UnknownNameError
+from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules import registry
 from gemini.modules.plants import library, templating
 from gemini.modules.plants.spec import from_spec
@@ -18,11 +18,12 @@ def names():
 def _check(function, name):
     valid = names()
     if name not in valid:
-        raise UnknownNameError(
+        raise ValidationError(
             f"plants.{function}: unknown plant {name!r}; valid: {join_names(valid)}"
             f"{did_you_mean(name, valid)}",
             path=name,
             suggestions=close_matches(name, valid),
+            code="unknown_name",
         )
 
 
@@ -30,7 +31,7 @@ def get(name):
     """Return a new plant of registry name ``name`` whose parameters are not set.
 
     A spec plant comes back as a ``Plant`` and a special case as an instance of its class. An
-    unknown name, or the name of a module that is not a plant, raises ``UnknownNameError`` with
+    unknown name, or the name of a module that is not a plant, raises ``ValidationError`` with
     close matches in ``suggestions``.
     """
     _check("get", name)

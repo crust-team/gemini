@@ -30,29 +30,29 @@ def spec():
 
 def problems_of(spec, **changes):
     """Return the problems of a copy of ``spec`` with top-level ``changes``."""
-    return gm.plants.validate(copy.deepcopy(spec) | changes)
+    return gm.plants.validate(copy.deepcopy(spec) | changes, on_error="record")
 
 
 def test_a_valid_spec_has_no_problems(spec):
     """The base spec builds."""
-    assert gm.plants.validate(spec) == []
+    assert gm.plants.validate(spec, on_error="record") == []
 
 
 def test_every_problem_is_reported_at_once_with_its_path(spec):
     """Several mistakes give several problems, none raised."""
     spec["modules"]["degasser"]["type"] = "Degaser"
     spec["modules"]["pipe"]["params"] = {"length": "2 bar", "lenght": 1, "diameter": -1}
-    codes = {item["path"]: item["code"] for item in gm.plants.validate(spec)}
+    codes = {item["path"]: item["code"] for item in gm.plants.validate(spec, on_error="record")}
     assert codes["modules.degasser.type"] == "unknown_name"
     assert codes["modules.pipe.params.length"] == "invalid_unit"
     assert codes["modules.pipe.params.lenght"] == "unknown_name"
-    assert gm.plants.validate(spec)[0]["suggestions"][0] == "Degasser"
+    assert gm.plants.validate(spec, on_error="record")[0]["suggestions"][0] == "Degasser"
 
 
 def test_an_out_of_bounds_value_has_its_own_code(spec):
     """A value below its minimum is ``out_of_bounds``."""
     spec["modules"]["pipe"]["params"] = {"length": -5.0}
-    (item,) = gm.plants.validate(spec)
+    (item,) = gm.plants.validate(spec, on_error="record")
     assert item["code"] == "out_of_bounds" and item["path"] == "modules.pipe.params.length"
 
 
@@ -80,7 +80,7 @@ def test_ambiguous_ports_are_listed(spec):
     """A bare module name needs a port in a spec; an ambiguous pair is refused elsewhere."""
     spec["modules"]["splitter"] = {"type": "Splitter", "params": {}}
     spec["connections"].append({"source": "splitter", "target": "pipe.inlet"})
-    (item,) = gm.plants.validate(spec)
+    (item,) = gm.plants.validate(spec, on_error="record")
     assert item["code"] == "invalid_connection"
     assert item["suggestions"] == ["splitter.first_out", "splitter.second_out"]
 
@@ -89,16 +89,18 @@ def test_a_failed_module_does_not_bury_the_report_in_follow_ups(spec):
     """Connections and sections naming a module that did not build are not reported again."""
     spec["modules"]["degasser"]["type"] = "Degaser"
     spec["fluids"] = {"degasser": {}}
-    assert [item["path"] for item in gm.plants.validate(spec)] == ["modules.degasser.type"]
+    assert [item["path"] for item in gm.plants.validate(spec, on_error="record")] == [
+        "modules.degasser.type"
+    ]
 
 
 def test_shape_and_format_problems(spec):
     """Unknown keys, wrong types and old files are problems, not exceptions."""
     found = problems_of(spec, modul={}, modules=[])
     assert {"modul", "modules"} <= {item["path"] for item in found}
-    assert gm.plants.validate({"version": 1})[0]["code"] == "old_format"
-    assert gm.plants.validate([])[0]["code"] == "invalid_format"
-    assert gm.plants.validate({"format": 2, "name": 3})[0]["path"] == "name"
+    assert gm.plants.validate({"version": 1}, on_error="record")[0]["code"] == "old_format"
+    assert gm.plants.validate([], on_error="record")[0]["code"] == "invalid_format"
+    assert gm.plants.validate({"format": 2, "name": 3}, on_error="record")[0]["path"] == "name"
 
 
 def test_sections_are_checked_per_path(spec):

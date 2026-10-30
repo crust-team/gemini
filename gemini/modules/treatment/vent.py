@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import combustion
 from gemini.types import (
@@ -45,7 +45,7 @@ class Vent(Module):
     combustion: inlet mass flow, temperature, pressure and fluid unchanged. Leaving the plant
     through a port keeps ``mass_balance`` and ``energy_balance`` honest without a special
     boundary case; the combustion products and air are not streams. Reverse flow raises
-    ``PhysicsRangeError``.
+    ``PhysicsError``.
     """
 
     def __init__(self):
@@ -105,7 +105,7 @@ class Vent(Module):
         """Reject reverse flow and gas compositions above one."""
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
@@ -113,8 +113,9 @@ class Vent(Module):
         total = self.co2_mass_fraction + self.methane_mass_fraction
         ops.check(
             total <= 1,
-            ConfigurationError,
+            ValidationError,
             "{path}: co2_mass_fraction + methane_mass_fraction = {total}; expected at most 1",
             path=self.path,
             total=total,
+            code="invalid_design",
         )

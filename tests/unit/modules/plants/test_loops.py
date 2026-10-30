@@ -8,6 +8,7 @@ from gemini.modules import Module
 from gemini.modules.plants import loops
 from gemini.modules.storage import ThermalStorage
 from gemini.types import Inlet, Outlet, Output, Stream
+from tests.fixtures.errors import raises
 
 STREAM = Stream(m_dot=1.0, T=300.0, p=1e5)
 
@@ -104,7 +105,7 @@ def test_clamped_loop_and_capped_map():
 
 def test_diverging_loop_raises():
     """A map without a fixed point exhausts the passes and names the loop."""
-    with pytest.raises(gm.errors.PhysicsRangeError, match="plant: loop temperature"):
+    with pytest.raises(gm.errors.PhysicsError, match="plant: loop temperature"):
         loops.close_loop(lambda value: value + 1.0, 0.0, "plant")
 
 
@@ -126,5 +127,7 @@ def test_detached_call_keeps_runtime_settings():
 
 def test_detached_call_rejects_stateful_modules():
     """A stateful module would be evaluated at its initial states, so it is refused."""
-    with pytest.raises(gm.errors.ConfigurationError, match="stateless module for a trial call"):
+    with raises(
+        gm.errors.ValidationError, "invalid_design", match="stateless module for a trial call"
+    ):
         ThermalStorage().trial_outlets({})

@@ -1,6 +1,6 @@
 """Make the module a spec or a call to ``Plant.add`` names: a registry type or a group."""
 
-from gemini.errors import UnknownNameError, ValidationError
+from gemini.errors import ValidationError
 from gemini.modules import registry
 from gemini.modules.container import ModuleDict, ModuleList
 
@@ -14,8 +14,10 @@ def make_module(kind):
     name = kind if isinstance(kind, str) else getattr(kind, "__name__", repr(kind))
     try:
         found = registry.get(name)
-    except UnknownNameError as error:
-        raise UnknownNameError(str(error), path="type", suggestions=error.suggestions) from error
+    except ValidationError as error:
+        raise ValidationError(
+            str(error), path="type", suggestions=error.suggestions, code=error.code
+        ) from error
     if not isinstance(kind, str) and found is not kind:
         raise ValidationError(
             f"add: type = {kind!r}; register the class with gm.modules.register first",

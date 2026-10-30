@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules import Module, mass_balance
 from gemini.modules.power import FlashTurbine, Separator
 from gemini.physics import steam
@@ -52,7 +52,7 @@ def test_zero_flow_and_invalid_inlets():
         STEAM_FEED.with_(m_dot=-1),
         STEAM_FEED.with_(p=1e4),
     ):
-        with pytest.raises(gm.errors.PhysicsRangeError):
+        with pytest.raises(gm.errors.PhysicsError):
             turbine()(inlet=inlet)
 
 
@@ -122,9 +122,9 @@ def test_traced_call_matches_one_call_per_row():
 def test_a_bad_expansion_rejects_the_call_without_outputs_too():
     """``forward`` uses no number of the expansion, but its error still fails the call."""
     module = turbine().update_params(condenser_pressure="7 bar")
-    with pytest.raises(PhysicsRangeError) as with_outputs:
+    with pytest.raises(PhysicsError) as with_outputs:
         module(inlet=STEAM_FEED)
     with gm.no_outputs():
-        with pytest.raises(PhysicsRangeError) as without_outputs:
+        with pytest.raises(PhysicsError) as without_outputs:
             module(inlet=STEAM_FEED)
     assert str(without_outputs.value) == str(with_outputs.value)

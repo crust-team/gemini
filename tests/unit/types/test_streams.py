@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.errors import DeclarationError
+from gemini.errors import DefinitionError
 from gemini.types import Inlet, Outlet, Stream, streams
 
 
@@ -19,5 +19,5 @@ def test_a_port_keeps_its_stream():
 
 def test_an_unknown_stream_suggests_the_closest():
     """A misspelt stream type fails while the class is built."""
-    with pytest.raises(DeclarationError, match="did you mean 'brine'"):
+    with pytest.raises(DefinitionError, match="did you mean 'brine'"):
         Inlet(Stream, stream="brin")

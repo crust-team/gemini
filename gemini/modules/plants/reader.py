@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 from gemini.errors import GeminiError, ValidationError
+from gemini.errors.base import reported
 from gemini.modules import registry
 from gemini.modules.plants import outputs
 from gemini.modules.plants.factory import make_module
@@ -171,23 +172,10 @@ def problems(cls, spec):
 
 
 def read(cls, spec):
-    """Return the plant of ``spec``, or raise a ``ValidationError`` that lists every problem."""
+    """Return the plant of ``spec``, or raise a ``ValidationError`` that carries every problem."""
     error = format_error(spec)
     if error is not None:
         raise error
     plant, items = build(cls, spec)
-    raise_problems(items)
+    reported(items, "raise")
     return plant
-
-
-def raise_problems(items):
-    """Raise one ``ValidationError`` that lists ``items``, the problems of a spec, if any."""
-    if not items:
-        return
-    first = items[0]
-    raise ValidationError(
-        "; ".join(f"{item['path']}: {item['message']}" for item in items),
-        path=first["path"],
-        code=first["code"],
-        suggestions=first["suggestions"],
-    )

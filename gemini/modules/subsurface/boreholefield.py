@@ -1,7 +1,7 @@
 """Shallow closed-loop borehole field with a lumped ground temperature."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import ground, heat_transfer
 from gemini.types import (
@@ -152,7 +152,8 @@ class BoreholeField(Module):
             self.borehole_spacing,
             self.ground_conductivity,
             self.borehole_resistance,
-            error=ConfigurationError,
+            error=ValidationError,
+            code="invalid_design",
             context=self._rejection,
         )
 
@@ -163,7 +164,8 @@ class BoreholeField(Module):
             self.borehole_spacing,
             self.borehole_depth,
             self.ground_conductivity,
-            error=ConfigurationError,
+            error=ValidationError,
+            code="invalid_design",
             context=self._rejection,
         )
 
@@ -180,7 +182,7 @@ class BoreholeField(Module):
         """Return m_dot cp [W/K] of the loop flow; reverse flow is outside the model."""
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,

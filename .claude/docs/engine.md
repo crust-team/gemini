@@ -32,7 +32,7 @@ The on_error default is `"raise"`, on the functions and on `gm.Engine`.
 `gm.resume(checkpoint, callbacks=None)` is `Engine.load_checkpoint(path, callbacks).resume()`, and
 it writes to the same file when the run ends or stops early. `checkpoint_every` is not stored in
 the file: pass `callbacks=[AutoCheckpoint(path, every)]` for periodic saves on a resumed run. A
-live checkpoint raises `CheckpointError` naming `gm.live`. The files are the ones `save_checkpoint`
+live checkpoint raises `RunError` naming `gm.live`. The files are the ones `save_checkpoint`
 writes, so either level resumes the other's.
 
 `gm.live(plant, source, checkpoint, ...)` requires the path, which is all that carries a live run
@@ -62,18 +62,18 @@ fits parameters by calling `Engine.replay` on a copy of the plant.
 One format serves `simulate`, `replay` and `live`: a `gm.Dataset`, or a pandas DataFrame with a
 timezone-aware `DatetimeIndex` (any zone; the instants become UTC) and one column per binding
 `column`. A DataFrame is wrapped by `gemini.utils.data.dataset.as_dataset`; a naive index, a
-non-time index or any other object raises `DatasetError`. Values have the unit of the binding,
+non-time index or any other object raises `RunError`. Values have the unit of the binding,
 except that a unit recorded in `Dataset` metadata replaces it (the rule below stays). Without
 `clock`, `simulate` and `replay` use the ticks of the input (`Clock.from_data`).
 
-- **Missing columns.** Every bound column the input lacks is listed in one `BindingError` (a
+- **Missing columns.** Every bound column the input lacks is listed in one `ValidationError` (a
   `ValidationError`, code `missing_column`, `suggestions` with the closest column), raised before
   the first step.
 - **NaN rows.** A tick where a bound value is NaN, absent beyond `max_gap` or a text flag is not an
   error of the run: that twin is skipped at the tick, counted in `results.skip_counts`, listed in
   `results.errors()` with the code `missing_value`, and the run continues. A tick where a module
-  raises is a row with the code of the failure (`invalid_inlet`, `out_of_bounds`, `physics_range`,
-  `solver_failed`, `module_error`; the table is `gm.errors.ROW_CODES`), under `on_error="record"`.
+  raises is a row with the code of the failure (`invalid_inlet`, `out_of_bounds`, `out_of_range`,
+  `no_convergence`, `module_error`; the table is `gm.errors.ROW_CODES`), under `on_error="record"`.
 
 ## Threads and backends
 
@@ -85,11 +85,11 @@ context-local and a new thread starts from the defaults.
 `backend` is applied to every run of the engine with `gemini.backends.settings(backend=...)`:
 `"numpy"` evaluates arrays, `"python"` evaluates row by row, and the numbers are the same (the
 parity suite checks it). The backend is saved in checkpoints. An unknown name raises
-`UnknownNameError` when the engine is built.
+`ValidationError` when the engine is built.
 
 ## Clocks
 
-`Clock(ticks, step=None)` holds strictly increasing UTC ticks; invalid ticks raise `ClockError`.
+`Clock(ticks, step=None)` holds strictly increasing UTC ticks; invalid ticks raise `RunError`.
 `Clock.days(year, month, day, days=1, step="1h", tz="UTC")` and `Clock.year(year, step="1h",
 tz="UTC")` cover local calendar days, so a daily step follows local midnight and DST days have 23
 or 25 hourly ticks. `Clock.range(start, end, step)` is an inclusive fixed grid, and
@@ -101,7 +101,7 @@ select ticks and keep the final step.
 
 ## Runs
 
-One binding plan is compiled per run, and binding errors raise `BindingError` before the first
+One binding plan is compiled per run, and binding errors raise `ValidationError` before the first
 step: missing bound columns, `only` paths without measured bindings, and volumetric flow columns
 bound to a kg/s input that cannot be converted (a control or boundary on a module without
 `pressure` and `temperature` parameters, or an inlet without `p` and `T`). A column's unit in the
@@ -127,7 +127,7 @@ is recorded as `assessed=False`.
 A run raises by default. Under `on_error="record"` an ordinary exception becomes a recorded error and the run continues: per twin when a replayed
 twin fails, otherwise (always in simulation) for the whole step with module path `""`, in which
 case the module states are also restored to their value before the step. Under
-`on_error="raise"` a failing replay twin raises `StepError` with the cause chained, and a failing
+`on_error="raise"` a failing replay twin raises `RunError` with the cause chained, and a failing
 simulation step raises its exception.
 
 ## The runner
@@ -174,7 +174,7 @@ equipment twins of a replay; the plant in simulate) evaluated over **chunks** of
   `engine.module_states` is `{path: tree}` in replay and `{"": tree}` in simulate, as in a
   checkpoint. State bound to a sensor is passed as the start state and stays authoritative.
 - **`on_error="raise"`.** The ticks before the first failing one are committed, their callbacks run,
-  `on_step_start` of the failing tick is delivered and the error is raised: `StepError` chained to
+  `on_step_start` of the failing tick is delivered and the error is raised: `RunError` chained to
   the cause in replay, the exception itself in simulate. A later twin of the failing tick is not
   evaluated when the chunk is one tick.
 
@@ -229,7 +229,7 @@ a column of row values with NaN for absent ones. Energy fields and `operating` a
 the columns.
 
 `Results[path]` returns the series of one module path; `Results[path].field` is a pandas Series
-and an unknown path or field raises `UnknownResultError`. Only leaf results are stored: twins in
+and an unknown path or field raises `ValidationError`. Only leaf results are stored: twins in
 replay and the leaves of the plant call in simulation, not root or composite formula outputs.
 `Results[path].get(field, unit=...)` converts only the six fields of `SERIES_UNITS` (`head`,
 `pressure_drop`, `discharge_pressure`, `power`, `duty`, `thermal_power`), because a conversion

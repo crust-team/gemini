@@ -1,7 +1,7 @@
 """Flow splitter dividing one stream into two branches."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import separation
 from gemini.types import Control, Fraction, Inlet, Outlet, Stream
@@ -15,7 +15,7 @@ class Splitter(Module):
     ``Pipe`` or ``Valve`` in a branch for those), so mass and energy close to rounding. The
     commanded split stands for whatever sets it in the plant (balancing valves, branch
     resistances); the splitter does not solve a hydraulic network. Reverse flow (``m_dot < 0``)
-    raises ``PhysicsRangeError``: a reversed splitter is a ``Mixer``.
+    raises ``PhysicsError``: a reversed splitter is a ``Mixer``.
     """
 
     def __init__(self):
@@ -39,7 +39,7 @@ class Splitter(Module):
         feed_in = inlets.feed_in
         ops.check(
             feed_in.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: feed_in.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow "
             "is not modelled; use a Mixer)",
             path=self.path,

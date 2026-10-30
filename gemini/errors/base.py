@@ -1,10 +1,11 @@
-"""Roots of every GEMINI exception and warning, and the fixed lists of error codes."""
+"""The seven public classes, the fixed lists of codes and the shape of a problem."""
 
 CODES = (
     "error",
     "invalid_value",
     "out_of_bounds",
     "missing_value",
+    "no_value",
     "invalid_unit",
     "unknown_name",
     "unknown_port",
@@ -20,8 +21,15 @@ CODES = (
     "invalid_binding",
     "missing_column",
     "invalid_data",
-    "physics_range",
-    "solver_failed",
+    "invalid_design",
+    "invalid_definition",
+    "out_of_range",
+    "no_convergence",
+    "missing_chemistry",
+    "too_little_data",
+    "clock",
+    "checkpoint",
+    "step",
     "cancelled",
     "not_implemented",
 )
@@ -31,11 +39,14 @@ ROW_CODES = {
     "missing_value": "A bound column has no finite value at this tick; the row was skipped.",
     "invalid_inlet": "An inlet stream breaks the stream limits; the row failed.",
     "out_of_bounds": "A control, boundary or output is outside its bounds; the row failed.",
-    "physics_range": "An input is outside the domain of a correlation; the row failed.",
-    "solver_failed": "An iterative solve did not converge; the row failed.",
+    "out_of_range": "An input is outside the domain of a correlation; the row failed.",
+    "no_convergence": "An iterative solve did not converge; the row failed.",
     "module_error": "A module raised any other error; the row failed.",
 }
 """Every row code of ``Results.errors()`` with its meaning."""
+
+ON_ERROR = ("raise", "record")
+"""The values of ``on_error``, the one argument of a call that can report instead of raising."""
 
 
 def problem(path, code, message, suggestions=(), time=None):
@@ -54,14 +65,16 @@ class GeminiError(Exception):
     ``path`` says where the problem is (a dotted module path or a path into a spec),
     ``suggestions`` lists close valid names and ``code`` is one of ``CODES``, by default the
     class attribute. ``to_dict`` gives the JSON form used in ``422`` details and tool results.
+    ``problems`` lists every problem as such a dictionary: all of them when the error comes from
+    several, the one of ``to_dict`` otherwise.
     """
 
     code = "error"
     path = None
     suggestions = ()
 
-    def __init__(self, *args, path=None, code=None, suggestions=()):
-        """Keep the message and the optional location, code and close-match names."""
+    def __init__(self, *args, path=None, code=None, suggestions=(), problems=()):
+        """Keep the message and the optional location, code, close-match names and problems."""
         super().__init__(*args)
         if code is not None:
             if code not in CODES:
@@ -71,11 +84,16 @@ class GeminiError(Exception):
             self.path = path
         if suggestions:
             self.suggestions = tuple(suggestions)
+        self._problems = list(problems)
+
+    @property
+    def problems(self):
+        """Every problem of this error, the list ``on_error="record"`` returns."""
+        return self._problems or [self.to_dict()]
 
     def to_dict(self):
         """Return the problem ``{path, code, message, suggestions}`` as plain JSON."""
-        message = self.args[0] if isinstance(self, KeyError) and self.args else self
-        return problem(self.path, self.code, message, self.suggestions)
+        return problem(self.path, self.code, self, self.suggestions)
 
 
 class GeminiWarning(UserWarning):
@@ -83,9 +101,40 @@ class GeminiWarning(UserWarning):
 
 
 class ValidationError(GeminiError, ValueError):
-    """A value, a spec or a run input breaks a documented rule; every problem is in the message."""
+    """Wrong input: a value, a dict, a binding, a unit or an unknown name."""
 
     code = "invalid_value"
+
+    @classmethod
+    def of(cls, problems):
+        """Return the one error of a non-empty list of problems, carried in ``problems``."""
+        first = problems[0]
+        message = "; ".join(f"{item['path']}: {item['message']}" for item in problems)
+        return cls(
+            message,
+            path=first["path"],
+            code=first["code"],
+            suggestions=first["suggestions"],
+            problems=problems,
+        )
+
+
+class DefinitionError(GeminiError):
+    """A module class written wrongly: declarations, children, hooks, formulas or outlets."""
+
+    code = "invalid_definition"
+
+
+class PhysicsError(GeminiError):
+    """Out of range, no convergence, missing chemistry or too little data."""
+
+    code = "out_of_range"
+
+
+class RunError(GeminiError):
+    """A dataset, a clock, a checkpoint or a step of a run failed."""
+
+    code = "step"
 
 
 class Cancelled(GeminiError):
@@ -94,7 +143,23 @@ class Cancelled(GeminiError):
     code = "cancelled"
 
 
-class NotImplementedYet(GeminiError, NotImplementedError):
+class NotImplementedYet(GeminiError):
     """The name is final but its work lands in a later step."""
 
     code = "not_implemented"
+
+
+def check_on_error(on_error):
+    """Refuse a value of ``on_error`` other than ``"raise"`` and ``"record"``."""
+    if on_error not in ON_ERROR:
+        raise ValidationError(
+            f"on_error = {on_error!r}; expected 'raise' or 'record'", path="on_error"
+        )
+
+
+def reported(problems, on_error):
+    """Return ``problems`` under ``on_error="record"``; else raise them, if there are any."""
+    check_on_error(on_error)
+    if problems and on_error == "raise":
+        raise ValidationError.of(problems)
+    return problems

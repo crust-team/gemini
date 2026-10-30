@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from gemini.engine.callbacks import AutoCheckpoint
 from gemini.engine.engine import Engine
-from gemini.errors import CheckpointError, ValidationError
+from gemini.errors import RunError, ValidationError
 
 
 def _with_autosave(callbacks, checkpoint, checkpoint_every):
@@ -121,13 +121,14 @@ def resume(checkpoint, callbacks=None):
     The run continues strictly after the saved position, with the saved backend and error
     policy, gives the results of an uninterrupted run and writes to the same file when it ends
     or stops early. A finished run returns its stored results. A live checkpoint raises
-    ``CheckpointError``: ``gm.live`` continues those.
+    ``RunError``: ``gm.live`` continues those.
     """
     engine = Engine.load_checkpoint(checkpoint, callbacks)
     if engine.run_kind == "live":
-        raise CheckpointError(
+        raise RunError(
             f"{checkpoint}: run_kind = 'live'; expected a simulate or replay checkpoint; "
-            "continue a live run with gm.live"
+            "continue a live run with gm.live",
+            code="checkpoint",
         )
     with _saved_after(engine, checkpoint):
         return engine.resume()

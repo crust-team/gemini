@@ -4,6 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules.plants import library, templating
+from tests.fixtures.errors import raises
 
 
 def _chain_template():
@@ -107,7 +108,7 @@ def test_unknown_names_and_wrong_flags_are_listed_together():
     with pytest.raises(gm.errors.ValidationError) as error:
         gm.plants.from_template("MultiWellPlant", {"produsers": 3, "injectors": 0})
     assert "produsers" in str(error.value) and "producers" in error.value.suggestions
-    with pytest.raises(gm.errors.UnknownNameError) as unknown:
+    with raises(gm.errors.ValidationError, "unknown_name") as unknown:
         gm.plants.from_template("MultiWellPlnt")
     assert "MultiWellPlant" in unknown.value.suggestions
 

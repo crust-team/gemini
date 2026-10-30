@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, psychrometrics
 from gemini.types import (
@@ -32,7 +32,7 @@ class Cooler(Module):
     The fluid is cooled towards ``temperature_setpoint`` but not below the reference air
     temperature plus ``approach``: the dry-bulb ``ambient_temperature`` for a ``dry`` cooler and
     the ``wet_bulb_temperature`` for a ``wet`` one (a ``wet`` cooler without a wet-bulb
-    temperature raises ``ConfigurationError``). The removed duty is capped at ``capacity``.
+    temperature raises ``ValidationError``). The removed duty is capped at ``capacity``.
     Fans draw electricity = specific_fan_power * duty; the fan work is dissipated into the air
     stream, so heat_loss = duty + electricity and the model is first-law closed.
 
@@ -112,7 +112,7 @@ class Cooler(Module):
         """Return the rejected duty [W], heat capacity rate [W/K] and uncapped request [W]."""
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
@@ -128,12 +128,13 @@ class Cooler(Module):
             return self.ambient_temperature
         wet_bulb = self.wet_bulb_temperature
         if wet_bulb is None:
-            raise ConfigurationError(
-                f"{self.path}: wet_bulb_temperature = None; expected a value for a wet cooler"
+            raise ValidationError(
+                f"{self.path}: wet_bulb_temperature = None; expected a value for a wet cooler",
+                code="invalid_design",
             )
         ops.check(
             wet_bulb <= self.ambient_temperature,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: wet_bulb_temperature = {wet_bulb} K; expected at most "
             "ambient_temperature = {ambient} K",
             path=self.path,

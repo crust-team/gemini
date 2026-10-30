@@ -4,7 +4,7 @@ import numpy as np
 
 from gemini import backends, ops
 from gemini.backends import runtime
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import constants, diagnostics, energy, pumps
 from gemini.types import (
@@ -108,7 +108,7 @@ class ESP(Module):
         flow = suction.volumetric_flow()
         ops.check(
             flow >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
             path=self.path,
             flow=flow,

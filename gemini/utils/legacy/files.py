@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from gemini.errors import LegacyFormatError
+from gemini.errors import ValidationError
 from gemini.utils.files import read_json, write_json
 
 OLD_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -85,7 +85,9 @@ def parameter_times(project, node_id):
         return project._timestamps.get(node_id, [None])
     timestamps = next(iter(properties.values())).timestamps
     if any(value.timestamps != timestamps for value in properties.values()):
-        raise LegacyFormatError(f"{node_id}: old properties require one shared timestamp axis")
+        raise ValidationError(
+            f"{node_id}: old properties require one shared timestamp axis", code="invalid_format"
+        )
     return timestamps
 
 
@@ -94,7 +96,7 @@ def _read_json(path, what):
     try:
         return read_json(path)
     except (OSError, ValueError) as exc:
-        raise LegacyFormatError(f"{path}: invalid {what}: {exc}") from exc
+        raise ValidationError(f"{path}: invalid {what}: {exc}", code="invalid_format") from exc
 
 
 def _parse_node(cell, path):
@@ -108,7 +110,9 @@ def _parse_node(cell, path):
             ports=[item["id"] for item in cell.get("ports", {}).get("items", [])],
         )
     except (KeyError, TypeError) as exc:
-        raise LegacyFormatError(f"{path}: malformed model node {node_id!r}: {exc}") from exc
+        raise ValidationError(
+            f"{path}: malformed model node {node_id!r}: {exc}", code="invalid_format"
+        ) from exc
 
 
 def _parse_link(cell, path):
@@ -120,7 +124,7 @@ def _parse_link(cell, path):
             target_port=cell["target"]["port"],
         )
     except KeyError as exc:
-        raise LegacyFormatError(f"{path}: malformed link field {exc}") from exc
+        raise ValidationError(f"{path}: malformed link field {exc}", code="invalid_format") from exc
 
 
 def _parse_diagram(diagram, path):
@@ -139,9 +143,10 @@ def _parse_tags(raw, path):
         for name, values in raw.get("tagnames", {}).get(kind, {}).items():
             populated = sorted({str(value) for value in values if value})
             if len(populated) > 1:
-                raise LegacyFormatError(
+                raise ValidationError(
                     f"{path}: tagnames.{kind}.{name} = {populated!r}; expected one column for "
-                    "every timestamp"
+                    "every timestamp",
+                    code="invalid_format",
                 )
             tags[kind][name] = populated[0] if populated else ""
     return GeminiTags(**tags)
@@ -154,15 +159,18 @@ def _parse_param_file(raw, path):
         timestamps = raw["parameters"]["timestamps"]
         properties = raw["parameters"]["property"]
     except (KeyError, TypeError) as exc:
-        raise LegacyFormatError(f"{path}: malformed old parameter file: {exc}") from exc
+        raise ValidationError(
+            f"{path}: malformed old parameter file: {exc}", code="invalid_format"
+        ) from exc
     times = [pd.Timestamp(value).to_pydatetime() if value else None for value in timestamps]
     params = {}
     for name, values in properties.items():
         values = values if isinstance(values, list) else [values]
         if len(values) != len(times):
-            raise LegacyFormatError(
+            raise ValidationError(
                 f"{path}: parameters.property.{name} has {len(values)} values for "
-                f"{len(times)} timestamps"
+                f"{len(times)} timestamps",
+                code="invalid_format",
             )
         params[name] = GeminiParam(values=values, timestamps=times)
     return node_id, times, params
@@ -179,13 +187,16 @@ def read_project(folder):
         raw = _read_json(path, "old parameter file")
         node_id, times, properties = _parse_param_file(raw, path)
         if node_id not in nodes:
-            raise LegacyFormatError(f"{path}: node id {node_id!r} is absent from diagram.json")
+            raise ValidationError(
+                f"{path}: node id {node_id!r} is absent from diagram.json", code="invalid_format"
+            )
         params[node_id], timestamps[node_id] = properties, times
         tags[node_id] = _parse_tags(raw, path)
         raw_files[path.name] = raw
     if set(params) != set(nodes):
-        raise LegacyFormatError(
-            f"{folder}: diagram nodes without a .param file = {sorted(set(nodes) - set(params))}"
+        raise ValidationError(
+            f"{folder}: diagram nodes without a .param file = {sorted(set(nodes) - set(params))}",
+            code="invalid_format",
         )
     project = GeminiProject(nodes=nodes, links=links, params=params, tags=tags)
     project._diagram = diagram
@@ -254,9 +265,10 @@ def _updated_param_files(project):
     Raw tag sections the typed model does not know are kept, in their original order.
     """
     if _parse_diagram(project._diagram, "diagram.json") != (project.nodes, project.links):
-        raise LegacyFormatError(
+        raise ValidationError(
             "write_project: nodes or links differ from the parsed diagram.json; expected "
-            "the parsed topology (edit parameters and tags only)"
+            "the parsed topology (edit parameters and tags only)",
+            code="invalid_format",
         )
     param_files = deepcopy(project._param_files)
     by_id = {raw["id"]: raw for raw in param_files.values()}
@@ -295,8 +307,9 @@ def _parse_times(column, path):
             return pd.to_datetime(column, format=time_format)
         except (TypeError, ValueError):
             continue
-    raise LegacyFormatError(
-        f"{path}: {column.name} = {column.iloc[0]!r}; expected {OLD_TIME_FORMAT} or ISO 8601"
+    raise ValidationError(
+        f"{path}: {column.name} = {column.iloc[0]!r}; expected {OLD_TIME_FORMAT} or ISO 8601",
+        code="invalid_format",
     )
 
 
@@ -306,7 +319,7 @@ def read_csv(path):
     try:
         frame = pd.read_csv(path, sep=";", encoding="utf-8-sig")
     except (OSError, ValueError) as exc:
-        raise LegacyFormatError(f"{path}: invalid old CSV: {exc}") from exc
+        raise ValidationError(f"{path}: invalid old CSV: {exc}", code="invalid_format") from exc
     if len(frame.columns):
         first = frame.columns[0]
         frame[first] = _parse_times(frame[first], path)

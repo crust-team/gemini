@@ -1,7 +1,7 @@
 """Surface pipeline with wall friction, elevation change and heat exchange with its surroundings."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import geometry, heat_transfer, hydraulics
 from gemini.types import (
@@ -48,8 +48,8 @@ class Pipe(Module):
     Simplifications: steady state (no fluid or wall heat capacity, no transit time), constant
     fluid properties, uniform ``heat_transfer_coefficient`` and ambient along the pipe, no fittings
     (add their equivalent length to ``length``), kinetic and pressure energy outside the thermal
-    model. Validity: single-phase liquid (free gas raises ``PhysicsRangeError``), forward flow
-    (reverse flow raises ``PhysicsRangeError``; wire the pipe in the flow direction), relative
+    model. Validity: single-phase liquid (free gas raises ``PhysicsError``), forward flow
+    (reverse flow raises ``PhysicsError``; wire the pipe in the flow direction), relative
     roughness 1e-6 to 1e-2 and Re up to 1e8 (Swamee–Jain range), ``|elevation_change| <=
     length``. Zero flow has no friction or heat exchange and keeps the static head; the stopped
     stream keeps the inlet temperature, which carries no energy.
@@ -93,7 +93,7 @@ class Pipe(Module):
         outlet_p = inlet.p - self._friction_drop(inlet) - static
         ops.check(
             outlet_p >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: outlet pressure = {outlet_p} Pa from inlet.p = {inlet_p} Pa; "
             "expected the friction and static drops to leave a nonnegative pressure",
             path=self.path,
@@ -121,23 +121,24 @@ class Pipe(Module):
         """Reject a pipe shorter than its rise, reverse flow and free gas."""
         ops.check(
             ops.abs(self.elevation_change) <= self.length,
-            ConfigurationError,
+            ValidationError,
             "{path}: elevation_change = {elevation_change} m; expected at most "
             "length = {length} m in magnitude",
             path=self.path,
             elevation_change=self.elevation_change,
             length=self.length,
+            code="invalid_design",
         )
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is "
             "not modelled; wire the pipe in the flow direction)",
             path=self.path,
             m_dot=inlet.m_dot,
         )
         if inlet.fluid.gas_mass_fraction > 0:
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"{self.path}: inlet.fluid.gas_mass_fraction = "
                 f"{inlet.fluid.gas_mass_fraction}; expected 0 (single-phase liquid model)"
             )

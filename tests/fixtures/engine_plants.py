@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules import Module
 from gemini.types import (
     Control,
@@ -59,7 +59,7 @@ class Booster(Module):
         # Outlets
         ops.check(
             self.level >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: level = {level}",
             path=self.path,
             level=self.level,

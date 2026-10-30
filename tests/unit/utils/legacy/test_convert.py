@@ -6,9 +6,10 @@ from pathlib import Path
 import pytest
 
 import gemini as gm
-from gemini.errors import LegacyFormatError
+from gemini.errors import ValidationError
 from gemini.utils import legacy
 from gemini.utils.legacy import convert
+from tests.fixtures.errors import raises
 
 OLD = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
 
@@ -64,7 +65,7 @@ def test_to_plant_rejects_an_ambiguous_data_csv(tmp_path):
     folder = tmp_path / "old"
     shutil.copytree(OLD, folder)
     (folder / "extra.csv").write_text("Timestamp;x\n", encoding="utf-8")
-    with pytest.raises(LegacyFormatError, match="exactly one"):
+    with raises(ValidationError, "invalid_format", match="exactly one"):
         legacy.to_plant(legacy.read_project(folder), gm.plants.get("DoubletHeatPlant"))
 
 
@@ -78,7 +79,7 @@ def test_to_dataset_converts_and_reports_missing_columns(project):
     assert data.columns["heat_exchanger.hot_out_T"].unit == "K"
     assert values["production_wellhead_pressure"].iloc[0] == pytest.approx(10e5)
     assert values["esp_status"].iloc[0] == "Normal"
-    with pytest.raises(LegacyFormatError, match="ESP_freq"):
+    with raises(ValidationError, "invalid_format", match="ESP_freq"):
         legacy.to_dataset(project, frame.drop(columns=["ESP_freq"]))
 
 
@@ -87,7 +88,7 @@ def test_old_units_from_si():
     assert convert._from_si(1e5 + 101325, "barg") == 1.0
     assert convert._from_si(2e5, "bar") == 2.0
     assert convert._from_si(293.15, "degC") == pytest.approx(20.0)
-    with pytest.raises(LegacyFormatError, match="psi"):
+    with raises(ValidationError, "invalid_format", match="psi"):
         convert._from_si(1.0, "psi")
 
 
@@ -129,7 +130,7 @@ def test_check_wiring_reports_mismatches_and_raises_on_errors(project, converted
     edited.links = edited.links[1:]
     errors = legacy.check_wiring(converted, edited)
     assert len(errors) == 1 and errors[0].startswith("Unexpected connection")
-    with pytest.raises(LegacyFormatError, match="root_inputs"):
+    with raises(ValidationError, "invalid_format", match="root_inputs"):
         legacy.check_wiring(gm.plants.get("DoubletHeatPlant"), project)
 
 

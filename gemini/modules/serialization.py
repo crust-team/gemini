@@ -12,12 +12,7 @@ from pydantic import ValidationError as PydanticError
 from pydantic_core import to_jsonable_python
 
 from gemini.backends import runtime
-from gemini.errors import (
-    GeminiError,
-    PlantFormatError,
-    UnknownNameError,
-    ValidationError,
-)
+from gemini.errors import GeminiError, ValidationError
 from gemini.modules import design
 from gemini.types.bindings import DatedParams, ModuleBindings
 from gemini.types.fluid import Fluid
@@ -61,20 +56,24 @@ def located(path, error):
 
 
 def format_error(data):
-    """Return the ``PlantFormatError`` for data that is not format 2, else ``None``."""
+    """Return the ``ValidationError`` for data that is not format 2, else ``None``."""
     if not isinstance(data, dict):
-        return PlantFormatError(f"plant file = {type(data).__name__}; expected a mapping")
+        return ValidationError(
+            f"plant file = {type(data).__name__}; expected a mapping", code="invalid_format"
+        )
     if data.get("format") == FORMAT:
         return None
     if "version" in data:
-        return PlantFormatError(
+        return ValidationError(
             f"plant file version = {data['version']!r}; expected format {FORMAT}: "
             "convert it with gm.plants.migrate",
             code="old_format",
             path="version",
         )
-    return PlantFormatError(
-        f"plant file format = {data.get('format')!r}; expected {FORMAT}", path="format"
+    return ValidationError(
+        f"plant file format = {data.get('format')!r}; expected {FORMAT}",
+        path="format",
+        code="invalid_format",
     )
 
 
@@ -166,9 +165,10 @@ def write_sections(root, stated=None, baselines=None):
 def _module_at(root, path):
     modules = dict(root.named_modules())
     if path not in modules:
-        raise UnknownNameError(
+        raise ValidationError(
             f"{root.path}: unknown module path {path!r}{did_you_mean(path, modules)}",
             suggestions=close_matches(path, modules),
+            code="unknown_name",
         )
     return modules[path]
 

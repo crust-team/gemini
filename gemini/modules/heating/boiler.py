@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import energy, heat_transfer
 from gemini.types import (
@@ -60,7 +60,7 @@ class Boiler(Module):
         inlet = inlets.inlet
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,

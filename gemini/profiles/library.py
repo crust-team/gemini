@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from gemini.errors import NotImplementedYet, UnknownNameError, ValidationError
+from gemini.errors import NotImplementedYet, ValidationError
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
@@ -25,15 +25,16 @@ def get(name):
 
     The index is a timezone-aware UTC ``DatetimeIndex`` called ``time``; each column holds one
     quantity in the unit its profile file declares, listed in ``frame.attrs["units"]``. An unknown
-    name raises ``UnknownNameError`` with close matches. A name whose data is not in the package
+    name raises ``ValidationError`` with close matches. A name whose data is not in the package
     raises ``NotImplementedYet`` naming the file to add.
     """
     if name not in NAMES:
-        raise UnknownNameError(
+        raise ValidationError(
             f"profiles.get: unknown profile {name!r}; valid: {join_names(NAMES)}"
             f"{did_you_mean(name, NAMES)}",
             path=name,
             suggestions=close_matches(name, NAMES),
+            code="unknown_name",
         )
     path = DATA / f"{name}.json"
     if not path.exists():

@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from gemini.engine.step import VOLUMETRIC_UNITS
-from gemini.errors import MissingMeasurementError
 from gemini.physics import units
 from gemini.types import Fluid, Stream
 from gemini.types.flows import STREAM_FIELDS, mass_flow, stream_valid
@@ -98,7 +97,7 @@ def _mark_missing(block, source, present):
     missing = (block.status == 0) & ~present
     if not missing.any():
         return
-    block.reasons.append(str(MissingMeasurementError(source.binding.column)))
+    block.reasons.append(source.binding.column)
     block.status[missing] = len(block.reasons)
     if source.kind == "state":
         block.late += (len(block.reasons),)

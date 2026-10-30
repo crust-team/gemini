@@ -13,7 +13,7 @@ from functools import reduce
 from typing import TYPE_CHECKING, Literal
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.ops import Constant
 
 from . import corrosion, erosion
@@ -466,7 +466,7 @@ def beggs_brill_dp(
     us_g, us_l = units.ft_to_m(gas_velocity), units.ft_to_m(liquid_velocity)
     ops.check(
         ops.logical_and(liquid_velocity != 0, liquid_velocity + gas_velocity != 0),
-        PhysicsRangeError,
+        PhysicsError,
         "beggs_brill_dp: us_l = {us_l} m/s, us_g = {us_g} m/s; expected a nonzero liquid and "
         "mixture velocity (use darcy_weisbach_dp for single-phase flow)",
         us_l=us_l,
@@ -532,7 +532,7 @@ def _holdup_and_friction_multiplier(
     holdup = ops.maximum(holdup, 0)
     ops.check(
         holdup != 0,
-        PhysicsRangeError,
+        PhysicsError,
         "beggs_brill_dp: liquid holdup = 0 at inclination = {inclination} rad; expected a "
         "positive holdup (the downhill inclination factor removed all liquid)",
         holdup=holdup,
@@ -587,7 +587,7 @@ def _flow_regime(no_slip_holdup, froude):
     )
     ops.check(
         regime != _OUTSIDE_MAP,
-        PhysicsRangeError,
+        PhysicsError,
         "beggs_brill_dp: no-slip holdup = {no_slip_holdup}, Froude number = {froude}; "
         "expected finite values inside the flow-regime map",
         no_slip_holdup=no_slip_holdup,
@@ -824,9 +824,10 @@ def pipe_path_profile(
     """
     direction, sections = _traversal(path, direction)
     if correlation != "darcy_weisbach" or correlation_2p != "BeggsBrill":
-        raise UnknownCorrelationError(
+        raise ValidationError(
             f"pipe_path_profile: correlation = {correlation!r}, correlation_2p = "
-            f"{correlation_2p!r}; expected 'darcy_weisbach' and 'BeggsBrill'"
+            f"{correlation_2p!r}; expected 'darcy_weisbach' and 'BeggsBrill'",
+            code="unknown_name",
         )
     p, T = stream.p, stream.T
     flow = fluid_physics.volume_flow(stream.m_dot, fluid.properties(p, T).density)
@@ -851,8 +852,8 @@ def _traversal(path, direction):
     """Return the normalised direction and the path sections in traversal order."""
     direction = direction.strip().lower()
     if direction not in {"up", "down"}:
-        raise UnknownCorrelationError(
-            f"pipe path: direction = {direction!r}; expected 'up' or 'down'"
+        raise ValidationError(
+            f"pipe path: direction = {direction!r}; expected 'up' or 'down'", code="unknown_name"
         )
     sections = path.sections if direction == "down" else list(reversed(path.sections))
     return direction, sections
@@ -960,7 +961,7 @@ def radial_pressure_drops(
     )
     ops.check(
         ops.logical_not(smallest <= 0),
-        PhysicsRangeError,
+        PhysicsError,
         "radial_pressure_drops: permeability = {permeability} m2, thickness = {thickness} m, "
         "drainage_radius = {drainage_radius} m, wellbore_radius = {wellbore_radius} m; "
         "expected positive values",

@@ -9,7 +9,7 @@ from scipy.optimize import least_squares
 
 from gemini.analysis.fits import fit_head_coefficients
 from gemini.engine.engine import Engine
-from gemini.errors import BindingError, ConfigurationError, InsufficientDataError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.pumps import ESP
 from gemini.physics import heat_transfer
@@ -81,28 +81,35 @@ class _Coordinates:
 def _owner(plant, params):
     """Return the one module owning ``params``, its plant path and the parameter names."""
     if not params:
-        raise ConfigurationError("calibrate: params = []; expected at least one Parameter")
+        raise ValidationError(
+            "calibrate: params = []; expected at least one Parameter", code="invalid_design"
+        )
     for parameter in params:
         if not parameter.calibratable:
-            raise ConfigurationError(
+            raise ValidationError(
                 f"{parameter.path}: calibratable = False; expected parameters declared with "
-                "calibratable=True"
+                "calibratable=True",
+                code="invalid_design",
             )
     owners = {parameter.owner for parameter in params}
     if len(owners) != 1:
         paths = sorted(owner.path for owner in owners)
-        raise ConfigurationError(
-            f"calibrate: parameter owners = {join_names(paths)}; expected one module at a time"
+        raise ValidationError(
+            f"calibrate: parameter owners = {join_names(paths)}; expected one module at a time",
+            code="invalid_design",
         )
     module = owners.pop()
     path = next((path for path, item in plant.named_modules() if item is module), None)
     if path is None:
-        raise ConfigurationError(f"{module.path}: module is not part of the supplied plant")
+        raise ValidationError(
+            f"{module.path}: module is not part of the supplied plant", code="invalid_design"
+        )
     fields = [parameter.name for parameter in params]
     duplicates = sorted({field for field in fields if fields.count(field) > 1})
     if duplicates:
-        raise ConfigurationError(
-            f"{join_path(path, duplicates[0])}: parameter given twice; expected each once"
+        raise ValidationError(
+            f"{join_path(path, duplicates[0])}: parameter given twice; expected each once",
+            code="invalid_design",
         )
     return module, path, fields
 
@@ -113,15 +120,17 @@ def _check_single_snapshot(module, path, index):
     dates = [item.valid_from for item in module._param_history]
     if all(date is not None and date > start for date in dates):
         first = min(dates, default=None)
-        raise ConfigurationError(
+        raise ValidationError(
             f"{path}: calibration window starts {start}; first parameter snapshot valid_from = "
-            f"{first}; expected a window inside one dated design snapshot"
+            f"{first}; expected a window inside one dated design snapshot",
+            code="invalid_design",
         )
     changes = sorted(date for date in dates if date is not None and start < date <= end)
     if changes:
-        raise ConfigurationError(
+        raise ValidationError(
             f"{path}: parameter snapshots start at {changes[0]} inside the calibration window "
-            f"{start} to {end}; expected one dated design snapshot"
+            f"{start} to {end}; expected one dated design snapshot",
+            code="invalid_design",
         )
 
 
@@ -133,9 +142,10 @@ def _fit_targets(module, path, measured, fields):
             targets &= allowed
             break
     if not targets:
-        raise BindingError(
+        raise ValidationError(
             f"{path}: measured bindings = {join_names(sorted(measured))}; expected at least one "
-            f"output of {join_names(sorted(module.outputs(recurse=False)))}"
+            f"output of {join_names(sorted(module.outputs(recurse=False)))}",
+            code="invalid_binding",
         )
     return sorted(targets)
 
@@ -160,7 +170,9 @@ def _coordinates(module, path, fields):
     for field in fields:
         value = getattr(module, field)
         if value is None or isinstance(value, bool):
-            raise ConfigurationError(f"{path}.{field} = {value!r}; expected a numeric value")
+            raise ValidationError(
+                f"{path}.{field} = {value!r}; expected a numeric value", code="invalid_design"
+            )
         values = np.atleast_1d(np.asarray(value, dtype=float))
         sizes[field] = (len(values), isinstance(value, (list, tuple)))
         field_scale = np.where(values == 0, 1.0, np.maximum(np.abs(values), 1e-30))
@@ -227,9 +239,10 @@ def _head_coefficient_guess(module, path, observed, measured, valid):
         )
     distinct = len(np.unique(flows[valid]))
     if distinct < 6:
-        raise InsufficientDataError(
+        raise PhysicsError(
             f"{path}.head_coefficients: distinct valid flows = {distinct}; expected at least 6 to "
-            "seed the head-curve guess"
+            "seed the head-curve guess",
+            code="too_little_data",
         )
     frequencies = observed.values(observed.bindings.controls["frequency"])[valid]
     fitted = fit_head_coefficients(
@@ -256,7 +269,9 @@ def _predictor(engine, trial, dataset, index, path, targets, coordinates):
         target.update_params(**coordinates.unpack(x))
         results = engine.replay(dataset, only=[path])
         if path not in results.names():
-            raise InsufficientDataError(f"{path}: module was skipped on every calibration row")
+            raise PhysicsError(
+                f"{path}: module was skipped on every calibration row", code="too_little_data"
+            )
         return results.to_frame()[columns].reindex(index).to_numpy(dtype=float)
 
     return predict
@@ -266,7 +281,9 @@ def _valid_rows(predicted, measured, path):
     """Return the rows where every target is both predicted and measured."""
     valid = np.isfinite(predicted).all(axis=1) & np.isfinite(measured).all(axis=1)
     if not valid.any():
-        raise InsufficientDataError(f"{path}: no row has every target measured and predicted")
+        raise PhysicsError(
+            f"{path}: no row has every target measured and predicted", code="too_little_data"
+        )
     return valid
 
 
@@ -319,7 +336,9 @@ def calibrate(plant, dataset, params, start=None, end=None, backend="numpy", app
     dataset = as_dataset(dataset).window(start, end)
     data = dataset.read()
     if not len(data):
-        raise InsufficientDataError(f"{path}: calibration window {start} to {end} has no rows")
+        raise PhysicsError(
+            f"{path}: calibration window {start} to {end} has no rows", code="too_little_data"
+        )
     _check_single_snapshot(original, path, data.index)
     trial = deepcopy(plant)
     target = trial.get_submodule(path)

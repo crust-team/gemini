@@ -1,6 +1,6 @@
 """Which ports a connection joins: the lookups and rules of ``Plant.connect``."""
 
-from gemini.errors import UnknownNameError, ValidationError
+from gemini.errors import ValidationError
 from gemini.modules.module import Module
 from gemini.modules.plants.plan import is_group, members, split_end
 from gemini.types.declarations import Declaration
@@ -80,10 +80,11 @@ class PortResolver:
         module = self._find_submodule(path)
         if module is None:
             paths = [item for item, _ in members(self)]
-            raise UnknownNameError(
+            raise ValidationError(
                 f"{value!r}: no module {path!r}{did_you_mean(path, paths)}",
                 path=field,
                 suggestions=close_matches(path, paths),
+                code="unknown_name",
             )
         self._check_reach(path, field)
         if port is None and explicit:

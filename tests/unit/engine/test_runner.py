@@ -6,7 +6,7 @@ import pytest
 
 import gemini as gm
 from gemini.engine.callbacks import AutoCheckpoint, Callback, EventLog
-from gemini.errors import PhysicsRangeError, StepError
+from gemini.errors import PhysicsError, RunError
 from tests.fixtures.engine_plants import (
     TICKS,
     dated_pair_plant,
@@ -15,6 +15,7 @@ from tests.fixtures.engine_plants import (
     pair_plant,
 )
 from tests.fixtures.engine_tank import ROW, TIME, tank
+from tests.fixtures.errors import raises
 
 
 def _run(backend, frame, make=pair_plant, callbacks=(), on_error="record", **kwargs):
@@ -60,12 +61,12 @@ def test_rows_with_a_failing_check_are_recorded_with_their_tick_code_and_message
     """The other rows of the chunk keep their results."""
     _, results = assert_same(pair_frame({("level", 4): -1.0}))
     assert results.errors()[0]["path"] == "first"
-    assert results.errors()[0]["code"] == "physics_range"
+    assert results.errors()[0]["code"] == "out_of_range"
     assert results["first"].rise.notna().sum() == len(TICKS) - 1
 
 
 def test_rows_with_a_failing_check_raise_the_step_error_after_the_earlier_rows():
-    """Under ``raise`` the error is a ``StepError`` chained to the check's error."""
+    """Under ``raise`` the error is a ``RunError`` chained to the check's error."""
     seen = []
 
     class Watch(Callback):
@@ -75,9 +76,9 @@ def test_rows_with_a_failing_check_raise_the_step_error_after_the_earlier_rows()
     frame = pair_frame({("level", 4): -1.0})
     for backend in ("numpy", "python"):
         engine = gm.Engine(pair_plant(), backend, [Watch()], "raise")
-        with pytest.raises(StepError) as raised:
+        with raises(RunError, "step") as raised:
             engine.replay(gm.Dataset.from_frame(frame))
-        assert isinstance(raised.value.__cause__, PhysicsRangeError)
+        assert isinstance(raised.value.__cause__, PhysicsError)
         assert len(engine.results) == 4 and engine.position == TICKS[3]
     assert seen[0] == seen[1]
 
@@ -194,7 +195,7 @@ def _tank_run(rows, on_error="record"):
 
 
 def test_missing_data_is_a_counted_skip_and_failures_are_recorded_or_raised():
-    """Skips are counted per twin; failures are recorded, or raised as StepError."""
+    """Skips are counted per twin; failures are recorded, or raised as RunError."""
     rows = {name: [value] * 3 for name, value in ROW.items()}
     rows["p"][1], rows["rate"][2] = np.nan, -1.0
     _, results = _tank_run(rows)
@@ -203,7 +204,7 @@ def test_missing_data_is_a_counted_skip_and_failures_are_recorded_or_raised():
     assert [row["code"] for row in errors] == ["missing_value", "module_error"]
     assert errors[1]["message"] == "negative flow"
     assert results[""].flow.tolist()[0] == 2.0
-    with pytest.raises(StepError, match="negative flow") as raised:
+    with raises(RunError, "step", match="negative flow") as raised:
         _tank_run(rows, on_error="raise")
     assert isinstance(raised.value.__cause__, ValueError)
 

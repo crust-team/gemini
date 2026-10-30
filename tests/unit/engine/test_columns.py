@@ -6,7 +6,7 @@ import pytest
 import gemini as gm
 from gemini.engine.columns import read
 from gemini.engine.step import BindingPlan
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.types.bindings import Binding, ModuleBindings
 from gemini.utils.data.loader import Aligned
 from tests.fixtures.engine_tank import ROW, TIME, dataset, tank
@@ -45,11 +45,11 @@ def test_the_first_missing_column_in_reading_order_is_the_skip_reason():
 
 
 def test_an_inlet_stream_the_limits_refuse_has_the_error_of_the_stream_constructor():
-    """The error is the real ``PhysicsRangeError`` of a ``Stream``; inputs are not applied."""
+    """The error is the real ``PhysicsError`` of a ``Stream``; inputs are not applied."""
     block = _read(tank(), T=[-5.0, 330.0], rate=[2.0, 2.0], flow=[10.0] * 2, p=[3e5] * 2)
     assert block.status.tolist() == [-1, 0]
     error = block.stream_error(0)
-    assert isinstance(error, PhysicsRangeError) and "T = -5.0 K" in str(error)
+    assert isinstance(error, PhysicsError) and "T = -5.0 K" in str(error)
     assert block.applied.tolist() == [False, True]
 
 

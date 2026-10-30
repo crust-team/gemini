@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.cooling import AbsorptionUnit
 from gemini.types.flows import Stream
@@ -97,7 +97,7 @@ def test_no_cold_without_driving_heat_or_flow(streams):
 
 def test_negative_flow_raises():
     """A reversed circuit flow is outside the model."""
-    with pytest.raises(PhysicsRangeError, match="chilled_in.m_dot = -1"):
+    with pytest.raises(PhysicsError, match="chilled_in.m_dot = -1"):
         call(unit(), 280, chilled_in=CHILLED.with_(m_dot=-1))
 
 

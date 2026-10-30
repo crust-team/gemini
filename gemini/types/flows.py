@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from gemini import ops
-from gemini.errors import CallError, PhysicsRangeError, UnitError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import fluid as fluid_physics
 from gemini.physics import units
 from gemini.types.fluid import Fluid
@@ -29,7 +29,7 @@ class Stream:
     ``p`` the absolute pressure [Pa]; ``fluid`` the immutable composition and property model.
     The constructor is keyword-only and validates at the boundary: numbers become ``float``,
     ``m_dot`` must be finite, ``T`` positive and finite, ``p`` non-negative and finite
-    (``PhysicsRangeError``). The same class carries arrays over time and traced values on the
+    (``PhysicsError``). The same class carries arrays over time and traced values on the
     batched and traced paths; the limits are then ``gemini.ops.check`` calls.
     """
 
@@ -109,14 +109,15 @@ class Stream:
         """Return a copy with updated SI stream fields.
 
         The copy skips the constructor: it reuses the same ``Fluid`` and checks only the changed
-        fields against the physical limits, which raise ``PhysicsRangeError`` (``plants.nodal``
+        fields against the physical limits, which raise ``PhysicsError`` (``plants.nodal``
         relies on it to bracket a solver). Values may be floats, arrays or traced values.
         """
         unknown = [name for name in changes if name not in _FIELDS]
         if unknown:
-            raise CallError(
+            raise ValidationError(
                 f"Stream.with_: unknown field {unknown[0]!r}; valid names: "
-                f"{join_names(_FIELDS)}{did_you_mean(unknown[0], _FIELDS)}"
+                f"{join_names(_FIELDS)}{did_you_mean(unknown[0], _FIELDS)}",
+                code="invalid_call",
             )
         if "fluid" in changes:
             changes["fluid"] = _as_fluid(changes["fluid"])
@@ -144,19 +145,20 @@ def _shown(value):
 
 
 def _check_arguments(data):
-    """Reject unknown, conflicting and missing constructor keywords with ``CallError``."""
+    """Reject unknown, conflicting and missing constructor keywords with ``ValidationError``."""
     for name in data:
         if name not in _ARGUMENTS:
-            raise CallError(
+            raise ValidationError(
                 f"Stream: unknown argument {name!r}; valid names: "
-                f"{join_names(_ARGUMENTS)}{did_you_mean(name, _ARGUMENTS)}"
+                f"{join_names(_ARGUMENTS)}{did_you_mean(name, _ARGUMENTS)}",
+                code="invalid_call",
             )
     if "flow" in data and "m_dot" in data:
-        raise CallError("Stream: pass either flow or m_dot, not both")
+        raise ValidationError("Stream: pass either flow or m_dot, not both", code="invalid_call")
     required = ("T", "p") if "flow" in data or "m_dot" in data else ("m_dot", "T", "p")
     missing = [name for name in required if name not in data]
     if missing:
-        raise CallError(f"Stream: missing argument {', '.join(missing)}")
+        raise ValidationError(f"Stream: missing argument {', '.join(missing)}", code="invalid_call")
 
 
 def _as_fluid(value):
@@ -165,7 +167,10 @@ def _as_fluid(value):
         return value
     if isinstance(value, Mapping):
         return Fluid.model_validate(value)
-    raise CallError(f"Stream.fluid: value = {value!r}; expected a Fluid or a mapping of its fields")
+    raise ValidationError(
+        f"Stream.fluid: value = {value!r}; expected a Fluid or a mapping of its fields",
+        code="invalid_call",
+    )
 
 
 def _number(name, value):
@@ -175,7 +180,7 @@ def _number(name, value):
     try:
         return float(value)
     except (TypeError, ValueError) as error:
-        raise PhysicsRangeError(f"Stream.{name}: value = {value!r}; expected a number") from error
+        raise PhysicsError(f"Stream.{name}: value = {value!r}; expected a number") from error
 
 
 def _validated(**values):
@@ -189,7 +194,7 @@ def _validated(**values):
     for name, value in values.items():
         ops.check(
             _within(name, value),
-            PhysicsRangeError,
+            PhysicsError,
             "Stream: {name} = {value} {unit}; expected {expected}",
             name=name,
             value=value,
@@ -224,8 +229,9 @@ def _mass_flow(flow, fluid, pressure, temperature):
     """Return a public ``flow`` value as mass flow [kg/s], using density for volume units."""
     number, unit = units.split_quantity(flow)
     if isinstance(number, str):
-        raise UnitError(
-            f"Stream.flow: value = {flow!r}; expected a number [kg/s] or '<number> <unit>'"
+        raise ValidationError(
+            f"Stream.flow: value = {flow!r}; expected a number [kg/s] or '<number> <unit>'",
+            code="invalid_unit",
         )
     if units.si_unit(unit) == "m3/s":
         volume = units.value_in_si(flow, "m3/s", "Stream.flow")

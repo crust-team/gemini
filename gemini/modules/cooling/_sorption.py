@@ -1,7 +1,7 @@
 """What the absorption and adsorption machines share: circuit rates, outlets, outputs, capacity."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics import heat_transfer, refrigeration
 
 
@@ -11,7 +11,7 @@ def rates(path, inlets):
     for port, stream in inlets.items():
         ops.check(
             stream.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: {port}.m_dot = {m_dot} kg/s; expected >= 0",
             path=path,
             port=port,

@@ -8,6 +8,7 @@ import pytest
 
 import gemini as gm
 from gemini.utils.data.loader import Loader
+from tests.fixtures.errors import raises
 
 
 @pytest.fixture
@@ -73,11 +74,11 @@ def test_alignment_is_independent_of_the_timestamp_resolution(source, unit):
 
 def test_options_and_columns_are_validated(source):
     """Invalid options fail at construction; unknown columns fail on the first read."""
-    with pytest.raises(ValueError, match="align = 'nearest'"):
+    with pytest.raises(gm.errors.RunError, match="align = 'nearest'"):
         Loader(source, source.to_frame().index, align="nearest")
-    with pytest.raises(ValueError, match="chunk"):
+    with pytest.raises(gm.errors.RunError, match="chunk"):
         Loader(source, source.to_frame().index, chunk=timedelta(0))
-    with pytest.raises(gm.errors.DatasetError, match="absent_a, absent_b"):
+    with raises(gm.errors.RunError, "invalid_data", match="absent_a, absent_b"):
         list(Loader(source, source.to_frame().index, columns=["absent_b", "absent_a"]))
 
 

@@ -1,7 +1,7 @@
 """Injection pump using supplied curves or a discharge-pressure setpoint."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import energy, pumps
 from gemini.types import (
@@ -67,7 +67,7 @@ class InjectionPump(Module):
         head = self._head(suction)
         ops.check(
             head >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: head = {head} Pa; discharge pressure is below suction pressure",
             path=self.path,
             head=head,
@@ -101,20 +101,22 @@ class InjectionPump(Module):
         flow = suction.volumetric_flow()
         ops.check(
             flow >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
             path=self.path,
             flow=flow,
         )
         if self.head_coefficients is not None:
             if self.stage_count is None:
-                raise ConfigurationError(
-                    f"{self.path}: head_coefficients curves require stage_count"
+                raise ValidationError(
+                    f"{self.path}: head_coefficients curves require stage_count",
+                    code="invalid_design",
                 )
             return pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         if self.pressure_setpoint is not None:
             return self.pressure_setpoint - suction.p
-        raise ConfigurationError(
+        raise ValidationError(
             f"{self.path}: supply the pressure_setpoint control or head_coefficients and "
-            "stage_count"
+            "stage_count",
+            code="invalid_design",
         )

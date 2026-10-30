@@ -4,14 +4,15 @@ import json
 
 import numpy as np
 import pytest
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticError
 from pydantic_core import to_jsonable_python
 
-from gemini.errors import CallError
+from gemini.errors import ValidationError
 from gemini.physics.fluid import FluidProperties
 from gemini.types.flows import Stream
 from gemini.types.fluid import BRINE, GLYCOL_30, STEAM, WATER, Fluid
 from tests.fixtures.equivalence import assert_function_matches
+from tests.fixtures.errors import raises
 
 
 def test_fluid_properties_and_identity():
@@ -30,11 +31,11 @@ def test_fluid_properties_and_identity():
         FluidProperties(gmf=0.1, cp_l=4000)
     )
     assert Stream(**json.loads(json.dumps(to_jsonable_python(stream)))) == stream
-    with pytest.raises(ValidationError):
+    with pytest.raises(PydanticError):
         brine.salinity = 0.5
-    with pytest.raises(ValidationError):
+    with pytest.raises(PydanticError):
         Fluid(salinity=0.9, co2_mass_fraction=0.2)
-    with pytest.raises(CallError):
+    with raises(ValidationError, "invalid_call"):
         Stream(m_dot=1, T=300, p=1e5, fluid="brine")
 
 

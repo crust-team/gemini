@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pytest
 
-from gemini.errors import DeclarationError
+from gemini.errors import DefinitionError, ValidationError
 from gemini.modules import Module
 from gemini.types import (
     UNSET,
@@ -82,9 +82,9 @@ def test_parameter_units_shape_and_metadata():
     module = _declared(length="1200 m", coefficients=[1, 2])
     assert module.length == 1200
     assert module.get_parameter("length").unit == "m"
-    with pytest.raises(TypeError, match="shape"):
+    with pytest.raises(ValidationError, match="shape"):
         _declared(length=1, coefficients=[1])
-    with pytest.raises(TypeError, match="expected m"):
+    with pytest.raises(ValidationError, match="expected m"):
         _declared(length="12 bar", coefficients=[1, 2])
 
 
@@ -114,9 +114,9 @@ def test_all_sections_list_own_declarations():
 
 def test_inlets_and_outlets_accept_fluid_stream_types_only():
     """Scalar and energy values belong in inputs or outputs, never flow ports."""
-    with pytest.raises(TypeError, match="fluid Stream"):
+    with pytest.raises(DefinitionError, match="fluid Stream"):
         Inlet(float)
-    with pytest.raises(TypeError, match="fluid Stream"):
+    with pytest.raises(DefinitionError, match="fluid Stream"):
         Outlet(float)
 
 
@@ -146,11 +146,11 @@ def test_unitless_declarations_keep_text_values():
 def test_invalid_values_raise_declaration_errors():
     """Wrong units and wrong shapes name the declaration path, value and expectation."""
     parameter = Parameter(Length).bind(None, "length")
-    with pytest.raises(DeclarationError, match="length: invalid parameter value '12 bar'.*m"):
+    with pytest.raises(ValidationError, match="length: invalid parameter value '12 bar'.*m"):
         parameter.validate("12 bar")
-    with pytest.raises(DeclarationError, match="coefficients: shape = \\(1,\\); expected \\(2,\\)"):
+    with pytest.raises(ValidationError, match="coefficients: shape = \\(1,\\); expected \\(2,\\)"):
         Parameter(list[float], shape=(2,)).bind(None, "coefficients").validate([1])
-    with pytest.raises(DeclarationError, match="outlet.mdot: unknown stream field.*'m_dot'"):
+    with pytest.raises(DefinitionError, match="outlet.mdot: unknown stream field.*'m_dot'"):
         Outlet(Stream).bind(None, "outlet").field("mdot")
 
 
@@ -256,5 +256,5 @@ def test_the_quick_check_converts_numpy_scalars_of_the_eager_scope():
     checked = number.validate(np.float64(2.5))
     assert type(checked) is float and checked == 2.5
     assert flag.validate(np.bool_(True)) is True
-    with pytest.raises(DeclarationError, match=r"invalid parameter value -1\.0"):
+    with pytest.raises(ValidationError, match=r"invalid parameter value -1\.0"):
         number.validate(np.float64(-1.0))

@@ -27,7 +27,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from gemini.errors import UnitError, UnknownNameError
+from gemini.errors import ValidationError
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
 KILO = 1000
@@ -359,8 +359,9 @@ class Quantity:
 def _entry(unit, path="units"):
     """Return ``(si_unit, scale, offset)`` of a known unit."""
     if unit not in _UNITS:
-        raise UnitError(
-            f"{path}: unit = {unit!r}; expected a known unit{did_you_mean(unit, _UNITS)}"
+        raise ValidationError(
+            f"{path}: unit = {unit!r}; expected a known unit{did_you_mean(unit, _UNITS)}",
+            code="invalid_unit",
         )
     return _UNITS[unit]
 
@@ -429,7 +430,10 @@ def value_in_si(value, expected_unit=None, path="value", quantity=None):
     if supplied is None or expected_unit is None:
         return value
     if _entry(supplied, path)[0] != expected_unit:
-        raise UnitError(f"{path}: unit = {supplied!r}; expected a unit of {expected_unit!r}")
+        raise ValidationError(
+            f"{path}: unit = {supplied!r}; expected a unit of {expected_unit!r}",
+            code="invalid_unit",
+        )
     return to_si(number, supplied, quantity)
 
 
@@ -443,9 +447,10 @@ def convert(value, from_unit, to_unit, quantity=None):
         return value
     source, target = _entry(from_unit, "units.convert"), _entry(to_unit, "units.convert")
     if source[0] != target[0]:
-        raise UnitError(
+        raise ValidationError(
             f"units.convert: unit = {to_unit!r}; expected a unit of {source[0]!r} "
-            f"to convert from {from_unit!r}"
+            f"to convert from {from_unit!r}",
+            code="invalid_unit",
         )
     si = to_si(value, from_unit, quantity)
     return (si - _offset(to_unit, quantity)) / target[1]
@@ -454,20 +459,25 @@ def convert(value, from_unit, to_unit, quantity=None):
 def define_quantity(name, unit):
     """Record that the quantity ``name`` is stored in the SI unit ``unit``.
 
-    Defining a name again with the same unit changes nothing; another unit raises ``UnitError``.
+    Defining a name again with the same unit changes nothing; another unit raises
+    ``ValidationError``.
     """
     known = _QUANTITY_UNITS.setdefault(name, unit)
     if known != unit:
-        raise UnitError(f"units.define_quantity: quantity {name!r} = {unit!r}; already {known!r}")
+        raise ValidationError(
+            f"units.define_quantity: quantity {name!r} = {unit!r}; already {known!r}",
+            code="invalid_unit",
+        )
 
 
 def _quantity_si_unit(quantity):
     """Return the SI unit of a named quantity, or raise with the closest names."""
     if quantity not in _QUANTITY_UNITS:
-        raise UnknownNameError(
+        raise ValidationError(
             f"units: quantity = {quantity!r}; expected one of "
             f"{join_names(sorted(_QUANTITY_UNITS))}{did_you_mean(quantity, _QUANTITY_UNITS)}",
             suggestions=close_matches(quantity, _QUANTITY_UNITS),
+            code="unknown_name",
         )
     return _QUANTITY_UNITS[quantity]
 
@@ -476,7 +486,7 @@ def names(quantity=None):
     """Return the sorted unit names, or those of one quantity such as ``"pressure"``.
 
     Every unit name returned converts with ``convert``; an unknown quantity raises
-    ``UnknownNameError`` with the closest names.
+    ``ValidationError`` with the closest names.
     """
     if quantity is None:
         return sorted(_UNITS)
@@ -488,12 +498,13 @@ def parse(text):
     """Return ``(value, unit)`` of ``"<number> <unit>"`` text such as ``"150 m3/h"``.
 
     The value stays in the given unit; the unit must be known. Text that is not a number and a
-    unit separated by a space raises ``UnitError``.
+    unit separated by a space raises ``ValidationError``.
     """
     value, unit = split_quantity(text)
     if unit is None:
-        raise UnitError(
-            f"units.parse: text = {text!r}; expected '<number> <unit>', e.g. '150 m3/h'"
+        raise ValidationError(
+            f"units.parse: text = {text!r}; expected '<number> <unit>', e.g. '150 m3/h'",
+            code="invalid_unit",
         )
     _entry(unit, "units.parse")
     return value, unit
@@ -502,6 +513,6 @@ def parse(text):
 def fits(unit, quantity):
     """Whether ``unit`` is a known unit of the named ``quantity`` (``"pressure"``, ``"power"``).
 
-    An unknown unit does not fit; an unknown quantity raises ``UnknownNameError``.
+    An unknown unit does not fit; an unknown quantity raises ``ValidationError``.
     """
     return si_unit(unit) == _quantity_si_unit(quantity)

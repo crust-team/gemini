@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from gemini import backends, ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.graph import run_function
 from gemini.ops import Constant
 from gemini.types.flows import Stream
@@ -128,11 +128,11 @@ def test_integer_arguments_divide_silently_and_stay_integers():
 
     @ops.physics
     def ratio(left, right):
-        ops.check(left >= 0, PhysicsRangeError, "ratio: left = {left}", left=left)
+        ops.check(left >= 0, PhysicsError, "ratio: left = {left}", left=left)
         return [left / right, list(range(right + 2))]
 
     assert ratio(1, 0) == [math.inf, [0, 1]]
-    with pytest.raises(PhysicsRangeError, match="ratio: left = -1$"):
+    with pytest.raises(PhysicsError, match="ratio: left = -1$"):
         ratio(-1, 1)
 
 
@@ -141,7 +141,7 @@ def test_a_stream_of_traced_values_keeps_the_frames_of_nested_functions():
 
     @ops.physics
     def checked(stream):
-        ops.check(stream.p > 0, PhysicsRangeError, "checked: p = {p}", p=stream.p)
+        ops.check(stream.p > 0, PhysicsError, "checked: p = {p}", p=stream.p)
         return stream.p
 
     @ops.physics

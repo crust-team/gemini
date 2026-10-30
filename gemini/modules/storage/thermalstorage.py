@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, storage
 from gemini.types import (
@@ -159,7 +159,7 @@ class ThermalStorage(Module):
         """Return the circuit conductance e * m_dot * cp [W/K]; reject reverse flow."""
         ops.check(
             stream.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: circuit m_dot = {m_dot} kg/s; expected >= 0 (reverse flow " "is not modelled)",
             path=self.path,
             m_dot=stream.m_dot,

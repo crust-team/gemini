@@ -14,7 +14,8 @@ from gemini.engine.clock import Clock
 from gemini.engine.results import Results, declared_units
 from gemini.engine.runner import Runner
 from gemini.engine.step import BindingPlan
-from gemini.errors import CheckpointError, ConfigurationError, ValidationError
+from gemini.errors import RunError, ValidationError
+from gemini.errors.base import check_on_error
 from gemini.graph import graph_cache
 from gemini.modules.module import Module, class_path, import_class
 from gemini.utils.data.dataset import as_dataset
@@ -53,13 +54,10 @@ class Engine:
         it becomes a row of ``results.errors()`` and the run continues.
         """
         if not isinstance(plant, Module):
-            raise ConfigurationError(
+            raise ValidationError(
                 f"Engine: plant = {type(plant).__name__}; expected a plant or module"
             )
-        if on_error not in {"record", "raise"}:
-            raise ConfigurationError(
-                f"Engine: on_error = {on_error!r}; expected 'record' or 'raise'"
-            )
+        check_on_error(on_error)
         backends.get(backend)
         self.plant = plant
         self.backend = backend
@@ -149,12 +147,15 @@ class Engine:
         """Take the run state of a live checkpoint saved for this engine's plant class."""
         checkpoint = storage.load(path)
         if checkpoint.run_kind != "live":
-            raise CheckpointError(f"{path}: run_kind = {checkpoint.run_kind!r}; expected 'live'")
+            raise RunError(
+                f"{path}: run_kind = {checkpoint.run_kind!r}; expected 'live'", code="checkpoint"
+            )
         supplied = class_path(type(self.plant))
         if checkpoint.plant_class != supplied:
-            raise CheckpointError(
+            raise RunError(
                 f"{path}: plant_class = {checkpoint.plant_class!r}; expected the supplied "
-                f"plant's {supplied!r}"
+                f"plant's {supplied!r}",
+                code="checkpoint",
             )
         self._restore(checkpoint, Path(path).parent)
 
@@ -270,7 +271,9 @@ class Engine:
     def save_checkpoint(self, path):
         """Save at a step boundary; before the first run the checkpoint holds no results."""
         if self._in_step:
-            raise CheckpointError(f"{path}: called inside a step; expected a completed step")
+            raise RunError(
+                f"{path}: called inside a step; expected a completed step", code="checkpoint"
+            )
         checkpoint = storage.Checkpoint(
             run_kind=self.run_kind,
             plant_class=class_path(type(self.plant)),
@@ -333,14 +336,17 @@ class Engine:
         if self.run_kind is None:
             return self.results if self.results is not None else Results()
         if self.clock is None:
-            raise CheckpointError(f"{self.run_kind} checkpoint: clock = None; expected a clock")
+            raise RunError(
+                f"{self.run_kind} checkpoint: clock = None; expected a clock", code="checkpoint"
+            )
         remaining = self._remaining(self.clock)
         if not len(remaining):
             return self.results
         if self.dataset is None:
-            raise CheckpointError(
+            raise RunError(
                 f"{self.run_kind} checkpoint: {len(remaining)} unfinished ticks and no stored "
-                "rows; expected the rows saved with an unfinished simulation or replay"
+                "rows; expected the rows saved with an unfinished simulation or replay",
+                code="checkpoint",
             )
         with self._saved_settings():
             return self._run(

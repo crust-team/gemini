@@ -6,7 +6,7 @@ string formatting. ``TraceError`` makes the module a graph break; physics writte
 ``gemini.ops.where``, ``check`` and ``logical_and`` never needs them.
 """
 
-from gemini.errors import TraceError
+from gemini.graph.errors import TraceError
 from gemini.ops import Operators, Symbolic, dispatch
 
 

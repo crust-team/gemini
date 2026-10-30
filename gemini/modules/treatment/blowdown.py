@@ -1,7 +1,7 @@
 """Continuous blowdown bleeding a commanded share of a circuit's flow to drain."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import separation
 from gemini.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Stream
@@ -25,7 +25,7 @@ class Blowdown(Module):
     counts it as an outflow, and mass and sensible energy close exactly. The fraction is a
     control because operators and controllers adjust it to the measured concentration (for a
     make-up stream ``M`` and ``C`` cycles of concentration the bleed is ``M / C``). Reverse
-    flow through a blowdown is not defined and raises ``PhysicsRangeError``.
+    flow through a blowdown is not defined and raises ``PhysicsError``.
     """
 
     def __init__(self):
@@ -52,7 +52,7 @@ class Blowdown(Module):
         feed_in = inlets.feed_in
         ops.check(
             feed_in.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: feed_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=feed_in.m_dot,

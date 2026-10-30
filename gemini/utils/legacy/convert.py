@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import pandas as pd
 
-from gemini.errors import GeminiWarning, LegacyFormatError
+from gemini.errors import GeminiWarning, ValidationError
 from gemini.modules.wiring import trace_wiring
 from gemini.physics import units
 from gemini.types import Binding, ModuleBindings
@@ -23,9 +23,10 @@ _SECTIONS = ("controls", "boundaries", "inlets", "measured", "state")
 def _si_unit(unit):
     """Return the SI unit an old tag unit converts to."""
     if unit not in tables.SI_UNITS:
-        raise LegacyFormatError(
+        raise ValidationError(
             f"old tag: unit = {unit!r}; expected one of {sorted(tables.SI_UNITS)}"
-            f"{did_you_mean(unit, tables.SI_UNITS)}"
+            f"{did_you_mean(unit, tables.SI_UNITS)}",
+            code="invalid_format",
         )
     return tables.SI_UNITS[unit]
 
@@ -75,9 +76,10 @@ def _filled_module(plant, path, item):
     module = plant.get_submodule(path)
     expected = tables.MODULE_CLASSES[item.type]
     if not isinstance(module, expected):
-        raise LegacyFormatError(
+        raise ValidationError(
             f"{path}: module type = {type(module).__name__}; expected {expected.__name__} for "
-            f"old kind {item.type!r}"
+            f"old kind {item.type!r}",
+            code="invalid_format",
         )
     module._param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
     values = module._params_at(None)
@@ -117,7 +119,9 @@ def to_dataset(project, frame):
     index = pd.to_datetime(frame.pop(time_column), utc=True)
     missing = sorted({source.column for source in sources.values()} - set(frame.columns))
     if missing:
-        raise LegacyFormatError(f"old CSV: bound tag columns {missing} are missing")
+        raise ValidationError(
+            f"old CSV: bound tag columns {missing} are missing", code="invalid_format"
+        )
     converted, metadata = {}, {}
     for name, source in sources.items():
         converted[name] = _si_column(frame[source.column], source.unit)
@@ -230,9 +234,10 @@ def results_to_frame(results, project):
 def _traced_edges(plant):
     """Return the stream connections of one step of a copy of ``plant`` with assumed inputs."""
     if "root_inputs" not in plant.boundary:
-        raise LegacyFormatError(
+        raise ValidationError(
             f"{plant.path}: boundary.root_inputs is missing; expected a plant filled by "
-            "legacy.to_plant"
+            "legacy.to_plant",
+            code="invalid_format",
         )
     trial = deepcopy(plant)
     trial.set_inputs(tables.TRACE_CONTROLS)

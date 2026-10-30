@@ -9,9 +9,10 @@ import pytest
 import gemini as gm
 from gemini.engine.columns import read
 from gemini.engine.step import BindingPlan
-from gemini.errors import ConfigurationError, InsufficientDataError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.types import Binding, Stream
 from gemini.utils.data.loader import Aligned
+from tests.fixtures.errors import raises
 
 
 def _kwargs(plant, path, row):
@@ -140,7 +141,7 @@ def test_esp_head_guess_names_too_few_flows(fresh_plant, fast_dataset):
     """Steady flow cannot seed the six-coefficient head guess; the error says so."""
     data = _head_rows(fresh_plant, fast_dataset, [0.03] * 8)
     head = fresh_plant.get_parameter("doublet.esp.head_coefficients")
-    with pytest.raises(InsufficientDataError, match="doublet.esp.head_coefficients.*distinct"):
+    with raises(PhysicsError, "too_little_data", match="doublet.esp.head_coefficients.*distinct"):
         gm.optim.calibrate(fresh_plant, data, params=[head], apply=False)
 
 
@@ -151,5 +152,5 @@ def test_window_before_the_first_snapshot_is_rejected(fresh_plant, reference_dat
         history[0].model_copy(update={"valid_from": pd.Timestamp("2024-06-07T01:00Z")})
     ]
     ua = fresh_plant.get_parameter("heat_exchanger.thermal_conductance")
-    with pytest.raises(ConfigurationError, match="2024-06-07 01:00"):
+    with raises(ValidationError, "invalid_design", match="2024-06-07 01:00"):
         gm.optim.calibrate(fresh_plant, reference_dataset.window(end="2024-06-07T02:45Z"), [ua])

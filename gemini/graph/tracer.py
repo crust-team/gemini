@@ -19,8 +19,8 @@ import numbers
 
 from gemini import ops
 from gemini.backends import runtime
-from gemini.errors import TraceError
 from gemini.graph.breaks import record_break
+from gemini.graph.errors import TraceError
 from gemini.graph.graph import Graph
 from gemini.graph.limits import certain, check_declared_limits
 from gemini.graph.node import STREAM_FIELDS

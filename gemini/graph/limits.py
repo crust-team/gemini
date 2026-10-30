@@ -2,7 +2,7 @@
 
 ``check_declared_limits(module, call)`` adds one ``ops.check`` per bound (``Declaration.limits``)
 of every control, boundary and output a traced call holds, each item of a list separately, with
-``DeclarationError`` as ``Declaration.validate`` raises on a plain call. A declared
+``ValidationError`` as ``Declaration.validate`` raises on a plain call. A declared
 ``X | None`` lets NaN pass, which is how ``None`` is stored on arrays. Each check keeps its
 ``Declaration`` and the whole value among its message values (``declaration`` and ``whole``), so
 an evaluation words the error of a failing row with ``declaration.validate``. ``certain`` marks the
@@ -13,7 +13,7 @@ bad value does not reach the output through the arithmetic.
 import operator
 
 from gemini import ops
-from gemini.errors import DeclarationError
+from gemini.errors import ValidationError
 
 _COMPARISONS = {
     "ge": (operator.ge, ">="),
@@ -44,7 +44,7 @@ def _check_value(declaration, value):
                 held = ops.logical_or(ops.isnan(item), held)
             ops.check(
                 held,
-                DeclarationError,
+                ValidationError,
                 "{path}: invalid {section} value {value}; expected {relation} {bound}",
                 path=declaration.path,
                 section=declaration.section,

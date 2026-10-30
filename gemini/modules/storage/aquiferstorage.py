@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import fluid, ground, heat_transfer
 from gemini.types import (
@@ -261,7 +261,7 @@ class AquiferStorage(Module):
         """Return the injected liquid volume flow [m3/s] after checking it against the mode."""
         ops.check(
             injection.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: injection_in.m_dot = {m_dot} kg/s; expected >= 0 "
             "(the mode sets the direction)",
             path=self.path,
@@ -270,7 +270,7 @@ class AquiferStorage(Module):
         if self.mode == "idle":
             ops.check(
                 injection.m_dot == 0,
-                PhysicsRangeError,
+                PhysicsError,
                 "{path}: injection_in.m_dot = {m_dot} kg/s in idle mode; expected 0",
                 path=self.path,
                 m_dot=injection.m_dot,

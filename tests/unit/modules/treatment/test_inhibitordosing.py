@@ -7,6 +7,7 @@ from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.treatment import InhibitorDosing
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 INLET = Stream(m_dot=50, T=340, p=8e5)
 
@@ -26,11 +27,11 @@ def test_limits():
     """Zero flow doses nothing; reverse flow, a bad strength and a missing dose raise."""
     dosing = InhibitorDosing().update_params(product_concentration=0.4)
     assert dosing(inlet=INLET.with_(m_dot=0), dose=2e-5).outputs.product_mass_flow == 0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot"):
         dosing(inlet=INLET.with_(m_dot=-1), dose=2e-5)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         dosing(inlet=INLET)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         InhibitorDosing().update_params(product_concentration=0)
 
 

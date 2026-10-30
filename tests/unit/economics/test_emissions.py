@@ -7,7 +7,7 @@ import pytest
 import gemini as gm
 from gemini.economics import emissions as module
 from gemini.modules.balance import emissions
-from tests.fixtures.costed_plants import HOURS, day
+from tests.fixtures.costed_plants import HOURS, day, heating_plant
 from tests.fixtures.result_tables import make_results
 
 DAY = HOURS * 3600.0
@@ -17,7 +17,9 @@ DAY = HOURS * 3600.0
 def test_co2_is_fuel_and_grid_electricity_times_their_factors():
     """1000 W of fuel and 60 W of grid electricity (100 consumed, 40 generated) for a day."""
     values = gm.economics.Assumptions(electricity_emission_factor=1e-7)
-    result = gm.economics.co2(day(electricity=100.0, generated=40.0, fuel=1000.0), values)
+    result = gm.economics.co2(
+        heating_plant(), day(electricity=100.0, generated=40.0, fuel=1000.0), values
+    )
     assert result["unit"] == "kg"
     assert result["fuel_energy"] == {"value": 1000.0 * DAY, "unit": "J"}
     assert result["grid_energy"] == {"value": 60.0 * DAY, "unit": "J"}
@@ -35,12 +37,14 @@ def test_co2_is_the_balance_emissions_rate_times_the_tick():
         children={}, outputs={"electricity": 30.0, "electricity_generated": 10.0, "fuel": 500.0}
     )
     rate = emissions({"": leaf}, values.fuel_emission_factor, 2e-7)
-    assert gm.economics.co2(one, values)["value"] == pytest.approx(rate * 3600.0, rel=1e-12)
+    assert gm.economics.co2(heating_plant(), one, values)["value"] == pytest.approx(
+        rate * 3600.0, rel=1e-12
+    )
 
 
 def test_a_surplus_of_generation_earns_no_credit():
     """Generation above consumption draws no grid electricity, and the factor is not needed."""
-    result = gm.economics.co2(day(electricity=10.0, generated=50.0, fuel=0.0))
+    result = gm.economics.co2(heating_plant(), day(electricity=10.0, generated=50.0, fuel=0.0))
     assert result["grid_energy"]["value"] == 0.0
     assert result["value"] == 0.0
 
@@ -48,7 +52,7 @@ def test_a_surplus_of_generation_earns_no_credit():
 def test_grid_electricity_without_a_factor_is_refused():
     """Drawing electricity with no ``electricity_emission_factor`` names what to give."""
     with pytest.raises(gm.errors.ValidationError, match="electricity_emission_factor") as error:
-        gm.economics.co2(day())
+        gm.economics.co2(heating_plant(), day())
     assert error.value.code == "missing_value"
 
 

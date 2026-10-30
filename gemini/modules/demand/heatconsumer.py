@@ -1,7 +1,7 @@
 """Space or process heat demand on a hydronic circuit with a steady first-law balance."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer
 from gemini.types import (
@@ -100,7 +100,7 @@ class HeatConsumer(Module):
         """Return the delivered heat [W]: the demand, capped by the return-temperature floor."""
         ops.check(
             supply_in.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: supply_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=supply_in.m_dot,

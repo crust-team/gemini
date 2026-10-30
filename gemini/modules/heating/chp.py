@@ -1,7 +1,7 @@
 """Gas-engine combined heat and power unit heating a water circuit."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import combustion, heat_transfer
 from gemini.types import (
@@ -93,14 +93,15 @@ class CHP(Module):
         """Return fuel, electricity, heat flows [W] and the outlet temperature [K]."""
         ops.check(
             self.electric_efficiency + self.thermal_efficiency <= 1,
-            ConfigurationError,
+            ValidationError,
             "{path}: electric_efficiency + thermal_efficiency = {total}; expected <= 1",
             path=self.path,
             total=self.electric_efficiency + self.thermal_efficiency,
+            code="invalid_design",
         )
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,

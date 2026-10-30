@@ -11,7 +11,7 @@ from copy import deepcopy
 from pydantic import ValidationError as PydanticError
 from pydantic_core import to_jsonable_python
 
-from gemini.errors import BindingError, ConfigurationError, UnitError, UnknownNameError
+from gemini.errors import ValidationError
 from gemini.physics import units
 from gemini.types.bindings import DatedParams, ModuleBindings
 from gemini.types.flows import STREAM_FIELDS
@@ -35,7 +35,7 @@ def snapshot_at(module, at):
         if at is None or item.valid_from is None or item.valid_from <= to_utc(at)
     ]
     if not eligible:
-        raise ConfigurationError(f"{module.path}: no parameters valid at {at}")
+        raise ValidationError(f"{module.path}: no parameters valid at {at}", code="invalid_design")
     return max(eligible, key=_date)
 
 
@@ -55,10 +55,11 @@ def parameter(module, name):
     """Return the parameter declaration ``name`` below ``module``; an unknown name suggests one."""
     declarations = {path: item for path, item in module.named_parameters()}
     if name not in declarations:
-        raise UnknownNameError(
+        raise ValidationError(
             f"{module.path}: unknown parameter {name!r}; valid: {join_names(declarations)}"
             f"{did_you_mean(name, declarations)}",
             suggestions=close_matches(name, declarations),
+            code="unknown_name",
         )
     return declarations[name]
 
@@ -128,19 +129,21 @@ def _fits(unit, accepted):
 
 def _check_name(section, name, valid):
     if name not in valid:
-        raise UnknownNameError(
+        raise ValidationError(
             f"{section}: unknown name {name!r}; valid: {join_names(valid)}"
             f"{did_you_mean(name, valid)}",
             path=f"{section}.{name}",
             suggestions=close_matches(name, valid),
+            code="unknown_name",
         )
 
 
 def _check_unit(path, binding, accepted):
     if not _fits(binding.unit, accepted):
-        raise UnitError(
+        raise ValidationError(
             f"{path}.unit: unit = {binding.unit!r}; expected a unit of {join_names(accepted)}",
             path=f"{path}.unit",
+            code="invalid_unit",
         )
 
 
@@ -170,7 +173,7 @@ def _parsed_bindings(bindings):
     try:
         return ModuleBindings.model_validate(bindings)
     except PydanticError as error:
-        raise BindingError(f"bindings: {error}") from error
+        raise ValidationError(f"bindings: {error}", code="invalid_binding") from error
 
 
 def set_bindings(module, path, bindings):

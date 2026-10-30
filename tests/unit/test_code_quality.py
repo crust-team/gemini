@@ -36,6 +36,26 @@ LONG_FUNCTIONS = {
 }
 EARLY_EXITS = (ast.Return, ast.Raise, ast.Continue, ast.Break)
 BUILTIN_ERRORS = {"ValueError", "TypeError", "KeyError", "RuntimeError"}
+RAISED_CLASSES = {
+    "ValidationError",
+    "DefinitionError",
+    "PhysicsError",
+    "RunError",
+    "Cancelled",
+    "NotImplementedYet",
+    "GeminiError",
+    "TraceError",
+    "UnknownKey",
+    "UnknownPort",
+    "UnknownMember",
+    "AttributeError",
+    "NotImplementedError",
+    "KeyError",
+    "TypeError",
+    "ValueError",
+    "RuntimeError",
+}
+"""What the package raises; the built-ins are for the exempt topics of ``gemini.utils``."""
 VALIDATORS = {"model_validator", "field_validator"}
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
 FRAMEWORK_STEM = "tor" + "ch"
@@ -226,6 +246,37 @@ def test_package_code_raises_gemini_errors(path):
         if isinstance(node, ast.Raise) and node.exc and raised_name(node) in BUILTIN_ERRORS
     ]
     assert found == []
+
+
+@pytest.mark.parametrize("path", PACKAGE_FILES)
+def test_package_code_raises_only_the_allowed_classes(path):
+    """A raise names a public class of ``gm.errors``, a private lookup or a Python protocol error.
+
+    ``TraceError`` is internal to ``gemini/graph/``; a former class has no way back in.
+    """
+    found = [
+        f"{path}:{node.lineno} {raised_name(node)}"
+        for function in functions(path)
+        for node in ast.walk(function)
+        if isinstance(node, ast.Raise) and node.exc and _named_class(raised_name(node))
+        if raised_name(node) not in RAISED_CLASSES
+    ]
+    assert found == []
+    if not str(path).startswith("gemini/graph/"):
+        assert "TraceError" not in {raised_name(node) for node in _raises(path)}
+
+
+def _raises(path):
+    return [
+        node
+        for function in functions(path)
+        for node in ast.walk(function)
+        if isinstance(node, ast.Raise) and node.exc
+    ]
+
+
+def _named_class(name):
+    return bool(name) and name[0].isupper()
 
 
 def formula_markers(source):

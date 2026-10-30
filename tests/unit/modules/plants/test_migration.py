@@ -6,8 +6,9 @@ import json
 import pytest
 
 import gemini as gm
-from gemini.errors import PlantFormatError
+from gemini.errors import ValidationError
 from tests.fixtures import ROOT
+from tests.fixtures.errors import raises
 
 OLD = ROOT / "tests/fixtures/plant_format1.json"
 MIGRATED = ROOT / "examples/shared/doublet_heat/plant.json"
@@ -48,7 +49,7 @@ def test_a_module_the_wiring_lacks_fails_with_migration_failed(old):
     """The error carries the code and the path of the module."""
     broken = copy.deepcopy(old)
     broken["modules"]["mixer"] = copy.deepcopy(broken["modules"]["degasser"])
-    with pytest.raises(PlantFormatError) as caught:
+    with raises(ValidationError, "migration_failed") as caught:
         gm.plants.migrate(broken)
     assert caught.value.code == "migration_failed" and caught.value.path == "mixer"
 
@@ -56,13 +57,13 @@ def test_a_module_the_wiring_lacks_fails_with_migration_failed(old):
 def test_garbage_fails_with_migration_failed():
     """Things that are not plant files are not crashes."""
     for garbage in ({"version": 1}, {"version": 7}, [], "x"):
-        with pytest.raises(PlantFormatError) as caught:
+        with raises(ValidationError, "migration_failed") as caught:
             gm.plants.migrate(garbage)
         assert caught.value.code == "migration_failed"
 
 
 def test_loading_an_old_file_names_the_migration(old):
     """``from_spec`` of format 1 raises ``old_format``."""
-    with pytest.raises(PlantFormatError) as caught:
+    with raises(ValidationError, "old_format") as caught:
         gm.plants.from_spec(old)
     assert caught.value.code == "old_format" and "gm.plants.migrate" in str(caught.value)

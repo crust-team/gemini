@@ -8,11 +8,12 @@ from types import SimpleNamespace
 import pytest
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import diagnostics, geometry, hydraulics
 from gemini.types.flows import Stream
 from gemini.types.fluid import BRINE, Fluid
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.errors import raises
 from tests.unit.test_golden import assert_values
 
 GOLDEN = json.loads((Path(__file__).parents[2] / "fixtures/golden_values.json").read_text())
@@ -110,7 +111,7 @@ def test_flow_regime_map_and_exact_boundaries():
     assert hydraulics._flow_regime(0.01, 100.0)[0] == hydraulics._DISTRIBUTED
     assert hydraulics._flow_regime(0.4, 1.0)[0] == hydraulics._INTERMITTENT
     assert hydraulics._flow_regime(0.4, 1e4)[0] == hydraulics._DISTRIBUTED
-    with pytest.raises(PhysicsRangeError, match="flow-regime map"):
+    with pytest.raises(PhysicsError, match="flow-regime map"):
         hydraulics._flow_regime(float("nan"), 1.0)
 
 
@@ -124,11 +125,11 @@ def test_beggs_brill_exact_boundary_no_longer_divides_by_zero():
 
 def test_beggs_brill_rejects_zero_holdup_and_missing_liquid():
     """Steep downhill flow can clamp the holdup to zero; pure gas has no liquid number."""
-    with pytest.raises(PhysicsRangeError, match="holdup = 0"):
+    with pytest.raises(PhysicsError, match="holdup = 0"):
         hydraulics.beggs_brill_dp(
             0.5, 0.05, *FLUID_PROPERTIES, -math.pi / 4, 21.29e-6, 1e-3, 0.0728, 0.1778, 2e-5, 100
         )
-    with pytest.raises(PhysicsRangeError, match="us_l = 0"):
+    with pytest.raises(PhysicsError, match="us_l = 0"):
         hydraulics.beggs_brill_dp(
             0.5, 0, *FLUID_PROPERTIES, 0.7, 21.29e-6, 1e-3, 0.0728, 0.1778, 2e-5, 100
         )
@@ -153,7 +154,7 @@ def test_zero_flow_unknown_correlation_and_direction():
     assert result.p_out == stream.p and result.T_out == stream.T
     assert result.friction_pressure_drop == result.gravity_pressure_drop == 0
     assert hydraulics.pipe_path_profile(path, stream, BRINE, " Up ", 10, 290) == result
-    with pytest.raises(UnknownCorrelationError, match="'unknown'"):
+    with raises(ValidationError, "unknown_name", match="'unknown'"):
         hydraulics.pipe_path_profile(path, stream, BRINE, "up", 10, 290, correlation="unknown")
     with pytest.raises(ValueError, match="direction = 'sideways'"):
         hydraulics.pipe_path_profile(path, stream, BRINE, "sideways", 10, 290)
@@ -187,7 +188,7 @@ def test_radial_pressure_drops_and_hydrostatics():
         0.04 * 6.5e-4 * math.log(1000 / 0.0765) / (2 * math.pi * 1e-11 * 45)
     )
     assert skin_pressure_drop == pytest.approx(0.04 * 6.5e-4 * 2 / (2 * math.pi * 1e-11 * 45))
-    with pytest.raises(PhysicsRangeError, match="thickness = 0"):
+    with pytest.raises(PhysicsError, match="thickness = 0"):
         hydraulics.radial_pressure_drops(0.04, 6.5e-4, 1e-11, 0, 1000, 0.0765, 2)
     assert hydraulics.hydrostatic_dp(1000, 10) == pytest.approx(98100)
 
@@ -236,7 +237,7 @@ def test_beggs_brill_errors_match_on_arrays():
     )
     outside = (0.5, math.nan, *FLUID_PROPERTIES, 0.7, 21.29e-6, 1e-3, 0.0728, 0.1778, 2e-5, 100)
     for row in (zero_liquid, zero_holdup, outside):
-        assert_same_error(hydraulics.beggs_brill_dp, [BEGGS_ROWS[0], row], PhysicsRangeError)
+        assert_same_error(hydraulics.beggs_brill_dp, [BEGGS_ROWS[0], row], PhysicsError)
 
 
 def test_flow_regime_and_friction_multiplier_match_on_arrays():
@@ -260,7 +261,7 @@ def test_radial_drops_and_hydrostatics_match_on_arrays():
     assert_same_error(
         hydraulics.radial_pressure_drops,
         rows + [(0.04, 6.5e-4, 1e-11, 0.0, 1000.0, 0.0765, 2)],
-        PhysicsRangeError,
+        PhysicsError,
     )
     assert_function_matches(hydraulics.hydrostatic_dp, [(1000, 10), (1020, -5)])
 

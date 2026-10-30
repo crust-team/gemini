@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 import gemini as gm
 
 DESCRIPTION_KEYS = {
@@ -159,7 +161,7 @@ def test_description_does_not_mutate():
     before = esp.state_dict()
     esp.describe()
     esp.parameter_schema()
-    esp.validate_params({"stage_count": "5", "bogus": 1})
+    esp.validate_params({"stage_count": "5", "bogus": 1}, on_error="record")
     assert esp.state_dict() == before
 
 
@@ -185,6 +187,15 @@ def test_schema_accepts_unit_strings_and_keeps_units():
     assert "stage_count" in gm.modules.ESP.parameter_schema()["required"]
 
 
+def test_validate_params_raises_every_problem_by_default():
+    """The default is to raise; the error carries the list ``on_error="record"`` returns."""
+    params = {"stage_coun": 3, "motor_efficiency": 1.5}
+    recorded = gm.modules.ESP.validate_params(params, on_error="record")
+    with pytest.raises(gm.errors.ValidationError) as caught:
+        gm.modules.ESP.validate_params(params)
+    assert caught.value.problems == recorded and len(recorded) == 2
+
+
 def test_validate_params_accepts_valid_values_and_unit_strings():
     """Numbers and unit strings in the right dimension raise nothing."""
     assert gm.modules.ESP.validate_params({"stage_count": 12, "setting_depth": "1000 ft"}) == []
@@ -193,7 +204,8 @@ def test_validate_params_accepts_valid_values_and_unit_strings():
 def test_validate_params_reports_every_problem():
     """Unknown names, units and bounds are all reported at once."""
     problems = gm.modules.ESP.validate_params(
-        {"stage_coun": 3, "setting_depth": "5 bar", "motor_efficiency": 1.5, "tubing": "x"}
+        {"stage_coun": 3, "setting_depth": "5 bar", "motor_efficiency": 1.5, "tubing": "x"},
+        on_error="record",
     )
     by_path = {problem["path"]: problem for problem in problems}
     assert by_path["stage_coun"]["code"] == "unknown_name"

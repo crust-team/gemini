@@ -2,10 +2,9 @@
 
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 import gemini as gm
-from gemini.errors import UnknownNameError
+from gemini.errors import ValidationError
+from tests.fixtures.errors import raises
 
 
 def test_settings_restore_and_context_isolation():
@@ -30,10 +29,10 @@ def test_state_round_trip():
 
 def test_unknown_settings_are_rejected():
     """A misspelled setting raises with a suggestion instead of doing nothing."""
-    with pytest.raises(UnknownNameError, match="did you mean 'precision'"):
+    with raises(ValidationError, "unknown_name", match="did you mean 'precision'"):
         with gm.runtime.settings(precison="float32"):
             pass
-    with pytest.raises(UnknownNameError, match="float16"):
+    with raises(ValidationError, "unknown_name", match="float16"):
         with gm.runtime.settings(precision="float16"):
             pass
     assert gm.runtime.get_precision() == "float64"
@@ -42,9 +41,9 @@ def test_unknown_settings_are_rejected():
 def test_partial_or_unknown_state_is_rejected():
     """load_state needs every setting and nothing else, so later reads cannot fail."""
     before = gm.runtime.state()
-    with pytest.raises(UnknownNameError, match="precision"):
+    with raises(ValidationError, "unknown_name", match="precision"):
         gm.runtime.load_state({})
-    with pytest.raises(UnknownNameError, match="colour"):
+    with raises(ValidationError, "unknown_name", match="colour"):
         gm.runtime.load_state(before | {"colour": "red"})
     assert gm.runtime.state() == before
 

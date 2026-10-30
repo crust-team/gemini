@@ -5,6 +5,7 @@ import pytest
 import gemini as gm
 from gemini.modules.plants import generators, library
 from gemini.modules.plants.plan import compile_plan
+from tests.fixtures.errors import raises
 
 SIZES = [(1, 1), (2, 1), (1, 3), (3, 2)]
 
@@ -58,9 +59,9 @@ def test_a_network_splits_serves_in_order_and_mixes():
 
 def test_sizes_below_one_and_unknown_services_raise():
     """A structural argument that cannot build a plant is a configuration error."""
-    with pytest.raises(gm.errors.ConfigurationError, match="producers = 0, injectors = 1"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="producers = 0, injectors = 1"):
         generators.multi_well_spec(0, 1)
-    with pytest.raises(gm.errors.ConfigurationError, match="consumers = 0"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="consumers = 0"):
         generators.district_network_spec(0)
-    with pytest.raises(gm.errors.ConfigurationError, match="service = 'steam'"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="service = 'steam'"):
         generators.district_network_spec(2, "steam")

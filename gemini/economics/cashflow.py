@@ -3,6 +3,7 @@
 from gemini.economics.assumptions import discounting, require, resolve
 from gemini.economics.costs import annual_energies, capex, opex
 from gemini.economics.levelised import annuity
+from gemini.economics.outcome import currency_of, reported, unavailable
 from gemini.types.shapes import value
 
 
@@ -18,15 +19,15 @@ def _revenue(assumptions, annual):
 
 def _net_cash_flow(plant, results, assumptions):
     """Return ``(capex, yearly net cash flow, unit, reason)``; no cost gives ``None`` numbers."""
-    investment = capex(plant, assumptions)
+    investment = capex(plant, assumptions, "record")
     if investment["value"] is None:
         return None, None, investment["unit"], investment["reason"]
-    yearly = opex(plant, results, assumptions)
+    yearly = opex(plant, results, assumptions, "raise")
     revenue = _revenue(assumptions, annual_energies(plant, results))
     return investment["value"], revenue - yearly["value"], investment["unit"], None
 
 
-def npv(plant, results, discount_rate=None, lifetime=None, assumptions=None):
+def npv(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise"):
     """Return the net present value [currency]: ``-capex + (revenue - opex) * A``.
 
     ``A`` is the annuity factor, the sum over the lifetime years of ``1 / (1 + rate) ** t``.
@@ -45,19 +46,30 @@ def npv(plant, results, discount_rate=None, lifetime=None, assumptions=None):
     assumptions : Assumptions, optional
         The prices, and the rate and lifetime when not given above. Anything needed and given
         nowhere raises ``ValidationError`` (code ``missing_value``).
+    on_error : {"raise", "record"}, optional
+        A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
     Returns
     -------
     dict
         ``{value, unit, capex, net_cash_flow, discount_rate, lifetime_years}``, the last four each
         a value, with ``value`` and ``capex`` in the currency (``unit``) and ``net_cash_flow`` in
-        currency per year. ``value`` is ``None`` with a ``reason`` when the plant declares no cost.
+        currency per year. A plant that declares no cost has no value.
     """
+    return reported(
+        on_error,
+        currency_of(assumptions),
+        lambda: _npv(plant, results, discount_rate, lifetime, assumptions, on_error),
+    )
+
+
+def _npv(plant, results, discount_rate, lifetime, assumptions, on_error):
+    """Return the net present value; ``on_error`` applies to a plant without a cost."""
     assumptions = resolve(assumptions)
     rate, years = discounting(assumptions, discount_rate, lifetime)
     investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions)
     if investment is None:
-        return value(None, unit, reason)
+        return unavailable(unit, reason, on_error)
     return value(
         flow * annuity(rate, years) - investment,
         unit,
@@ -68,7 +80,7 @@ def npv(plant, results, discount_rate=None, lifetime=None, assumptions=None):
     )
 
 
-def payback(plant, results, assumptions=None):
+def payback(plant, results, assumptions=None, on_error="raise"):
     """Return the simple payback time [year]: ``capex / (revenue - opex)``, without discounting.
 
     Parameters
@@ -78,20 +90,27 @@ def payback(plant, results, assumptions=None):
     assumptions : Assumptions, optional
         ``heat_price``, ``cold_price`` and the energy prices, as for ``npv``; anything needed and
         missing raises ``ValidationError`` (code ``missing_value``).
+    on_error : {"raise", "record"}, optional
+        A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
     Returns
     -------
     dict
         ``{value, unit, capex, net_cash_flow}`` with ``unit`` ``"year"`` and the last two each a
-        value. ``value`` is ``None`` with a ``reason`` when the plant declares no cost or its
-        yearly revenue does not exceed its yearly cost (it never pays back).
+        value. A plant that declares no cost, or whose yearly revenue does not exceed its yearly
+        cost (it never pays back), has no value.
     """
+    return reported(on_error, "year", lambda: _payback(plant, results, assumptions, on_error))
+
+
+def _payback(plant, results, assumptions, on_error):
+    """Return the payback time; ``on_error`` applies to a value the plant cannot give."""
     assumptions = resolve(assumptions)
     investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions)
     if investment is None:
-        return value(None, "year", reason)
+        return unavailable("year", reason, on_error)
     details = dict(capex=value(investment, unit), net_cash_flow=value(flow, f"{unit}/year"))
     if flow <= 0:
         reason = "the yearly revenue does not exceed the yearly cost"
-        return value(None, "year", reason, **details)
+        return unavailable("year", reason, on_error, **details)
     return value(investment / flow, "year", **details)

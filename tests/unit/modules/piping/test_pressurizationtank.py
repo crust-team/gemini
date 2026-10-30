@@ -15,6 +15,7 @@ from gemini.types import (
     Temperature,
 )
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 RETURN = Stream(m_dot=10, T=323.15, p=1.2e5)
 
@@ -83,9 +84,9 @@ def test_outlet_leaves_at_the_setpoint():
 
 def test_invalid_setpoint_and_missing_command_raise():
     """A zero or missing pressure setpoint is rejected."""
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         PressurizationTank()(inlet=RETURN, pressure_setpoint=0)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         PressurizationTank()(inlet=RETURN)
 
 

@@ -3,8 +3,9 @@
 import pytest
 
 import gemini as gm
-from gemini.errors import BindingError, ConfigurationError
+from gemini.errors import ValidationError
 from gemini.optim import CalibrationResult
+from tests.fixtures.errors import raises
 
 
 def test_parameters_must_be_one_calibratable_set_of_the_plant(fresh_plant, reference_dataset):
@@ -14,14 +15,18 @@ def test_parameters_must_be_one_calibratable_set_of_the_plant(fresh_plant, refer
     head = plant.get_parameter("doublet.esp.head_coefficients")
     with pytest.raises(ValueError, match="at least one"):
         gm.optim.calibrate(plant, data, [])
-    with pytest.raises(ConfigurationError, match="heat_exchanger.arrangement.*calibratable"):
+    with raises(
+        ValidationError, "invalid_design", match="heat_exchanger.arrangement.*calibratable"
+    ):
         gm.optim.calibrate(plant, data, [plant.get_parameter("heat_exchanger.arrangement")])
-    with pytest.raises(ConfigurationError, match="doublet.esp, heat_exchanger"):
+    with raises(ValidationError, "invalid_design", match="doublet.esp, heat_exchanger"):
         gm.optim.calibrate(plant, data, [ua, head])
-    with pytest.raises(ConfigurationError, match="heat_exchanger.thermal_conductance.*twice"):
+    with raises(
+        ValidationError, "invalid_design", match="heat_exchanger.thermal_conductance.*twice"
+    ):
         gm.optim.calibrate(plant, data, [ua, ua])
     foreign = gm.modules.exchangers.HeatExchanger()
-    with pytest.raises(ConfigurationError, match="supplied plant"):
+    with raises(ValidationError, "invalid_design", match="supplied plant"):
         gm.optim.calibrate(plant, data, [foreign.get_parameter("thermal_conductance")])
 
 
@@ -29,7 +34,7 @@ def test_modules_without_measured_bindings_cannot_be_fitted(fresh_plant, referen
     """A module with no measured output binding names what is missing."""
     plant = fresh_plant
     plant.bindings["heat_exchanger"].measured.clear()
-    with pytest.raises(BindingError, match="heat_exchanger: measured"):
+    with raises(ValidationError, "invalid_binding", match="heat_exchanger: measured"):
         gm.optim.calibrate(
             plant, reference_dataset, [plant.get_parameter("heat_exchanger.thermal_conductance")]
         )

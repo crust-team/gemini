@@ -7,6 +7,7 @@ from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.treatment import Blowdown
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 FEED = Stream(m_dot=8, T=330, p=3e5)
 
@@ -30,9 +31,9 @@ def test_limits():
     assert blowdown(feed_in=FEED, blowdown_fraction=1).outlets.retained_out.m_dot == 0
     stopped = blowdown(feed_in=FEED.with_(m_dot=0), blowdown_fraction=0.1)
     assert stopped.outputs.blowdown_mass_flow == 0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="feed_in.m_dot"):
+    with pytest.raises(gm.errors.PhysicsError, match="feed_in.m_dot"):
         blowdown(feed_in=FEED.with_(m_dot=-1), blowdown_fraction=0.1)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         blowdown(feed_in=FEED)
 
 

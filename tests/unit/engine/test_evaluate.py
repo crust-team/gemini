@@ -5,6 +5,7 @@ import json
 import pytest
 
 import gemini as gm
+from tests.fixtures.errors import raises
 
 ESP_PARAMETERS = {
     "stage_count": 12,
@@ -65,14 +66,23 @@ def test_evaluate_accepts_si_numbers_as_well_as_unit_strings():
         ({"inlets": {"suction": {"flow": "1 m3/h", "T": "-5 K", "p": "1 bar"}}}, "invalid_call"),
     ],
 )
-def test_a_failing_call_returns_errors_instead_of_raising(changes, code):
+def test_a_recorded_failure_returns_errors_instead_of_raising(changes, code):
     """Every failure is one ``GeminiError.to_dict()`` and the other parts are empty."""
-    result = call(**changes)
+    result = call(on_error="record", **changes)
     assert result["outlets"] == {} and result["outputs"] == {}
     assert [error["code"] for error in result["errors"]] == [code]
     assert set(result["errors"][0]) == {"path", "code", "message", "suggestions"}
 
 
+def test_a_failing_call_raises_by_default():
+    """``gm.evaluate`` has no never-raises rule: the same error reaches the caller."""
+    with raises(gm.errors.ValidationError, "unknown_name") as caught:
+        call(module="ESp")
+    assert caught.value.suggestions == ("ESP",)
+    with pytest.raises(gm.errors.ValidationError, match="on_error"):
+        call(on_error="ignore")
+
+
 def test_an_unknown_name_comes_with_suggestions():
     """The registry's close matches reach the error."""
-    assert call(module="ESp")["errors"][0]["suggestions"] == ["ESP"]
+    assert call(module="ESp", on_error="record")["errors"][0]["suggestions"] == ["ESP"]

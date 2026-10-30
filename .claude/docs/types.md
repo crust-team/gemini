@@ -35,7 +35,7 @@ tighten quantity defaults.
 
 `declaration.validate(value)` converts a unit string or `gm.Quantity(value, unit)` to the declared
 SI unit and then validates it with a Pydantic `TypeAdapter`; a failure raises
-`gm.errors.DeclarationError`. Plain numbers are taken as SI. A cheap check built once per
+`gm.errors.ValidationError`. Plain numbers are taken as SI. A cheap check built once per
 declaration is tried first and accepts only the common case, returned unchanged: an exact `float`
 inside its bounds (NaN never is), an exact `bool` or `str` for those kinds, `None` for an optional
 kind. Everything else, and every failure, takes the full path, so accepted values, coercions and
@@ -92,8 +92,8 @@ helpers remain in `physics.units`.
 
 `Stream(flow=..., T=..., p=..., fluid=None)` accepts mass flow (`kg/s`, `t/h`) or volumetric flow
 (`m3/s`, `m3/h`, `l/s`) and converts it with the stream's fluid density. Plain `flow` numbers are
-kg/s; text without a unit such as `flow="150"` raises `gm.errors.UnitError`, and passing both
-`flow` and `m_dot` raises `gm.errors.CallError`, as do an unknown keyword (with a did-you-mean),
+kg/s; text without a unit such as `flow="150"` raises `gm.errors.ValidationError`, and passing both
+`flow` and `m_dot` raises `gm.errors.ValidationError`, as do an unknown keyword (with a did-you-mean),
 a missing field and a `fluid` that is neither a `Fluid` nor a mapping of its fields. The explicit
 SI `m_dot` field remains supported. Without `fluid` the constructor uses the runtime default
 fluid. All public numeric declarations accept a unit string or `gm.Quantity(value, unit)`.
@@ -102,10 +102,10 @@ fluid. All public numeric declarations accept a unit string or `gm.Quantity(valu
 `gm.units` is the one unit implementation (`physics/units.py`, one table). Its public names:
 `names(quantity=None)` lists every unit, or those of a named quantity such as `"pressure"`;
 `parse("150 m3/h")` returns `(150.0, "m3/h")` (a number, a space and a known unit, else
-`UnitError`); `convert(value, from_unit, to_unit, quantity=None)`; and `fits(unit, quantity)` tells
+`ValidationError`); `convert(value, from_unit, to_unit, quantity=None)`; and `fits(unit, quantity)` tells
 whether a unit converts to the quantity's SI unit, which is how bindings and CSV headers
 `name [unit]` are checked. An unknown unit does not fit and an unknown quantity raises
-`UnknownNameError` with suggestions. The table includes `km`, `mm`, `in`, `kPa`, `MPa`, `rpm`
+`ValidationError` with suggestions. The table includes `km`, `mm`, `in`, `kPa`, `MPa`, `rpm`
 (1/60 Hz, since frequency is stored in Hz), `degC`, `m3/h`, `kW`, `MW` and `bar(g)`, the same
 gauge entry as `barg` (offset 101325 Pa). The SI unit of each quantity name comes from
 `quantity(name, unit)` in `types/quantities.py`, which calls `units.define_quantity` once per
@@ -115,11 +115,11 @@ quantity, so physics needs no upward import and the quantity list has one source
 batched runs and traces. It has dataclass equality, hash, `repr`, pickling and `copy`; its JSON
 (`pydantic_core.to_jsonable_python`) lists `m_dot`, `T`, `p` and `fluid`, and `Stream(**data)`
 builds it back. The constructor validates at the boundary: numbers become Python `float`,
-`m_dot` must be finite, `T > 0` and finite, `p >= 0` and finite, else `PhysicsRangeError`. When a
+`m_dot` must be finite, `T > 0` and finite, `p >= 0` and finite, else `PhysicsError`. When a
 field is an array over time or a traced value it is kept as given and the limits become
 `gemini.ops.check` calls, so an invalid row raises the same class. `stream.with_(**changes)` is
 a trusted fast copy: it reuses the `Fluid`, checks only the changed fields against the same
-limits and raises `CallError` for an unknown field. A traced inlet is a `Stream` of graph
+limits and raises `ValidationError` for an unknown field. A traced inlet is a `Stream` of graph
 inputs with the concrete `Fluid`, so `volumetric_flow()` divides by a plain float density.
 `Ports` accept only `Stream`. Ports have no JSON schema, quantity or unit in `Declaration`.
 
@@ -128,7 +128,7 @@ loop count, a value that changes a `Fluid`): a trace reads it as a plain value a
 guard of the graph cache; numeric parameters are graph inputs by default.
 
 `BRINE` and `WATER` use the defaults of `gemini.physics.fluid.FluidProperties` (a frozen slots
-dataclass: numbers become `float`, bounds raise `PhysicsRangeError`), the original
+dataclass: numbers become `float`, bounds raise `PhysicsError`), the original
 constant-water numbers. `Fluid` carries salinity, dissolved CO2 and free-gas mass fractions.
 Density, viscosity, heat capacity and conductivity overrides are validated and immutable.
 `fluid.properties(p, T)` returns a `FluidProperties` snapshot cached by the complete Fluid value.
@@ -199,8 +199,8 @@ the `physics.units` table whose SI unit is W, K, Pa, kg/s, m3/s, Hz, J, currency
 `tz`; storage is UTC. `Profile.constant(value, unit=..., clock=...)` builds a constant profile on
 every tick of a clock from a raw-unit value. Indices must be nonempty, unique and strictly
 increasing, with finite matching values. `at(t)` holds the latest sample at or before `t`; times
-before the first sample raise `DatasetError`. `resample(step, how)` supports mean/sum/first and
-rejects empty bins with `DatasetError`. Sum is a sum of sample values, not time integration.
+before the first sample raise `RunError`. `resample(step, how)` supports mean/sum/first and
+rejects empty bins with `RunError`. Sum is a sum of sample values, not time integration.
 
 Simulate profiles by combining them into a dataset keyed by dotted control or boundary paths:
 `gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock)`. Profiles combined into a

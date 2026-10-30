@@ -9,7 +9,7 @@ over chunks of ticks.
 from copy import deepcopy
 from dataclasses import dataclass, field
 
-from gemini.errors import BindingError
+from gemini.errors import ValidationError
 from gemini.types.bindings import Binding, ModuleBindings
 from gemini.types.declarations import UNSET
 from gemini.utils.data.dataset import bound_unit
@@ -131,7 +131,7 @@ class BindingPlan:
             self._measured(plant, dataset, only)
         missing = sorted(self.columns - set(dataset.names))
         if missing:
-            raise BindingError(
+            raise ValidationError(
                 f"{plant.path}: bound columns = {join_names(missing)}; expected dataset columns"
                 f"{did_you_mean(missing[0], dataset.names)}",
                 path=plant.path,
@@ -202,9 +202,10 @@ def _check_only(plant, only):
     for path in only or ():
         plant.get_submodule(path)
         if path not in plant.bindings:
-            raise BindingError(
+            raise ValidationError(
                 f"{plant.path}: only path = {path!r}; expected a module with measured "
-                f"bindings{did_you_mean(path, plant.bindings)}"
+                f"bindings{did_you_mean(path, plant.bindings)}",
+                code="invalid_binding",
             )
 
 
@@ -248,9 +249,10 @@ def _simulation_inputs(plant, dataset):
         chained.append((module_path, module, bound))
         columns.add(binding.column)
     if missing:
-        raise BindingError(
+        raise ValidationError(
             f"{plant.path}: simulation inputs = {join_names(sorted(missing))}; expected a data "
-            "column or a default for each"
+            "column or a default for each",
+            code="invalid_binding",
         )
     return chained, columns
 
@@ -320,9 +322,10 @@ def _check_volumetric_inputs(path, module, bound):
         if is_volumetric_mass_flow(module, name, binding) and not (
             {"pressure", "temperature"} <= parameters.keys()
         ):
-            raise BindingError(
+            raise ValidationError(
                 f"{path or module.path}: {name} = {binding.column!r} [{binding.unit}]; expected "
-                "a module with pressure and temperature parameters to convert it to kg/s"
+                "a module with pressure and temperature parameters to convert it to kg/s",
+                code="invalid_binding",
             )
 
 
@@ -332,7 +335,8 @@ def _check_volumetric_inlets(path, bound, defaults):
         flow = fields.get("m_dot")
         known = fields.keys() | defaults.get(port, {}).keys()
         if flow is not None and flow.unit in VOLUMETRIC_UNITS and not {"p", "T"} <= known:
-            raise BindingError(
+            raise ValidationError(
                 f"{path}: {port}.m_dot = {flow.column!r} [{flow.unit}]; expected p and T "
-                "bindings or defaults to convert it to kg/s"
+                "bindings or defaults to convert it to kg/s",
+                code="invalid_binding",
             )

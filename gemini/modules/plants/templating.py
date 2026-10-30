@@ -22,8 +22,9 @@ ports on modules that stay.
 from copy import deepcopy
 from pathlib import Path
 
-from gemini.errors import ConfigurationError, UnknownNameError, ValidationError
-from gemini.modules.plants import generators, reader
+from gemini.errors import ValidationError
+from gemini.errors.base import reported
+from gemini.modules.plants import generators
 from gemini.modules.plants.spec import from_spec, validate
 from gemini.modules.serialization import located
 from gemini.utils.files import read_json
@@ -48,11 +49,12 @@ def load(name):
     """Return the template file ``name``; an unknown name raises with close matches."""
     names = template_names()
     if name not in names:
-        raise UnknownNameError(
+        raise ValidationError(
             f"templates: unknown template {name!r}; valid: {join_names(names)}"
             f"{did_you_mean(name, names)}",
             path=name,
             suggestions=close_matches(name, names),
+            code="unknown_name",
         )
     return read_json(TEMPLATES / f"{name}.json")
 
@@ -76,10 +78,11 @@ def _unknown_names(template, given):
     return [
         located(
             f"parameters.{name}",
-            UnknownNameError(
+            ValidationError(
                 f"unknown parameter {name!r}; valid: {join_names(declared)}"
                 f"{did_you_mean(name, declared)}",
                 suggestions=close_matches(name, declared),
+                code="unknown_name",
             ),
         )
         for name in given
@@ -190,7 +193,9 @@ def fill(template, given):
 def _filled(template, given):
     try:
         return fill(template, given), []
-    except ConfigurationError as error:
+    except ValidationError as error:
+        if error.code != "invalid_design":
+            raise
         return None, [located("parameters", ValidationError(str(error), code="out_of_bounds"))]
 
 
@@ -207,5 +212,5 @@ def from_template(name, parameters=None):
         spec, items = _filled(template, given)
     if not items:
         items = validate(spec)
-    reader.raise_problems(items)
+    reported(items, "raise")
     return from_spec(spec)

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.graph import run_function
 from gemini.ops import Constant, Failed
 
@@ -15,7 +15,7 @@ SCALE = Constant("SCALE", 2.0, "-", "a test constant")
 @ops.physics
 def checked(x):
     """Double ``x``, which must not be negative."""
-    ops.check(x >= 0, PhysicsRangeError, MESSAGE, path="pipe", x=x)
+    ops.check(x >= 0, PhysicsError, MESSAGE, path="pipe", x=x)
     return x * 2.0
 
 
@@ -45,11 +45,11 @@ def checked_condition(x):
 def test_outside_a_scope_the_check_raises_the_real_error():
     """The caller of a physics function sees the check's class and exact message."""
     assert checked(1.5) == 3.0
-    with pytest.raises(PhysicsRangeError) as raised:
+    with pytest.raises(PhysicsError) as raised:
         checked(-1.0)
-    assert type(raised.value) is PhysicsRangeError
+    assert type(raised.value) is PhysicsError
     assert str(raised.value) == "pipe: x = -1.0 m; expected x >= 0"
-    with pytest.raises(PhysicsRangeError, match="expected x >= 0"):
+    with pytest.raises(PhysicsError, match="expected x >= 0"):
         inner(-1.0)
 
 
@@ -57,16 +57,16 @@ def test_where_drops_an_error_of_the_unselected_branch_and_keeps_the_selected_on
     """A concrete condition selects a branch and its error, as the graph's error codes do."""
     assert stopped_or_checked(-1.0, True) == 0.0
     assert stopped_or_checked(2.0, False) == 4.0
-    with pytest.raises(PhysicsRangeError, match="x = -1.0 m"):
+    with pytest.raises(PhysicsError, match="x = -1.0 m"):
         stopped_or_checked(-1.0, False)
-    with pytest.raises(PhysicsRangeError, match="x = -1.0 m"):
+    with pytest.raises(PhysicsError, match="x = -1.0 m"):
         checked_condition(-1.0)
     assert stopped_or_checked(np.float64(-1.0), np.bool_(True)) == 0.0
 
 
 def test_a_failed_value_carries_through_every_kind_of_op():
     """Arithmetic with floats, NumPy scalars and constants, sum, abs, every arity and a solver."""
-    failure = Failed(PhysicsRangeError("boom"))
+    failure = Failed(PhysicsError("boom"))
     carried = [
         failure + 1.0,
         1.0 - failure,
@@ -96,7 +96,7 @@ def test_a_failed_value_carries_through_every_kind_of_op():
 
 def test_a_failed_condition_stays_failed_and_a_check_on_it_does_nothing():
     """Only a concrete condition drops an error; the first failure is the one a value carries."""
-    first = Failed(PhysicsRangeError("first"))
+    first = Failed(PhysicsError("first"))
     assert ops.where(first, 1.0, 2.0) is first
     assert ops.check(first, ValueError, "second") is None
     assert ops.check(False, ValueError, "second {x}", x=first) is None
@@ -104,12 +104,12 @@ def test_a_failed_condition_stays_failed_and_a_check_on_it_does_nothing():
 
 def test_using_a_failed_as_a_plain_number_raises_its_error():
     """``bool``, ``float``, ``int`` and ``format`` surface the error; ``repr`` does not."""
-    error = PhysicsRangeError("boom")
+    error = PhysicsError("boom")
     failure = Failed(error)
     for convert in (bool, float, int, format):
-        with pytest.raises(PhysicsRangeError, match="boom"):
+        with pytest.raises(PhysicsError, match="boom"):
             convert(failure)
-    assert repr(failure) == "Failed(PhysicsRangeError: boom)"
+    assert repr(failure) == "Failed(PhysicsError: boom)"
 
 
 def test_leaving_the_outermost_scope_with_a_failed_anywhere_raises():
@@ -121,16 +121,16 @@ def test_leaving_the_outermost_scope_with_a_failed_anywhere_raises():
         return {"tuple": (1.0, value), "list": [value], "dict": {"a": value}}[kind]
 
     for kind in ("tuple", "list", "dict"):
-        with pytest.raises(PhysicsRangeError, match="x = -1.0 m"):
+        with pytest.raises(PhysicsError, match="x = -1.0 m"):
             holder(-1.0, kind)
 
 
 def test_a_check_on_an_eager_array_raises_at_once_for_the_first_failing_row():
     """Arrays are never turned into a ``Failed``: the first failing row raises, with its values."""
     values = np.array([1.0, -2.0, -3.0])
-    with pytest.raises(PhysicsRangeError, match="x = -2.0 m"):
+    with pytest.raises(PhysicsError, match="x = -2.0 m"):
         checked(values)
-    with pytest.raises(PhysicsRangeError, match="x = -2.0 m"):
+    with pytest.raises(PhysicsError, match="x = -2.0 m"):
         inner(values)
 
 
@@ -139,19 +139,19 @@ def test_a_failed_argument_short_circuits_so_the_earliest_failure_wins():
 
     @ops.physics
     def inner(value):
-        ops.check(value > 0, PhysicsRangeError, "inner: value = {value}", value=value)
+        ops.check(value > 0, PhysicsError, "inner: value = {value}", value=value)
         return value
 
     @ops.physics
     def outer(value):
-        ops.check(value > 1, PhysicsRangeError, "outer: value = {value}", value=value)
+        ops.check(value > 1, PhysicsError, "outer: value = {value}", value=value)
         return value
 
     @ops.physics
     def chained(value):
         return outer(inner(value))
 
-    with pytest.raises(PhysicsRangeError, match="inner: value = -1"):
+    with pytest.raises(PhysicsError, match="inner: value = -1"):
         chained(-1.0)
 
 
@@ -160,7 +160,7 @@ def test_require_surfaces_the_error_of_a_value_whose_number_is_not_used():
 
     @ops.physics
     def checked(value):
-        ops.check(value > 0, PhysicsRangeError, "checked: value = {value}", value=value)
+        ops.check(value > 0, PhysicsError, "checked: value = {value}", value=value)
         return value
 
     @ops.physics
@@ -175,8 +175,8 @@ def test_require_surfaces_the_error_of_a_value_whose_number_is_not_used():
 
     assert discards(-1.0) == 1.0
     assert requires(1.0) == 1.0
-    with pytest.raises(PhysicsRangeError, match="checked: value = -1"):
+    with pytest.raises(PhysicsError, match="checked: value = -1"):
         requires(-1.0)
-    with pytest.raises(PhysicsRangeError, match="checked: value = -1"):
+    with pytest.raises(PhysicsError, match="checked: value = -1"):
         run_function(requires, np.array([1.0, -1.0]))
     assert np.all(run_function(discards, np.array([1.0, -1.0])) == 1.0)

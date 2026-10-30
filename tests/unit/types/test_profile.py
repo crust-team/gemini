@@ -6,8 +6,9 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.errors import DatasetError, UnitError
+from gemini.errors import RunError, ValidationError
 from gemini.types.profile import Profile
+from tests.fixtures.errors import raises
 
 
 def test_series_previous_and_resample():
@@ -23,7 +24,7 @@ def test_series_previous_and_resample():
     assert profile.index[0].hour == 23
     assert profile.at(profile.index[0] + timedelta(minutes=30)) == 283.15
     assert profile.at(profile.index[-1] + timedelta(days=1)) == 293.15
-    with pytest.raises(DatasetError, match="first sample"):
+    with raises(RunError, "invalid_data", match="first sample"):
         profile.at(profile.index[0] - timedelta(seconds=1))
     series = profile.to_series()
     series.iloc[0] = 0
@@ -76,7 +77,7 @@ def test_units_come_from_the_unit_table():
     profile = Profile.from_series(source, "t/h")
     assert (profile.quantity, profile.unit, profile.values) == ("mass_flow", "kg/s", [10.0])
     assert Profile.from_series(source, "°C").values == [309.15]
-    with pytest.raises(UnitError, match="'m'"):
+    with raises(ValidationError, "invalid_unit", match="'m'"):
         Profile.from_series(source, "m")
 
 
@@ -86,5 +87,5 @@ def test_resample_rejects_empty_bins():
         [1.0, 2.0], index=pd.to_datetime(["2024-01-01 00:00", "2024-01-01 03:00"]), name="x"
     )
     profile = Profile.from_series(source, "W")
-    with pytest.raises(DatasetError, match="bin at 2024-01-01 01:00:00\\+00:00 is empty"):
+    with raises(RunError, "invalid_data", match="bin at 2024-01-01 01:00:00\\+00:00 is empty"):
         profile.resample(timedelta(hours=1), "mean")

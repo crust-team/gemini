@@ -9,7 +9,7 @@ import csv
 import io
 from pathlib import Path
 
-from gemini.errors import LegacyFormatError
+from gemini.errors import ValidationError
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
@@ -404,7 +404,9 @@ def _well_params(properties, prefix, base_path):
     if not table:
         filename = properties.get(f"{prefix}_trajectory_file")
         if not filename:
-            raise LegacyFormatError(f"{prefix}: provide a trajectory table or trajectory file")
+            raise ValidationError(
+                f"{prefix}: provide a trajectory table or trajectory file", code="invalid_format"
+            )
         text = (Path(base_path) / filename).read_text(encoding="utf-8-sig")
         table = parse_trajectory_csv(text)
     tally = [

@@ -5,8 +5,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from gemini.errors import UnitError, UnknownNameError
+from gemini.errors import ValidationError
 from gemini.physics import units
+from tests.fixtures.errors import raises
 
 
 @pytest.mark.parametrize(
@@ -50,7 +51,7 @@ def test_to_si_scales_offsets_and_unknown_units():
     assert units.to_si(1, "barg") == 201325
     assert units.to_si(25, "°C") == 298.15
     assert units.to_si(36, "t/h") == 10
-    with pytest.raises(UnitError, match="'barr'.*did you mean 'bar'"):
+    with raises(ValidationError, "invalid_unit", match="'barr'.*did you mean 'bar'"):
         units.to_si(1, "barr")
 
 
@@ -59,7 +60,7 @@ def test_convert_between_units_of_one_dimension():
     assert units.convert(2e5, "Pa", "bar") == 2
     assert units.convert(300, "K", "degC") == pytest.approx(26.85)
     assert units.convert(1, "m3/s", "m3/h") == 3600
-    with pytest.raises(UnitError, match="'K'.*'Pa'.*'bar'"):
+    with raises(ValidationError, "invalid_unit", match="'K'.*'Pa'.*'bar'"):
         units.convert(1, "bar", "K")
 
 
@@ -85,7 +86,9 @@ def test_value_in_si_parses_strings_and_quantities():
     assert units.value_in_si("1.5e3 bar", "Pa") == 1.5e8
     assert units.value_in_si(units.Quantity(3, "ft"), "m") == pytest.approx(0.9144)
     assert units.value_in_si("12", "m") == "12"
-    with pytest.raises(UnitError, match="plant.length: unit = 'bar'; expected a unit of 'm'"):
+    with raises(
+        ValidationError, "invalid_unit", match="plant.length: unit = 'bar'; expected a unit of 'm'"
+    ):
         units.value_in_si("12 bar", "m", "plant.length")
 
 
@@ -119,7 +122,7 @@ def test_si_conversion_gives_the_bits_of_to_si_on_arrays(unit, quantity):
     expected = [units.to_si(value, unit, quantity) for value in values.tolist()]
     assert (values * scale + offset).tolist() == expected
     assert units.array_to_si(values, unit, quantity).tolist() == expected
-    with pytest.raises(UnitError, match="units.si_conversion"):
+    with raises(ValidationError, "invalid_unit", match="units.si_conversion"):
         units.si_conversion("furlong")
 
 
@@ -155,7 +158,7 @@ def test_names_list_every_unit_or_those_of_one_quantity():
     assert "rpm" in units.names() and units.names() == sorted(units.names())
     assert {"Pa", "bar", "bar(g)", "kPa", "MPa"} <= set(units.names("pressure"))
     assert "m3/h" in units.names("volume_flow") and "bar" not in units.names("volume_flow")
-    with pytest.raises(UnknownNameError, match="did you mean 'pressure'") as caught:
+    with raises(ValidationError, "unknown_name", match="did you mean 'pressure'") as caught:
         units.names("pressur")
     assert caught.value.suggestions[0] == "pressure"
 
@@ -164,9 +167,9 @@ def test_parse_splits_a_number_and_a_known_unit():
     """Text gives its value in the unit it states; unknown units and bare numbers raise."""
     assert units.parse("150 m3/h") == (150.0, "m3/h")
     assert units.parse("-2.5e3 bar(g)") == (-2500.0, "bar(g)")
-    with pytest.raises(UnitError, match="'furlong'"):
+    with raises(ValidationError, "invalid_unit", match="'furlong'"):
         units.parse("3 furlong")
-    with pytest.raises(UnitError, match="expected '<number> <unit>'"):
+    with raises(ValidationError, "invalid_unit", match="expected '<number> <unit>'"):
         units.parse("150")
 
 
@@ -175,14 +178,14 @@ def test_fits_checks_a_unit_against_a_quantity():
     assert units.fits("MPa", "pressure") and units.fits("barg", "pressure_difference")
     assert units.fits("rpm", "frequency") and units.fits("degC", "temperature")
     assert not units.fits("kW", "pressure") and not units.fits("furlong", "pressure")
-    with pytest.raises(UnknownNameError):
+    with raises(ValidationError, "unknown_name"):
         units.fits("bar", "pressur")
 
 
 def test_a_quantity_keeps_one_unit():
     """Defining a known quantity again with the same unit is fine; another unit raises."""
     units.define_quantity("pressure", "Pa")
-    with pytest.raises(UnitError, match="already 'Pa'"):
+    with raises(ValidationError, "invalid_unit", match="already 'Pa'"):
         units.define_quantity("pressure", "K")
 
 

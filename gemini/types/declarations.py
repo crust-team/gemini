@@ -8,10 +8,11 @@ from functools import partial
 from typing import Annotated, Any
 
 import numpy as np
-from pydantic import Field, TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter
+from pydantic import ValidationError as PydanticError
 
 from gemini import ops
-from gemini.errors import DeclarationError, UnitError
+from gemini.errors import DefinitionError, PhysicsError, ValidationError
 from gemini.physics import units
 from gemini.types import streams
 from gemini.types.flows import Stream
@@ -117,9 +118,9 @@ _BOUND_FAILURES = {"greater_than", "greater_than_equal", "less_than", "less_than
 
 def _failure_code(cause):
     """Return the ``gm.errors.CODES`` entry of a failed validation: unit, bound or other value."""
-    if isinstance(cause, UnitError):
+    if isinstance(cause, ValidationError) and cause.code == "invalid_unit":
         return "invalid_unit"
-    if isinstance(cause, ValidationError) and any(
+    if isinstance(cause, PydanticError) and any(
         item["type"] in _BOUND_FAILURES for item in cause.errors()
     ):
         return "out_of_bounds"
@@ -237,8 +238,8 @@ class Declaration:
         try:
             value = units.value_in_si(value, self.unit, self.path, self.quantity)
             return self._adapter.validate_python(value)
-        except (TypeError, ValueError, ValidationError) as exc:
-            raise DeclarationError(
+        except (TypeError, ValueError, PydanticError, PhysicsError) as exc:
+            raise ValidationError(
                 f"{self.path}: invalid {self.section} value {value!r}"
                 + (f"; expected {self.unit}" if self.unit else "")
                 + f" ({exc})",
@@ -300,7 +301,7 @@ class Parameter(Declaration):
         if self.shape is not None and value is not None:
             actual = (len(value),) if hasattr(value, "__len__") else ()
             if actual != self.shape:
-                raise DeclarationError(f"{self.path}: shape = {actual}; expected {self.shape}")
+                raise ValidationError(f"{self.path}: shape = {actual}; expected {self.shape}")
         return value
 
     def set(self, value, *, explicit=True):
@@ -323,12 +324,12 @@ class _StreamPort(Declaration):
     def __init__(self, kind=Stream, *, stream=None, description=None):
         """Declare a fluid port carrying streams of ``kind`` and stream type ``stream``."""
         if stream is not None and stream not in streams.NAMES:
-            raise DeclarationError(
+            raise DefinitionError(
                 f"{type(self).__name__}: stream = {stream!r}; expected one of "
                 f"{join_names(streams.NAMES)}{did_you_mean(stream, streams.NAMES)}"
             )
         if not isinstance(kind, type) or not issubclass(kind, Stream):
-            raise DeclarationError(
+            raise DefinitionError(
                 f"{type(self).__name__}: kind = {kind!r}; expected a fluid Stream type"
             )
         self.kind = kind
@@ -347,7 +348,7 @@ class _StreamPort(Declaration):
             return value
         if isinstance(value, Mapping):
             return self.kind(**value)
-        raise DeclarationError(
+        raise ValidationError(
             f"{self.path}: invalid {self.section} value {value!r}; expected a {self.kind.__name__}"
         )
 
@@ -426,7 +427,7 @@ class Outlet(_StreamPort):
         """Return a reference to one ``Stream`` field of this outlet for ``Output.of``."""
         names = [field.name for field in fields(self.kind)]
         if name not in names:
-            raise DeclarationError(
+            raise DefinitionError(
                 f"{self.path}.{name}: unknown stream field; valid: "
                 f"{join_names(names)}{did_you_mean(name, names)}"
             )

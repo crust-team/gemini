@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules import Module
 from gemini.ops import Constant
 from gemini.types import (
@@ -58,7 +58,7 @@ class Gain(Module):
         inlet = inlets.inlet
         ops.check(
             self.gain >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: gain = {gain}",
             path=self.path,
             gain=self.gain,
@@ -360,7 +360,7 @@ class Stubborn(Gain):
         # Outlets
         ops.check(
             self.gain >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: gain = {gain}",
             path=self.path,
             gain=self.gain,

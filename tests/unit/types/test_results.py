@@ -3,11 +3,12 @@
 import numpy as np
 import pytest
 
-from gemini.errors import PhysicsRangeError, UnitError, UnknownPortError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.types import Ports, Stream
 from gemini.types.declarations import Output
 from gemini.types.quantities import Power, PressureDifference, TemperatureDifference
 from gemini.types.results import Health, ModuleResult, Values
+from tests.fixtures.errors import raises
 
 
 @pytest.fixture
@@ -29,15 +30,17 @@ def test_values_mapping_and_unit_conversion(values):
     assert values.get("head", unit="barg") == 1
     assert values.get("rise", unit="degC") == 10
     assert values.get("missing", 5) == 5
-    with pytest.raises(UnitError, match="label"):
+    with raises(ValidationError, "invalid_unit", match="label"):
         values.get("label", unit="m")
 
 
 def test_unknown_values_suggest_close_names(values):
     """Misspelled names list the valid names and the closest one."""
-    with pytest.raises(UnknownPortError, match="'powr'.*valid names: power.*did you mean 'power'"):
+    with raises(
+        ValidationError, "unknown_port", match="'powr'.*valid names: power.*did you mean 'power'"
+    ):
         values.powr
-    with pytest.raises(UnknownPortError, match="'hed'"):
+    with raises(ValidationError, "unknown_port", match="'hed'"):
         values["hed"]
 
 
@@ -58,11 +61,11 @@ def test_health_bounds():
     health = Health(score=1, alarm=False, message="ok")
     assert health.assessed and health.score == 1.0 and type(health.score) is float
     assert health.metrics == {}
-    with pytest.raises(PhysicsRangeError, match="score"):
+    with pytest.raises(PhysicsError, match="score"):
         Health(score=1.5, alarm=False, message="bad")
-    with pytest.raises(PhysicsRangeError, match="score"):
+    with pytest.raises(PhysicsError, match="score"):
         Health(score=float("nan"), alarm=False, message="bad")
-    with pytest.raises(PhysicsRangeError, match="metrics.drift"):
+    with pytest.raises(PhysicsError, match="metrics.drift"):
         Health(score=1, alarm=False, message="bad", metrics={"drift": float("inf")})
     with pytest.raises(TypeError):
         Health(score=1, alarm=False, message="ok", extra=1)
@@ -77,9 +80,9 @@ def test_health_holds_arrays_and_checks_every_row():
         metrics={"drift": np.array([0.0, 0.2])},
     )
     assert health.message.tolist() == ["ok", "low"] and health.assessed is True
-    with pytest.raises(PhysicsRangeError, match="value = 1.5"):
+    with pytest.raises(PhysicsError, match="value = 1.5"):
         Health(score=np.array([1.0, 1.5]), alarm=False, message="x")
-    with pytest.raises(PhysicsRangeError, match="metrics.drift"):
+    with pytest.raises(PhysicsError, match="metrics.drift"):
         Health(score=1, alarm=False, message="x", metrics={"drift": np.array([0.0, np.nan])})
 
 

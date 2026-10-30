@@ -5,6 +5,7 @@ import pytest
 import gemini as gm
 from gemini.modules import Filter, Module, ProductionReservoir
 from gemini.types import Control, Inlet, Outlet, Output, Parameter, Power, Stream
+from tests.fixtures.errors import raises
 
 STREAM = Stream(m_dot=10, T=330, p=1e6)
 
@@ -78,7 +79,7 @@ def test_missing_super_init_is_explicit():
         def __init__(self):
             self.value = Parameter(float)
 
-    with pytest.raises(gm.errors.DeclarationError, match="super"):
+    with pytest.raises(gm.errors.DefinitionError, match="super"):
         Broken()
 
 
@@ -227,7 +228,7 @@ def test_composite_step_refuses_stateful_descendants():
 
     parent = Parent()
     parent.child = Tank()
-    with pytest.raises(gm.errors.ConfigurationError, match="child"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="child"):
         parent.step(None, 900.0, {"inlet": STREAM})
 
 
@@ -242,7 +243,7 @@ def test_injection_reservoir_without_injectivity_fails_in_forward():
         top_depth=2000,
         wellbore_radius=0.1,
     )
-    with gm.no_outputs(), pytest.raises(gm.errors.ConfigurationError, match="injectivity"):
+    with gm.no_outputs(), raises(gm.errors.ValidationError, "invalid_design", match="injectivity"):
         reservoir(sandface=STREAM)
 
 

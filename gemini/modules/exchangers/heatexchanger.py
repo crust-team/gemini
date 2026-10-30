@@ -5,7 +5,7 @@ from typing import Literal
 import numpy as np
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import diagnostics, heat_transfer, hydraulics
 from gemini.types import (
@@ -129,7 +129,7 @@ class HeatExchanger(Module):
         """Reject negative flow and a hot inlet below the cold inlet."""
         ops.check(
             ops.logical_and(hot_in.m_dot >= 0, cold_in.m_dot >= 0),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: negative mass flow hot_in.m_dot = {hot_m_dot} kg/s, "
             "cold_in.m_dot = {cold_m_dot} kg/s; expected >= 0",
             path=self.path,
@@ -138,7 +138,7 @@ class HeatExchanger(Module):
         )
         ops.check(
             hot_in.T >= cold_in.T,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: hot inlet is below cold inlet: hot_in.T = {hot_T} K, "
             "cold_in.T = {cold_T} K",
             path=self.path,

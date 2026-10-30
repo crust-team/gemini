@@ -18,6 +18,7 @@ from gemini.types import (
     Stream,
 )
 from tests.fixtures.equivalence import assert_close, assert_module_matches
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 """Default fluid heat capacity [J/kg/K]."""
@@ -135,11 +136,11 @@ def test_stopped_circuits_leave_only_ambient_cooling():
 def test_invalid_inputs_raise():
     """Reverse flow is outside the model; a missing ambient temperature is a missing value."""
     tank = _tank()
-    with pytest.raises(gm.errors.PhysicsRangeError, match="thermal_storage: circuit m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="thermal_storage: circuit m_dot = -1"):
         tank(charge_in=CHARGE.with_(m_dot=-1), discharge_in=DISCHARGE, ambient_temperature=290)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         tank(charge_in=CHARGE, discharge_in=DISCHARGE)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         tank.update_params(charge_effectiveness=1.2)
 
 

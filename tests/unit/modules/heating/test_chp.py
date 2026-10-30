@@ -2,11 +2,12 @@
 
 import pytest
 
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.heating import CHP
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 WATER = Stream(m_dot=20, T=333.15, p=3e5)
@@ -68,9 +69,11 @@ def test_heat_dumping_and_engine_off():
 
 def test_invalid_design_and_flow_raise():
     """Efficiencies above one in sum and reversed flow raise the documented errors."""
-    with pytest.raises(ConfigurationError, match="electric_efficiency \\+ thermal_efficiency"):
+    with raises(
+        ValidationError, "invalid_design", match="electric_efficiency \\+ thermal_efficiency"
+    ):
         engine(thermal_efficiency=0.7)(inlet=WATER, load_fraction=1)
-    with pytest.raises(PhysicsRangeError, match="inlet.m_dot = -1"):
+    with pytest.raises(PhysicsError, match="inlet.m_dot = -1"):
         engine()(inlet=WATER.with_(m_dot=-1), load_fraction=1)
 
 

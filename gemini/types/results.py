@@ -7,7 +7,8 @@ from typing import Any
 import numpy as np
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError, UnitError, UnknownPortError
+from gemini.errors import PhysicsError, ValidationError
+from gemini.errors.lookup import UnknownPort
 from gemini.physics import units
 from gemini.types.flows import Stream
 from gemini.types.ports import Ports
@@ -28,7 +29,7 @@ class Health:
     maps names to values, finite where assessed and NaN where a row has no metric. Validation
     is ``ops.check``, so it holds for scalars, arrays (the first failing row raises) and traced
     values alike: a score outside ``[0, 1]`` or a non-finite metric of an assessed row raises
-    ``PhysicsRangeError``. Plain integers become ``float``.
+    ``PhysicsError``. Plain integers become ``float``.
     """
 
     assessed: Any = True
@@ -42,7 +43,7 @@ class Health:
         self.score = _number(self.score)
         ops.check(
             ops.logical_and(self.score >= 0, self.score <= 1),
-            PhysicsRangeError,
+            PhysicsError,
             "Health.score: value = {score}; expected a finite fraction in [0, 1]",
             score=self.score,
         )
@@ -50,7 +51,7 @@ class Health:
         for name, value in self.metrics.items():
             ops.check(
                 ops.logical_or(ops.logical_not(self.assessed), ops.isfinite(value)),
-                PhysicsRangeError,
+                PhysicsError,
                 "Health.metrics[{name}]: value = {value}; expected a finite number",
                 name=name,
                 value=value,
@@ -65,8 +66,8 @@ def _number(value):
 class Values(AttributeMapping):
     """Read-only attribute and mapping access to named call values."""
 
-    key_error = UnknownPortError
-    attribute_error = UnknownPortError
+    key_error = UnknownPort
+    attribute_error = UnknownPort
 
     def __init__(self, values=None, declarations=None):
         """Store immutable-by-interface values and declaration metadata."""
@@ -122,7 +123,9 @@ class Values(AttributeMapping):
             return value
         declaration = self._declarations.get(name)
         if declaration is None or declaration.unit is None:
-            raise UnitError(f"{name}: unit = None; expected a declared physical unit")
+            raise ValidationError(
+                f"{name}: unit = None; expected a declared physical unit", code="invalid_unit"
+            )
         return units.convert(value, declaration.unit, unit, declaration.quantity)
 
 

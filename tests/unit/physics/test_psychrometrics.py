@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.graph import Graph
 from gemini.graph.limits import certain
 from gemini.physics import psychrometrics
@@ -95,8 +95,8 @@ def test_wet_bulb_temperature():
     ],
 )
 def test_out_of_range_inputs_raise(call, message):
-    """Inputs outside each correlation's domain raise PhysicsRangeError."""
-    with pytest.raises(PhysicsRangeError, match=message):
+    """Inputs outside each correlation's domain raise PhysicsError."""
+    with pytest.raises(PhysicsError, match=message):
         call()
 
 
@@ -125,7 +125,7 @@ def test_dew_point_on_a_dense_grid_stays_within_the_documented_tolerance():
     for row in rows:
         try:
             floats.append(psychrometrics.dew_point(*row))
-        except PhysicsRangeError:
+        except PhysicsError:
             floats.append(math.nan)
     valid = np.isfinite(floats)
     columns = [np.array(column)[valid] for column in zip(*rows)]
@@ -146,7 +146,7 @@ def test_dew_point_on_a_dense_grid_stays_within_the_documented_tolerance():
 )
 def test_dew_point_rows_raise_the_error_of_the_float_path(rows):
     """The first failing row raises the same class and message on arrays."""
-    assert_same_error(psychrometrics.dew_point, rows, PhysicsRangeError)
+    assert_same_error(psychrometrics.dew_point, rows, PhysicsError)
 
 
 def test_dew_point_in_a_graph_runs_the_solver_and_raises_the_check_error():
@@ -163,7 +163,7 @@ def test_dew_point_in_a_graph_runs_the_solver_and_raises_the_check_error():
     }
     expected = [psychrometrics.dew_point(*row) for row in rows]
     np.testing.assert_allclose(graph_outputs(graph, columns)["dew"], expected, rtol=1e-12, atol=0)
-    with pytest.raises(PhysicsRangeError, match="expected a dew point above"):
+    with pytest.raises(PhysicsError, match="expected a dew point above"):
         graph_outputs(
             graph, {"temperature": np.array([300.0, 300.0]), "humidity": np.array([0.5, 1e-9])}
         )
@@ -174,13 +174,11 @@ def test_humidity_ratio_and_wet_bulb_on_arrays_match_floats():
     rows = [(300.0, 0.5, 101325.0), (250.0, 0.0, 101325.0), (280.0, 1.0, 101325.0)]
     assert_function_matches(psychrometrics.humidity_ratio, rows)
     for bad in [(300.0, 0.5, 100.0), (300.0, 0.5, math.nan), (300.0, 1.5, 101325.0)]:
-        assert_same_error(psychrometrics.humidity_ratio, [rows[0], bad], PhysicsRangeError)
+        assert_same_error(psychrometrics.humidity_ratio, [rows[0], bad], PhysicsError)
     wet_rows = [(300.0, 0.5), (260.0, 0.06), (323.15, 0.99), (253.15, 0.05)]
     assert_function_matches(psychrometrics.wet_bulb_temperature, wet_rows)
     for bad in [(330.0, 0.5), (300.0, 0.01), (300.0, math.nan)]:
-        assert_same_error(
-            psychrometrics.wet_bulb_temperature, [wet_rows[0], bad], PhysicsRangeError
-        )
+        assert_same_error(psychrometrics.wet_bulb_temperature, [wet_rows[0], bad], PhysicsError)
 
 
 def test_evaporation_rate_is_duty_over_latent_heat():

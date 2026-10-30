@@ -3,7 +3,7 @@
 import pytest
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics import steam
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
@@ -93,9 +93,9 @@ def test_domain_limits_raise():
         lambda: steam.b23_pressure(900),
     ]
     for call in calls:
-        with pytest.raises(PhysicsRangeError):
+        with pytest.raises(PhysicsError):
             call()
-    with pytest.raises(PhysicsRangeError, match="saturation_pressure: temperature = nan"):
+    with pytest.raises(PhysicsError, match="saturation_pressure: temperature = nan"):
         steam.saturation_pressure(float("nan"))
 
 
@@ -114,7 +114,7 @@ def test_flash_fraction():
     half = saturation.liquid_enthalpy + 0.5 * saturation.evaporation_enthalpy
     assert steam.flash_fraction(half, 6e5) == pytest.approx(0.5, rel=1e-12)
     assert steam.flash_fraction(saturation.liquid_enthalpy - 1e3, 6e5) == 0
-    with pytest.raises(PhysicsRangeError, match="saturated vapour"):
+    with pytest.raises(PhysicsError, match="saturated vapour"):
         steam.flash_fraction(saturation.vapour_enthalpy, 6e5)
 
 
@@ -139,9 +139,9 @@ def test_baumann_expansion_limits():
     dry = steam.baumann_expansion(6e5, 1e4, 0.85, 0)
     assert dry.efficiency == pytest.approx(0.85, rel=1e-12)
     for args in ((1e4, 6e5, 0.85, 1), (6e5, 1e4, 0, 1), (6e5, 1e4, 0.85, -1)):
-        with pytest.raises(PhysicsRangeError):
+        with pytest.raises(PhysicsError):
             steam.baumann_expansion(*args)
-    with pytest.raises(PhysicsRangeError, match="wet exhaust"):
+    with pytest.raises(PhysicsError, match="wet exhaust"):
         steam.baumann_expansion(6e5, 4e5, 0.2, 1)
 
 
@@ -192,7 +192,7 @@ def test_flash_and_expansion_match_on_arrays():
 )
 def test_checks_match_on_arrays(function, rows):
     """A failing row raises the same error and message on arrays and on floats."""
-    assert_same_error(function, rows, PhysicsRangeError)
+    assert_same_error(function, rows, PhysicsError)
 
 
 @ops.physics
@@ -206,7 +206,7 @@ def test_the_range_error_of_an_unselected_row_is_dropped():
     rows = [(1.0, 5e5, 450.0), (1.0, 1e6, 700.0), (0.0, 1e6, 1100.0), (0.0, 4e7, 500.0)]
     assert_function_matches(_vapour_enthalpy_when_wanted, rows)
     assert_same_error(
-        _vapour_enthalpy_when_wanted, [(1.0, 1e6, 700.0), (1.0, 4e7, 500.0)], PhysicsRangeError
+        _vapour_enthalpy_when_wanted, [(1.0, 1e6, 700.0), (1.0, 4e7, 500.0)], PhysicsError
     )
 
 

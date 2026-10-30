@@ -4,7 +4,7 @@ from functools import partial
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
@@ -44,7 +44,7 @@ class HeatPump(Module):
     max(T_h - T_s, minimum_temperature_lift), with T_h and T_s the log-mean temperatures of the
     sink and source glides (``refrigeration.lorenz_cop_heating``). The source outlet then enters
     the COP through a logarithm, so the balance is solved by ``brentq`` instead of in closed
-    form. A cooling-mode Lorenz machine raises ``ConfigurationError``: the upstream GEMINI model
+    form. A cooling-mode Lorenz machine raises ``ValidationError``: the upstream GEMINI model
     it is ported from defines the Lorenz COP for heating only.
 
     Assumptions: constant Carnot fraction over load and temperatures (no part-load or
@@ -63,7 +63,7 @@ class HeatPump(Module):
     circuit has a zero capacity rate, whose temperature change ``heat_transfer.temperature_change``
     takes as zero. The two ``ops.brentq`` solves (the Lorenz source outlet and the source-limited
     duty) are functions of ``refrigeration`` called through their ``args``; a
-    solve that fails gives NaN and raises ``PhysicsRangeError`` where its row is selected.
+    solve that fails gives NaN and raises ``PhysicsError`` where its row is selected.
     """
 
     def __init__(self):
@@ -127,9 +127,10 @@ class HeatPump(Module):
         sink_rate = _rate(self.path, "sink_in", sink_in)
         heating = self.mode == "heating"
         if self.cop_model == "lorenz" and not heating:
-            raise ConfigurationError(
+            raise ValidationError(
                 f"{self.path}: cop_model = 'lorenz' with mode = 'cooling'; expected "
-                "mode = 'heating' (the Lorenz COP is defined for heating only)"
+                "mode = 'heating' (the Lorenz COP is defined for heating only)",
+                code="invalid_design",
             )
         operate = self._heating if heating else self._cooling
         duty, is_capped, source_T, sink_T = operate(source_in, sink_in, source_rate, sink_rate)
@@ -254,7 +255,7 @@ class HeatPump(Module):
         )
         ops.check(
             ops.logical_or(ops.logical_not(selected), ops.logical_or(available <= 0, root == root)),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: no heating duty between 0 W and {duty} W cools the source to "
             "{limit} K; expected a source below the minimum at the requested duty",
             path=self.path,
@@ -307,7 +308,7 @@ class HeatPump(Module):
         )
         ops.check(
             ops.where(duty == 0, True, self._cop(source_in, sink_in, outlet_T, sink_T) > 1),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: source_in.T = {inlet_T} K; expected above {minimum} K for a heating COP "
             "above 1 at sink outlet {sink_T} K",
             path=self.path,
@@ -338,7 +339,7 @@ class HeatPump(Module):
         at_inlet = refrigeration.lorenz_source_surplus(source_in.T, *arguments)
         ops.check(
             ops.where(duty == 0, True, ops.logical_and(lower > 0, at_inlet < 0)),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: source_in.T = {inlet_T} K, source_in.m_dot * cp = {rate} W/K; expected a "
             "source that supplies the duty {duty} W with a heating COP above 1 at sink outlet "
             "{sink_T} K",
@@ -361,7 +362,7 @@ class HeatPump(Module):
         """Reject a failed evaporator solve on the rows that have a duty."""
         ops.check(
             ops.logical_or(duty == 0, root == root),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: no source outlet between {lower} K and {inlet_T} K balances the "
             "evaporator duty {duty} W at sink outlet {sink_T} K",
             path=self.path,
@@ -387,7 +388,7 @@ class HeatPump(Module):
         )
         ops.check(
             ops.logical_or(ops.logical_or(duty == 0, within_floor), denominator > 0),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: sink_in.m_dot * cp = {rate} W/K; expected above {minimum} W/K to reject "
             "the cooling duty {duty} W",
             path=self.path,
@@ -402,7 +403,7 @@ def _rate(path, port, stream):
     """Return a stream's heat capacity rate m_dot * cp [W/K]; reject negative flow."""
     ops.check(
         stream.m_dot >= 0,
-        PhysicsRangeError,
+        PhysicsError,
         "{path}: {port}.m_dot = {m_dot} kg/s; expected >= 0",
         path=path,
         port=port,

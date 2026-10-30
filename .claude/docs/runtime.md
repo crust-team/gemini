@@ -17,7 +17,7 @@ hands work to threads passes `state()` along or runs it in `contextvars.copy_con
 
 `state()` returns a JSON-safe copy of the settings. `load_state(mapping)` requires the complete
 mapping that `state()` returns. Unknown setting names, missing names in `load_state` and values
-outside the choices raise `gm.errors.UnknownNameError`; an invalid fluid raises a validation error.
+outside the choices raise `gm.errors.ValidationError`; an invalid fluid raises a validation error.
 
 Precision selects the ESP's legacy float32 arithmetic, used for golden parity. Display units
 affect module representations only. A default fluid is copied into newly built modules and

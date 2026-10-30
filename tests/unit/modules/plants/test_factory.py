@@ -1,11 +1,10 @@
 """Registry types and groups become modules."""
 
-import pytest
-
 import gemini as gm
-from gemini.errors import UnknownNameError
+from gemini.errors import ValidationError
 from gemini.modules.container import ModuleDict
 from gemini.modules.plants.factory import make_module
+from tests.fixtures.errors import raises
 
 
 def test_a_registry_name_a_class_and_a_group_make_modules():
@@ -25,7 +24,7 @@ def test_a_spec_plant_makes_a_new_plant_each_time():
 
 def test_unknown_types_point_at_the_type_with_a_suggestion():
     """The problem path is ``type`` and the closest name is suggested."""
-    with pytest.raises(UnknownNameError) as caught:
+    with raises(ValidationError, "unknown_name") as caught:
         make_module("Degaser")
     assert caught.value.path == "type" and caught.value.suggestions[0] == "Degasser"
 
@@ -36,5 +35,5 @@ def test_an_unregistered_class_is_refused():
     class Mine(gm.modules.Module):
         category = "pumps"
 
-    with pytest.raises(UnknownNameError):
+    with raises(ValidationError, "unknown_name"):
         make_module(Mine)

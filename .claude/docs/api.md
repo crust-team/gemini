@@ -40,7 +40,7 @@ with it; its hash per version is held in the test.
 | Name | Returns | Status |
 | --- | --- | --- |
 | `gm.modules.names(category=None)` | sorted registry names; spec plants have category `plants` | real |
-| `gm.modules.get(name)` | the class; a spec plant gives a new plant. Unknown: `UnknownNameError` with `suggestions` | real |
+| `gm.modules.get(name)` | the class; a spec plant gives a new plant. Unknown: `ValidationError` with `suggestions` | real |
 | `gm.modules.categories()` | `subsurface`, `wells`, `pumps`, `treatment`, `exchangers`, `heating`, `cooling`, `power`, `storage`, `piping`, `demand`, `control`, `plants`, in display order; each is the folder that holds the module | real |
 | `gm.modules.register(cls)` | `cls`, now in the registry; it states `category = "<one of the list>"`; a taken name is refused | real |
 | `gm.modules.load_file(path)` | names of the `Module` classes of a Python file that state a `category`, registered | real |
@@ -121,7 +121,7 @@ On any plant, `path` being a dotted module path (`""` is the root):
 
 Run input is one format: a pandas DataFrame or a `gm.Dataset` with a timezone-aware UTC index,
 columns named by binding `column`, units from the binding. A missing bound column raises
-`BindingError` (a `ValidationError`, code `missing_column`) listing them all. A NaN row is a row
+`ValidationError` (a `ValidationError`, code `missing_column`) listing them all. A NaN row is a row
 code and the run continues.
 
 ```python
@@ -142,7 +142,7 @@ returns its `Results`, so the numbers are the same on every backend; see
 | `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` | real |
 | `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results`; `results.end_state` is the `state=` of the next call | real |
 | `gm.live(plant, source, checkpoint, step=None, now=None, sink=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` of the new rows; `checkpoint` is a required path | real |
-| `gm.resume(checkpoint, callbacks=None)` | `Results` of an interrupted `simulate` or `replay`; `CheckpointError` on a live checkpoint | real |
+| `gm.resume(checkpoint, callbacks=None)` | `Results` of an interrupted `simulate` or `replay`; `RunError` on a live checkpoint | real |
 | `gm.Engine(plant, backend="numpy", callbacks=None, on_error="raise")` | one runner, for complex tasks | real |
 | `engine.simulate(profile, clock=None)` | `Results` | real |
 | `engine.replay(data, start=None, end=None, state=None, clock=None, only=None)` | `Results`; `results.end_state` is the `state=` of the next call | real |
@@ -221,10 +221,11 @@ Pass parameter objects declared `calibratable=True`, such as
 
 ## Errors
 
-`gm.errors` holds every class, listed with its use in [errors.md](errors.md). Each derives from
-`GeminiError` and from the matching built-in exception. `to_dict()` is
-`{class, message, path, code, suggestions}` (schema `error`), `CODES` the fixed `code` list and
-`ROW_CODES` the row codes with their meaning.
+`gm.errors` holds seven public classes, listed with their use in [errors.md](errors.md): `GeminiError`
+with `ValidationError`, `DefinitionError`, `PhysicsError`, `RunError`, `Cancelled` and
+`NotImplementedYet`, and `GeminiWarning`. `to_dict()` is the problem
+`{path, code, message, suggestions}` (schema `problem`), `CODES` the fixed `code` list and `ROW_CODES`
+the row codes with their meaning. `error.problems` lists every problem of an error.
 
 ## Change log
 

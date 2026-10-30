@@ -6,10 +6,11 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini.errors import MissingValueError, OutputError, PhysicsRangeError
+from gemini.errors import DefinitionError, PhysicsError, ValidationError
 from gemini.graph import Tracer, run
 from gemini.graph.tracer import parameter_shape
 from gemini.types.declarations import UNSET
+from tests.fixtures.errors import raises
 
 
 def test_trace_names_inputs_by_role_and_records_outputs(gain):
@@ -73,7 +74,7 @@ def test_unassigned_outputs_fail_at_trace_time(gain):
             self.rise = 0.0
 
     module = Forgetful().update_params(scale=1.0)
-    with pytest.raises(OutputError, match="boost"):
+    with pytest.raises(DefinitionError, match="boost"):
         Tracer().trace(module, {"inlet": module.fluid})
 
 
@@ -115,7 +116,7 @@ def test_a_stream_built_in_forward_traces_and_keeps_its_limits(gain):
         2e5,
         1e5,
     ]
-    with pytest.raises(PhysicsRangeError, match="p = -800000.0 Pa"):
+    with pytest.raises(PhysicsError, match="p = -800000.0 Pa"):
         run(module, {"inlet": stream}, {"gain": 1.0})
 
 
@@ -158,7 +159,7 @@ def test_composite_without_outputs_traces_the_fluid_step(line):
 def test_uninitialized_parameters_of_the_tree_are_refused(line):
     """A parameter without a value anywhere below the root cannot be traced."""
     line.gain._parameters["scale"].value = UNSET
-    with pytest.raises(MissingValueError, match="line: uninitialized parameters"):
+    with raises(ValidationError, "missing_value", match="line: uninitialized parameters"):
         Tracer().trace(line, {"inlet": line.fluid})
 
 

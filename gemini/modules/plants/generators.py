@@ -10,7 +10,7 @@ list. A well field produces from every limb, mixes, then injects; a network pump
 the substations in order, mixes the returns and passes the return pipe.
 """
 
-from gemini.errors import ConfigurationError
+from gemini.errors import ValidationError
 
 SUBSTATIONS = {"heating": "HeatingSubstation", "cooling": "CoolingSubstation"}
 """Substation type per network service."""
@@ -96,7 +96,7 @@ def _split(prefix, targets):
 def _check(**counts):
     if any(value < 1 for value in counts.values()):
         given = ", ".join(f"{name} = {value}" for name, value in counts.items())
-        raise ConfigurationError(f"{given}; expected >= 1")
+        raise ValidationError(f"{given}; expected >= 1", code="invalid_design")
 
 
 def multi_well_spec(producers=2, injectors=1):
@@ -155,7 +155,9 @@ def district_network_spec(consumers=2, service="heating"):
     ``electricity`` and ``return_out_T``.
     """
     if service not in SUBSTATIONS:
-        raise ConfigurationError(f"service = {service!r}; expected 'heating' or 'cooling'")
+        raise ValidationError(
+            f"service = {service!r}; expected 'heating' or 'cooling'", code="invalid_design"
+        )
     _check(consumers=consumers)
     splitting, feed = _split(
         "splitters", [f"substations.{index}.network_in" for index in range(consumers)]

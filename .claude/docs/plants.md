@@ -107,7 +107,7 @@ are not computed.
 
 `plant.save(path)` and `gm.Plant.load(path)` read and write the spec. `gm.plants.migrate(old)`
 converts every older stored format, and `scripts/migrate_plants.py` runs it over files. Loading an
-old file without it raises `PlantFormatError` with code `old_format`, naming `gm.plants.migrate`.
+old file without it raises `ValidationError` with code `old_format`, naming `gm.plants.migrate`.
 
 ## Level 3: subclassing
 

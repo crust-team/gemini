@@ -80,7 +80,7 @@ def test_idle_zero_flow_and_reverse_flow():
     assert result.outlets.brine_out.T == 340
     stopped = orc()(brine_in=BRINE.with_(m_dot=0), ambient_temperature=288.15).outputs
     assert stopped.heat_input == 0 and stopped.gross_power == 0 and not stopped.is_capped
-    with pytest.raises(gm.errors.PhysicsRangeError, match="brine_in.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="brine_in.m_dot = -1"):
         orc()(brine_in=BRINE.with_(m_dot=-1), ambient_temperature=288.15)
 
 

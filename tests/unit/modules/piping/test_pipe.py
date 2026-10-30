@@ -9,6 +9,7 @@ from gemini.modules import energy_balance, mass_balance
 from gemini.modules.piping import Pipe
 from gemini.types import Fluid, Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 STREAM = Stream(m_dot=10, T=353.15, p=5e5)
 
@@ -88,18 +89,18 @@ def test_zero_flow_keeps_only_the_static_head():
 
 def test_invalid_inputs_raise():
     """Reverse flow, free gas, impossible rise and a negative outlet pressure are rejected."""
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot = -1"):
         pipe()(inlet=STREAM.with_(m_dot=-1), ambient_temperature=283.15)
     gassy = STREAM.with_(fluid=Fluid(gas_mass_fraction=0.01))
-    with pytest.raises(gm.errors.PhysicsRangeError, match="gas_mass_fraction"):
+    with pytest.raises(gm.errors.PhysicsError, match="gas_mass_fraction"):
         pipe()(inlet=gassy, ambient_temperature=283.15)
-    with pytest.raises(gm.errors.ConfigurationError, match="pipe: elevation_change = 2000"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="pipe: elevation_change = 2000"):
         pipe(elevation_change=2000)(inlet=STREAM, ambient_temperature=283.15)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="outlet pressure"):
+    with pytest.raises(gm.errors.PhysicsError, match="outlet pressure"):
         pipe()(inlet=STREAM.with_(m_dot=40), ambient_temperature=283.15)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         pipe()(inlet=STREAM)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         pipe(inner_diameter=0)
 
 

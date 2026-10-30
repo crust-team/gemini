@@ -111,9 +111,9 @@ def test_zero_and_reverse_flow():
     module = decline()
     state, result = module.step({"injected_volume": 1e7}, 3600, {"inlet": STREAM.with_(m_dot=0)})
     assert state == {"injected_volume": 1e7} and result.outputs.breakthrough_time is None
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot = -1"):
         module(inlet=STREAM.with_(m_dot=-1))
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         module.update_params(porosity=1)
 
 
@@ -144,4 +144,4 @@ def test_decline_arithmetic_matches_on_arrays():
 
     rows = [(50.0, 353.15, 2e7), (0.0, 353.15, 2e7), (5.0, 330.0, 1e6)]
     assert_function_matches(numbers, rows)
-    assert_same_error(numbers, rows + [(-1.0, 353.15, 2e7)], gm.errors.PhysicsRangeError)
+    assert_same_error(numbers, rows + [(-1.0, 353.15, 2e7)], gm.errors.PhysicsError)

@@ -6,7 +6,8 @@ its public methods only.
 
 from copy import deepcopy
 
-from gemini.errors import DeclarationError, MissingValueError, UnitError
+from gemini.errors import ValidationError
+from gemini.errors.base import reported
 from gemini.types.declarations import UNSET
 from gemini.types.shapes import problem
 from gemini.utils.jsonable import to_plain
@@ -118,8 +119,9 @@ def _current_inputs(declarations):
     for path, declaration in declarations.items():
         try:
             values[path] = to_plain(getattr(declaration.owner, declaration.name))
-        except MissingValueError:
-            continue
+        except ValidationError as error:
+            if error.code != "missing_value":
+                raise
     return values
 
 
@@ -263,17 +265,18 @@ def parameter_schema(module):
 def _check_value(name, declaration, value):
     try:
         declaration.validate(value)
-    except (DeclarationError, UnitError) as error:
+    except ValidationError as error:
         return problem(name, error.code, error)
     return None
 
 
-def validate_params(module, params):
-    """Return every problem of ``params`` as ``[{path, code, message, suggestions}]``.
+def validate_params(module, params, on_error="raise"):
+    """Check ``params`` and return ``[]``, or raise one ``ValidationError`` with every problem.
 
-    It never raises for them. ``params`` maps a parameter name (dotted for a child's) to a number,
-    a unit string or a value of the declared kind. The codes are ``unknown_name`` (with
-    ``suggestions``),
+    With ``on_error="record"`` nothing is raised and the problems are returned, each
+    ``{path, code, message, suggestions}``: the list the error carries in ``problems``.
+    ``params`` maps a parameter name (dotted for a child's) to a number, a unit string or a value
+    of the declared kind. The codes are ``unknown_name`` (with ``suggestions``),
     ``invalid_unit``, ``out_of_bounds`` and ``invalid_value``. The module is not changed.
     """
     declarations = dict(module.named_parameters())
@@ -288,4 +291,4 @@ def validate_params(module, params):
         found = _check_value(name, declarations[name], value)
         if found is not None:
             problems.append(found)
-    return problems
+    return reported(problems, on_error)

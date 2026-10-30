@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import hydraulics
 from gemini.types import (
@@ -41,9 +41,9 @@ class Valve(Module):
     Reynolds-number correction, constant liquid density. The throttled pressure energy
     (``dp / (rho cp)``, about 0.024 K per bar for water) is not converted into a temperature
     rise, consistent with the package's sensible-enthalpy audit. Validity: single-phase liquid
-    (free gas raises ``PhysicsRangeError``) in the marked flow direction (reverse flow raises
-    ``PhysicsRangeError``). A closed valve passes zero flow with no pressure drop; flow through
-    a closed valve raises ``PhysicsRangeError``.
+    (free gas raises ``PhysicsError``) in the marked flow direction (reverse flow raises
+    ``PhysicsError``). A closed valve passes zero flow with no pressure drop; flow through
+    a closed valve raises ``PhysicsError``.
     """
 
     def __init__(self):
@@ -78,7 +78,7 @@ class Valve(Module):
         drop = self._pressure_drop(inlet)
         ops.check(
             drop <= inlet.p,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: pressure drop = {drop} Pa; expected at most inlet.p = {inlet_p} Pa "
             "(open the valve or reduce the flow)",
             path=self.path,
@@ -107,20 +107,20 @@ class Valve(Module):
         """Return the pressure drop [Pa] of the inlet flow at the commanded opening."""
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
             path=self.path,
             m_dot=inlet.m_dot,
         )
         if inlet.fluid.gas_mass_fraction > 0:
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"{self.path}: inlet.fluid.gas_mass_fraction = "
                 f"{inlet.fluid.gas_mass_fraction}; expected 0 (single-phase liquid model)"
             )
         coefficient = self._effective_flow_coefficient()
         ops.check(
             ops.logical_or(inlet.m_dot == 0, coefficient != 0),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s through a closed valve "
             "(opening = 0); expected zero flow",
             path=self.path,

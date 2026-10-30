@@ -9,6 +9,7 @@ import gemini as gm
 from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.types.flows import Stream
 from gemini.utils.legacy import tables as mapping
+from tests.fixtures.errors import raises
 
 DATA = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
 
@@ -52,7 +53,7 @@ def test_correction_applies_the_affine_pressure_factors():
 def test_traversal_direction_must_match_the_depth_interval():
     """Upward traversal from shallow to deep is rejected with both depths in the message."""
     well = production_well()
-    with pytest.raises(gm.errors.PhysicsRangeError, match="conflicts with direction up"):
+    with pytest.raises(gm.errors.PhysicsError, match="conflicts with direction up"):
         well.traverse(Stream(m_dot=40, T=353.15, p=25e6), 0, 100, "up")
 
 
@@ -60,7 +61,7 @@ def test_esp_split_needs_a_configured_depth():
     """Splitting at the ESP without an ESP depth inside the path is a configuration error."""
     well = production_well()
     well.esp_depth = None
-    with pytest.raises(gm.errors.ConfigurationError, match="esp_depth"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="esp_depth"):
         well.intake_conditions(Stream(m_dot=40, T=353.15, p=25e6))
 
 
@@ -72,5 +73,5 @@ def test_traversal_direction_check_runs_on_depths_not_flows():
     )
     result = well.traverse(stream, 0, 100, "down")
     assert result.p_out.shape == (2,)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="conflicts with direction up"):
+    with pytest.raises(gm.errors.PhysicsError, match="conflicts with direction up"):
         well.traverse(stream, 0, 100, "up")

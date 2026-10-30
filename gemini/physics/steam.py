@@ -15,7 +15,7 @@ The IAPWS Industrial Formulation 1997, J. Eng. Gas Turbines Power 122, 150-182.
 
 Saturated properties need regions 1 and 2, which border the saturation line only up to
 623.15 K (16.529 MPa); region 3 is not implemented, so saturation states above 623.15 K raise
-``PhysicsRangeError``. Geothermal flash plants operate far below this limit (separators at
+``PhysicsError``. Geothermal flash plants operate far below this limit (separators at
 0.2 to 2 MPa, condensers at 5 to 15 kPa). All properties are those of pure water; dissolved
 salts and non-condensable gases are not represented.
 """
@@ -23,7 +23,7 @@ salts and non-condensable gases are not represented.
 from dataclasses import dataclass
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.ops import Constant
 from gemini.physics import units
 
@@ -401,7 +401,7 @@ def b23_pressure(temperature: float) -> float:
 
     Notes
     -----
-    Validity: temperature from 623.15 K to 863.15 K; other values raise PhysicsRangeError. No
+    Validity: temperature from 623.15 K to 863.15 K; other values raise PhysicsError. No
     division occurs.
     Source: IAPWS (2007), Revised Release on the IAPWS Industrial Formulation 1997
     (IAPWS-R7-97(2012)), eq. 5 and table 1.
@@ -473,14 +473,14 @@ def flash_fraction(enthalpy: float, pressure: float) -> float:
     Notes
     -----
     x = (h - h_f) / h_fg at the flash pressure, zero for subcooled liquid (h <= h_f).
-    An enthalpy at or above saturated vapour raises ``PhysicsRangeError``: the fluid does not
+    An enthalpy at or above saturated vapour raises ``PhysicsError``: the fluid does not
     separate into two phases. Reference: DiPippo, R. (2016), Geothermal Power Plants, 4th ed.,
     Butterworth-Heinemann, section 5.2 (single-flash plants).
     """
     saturation = saturation_properties(pressure)
     ops.check(
         enthalpy < saturation.vapour_enthalpy,
-        PhysicsRangeError,
+        PhysicsError,
         "flash_fraction: enthalpy = {enthalpy} J/kg; expected below the saturated vapour "
         "enthalpy {vapour_enthalpy} J/kg at {pressure} Pa",
         enthalpy=enthalpy,
@@ -638,7 +638,7 @@ def baumann_expansion(
     h_s). Since x_out = (h_out - h_f) / h_fg depends on eta, the linear system is solved in
     closed form: x_out = (h_in - h_f - eta_d dh_s (1 - a / 2)) / (h_fg + a eta_d dh_s / 2). For
     a = 1 this is DiPippo's eq. 5.13 with A = eta_d dh_s / 2. A dry or superheated exhaust
-    (x_out >= 1) is outside this wet-expansion model and raises ``PhysicsRangeError``.
+    (x_out >= 1) is outside this wet-expansion model and raises ``PhysicsError``.
     Reference: Baumann, K. (1921), Some recent developments in large steam turbine practice,
     J. Inst. Electr. Eng. 59, 565-623; DiPippo, R. (2016), Geothermal Power Plants, 4th ed.,
     section 5.5.
@@ -648,7 +648,7 @@ def baumann_expansion(
             ops.logical_and(dry_efficiency > 0, dry_efficiency <= 1),
             ops.logical_not(baumann_factor < 0),
         ),
-        PhysicsRangeError,
+        PhysicsError,
         "baumann_expansion: dry_efficiency = {dry_efficiency}, baumann_factor = "
         "{baumann_factor}; expected 0 < dry_efficiency <= 1 and baumann_factor >= 0",
         dry_efficiency=dry_efficiency,
@@ -656,7 +656,7 @@ def baumann_expansion(
     )
     ops.check(
         ops.logical_not(outlet_pressure >= inlet_pressure),
-        PhysicsRangeError,
+        PhysicsError,
         "baumann_expansion: outlet_pressure = {outlet_pressure} Pa; expected below "
         "inlet_pressure = {inlet_pressure} Pa",
         outlet_pressure=outlet_pressure,
@@ -672,7 +672,7 @@ def baumann_expansion(
     )
     ops.check(
         ops.logical_not(quality >= 1),
-        PhysicsRangeError,
+        PhysicsError,
         "baumann_expansion: exhaust quality = {quality}; expected a wet exhaust below 1",
         quality=quality,
     )
@@ -709,10 +709,10 @@ def _region_2(pressure, temperature):
 
 
 def _check_range(function, name, value, unit, lower, upper):
-    """Raise ``PhysicsRangeError`` unless lower <= value <= upper (NaN fails)."""
+    """Raise ``PhysicsError`` unless lower <= value <= upper (NaN fails)."""
     ops.check(
         ops.logical_and(lower <= value, value <= upper),
-        PhysicsRangeError,
+        PhysicsError,
         "{function}: {name} = {value} {unit}; expected {lower} {unit} to {upper} {unit}",
         function=function,
         name=name,
@@ -724,7 +724,7 @@ def _check_range(function, name, value, unit, lower, upper):
 
 
 def _check_liquid(function, pressure, temperature):
-    """Raise ``PhysicsRangeError`` outside IF97 region 1."""
+    """Raise ``PhysicsError`` outside IF97 region 1."""
     _check_range(
         function, "temperature", temperature, "K", MINIMUM_TEMPERATURE, REGION_1_MAXIMUM_TEMPERATURE
     )
@@ -733,7 +733,7 @@ def _check_liquid(function, pressure, temperature):
 
 
 def _check_vapour(function, pressure, temperature):
-    """Raise ``PhysicsRangeError`` outside IF97 region 2."""
+    """Raise ``PhysicsError`` outside IF97 region 2."""
     _check_range(
         function, "temperature", temperature, "K", MINIMUM_TEMPERATURE, REGION_2_MAXIMUM_TEMPERATURE
     )
@@ -748,7 +748,7 @@ def _check_vapour(function, pressure, temperature):
     )
     ops.check(
         ops.logical_and(pressure > 0, pressure <= upper),
-        PhysicsRangeError,
+        PhysicsError,
         "{function}: pressure = {pressure} Pa; expected 0 Pa < pressure <= {upper} Pa in "
         "region 2 at {temperature} K",
         function=function,

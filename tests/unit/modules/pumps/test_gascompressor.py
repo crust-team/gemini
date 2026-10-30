@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.pumps import GasCompressor
 from gemini.types.flows import Stream
@@ -68,9 +68,9 @@ def test_zero_flow_unit_ratio_and_invalid_setpoints():
     assert out.discharge_T > 300
     out = compressor()(suction=GAS, pressure_setpoint=1e5).outputs
     assert out.pressure_ratio == 1 and out.shaft_power == 0 and out.discharge_T == 300
-    with pytest.raises(PhysicsRangeError, match="pressure_setpoint = 50000"):
+    with pytest.raises(PhysicsError, match="pressure_setpoint = 50000"):
         compressor()(suction=GAS, pressure_setpoint=5e4)
-    with pytest.raises(PhysicsRangeError, match="reverse flow"):
+    with pytest.raises(PhysicsError, match="reverse flow"):
         compressor()(suction=GAS.with_(m_dot=-0.1), pressure_setpoint=8e5)
 
 

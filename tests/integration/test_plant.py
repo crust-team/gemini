@@ -60,7 +60,7 @@ def test_trace_hooks_are_removed_after_failure(example):
     plant, inputs = example
     before = [(len(m._hooks), len(m._pre_hooks)) for m in plant.modules()]
     plant.injection_pump.pressure_setpoint = 0
-    with pytest.raises(ValueError):
+    with pytest.raises(gm.errors.PhysicsError):
         trace_wiring(plant, inputs)
     assert before == [(len(m._hooks), len(m._pre_hooks)) for m in plant.modules()]
     plant.injection_pump.pressure_setpoint = 5.15e6

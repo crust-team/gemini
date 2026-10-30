@@ -1,7 +1,7 @@
 """Hydrocyclone desander with a quadratic pressure loss and a constant sand removal share."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import fluid, hydraulics, separation
 from gemini.types import (
@@ -38,7 +38,7 @@ class Desander(Module):
     unchanged and the stream balances close exactly; the removed sand is reported as
     ``sand_removal_rate`` only. Pressure loss (of the order of 1 bar at design flow) and
     efficiency are design specific, so all three design values are required. Valid for forward
-    flow with a loss below the inlet pressure; otherwise ``PhysicsRangeError`` is raised.
+    flow with a loss below the inlet pressure; otherwise ``PhysicsError`` is raised.
     """
 
     def __init__(self):
@@ -89,7 +89,7 @@ class Desander(Module):
         """Return the cyclone loss [Pa], quadratic in forward mass flow."""
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
@@ -99,7 +99,7 @@ class Desander(Module):
         )
         ops.check(
             drop <= inlet.p,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: pressure_drop = {drop} Pa; expected at most inlet.p = {pressure} Pa",
             path=self.path,
             drop=drop,

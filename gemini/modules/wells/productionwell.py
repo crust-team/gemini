@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from gemini.errors import ConfigurationError
+from gemini.errors import ValidationError
 from gemini.modules.wells.well import _Well
 from gemini.physics import fluid, heat_transfer
 from gemini.types import (
@@ -108,8 +108,9 @@ class ProductionWell(_Well):
     def _esp_depth(self):
         depth = self.esp_depth
         if depth is None or depth > self.pipe_path.total_length:
-            raise ConfigurationError(
+            raise ValidationError(
                 f"{self.path}: esp_depth = {depth} m is not configured within the "
-                f"{self.pipe_path.total_length} m path"
+                f"{self.pipe_path.total_length} m path",
+                code="invalid_design",
             )
         return depth

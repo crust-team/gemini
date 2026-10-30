@@ -1,6 +1,7 @@
 """Plants built from data: a ``Module`` whose forward runs its children in connection order."""
 
 from gemini.errors import ValidationError
+from gemini.errors.base import reported
 from gemini.modules.container import ModuleList
 from gemini.modules.module import Module
 from gemini.modules.plants import listing, outputs, reader, writer
@@ -168,9 +169,9 @@ class Plant(PortResolver, Module):
         """Build a plant of this class from a format 2 plant file."""
         return reader.read(cls, data)
 
-    def validate(self):
-        """Return every problem of the plant's spec, the list ``gm.plants.validate`` returns."""
-        return reader.problems(type(self), self.to_spec())
+    def validate(self, on_error="raise"):
+        """Check the plant's spec as ``gm.plants.validate`` does; the same ``on_error``."""
+        return reported(reader.problems(type(self), self.to_spec()), on_error)
 
     def _compiled(self):
         if self._plan is None:

@@ -1,7 +1,7 @@
 """Binary organic Rankine cycle plant driven by geothermal brine, with an air-cooled condenser."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, power_cycles
 from gemini.types import (
@@ -125,7 +125,7 @@ class ORC(Module):
         """Return the ``power_cycles.cycle_design`` of the brine inlet."""
         ops.check(
             brine_in.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: brine_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=brine_in.m_dot,

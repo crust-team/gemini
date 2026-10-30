@@ -1,7 +1,7 @@
 """Ideal-gas compressor for separated non-condensable gas."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import compression, energy
 from gemini.types import (
@@ -48,7 +48,7 @@ class GasCompressor(Module):
     Valid for gases near ideal behaviour (compressibility factor close to one) and stage
     pressure ratios up to about 4, the usual limit set by the discharge temperature. A
     setpoint below the suction pressure (expansion) and reverse flow raise
-    ``PhysicsRangeError``; at zero gas flow the compressor draws no power and the discharge
+    ``PhysicsError``; at zero gas flow the compressor draws no power and the discharge
     temperature is the one the gas would have.
     """
 
@@ -121,14 +121,14 @@ class GasCompressor(Module):
         """Return the overall pressure ratio [-]; reject reverse flow and expansion."""
         ops.check(
             ops.logical_not(suction.m_dot < 0),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: suction.m_dot = {m_dot} kg/s; reverse flow is unsupported",
             path=self.path,
             m_dot=suction.m_dot,
         )
         ops.check(
             ops.logical_not(ops.logical_or(suction.p <= 0, self.pressure_setpoint < suction.p)),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: pressure_setpoint = {setpoint} Pa, suction.p = {p} Pa; expected a "
             "positive suction pressure at or below the setpoint",
             path=self.path,

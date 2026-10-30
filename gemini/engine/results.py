@@ -14,7 +14,8 @@ from gemini.engine.chunks import (
     first_present,
     merge,
 )
-from gemini.errors import UnitError, UnknownResultError, ValidationError
+from gemini.errors import ValidationError
+from gemini.errors.lookup import UnknownKey
 from gemini.physics import units
 from gemini.types.shapes import problem, series, statistics, value
 from gemini.utils.jsonable import to_plain
@@ -72,7 +73,7 @@ class ModuleSeries:
     def __getattr__(self, field):
         """Return one pandas Series or an informative unknown-field error."""
         if field not in self._frame:
-            raise UnknownResultError(
+            raise UnknownKey(
                 f"{self._path}: result field = {field!r}; expected one of "
                 f"{join_names(self._frame)}{did_you_mean(field, self._frame)}"
             )
@@ -88,9 +89,10 @@ class ModuleSeries:
         if unit is None:
             return series
         if field not in SERIES_UNITS:
-            raise UnitError(
+            raise ValidationError(
                 f"{self._path}: result field = {field!r}; expected one of "
-                f"{join_names(SERIES_UNITS)} for unit conversion"
+                f"{join_names(SERIES_UNITS)} for unit conversion",
+                code="invalid_unit",
             )
         source, quantity = SERIES_UNITS[field]
         return series.map(lambda value: units.convert(value, source, unit, quantity))
@@ -207,7 +209,7 @@ class Results:
         """Return the series ``{time, value, unit}`` of one field, ``start`` to ``end`` inclusive.
 
         ``time`` is ISO 8601 UTC text, ``value`` has ``None`` for a missing value and ``unit``
-        is the SI unit of the field. An unknown path or field raises ``UnknownResultError``.
+        is the SI unit of the field. An unknown path or field raises ``ValidationError``.
         """
         column = _window(getattr(self[path], field), start, end)
         return series(column.index, column, self.unit(path, field))
@@ -479,7 +481,7 @@ def declared_units(plant):
 
 def _unknown_path(path, paths):
     """Return the error for a results path that does not exist."""
-    return UnknownResultError(
+    return UnknownKey(
         f"Results: module path = {path!r}; expected one of "
         f"{join_names(paths)}{did_you_mean(path, paths)}",
         path=path,

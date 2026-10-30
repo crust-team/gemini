@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from gemini.errors import UnknownNameError, ValidationError
+from gemini.errors import ValidationError
 from gemini.modules.module import Module
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
@@ -100,10 +100,11 @@ def category(name):
 def _entry(name):
     entry = _entries.get(name)
     if entry is None:
-        raise UnknownNameError(
+        raise ValidationError(
             f"modules: unknown module type {name!r}{did_you_mean(name, _entries)}",
             path=name,
             suggestions=close_matches(name, _entries),
+            code="unknown_name",
         )
     return entry
 

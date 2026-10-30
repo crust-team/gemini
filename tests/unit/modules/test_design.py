@@ -3,8 +3,9 @@
 import pytest
 
 import gemini as gm
-from gemini.errors import BindingError, UnitError, UnknownNameError
+from gemini.errors import ValidationError
 from gemini.modules import design
+from tests.fixtures.errors import raises
 
 BINDING = {"column": "x", "unit": "kW/K"}
 
@@ -49,7 +50,7 @@ def test_a_dated_snapshot_is_complete_and_sorted(exchanger):
 
 def test_an_unknown_parameter_suggests_a_name(exchanger):
     """The error names the closest parameter."""
-    with pytest.raises(UnknownNameError) as caught:
+    with raises(ValidationError, "unknown_name") as caught:
         exchanger.set_params("", {"thermal_conductanc": 1.0})
     assert caught.value.suggestions == ("thermal_conductance",)
 
@@ -64,7 +65,7 @@ def test_bindable_lists_what_a_module_accepts(exchanger):
 
 def test_bindings_check_units_against_the_declaration(exchanger):
     """A column in a unit of another dimension is refused; a fitting one is stored."""
-    with pytest.raises(UnitError):
+    with raises(ValidationError, "invalid_unit"):
         exchanger.set_bindings("", {"measured": {"duty": {"column": "d", "unit": "bar"}}})
     exchanger.set_bindings("", {"measured": {"duty": {"column": "d", "unit": "kW"}}})
     assert exchanger.bindings[""].measured["duty"].unit == "kW"
@@ -74,11 +75,11 @@ def test_bindings_check_units_against_the_declaration(exchanger):
 
 def test_bindings_reject_unknown_names_and_fields(exchanger):
     """Names and inlet fields are checked."""
-    with pytest.raises(UnknownNameError):
+    with raises(ValidationError, "unknown_name"):
         exchanger.set_bindings("", {"measured": {"dutty": {"column": "d", "unit": "kW"}}})
-    with pytest.raises(UnknownNameError):
+    with raises(ValidationError, "unknown_name"):
         exchanger.set_bindings("", {"inlets": {"hot_in": {"q": {"column": "d", "unit": "K"}}}})
-    with pytest.raises(BindingError):
+    with raises(ValidationError, "invalid_binding"):
         exchanger.set_bindings("", {"measured": {"duty": {"column": "d"}}})
 
 

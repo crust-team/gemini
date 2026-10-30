@@ -2,7 +2,7 @@
 
 ``check(condition, error, message, **values)`` replaces ``if not condition: raise error(...)``.
 ``message`` is a ``str.format`` template filled with ``values`` of the failing row, so
-``check(flow >= 0, PhysicsRangeError, "{path}: flow = {flow} m3/s", path=self.path, flow=flow)``
+``check(flow >= 0, PhysicsError, "{path}: flow = {flow} m3/s", path=self.path, flow=flow)``
 raises exactly the message of the former f-string. On concrete values it raises at once, for
 the first failing row of an array. In a trace it records a ``check`` node. ``values`` only fill
 the message. The error code guards the results of the ``@ops.physics`` function that recorded the
@@ -20,7 +20,7 @@ raises at once, for the first failing row, and is not marked.
 
 import numpy as np
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.ops.dispatch import Constant, Symbolic
 from gemini.ops.elementwise import isnan, logical_not, logical_or
 from gemini.ops.failed import mark
@@ -29,11 +29,15 @@ from gemini.ops.registry import get, register
 register("check", "check", 1)
 
 
-def check(condition, error, message, **values):
-    """Raise ``error(message.format(**values))`` where ``condition`` fails; record it if traced."""
+def check(condition, error, message, code=None, **values):
+    """Raise ``error(message.format(**values), code=code)`` where ``condition`` fails.
+
+    ``code`` is the ``gm.errors.CODES`` entry of the error, the default of its class when ``None``.
+    In a trace the check is recorded instead.
+    """
     traced = condition if isinstance(condition, Symbolic) else _first_traced(values)
     if traced is not None:
-        attributes = {"error": error, "message": message, "values": values}
+        attributes = {"error": error, "message": message, "values": values, "code": code}
         traced.record(get("check"), (condition,), attributes)
         return
     if condition is True:
@@ -42,15 +46,15 @@ def check(condition, error, message, **values):
         if condition:
             return
         concrete = {name: _concrete(value) for name, value in values.items()}
-        raise mark(failure(error, message, concrete, 0))
+        raise mark(failure(error, message, concrete, 0, code))
     failing = np.flatnonzero(np.logical_not(condition))
     if failing.size:
         concrete = {name: _concrete(value) for name, value in values.items()}
-        raise failure(error, message, concrete, int(failing[0]))
+        raise failure(error, message, concrete, int(failing[0]), code)
 
 
 def check_numbers(function, **values):
-    """Raise ``PhysicsRangeError`` where a named value of ``function`` is NaN.
+    """Raise ``PhysicsError`` where a named value of ``function`` is NaN.
 
     A NaN input would otherwise return NaN as if it were a valid result. One check per value, in
     the order given, with the message ``"<function>: <name> = nan; expected a number"``.
@@ -58,7 +62,7 @@ def check_numbers(function, **values):
     for name, value in values.items():
         check(
             logical_not(isnan(value)),
-            PhysicsRangeError,
+            PhysicsError,
             "{function}: {name} = nan; expected a number",
             function=function,
             name=name,
@@ -66,10 +70,10 @@ def check_numbers(function, **values):
         )
 
 
-def failure(error, message, values, row):
-    """Return the ``error`` instance of one failing ``row``, its message filled from ``values``."""
+def failure(error, message, values, row, code=None):
+    """Return the ``error`` of one failing ``row``, its message filled from ``values``."""
     filled = {name: _row_value(value, row) for name, value in values.items()}
-    return error(message.format(**filled))
+    return error(message.format(**filled), code=code)
 
 
 def _first_traced(values):

@@ -1,10 +1,10 @@
 """Backend registry, setting, automatic choice and NumPy fallback."""
 
 import numpy as np
-import pytest
 
 from gemini import backends
-from gemini.errors import UnknownNameError
+from gemini.errors import ValidationError
+from tests.fixtures.errors import raises
 
 
 def test_automatic_choice_follows_the_values():
@@ -20,7 +20,7 @@ def test_automatic_choice_follows_the_values():
 
 def test_unknown_backend_names_raise():
     """A misspelled backend name suggests the registered one."""
-    with pytest.raises(UnknownNameError, match="did you mean 'numpy'"):
+    with raises(ValidationError, "unknown_name", match="did you mean 'numpy'"):
         backends.settings("nunpy")
 
 

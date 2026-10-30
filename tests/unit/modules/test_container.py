@@ -41,5 +41,5 @@ def test_module_dict_hashes_by_identity_and_rejects_shadowing_keys():
     """E-modules-008: containers are hashable and keys cannot hide methods like ``step``."""
     first, second = ModuleDict(), ModuleDict()
     assert first != second and len({first, second}) == 2
-    with pytest.raises(gm.errors.DeclarationError, match="shadows"):
+    with pytest.raises(gm.errors.DefinitionError, match="shadows"):
         ModuleDict({"step": Filter()})

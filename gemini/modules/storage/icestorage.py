@@ -1,7 +1,7 @@
 """Lumped ice-on-coil or encapsulated ice store on one glycol circuit."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, storage, units
 from gemini.types import (
@@ -30,7 +30,7 @@ class IceStorage(Module):
     state ``ice_fraction`` x is frozen. The state ``temperature`` is the store temperature: the
     freezing temperature T_f while partly frozen (0 < x < 1), above it only as all liquid
     (x = 0, sensible heat with ``water_specific_heat``) and below it only as all ice (x = 1,
-    sensible heat with ``ice_specific_heat``). Other combinations raise ``ConfigurationError``.
+    sensible heat with ``ice_specific_heat``). Other combinations raise ``ValidationError``.
 
     The coil is a heat exchanger against a store at uniform temperature (capacity ratio zero),
     so with ``C = m_dot * cp`` of the glycol its effectiveness is ``e = 1 - exp(-UA / C)``
@@ -153,7 +153,7 @@ class IceStorage(Module):
         """Return the glycol capacity rate m_dot * cp [W/K]; reject reverse flow."""
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
             path=self.path,
             m_dot=inlet.m_dot,
@@ -183,7 +183,7 @@ class IceStorage(Module):
         )
         ops.check(
             consistent,
-            ConfigurationError,
+            ValidationError,
             "{path}: temperature = {temperature} K with ice_fraction = {fraction}; "
             "expected {freezing} K while partly frozen, above it only with no ice and "
             "below it only when fully frozen",
@@ -191,4 +191,5 @@ class IceStorage(Module):
             temperature=temperature,
             fraction=fraction,
             freezing=freezing,
+            code="invalid_design",
         )

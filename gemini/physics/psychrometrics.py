@@ -7,7 +7,7 @@ humidity ratios (about 0.4 % at sea level); see ``humidity_ratio``.
 """
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics import units
 
 MINIMUM_TEMPERATURE = 173.15
@@ -88,7 +88,7 @@ def dew_point(temperature: float, relative_humidity: float) -> float:
     The Hyland-Wexler saturation pressure is inverted with Brent's method to 1e-9 K instead of
     the ASHRAE fitted dew-point polynomial, so the result is consistent with
     ``saturation_pressure`` by construction. A vapour pressure below the saturation pressure at
-    -100 degC raises ``PhysicsRangeError``.
+    -100 degC raises ``PhysicsError``.
     """
     _check_temperature("dew_point", temperature)
     _check_relative_humidity("dew_point", relative_humidity)
@@ -97,7 +97,7 @@ def dew_point(temperature: float, relative_humidity: float) -> float:
         ops.logical_or(
             relative_humidity == 1, vapour_pressure >= saturation_pressure(MINIMUM_TEMPERATURE)
         ),
-        PhysicsRangeError,
+        PhysicsError,
         "dew_point: vapour pressure = {vapour_pressure} Pa at temperature = {temperature} K "
         "and relative_humidity = {relative_humidity}; expected a dew point above "
         "{minimum} K",
@@ -179,14 +179,14 @@ def humidity_ratio(temperature: float, relative_humidity: float, pressure: float
 
     Validity: temperature from 173.15 K to 473.15 K, relative_humidity in [0, 1] and pressure above
     the vapour pressure relative_humidity * saturation_pressure(T), so the divisor is positive;
-    other values raise PhysicsRangeError.
+    other values raise PhysicsError.
     """
     _check_temperature("humidity_ratio", temperature)
     _check_relative_humidity("humidity_ratio", relative_humidity, minimum_included=True)
     vapour_pressure = relative_humidity * saturation_pressure(temperature)
     ops.check(
         pressure > vapour_pressure,
-        PhysicsRangeError,
+        PhysicsError,
         "humidity_ratio: pressure = {pressure} Pa; expected more than the vapour pressure "
         "{vapour_pressure} Pa",
         pressure=pressure,
@@ -222,7 +222,7 @@ def wet_bulb_temperature(temperature: float, relative_humidity: float) -> float:
     Fitted at 101.325 kPa; the error is between -1 and +0.65 K over the validity range, mostly
     within 0.3 K. Stull notes that cold and very dry combinations (low wet-bulb, below his
     figure's curve) are less accurate; inputs outside the stated ranges raise
-    ``PhysicsRangeError``.
+    ``PhysicsError``.
     """
     ops.check_numbers("wet_bulb_temperature", temperature=temperature)
     ops.check_numbers("wet_bulb_temperature", relative_humidity=relative_humidity)
@@ -231,7 +231,7 @@ def wet_bulb_temperature(temperature: float, relative_humidity: float) -> float:
             ops.logical_and(temperature >= 253.15, temperature <= 323.15),
             ops.logical_and(relative_humidity >= 0.05, relative_humidity <= 0.99),
         ),
-        PhysicsRangeError,
+        PhysicsError,
         "wet_bulb_temperature: temperature = {temperature} K, relative_humidity = "
         "{relative_humidity}; expected 253.15 K to 323.15 K and 0.05 to 0.99",
         temperature=temperature,
@@ -260,7 +260,7 @@ def _check_temperature(function, temperature):
     ops.check_numbers(function, temperature=temperature)
     ops.check(
         ops.logical_and(temperature >= MINIMUM_TEMPERATURE, temperature <= MAXIMUM_TEMPERATURE),
-        PhysicsRangeError,
+        PhysicsError,
         "{function}: temperature = {temperature} K; expected {minimum} K to {maximum} K",
         function=function,
         temperature=temperature,
@@ -277,7 +277,7 @@ def _check_relative_humidity(function, relative_humidity, minimum_included=False
         valid = ops.logical_and(valid, relative_humidity > 0)
     ops.check(
         valid,
-        PhysicsRangeError,
+        PhysicsError,
         "{function}: relative_humidity = {relative_humidity}; expected a fraction in {expected}",
         function=function,
         relative_humidity=relative_humidity,

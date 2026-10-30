@@ -9,9 +9,10 @@ import numpy as np
 import pytest
 
 from gemini import ops
-from gemini.errors import MissingChemistryError, PhysicsRangeError, UnknownCorrelationError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import corrosion, units
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.errors import raises
 
 GOLDEN = json.loads((Path(__file__).parents[2] / "fixtures/golden_values.json").read_text())
 
@@ -121,16 +122,16 @@ def test_partial_pressure_and_unknown_model():
     a = corrosion.co2_corrosion_rate("DLM", co2_fraction=0.1, **common)
     b = corrosion.co2_corrosion_rate("DLM", co2_partial_pressure=30000, **common)
     assert a == pytest.approx(b, rel=1e-12)
-    with pytest.raises(UnknownCorrelationError, match="'NORSK'.*did you mean 'NORSOK'"):
+    with raises(ValidationError, "unknown_name", match="'NORSK'.*did you mean 'NORSOK'"):
         corrosion.co2_corrosion_rate("NORSK", co2_fraction=0.1, **common)
-    with pytest.raises(MissingChemistryError, match="co2_fraction"):
+    with raises(PhysicsError, "missing_chemistry", match="co2_fraction"):
         corrosion.co2_corrosion_rate("DLM", **common)
 
 
 @pytest.mark.parametrize("model", ["NORSOK", "DLD"])
 def test_zero_flow_is_outside_flow_dependent_correlations(model):
     """NORSOK and DLD divide by the flow velocity; formerly ZeroDivisionError."""
-    with pytest.raises(PhysicsRangeError, match="water_flow_rate = 0"):
+    with pytest.raises(PhysicsError, match="water_flow_rate = 0"):
         corrosion.co2_corrosion_rate(
             model, temperature=330, pressure=3e5, water_flow_rate=0, co2_fraction=0.1
         )
@@ -146,7 +147,7 @@ def test_zero_flow_is_outside_flow_dependent_correlations(model):
 @pytest.mark.parametrize("chemistry", [{"co2_fraction": 0}, {"co2_partial_pressure": 0}])
 def test_zero_co2_is_outside_the_correlations(model, chemistry):
     """The correlations take the logarithm of the CO2 fugacity; formerly a math error."""
-    with pytest.raises(PhysicsRangeError, match="CO2 partial pressure = 0"):
+    with pytest.raises(PhysicsError, match="CO2 partial pressure = 0"):
         corrosion.co2_corrosion_rate(
             model, temperature=330, pressure=3e5, water_flow_rate=0.01, **chemistry
         )
@@ -154,7 +155,7 @@ def test_zero_co2_is_outside_the_correlations(model, chemistry):
 
 def test_negative_flow_with_a_complex_rate_is_rejected():
     """A negative DLD velocity makes the rate complex; formerly TypeError from float()."""
-    with pytest.raises(PhysicsRangeError, match="complex rate"):
+    with pytest.raises(PhysicsError, match="complex rate"):
         corrosion.co2_corrosion_rate(
             "DLD", temperature=330, pressure=3e5, water_flow_rate=-0.01, co2_fraction=0.1
         )
@@ -177,9 +178,9 @@ def test_wall_loss():
     np.testing.assert_allclose(
         corrosion.wall_loss([1, 2], [units.SECONDS_PER_YEAR / 2] * 2), [0.5, 1.5]
     )
-    with pytest.raises(PhysicsRangeError, match="shape"):
+    with pytest.raises(PhysicsError, match="shape"):
         corrosion.wall_loss([1, 2], [1])
-    with pytest.raises(PhysicsRangeError, match="negative"):
+    with pytest.raises(PhysicsError, match="negative"):
         corrosion.wall_loss([1], [-1])
 
 
@@ -246,7 +247,7 @@ def test_norsok_ph_on_a_dense_grid_has_no_rounding_boundary_flips():
 def test_norsok_ph_underflow_raises_the_error_of_the_float_path():
     """Equilibrium constants that underflow raise on arrays with the same message."""
     rows = [(60.0, 100.0, 10.0, 100.0, 1.0), (60.0, 100.0, 1e5, 100.0, 1.0)]
-    assert_same_error(_ph, rows, PhysicsRangeError)
+    assert_same_error(_ph, rows, PhysicsError)
 
 
 RATE_ROWS = [
@@ -288,15 +289,15 @@ def test_fitted_coefficients_match_arrays():
 @pytest.mark.parametrize("model", ["NORSOK", "DLM", "DLD"])
 def test_zero_co2_error_matches_arrays(model):
     """Zero CO2 raises the same message on arrays as on floats."""
-    assert_same_error(_rate(model, co2_fraction=0.0), RATE_ROWS, PhysicsRangeError)
+    assert_same_error(_rate(model, co2_fraction=0.0), RATE_ROWS, PhysicsError)
 
 
 @pytest.mark.parametrize("model", ["NORSOK", "DLD"])
 def test_flow_errors_match_arrays(model):
     """Zero flow raises the same message on arrays as on floats; DLD also rejects negative."""
-    assert_same_error(_rate(model), RATE_ROWS[:2] + [(330.0, 3e5, 0.0)], PhysicsRangeError)
+    assert_same_error(_rate(model), RATE_ROWS[:2] + [(330.0, 3e5, 0.0)], PhysicsError)
     if model == "DLD":
-        assert_same_error(_rate(model), RATE_ROWS[:2] + [(330.0, 3e5, -0.01)], PhysicsRangeError)
+        assert_same_error(_rate(model), RATE_ROWS[:2] + [(330.0, 3e5, -0.01)], PhysicsError)
 
 
 def test_kt_and_ph_factor_match_arrays():
@@ -374,5 +375,5 @@ def test_nan_input_passes_through_and_a_negative_flow_is_complex():
     arguments = dict(temperature=333.15, pressure=1e7, co2_fraction=0.01)
     rate = corrosion.co2_corrosion_rate("DLD", water_flow_rate=float("nan"), **arguments)
     assert math.isnan(rate)
-    with pytest.raises(PhysicsRangeError, match="complex"):
+    with pytest.raises(PhysicsError, match="complex"):
         corrosion.co2_corrosion_rate("DLD", water_flow_rate=-1, **arguments)

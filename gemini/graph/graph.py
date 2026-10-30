@@ -6,7 +6,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from gemini.errors import TraceError
+from gemini.graph.errors import TraceError
 from gemini.graph.node import Node, caller_source
 from gemini.graph.proxy import Proxy
 from gemini.ops import Constant, Failed, registry
@@ -116,6 +116,10 @@ class Graph:
         """Start collecting the checks of one physics function; return the next node index."""
         self.frames.append([])
         return len(self.nodes)
+
+    def constant_failure(self, function, error):
+        """Return the error of a check that failed on constant values, which ends the trace."""
+        return TraceError(f"{function}: a check failed on constant values: {error}")
 
     def abandon_frame(self):
         """Drop the running frame after an error; its checks stay unframed."""

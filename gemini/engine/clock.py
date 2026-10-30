@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from gemini.errors import CheckpointError, ClockError
+from gemini.errors import RunError
 from gemini.utils.time import DEFAULT_STEP, interval_seconds, median_step, parse_duration, to_utc
 
 
@@ -26,9 +26,10 @@ class Clock:
         """Validate ordered unique UTC ticks and retain a final interval."""
         self.ticks = pd.DatetimeIndex(pd.to_datetime(list(ticks), utc=True))
         if not self.ticks.is_unique or not self.ticks.is_monotonic_increasing or self.ticks.hasnans:
-            raise ClockError(
+            raise RunError(
                 f"Clock: tick = {_first_unordered(self.ticks)}; expected strictly increasing "
-                "timestamps"
+                "timestamps",
+                code="clock",
             )
         inferred = median_step(self.ticks) or DEFAULT_STEP
         self.step = parse_duration(step if step is not None else inferred)
@@ -54,8 +55,9 @@ class Clock:
             span = (
                 f"{self.ticks[0].isoformat()} .. {self.ticks[-1].isoformat()}" if len(self) else ""
             )
-            raise ClockError(
-                f"Clock: t = {timestamp.isoformat()}; expected one of {len(self)} ticks {span}"
+            raise RunError(
+                f"Clock: t = {timestamp.isoformat()}; expected one of {len(self)} ticks {span}",
+                code="clock",
             )
         return int(self.ticks.get_loc(timestamp))
 
@@ -87,7 +89,9 @@ class Clock:
             return FixedClock(spec["start"], spec["end"], spec["step"])
         if spec.get("kind") == "ticks":
             return Clock(spec["ticks"], spec["step"])
-        raise CheckpointError(f"Clock: kind = {spec.get('kind')!r}; expected 'fixed' or 'ticks'")
+        raise RunError(
+            f"Clock: kind = {spec.get('kind')!r}; expected 'fixed' or 'ticks'", code="checkpoint"
+        )
 
     @staticmethod
     def year(year, step="1h", tz="UTC"):
@@ -100,7 +104,7 @@ class Clock:
     def days(year, month, day, days=1, step="1h", tz="UTC"):
         """Cover calendar days in the chosen timezone; DST days may have 23 or 25 hours."""
         if days <= 0:
-            raise ClockError(f"Clock.days: days = {days!r}; expected a positive count")
+            raise RunError(f"Clock.days: days = {days!r}; expected a positive count", code="clock")
         start = pd.Timestamp(year=year, month=month, day=day, tz=tz)
         return Clock._calendar(start, start + pd.DateOffset(days=days), step)
 

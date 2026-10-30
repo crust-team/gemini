@@ -5,8 +5,9 @@ import pytest
 
 import gemini as gm
 from gemini import ops
-from gemini.errors import PhysicsRangeError, TraceError
+from gemini.errors import PhysicsError
 from gemini.graph import GraphCache, run, run_function
+from gemini.graph.errors import TraceError
 from gemini.ops import Constant
 
 from .conftest import Chain, Gain, Opaque, Stubborn, Switcher, Tank, Vectored
@@ -51,7 +52,7 @@ def test_a_reading_hook_makes_the_root_a_break_that_sees_every_real_row(gain, in
 
 def test_errors_raise_after_the_run(gain, inlet):
     """A negative gain raises the untraced error for its first row."""
-    with pytest.raises(PhysicsRangeError, match="gain: gain = -1.0"):
+    with pytest.raises(PhysicsError, match="gain: gain = -1.0"):
         run(gain, {"inlet": inlet}, {"gain": np.array([1.0, -1.0, -2.0])})
 
 
@@ -125,7 +126,7 @@ def test_composite_child_inputs_come_from_the_tree(line, inlet):
 
 def test_composite_errors_raise_the_child_error(line, inlet):
     """A negative control of a child raises the child's error class and message."""
-    with pytest.raises(PhysicsRangeError, match="gain: gain = -1.0"):
+    with pytest.raises(PhysicsError, match="gain: gain = -1.0"):
         run(line, {"inlet": inlet}, {"boost": np.array([1.0, -1.0, 2.0])})
 
 
@@ -175,7 +176,7 @@ def test_a_leaf_break_keeps_the_rest_in_the_graph(kind, chain_inlet):
 def test_a_failing_break_row_raises_its_own_exception(chain_inlet):
     """The exception of the first failing row of the child is raised as it was."""
     chain = Chain(Stubborn().update_params(scale=3.0))
-    with pytest.raises(PhysicsRangeError, match="middle: gain = -2.0"):
+    with pytest.raises(PhysicsError, match="middle: gain = -2.0"):
         run(chain, {"inlet": chain_inlet}, {"drive": np.array([1.0, -2.0, -3.0])})
 
 
@@ -236,7 +237,7 @@ MESSAGE = "pipe: x = {x} m; expected x >= 0"
 @ops.physics
 def doubled(x):
     """Double ``x``, which must not be negative."""
-    ops.check(x >= 0, PhysicsRangeError, MESSAGE, x=x)
+    ops.check(x >= 0, PhysicsError, MESSAGE, x=x)
     return x * 2.0
 
 
@@ -267,7 +268,7 @@ def pair(x, y):
 @ops.physics
 def checked_pass_through(x):
     """Check ``x`` and return the argument itself."""
-    ops.check(x >= 0, PhysicsRangeError, MESSAGE, x=x)
+    ops.check(x >= 0, PhysicsError, MESSAGE, x=x)
     return x
 
 
@@ -291,7 +292,7 @@ def two_failures_reversed(x, y):
 
 def inline_check(x, gate):
     """Raise at once for a check outside any physics function, whatever the gate does."""
-    ops.check(x >= 0, PhysicsRangeError, MESSAGE, x=x)
+    ops.check(x >= 0, PhysicsError, MESSAGE, x=x)
     return ops.where(gate > 0.0, 0.0, x * 2.0)
 
 
@@ -325,7 +326,7 @@ def outcome(call):
     """Return the value of ``call()``, or the class and message of its error."""
     try:
         return call()
-    except PhysicsRangeError as error:
+    except PhysicsError as error:
         return type(error), str(error)
 
 
@@ -341,9 +342,9 @@ def test_run_function_lets_an_array_row_cross_a_where_around_a_check():
     """Rows the gate stops do not raise; the first failing selected row does."""
     x = np.array([-1.0, 2.0, -3.0])
     assert run_function(gated, x, np.array([1.0, -1.0, 1.0])).tolist() == [0.0, 4.0, 0.0]
-    with pytest.raises(PhysicsRangeError, match=r"x = -2\.0 m"):
+    with pytest.raises(PhysicsError, match=r"x = -2\.0 m"):
         run_function(gated, np.array([-1.0, -2.0, 3.0]), np.array([1.0, -1.0, -1.0]))
-    with pytest.raises(PhysicsRangeError, match=r"x = -1\.0 m"):
+    with pytest.raises(PhysicsError, match=r"x = -1\.0 m"):
         doubled(x)
 
 
@@ -367,7 +368,7 @@ def test_a_physics_function_that_failed_on_constants_cannot_be_traced():
     def constant_failure(x):
         return x + doubled(-1.0)
 
-    with pytest.raises(PhysicsRangeError, match="x = -1.0 m"):
+    with pytest.raises(PhysicsError, match="x = -1.0 m"):
         constant_failure(1.0)
     with pytest.raises(TraceError, match="check failed on constant values"):
         run_function(constant_failure, 1.0)

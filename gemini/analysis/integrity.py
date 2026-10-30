@@ -83,7 +83,7 @@ def corrosion_forecast(model, until):
         ``years_left`` [year] is a value: the time from ``start`` to the minimum wall, 0 when the
         wall is already at it, and ``None`` with a ``reason`` when the rate is not positive. The
         rate of a correlation outside its domain raises
-        ``PhysicsRangeError``.
+        ``PhysicsError``.
     """
     start, end = to_utc(model["start"]), to_utc(until)
     if end <= start:

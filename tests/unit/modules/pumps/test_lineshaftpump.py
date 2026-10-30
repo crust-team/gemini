@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.pumps import ESP, LineShaftPump
 from gemini.physics import units
@@ -57,13 +57,13 @@ def test_zero_flow_runs_at_shutoff():
 
 
 def test_reverse_flow_and_off_curve_raise():
-    """Reverse flow, a negative head and a negative pump power raise PhysicsRangeError."""
+    """Reverse flow, a negative head and a negative pump power raise PhysicsError."""
     suction = Stream(m_dot=40, T=340, p=1e6)
-    with pytest.raises(PhysicsRangeError, match="reverse flow"):
+    with pytest.raises(PhysicsError, match="reverse flow"):
         pump()(suction=suction.with_(m_dot=-1), frequency=50)
-    with pytest.raises(PhysicsRangeError, match="head curve"):
+    with pytest.raises(PhysicsError, match="head curve"):
         pump(head_coefficients=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
-    with pytest.raises(PhysicsRangeError, match="power curve"):
+    with pytest.raises(PhysicsError, match="power curve"):
         pump(power_coefficients=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
 
 

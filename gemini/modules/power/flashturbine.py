@@ -1,7 +1,7 @@
 """Single-flash condensing steam turbine with Baumann wet-expansion losses."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import steam
 from gemini.types import (
@@ -103,23 +103,23 @@ class FlashTurbine(Module):
     def _expansion(self, inlet):
         """Return the Baumann expansion of the inlet steam to the condenser pressure.
 
-        Raises ``PhysicsRangeError`` outside the model domain; ``forward`` calls it to reject
+        Raises ``PhysicsError`` outside the model domain; ``forward`` calls it to reject
         such an inlet before it emits the condensate.
         """
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )
         if inlet.fluid.kind != "steam":
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"{self.path}: inlet.fluid.kind = {inlet.fluid.kind!r}; expected 'steam'"
             )
         ops.check(
             inlet.p > self.condenser_pressure,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.p = {p} Pa; expected above the condenser pressure "
             "{condenser_pressure} Pa",
             path=self.path,

@@ -8,7 +8,7 @@ its kelvin inputs internally.
 import math
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics import heat_transfer
 from gemini.physics.units import k_to_c
 
@@ -131,7 +131,7 @@ def log_mean_temperature(inlet_temperature: float, outlet_temperature: float) ->
     )
     ops.check(
         ops.logical_and(inlet_temperature > 0, outlet_temperature > 0),
-        PhysicsRangeError,
+        PhysicsError,
         "log_mean_temperature: inlet_temperature = {inlet_temperature} K, "
         "outlet_temperature = {outlet_temperature} K; expected positive temperatures",
         inlet_temperature=inlet_temperature,
@@ -273,7 +273,7 @@ def characteristic_evaporator_duty(
     )
     ops.check(
         ops.logical_and(slope >= 0, sensitivity >= 0),
-        PhysicsRangeError,
+        PhysicsError,
         "characteristic_evaporator_duty: slope = {slope} W/K, sensitivity = "
         "{sensitivity} K/W; expected both >= 0",
         slope=slope,
@@ -331,7 +331,7 @@ def characteristic_sensitivity(
     smallest = ops.minimum(ops.minimum(generator_rate, rejection_rate), evaporator_rate)
     ops.check(
         smallest >= 0,
-        PhysicsRangeError,
+        PhysicsError,
         "characteristic_sensitivity: capacity rates {{'generator_rate': {generator_rate}, "
         "'rejection_rate': {rejection_rate}, 'evaporator_rate': {evaporator_rate}}} W/K; "
         "expected all >= 0",
@@ -397,7 +397,7 @@ def sorption_evaporator_capacity(
     """
     ops.check(
         ops.logical_and(thermal_cop > 0, auxiliary_power_ratio >= 0),
-        PhysicsRangeError,
+        PhysicsError,
         "sorption_evaporator_capacity: thermal_cop = {thermal_cop}, auxiliary_power_ratio "
         "= {auxiliary_power_ratio}; expected thermal_cop > 0 and auxiliary_power_ratio >= 0",
         thermal_cop=thermal_cop,
@@ -579,7 +579,7 @@ def part_load_duty(requested: float, capacity: float, minimum_part_load: float) 
             ops.logical_and(requested >= 0, capacity > 0),
             ops.logical_and(minimum_part_load >= 0, minimum_part_load <= 1),
         ),
-        PhysicsRangeError,
+        PhysicsError,
         "part_load_duty: requested = {requested} W, capacity = {capacity} W, "
         "minimum_part_load = {minimum_part_load}; expected requested >= 0, capacity > 0 "
         "and minimum_part_load in [0, 1]",
@@ -609,7 +609,7 @@ def _lift(function, sink_temperature, source_temperature, minimum_lift):
         ops.logical_and(
             ops.logical_and(sink_temperature > 0, source_temperature > 0), minimum_lift >= 0
         ),
-        PhysicsRangeError,
+        PhysicsError,
         "{function}: sink_temperature = {sink_temperature} K, source_temperature = "
         "{source_temperature} K, minimum_lift = {minimum_lift} K; expected positive "
         "temperatures and minimum_lift >= 0",
@@ -622,7 +622,7 @@ def _lift(function, sink_temperature, source_temperature, minimum_lift):
     floored = ops.maximum(lift, minimum_lift)
     ops.check(
         floored > 0,
-        PhysicsRangeError,
+        PhysicsError,
         "{function}: lift = {lift} K, minimum_lift = {minimum_lift} K; expected "
         "sink_temperature above source_temperature or a positive minimum_lift",
         function=function,

@@ -2,6 +2,7 @@
 
 from gemini.economics.assumptions import discounting, resolve
 from gemini.economics.costs import annual_energies, capex, opex
+from gemini.economics.outcome import currency_of, reported, unavailable
 from gemini.types.shapes import value
 
 
@@ -12,25 +13,33 @@ def annuity(rate, years):
     return (1 - (1 + rate) ** -years) / rate
 
 
-def _levelised(plant, results, product, rate, years, assumptions):
+def _levelised(plant, results, product, rate, years, assumptions, on_error):
     """Return the levelised cost of ``product`` ("heat" or "cold") over the lifetime."""
+    return reported(
+        on_error,
+        f"{currency_of(assumptions)}/J",
+        lambda: _cost_of(plant, results, product, rate, years, assumptions, on_error),
+    )
+
+
+def _cost_of(plant, results, product, rate, years, assumptions, on_error):
+    """Compute the levelised cost; ``on_error`` applies to a value the plant cannot give."""
     assumptions = resolve(assumptions)
     rate, years = discounting(assumptions, rate, years)
-    investment = capex(plant, assumptions)
+    investment = capex(plant, assumptions, "record")
     unit = f"{investment['unit']}/J"
     if investment["value"] is None:
-        return value(None, unit, investment["reason"])
+        return unavailable(unit, investment["reason"], on_error)
     annual = annual_energies(plant, results)
     delivered, other = (
         (annual.heat, annual.cold) if product == "heat" else (annual.cold, annual.heat)
     )
     if delivered <= 0:
-        return value(None, unit, f"the run delivers no {product}")
+        return unavailable(unit, f"the run delivers no {product}", on_error)
     if other > 0:
-        return value(
-            None, unit, "the plant delivers heat and cold; the split of its cost is not defined"
-        )
-    yearly = opex(plant, results, assumptions)["value"]
+        reason = "the plant delivers heat and cold; the split of its cost is not defined"
+        return unavailable(unit, reason, on_error)
+    yearly = opex(plant, results, assumptions, "raise")["value"]
     factor = annuity(rate, years)
     cost = investment["value"] + yearly * factor
     return value(
@@ -44,7 +53,7 @@ def _levelised(plant, results, product, rate, years, assumptions):
     )
 
 
-def lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None):
+def lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise"):
     """Return the levelised cost of heat [currency/J]: the discounted cost over the discounted heat.
 
     ``(capex + opex * A) / (heat * A)`` with ``A`` the annuity factor, the sum over the lifetime
@@ -65,22 +74,24 @@ def lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None):
     assumptions : Assumptions, optional
         Prices and, when not given above, the rate and lifetime. A rate or lifetime given nowhere
         raises ``ValidationError`` (code ``missing_value``).
+    on_error : {"raise", "record"}, optional
+        A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
     Returns
     -------
     dict
         ``{value, unit, capex, opex, energy, discount_rate, lifetime_years}``, the last five each
-        a value; ``value`` in currency/J (multiply by 3.6e9 for currency/MWh), ``None`` with a
-        ``reason`` when the plant declares no cost, delivers no heat or also delivers cold.
+        a value; ``value`` in currency/J (multiply by 3.6e9 for currency/MWh). A plant that
+        declares no cost, delivers no heat or also delivers cold has no value.
     """
-    return _levelised(plant, results, "heat", discount_rate, lifetime, assumptions)
+    return _levelised(plant, results, "heat", discount_rate, lifetime, assumptions, on_error)
 
 
-def lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None):
+def lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise"):
     """Return the levelised cost of cold [currency/J]; the cooling twin of ``lcoh``.
 
     The same formula with the cold delivered (``heat_absorbed`` of the ``CoolingConsumer``
     leaves) in place of the heat, and a plant that also delivers heat gives no value. The
     parameters and the return shape are those of ``lcoh``.
     """
-    return _levelised(plant, results, "cold", discount_rate, lifetime, assumptions)
+    return _levelised(plant, results, "cold", discount_rate, lifetime, assumptions, on_error)

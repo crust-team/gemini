@@ -3,8 +3,9 @@
 import pytest
 
 import gemini as gm
-from gemini.errors import UnknownNameError, ValidationError
+from gemini.errors import ValidationError
 from gemini.modules.plants import outputs
+from tests.fixtures.errors import raises
 
 
 @pytest.fixture
@@ -42,12 +43,12 @@ def test_bad_outputs_name_the_problem(plant):
     """Missing keys, unknown modules and outputs, non-additive sums and clashes are refused."""
     with pytest.raises(ValidationError):
         outputs.declare_output(plant, "x", {"of": "exchanger.duty", "sum": "heat_loss"})
-    with pytest.raises(UnknownNameError):
+    with raises(ValidationError, "unknown_name"):
         outputs.declare_output(plant, "x", {"of": "exchangr.duty"})
-    with pytest.raises(UnknownNameError) as caught:
+    with raises(ValidationError, "unknown_name") as caught:
         outputs.declare_output(plant, "x", {"of": "exchanger.dutty"})
     assert caught.value.suggestions == ("duty",)
-    with pytest.raises(UnknownNameError):
+    with raises(ValidationError, "unknown_name"):
         outputs.declare_output(plant, "x", {"sum": "nothing"})
     with pytest.raises(ValidationError):
         outputs.declare_output(plant, "x", {"sum": "effectiveness"})

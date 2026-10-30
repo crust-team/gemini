@@ -92,7 +92,7 @@ Physics authors write:
 
 ```
 if re < 2300: f = 64 / re            ->  f = gm.where(re < 2300, 64 / re, turbulent(re))
-if p < 0: raise PhysicsRangeError    ->  gm.check(p >= 0, PhysicsRangeError, "...")
+if p < 0: raise PhysicsError    ->  gm.check(p >= 0, PhysicsError, "...")
 ```
 
 The engine handles the side effects of evaluating both branches of `where` on arrays:
@@ -271,7 +271,7 @@ Where the implementation differs from sections 1 to 11, and why:
 - **`Stream` and `FluidProperties` are plain slots dataclasses.** The `rho_l`, `rho_g` and `gmf` graph
   inputs are gone. Validation happens at the boundary and raises
   `gm.errors`: numbers become `float`; `m_dot` must be finite, `T > 0`, `p >= 0`
-  (`PhysicsRangeError`). When a field is an array or a traced value the same limits are
+  (`PhysicsError`). When a field is an array or a traced value the same limits are
   `ops.check` calls, so an invalid row raises the same class. `with_` is a trusted copy
   (`object.__new__`, same `Fluid`, only changed fields checked), about 5 us against 25 us before.
   A traced inlet is a `Stream` of `Proxy` fields with the concrete `Fluid`: **a `Fluid` is static
@@ -319,7 +319,7 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Hooks.** An ordinary forward hook is called once on traced values and classified: one that
   writes outputs joins the graph, one that only reads, and any pre-hook, makes its leaf a break
   or the root a root break, so it runs for real on every row. `EventLog` registers no hook.
-- **Limits.** `Declaration.limits()` gives an `ops.check(..., DeclarationError)` for every traced
+- **Limits.** `Declaration.limits()` gives an `ops.check(..., ValidationError)` for every traced
   control, boundary and output, attached to every output so a violated bound always fails the
   row, and the root inlets carry the `Stream` limits.
 - **One evaluation.** `gemini.graph.evaluate(graph, feeds, rows, context)` runs a graph on the
@@ -423,7 +423,7 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
 - **Migration.** `gm.plants.migrate(old)` converts format 1 files; a root class that is a shipped
   plant takes that plant's wiring with the stored values that differ from the starting values,
   any other root becomes a handwritten root. `scripts/migrate_plants.py` runs it over files.
-  Loading an old file raises `PlantFormatError` with code `old_format`, naming the function.
+  Loading an old file raises `ValidationError` with code `old_format`, naming the function.
 - **Shipped plants and templates.** `specs/` holds the plants that ship as specs (`Doublet`,
   `DoubletHeatPlant`, `MultiWellPlant`, `DistrictNetwork`), registered by file name. The two of
   variable size are written by `generators.py` (`multi_well_spec`, `district_network_spec`): the

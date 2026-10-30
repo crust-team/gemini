@@ -7,6 +7,7 @@ from gemini.economics import levelised
 from gemini.modules import CoolingConsumer
 from gemini.physics.units import SECONDS_PER_YEAR
 from tests.fixtures.costed_plants import cooling_plant, day, heating_plant
+from tests.fixtures.errors import raises
 
 PRICES = gm.economics.Assumptions(electricity_price=2e-8)
 HEAT = 1000.0 * SECONDS_PER_YEAR
@@ -52,14 +53,18 @@ def test_a_missing_rate_is_asked_for():
 
 def test_null_with_a_reason_when_the_cost_or_the_heat_is_missing():
     """No declared cost, no heat delivered, or heat and cold together give no value."""
-    unpriced = gm.economics.lcoh(heating_plant(costed=False), day(), 0.05, 20, PRICES)
+    unpriced = gm.economics.lcoh(
+        heating_plant(costed=False), day(), 0.05, 20, PRICES, on_error="record"
+    )
     assert unpriced["value"] is None and "no module declares a cost" in unpriced["reason"]
-    idle = gm.economics.lcoh(heating_plant(), day(heat=0.0), 0.05, 20, PRICES)
+    idle = gm.economics.lcoh(heating_plant(), day(heat=0.0), 0.05, 20, PRICES, on_error="record")
     assert idle["reason"] == "the run delivers no heat"
     plant = heating_plant()
     plant.add_module("cool", CoolingConsumer())
-    both = gm.economics.lcoh(plant, day(cold=100.0), 0.05, 20, PRICES)
+    both = gm.economics.lcoh(plant, day(cold=100.0), 0.05, 20, PRICES, on_error="record")
     assert both["value"] is None and "split of its cost" in both["reason"]
+    with raises(gm.errors.ValidationError, "no_value", match="split of its cost"):
+        gm.economics.lcoh(plant, day(cold=100.0), 0.05, 20, PRICES)
 
 
 def test_lcoc_divides_by_the_cold_delivered():

@@ -6,7 +6,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from gemini.errors import DatasetError
+from gemini.errors import RunError
 from gemini.types.bindings import ColumnInfo
 from gemini.utils.strings import did_you_mean, join_names
 from gemini.utils.time import median_step, to_utc, to_utc_index
@@ -33,28 +33,33 @@ class Dataset:
     def __init__(self, frame, units=None):
         """Own and validate a sorted, unique, UTC-indexed frame."""
         if not isinstance(frame, pd.DataFrame):
-            raise DatasetError(
-                f"Dataset: frame = {type(frame).__name__}; expected a pandas DataFrame"
+            raise RunError(
+                f"Dataset: frame = {type(frame).__name__}; expected a pandas DataFrame",
+                code="invalid_data",
             )
         self._frame = frame.copy().infer_objects()
         try:
             self._frame.index = pd.to_datetime(self._frame.index, utc=True)
         except (TypeError, ValueError) as exc:
-            raise DatasetError(f"Dataset: index is invalid; expected timestamps ({exc})") from exc
+            raise RunError(
+                f"Dataset: index is invalid; expected timestamps ({exc})", code="invalid_data"
+            ) from exc
         self._frame.index.name = "time"
         self._frame = self._frame.sort_index()
         if self._frame.index.has_duplicates or self._frame.index.hasnans:
-            raise DatasetError(
+            raise RunError(
                 f"Dataset: timestamp = {_first_invalid_timestamp(self._frame.index)}; expected "
-                "unique timestamps and no NaT"
+                "unique timestamps and no NaT",
+                code="invalid_data",
             )
         self._check_column_names()
         self.columns = _metadata(units)
         unknown = sorted(set(self.columns) - set(self._frame.columns))
         if unknown:
-            raise DatasetError(
+            raise RunError(
                 f"Dataset: unit metadata columns = {join_names(unknown)}; expected data "
-                f"columns{did_you_mean(unknown[0], self._frame.columns)}"
+                f"columns{did_you_mean(unknown[0], self._frame.columns)}",
+                code="invalid_data",
             )
         self.names = tuple(self._frame.columns)
 
@@ -63,10 +68,15 @@ class Dataset:
         columns = self._frame.columns
         if columns.has_duplicates:
             repeated = sorted(set(columns[columns.duplicated()]))
-            raise DatasetError(f"Dataset: column names = {repeated}; expected unique names")
+            raise RunError(
+                f"Dataset: column names = {repeated}; expected unique names", code="invalid_data"
+            )
         invalid = [name for name in columns if not isinstance(name, str) or not name]
         if invalid:
-            raise DatasetError(f"Dataset: column names = {invalid!r}; expected nonempty strings")
+            raise RunError(
+                f"Dataset: column names = {invalid!r}; expected nonempty strings",
+                code="invalid_data",
+            )
 
     @property
     def start(self):
@@ -95,9 +105,10 @@ class Dataset:
         selected = list(columns) if columns is not None else list(self.names)
         missing = sorted(set(selected) - set(self.names))
         if missing:
-            raise DatasetError(
+            raise RunError(
                 f"Dataset: columns = {join_names(missing)}; expected columns of this dataset"
-                f"{did_you_mean(missing[0], self.names)}"
+                f"{did_you_mean(missing[0], self.names)}",
+                code="invalid_data",
             )
         lower = to_utc(start) if start is not None else None
         upper = to_utc(end) if end is not None else None
@@ -147,17 +158,19 @@ class Dataset:
         frame = df.copy()
         if time_column is not None:
             if time_column not in frame:
-                raise DatasetError(
+                raise RunError(
                     f"Dataset.from_frame: time_column = {time_column!r}; expected one of "
-                    f"{join_names(map(str, frame.columns))}{did_you_mean(time_column, frame)}"
+                    f"{join_names(map(str, frame.columns))}{did_you_mean(time_column, frame)}",
+                    code="invalid_data",
                 )
             times = frame.pop(time_column)
         elif isinstance(frame.index, pd.DatetimeIndex):
             times = frame.index
         else:
-            raise DatasetError(
+            raise RunError(
                 f"Dataset.from_frame: index = {type(frame.index).__name__}; expected a "
-                "DatetimeIndex when time_column is omitted"
+                "DatetimeIndex when time_column is omitted",
+                code="invalid_data",
             )
         frame.index = to_utc_index(times, tz)
         return Dataset(frame, units)
@@ -179,9 +192,10 @@ class Dataset:
         """Build from a two-dimensional value array and explicit column names."""
         values = np.asarray(values)
         if values.ndim != 2 or values.shape[1] != len(columns):
-            raise DatasetError(
+            raise RunError(
                 f"Dataset.from_numpy: values shape = {values.shape}; expected (rows, "
-                f"{len(columns)}) for {len(columns)} column names"
+                f"{len(columns)}) for {len(columns)} column names",
+                code="invalid_data",
             )
         frame = pd.DataFrame(values, index=to_utc_index(time, tz), columns=columns)
         return Dataset.from_frame(frame, units=units, tz=tz)
@@ -190,13 +204,16 @@ class Dataset:
     def from_profiles(profiles):
         """Combine profiles sharing one clock; their values and units are already SI."""
         if not profiles:
-            raise DatasetError("Dataset.from_profiles: profiles = {}; expected at least one")
+            raise RunError(
+                "Dataset.from_profiles: profiles = {}; expected at least one", code="invalid_data"
+            )
         index = next(iter(profiles.values())).index
         differing = [name for name, profile in profiles.items() if profile.index != index]
         if differing:
-            raise DatasetError(
+            raise RunError(
                 f"Dataset.from_profiles: profile {differing[0]!r} index differs from the first "
-                "profile; expected one shared index (resample explicitly)"
+                "profile; expected one shared index (resample explicitly)",
+                code="invalid_data",
             )
         frame = pd.DataFrame(
             {name: profile.values for name, profile in profiles.items()}, index=index
@@ -213,19 +230,21 @@ def as_dataset(data):
 
     A DataFrame needs a timezone-aware ``DatetimeIndex`` (any zone; the instants become UTC) and
     columns named by the binding ``column``. Its values have the units of the bindings. A naive
-    index raises ``DatasetError``, because a local time without a zone is ambiguous.
+    index raises ``RunError``, because a local time without a zone is ambiguous.
     """
     if isinstance(data, Dataset):
         return data
     if not isinstance(data, pd.DataFrame):
-        raise DatasetError(
-            f"run input: type = {type(data).__name__}; expected a Dataset or a pandas DataFrame"
+        raise RunError(
+            f"run input: type = {type(data).__name__}; expected a Dataset or a pandas DataFrame",
+            code="invalid_data",
         )
     index = data.index
     if not isinstance(index, pd.DatetimeIndex) or index.tz is None:
-        raise DatasetError(
+        raise RunError(
             f"run input: index = {type(index).__name__} without a timezone; expected a "
-            "timezone-aware DatetimeIndex (UTC)"
+            "timezone-aware DatetimeIndex (UTC)",
+            code="invalid_data",
         )
     return Dataset(data)
 

@@ -145,14 +145,14 @@ def test_faulted_rows_give_the_same_errors_and_skips(faulty):
 
 
 def test_raise_stops_at_the_same_row_with_the_same_chained_error(shared_plant, faulted_window):
-    """``on_error="raise"`` ends the run with the same ``StepError`` and cause on every backend."""
+    """``on_error="raise"`` ends the run with the same ``RunError`` and cause on every backend."""
     outcomes = on_each_backend(
         lambda backend: run_engine(
             copy.deepcopy(shared_plant), _dataset(faulted_window), on_error="raise"
         )
     )
     reference = outcomes[REFERENCE]
-    assert reference.failure[0] == "StepError" and reference.failure[2] == "PhysicsRangeError"
+    assert reference.failure[0] == "RunError" and reference.failure[2] == "PhysicsError"
     assert_runs_match(outcomes)
 
 

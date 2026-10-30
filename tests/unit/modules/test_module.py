@@ -24,6 +24,7 @@ from gemini.types import (
     Power,
     Stream,
 )
+from tests.fixtures.errors import raises
 
 
 class PassThrough(Module):
@@ -74,7 +75,7 @@ def test_registration_construction_and_state():
     module.value = 4
     module.load_state_dict(state)
     assert module.value == 3
-    with pytest.raises(TypeError):
+    with pytest.raises(gm.errors.ValidationError):
         module.value = -1
 
 
@@ -94,24 +95,39 @@ def test_call_output_and_signature_guards():
     assert all(isinstance(result.outlets, Ports) for result in results)
     assert module.result.soft_sensor
 
-    with pytest.raises(
-        gm.errors.CallError, match="pass_through.*missing.*inlet.*valid names: inlet"
+
+def test_a_wrong_call_names_the_inlets():
+    """Missing, misspelled, mixed, invalid and repeated inlets each say what is valid."""
+    stream = Stream(m_dot=1, T=300, p=1e5)
+    module = PassThrough().update_params(value=2)
+    with raises(
+        gm.errors.ValidationError,
+        "invalid_call",
+        match="pass_through.*missing.*inlet.*valid names: inlet",
     ):
         module()
-    with pytest.raises(
-        gm.errors.CallError, match="pass_through.*inlett.*valid names.*did you mean 'inlet'"
+    with raises(
+        gm.errors.ValidationError,
+        "invalid_call",
+        match="pass_through.*inlett.*valid names.*did you mean 'inlet'",
     ):
         module(inlett=stream)
-    with pytest.raises(
-        gm.errors.CallError, match="pass_through.*cannot mix.*inlet.*valid names: inlet"
+    with raises(
+        gm.errors.ValidationError,
+        "invalid_call",
+        match="pass_through.*cannot mix.*inlet.*valid names: inlet",
     ):
         module({"inlet": stream}, inlet=stream)
-    with pytest.raises(
-        gm.errors.CallError, match="pass_through.*invalid inlet 'inlet'.*valid names: inlet"
+    with raises(
+        gm.errors.ValidationError,
+        "invalid_call",
+        match="pass_through.*invalid inlet 'inlet'.*valid names: inlet",
     ):
         module(inlet=1)
-    with pytest.raises(
-        gm.errors.CallError, match="pass_through.*multiple values.*inlet.*valid names"
+    with raises(
+        gm.errors.ValidationError,
+        "invalid_call",
+        match="pass_through.*multiple values.*inlet.*valid names",
     ):
         module(stream, inlet=stream)
 
@@ -125,18 +141,18 @@ def test_outlet_dict_names_and_flow_types_are_checked(monkeypatch):
         return inlets.inlet
 
     monkeypatch.setattr(module, "forward", scalar_forward)
-    with pytest.raises(gm.errors.OutletError, match="outlet dict"):
+    with pytest.raises(gm.errors.DefinitionError, match="outlet dict"):
         module(inlet=stream)
 
     monkeypatch.setattr(module, "forward", lambda inlets: {})
-    with pytest.raises(gm.errors.OutletError, match=r"pass_through.*missing=\['outlet'\]"):
+    with pytest.raises(gm.errors.DefinitionError, match=r"pass_through.*missing=\['outlet'\]"):
         module(inlet=stream)
     monkeypatch.setattr(module, "forward", lambda inlets: {"outlet": stream, "extra": stream})
-    with pytest.raises(gm.errors.OutletError, match=r"pass_through.*extra=\['extra'\]"):
+    with pytest.raises(gm.errors.DefinitionError, match=r"pass_through.*extra=\['extra'\]"):
         module(inlet=stream)
     monkeypatch.setattr(module, "forward", lambda inlets: {"outlet": 1})
     with pytest.raises(
-        gm.errors.OutletError, match="pass_through.*invalid outlet 'outlet'.*valid names"
+        gm.errors.DefinitionError, match="pass_through.*invalid outlet 'outlet'.*valid names"
     ):
         module(inlet=stream)
 
@@ -196,7 +212,7 @@ def test_uninitialized_and_hooks():
     """Uninitialized parameters and hook ordering have clear behavior."""
     module = PassThrough()
     assert module.missing_parameters() == ["value"]
-    with pytest.raises(gm.errors.MissingValueError, match="uninitialized"):
+    with raises(gm.errors.ValidationError, "missing_value", match="uninitialized"):
         module(inlet=Stream(m_dot=1, T=300, p=1e5))
     module.value = 2
     calls = []
@@ -255,7 +271,7 @@ def test_input_resolution_units_bounds_and_metadata():
     assert module(inlet=stream).outputs.total == 90
     assert module(inlet=stream, frequency="45 Hz").outputs.total == 95
     assert module.frequency == 40
-    with pytest.raises(TypeError, match="frequency.*invalid control.*Hz"):
+    with pytest.raises(gm.errors.ValidationError, match="frequency.*invalid control.*Hz"):
         module.frequency = "61 Hz"
 
 
@@ -263,14 +279,18 @@ def test_missing_input_and_unknown_keyword_errors_are_complete():
     """Missing and unknown values report path, kind, unit and valid names before forward."""
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = RequiredInputs()
-    with pytest.raises(gm.errors.MissingValueError, match="required_inputs.frequency.*control.*Hz"):
-        module(inlet=stream)
-    module.frequency = 50
-    with pytest.raises(
-        gm.errors.MissingValueError, match="required_inputs.grid_frequency.*boundary.*Hz"
+    with raises(
+        gm.errors.ValidationError, "missing_value", match="required_inputs.frequency.*control.*Hz"
     ):
         module(inlet=stream)
-    with pytest.raises(gm.errors.CallError, match="valid names"):
+    module.frequency = 50
+    with raises(
+        gm.errors.ValidationError,
+        "missing_value",
+        match="required_inputs.grid_frequency.*boundary.*Hz",
+    ):
+        module(inlet=stream)
+    with raises(gm.errors.ValidationError, "invalid_call", match="valid names"):
         module(inlet=stream, typo=1)
 
 
@@ -376,7 +396,7 @@ def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
     parent = ParentInputs()
     parent.set_inputs({"child.frequency": "50 Hz", "child.grid_frequency": 50})
     assert parent().children["child"].outputs.total == 100
-    with pytest.raises(gm.errors.UnknownNameError, match="did you mean 'child.frequency'"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'child.frequency'"):
         parent.set_inputs({"child.frequncy": 40})
 
 
@@ -384,15 +404,15 @@ def test_hooks_require_the_fixed_signatures():
     """Hook registration rejects old by-name, variadic and defaulted signatures."""
     module = PassThrough().update_params(value=1)
 
-    with pytest.raises(gm.errors.DeclarationError, match="forward hook.*module, inlets, outlets"):
+    with pytest.raises(gm.errors.DefinitionError, match="forward hook.*module, inlets, outlets"):
         module.register_forward_hook(lambda module, inlet, outlet: None)
-    with pytest.raises(gm.errors.DeclarationError, match="forward pre-hook.*module, inlets"):
+    with pytest.raises(gm.errors.DefinitionError, match="forward pre-hook.*module, inlets"):
         module.register_forward_pre_hook(lambda module: None)
 
     def defaulted(module, inlets, outlets=None):
         pass
 
-    with pytest.raises(gm.errors.DeclarationError, match="forward hook.*module, inlets, outlets"):
+    with pytest.raises(gm.errors.DefinitionError, match="forward hook.*module, inlets, outlets"):
         module.register_forward_hook(defaulted)
 
 
@@ -417,7 +437,7 @@ def test_missing_output_and_named_hook_ordering():
 
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = MissingOutput()
-    with pytest.raises(gm.errors.OutputError, match="missing_output.*value"):
+    with pytest.raises(gm.errors.DefinitionError, match="missing_output.*value"):
         module(inlet=stream)
 
     good = PassThrough().update_params(value=3)
@@ -566,11 +586,11 @@ def test_wrong_references_fail_when_the_class_is_built():
             self.ratio = Output.ratio(self.copied, self.child.electricity)
 
     for cls in (Foreign, OwnOutput):
-        with pytest.raises(gm.errors.FormulaError, match="not an output or outlet field"):
+        with pytest.raises(gm.errors.DefinitionError, match="not an output or outlet field"):
             cls()
-    with pytest.raises(gm.errors.FormulaError, match="not an earlier output of this module"):
+    with pytest.raises(gm.errors.DefinitionError, match="not an earlier output of this module"):
         ChildOperand()
-    with pytest.raises(gm.errors.DeclarationError, match="did you mean 'm_dot'"):
+    with pytest.raises(gm.errors.DefinitionError, match="did you mean 'm_dot'"):
         EnergyLeaf().outlet.field("mdot")
 
 
@@ -662,7 +682,9 @@ def test_summed_output_rejects_the_same_name_with_another_quantity():
             super().__init__()
             self.other = PowerLeaf()
 
-    with pytest.raises(gm.errors.FormulaError, match="other.electricity = power.*expected electr"):
+    with pytest.raises(
+        gm.errors.DefinitionError, match="other.electricity = power.*expected electr"
+    ):
         Mixed()()
 
 
@@ -674,7 +696,7 @@ def test_summed_output_without_descendant_suggests_a_close_name():
             super().__init__()
             self.electricty = Output(Electricity)
 
-    with pytest.raises(gm.errors.FormulaError, match="did you mean 'electricity'"):
+    with pytest.raises(gm.errors.DefinitionError, match="did you mean 'electricity'"):
         Typo()()
 
 
@@ -699,7 +721,7 @@ def test_forward_hook_sees_the_automatic_sum():
 
 def test_copy_needs_exactly_one_call():
     """``Output.of`` refuses a descendant that was called twice."""
-    with pytest.raises(gm.errors.OutputError, match="child.*called 2 times"):
+    with pytest.raises(gm.errors.DefinitionError, match="child.*called 2 times"):
         RepeatedParent()(inlet=STREAM)
 
 
@@ -757,7 +779,7 @@ class FormulaOf(Module):
 
 def test_sum_requires_one_unit():
     """Summing power and mass flow is rejected."""
-    with pytest.raises(gm.errors.FormulaError, match="power.use = power \\[W\\]; expected mass"):
+    with pytest.raises(gm.errors.DefinitionError, match="power.use = power \\[W\\]; expected mass"):
         FormulaOf(lambda module: {"use": Output(MassFlow)})()
 
 
@@ -776,7 +798,7 @@ def test_formula_typo_fails_when_the_class_is_built():
 
 def test_misspelled_child_names_path_and_suggestion():
     """A misspelled child fails with the module path and the closest child."""
-    with pytest.raises(gm.errors.UnknownMemberError) as caught:
+    with raises(gm.errors.ValidationError, "unknown_name") as caught:
         FormulaOf(lambda module: {"value": Output.of(module.powerr.use)})
     message = str(caught.value)
     assert message.startswith("formula_of: unknown member 'powerr'")
@@ -785,7 +807,7 @@ def test_misspelled_child_names_path_and_suggestion():
 
 def test_misspelled_output_on_a_child_names_the_child_path():
     """A misspelled output on a real child names that child and suggests the output."""
-    with pytest.raises(gm.errors.UnknownMemberError) as caught:
+    with raises(gm.errors.ValidationError, "unknown_name") as caught:
         FormulaOf(lambda module: {"value": Output.of(module.power.ues)})
     assert "power: unknown member 'ues'" in str(caught.value)
     assert "did you mean 'use'?" in str(caught.value)
@@ -807,7 +829,7 @@ class OutletFormula(Module):
 
 def test_misspelled_outlet_suggests_the_outlet():
     """A misspelled outlet is suggested from the ports of the child."""
-    with pytest.raises(gm.errors.UnknownMemberError, match="did you mean 'outlet'"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'outlet'"):
         OutletFormula("outlett")
 
 
@@ -828,7 +850,7 @@ class RatioTypo(Module):
 
 def test_ratio_operand_typo_is_reported():
     """A misspelled ``Output.ratio`` operand fails the same way."""
-    with pytest.raises(gm.errors.UnknownMemberError, match="did you mean 'value'"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'value'"):
         RatioTypo()
 
 
@@ -858,7 +880,7 @@ def test_unknown_member_before_super_init_has_no_registries():
 def test_unknown_member_survives_pickle_and_copy():
     """The error round-trips with its message intact."""
     module = FormulaOf(lambda module: {"value": Output.of(module.power.use)})
-    with pytest.raises(gm.errors.UnknownMemberError) as caught:
+    with raises(gm.errors.ValidationError, "unknown_name") as caught:
         module.powerr
     for clone in (pickle.loads(pickle.dumps(caught.value)), deepcopy(caught.value)):
         assert str(clone) == str(caught.value)
@@ -868,9 +890,9 @@ def test_unknown_member_survives_pickle_and_copy():
 def test_formula_strings_are_rejected():
     """Formulas take declaration references; path strings and ``Output.total`` are gone."""
     assert not hasattr(Output, "total")
-    with pytest.raises(gm.errors.FormulaError, match="expected a descendant output declaration"):
+    with pytest.raises(gm.errors.DefinitionError, match="expected a descendant output declaration"):
         FormulaOf(lambda module: {"value": Output.of("power.use")})
-    with pytest.raises(gm.errors.FormulaError, match="'value' is not an earlier output"):
+    with pytest.raises(gm.errors.DefinitionError, match="'value' is not an earlier output"):
         FormulaOf(lambda module: {"value": Output.ratio("value", "value")})
 
 

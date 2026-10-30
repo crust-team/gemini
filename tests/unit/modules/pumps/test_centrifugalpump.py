@@ -2,11 +2,12 @@
 
 import pytest
 
-from gemini.errors import MissingValueError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.pumps import CentrifugalPump
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 PARAMS = dict(
@@ -82,14 +83,14 @@ def test_zero_flow_is_a_stopped_pump():
 
 def test_off_curve_and_reverse_flow_raise():
     """Run-out beyond twice the best-efficiency flow, negative head and reverse flow raise."""
-    with pytest.raises(PhysicsRangeError, match="off its curve"):
+    with pytest.raises(PhysicsError, match="off its curve"):
         pump()(suction=Stream(m_dot=100, T=330, p=3e5), frequency=50)
     steep = pump().update_params(head_coefficients=[6e5, 0, -4e8])
-    with pytest.raises(PhysicsRangeError, match="head = -"):
+    with pytest.raises(PhysicsError, match="head = -"):
         steep(suction=Stream(m_dot=60, T=330, p=3e5), frequency=50)
-    with pytest.raises(PhysicsRangeError, match="reverse flow"):
+    with pytest.raises(PhysicsError, match="reverse flow"):
         pump()(suction=Stream(m_dot=-1, T=330, p=3e5), frequency=50)
-    with pytest.raises(MissingValueError):
+    with raises(ValidationError, "missing_value"):
         CentrifugalPump()(suction=Stream(m_dot=1, T=330, p=3e5), frequency=50)
 
 

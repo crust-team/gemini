@@ -11,7 +11,7 @@ def convert_legacy(folder):
     names, and any other file (the data CSV, ``well_trajectory.csv``, ``plant.conf``), which is
     read as-is and not converted. The bridge maps the example project's ten nodes
     (``gemini.utils.legacy.tables.NODE_PATHS``): another node set, a missing ``.param`` file or an
-    unit it does not know raises ``LegacyFormatError``. Old fields that have no new counterpart are
+    unit it does not know raises ``ValidationError``. Old fields that have no new counterpart are
     listed in one ``GeminiWarning``. The data CSV is converted separately, by the
     internal ``gemini.utils.legacy.to_dataset``.
 

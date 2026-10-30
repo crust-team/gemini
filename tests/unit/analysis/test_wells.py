@@ -9,6 +9,7 @@ import gemini as gm
 from gemini.analysis import wells
 from gemini.physics import units
 from gemini.types.flows import Stream
+from tests.fixtures.errors import raises
 
 BAR = 1e5
 CASE = {"wellhead_pressure": "4.6 bar", "rates": [20, 45], "frequency": 55.484}
@@ -64,16 +65,18 @@ def test_a_higher_frequency_lifts_more(doublet_curves):
 
 def test_the_plant_is_not_changed(shared_plant, doublet_curves):
     """The ESP frequency of a case is set on a copy: the plant's control stays unset."""
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         shared_plant.get_module("doublet.esp").frequency
 
 
 def test_a_bracket_outside_the_well_model_fails_that_case_only():
     """Rates up to 200 kg/s drive the pressure below zero: the case carries the error."""
     plant = gm.Plant.load("examples/shared/doublet_heat/plant.json")
-    result = wells.nodal(plant, "doublet", [dict(CASE, rates=[20, 200]), CASE])
-    broken, fine = result["cases"]
-    assert broken["error"]["code"] == "physics_range"
+    cases = [dict(CASE, rates=[20, 200]), CASE]
+    with raises(gm.errors.PhysicsError, "out_of_range"):
+        wells.nodal(plant, "doublet", cases)
+    broken, fine = wells.nodal(plant, "doublet", cases, on_error="record")["cases"]
+    assert broken["error"]["code"] == "out_of_range"
     assert broken["ipr"] is None and broken["operating_point"] is None
     assert fine["operating_point"] is not None
 
@@ -83,7 +86,7 @@ def test_inputs_are_checked(shared_plant):
     with pytest.raises(gm.errors.ValidationError, match="wellhead_pressure") as missing:
         wells.nodal(shared_plant, "doublet", {"rates": [1, 2], "frequency": 50})
     assert missing.value.code == "missing_value"
-    with pytest.raises(gm.errors.UnknownNameError):
+    with raises(gm.errors.ValidationError, "unknown_name"):
         wells.nodal(shared_plant, "doublt", CASE)
     with pytest.raises(gm.errors.ValidationError, match="ProductionReservoir"):
         wells.nodal(shared_plant, "doublet.esp", CASE)

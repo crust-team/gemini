@@ -12,6 +12,7 @@ from gemini.engine.results import Results
 from gemini.modules import Module
 from gemini.types import Health, ModuleResult, Output, Ports, Ratio, Stream, Values
 from gemini.types.shapes import problem
+from tests.fixtures.errors import raises
 from tests.fixtures.frames import path_frame
 
 SIZE = 8
@@ -267,9 +268,9 @@ def test_a_chunk_with_a_wrong_length_is_refused():
     """Every column, mask, duration and skip list has one entry per tick."""
     columns = {"x": np.ones(3)}
     message = r"a\.x has 3 entries; expected one per tick \(2\)"
-    with pytest.raises(gm.errors.CallError, match=message):
+    with raises(gm.errors.ValidationError, "invalid_call", match=message):
         ResultChunk(TIMES[:2], DURATIONS[:2], {"a": PathColumns(np.ones(2, dtype=bool), columns)})
-    with pytest.raises(gm.errors.CallError, match="durations has 1 entries"):
+    with raises(gm.errors.ValidationError, "invalid_call", match="durations has 1 entries"):
         ResultChunk(TIMES[:2], DURATIONS[:1], {})
 
 

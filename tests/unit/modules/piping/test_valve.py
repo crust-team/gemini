@@ -57,21 +57,21 @@ def test_closed_valve():
     """A closed valve passes zero flow with no drop and rejects any flow."""
     stopped = valve()(inlet=STREAM.with_(m_dot=0), opening=0).outputs
     assert stopped.pressure_drop == 0 and stopped.effective_flow_coefficient == 0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="valve: inlet.m_dot = 10.0 kg/s"):
+    with pytest.raises(gm.errors.PhysicsError, match="valve: inlet.m_dot = 10.0 kg/s"):
         valve()(inlet=STREAM, opening=0)
 
 
 def test_invalid_inputs_raise():
     """Reverse flow, free gas and a drop larger than the inlet pressure are rejected."""
-    with pytest.raises(gm.errors.PhysicsRangeError, match="reverse flow"):
+    with pytest.raises(gm.errors.PhysicsError, match="reverse flow"):
         valve()(inlet=STREAM.with_(m_dot=-1), opening=1)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="gas_mass_fraction"):
+    with pytest.raises(gm.errors.PhysicsError, match="gas_mass_fraction"):
         valve()(inlet=STREAM.with_(fluid=Fluid(gas_mass_fraction=0.01)), opening=1)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="pressure drop"):
+    with pytest.raises(gm.errors.PhysicsError, match="pressure drop"):
         valve()(inlet=STREAM, opening=0.05)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         valve(rangeability=1)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         valve()(inlet=STREAM, opening=1.5)
 
 

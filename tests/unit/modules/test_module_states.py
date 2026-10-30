@@ -18,6 +18,7 @@ from gemini.types import (
     Temperature,
 )
 from gemini.types.bindings import Binding, ModuleBindings
+from tests.fixtures.errors import raises
 
 STREAM = Stream(m_dot=1, T=350, p=1e6)
 
@@ -162,15 +163,17 @@ def test_composite_step_advances_every_descendant():
 def test_state_errors():
     """Unknown states, assignments, wrong returns and double calls fail with the module path."""
     tank = Tank()
-    with pytest.raises(gm.errors.UnknownNameError, match="tank: unknown state 'temperatur'"):
+    with raises(
+        gm.errors.ValidationError, "unknown_name", match="tank: unknown state 'temperatur'"
+    ):
         tank.step({"temperatur": 300}, 10, {"inlet": STREAM})
-    with pytest.raises(gm.errors.DeclarationError, match="changes only in _advance_states"):
+    with pytest.raises(gm.errors.DefinitionError, match="changes only in _advance_states"):
         tank.temperature = 310
-    with pytest.raises(gm.errors.DeclarationError, match="tank.temperature: invalid state"):
+    with pytest.raises(gm.errors.ValidationError, match="tank.temperature: invalid state"):
         tank.step({"temperature": -1}, 10, {"inlet": STREAM})
     line = Line()
     line.second = line.first
-    with pytest.raises(gm.errors.ConfigurationError, match="more than once in one step"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="more than once in one step"):
         line.step(None, 10, {"inlet": STREAM})
 
 
@@ -183,7 +186,7 @@ def test_advance_states_must_return_every_state():
         def _advance_states(self, inlets, outlets, dt):
             return {}
 
-    with pytest.raises(gm.errors.ConfigurationError, match="expected temperature"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="expected temperature"):
         Leaky().step(None, 10, {"inlet": STREAM})
 
 

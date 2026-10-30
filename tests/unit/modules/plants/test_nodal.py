@@ -7,13 +7,14 @@ ESP at 650 m, reservoirs at 250 and 240 bar with 10 m3/h/bar indices, constant-p
 
 import pytest
 
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.plants import nodal
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.physics.geometry import build_path
 from gemini.types.flows import Stream
+from tests.fixtures.errors import raises
 
 DENSITY = 1000.0
 """Density [kg/m3] of the default constant-property brine."""
@@ -158,11 +159,11 @@ def test_invalid_requests_raise(producer):
     """A lone ESP, a bracket without a sign change and a trial outside the model's domain."""
     reservoir, well, esp, riser = producer
     esp.frequency = 65
-    with pytest.raises(ConfigurationError, match="expected both or neither"):
+    with raises(ValidationError, "invalid_design", match="expected both or neither"):
         nodal.solve_production_rate(reservoir, well, 3e5, (5, 60), esp=esp)
-    with pytest.raises(PhysicsRangeError, match="expected opposite signs"):
+    with pytest.raises(PhysicsError, match="expected opposite signs"):
         nodal.solve_production_rate(reservoir, well, 3e5, (5, 10), esp=esp, riser=riser)
-    with pytest.raises(PhysicsRangeError, match="rate = 1000 kg/s"):
+    with pytest.raises(PhysicsError, match="rate = 1000 kg/s"):
         nodal.solve_production_rate(reservoir, well, 3e5, (5, 1000), esp=esp, riser=riser)
 
 

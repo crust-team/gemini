@@ -67,9 +67,9 @@ def test_invalid_inlets_and_setpoints_raise():
         (GEOFLUID.with_(T=650, p=250e5), 6e5),
     ]
     for inlet, setpoint in cases:
-        with pytest.raises(gm.errors.PhysicsRangeError):
+        with pytest.raises(gm.errors.PhysicsError):
             separator(inlet=inlet, pressure_setpoint=setpoint)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="separator: pressure_setpoint"):
+    with pytest.raises(gm.errors.PhysicsError, match="separator: pressure_setpoint"):
         separator(inlet=GEOFLUID, pressure_setpoint=50e5)
 
 

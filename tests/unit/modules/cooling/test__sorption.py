@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.cooling import _sorption as sorption
 from gemini.types.flows import Stream
 
@@ -20,7 +20,7 @@ def test_rates_are_the_heat_capacity_rate_of_each_inlet():
 def test_rates_reject_negative_flow_naming_the_port():
     """A negative mass flow raises with the module path and the port."""
     inlets = {"hot": Stream(m_dot=-1.0, T=350.0, p=1e5)}
-    with pytest.raises(PhysicsRangeError, match=r"^unit: hot.m_dot = -1.0 kg/s; expected >= 0$"):
+    with pytest.raises(PhysicsError, match=r"^unit: hot.m_dot = -1.0 kg/s; expected >= 0$"):
         sorption.rates("unit", inlets)
 
 

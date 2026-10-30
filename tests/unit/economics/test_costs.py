@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.economics import costs
 from gemini.physics.units import SECONDS_PER_YEAR
 from tests.fixtures.costed_plants import cooling_plant, day, heating_plant
+from tests.fixtures.errors import raises
 
 HEAT_PER_YEAR = 1000.0 * SECONDS_PER_YEAR
 """Heat [J/year] of 1000 W delivered all year."""
@@ -27,19 +28,21 @@ def test_capex_is_the_declared_cost_with_its_source():
 
 def test_capex_of_a_plant_without_declared_costs_is_null_with_a_reason():
     """Built-in modules declare no cost: nothing is invented."""
-    result = gm.economics.capex(heating_plant(costed=False))
+    result = gm.economics.capex(heating_plant(costed=False), on_error="record")
     assert result["value"] is None
     assert result["reason"] == costs.NO_COST
     assert result["unit"] == "EUR"
     no_euro = gm.economics.capex(
-        heating_plant(costed=False), gm.economics.Assumptions(currency="USD")
+        heating_plant(costed=False), gm.economics.Assumptions(currency="USD"), on_error="record"
     )
     assert no_euro["unit"] == "USD"
 
 
 def test_the_example_plant_has_no_declared_cost(shared_plant):
     """The doublet heat plant is built of built-in modules, so it has no capex."""
-    assert gm.economics.capex(shared_plant)["value"] is None
+    assert gm.economics.capex(shared_plant, on_error="record")["value"] is None
+    with raises(gm.errors.ValidationError, "no_value", match="no module declares a cost"):
+        gm.economics.capex(shared_plant)
 
 
 def test_annual_energies_scale_the_window_to_a_year():
@@ -74,7 +77,7 @@ def test_opex_needs_the_price_of_an_energy_the_run_draws():
 def test_opex_without_declared_costs_reports_only_the_bill():
     """No declared cost: the value is null and says why; the bill is still given."""
     values = gm.economics.Assumptions(electricity_price=2e-8)
-    result = gm.economics.opex(heating_plant(costed=False), day(), values)
+    result = gm.economics.opex(heating_plant(costed=False), day(), values, on_error="record")
     assert result["value"] is None and result["reason"] == costs.NO_COST
     assert result["components"]["electricity"]["value"] == pytest.approx(
         2e-8 * GRID_PER_YEAR, rel=1e-12

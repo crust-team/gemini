@@ -4,7 +4,9 @@ import numpy as np
 import pytest
 from scipy import optimize
 
+from gemini.backends.python import PythonBackend
 from gemini.backends.solvers import brent_roots, newton_roots
+from gemini.errors import PhysicsError
 from tests.fixtures.equivalence import RTOL
 
 pytestmark = pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -26,6 +28,18 @@ def _scalar(function, low, high, args):
         return optimize.brentq(function, low, high, args=args, xtol=XTOL, rtol=RTOL_BRENT)
     except ValueError:
         return np.nan
+
+
+def test_a_physics_error_in_a_trial_gives_nan_on_the_python_backend():
+    """The failing row is NaN, as an unbracketed root is; ``PhysicsError`` is no ``ValueError``."""
+
+    def refuses(value):
+        raise PhysicsError("a trial outside the model's domain")
+
+    root = PythonBackend().brentq(
+        -1.0, 1.0, function=refuses, xtol=XTOL, rtol=RTOL_BRENT, maxiter=10
+    )
+    assert np.isnan(root)
 
 
 def test_brent_roots_follow_scipy_brentq_on_every_row():

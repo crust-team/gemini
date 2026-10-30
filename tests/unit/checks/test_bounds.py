@@ -38,10 +38,10 @@ def test_a_path_the_plant_lacks_is_refused():
     results = make_results({"elsewhere": {"return_out_T": [300.0]}})
     try:
         gm.checks.bounds(heating_plant(), results)
-    except gm.errors.UnknownNameError as error:
+    except gm.errors.ValidationError as error:
         assert "elsewhere" in str(error)
     else:
-        raise AssertionError("expected UnknownNameError")
+        raise AssertionError("expected ValidationError")
 
 
 def test_the_example_plant_run_stays_inside_its_limits(fresh_plant, fast_dataset):

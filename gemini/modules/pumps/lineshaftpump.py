@@ -1,7 +1,7 @@
 """Line-shaft downhole pump on the retained TNO ESP polynomial basis."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import constants, energy, pumps
 from gemini.types import (
@@ -45,7 +45,7 @@ class LineShaftPump(Module):
     electricity is listed as unresolved pump power by ``energy_balance``. Thrust-bearing
     losses, shaft stretch and the column pipe friction (part of the well model) are not
     modelled. Reverse flow, a negative head or a negative pump power (running off the
-    polynomial curve) raise ``PhysicsRangeError``; at zero flow the pump runs at shutoff.
+    polynomial curve) raise ``PhysicsError``; at zero flow the pump runs at shutoff.
     """
 
     repr_fields = ("stage_count", "setting_depth", "motor_efficiency")
@@ -101,7 +101,7 @@ class LineShaftPump(Module):
         pump_power = pumps.power(flow, self.frequency, self.stage_count, self.power_coefficients)
         ops.check(
             pump_power >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: pump power = {pump_power} W at flow = {flow} m3/s; expected >= 0 "
             "(pump off its power curve)",
             path=self.path,
@@ -124,7 +124,7 @@ class LineShaftPump(Module):
         """Return the pump-curve pressure rise [Pa] at a suction volume flow [m3/s]."""
         ops.check(
             flow >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
             path=self.path,
             flow=flow,
@@ -132,7 +132,7 @@ class LineShaftPump(Module):
         head = pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         ops.check(
             head >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: head = {head} Pa at flow = {flow} m3/s; expected >= 0 (pump off "
             "its head curve)",
             path=self.path,

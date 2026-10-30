@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from gemini.errors import CallError
+from gemini.errors import ValidationError
 
 MISSING = float("nan")
 """What a row without a path holds in an object column, as an absent key of a row dict did."""
@@ -168,8 +168,9 @@ class ResultChunk:
         wrong = {name: length for name, length in sizes.items() if length != size}
         if wrong:
             name, length = next(iter(wrong.items()))
-            raise CallError(
-                f"ResultChunk: {name} has {length} entries; expected one per tick ({size})"
+            raise ValidationError(
+                f"ResultChunk: {name} has {length} entries; expected one per tick ({size})",
+                code="invalid_call",
             )
 
     def __len__(self):

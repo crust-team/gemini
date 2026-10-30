@@ -55,7 +55,11 @@ def _call(cls, instance, example):
     """Run one call through ``evaluate``; a missing value without an example is undecided."""
     example = example or {}
     result = evaluate(
-        cls, example.get("parameters"), example.get("inlets"), example.get("controls")
+        cls,
+        example.get("parameters"),
+        example.get("inlets"),
+        example.get("controls"),
+        on_error="record",
     )
     if not result["errors"]:
         return True, f"one call returned {len(result['outputs'])} outputs"

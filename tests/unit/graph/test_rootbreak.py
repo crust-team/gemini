@@ -5,7 +5,7 @@ import pytest
 
 import gemini as gm
 from gemini import backends
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.graph import GraphCache, evaluate, graph_feeds
 
 from .conftest import Chain, Gain, Opaque, Tank
@@ -53,7 +53,7 @@ def test_failed_rows_keep_their_exception_and_are_nan():
     module.register_forward_pre_hook(lambda module, inlets: None)
     _, evaluation = _evaluate(module, {"gain": np.array([1.0, -2.0, 3.0])}, 3)
     assert evaluation.failed.tolist() == [False, True, False]
-    assert isinstance(evaluation.error(1), PhysicsRangeError)
+    assert isinstance(evaluation.error(1), PhysicsError)
     assert "gain = -2.0" in str(evaluation.error(1))
     assert np.isnan(evaluation.result.outputs["rise"][1])
     assert evaluation.result.outputs["rise"][[0, 2]].tolist() == [6.0, 18.0]

@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import Field
 
-from gemini.errors import LegacyFormatError
+from gemini.errors import ValidationError
 from gemini.types.bindings import Binding, ConfigModel, DatedParams, ModuleBindings
 from gemini.types.fluid import BRINE, Fluid
 from gemini.utils.mappings import set_nested
@@ -49,10 +49,11 @@ def node_paths(project):
     """Return the plant path of every old node; the nodes must be the example's exactly."""
     names = {node.name for node in project.nodes.values()}
     if names != tables.NODE_PATHS.keys():
-        raise LegacyFormatError(
+        raise ValidationError(
             f"old project: unexpected nodes = {sorted(names - tables.NODE_PATHS.keys())}, "
             f"missing nodes = {sorted(tables.NODE_PATHS.keys() - names)}; expected the node "
-            "table of the example project"
+            "table of the example project",
+            code="invalid_format",
         )
     return {node_id: tables.NODE_PATHS[node.name] for node_id, node in project.nodes.items()}
 
@@ -63,8 +64,9 @@ def _data_columns(project):
         name for name in project._auxiliary if name.endswith(".csv") and "trajectory" not in name
     )
     if len(names) != 1:
-        raise LegacyFormatError(
-            f"old project: data CSV files = {names}; expected exactly one besides trajectory files"
+        raise ValidationError(
+            f"old project: data CSV files = {names}; expected exactly one besides trajectory files",
+            code="invalid_format",
         )
     text = project._auxiliary[names[0]].decode("utf-8-sig")
     return set(next(csv.reader(io.StringIO(text, newline=""), delimiter=";"), []))
@@ -93,9 +95,10 @@ def _snapshot_at(project, node_id, at):
         if time is None or at is None or to_utc(time) <= to_utc(at)
     ]
     if not eligible:
-        raise LegacyFormatError(
+        raise ValidationError(
             f"{project.nodes[node_id].name}: parameters.timestamps = {times}; expected one at "
-            f"or before {at}"
+            f"or before {at}",
+            code="invalid_format",
         )
     return _snapshot(project, node_id, eligible[-1])
 
@@ -106,8 +109,9 @@ def _with_trajectory(project, properties, prefix):
     if properties.get(f"{prefix}_trajectory_table") or not filename:
         return properties
     if filename not in project._auxiliary:
-        raise LegacyFormatError(
-            f"{prefix}_trajectory_file = {filename!r}; expected a file of the project folder"
+        raise ValidationError(
+            f"{prefix}_trajectory_file = {filename!r}; expected a file of the project folder",
+            code="invalid_format",
         )
     text = project._auxiliary[filename].decode("utf-8-sig")
     return properties | {f"{prefix}_trajectory_table": tables.parse_trajectory_csv(text)}
@@ -124,7 +128,9 @@ def _converted(project, node_id, kinds, properties, at):
         role = kind.removesuffix("_reservoir")
         well = _neighbour(project, node_id, upstream=role == "injection")
         if well is None:
-            raise LegacyFormatError(f"{project.nodes[node_id].name}: no linked well")
+            raise ValidationError(
+                f"{project.nodes[node_id].name}: no linked well", code="invalid_format"
+            )
         well_properties = _snapshot_at(project, well, at)
         return tables.reservoir_params_from_gemini(properties, well_properties, role)
     if kind == "production_well":
@@ -150,9 +156,10 @@ def _snapshots(project, node_id, kinds, columns):
     kind = kinds[node_id]
     times = parameter_times(project, node_id)
     if len(set(times)) != len(times):
-        raise LegacyFormatError(
+        raise ValidationError(
             f"{project.nodes[node_id].name}: parameters.timestamps = {times}; expected distinct "
-            "effective dates"
+            "effective dates",
+            code="invalid_format",
         )
     column, supplement = tables.PARAMETER_SUPPLEMENTS.get(kind, (None, {}))
     snapshots = []
@@ -229,7 +236,9 @@ def _project_fluid(project, kinds, modules, paths, columns):
     """
     reservoir = next((node for node, kind in kinds.items() if kind == "production_reservoir"), None)
     if reservoir is None:
-        raise LegacyFormatError("old project: no reservoir without an incoming link")
+        raise ValidationError(
+            "old project: no reservoir without an incoming link", code="invalid_format"
+        )
     params = modules[paths[reservoir]].params[-1].params
     properties = _snapshot(project, reservoir, -1)
     brine = Fluid(

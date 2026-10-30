@@ -34,7 +34,7 @@ and checkpoints store the root class as `module:qualname` through `class_path`/`
 `gemini/modules/registry.py` is the one registry of module and plant types. A class joins it
 under its class name with `gm.modules.register(cls)`, and every shipped equipment class is
 registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `get(name)` and
-`categories()` read it; an unknown name raises `UnknownNameError` with its close matches in
+`categories()` read it; an unknown name raises `ValidationError` with its close matches in
 `suggestions`.
 
 `gm.modules.load_file(path)` imports a Python file, registers every `Module` class it defines that
@@ -202,7 +202,7 @@ record their own value for an additive output:
   `self.electricity = Output(Electricity)`, is the automatic sum of the descendant leaf outputs
   with the same name over this call. A leaf called twice contributes twice; the sums of nested
   composites are not counted again. Every descendant leaf output of that name must have the same
-  quantity and unit, and at least one must exist; otherwise the first call raises `FormulaError`
+  quantity and unit, and at least one must exist; otherwise the first call raises `DefinitionError`
   (with a close-match suggestion for a name no leaf declares). A composite that records its own
   value for the output in `_compute_outputs` replaces the sum. The additive quantities are listed
   in [types.md](types.md#quantities-and-declarations).
@@ -212,9 +212,9 @@ record their own value for an additive output:
 Formulas take declaration references, not path strings. Children are assigned first
 (`# Modules`), so the references exist when the outputs are declared. Assigning a formula checks
 it while the class is built: an `Output.of` target outside the descendant tree (or a string), or a
-ratio operand that is not an earlier output of the module, raises `FormulaError`, an unknown
-outlet field raises `DeclarationError` with a close-match suggestion, and a misspelled reference
-(`self.heat_exchanger.dutyy`, `self.heat_exchangerr.duty`) raises `UnknownMemberError` with the
+ratio operand that is not an earlier output of the module, raises `DefinitionError`, an unknown
+outlet field raises `ValidationError` with a close-match suggestion, and a misspelled reference
+(`self.heat_exchanger.dutyy`, `self.heat_exchangerr.duty`) raises `ValidationError` with the
 module path and the closest child, parameter, input, output, state or port (an `AttributeError`,
 so `hasattr` stays false). The first call resolves each reference to its descendant
 path by identity, so deep copies and nested trees resolve to their own children.
@@ -364,7 +364,7 @@ handle.remove()
 ```
 
 Hook return values are ignored. Any non-fixed hook signature fails at registration with a
-`DeclarationError`. Remove a hook with `handle.remove()`; removing twice does nothing. Assigning a
+`ValidationError`. Remove a hook with `handle.remove()`; removing twice does nothing. Assigning a
 control inside a hook changes only the running call.
 
 A pre-hook makes its module a graph break, and so does a forward hook that only reads: the tracer
@@ -409,7 +409,7 @@ A traced call is not validated, so the tracer adds the validation as graph check
 traced call (children included, break nodes excepted) each control, boundary and output with
 bounds (`Declaration.limits()`: `ge`/`gt`/`le`/`lt` read once from the quantity metadata and the
 declared bounds, applied to each item of a list; an `X | None` kind lets NaN pass) gets an
-`ops.check` raising `DeclarationError`, and the root inlets carry the `Stream` limits (finite
+`ops.check` raising `ValidationError`, and the root inlets carry the `Stream` limits (finite
 `m_dot`, `T > 0`, `p >= 0`). These checks are attached to every graph output, so a row that
 violates a bound fails even where the arithmetic never reads the bad value.
 
@@ -441,7 +441,7 @@ when a module declares states, and `states(recurse=True)` lists them by dotted p
 composite, for example `{"storage": {"temperature": 330.0}}`; `None` means the initial states.
 A composite needs no `step` method: its `forward` runs once, every stateful descendant it calls
 starts from its entry and records its end-of-step entry, and a descendant that is not called
-keeps its state. A stateful module called twice in one step raises `ConfigurationError`. Outside
+keeps its state. A stateful module called twice in one step raises `ValidationError`. Outside
 `step`, a call evaluates at the initial states. The engine integrates these steps; see
 [engine.md](engine.md). A module that sets `stateful = True` without declaring states must
 override `step` itself, and a composite refuses to step such a descendant. The shipped stateful

@@ -7,6 +7,7 @@ from gemini.modules import energy_balance, mass_balance
 from gemini.modules.piping import Mixer
 from gemini.types import WATER, Fluid, Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 HOT = Stream(m_dot=6, T=363.15, p=5e5)
 COLD = Stream(m_dot=2, T=323.15, p=4e5)
@@ -35,11 +36,11 @@ def test_zero_flows():
 
 def test_invalid_inputs_raise():
     """Different fluids and reverse flow are rejected."""
-    with pytest.raises(gm.errors.ConfigurationError, match="expected the same fluid"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="expected the same fluid"):
         Mixer()(first_in=HOT, second_in=COLD.with_(fluid=WATER))
-    with pytest.raises(gm.errors.ConfigurationError):
+    with raises(gm.errors.ValidationError, "invalid_design"):
         Mixer()(first_in=HOT, second_in=COLD.with_(fluid=Fluid(liquid_density=1050)))
-    with pytest.raises(gm.errors.PhysicsRangeError, match="mixer: first_in.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="mixer: first_in.m_dot = -1"):
         Mixer()(first_in=HOT.with_(m_dot=-1), second_in=COLD)
 
 

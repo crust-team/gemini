@@ -6,6 +6,7 @@ import numpy as np
 
 from gemini.analysis.series import results_total, window_seconds
 from gemini.economics.assumptions import require, resolve
+from gemini.economics.outcome import reported
 from gemini.modules.balance import emissions
 from gemini.types.shapes import value
 
@@ -39,7 +40,7 @@ def source_energies(results):
     return _weighted_energy(results, 1.0, 0.0), _weighted_energy(results, 0.0, 1.0)
 
 
-def co2(results, assumptions=None):
+def co2(plant, results, assumptions=None, on_error="raise"):
     """Return the CO2 emitted over the run [kg] from the fuel burnt and the grid electricity.
 
     This is ``gemini.modules.balance.emissions`` summed over the ticks: fuel energy times
@@ -49,12 +50,16 @@ def co2(results, assumptions=None):
 
     Parameters
     ----------
+    plant : Module
+        The plant of the run, as for every economics function; the columns alone give the value.
     results : Results
         A finished run; its leaf ``electricity``, ``fuel`` and ``electricity_generated`` columns
-        are summed. The plant is not needed.
+        are summed.
     assumptions : Assumptions, optional
         The emission factors [kg/J]. The default has the sourced fuel factor of natural gas and
         no electricity factor.
+    on_error : {"raise", "record"}, optional
+        A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
     Returns
     -------
@@ -64,6 +69,11 @@ def co2(results, assumptions=None):
         Grid electricity drawn without ``electricity_emission_factor`` raises
         ``ValidationError`` (code ``missing_value``).
     """
+    return reported(on_error, "kg", lambda: _co2(results, assumptions))
+
+
+def _co2(results, assumptions):
+    """Return the CO2 value of a run."""
     assumptions = resolve(assumptions)
     fuel, grid = source_energies(results)
     emitted = fuel * assumptions.fuel_emission_factor

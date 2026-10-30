@@ -1,11 +1,10 @@
 """Stream-identity wiring traces leaf-to-leaf transfers and always removes its hooks."""
 
-import pytest
-
 import gemini as gm
 from gemini.modules import Filter, Module
 from gemini.modules.wiring import trace_wiring
 from gemini.types import Inlet, Outlet, Stream
+from tests.fixtures.errors import raises
 
 STREAM = Stream(m_dot=10, T=330, p=1e6)
 
@@ -55,6 +54,6 @@ def test_trace_removes_its_hooks_after_a_failure():
     """A failing call leaves no observers behind."""
     plant = Train()
     before = hook_counts(plant)
-    with pytest.raises(gm.errors.CallError, match="missing required inlet"):
+    with raises(gm.errors.ValidationError, "invalid_call", match="missing required inlet"):
         trace_wiring(plant, {})
     assert hook_counts(plant) == before

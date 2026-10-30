@@ -7,9 +7,10 @@ import pytest
 from scipy.special import exp1
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import ground
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.errors import raises
 
 
 def test_aquifer_heat_capacity_and_breakthrough_volume():
@@ -18,9 +19,9 @@ def test_aquifer_heat_capacity_and_breakthrough_volume():
     assert aquifer == pytest.approx(0.2 * 4.2e6 + 0.8 * 2.5e6)
     volume = ground.doublet_breakthrough_volume(1000, 50, aquifer, 4.2e6)
     assert volume == pytest.approx(math.pi * 1000**2 * 50 * aquifer / (3 * 4.2e6))
-    with pytest.raises(PhysicsRangeError, match="porosity = 1.5"):
+    with pytest.raises(PhysicsError, match="porosity = 1.5"):
         ground.aquifer_volumetric_heat_capacity(1.5, 4.2e6, 2.5e6)
-    with pytest.raises(PhysicsRangeError, match="well_spacing = 0"):
+    with pytest.raises(PhysicsError, match="well_spacing = 0"):
         ground.doublet_breakthrough_volume(0, 50, aquifer, 4.2e6)
 
 
@@ -38,7 +39,7 @@ def test_doublet_cold_fraction_follows_the_dipole_travel_times():
     fractions = [ground.doublet_cold_fraction(r) for r in (1.01, 1.5, 4, 100, 1e6)]
     assert fractions == sorted(fractions) and fractions[-1] < 1
     assert ground.doublet_cold_fraction(1e300) == 1
-    with pytest.raises(PhysicsRangeError, match="volume_ratio = -1"):
+    with pytest.raises(PhysicsError, match="volume_ratio = -1"):
         ground.doublet_cold_fraction(-1)
 
 
@@ -59,9 +60,9 @@ def test_store_and_field_conductances():
     assert ground.vertical_cylinder_conductance(2, 150, 20) == pytest.approx(
         2 * 2 * math.pi * 150 / math.log(30)
     )
-    with pytest.raises(PhysicsRangeError, match="volume = -1"):
+    with pytest.raises(PhysicsError, match="volume = -1"):
         ground.cylinder_store_conductance(2.5, 1e-6, -1, 20, 1.5e7)
-    with pytest.raises(PhysicsRangeError, match="expected ln"):
+    with pytest.raises(PhysicsError, match="expected ln"):
         ground.vertical_cylinder_conductance(2, 10, 40)
 
 
@@ -77,7 +78,7 @@ def test_steady_flux_resistance_matches_the_annulus_solution():
     assert ground.steady_flux_resistance(k, r_b, r_e) == pytest.approx(mean / heat, rel=1e-8)
     limit = (math.log(1e4) - 0.75) / (2 * math.pi * k)
     assert ground.steady_flux_resistance(k, 1e-4, 1) == pytest.approx(limit, rel=1e-7)
-    with pytest.raises(PhysicsRangeError, match="cell_radius = 0.05"):
+    with pytest.raises(PhysicsError, match="cell_radius = 0.05"):
         ground.steady_flux_resistance(k, r_b, 0.05)
 
 
@@ -89,9 +90,9 @@ def test_ramey_time_function_is_the_line_source_asymptote():
     fourier = ground.MIN_RAMEY_FOURIER
     short = ground.ramey_time_function(fourier * radius**2 / diffusivity, diffusivity, radius)
     assert short == pytest.approx(exp1(1 / (4 * fourier)) / 2, rel=0.01)
-    with pytest.raises(PhysicsRangeError, match="alpha t / r"):
+    with pytest.raises(PhysicsError, match="alpha t / r"):
         ground.ramey_time_function(3600, diffusivity, radius)
-    with pytest.raises(PhysicsRangeError, match="time = 0"):
+    with pytest.raises(PhysicsError, match="time = 0"):
         ground.ramey_time_function(0, diffusivity, radius)
 
 
@@ -108,9 +109,9 @@ def test_ramey_fluid_temperature_solves_the_energy_balance():
     assert slope == pytest.approx((283 + 0.03 * depth - temperature) / 800, rel=1e-6)
     far = ground.ramey_fluid_temperature(length=1e6, **args)
     assert far == pytest.approx(283 + 0.03 * 1e6 - 0.03 * 800)
-    with pytest.raises(PhysicsRangeError, match="length = -1"):
+    with pytest.raises(PhysicsError, match="length = -1"):
         ground.ramey_fluid_temperature(length=-1, **args)
-    with pytest.raises(PhysicsRangeError, match="relaxation_length = 0"):
+    with pytest.raises(PhysicsError, match="relaxation_length = 0"):
         ground.ramey_fluid_temperature(**(args | {"relaxation_length": 0}), length=10)
 
 
@@ -133,7 +134,7 @@ def test_doublet_cold_fraction_on_a_dense_grid():
 @pytest.mark.parametrize("rows", [[(2.0,), (-1.0,)], [(math.nan,)]])
 def test_doublet_cold_fraction_rows_raise_the_error_of_the_float_path(rows):
     """A negative or NaN ratio raises the same class and message on arrays."""
-    assert_same_error(ground.doublet_cold_fraction, rows, PhysicsRangeError)
+    assert_same_error(ground.doublet_cold_fraction, rows, PhysicsError)
 
 
 def test_aquifer_and_breakthrough_match_on_arrays():
@@ -141,15 +142,15 @@ def test_aquifer_and_breakthrough_match_on_arrays():
     rows = [(0.2, 4.2e6, 2.5e6), (0.0, 4.2e6, 2.5e6), (1.0, 3e6, 2e6)]
     assert_function_matches(ground.aquifer_volumetric_heat_capacity, rows)
     assert_same_error(
-        ground.aquifer_volumetric_heat_capacity, rows + [(1.5, 4.2e6, 2.5e6)], PhysicsRangeError
+        ground.aquifer_volumetric_heat_capacity, rows + [(1.5, 4.2e6, 2.5e6)], PhysicsError
     )
     assert_same_error(
-        ground.aquifer_volumetric_heat_capacity, rows + [(0.2, 0.0, 2.5e6)], PhysicsRangeError
+        ground.aquifer_volumetric_heat_capacity, rows + [(0.2, 0.0, 2.5e6)], PhysicsError
     )
     rows = [(1000.0, 50.0, 3.0e6, 4.2e6), (500.0, 20.0, 2.8e6, 4.0e6)]
     assert_function_matches(ground.doublet_breakthrough_volume, rows)
     assert_same_error(
-        ground.doublet_breakthrough_volume, rows + [(0.0, 50.0, 3.0e6, 4.2e6)], PhysicsRangeError
+        ground.doublet_breakthrough_volume, rows + [(0.0, 50.0, 3.0e6, 4.2e6)], PhysicsError
     )
 
 
@@ -160,29 +161,27 @@ def test_store_and_field_conductances_match_on_arrays():
     assert_same_error(
         ground.cylinder_store_conductance,
         rows + [(2.0, 1e-6, -1.0, 40.0, 1.5e7)],
-        PhysicsRangeError,
+        PhysicsError,
     )
     rows = [(2.0, 100.0, 0.15), (1.7, 50.0, 0.3)]
     assert_function_matches(ground.vertical_cylinder_conductance, rows)
-    assert_same_error(
-        ground.vertical_cylinder_conductance, rows + [(2.0, 0.1, 0.15)], PhysicsRangeError
-    )
+    assert_same_error(ground.vertical_cylinder_conductance, rows + [(2.0, 0.1, 0.15)], PhysicsError)
     rows = [(2.0, 0.075, 3.0), (1.5, 0.05, 0.2)]
     assert_function_matches(ground.steady_flux_resistance, rows)
-    assert_same_error(ground.steady_flux_resistance, rows + [(2.0, 0.075, 0.05)], PhysicsRangeError)
+    assert_same_error(ground.steady_flux_resistance, rows + [(2.0, 0.075, 0.05)], PhysicsError)
 
 
 def test_ramey_relations_match_on_arrays():
     """Ramey's time function and fluid profile agree on arrays and raise alike."""
     rows = [(3e7, 1e-6, 0.1), (1e9, 1.2e-6, 0.15)]
     assert_function_matches(ground.ramey_time_function, rows)
-    assert_same_error(ground.ramey_time_function, rows + [(10.0, 1e-6, 0.1)], PhysicsRangeError)
+    assert_same_error(ground.ramey_time_function, rows + [(10.0, 1e-6, 0.1)], PhysicsError)
     rows = [(300.0, 283.0, 0.03, 1500.0, 800.0), (320.0, 283.0, -0.01, 0.0, 400.0)]
     assert_function_matches(ground.ramey_fluid_temperature, rows)
     assert_same_error(
         ground.ramey_fluid_temperature,
         rows + [(300.0, 283.0, 0.03, -1.0, 800.0)],
-        PhysicsRangeError,
+        PhysicsError,
     )
 
 
@@ -201,16 +200,27 @@ def test_a_failing_check_is_dropped_by_the_branch_that_does_not_select_it():
 
 def test_ground_relations_raise_the_error_class_of_their_caller():
     """The context prefix and error class name the module that rejects its own configuration."""
-    with pytest.raises(ConfigurationError, match="^field: borehole cell: steady_flux_resistance"):
+    with raises(
+        ValidationError, "invalid_design", match="^field: borehole cell: steady_flux_resistance"
+    ):
         ground.steady_flux_resistance(
-            2.0, 0.075, 0.05, error=ConfigurationError, context="field: borehole cell: "
+            2.0,
+            0.075,
+            0.05,
+            error=ValidationError,
+            code="invalid_design",
+            context="field: borehole cell: ",
         )
-    with pytest.raises(ConfigurationError, match="^field: shape: vertical_cylinder_conductance"):
+    with raises(
+        ValidationError, "invalid_design", match="^field: shape: vertical_cylinder_conductance"
+    ):
         ground.vertical_cylinder_conductance(
-            2.0, 10.0, 40.0, error=ConfigurationError, context="field: shape: "
+            2.0, 10.0, 40.0, error=ValidationError, code="invalid_design", context="field: shape: "
         )
-    with pytest.raises(ConfigurationError, match="^well: ramey_time_function: time = 0"):
-        ground.ramey_time_function(0.0, 1e-6, 0.1, error=ConfigurationError, context="well: ")
+    with raises(ValidationError, "invalid_design", match="^well: ramey_time_function: time = 0"):
+        ground.ramey_time_function(
+            0.0, 1e-6, 0.1, error=ValidationError, code="invalid_design", context="well: "
+        )
 
 
 def test_doublet_drop_and_time_by_hand():

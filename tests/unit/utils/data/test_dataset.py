@@ -10,6 +10,7 @@ import pytest
 import gemini as gm
 from gemini.types.bindings import Binding
 from gemini.utils.data.dataset import as_dataset, bound_unit
+from tests.fixtures.errors import raises
 
 
 def test_constructors_fingerprint_bounds_and_types():
@@ -42,7 +43,7 @@ def test_timezones_duplicates_profiles_and_validation():
     frame = pd.DataFrame({"time": ["2024-01-01 00:00", "2024-01-01 01:00"], "x": [1, 2]})
     data = gm.Dataset.from_frame(frame, "time", tz="Europe/Oslo")
     assert data.start.hour == 23 and data.start.day == 31
-    with pytest.raises(gm.errors.DatasetError, match="timestamp = 2023-12-31T23:00:00"):
+    with raises(gm.errors.RunError, "invalid_data", match="timestamp = 2023-12-31T23:00:00"):
         gm.Dataset.from_dict({"x": [1, 2]}, [data.start, data.start])
     clock = gm.Clock.days(2027, 1, 1)
     profiles = gm.Dataset.from_profiles(
@@ -82,16 +83,18 @@ def test_dict_and_numpy_constructors_accept_string_time_axes():
 def test_invalid_tables_name_the_offending_values():
     """Construction and reads report the bad value and suggest a close column name."""
     time = pd.date_range("2024-01-01", periods=2, freq="1h", tz="UTC")
-    with pytest.raises(gm.errors.DatasetError, match="frame = list"):
+    with raises(gm.errors.RunError, "invalid_data", match="frame = list"):
         gm.Dataset([1, 2])
-    with pytest.raises(gm.errors.DatasetError, match="unit metadata columns = flwo.*'flow'"):
+    with raises(gm.errors.RunError, "invalid_data", match="unit metadata columns = flwo.*'flow'"):
         gm.Dataset.from_dict({"flow": [1, 2]}, time, units={"flwo": "W"})
-    with pytest.raises(gm.errors.DatasetError, match=r"shape = \(2, 1\); expected \(rows, 2\)"):
+    with raises(
+        gm.errors.RunError, "invalid_data", match=r"shape = \(2, 1\); expected \(rows, 2\)"
+    ):
         gm.Dataset.from_numpy(time, [[1], [2]], ["a", "b"])
-    with pytest.raises(gm.errors.DatasetError, match="time_column = 'tim'.*'time'"):
+    with raises(gm.errors.RunError, "invalid_data", match="time_column = 'tim'.*'time'"):
         gm.Dataset.from_frame(pd.DataFrame({"time": time, "x": [1, 2]}), "tim")
     data = gm.Dataset.from_dict({"flow": [1, 2]}, time, units={"flow": "m3/h"})
-    with pytest.raises(gm.errors.DatasetError, match="columns = flwo; .*'flow'"):
+    with raises(gm.errors.RunError, "invalid_data", match="columns = flwo; .*'flow'"):
         data.read(columns=["flwo"])
     assert data.unit("flow", "kg/s") == "m3/h" and data.unit("other", "kg/s") == "kg/s"
 
@@ -132,6 +135,6 @@ def test_a_dataframe_with_a_utc_index_is_wrapped_and_a_dataset_passes_through():
     ids=["naive index", "no time index", "not a table"],
 )
 def test_run_input_needs_a_timezone_aware_index(bad):
-    """A naive index is ambiguous, so it raises DatasetError instead of guessing a zone."""
-    with pytest.raises(gm.errors.DatasetError, match="run input"):
+    """A naive index is ambiguous, so it raises RunError instead of guessing a zone."""
+    with raises(gm.errors.RunError, "invalid_data", match="run input"):
         as_dataset(bad)

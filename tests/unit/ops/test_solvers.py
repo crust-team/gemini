@@ -7,10 +7,11 @@ import pytest
 from scipy import optimize
 
 from gemini import ops
-from gemini.errors import ConfigurationError
+from gemini.errors import ValidationError
 from gemini.graph import Graph
 from gemini.graph.passes.cse import eliminate_common_subexpressions
 from tests.fixtures.equivalence import RTOL
+from tests.fixtures.errors import raises
 from tests.fixtures.graph_run import graph_outputs
 
 
@@ -64,7 +65,7 @@ def test_no_convergence_in_the_iteration_budget_is_nan():
 
 def test_brentq_checks_its_settings():
     """A tolerance scipy would refuse is a configuration error, not a silent NaN."""
-    with pytest.raises(ConfigurationError, match="xtol = 0"):
+    with raises(ValidationError, "invalid_design", match="xtol = 0"):
         ops.brentq(_cubic, 0.0, 5.0, args=(2.0,), xtol=0)
 
 

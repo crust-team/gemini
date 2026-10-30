@@ -45,7 +45,7 @@ Every function returns `{value, unit, reason, ...}`; `unit` is the currency (`EU
 declares a cost**, so for a plant of built-in modules `capex` and `opex` return `value: null` with the
 reason "no module declares a cost" (`opex` still lists the energy bill in `components`), and
 `lcoh`, `lcoc`, `npv` and `payback` follow. A module declares its cost by defining `capex()` that
-returns a `Cost`. Costs in different currencies or price years raise `ConfigurationError`; assumptions
+returns a `Cost`. Costs in different currencies or price years raise `ValidationError`; assumptions
 in another currency than the costs raise `ValidationError`.
 
 Missing user inputs raise `ValidationError` with code `missing_value` and the path
@@ -116,7 +116,7 @@ as a result column; that is a change to the engine, not to this package.
 
 `nodal` takes `conditions` as one dict or a list of dicts (a what-if): `wellhead_pressure` [Pa],
 `rates` as the `[low, high]` bracket [kg/s] and `frequency` [Hz] for an ESP; strings with units
-are accepted. A case whose bracket leaves the well model's domain carries the `PhysicsRangeError`
+are accepted. A case whose bracket leaves the well model's domain carries the `PhysicsError`
 in `error` and the other cases still run. The VLP is the wellhead pressure the well, ESP and riser
 deliver at each rate; the operating point is where it falls to the wellhead pressure asked for.
 

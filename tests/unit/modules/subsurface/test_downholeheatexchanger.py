@@ -11,6 +11,7 @@ from gemini.modules import energy_balance, mass_balance
 from gemini.modules.subsurface import DownholeHeatExchanger
 from gemini.types import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 INLET = Stream(m_dot=5, T=303.15, p=3e5)
 CP = 4217.4
@@ -61,7 +62,7 @@ def test_flow_limits():
     still = module(inlet=INLET.with_(m_dot=0))
     assert still.outlets.outlet == INLET.with_(m_dot=0)
     assert still.outputs.heat_extraction_rate == 0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot = -1"):
         module(inlet=INLET.with_(m_dot=-1))
 
 
@@ -77,7 +78,7 @@ def test_hot_inlet_heats_the_rock():
 def test_short_operating_time_is_bad_design_data():
     """Ramey's long-time function needs alpha t / r**2 >= 25."""
     module = exchanger().update_params(operating_time=3600)
-    with pytest.raises(gm.errors.ConfigurationError, match="operating_time rejected"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="operating_time rejected"):
         module(inlet=INLET)
 
 
@@ -102,5 +103,5 @@ def test_traced_early_operating_time_raises_only_for_flowing_rows():
     stopped = Stream(m_dot=np.zeros(2), T=np.full(2, 303.15), p=np.full(2, 3e5))
     assert run(module, {"inlet": stopped}).outputs["heat_extraction_rate"].tolist() == [0, 0]
     mixed = Stream(m_dot=np.array([0.0, 5.0]), T=np.full(2, 303.15), p=np.full(2, 3e5))
-    with pytest.raises(gm.errors.ConfigurationError, match="operating_time rejected"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="operating_time rejected"):
         run(module, {"inlet": mixed})

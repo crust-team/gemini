@@ -8,6 +8,7 @@ from gemini.backends import runtime
 from gemini.modules import Module
 from gemini.types import Control, Output
 from gemini.types.bindings import Binding, ModuleBindings
+from tests.fixtures.errors import raises
 
 
 class Precision(Module):
@@ -47,21 +48,21 @@ def test_arguments_and_checkpoint_states_are_validated(setup, tmp_path):
     plant, data = setup
     with pytest.raises(ValueError, match="on_error = 'ignore'"):
         gm.Engine(plant, on_error="ignore")
-    with pytest.raises(gm.errors.ConfigurationError, match="plant = NoneType"):
+    with raises(gm.errors.ValidationError, "invalid_value", match="plant = NoneType"):
         gm.Engine(None)
-    with pytest.raises(gm.errors.UnknownNameError, match="did you mean 'numpy'"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'numpy'"):
         gm.Engine(plant, backend="nunpy")
     engine = gm.Engine(plant)
     engine.replay(data)
     engine.save_checkpoint(tmp_path / "replay.ckpt")
-    with pytest.raises(gm.errors.CheckpointError, match="run_kind = 'replay'; expected 'live'"):
+    with raises(gm.errors.RunError, "checkpoint", match="run_kind = 'replay'; expected 'live'"):
         gm.Engine(plant).live(data, tmp_path / "replay.ckpt")
     loaded = gm.Engine.load_checkpoint(tmp_path / "replay.ckpt")
     loaded.position = None
-    with pytest.raises(gm.errors.CheckpointError, match="no stored rows"):
+    with raises(gm.errors.RunError, "checkpoint", match="no stored rows"):
         loaded.resume()
     loaded.clock = None
-    with pytest.raises(gm.errors.CheckpointError, match="clock = None"):
+    with raises(gm.errors.RunError, "checkpoint", match="clock = None"):
         loaded.resume()
 
 

@@ -14,13 +14,13 @@ so no running call records a trial. Call a solve before the plant call and apply
 as a command, for example ``doublet.reservoir.production_rate = rate``. Each solve needs a
 bracket whose two ends lie inside the well model's domain and give residuals of opposite sign:
 very small rates can cool a stream below 0 K through the explicit heat loss and very large rates
-can drive the traversed pressure below zero, and a trial there raises ``PhysicsRangeError``
+can drive the traversed pressure below zero, and a trial there raises ``PhysicsError``
 naming the trial value.
 """
 
 from scipy.optimize import brentq
 
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 
 
 def solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, riser=None):
@@ -54,8 +54,9 @@ def solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, r
     the balance use the same traversal as an ordinary plant call.
     """
     if (esp is None) != (riser is None):
-        raise ConfigurationError(
-            f"solve_production_rate: esp = {esp!r}, riser = {riser!r}; expected both or neither"
+        raise ValidationError(
+            f"solve_production_rate: esp = {esp!r}, riser = {riser!r}; expected both or neither",
+            code="invalid_design",
         )
 
     def residual(rate):
@@ -140,7 +141,7 @@ def _root(function, name, unit, residual, bracket):
     at_low = _evaluate(function, name, unit, residual, low)
     at_high = _evaluate(function, name, unit, residual, high)
     if at_low * at_high > 0:
-        raise PhysicsRangeError(
+        raise PhysicsError(
             f"{function}: residual = {at_low} Pa at {name} {low} {unit} and {at_high} Pa at "
             f"{high} {unit}; expected opposite signs (widen or move the bracket)"
         )
@@ -151,8 +152,8 @@ def _evaluate(function, name, unit, residual, value):
     """Return ``residual(value)``; a trial outside the well model's domain names the value."""
     try:
         return residual(value)
-    except PhysicsRangeError as error:
-        raise PhysicsRangeError(
+    except PhysicsError as error:
+        raise PhysicsError(
             f"{function}: {name} = {value} {unit}; expected a trial inside the well model's "
             f"domain (narrow the bracket): {error}"
         ) from error

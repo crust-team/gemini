@@ -1,10 +1,9 @@
 """Every op is registered with a name, a known kind and an operand count."""
 
-import pytest
-
 from gemini import ops
-from gemini.errors import UnknownNameError
+from gemini.errors import ValidationError
 from gemini.ops import registry
+from tests.fixtures.errors import raises
 
 
 def test_registered_ops_describe_name_kind_and_arity():
@@ -20,7 +19,7 @@ def test_registered_ops_describe_name_kind_and_arity():
 
 def test_unknown_ops_and_kinds_raise():
     """An unknown op name suggests a close one; an unknown kind is refused."""
-    with pytest.raises(UnknownNameError, match="did you mean 'where'"):
+    with raises(ValidationError, "unknown_name", match="did you mean 'where'"):
         registry.get("wher")
-    with pytest.raises(UnknownNameError, match="kind = 'loop'"):
+    with raises(ValidationError, "unknown_name", match="kind = 'loop'"):
         registry.register("loop_op", "loop", 1)

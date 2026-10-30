@@ -89,6 +89,42 @@ def test_params_set_since_and_validation_agree_with_the_builder():
         plant.add("Pipe", "bad", length="5 bar")
 
 
+def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
+    """``from_dict``, ``gm.plants.validate`` and ``plant.validate`` tell one story in one try."""
+    spec = {
+        "format": 2,
+        "name": "broken",
+        "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe", "params": {"length": -5.0}}},
+        "connections": [],
+        "bindings": {},
+        "param_history": {},
+    }
+    recorded = gm.plants.validate(spec, on_error="record")
+    assert [item["path"] for item in recorded] == ["modules.a.type", "modules.pipe.params.length"]
+    for call in (gm.plants.validate, gm.plants.from_dict, gm.plants.from_spec):
+        with pytest.raises(gm.errors.ValidationError) as caught:
+            call(spec)
+        assert caught.value.problems == recorded and caught.value.code == recorded[0]["code"]
+
+
+def test_a_valid_spec_returns_no_problems_under_both_policies():
+    """Without problems nothing is raised; the list is empty."""
+    plant = gm.Plant.load(PLANT_FILE)
+    assert plant.validate() == plant.validate(on_error="record") == []
+    assert gm.plants.validate(plant.to_spec()) == []
+    with pytest.raises(gm.errors.ValidationError, match="on_error"):
+        plant.validate(on_error="ignore")
+
+
+def test_plant_validate_raises_what_the_spec_function_raises():
+    """A plant with a bad stated value fails its own ``validate``."""
+    plant = gm.Plant.load(PLANT_FILE)
+    plant.bindings["no.such.module"] = plant.bindings[next(iter(plant.bindings))]
+    with pytest.raises(gm.errors.ValidationError) as caught:
+        plant.validate()
+    assert caught.value.problems == plant.validate(on_error="record")
+
+
 def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
     """Every problem comes at once, also on a connection with one good end."""
     spec = {
@@ -102,7 +138,7 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
         "bindings": {},
         "param_history": {},
     }
-    problems = gm.plants.validate(spec)
+    problems = gm.plants.validate(spec, on_error="record")
     assert {item["path"] for item in problems} == {
         "modules.a.type",
         "connections[0].target",

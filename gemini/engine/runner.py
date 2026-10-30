@@ -21,12 +21,7 @@ import numpy as np
 from gemini.engine.chunks import ResultChunk
 from gemini.engine.columns import read
 from gemini.engine.outcome import UNCHANGED, StepResults, evaluate_twin
-from gemini.errors import (
-    DeclarationError,
-    PhysicsRangeError,
-    SolverError,
-    StepError,
-)
+from gemini.errors import GeminiError, RunError, ValidationError
 from gemini.types.shapes import problem
 
 
@@ -185,7 +180,7 @@ class Runner:
         if self.plan.kind == "simulate":
             raise failure.error
         module = self.plan.twins[failure.index].module
-        raise StepError(f"{module.path}: {failure.error}") from failure.error
+        raise RunError(f"{module.path}: {failure.error}", code="step") from failure.error
 
     def _persist_last(self, outcomes, failure, count):
         """Set the inputs of each twin's last applied tick, as a tick loop leaves the plant.
@@ -224,11 +219,10 @@ def row_code(error, inlet=False):
     """
     if inlet:
         return "invalid_inlet"
-    if isinstance(error, SolverError):
-        return "solver_failed"
-    if isinstance(error, PhysicsRangeError):
-        return "physics_range"
-    if isinstance(error, DeclarationError):
+    code = error.code if isinstance(error, GeminiError) else None
+    if code in ("no_convergence", "out_of_range"):
+        return code
+    if isinstance(error, ValidationError) and code in ("out_of_bounds", "invalid_value"):
         return "out_of_bounds"
     return "module_error"
 

@@ -11,6 +11,7 @@ from gemini.modules.control import PIDController
 from gemini.modules.storage import ThermalStorage
 from gemini.types import Boundary, Control, Inlet, Outlet, Output, Stream, Temperature
 from tests.fixtures.equivalence import assert_close
+from tests.fixtures.errors import raises
 
 
 def _controller(**changes):
@@ -80,15 +81,17 @@ def test_clamping_stops_windup_and_allows_unwinding():
 
 def test_invalid_settings_raise():
     """Crossed output limits and nonpositive tuning are configuration errors."""
-    with pytest.raises(
-        gm.errors.ConfigurationError, match="expected minimum_output < maximum_output"
+    with raises(
+        gm.errors.ValidationError,
+        "invalid_design",
+        match="expected minimum_output < maximum_output",
     ):
         _controller(minimum_output=1.0, maximum_output=0.0)(setpoint=1, measurement=0)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         _controller(proportional_gain=0)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         _controller(integral_time=0)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         _controller()(setpoint=1)
 
 

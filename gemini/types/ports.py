@@ -1,6 +1,7 @@
 """Immutable named fluid ports passed through module calls."""
 
-from gemini.errors import CallError, UnknownPortError
+from gemini.errors import ValidationError
+from gemini.errors.lookup import UnknownPort
 from gemini.types.flows import Stream
 from gemini.utils.mappings import AttributeMapping
 from gemini.utils.strings import did_you_mean, join_names
@@ -12,22 +13,24 @@ class Ports(AttributeMapping):
     Values are ``Stream`` objects, whose fields may be floats, arrays or traced values.
     """
 
-    key_error = UnknownPortError
-    attribute_error = UnknownPortError
+    key_error = UnknownPort
+    attribute_error = UnknownPort
 
     def __init__(self, values=None, *, path="module"):
         """Retain one private copy and the module path used in access errors."""
         super().__init__(values)
         for name, value in self._values.items():
             if not isinstance(name, str):
-                raise CallError(
+                raise ValidationError(
                     f"{path}: port name = {name!r}; expected a string; "
-                    f"valid names: {join_names(self._values)}"
+                    f"valid names: {join_names(self._values)}",
+                    code="invalid_call",
                 )
             if not isinstance(value, Stream):
-                raise CallError(
+                raise ValidationError(
                     f"{path}: port {name!r} = {value!r}; expected a Stream; "
-                    f"valid names: {join_names(self._values)}"
+                    f"valid names: {join_names(self._values)}",
+                    code="invalid_call",
                 )
         object.__setattr__(self, "_path", path)
 

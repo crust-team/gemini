@@ -1,7 +1,7 @@
 """Adiabatic junction mixing two streams of the same fluid."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer
 from gemini.types import Inlet, Outlet, Output, PressureDifference, Stream, Temperature
@@ -21,8 +21,8 @@ class Mixer(Module):
     difference is reported as ``pressure_imbalance``: a large value means the upstream branches
     are not hydraulically balanced and the model under-predicts a throttling loss upstream.
 
-    Streams of different fluids raise ``ConfigurationError`` (a mixture property model would be
-    needed); reverse flow in either inlet raises ``PhysicsRangeError``.
+    Streams of different fluids raise ``ValidationError`` (a mixture property model would be
+    needed); reverse flow in either inlet raises ``PhysicsError``.
     """
 
     def __init__(self):
@@ -64,7 +64,7 @@ class Mixer(Module):
         """Reject reverse flow and streams of different fluids."""
         ops.check(
             ops.logical_and(first_in.m_dot >= 0, second_in.m_dot >= 0),
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: first_in.m_dot = {first_m_dot} kg/s, second_in.m_dot = "
             "{second_m_dot} kg/s; expected both >= 0",
             path=self.path,
@@ -72,9 +72,10 @@ class Mixer(Module):
             second_m_dot=second_in.m_dot,
         )
         if first_in.fluid != second_in.fluid:
-            raise ConfigurationError(
+            raise ValidationError(
                 f"{self.path}: first_in.fluid = {first_in.fluid!r}, second_in.fluid = "
-                f"{second_in.fluid!r}; expected the same fluid"
+                f"{second_in.fluid!r}; expected the same fluid",
+                code="invalid_design",
             )
 
     def _mixed_temperature(self, first_in, second_in):

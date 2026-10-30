@@ -5,7 +5,7 @@ import pytest
 
 import gemini as gm
 from gemini import backends
-from gemini.errors import DeclarationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.graph import GraphCache, evaluate, graph_feeds
 
 
@@ -66,7 +66,7 @@ def test_failing_rows_carry_the_check_message_of_that_row(line, backend):
     evaluation = _evaluation(line, {"boost": np.array([1.0, -1.0, 2.0, -2.0])}, 4, backend)
     assert evaluation.failed.tolist() == [False, True, False, True]
     first, second = evaluation.error(1), evaluation.error(3)
-    assert isinstance(first, PhysicsRangeError) and "gain: gain = -1.0" in str(first)
+    assert isinstance(first, PhysicsError) and "gain: gain = -1.0" in str(first)
     assert "gain: gain = -2.0" in str(second)
     assert any("raised by the check" in note for note in first.__notes__)
 
@@ -79,10 +79,10 @@ def test_declared_limits_use_the_wording_of_declaration_validate(bounded, backen
     expected = None
     try:
         bounded.get_control("setpoint").validate(-5.0)
-    except DeclarationError as error:
+    except ValidationError as error:
         expected = str(error)
     assert evaluation.failed.tolist() == [False, True]
-    assert isinstance(evaluation.error(1), DeclarationError)
+    assert isinstance(evaluation.error(1), ValidationError)
     assert str(evaluation.error(1)) == expected
 
 

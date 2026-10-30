@@ -8,6 +8,7 @@ import pytest
 import gemini as gm
 from gemini.engine import checkpoint as storage
 from gemini.engine.results import Results
+from tests.fixtures.errors import raises
 
 
 def manifest(**fields):
@@ -36,14 +37,14 @@ def test_save_publishes_generations_and_removes_the_previous_one(tmp_path):
 
 
 def test_load_rejects_escaping_sibling_paths_and_invalid_manifests(tmp_path):
-    """Sibling names must stay in the folder; another manifest fails as CheckpointError."""
+    """Sibling names must stay in the folder; another manifest fails as RunError."""
     path = tmp_path / "bad.ckpt"
     path.write_text(manifest(results_file="../outside.csv").model_dump_json())
-    with pytest.raises(gm.errors.CheckpointError, match="results_file = '../outside.csv'"):
+    with raises(gm.errors.RunError, "checkpoint", match="results_file = '../outside.csv'"):
         storage.load(path)
     data = json.loads(manifest().model_dump_json()) | {"backend": 2}
     path.write_text(json.dumps(data))
-    with pytest.raises(gm.errors.CheckpointError, match="manifest is invalid"):
+    with raises(gm.errors.RunError, "checkpoint", match="manifest is invalid"):
         storage.load(path)
 
 

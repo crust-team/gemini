@@ -1,7 +1,7 @@
 """Silica-gel/water adsorption chiller driven by low-temperature hot water."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.cooling import _sorption as sorption
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, refrigeration
@@ -50,7 +50,7 @@ class AdsorptionChiller(Module):
     constant liquid heat capacity per stream. Validity: driving hot water from
     ``minimum_driving_temperature`` (55 degC; below it the chiller is off) to
     ``maximum_driving_temperature`` (90 degC; above it the map is not valid and the call raises
-    ``PhysicsRangeError``), cooling water of 20 to 35 degC, chilled water above 5 degC, circuit
+    ``PhysicsError``), cooling water of 20 to 35 degC, chilled water above 5 degC, circuit
     flows near the rated flows of the fit.
     """
 
@@ -151,16 +151,17 @@ class AdsorptionChiller(Module):
         driving_T = inlets.generator_in.T
         ops.check(
             self.minimum_driving_temperature < self.maximum_driving_temperature,
-            ConfigurationError,
+            ValidationError,
             "{path}: minimum_driving_temperature = {minimum} K; expected below "
             "maximum_driving_temperature = {maximum} K",
             path=self.path,
             minimum=self.minimum_driving_temperature,
             maximum=self.maximum_driving_temperature,
+            code="invalid_design",
         )
         ops.check(
             driving_T <= self.maximum_driving_temperature,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: generator_in.T = {driving_T} K; expected at most "
             "maximum_driving_temperature = {maximum} K",
             path=self.path,

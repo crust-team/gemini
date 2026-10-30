@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ValidationError as PydanticError
 
-from gemini.errors import CheckpointError
-from gemini.errors import ValidationError as GeminiValidationError
+from gemini.errors import RunError, ValidationError
 from gemini.utils.data.dataset import Dataset
 from gemini.utils.files import read_cells, read_json, write_cells
 from gemini.utils.version import OLDEST_READABLE, is_older, package_version
@@ -122,7 +122,7 @@ def _check_version(path, manifest):
     """Refuse a manifest written before the oldest readable version."""
     version = manifest.get("version") if isinstance(manifest, dict) else None
     if isinstance(manifest, dict) and is_older(version):
-        raise GeminiValidationError(
+        raise ValidationError(
             f"{path}: version = {version!r}; expected a checkpoint written by gemini "
             f"{OLDEST_READABLE} or later",
             path="version",
@@ -136,10 +136,14 @@ def load(path):
     _check_version(path, manifest)
     try:
         checkpoint = Checkpoint.model_validate(manifest)
-    except ValidationError as exc:
-        raise CheckpointError(f"{path}: manifest is invalid; expected a checkpoint\n{exc}") from exc
+    except PydanticError as exc:
+        raise RunError(
+            f"{path}: manifest is invalid; expected a checkpoint\n{exc}", code="checkpoint"
+        ) from exc
     for field in ("results_file", "remaining_data_file"):
         value = getattr(checkpoint, field)
         if value and Path(value).name != value:
-            raise CheckpointError(f"{path}: {field} = {value!r}; expected a sibling file name")
+            raise RunError(
+                f"{path}: {field} = {value!r}; expected a sibling file name", code="checkpoint"
+            )
     return checkpoint

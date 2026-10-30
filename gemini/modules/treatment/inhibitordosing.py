@@ -1,7 +1,7 @@
 """Scale or corrosion inhibitor injection at a commanded mass dose."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import separation
 from gemini.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Parameter, Stream
@@ -24,7 +24,7 @@ class InhibitorDosing(Module):
     fluid) and ``mass_balance`` closes exactly; the neglected mass is ``product_mass_flow``,
     a relative error equal to ``dose``. Dosing-pump power and injection-quill pressure loss are
     neglected. Cost is not modelled; multiply ``product_mass_flow`` by the product price.
-    Reverse flow raises ``PhysicsRangeError``.
+    Reverse flow raises ``PhysicsError``.
     """
 
     def __init__(self):
@@ -54,7 +54,7 @@ class InhibitorDosing(Module):
         inlet = inlets.inlet
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,

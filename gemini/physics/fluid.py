@@ -11,7 +11,7 @@ properties, so they need no eager scope.
 
 from dataclasses import dataclass, fields
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 
 DEFAULT_LIQUID_DENSITY = 1000.0
 """Density [kg/m3] of the constant-water liquid of GEMINI's PVTConstantSTP model, near 4 degC."""
@@ -23,7 +23,7 @@ class FluidProperties:
 
     Every field is converted to ``float``. Densities, viscosities, heat capacities,
     conductivities and surface tension must be positive; the gas mass fraction lies in
-    ``[0, 1)``. A violation raises ``PhysicsRangeError``.
+    ``[0, 1)``. A violation raises ``PhysicsError``.
 
     Fields: ``rho_l`` and ``rho_g`` densities [kg/m3], ``gmf`` gas mass fraction [-], ``mu_l`` and
     ``mu_g`` viscosities [Pa s], ``cp_l`` and ``cp_g`` heat capacities [J/kg/K], ``k_l`` and
@@ -49,9 +49,7 @@ class FluidProperties:
             valid = 0 <= value < 1 if field.name == "gmf" else value > 0
             if not valid:
                 expected = "0 <= gmf < 1" if field.name == "gmf" else f"{field.name} > 0"
-                raise PhysicsRangeError(
-                    f"FluidProperties: {field.name} = {value}; expected {expected}"
-                )
+                raise PhysicsError(f"FluidProperties: {field.name} = {value}; expected {expected}")
 
     @property
     def density(self) -> float:

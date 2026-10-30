@@ -4,7 +4,7 @@ from contextvars import ContextVar
 
 import numpy as np
 
-from gemini.errors import UnknownNameError
+from gemini.errors import ValidationError
 from gemini.utils.context import ContextSetting
 from gemini.utils.strings import did_you_mean, join_names
 
@@ -42,9 +42,10 @@ def register(backend):
 def get(name):
     """Return the registered backend called ``name``."""
     if name not in _BACKENDS:
-        raise UnknownNameError(
+        raise ValidationError(
             f"backends: backend = {name!r}; expected one of {join_names(_BACKENDS)}"
-            f"{did_you_mean(name, _BACKENDS)}"
+            f"{did_you_mean(name, _BACKENDS)}",
+            code="unknown_name",
         )
     return _BACKENDS[name]
 

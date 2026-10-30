@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic_core import to_jsonable_python
 
-from gemini.errors import ConfigurationError
+from gemini.errors import ValidationError
 from gemini.utils.strings import join_path
 from gemini.utils.time import parse_duration
 
@@ -131,8 +131,9 @@ class AutoCheckpoint(Callback):
             self.every = parse_duration(every)
             return
         if every <= 0:
-            raise ConfigurationError(
-                f"AutoCheckpoint: every = {every!r}; expected a positive step count or duration"
+            raise ValidationError(
+                f"AutoCheckpoint: every = {every!r}; expected a positive step count or duration",
+                code="invalid_design",
             )
         self.every = int(every)
 

@@ -145,9 +145,9 @@ def test_idle_store_decays_exactly_and_rejects_flow():
     assert stopped == full
     empty = storage()
     assert empty.step(None, 60, {"injection_in": still})[0] == empty.initial_state()
-    with pytest.raises(gm.errors.PhysicsRangeError, match="idle mode"):
+    with pytest.raises(gm.errors.PhysicsError, match="idle mode"):
         module(injection_in=WARM)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="m_dot = -1"):
         storage()(injection_in=WARM.with_(m_dot=-1))
 
 
@@ -238,7 +238,7 @@ def test_store_arithmetic_matches_on_arrays():
 
     rows = [(0.0, HOUR), (1e4, HOUR), (3e5, 24 * HOUR)]
     assert_function_matches(numbers, rows)
-    assert_same_error(numbers, rows + [(-1.0, HOUR)], gm.errors.PhysicsRangeError)
+    assert_same_error(numbers, rows + [(-1.0, HOUR)], gm.errors.PhysicsError)
 
 
 @pytest.mark.parametrize("mode", ["charge", "discharge"])

@@ -26,18 +26,8 @@ from pydantic_core import to_jsonable_python
 
 from gemini import backends, ops
 from gemini.backends import runtime
-from gemini.errors import (
-    CallError,
-    ConfigurationError,
-    DeclarationError,
-    FormulaError,
-    MissingValueError,
-    OutletError,
-    OutputError,
-    PlantFormatError,
-    UnknownMemberError,
-    UnknownNameError,
-)
+from gemini.errors import DefinitionError, PhysicsError, ValidationError
+from gemini.errors.lookup import UnknownMember
 from gemini.modules import description, design, serialization
 from gemini.physics import units
 from gemini.types.bindings import DatedParams
@@ -123,7 +113,7 @@ def import_class(path):
     for part in qualname.split("."):
         value = getattr(value, part)
     if not isinstance(value, type) or not issubclass(value, Module):
-        raise PlantFormatError(f"Serialized class {path!r} is not a Module")
+        raise ValidationError(f"Serialized class {path!r} is not a Module", code="invalid_format")
     return value
 
 
@@ -150,7 +140,9 @@ class _Step:
         """Record the end-of-step states of the module at ``keys``; each module advances once."""
         if keys in self.advanced:
             path = ".".join(keys) or self.root.path
-            raise ConfigurationError(f"{path}: stateful module called more than once in one step")
+            raise ValidationError(
+                f"{path}: stateful module called more than once in one step", code="invalid_design"
+            )
         self.advanced.add(keys)
         if not keys:
             self.next_states = values
@@ -351,7 +343,7 @@ class Module:
             return
         if "_parameters" not in self.__dict__:
             if isinstance(value, (Declaration, Module)):
-                raise DeclarationError(
+                raise DefinitionError(
                     f"{type(self).__name__}.__init__ must call super().__init__() before "
                     f"assigning {name!r}"
                 )
@@ -367,7 +359,7 @@ class Module:
     def _register_declaration(self, name, declaration):
         existing = self._declarations().get(name)
         if existing is not None and existing is not declaration:
-            raise DeclarationError(f"{self.path}.{name}: declaration is already registered")
+            raise DefinitionError(f"{self.path}.{name}: declaration is already registered")
         registry = next(
             getattr(self, registry)
             for kind, registry in _REGISTRIES
@@ -395,13 +387,13 @@ class Module:
 
     def _check_of_target(self, name, target):
         if not isinstance(target, (Output, PortField)):
-            raise FormulaError(
+            raise DefinitionError(
                 f"{self.path}.{name}: Output.of target = {target!r}; expected a descendant output "
                 "declaration or an outlet field reference such as self.child.outlet.field('T')"
             )
         owner = target.port.owner if isinstance(target, PortField) else target.owner
         if owner is None or owner is self or self._descendant_path(owner) is None:
-            raise FormulaError(
+            raise DefinitionError(
                 f"{self.path}.{name}: Output.of target {target.path} is not an output or "
                 "outlet field of a descendant module"
             )
@@ -410,7 +402,7 @@ class Module:
         for operand in operands:
             if not isinstance(operand, Output) or self._outputs.get(operand.name) is not operand:
                 described = operand.path if isinstance(operand, Output) else repr(operand)
-                raise FormulaError(
+                raise DefinitionError(
                     f"{self.path}.{name}: Output.ratio operand {described} is not an "
                     f"earlier output of this module; valid: {join_names(self._outputs)}"
                 )
@@ -431,9 +423,9 @@ class Module:
             self._record_output(name, value)
             return
         if name in self._states:
-            raise DeclarationError(f"{self.path}.{name}: a state changes only in _advance_states")
+            raise DefinitionError(f"{self.path}.{name}: a state changes only in _advance_states")
         if name in self._declarations():
-            raise DeclarationError(f"{self.path}.{name}: cannot replace a declaration")
+            raise DefinitionError(f"{self.path}.{name}: cannot replace a declaration")
         self._children.pop(name, None)
         object.__setattr__(self, name, value)
 
@@ -445,7 +437,7 @@ class Module:
     def _record_output(self, name, value):
         call = _active_call(self)
         if call is None or call.outputs is None:
-            raise OutputError(
+            raise DefinitionError(
                 f"{self.path}.{name}: outputs may only be assigned while computing outputs"
             )
         if call.trace is not None:
@@ -456,15 +448,15 @@ class Module:
     def add_module(self, name, module):
         """Register an immediate child and reject ambiguous names or ownership cycles."""
         if not isinstance(module, Module):
-            raise DeclarationError(f"{self.path}.{name}: child must be a Module")
+            raise DefinitionError(f"{self.path}.{name}: child must be a Module")
         if not name or "." in name or name.startswith("_"):
-            raise DeclarationError(f"{self.path}: invalid child name {name!r}")
+            raise DefinitionError(f"{self.path}: invalid child name {name!r}")
         if name in self._declarations():
-            raise DeclarationError(f"{self.path}: child name {name!r} conflicts with a declaration")
+            raise DefinitionError(f"{self.path}: child name {name!r} conflicts with a declaration")
         if hasattr(type(self), name):
-            raise DeclarationError(f"{self.path}: child name {name!r} shadows a module attribute")
+            raise DefinitionError(f"{self.path}: child name {name!r} shadows a module attribute")
         if any(item is self for item in module.modules()):
-            raise DeclarationError(f"{self.path}.{name}: module ownership cannot contain a cycle")
+            raise DefinitionError(f"{self.path}.{name}: module ownership cannot contain a cycle")
         self._children[name] = module
         object.__setattr__(self, name, module)
         module._set_path(join_path(self._path, name))
@@ -512,12 +504,14 @@ class Module:
         for registry in ("_inlets", "_outlets"):
             if name in registries.get(registry, {}):
                 return registries[registry][name]
-        raise UnknownMemberError(name, self, _describe_unknown_member)
+        raise UnknownMember(name, self, _describe_unknown_member)
 
     def _parameter_value(self, name):
         parameter = self._parameters[name]
         if not parameter.initialized:
-            raise MissingValueError(f"{parameter.path}: parameter is uninitialized")
+            raise ValidationError(
+                f"{parameter.path}: parameter is uninitialized", code="missing_value"
+            )
         return parameter.value
 
     def _input_value(self, name):
@@ -529,9 +523,10 @@ class Module:
         declaration = (self._controls | self._boundaries)[name]
         if declaration.default is not UNSET:
             return declaration.default_value()
-        raise MissingValueError(
+        raise ValidationError(
             f"{declaration.path}: {declaration.section} {name!r} has no value "
-            f"[{declaration.unit or '-'}]"
+            f"[{declaration.unit or '-'}]",
+            code="missing_value",
         )
 
     def named_children(self):
@@ -565,9 +560,10 @@ class Module:
         """Resolve a dotted descendant path; the empty path denotes self."""
         module = self._find_submodule(path)
         if module is None:
-            raise UnknownNameError(
+            raise ValidationError(
                 f"{self.path}: unknown module path {path!r}"
-                f"{did_you_mean(path, dict(self.named_modules()))}"
+                f"{did_you_mean(path, dict(self.named_modules()))}",
+                code="unknown_name",
             )
         return module
 
@@ -645,9 +641,10 @@ class Module:
         module = self.get_submodule(module_path)
         registry = getattr(module, registry_name)
         if name not in registry:
-            raise UnknownNameError(
+            raise ValidationError(
                 f"{self.path}: unknown {kind} {path!r}; valid: {join_names(registry)}"
-                f"{did_you_mean(name, registry)}"
+                f"{did_you_mean(name, registry)}",
+                code="unknown_name",
             )
         return registry[name]
 
@@ -669,9 +666,10 @@ class Module:
         pending = []
         for path, value in mapping.items():
             if path not in declarations:
-                raise UnknownNameError(
+                raise ValidationError(
                     f"{self.path}: unknown control/boundary path {path!r}; valid: "
-                    f"{join_names(declarations)}{did_you_mean(path, declarations)}"
+                    f"{join_names(declarations)}{did_you_mean(path, declarations)}",
+                    code="unknown_name",
                 )
             declaration = declarations[path]
             pending.append((declaration.owner, declaration.name, declaration.validate(value)))
@@ -687,7 +685,9 @@ class Module:
         """Reject uninitialized parameters and resolve the formula outputs, before any call."""
         missing = self.missing_parameters()
         if missing:
-            raise MissingValueError(f"{self.path}: uninitialized parameters: {', '.join(missing)}")
+            raise ValidationError(
+                f"{self.path}: uninitialized parameters: {', '.join(missing)}", code="missing_value"
+            )
         self._resolve_formula_outputs()
 
     @property
@@ -846,11 +846,14 @@ class Module:
             inlet_values = self._positional_inlets(args, kwargs)
         missing = [name for name in inlet_names if name not in inlet_values]
         if missing:
-            raise CallError(
+            raise ValidationError(
                 f"{self.path}: missing required inlet(s) {', '.join(missing)}; "
-                f"valid names: {join_names(inlet_names)}"
+                f"valid names: {join_names(inlet_names)}",
+                code="invalid_call",
             )
-        inlets = self._validated_ports("inlet", self._inlets, inlet_values, CallError)
+        inlets = self._validated_ports(
+            "inlet", self._inlets, inlet_values, partial(ValidationError, code="invalid_call")
+        )
         inputs = {
             name: kwargs[name] for name in self._controls | self._boundaries if name in kwargs
         }
@@ -860,25 +863,28 @@ class Module:
         unknown = [name for name in kwargs if name not in valid_names]
         if unknown:
             name = unknown[0]
-            raise CallError(
+            raise ValidationError(
                 f"{self.path}: unexpected keyword {name!r}; valid names: {join_names(valid_names)}"
-                f"{did_you_mean(name, valid_names)}"
+                f"{did_you_mean(name, valid_names)}",
+                code="invalid_call",
             )
 
     def _mapping_inlets(self, mapping, kwargs):
         valid = join_names(self._inlets)
         mixed = [name for name in self._inlets if name in kwargs]
         if mixed:
-            raise CallError(
+            raise ValidationError(
                 f"{self.path}: cannot mix inlet mapping with inlet keyword {mixed[0]!r}; "
-                f"valid names: {valid}"
+                f"valid names: {valid}",
+                code="invalid_call",
             )
         unknown = [name for name in mapping if name not in self._inlets]
         if unknown:
             name = unknown[0]
-            raise CallError(
+            raise ValidationError(
                 f"{self.path}: unknown inlet {name!r}; valid names: {valid}"
-                f"{did_you_mean(name, self._inlets)}"
+                f"{did_you_mean(name, self._inlets)}",
+                code="invalid_call",
             )
         return mapping
 
@@ -886,16 +892,18 @@ class Module:
         inlet_names = list(self._inlets)
         valid = join_names(inlet_names)
         if len(args) > len(inlet_names):
-            raise CallError(
+            raise ValidationError(
                 f"{self.path}: expected at most {len(inlet_names)} positional inlet arguments, "
-                f"got {len(args)}; valid names: {valid}"
+                f"got {len(args)}; valid names: {valid}",
+                code="invalid_call",
             )
         values = dict(zip(inlet_names, args))
         duplicate = values.keys() & kwargs.keys()
         if duplicate:
-            raise CallError(
+            raise ValidationError(
                 f"{self.path}: multiple values for inlet {next(iter(duplicate))!r}; "
-                f"valid names: {valid}"
+                f"valid names: {valid}",
+                code="invalid_call",
             )
         values.update({name: kwargs[name] for name in inlet_names if name in kwargs})
         return values
@@ -911,7 +919,7 @@ class Module:
             value = prepare(values[name])
             try:
                 validated.append((name, declaration.validate(value)))
-            except (TypeError, ValueError) as exc:
+            except (TypeError, ValueError, PhysicsError) as exc:
                 raise error(
                     f"{self.path}: invalid {kind} {name!r}; "
                     f"valid names: {join_names(declarations)}: {exc}"
@@ -921,18 +929,20 @@ class Module:
     def _check_outlet_names(self, returned):
         """Reject a ``forward`` result that is not a dict of exactly the declared outlets."""
         if not isinstance(returned, dict):
-            raise OutletError(f"{self.path}: forward must return an outlet dict")
+            raise DefinitionError(f"{self.path}: forward must return an outlet dict")
         missing = self._outlets.keys() - returned.keys()
         extra = returned.keys() - self._outlets.keys()
         if missing or extra:
-            raise OutletError(
+            raise DefinitionError(
                 f"{self.path}: outlet names missing={sorted(missing)}, extra={sorted(extra)}; "
                 f"valid names: {join_names(self._outlets)}"
             )
 
     def _check_outlets(self, returned):
         self._check_outlet_names(returned)
-        return self._validated_ports("outlet", self._outlets, returned, OutletError, _plain_outlet)
+        return self._validated_ports(
+            "outlet", self._outlets, returned, DefinitionError, _plain_outlet
+        )
 
     def _resolve_inputs(self, supplied):
         """Return validated controls and boundaries: supplied, persisted, then default values."""
@@ -981,13 +991,13 @@ class Module:
         declarations = [leaf._outputs[name] for leaf in leaves if name in leaf._outputs]
         if not declarations:
             names = sorted({output for leaf in leaves for output in leaf._outputs})
-            raise FormulaError(
+            raise DefinitionError(
                 f"{self.path}.{name}: no descendant leaf declares output {name!r} to sum"
                 f"{did_you_mean(name, names)}"
             )
         for declaration in declarations:
             if (declaration.quantity, declaration.unit) != (output.quantity, output.unit):
-                raise FormulaError(
+                raise DefinitionError(
                     f"{self.path}.{name}: {declaration.path} = {declaration.quantity} "
                     f"[{declaration.unit}]; expected {output.quantity} [{output.unit}] to sum it"
                 )
@@ -1020,7 +1030,7 @@ class Module:
         section, port, field_name = access
         matches = [result for path, result in calls if path == module_path]
         if len(matches) != 1:
-            raise OutputError(
+            raise DefinitionError(
                 f"{self.path}.{name}: descendant {module_path!r} was called "
                 f"{len(matches)} times; expected exactly once"
             )
@@ -1046,7 +1056,7 @@ class Module:
     def _check_outputs(self, recorded):
         missing = sorted(self._outputs.keys() - recorded.keys())
         if missing:
-            raise OutputError(f"{self.path}: outputs left unassigned: {missing}")
+            raise DefinitionError(f"{self.path}: outputs left unassigned: {missing}")
 
     def initial_state(self):
         """Return the initial states, nested by child name; ``None`` when nothing is stateful."""
@@ -1068,16 +1078,19 @@ class Module:
         without declaring states steps itself, so a composite cannot step it and refuses.
         """
         if dt <= 0:
-            raise ConfigurationError(f"{self.path}: dt = {dt} s; expected a positive step")
+            raise ValidationError(
+                f"{self.path}: dt = {dt} s; expected a positive step", code="invalid_design"
+            )
         explicit = [
             path
             for path, module in self.named_modules()
             if path and module.stateful and not module._states
         ]
         if explicit:
-            raise ConfigurationError(
+            raise ValidationError(
                 f"{self.path}: stateful descendants {', '.join(explicit)} need a step method "
-                "on this composite that steps them"
+                "on this composite that steps them",
+                code="invalid_design",
             )
         start = state if state is not None else self.initial_state() or {}
         step = _Step(root=self, dt=dt, states=start, next_states=deepcopy(start))
@@ -1104,8 +1117,9 @@ class Module:
         pre-hooks run. A stateful module would evaluate at its initial states, so it is refused.
         """
         if self.stateful:
-            raise ConfigurationError(
-                f"{self.path}: stateful = True; expected a stateless module for a trial call"
+            raise ValidationError(
+                f"{self.path}: stateful = True; expected a stateless module for a trial call",
+                code="invalid_design",
             )
         token = _current_call.set(None)
         try:
@@ -1127,9 +1141,10 @@ class Module:
         supplied = step.start(self._step_keys(step))
         unknown = sorted(supplied.keys() - self._states.keys())
         if unknown:
-            raise UnknownNameError(
+            raise ValidationError(
                 f"{self.path}: unknown state {unknown[0]!r}; valid: {join_names(self._states)}"
-                f"{did_you_mean(unknown[0], self._states)}"
+                f"{did_you_mean(unknown[0], self._states)}",
+                code="unknown_name",
             )
         return self._initial_states() | {
             name: self._states[name].validate(value) for name, value in supplied.items()
@@ -1146,9 +1161,10 @@ class Module:
         """Validate the end-of-step states that ``_advance_states`` returns."""
         values = self._advance_states(inlets, outlets, dt)
         if not isinstance(values, Mapping) or values.keys() != self._states.keys():
-            raise ConfigurationError(
+            raise ValidationError(
                 f"{self.path}: _advance_states returned {sorted(values or ())}; expected "
-                f"{join_names(self._states)}"
+                f"{join_names(self._states)}",
+                code="invalid_design",
             )
         return {name: self._states[name].validate(value) for name, value in values.items()}
 
@@ -1169,7 +1185,7 @@ class Module:
     def _check_hook_signature(self, fn, expected, kind):
         if not has_signature(fn, expected):
             actual = tuple(inspect.signature(fn).parameters)
-            raise DeclarationError(
+            raise DefinitionError(
                 f"{self.path}: {kind} signature must be ({', '.join(expected)}); "
                 f"got ({', '.join(actual)})"
             )
@@ -1206,8 +1222,9 @@ class Module:
         modules = dict(self.named_modules())
         missing, unexpected = modules.keys() - state.keys(), state.keys() - modules.keys()
         if unexpected or (strict and missing):
-            raise PlantFormatError(
-                f"{self.path}: state paths differ; missing={missing}, unexpected={unexpected}"
+            raise ValidationError(
+                f"{self.path}: state paths differ; missing={missing}, unexpected={unexpected}",
+                code="invalid_format",
             )
         pending = []
         for path, entry in state.items():

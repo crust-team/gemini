@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError, asdict
 import numpy as np
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics.fluid import (
     DEFAULT_LIQUID_DENSITY,
     FluidProperties,
@@ -38,7 +38,7 @@ def test_mixture_density_and_validation():
     assert FluidProperties(rho_l=1068).density == 1068
     assert FluidProperties(gmf=0.5).density == pytest.approx(1 / (0.5 / 1.976 + 0.5 / 1000))
     for override in ({"rho_l": -1}, {"gmf": 1}, {"mu_l": 0}):
-        with pytest.raises(PhysicsRangeError):
+        with pytest.raises(PhysicsError):
             FluidProperties(**override)
     with pytest.raises(FrozenInstanceError):
         FluidProperties().rho_l = 1

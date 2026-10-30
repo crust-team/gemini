@@ -8,10 +8,11 @@ import pytest
 
 import gemini as gm
 from gemini.engine.callbacks import AutoCheckpoint, Callback
-from gemini.errors import Cancelled, CheckpointError, PhysicsRangeError, StepError, ValidationError
+from gemini.errors import Cancelled, PhysicsError, RunError, ValidationError
 from gemini.graph import graph_cache
 from tests.fixtures.engine_plants import TICKS, pair_frame, pair_plant
 from tests.fixtures.engine_tank import ROW, TIME, tank
+from tests.fixtures.errors import raises
 from tests.fixtures.parity import BACKENDS
 
 ROWS = 8
@@ -67,9 +68,9 @@ def test_a_function_returns_what_its_engine_method_returns(backend):
 def test_every_run_raises_by_default():
     """The default of the functions and of the engine is ``on_error="raise"``."""
     data = _pairs({("level", 4): -1.0})
-    with pytest.raises(StepError):
+    with raises(RunError, "step"):
         gm.replay(pair_plant(), data)
-    with pytest.raises(StepError):
+    with raises(RunError, "step"):
         gm.Engine(pair_plant()).replay(data)
     assert gm.replay(pair_plant(), data, on_error="record").errors()
 
@@ -84,7 +85,7 @@ def test_the_error_policy_and_callbacks_reach_the_engine():
 
     gm.replay(pair_plant(), _pairs(), callbacks=[Watch()])
     assert seen == [gm.Engine]
-    with pytest.raises(StepError):
+    with raises(RunError, "step"):
         gm.replay(pair_plant(), _pairs({("level", 4): -1.0}), on_error="raise")
 
 
@@ -121,7 +122,7 @@ def test_checkpoint_every_needs_a_checkpoint():
 def test_a_run_that_never_started_writes_nothing(tmp_path):
     """A binding error comes before the first tick, so there is no run to resume."""
     frame = pair_frame().drop(columns="level")
-    with pytest.raises(gm.errors.BindingError):
+    with raises(gm.errors.ValidationError, "missing_column"):
         gm.replay(pair_plant(), gm.Dataset.from_frame(frame), checkpoint=tmp_path / "run.ckpt")
     assert list(tmp_path.iterdir()) == []
 
@@ -151,12 +152,12 @@ def test_a_failed_run_resumes_from_the_tick_before_it(tmp_path):
     """``on_error="raise"`` is saved: the resumed run fails at the same tick, not earlier."""
     path = tmp_path / "run.ckpt"
     data = _pairs({("level", 4): -1.0})
-    with pytest.raises(StepError):
+    with raises(RunError, "step"):
         gm.replay(pair_plant(), data, checkpoint=path, on_error="raise")
     assert json.loads(path.read_text())["position"].startswith(str(TICKS[3].date()))
-    with pytest.raises(StepError) as caught:
+    with raises(RunError, "step") as caught:
         gm.resume(path)
-    assert isinstance(caught.value.__cause__, PhysicsRangeError)
+    assert isinstance(caught.value.__cause__, PhysicsError)
 
 
 def test_resume_keeps_writing_to_the_same_file_and_the_saved_backend(tmp_path):
@@ -244,7 +245,7 @@ def test_resume_refuses_a_live_checkpoint_and_names_live(tmp_path):
     """A live checkpoint holds no rows; only ``gm.live`` continues it."""
     path = tmp_path / "live.ckpt"
     gm.live(pair_plant(), _pairs(), path, now=TICKS[3])
-    with pytest.raises(CheckpointError, match="gm.live"):
+    with raises(RunError, "checkpoint", match="gm.live"):
         gm.resume(path)
 
 

@@ -7,13 +7,8 @@ from typing import Any
 import numpy as np
 
 from gemini.analysis.fits import fit_head_correction
-from gemini.errors import (
-    ConfigurationError,
-    InsufficientDataError,
-    NotImplementedYet,
-    PhysicsRangeError,
-    ValidationError,
-)
+from gemini.errors import GeminiError, NotImplementedYet, PhysicsError, ValidationError
+from gemini.errors.base import check_on_error
 from gemini.modules.plants import nodal as solves
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
@@ -53,9 +48,10 @@ def _chain(plant, well):
         return _Chain(reservoirs[0], wells["below_esp"], esps[0], wells["above_esp"])
     if not esps and "full" in wells:
         return _Chain(reservoirs[0], wells["full"], None, None)
-    raise ConfigurationError(
+    raise ValidationError(
         f"nodal: well = {well!r}; segments = {sorted(wells)}, ESPs = {len(esps)}; expected one "
-        "ProductionWell 'full', or an ESP with the segments 'below_esp' and 'above_esp'"
+        "ProductionWell 'full', or an ESP with the segments 'below_esp' and 'above_esp'",
+        code="invalid_design",
     )
 
 
@@ -112,11 +108,8 @@ def _curves(chain, pressure, rates):
     return ipr, vlp, point
 
 
-def _case(chain, conditions):
+def _case(chain, conditions, on_error):
     """Return the curves and the operating point of one set of conditions."""
-    pressure, rates, frequency = _case_inputs(chain, conditions)
-    if chain.esp is not None:
-        chain.esp.frequency = frequency
     case = {
         "conditions": conditions,
         "ipr": None,
@@ -125,13 +118,18 @@ def _case(chain, conditions):
         "error": None,
     }
     try:
+        pressure, rates, frequency = _case_inputs(chain, conditions)
+        if chain.esp is not None:
+            chain.esp.frequency = frequency
         case["ipr"], case["vlp"], case["operating_point"] = _curves(chain, pressure, rates)
-    except PhysicsRangeError as error:
+    except GeminiError as error:
+        if on_error == "raise":
+            raise
         case["error"] = error.to_dict()
     return case
 
 
-def nodal(plant, well, conditions):
+def nodal(plant, well, conditions, on_error="raise"):
     """Return the IPR and VLP curves and the operating point of a production well.
 
     The IPR (inflow performance) is the sandface pressure the reservoir delivers at each rate.
@@ -155,6 +153,8 @@ def nodal(plant, well, conditions):
         ``[low, high]`` bracket [kg/s] of the curves and of the solve (a trial outside the well
         model's domain fails the case), and ``frequency`` [Hz] when the chain has an ESP. Numbers
         are SI; unit strings such as ``"3 bar"`` are accepted.
+    on_error : {"raise", "record"}, optional
+        A case that fails raises; ``"record"`` puts its problem in ``error`` and runs the others.
 
     Returns
     -------
@@ -162,17 +162,17 @@ def nodal(plant, well, conditions):
         Plain JSON ``{well, cases}``. Each case holds ``conditions`` as given, ``ipr`` and ``vlp``
         as ``{rate, pressure}``, each a value with 21 points from the low to the high rate,
         ``operating_point`` as ``{rate, wellhead_pressure, sandface_pressure}``, each a value, and
-        ``error``. A case whose bracket leaves the well model's domain or has no sign change has
-        ``None`` curves and operating point and the problem of the ``PhysicsRangeError`` in
-        ``error``.
+        ``error``. Under ``on_error="record"`` a case whose bracket leaves the well model's domain
+        or has no sign change has ``None`` curves and operating point and its problem in ``error``.
     """
+    check_on_error(on_error)
     chain_plant = deepcopy(plant)
     chain = _chain(chain_plant, well)
     cases = [conditions] if isinstance(conditions, dict) else list(conditions)
     return to_plain(
         {
             "well": well,
-            "cases": [_case(chain, case) for case in cases],
+            "cases": [_case(chain, case, on_error) for case in cases],
         }
     )
 
@@ -226,7 +226,7 @@ def _correction(points):
         return fit_head_correction(
             [point["head"] for point in points], [point["theoretical_head"] for point in points]
         )
-    except InsufficientDataError as error:
+    except PhysicsError as error:
         return value(None, "-", str(error))
 
 
@@ -247,9 +247,10 @@ def _head_curve(module, frequency, n_points=50):
     flow referred to the reference speed.
     """
     if frequency <= 0 or n_points < 2:
-        raise ConfigurationError(
+        raise ValidationError(
             f"{module.path}: positive frequency and at least two curve points required; got "
-            f"frequency = {frequency} Hz, n_points = {n_points}"
+            f"frequency = {frequency} Hz, n_points = {n_points}",
+            code="invalid_design",
         )
     scale = frequency / constants.ESP_REFERENCE_FREQUENCY
     return [

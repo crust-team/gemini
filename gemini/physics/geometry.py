@@ -8,7 +8,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 
 from . import units
 
@@ -127,7 +127,7 @@ class PipePath(BaseModel):
     def index_at_measured_depth(self, md: float) -> int:
         """Return the interval containing depth [m], choosing the deeper interval at a joint."""
         if not 0 <= md <= self.total_length or not self.sections:
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"PipePath: measured depth = {md} m; expected a depth in [0, {self.total_length}]"
             )
         depth = 0.0
@@ -141,7 +141,7 @@ class PipePath(BaseModel):
         """Slice at arbitrary depths [m], retaining the intersected section geometry."""
         low, high = sorted((start_md, end_md))
         if low < 0 or high > self.total_length:
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"PipePath: depth interval = [{low}, {high}] m; "
                 f"expected an interval inside [0, {self.total_length}]"
             )
@@ -174,7 +174,7 @@ def build_path(trajectory_table: list[dict], tally_table: list[dict] | None = No
     Notes
     -----
     Valid for a trajectory of at least two points with increasing MD and
-    ``|delta TVD| <= delta MD``; a violation raises ``PhysicsRangeError``. The value tests
+    ``|delta TVD| <= delta MD``; a violation raises ``PhysicsError``. The value tests
     validate plain configuration numbers at build time, so the function is not
     ``@ops.physics``. Reference: GEMINI WIMS build_trajectory_geometry, extended with SI tally
     interval intersections; the angle is the elementary relation of a straight interval.
@@ -184,7 +184,7 @@ def build_path(trajectory_table: list[dict], tally_table: list[dict] | None = No
     NOTE(refactor): example roughness 2e-5 is metres, despite DPDT's old mm comment.
     """
     if not trajectory_table or len(trajectory_table) < 2:
-        raise PhysicsRangeError(
+        raise PhysicsError(
             f"build_path: trajectory points = {len(trajectory_table or [])}; expected at least 2"
         )
     sections = []
@@ -192,7 +192,7 @@ def build_path(trajectory_table: list[dict], tally_table: list[dict] | None = No
         length = last["MD"] - first["MD"]
         vertical = last["TVD"] - first["TVD"]
         if length <= 0 or abs(vertical) > length:
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"build_path: trajectory row {index}: delta MD = {length} m, delta TVD = "
                 f"{vertical} m; expected increasing MD and |delta TVD| <= delta MD"
             )

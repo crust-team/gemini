@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from gemini.analysis.series import energy, leaf_total, window_seconds
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.emissions import source_energies
+from gemini.economics.outcome import currency_of, reported, unavailable
 from gemini.errors import ValidationError
 from gemini.modules.demand import CoolingConsumer, HeatConsumer
 from gemini.physics.units import SECONDS_PER_YEAR
@@ -50,7 +51,7 @@ def annual_energies(plant, results):
     )
 
 
-def capex(plant, assumptions=None):
+def capex(plant, assumptions=None, on_error="raise"):
     """Return the investment of a plant: the sum of the costs its modules declare.
 
     One implementation: ``gemini.types.cost.total_cost``. A module declares its cost by
@@ -63,20 +64,25 @@ def capex(plant, assumptions=None):
         The plant whose modules and descendants declare costs.
     assumptions : Assumptions, optional
         Only its ``currency`` is used, to state the unit when the plant has no declared cost.
+    on_error : {"raise", "record"}, optional
+        A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
     Returns
     -------
     dict
         ``{value, unit, price_year, source}`` as plain JSON. ``value`` is the investment in the
         currency of the costs (``unit``), with their ``price_year`` (a value in ``year``) and
-        ``source``. With no declared cost ``value`` is ``None`` with a ``reason`` and there are no
-        other keys. Costs in different currencies or price years raise ``ConfigurationError``.
+        ``source``. Costs in different currencies or price years raise ``ValidationError``.
     """
-    cost = total_cost(plant)
-    if cost is None:
-        return value(None, resolve(assumptions).currency, NO_COST)
-    year = value(cost.price_year, "year")
-    return value(cost.capex, cost.currency, price_year=year, source=cost.source)
+
+    def compute():
+        cost = total_cost(plant)
+        if cost is None:
+            return unavailable(resolve(assumptions).currency, NO_COST, on_error)
+        year = value(cost.price_year, "year")
+        return value(cost.capex, cost.currency, price_year=year, source=cost.source)
+
+    return reported(on_error, currency_of(assumptions), compute)
 
 
 def _bill(assumptions, annual):
@@ -94,7 +100,7 @@ def _components(amounts, unit):
     return {name: value(amount, unit) for name, amount in amounts.items()}
 
 
-def opex(plant, results, assumptions=None):
+def opex(plant, results, assumptions=None, on_error="raise"):
     """Return the annual operating cost of a plant run.
 
     The sum of the declared fixed cost [currency/year], the declared variable cost
@@ -111,23 +117,31 @@ def opex(plant, results, assumptions=None):
     assumptions : Assumptions, optional
         ``electricity_price`` and ``fuel_price`` [currency/J], needed only for an energy that the
         run draws; a missing needed price raises ``ValidationError`` (code ``missing_value``).
+    on_error : {"raise", "record"}, optional
+        A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
     Returns
     -------
     dict
         ``{value, unit, components}`` with ``unit`` the cost currency per year and ``components``
         ``{fixed, variable, electricity, fuel}``, each a value in that unit. With no declared
-        cost ``value`` is ``None`` with a ``reason``, and only ``electricity`` and ``fuel``
-        are given. A currency in ``assumptions`` other than the cost's raises
-        ``ValidationError``.
+        cost and ``on_error="record"``, ``value`` is ``None`` with a ``reason``, and only
+        ``electricity`` and ``fuel`` are given. A currency in ``assumptions`` other than the cost's
+        raises ``ValidationError``.
     """
+    unit = f"{currency_of(assumptions)}/year"
+    return reported(on_error, unit, lambda: _opex(plant, results, assumptions, on_error))
+
+
+def _opex(plant, results, assumptions, on_error):
+    """Return the annual operating cost; ``on_error`` applies to a plant without a cost."""
     assumptions = resolve(assumptions)
     cost = total_cost(plant)
     annual = annual_energies(plant, results)
     bill = _bill(assumptions, annual)
     if cost is None:
         unit = f"{assumptions.currency}/year"
-        return value(None, unit, NO_COST, components=_components(bill, unit))
+        return unavailable(unit, NO_COST, on_error, components=_components(bill, unit))
     if cost.currency != assumptions.currency:
         raise ValidationError(
             f"assumptions.currency = {assumptions.currency!r}; expected the cost currency "

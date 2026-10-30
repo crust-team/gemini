@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import ConfigurationError
+from gemini.errors import ValidationError
 from gemini.modules.module import Module
 from gemini.physics import control
 from gemini.types import (
@@ -114,12 +114,13 @@ class PIDController(Module):
         """Return K * e + I + D from the start-of-step states, before the output limits."""
         ops.check(
             self.minimum_output < self.maximum_output,
-            ConfigurationError,
+            ValidationError,
             "{path}: minimum_output = {minimum_output}, maximum_output = {maximum_output}; "
             "expected minimum_output < maximum_output",
             path=self.path,
             minimum_output=self.minimum_output,
             maximum_output=self.maximum_output,
+            code="invalid_design",
         )
         error = self._error()
         derivative = 0.0

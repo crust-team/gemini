@@ -3,7 +3,7 @@
 from copy import deepcopy
 
 from gemini.backends import runtime
-from gemini.errors import GeminiError, PlantFormatError
+from gemini.errors import GeminiError, ValidationError
 from gemini.modules.plants import library, reader
 from gemini.modules.plants.builder import Plant
 from gemini.modules.serialization import FORMAT, SECTIONS, plain_value
@@ -66,7 +66,7 @@ RENAMED_NAMES = {
 
 
 def _failed(message, path=None):
-    return PlantFormatError(message, code="migration_failed", path=path)
+    return ValidationError(message, code="migration_failed", path=path)
 
 
 def _place(spec, path, params):
@@ -197,7 +197,7 @@ def migrate(old):
 
     A tree whose root class is a shipped plant takes that plant's wiring, with the stored
     values filled in; any other root is written as a handwritten root with flat dotted params.
-    Failures raise ``PlantFormatError`` with code ``migration_failed``.
+    Failures raise ``ValidationError`` with code ``migration_failed``.
     """
     if isinstance(old, dict) and old.get("format") == FORMAT:
         return deepcopy(old)

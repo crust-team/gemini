@@ -18,6 +18,7 @@ import numpy as np
 from scipy import optimize
 
 from gemini.backends.base import Backend, quiet
+from gemini.errors import PhysicsError
 
 PLAIN_NUMBERS = frozenset({float, int})
 DIVISIBLE = PLAIN_NUMBERS | {np.float64}
@@ -347,7 +348,7 @@ class PythonBackend(Backend):
                 rtol,
                 maxiter,
             )
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError, PhysicsError):
             return math.nan
 
     def newton(self, start, *args, function, derivative, tolerance, max_iterations):

@@ -14,12 +14,12 @@ Shared conventions, stated once here and not repeated per module:
 - Properties come from each stream's `Fluid`; unless a module says otherwise it uses the
   constant liquid heat capacity `cp_l` and density `rho_l` of that fluid.
 - Unless stated, a module has no pressure loss and passes mass flow and fluid unchanged.
-- Reverse (negative) mass flow raises `gm.errors.PhysicsRangeError` in every module except
+- Reverse (negative) mass flow raises `gm.errors.PhysicsError` in every module except
   `Filter`, `Degasser`, `PressurizationTank`, the wells and `InjectionReservoir`; zero flow is
   always a valid stopped state.
 - Bad design data found at call time (inconsistent parameters, a geometry outside a relation's
-  range) raises `ConfigurationError`; inputs outside a model's domain raise
-  `PhysicsRangeError`.
+  range) raises `ValidationError`; inputs outside a model's domain raise
+  `PhysicsError`.
 - Energy that leaves or enters a leaf outside its streams uses the fixed additive outputs of
   [types.md](types.md#energy-outputs-and-balances): `electricity`, `fuel`, `heat_absorbed`,
   `heat_loss`, `heat_supplied`, `electricity_generated` and the signed `heat_accumulation`.
@@ -122,7 +122,7 @@ basis (`gemini.physics.pumps`).
 - **Health**: worst relative drift of measured `power`, `head` and `discharge_pressure`, alarm
   above `drift_threshold` or outside the operating window.
 - **Assumptions and validity**: isothermal; empirical curves valid on their fitted flow range.
-  Reverse flow raises `PhysicsRangeError`. The fits
+  Reverse flow raises `PhysicsError`. The fits
   (`gm.analysis.fit_head_coefficients`, `gm.analysis.fit_head_correction`) are in `gm.analysis`;
   `head_curve` is the private helper of `gm.analysis.pump_curve`.
 - **Energy audit**: unresolved pump power. The pump is isothermal and allocates no
@@ -163,7 +163,7 @@ Injection (booster) pump that raises the brine to a discharge pressure.
   else `Q head / efficiency`; `electricity = power`.
 - **Physics**: `energy.input_power`, `pumps.head`, `pumps.hydraulic_power`, `pumps.power`
 - **Validity**: a negative head (setpoint below suction) and reverse flow raise
-  `PhysicsRangeError`; neither a setpoint nor a head curve raises `ConfigurationError`.
+  `PhysicsError`; neither a setpoint nor a head curve raises `ValidationError`.
 - **Energy audit**: unresolved pump power, as `ESP`.
 
 ```python
@@ -206,7 +206,7 @@ quadratic head curve and affinity-law speed scaling. It replaces the former `Boo
 - **Assumptions**: incompressible liquid, constant `cp`, efficiency independent of speed
   (affinity laws, about 0.5 to 1.1 of rated speed), no leakage or recirculation.
 - **Validity**: zero flow is a stopped pump (no head, no power). `x >= 2`, a negative head or
-  reverse flow raise `PhysicsRangeError` (pump off its curve). Deadhead (running against a
+  reverse flow raise `PhysicsError` (pump off its curve). Deadhead (running against a
   closed valve) is outside the steady model.
 - **Energy audit**: first-law closed when the flow work `Q H` is counted; `energy_balance`
   excludes pressure energy, so its `residual` equals `hydraulic_power` and `unresolved_power`
@@ -248,7 +248,7 @@ Downhole multistage (vertical turbine) pump driven by a surface motor through a 
 - **Assumptions**: isothermal like `ESP`, because the empirical polynomials do not guarantee
   `P_pump >= Q H`. Thrust bearing, shaft stretch and column friction are not modelled.
 - **Validity**: reverse flow, a negative head or a negative pump power raise
-  `PhysicsRangeError`; zero flow runs at shutoff head and power.
+  `PhysicsError`; zero flow runs at shutoff head and power.
 - **Energy audit**: unresolved pump power (it is in the pump tuple of `balance.py`).
 
 ```python
@@ -290,7 +290,7 @@ intercooled stages.
   `compression.stage_outlet_temperature`, `compression.stage_pressure_ratio`, `energy.input_power`
 - **Assumptions and validity**: ideal gas with constant `k` and `cp`, perfect intercooling to
   the suction temperature without pressure loss; stage ratios up to about 4. A setpoint below
-  the suction pressure or reverse flow raises `PhysicsRangeError`; zero flow draws no power.
+  the suction pressure or reverse flow raises `PhysicsError`; zero flow draws no power.
 - **Energy audit**: closed in gas enthalpy, `electricity = m_dot cp (T_2 - T_1) + heat_loss`
   (tested). `energy_balance` values streams with the liquid `cp_l`, so its residual
   `m_dot (T_2 - T_1) (cp - cp_l)` is not meaningful here.
@@ -313,7 +313,7 @@ assert round(out.discharge_T, 1) == 436.5
 ## Piping
 
 The pipe and the valve model a single-phase liquid in the forward direction: a free-gas fraction
-(`fluid.gas_mass_fraction > 0`) raises `PhysicsRangeError`.
+(`fluid.gas_mass_fraction > 0`) raises `PhysicsError`.
 
 ### Pipe
 
@@ -348,8 +348,8 @@ surroundings.
   and ambient, no separate fitting losses. The legacy `heat_transfer.pipe_temperature_change`
   is its first-order expansion and is not used because it overshoots ambient for NTU > 1.
 - **Validity**: relative roughness 1e-6 to 1e-2, Re up to 1e8. `|elevation_change| > length`
-  raises `ConfigurationError`; a negative outlet pressure, free gas and reverse flow raise
-  `PhysicsRangeError`. Zero flow keeps the static head and exchanges no heat.
+  raises `ValidationError`; a negative outlet pressure, free gas and reverse flow raise
+  `PhysicsError`. Zero flow keeps the static head and exchanges no heat.
 - **Energy audit**: closed.
 
 ```python
@@ -387,7 +387,7 @@ Control valve; isenthalpic, so the temperature is unchanged.
   no installed characteristic or Reynolds correction, constant density; the throttling
   temperature rise (about 0.024 K per bar of water) is neglected.
 - **Validity**: flow through a closed valve, a drop larger than the inlet pressure, free gas or
-  reverse flow raise `PhysicsRangeError`.
+  reverse flow raise `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -413,7 +413,7 @@ Ideal tee that divides a feed into two branches.
 - **Physics**: `separation.split_flow`
 - **Assumptions**: no tee loss or heat exchange; the commanded split stands for the balancing
   valves or branch resistances that set it; no hydraulic network solution.
-- **Validity**: reverse flow raises `PhysicsRangeError` (a reversed splitter is a `Mixer`).
+- **Validity**: reverse flow raises `PhysicsError` (a reversed splitter is a `Mixer`).
 - **Energy audit**: closed (`m - x m` may round by one ulp).
 
 ```python
@@ -436,8 +436,8 @@ Adiabatic junction mixing two streams of the same fluid.
   pressure never creates pressure energy. A large `pressure_imbalance` flags unbalanced
   upstream branches.
 - **Physics**: `heat_transfer.mixed_temperature`
-- **Validity**: different fluids raise `ConfigurationError`; reverse flow raises
-  `PhysicsRangeError`; zero total flow gives the mean inlet temperature, which carries no
+- **Validity**: different fluids raise `ValidationError`; reverse flow raises
+  `PhysicsError`; zero total flow gives the mean inlet temperature, which carries no
   energy.
 - **Energy audit**: closed.
 
@@ -556,7 +556,7 @@ Systems and Equipment, "Cooling Towers").
   feed T, p and fluid.
 - **Physics**: `separation.split_flow`
 - **Assumptions and validity**: ideal split, no valve loss or flash; reverse flow raises
-  `PhysicsRangeError`.
+  `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -586,7 +586,7 @@ Hydrocyclone sand separator ahead of heat exchangers and injection.
 - **Assumptions**: one constant efficiency lumps the grade-efficiency curve (Svarovsky 2000,
   *Solid-Liquid Separation*, 4th ed., "Hydrocyclones"); streams carry no solids, so the sand is
   only reported.
-- **Validity**: reverse flow or a loss above the inlet pressure raise `PhysicsRangeError`.
+- **Validity**: reverse flow or a loss above the inlet pressure raise `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -618,7 +618,7 @@ Scale or corrosion inhibitor injection proportional to the treated flow.
   resolution, and adding it would need a product inlet), so the neglected mass is
   `product_mass_flow`, a relative error equal to `dose`. Pump power, quill loss and cost are not
   modelled; multiply `product_mass_flow` by the product price. Reverse flow raises
-  `PhysicsRangeError`.
+  `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -648,8 +648,8 @@ Vent stack or flare releasing separated non-condensable gas, with CO2 and methan
   M_CO2 / M_CH4`; `methane_emission = x_CH4 m - m_b`; `fuel = heat_loss = m_b heating_value`.
 - **Physics**: `combustion.flare_emissions`
 - **Assumptions and validity**: H2S and other combustibles are not burnt; the inert rest
-  passes. `co2_mass_fraction + methane_mass_fraction > 1` raises `ConfigurationError`; reverse
-  flow raises `PhysicsRangeError`.
+  passes. `co2_mass_fraction + methane_mass_fraction > 1` raises `ValidationError`; reverse
+  flow raises `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -684,7 +684,7 @@ Two-stream effectiveness-NTU heat exchanger with fouling diagnostics.
   `hydraulics.quadratic_pressure_drop`
 - **Health**: apparent UA from measured temperatures (`heat_transfer.apparent_conductance`; the
   fit is `gm.analysis.estimate_conductance`), alarm below `1 - fouling_threshold` of the design UA.
-- **Validity**: a hot inlet below the cold inlet or negative flow raise `PhysicsRangeError`.
+- **Validity**: a hot inlet below the cold inlet or negative flow raise `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -725,8 +725,8 @@ Dry or wet (evaporative) closed-circuit cooler rejecting heat to ambient air.
 - **Assumptions**: closed circuit (the process stream keeps its mass); the evaporation rate is
   an upper bound (all heat taken as latent; 80 to 90 % in practice); fixed approach at every
   load; fan power proportional to duty; ambient about -20 to 45 degC.
-- **Validity**: a wet cooler without a wet bulb raises `ConfigurationError`; a wet bulb above
-  the dry bulb raises `PhysicsRangeError`.
+- **Validity**: a wet cooler without a wet bulb raises `ValidationError`; a wet bulb above
+  the dry bulb raises `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -781,7 +781,7 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
   With `cop_model="lorenz"` the heating COP is `eta_L T_h / max(T_h - T_s, L)` with `T_h`, `T_s`
   the log-mean temperatures of the sink and source glides (`refrigeration.lorenz_cop_heating`,
   Lorenz 1894); the source outlet is then found by `brentq` between `T_in - Q / C` and `T_in`.
-  `cop_model="lorenz"` with `mode="cooling"` raises `ConfigurationError`.
+  `cop_model="lorenz"` with `mode="cooling"` raises `ValidationError`.
 - **Physics**: `heat_transfer.heat_rate`, `heat_transfer.setpoint_duty`,
   `heat_transfer.temperature_change`, `refrigeration.carnot_cooling_sink_outlet`,
   `refrigeration.carnot_fraction_cop_cooling`, `refrigeration.carnot_fraction_cop_heating`,
@@ -797,7 +797,7 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
   raised to it.
 - **Validity**: lifts of about 10 to 80 K. A heating COP of 1 or less (source inlet at or below
   `(1 - eta) T_sink_out`) and a cooling sink too small to reject the heat raise
-  `PhysicsRangeError`. Outlets are not checked against freezing. Constant Carnot fraction, no
+  `PhysicsError`. Outlets are not checked against freezing. Constant Carnot fraction, no
   cycling or casing losses.
 - **Energy audit**: closed.
 
@@ -837,7 +837,7 @@ Auxiliary gas or electric boiler heating a stream to a setpoint.
   efficiency`, `heat_loss = fuel_or_power - duty`.
 - **Physics**: `energy.input_power`, `heat_transfer.setpoint_duty`,
   `heat_transfer.temperature_change`
-- **Validity**: negative flow raises `PhysicsRangeError`.
+- **Validity**: negative flow raises `PhysicsError`.
 - **Energy audit**: closed.
 
 ```python
@@ -867,7 +867,7 @@ Gas-engine combined heat and power unit heating a water circuit.
   engine heat is `dumped_heat`; `heat_loss = F - P - heat_recovered`.
 - **Physics**: `combustion.engine_energy_flows`, `combustion.willans_fuel_input`,
   `heat_transfer.setpoint_duty`, `heat_transfer.temperature_change`
-- **Validity**: `electric_efficiency + thermal_efficiency > 1` raises `ConfigurationError`. No
+- **Validity**: `electric_efficiency + thermal_efficiency > 1` raises `ValidationError`. No
   minimum stable load or start-up losses; with no water flow all engine heat is dumped.
 - **Energy audit**: closed.
 
@@ -961,8 +961,8 @@ Silica-gel/water adsorption chiller driven by hot water of 55 to 90 degC; a chil
   `heat_transfer.temperature_change`, `refrigeration.characteristic_temperature_difference`,
   `refrigeration.coefficient_of_performance`, `refrigeration.sorption_delivered_duty`,
   `refrigeration.sorption_duties`, `refrigeration.sorption_evaporator_capacity`
-- **Validity**: a driving temperature above the maximum raises `PhysicsRangeError`; a minimum
-  at or above the maximum raises `ConfigurationError`. Cooling water 20 to 35 degC, chilled
+- **Validity**: a driving temperature above the maximum raises `PhysicsError`; a minimum
+  at or above the maximum raises `ValidationError`. Cooling water 20 to 35 degC, chilled
   water above 5 degC.
 - **Energy audit**: closed.
 
@@ -1102,7 +1102,7 @@ ground temperature.
 - **Assumptions and validity**: a simplification of g-functions (Eskilson 1987): long-term
   balance, depletion and recovery, but not the short-term borehole response or field
   interaction; suits monthly to seasonal behaviour (peak-hour temperatures are optimistic).
-  A cell radius at or below r_b or `ln(4H/D) < 1` raises `ConfigurationError`.
+  A cell radius at or below r_b or `ln(4H/D) < 1` raises `ValidationError`.
 - **Energy audit**: closed.
 
 ```python
@@ -1136,7 +1136,7 @@ Deep coaxial closed-loop heat exchanger in a linear geothermal gradient (steady)
 - **Physics**: `ground.ramey_fluid_temperature`, `ground.ramey_relaxation_length`,
   `ground.ramey_rock_resistance`, `heat_transfer.heat_rate`, `heat_transfer.signed_parts`
 - **Validity**: `alpha t / r_b^2 >= 25`, typically a few days of operation, else
-  `ConfigurationError`. Steady state, no load history, perfectly insulated return pipe.
+  `ValidationError`. Steady state, no load history, perfectly insulated return pipe.
 - **Energy audit**: closed.
 
 ```python
@@ -1248,7 +1248,7 @@ tracking.
   IAPWS-95 at 0.01 degC), `ice_specific_heat` (default 2096.8 J/kg/K, IAPWS R10-06).
 - **States**: `ice_fraction` (default 0) and `temperature` (default 273.15 K): at the freezing
   temperature while partly frozen, above it only with no ice, below it only fully frozen;
-  anything else raises `ConfigurationError`.
+  anything else raises `ValidationError`.
 - **Outputs**: `stored_cold = M L x`, `duty` (heat from the glycol into the store; negative
   while charging), `outlet_T`, `is_full`, `is_empty`.
 - **Model**: `e = 1 - exp(-UA / (m_dot cp))` against a uniform store; `duty = e C (T_in - T)`;
@@ -1304,7 +1304,7 @@ as in [Subsurface](#subsurface).
   `ground.thermal_recovery`, `heat_transfer.heat_rate`, `heat_transfer.signed_parts`
 - **Assumptions and validity**: no regional flow, dispersion or buoyancy (stores below about
   30 degC), no well interaction, a mixed store instead of a thermal fringe, a conduction layer
-  thin against R and H. Negative flow, or flow in idle mode, raise `PhysicsRangeError`.
+  thin against R and H. Negative flow, or flow in idle mode, raise `PhysicsError`.
 - **Energy audit**: deliberately not closed per call: the residual equals the rate of change of
   `stored_energy`. Mass closes.
 
@@ -1333,7 +1333,7 @@ parent plant calls it once per step in `forward` and uses `result.outputs.comman
 parent cannot run under `gm.no_outputs()`.
 
 - **Parameters**: `proportional_gain` (> 0), `minimum_output`, `maximum_output` (`minimum_output <
-  maximum_output`, else `ConfigurationError`), `direction` (`"direct"` or `"reverse"`), all
+  maximum_output`, else `ValidationError`), `direction` (`"direct"` or `"reverse"`), all
   required; `integral_time` (`Duration | None`, default `None` for P or PD), `derivative_time`
   (default 0). Times are SI seconds; text such as `"15 min"` converts.
 - **Controls**: `setpoint`. **Boundaries**: `measurement` (both `Dimensionless`).
@@ -1418,7 +1418,7 @@ Plants*, 4th ed., section 5.2).
 - **Assumptions and validity**: pure-water properties, perfect separation, adiabatic vessel;
   the inlet temperature is that of the liquid before flashing. Inlet 273.15 K to 623.15 K,
   setpoint 611.213 Pa to 16.529 MPa. Reverse flow, a steam inlet or a setpoint above the inlet
-  pressure raise `PhysicsRangeError`.
+  pressure raise `PhysicsError`.
 - **Energy audit**: closed in IF97 enthalpies, `m h_in = m_g h_g + m_l h_f` (tested);
   `energy_balance` cannot represent latent heat, so its residual is not meaningful. Mass
   closes.
@@ -1451,7 +1451,7 @@ Single-flash condensing steam turbine with generator and condenser.
 - **Physics**: `steam.baumann_expansion`, `steam.saturation_properties`, `steam.turbine_balance`
 - **Validity**: pressures within 611.213 Pa to 16.529 MPa, a wet exhaust. A non-steam inlet,
   reverse flow, an inlet at or below the condenser pressure or a dry exhaust raise
-  `PhysicsRangeError`. No non-condensable gases or gland losses.
+  `PhysicsError`. No non-condensable gases or gland losses.
 - **Energy audit**: closed in IF97 enthalpies (tested); `energy_balance` is not valid across
   the phase change. Mass closes.
 
@@ -1609,7 +1609,7 @@ limbs fed from one return. A spec plant of variable size: `gm.plants.from_templa
   `splitters` (`injectors - 1` `Splitter`s); `injectors` (default 1) `ModuleList` of
   `ModuleDict(well=InjectionWell, sink=InjectionReservoir)`. Paths like
   `producers.0.esp.frequency`, `injectors.1.sink...`. Fewer than one producer or injector
-  raises `ConfigurationError` from the generator and `ValidationError` from `from_template`.
+  raises `ValidationError` from the generator and `ValidationError` from `from_template`.
 - Ports: `return_in` -> `supply_out`.
 - Parameters, controls, boundaries, states: none of its own (children's: `production_rate` per
   reservoir, `frequency` per ESP, `split_fraction` per splitter).
@@ -1625,7 +1625,7 @@ limbs fed from one return. A spec plant of variable size: `gm.plants.from_templa
 - Assumptions: as in `Doublet`, the return boundary is independent of production within a call;
   splitters stand for chokes or the injection-pump allocation; no field hydraulics.
 - Validity: that of the reservoirs, wells and ESPs; all limbs must deliver the same fluid
-  (`Mixer` raises `ConfigurationError` otherwise).
+  (`Mixer` raises `ValidationError` otherwise).
 
 ```python
 import gemini as gm
@@ -1710,7 +1710,7 @@ Guide*).
   The building supply temperature that reaches the consumer decides its dew-point test.
 - Limitation: the consumer's dew-point test is on/off, so near the threshold the loop can lack
   a steady state (meeting the latent load warms the supply above the threshold, dropping it
-  cools it below). The iteration then raises `PhysicsRangeError`; with the test configuration
+  cools it below). The iteration then raises `PhysicsError`; with the test configuration
   (latent 50 kW) a band of about 2 K of network temperature (280.6 to 282.4 K) fails. A partial
   dehumidification model in `CoolingConsumer` would remove the band (open question).
 - First-law closed, mass residual 0.
@@ -1747,7 +1747,7 @@ the file `plants/specs/DistrictNetwork.json` is the default size (2 heating cons
 - Structure: `pump` (`CentrifugalPump`, network circulation), `supply_pipe` (`Pipe`),
   `splitters` (`consumers - 1`), `substations` (`consumers` `HeatingSubstation`s for
   `service="heating"`, `CoolingSubstation`s for `"cooling"`), `mixers` (`consumers - 1`),
-  `return_pipe` (`Pipe`). An unknown service or `consumers < 1` raises `ConfigurationError` from the generator and
+  `return_pipe` (`Pipe`). An unknown service or `consumers < 1` raises `ValidationError` from the generator and
   `ValidationError` from `from_template`.
   `HeatingSubstation` and `CoolingSubstation` stay handwritten composites: each closes its building
   loop inside one call.
@@ -1861,7 +1861,7 @@ A composite with an internal closed circuit (the building loop of a substation) 
 circulated temperature first with `close_loop(update, start, path, lower, upper)` from
 `gemini/modules/plants/loops.py`: Wegstein's accelerated substitution (Wegstein 1958,
 "Accelerating convergence of iterative processes", Communications of the ACM 1(6), 9-13),
-tolerance 1e-9 K, at most 50 passes, then `PhysicsRangeError`. Each trial pass evaluates the
+tolerance 1e-9 K, at most 50 passes, then `PhysicsError`. Each trial pass evaluates the
 stateless children with `Module.trial_outlets(inlets)`, which no running call records, and the
 composite then calls every child once with the converged inlets. A loop through a stateful leaf
 whose outlet depends only on its state (the ATES groundwater loop) reads the child's states first
@@ -1888,7 +1888,7 @@ point at which well and reservoir agree, ported from the upstream GEMINI simulat
 
 Brackets are required: `(low, high)` must lie inside the well model's domain (very small rates
 can cool the stream below 0 K through the heat loss, very large ones drive the traversed
-pressure below zero) and give residuals of opposite sign; otherwise `PhysicsRangeError` names
+pressure below zero) and give residuals of opposite sign; otherwise `PhysicsError` names
 the trial value or both residuals. On the upstream doublet-A configuration (2400 m producer,
 10-stage ESP at 650 m, 3 bar wellhead) the solve gives 135.8666 m3/h at 69 Hz (upstream
 135.9258, -0.044 %) and 174406.5 W ESP shaft power at 65 Hz (upstream 174444.7, -0.022 %); the

@@ -17,7 +17,8 @@ row whose outlet fluid differs from the probed one counts as failed.
 import numpy as np
 
 from gemini import backends
-from gemini.errors import MissingValueError, TraceError
+from gemini.errors import ValidationError
+from gemini.graph.errors import TraceError
 from gemini.graph.node import STREAM_FIELDS, row_item, row_streams, stack_column
 from gemini.modules.module import _Call, _current_call
 from gemini.ops import Symbolic, registry
@@ -115,7 +116,9 @@ def _probe_inputs(module, supplied):
             continue
         try:
             inputs[name] = module._input_value(name)
-        except MissingValueError:
+        except ValidationError as error:
+            if error.code != "missing_value":
+                raise
             inputs[name] = PROBE_INPUT
     return inputs
 

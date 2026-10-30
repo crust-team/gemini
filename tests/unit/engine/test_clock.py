@@ -1,9 +1,9 @@
 """Finite clocks: constructors, DST calendars, tick lookup and checkpoint descriptors."""
 
 import pandas as pd
-import pytest
 
 import gemini as gm
+from tests.fixtures.errors import raises
 
 
 def test_clock_range_is_inclusive():
@@ -27,16 +27,16 @@ def test_daily_calendar_clocks_keep_local_midnight_across_dst():
 
 
 def test_ticks_must_increase_and_lookups_name_the_clock_range():
-    """Unordered ticks and timestamps off the clock raise ClockError with the values."""
-    with pytest.raises(gm.errors.ClockError, match="2024-01-01T00:00:00"):
+    """Unordered ticks and timestamps off the clock raise RunError with the values."""
+    with raises(gm.errors.RunError, "clock", match="2024-01-01T00:00:00"):
         gm.Clock(["2024-01-01T01:00Z", "2024-01-01T00:00Z"])
     clock = gm.Clock.range("2024-01-01", "2024-01-01T01:00Z", "30min")
     assert clock.dt("2024-01-01T01:00Z") == 1800.0
-    with pytest.raises(gm.errors.ClockError, match="t = 2024-01-01T00:10:00"):
+    with raises(gm.errors.RunError, "clock", match="t = 2024-01-01T00:10:00"):
         clock.dt("2024-01-01T00:10Z")
-    with pytest.raises(gm.errors.CheckpointError, match="kind = 'weekly'"):
+    with raises(gm.errors.RunError, "checkpoint", match="kind = 'weekly'"):
         gm.Clock.reopen({"kind": "weekly"})
-    with pytest.raises(gm.errors.ClockError, match="days = 0"):
+    with raises(gm.errors.RunError, "clock", match="days = 0"):
         gm.Clock.days(2024, 1, 1, days=0)
 
 

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini.errors import DeclarationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.graph import Tracer, run
 from tests.fixtures.graph_run import graph_outputs
 
@@ -43,9 +43,9 @@ def test_within_bounds_the_values_equal_the_untraced_call(bounded):
 )
 def test_a_violated_bound_raises_a_declaration_error(bounded, pressures, setpoint, ambient):
     """A negative control or boundary and a negative output raise like ``Declaration.validate``."""
-    with pytest.raises(DeclarationError, match="bounded"):
+    with pytest.raises(ValidationError, match="bounded"):
         _run(bounded, pressures, setpoint, ambient)
-    with pytest.raises(DeclarationError):
+    with pytest.raises(ValidationError):
         for row in range(2):
             bounded(
                 inlet=gm.Stream(m_dot=1.0, T=300.0, p=pressures[row], fluid=gm.WATER),
@@ -56,7 +56,7 @@ def test_a_violated_bound_raises_a_declaration_error(bounded, pressures, setpoin
 
 def test_a_list_item_out_of_bounds_fails_the_row(bounded):
     """Each item of a list output is checked: the second item is the setpoint minus one."""
-    with pytest.raises(DeclarationError, match="profile"):
+    with pytest.raises(ValidationError, match="profile"):
         _run(bounded, [2e5], [0.5])
 
 
@@ -64,7 +64,7 @@ def test_the_bound_fails_even_when_the_value_does_not_reach_an_output(bounded):
     """Bound checks guard every output, so a control the arithmetic ignores still fails."""
     graph = Tracer().trace(bounded, {"inlet": bounded.fluid})
     bounded_checks = [
-        check for check in graph.checks if check.attributes["error"] is DeclarationError
+        check for check in graph.checks if check.attributes["error"] is ValidationError
     ]
     assert bounded_checks
     for node in graph.outputs.values():
@@ -82,13 +82,13 @@ def test_inlet_limits_fail_the_row_with_the_stream_error(gain):
         "scale": 3.0,
         "REFERENCE": 2.0,
     }
-    with pytest.raises(PhysicsRangeError, match="Stream: T = 0.0 K"):
+    with pytest.raises(PhysicsError, match="Stream: T = 0.0 K"):
         graph_outputs(graph, feeds)
 
 
 def test_not_a_number_against_a_bound_fails_like_the_untraced_call(bounded):
     """Not-a-number satisfies no bound, so it fails the row like an untraced call."""
-    with pytest.raises(DeclarationError, match="bounded"):
+    with pytest.raises(ValidationError, match="bounded"):
         _run(bounded, [2e5], [np.nan])
-    with pytest.raises(DeclarationError):
+    with pytest.raises(ValidationError):
         bounded(inlet=gm.Stream(m_dot=1.0, T=300.0, p=2e5, fluid=gm.WATER), setpoint=np.nan)

@@ -2,11 +2,12 @@
 
 import pytest
 
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.cooling import AdsorptionChiller
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 GENERATOR = Stream(m_dot=5, T=343.15, p=3e5)
@@ -64,9 +65,9 @@ def test_driving_temperature_range():
     result = call(chiller(), 280, generator_in=GENERATOR.with_(T=273.15 + 50))
     assert result.outputs.evaporator_duty == 0 and result.outputs.cop is None
     assert result.outlets.chilled_out.T == CHILLED.T
-    with pytest.raises(PhysicsRangeError, match="generator_in.T = 368.15"):
+    with pytest.raises(PhysicsError, match="generator_in.T = 368.15"):
         call(chiller(), 280, generator_in=GENERATOR.with_(T=368.15))
-    with pytest.raises(ConfigurationError, match="minimum_driving_temperature"):
+    with raises(ValidationError, "invalid_design", match="minimum_driving_temperature"):
         call(chiller(minimum_driving_temperature=370), 280)
 
 
@@ -74,7 +75,7 @@ def test_zero_and_negative_flow():
     """A stopped circuit gives no cold; a reversed flow raises."""
     out = call(chiller(), 280, cooling_in=COOLING.with_(m_dot=0)).outputs
     assert out.evaporator_duty == 0 and out.electricity == 0
-    with pytest.raises(PhysicsRangeError, match="generator_in.m_dot = -2"):
+    with pytest.raises(PhysicsError, match="generator_in.m_dot = -2"):
         call(chiller(), 280, generator_in=GENERATOR.with_(m_dot=-2))
 
 

@@ -7,9 +7,10 @@ from pathlib import Path
 import pytest
 
 import gemini as gm
-from gemini.errors import UnknownNameError, ValidationError
+from gemini.errors import ValidationError
 from gemini.modules import registry
 from gemini.modules.module import Module
+from tests.fixtures.errors import raises
 
 
 def test_every_registered_type_has_a_listed_category():
@@ -89,7 +90,7 @@ def test_get_returns_the_class():
 
 def test_an_unknown_name_suggests_close_ones():
     """The error carries the close names as data, for tool results."""
-    with pytest.raises(UnknownNameError, match="did you mean 'Boiler'") as caught:
+    with raises(ValidationError, "unknown_name", match="did you mean 'Boiler'") as caught:
         gm.modules.get("Boilr")
     assert caught.value.to_dict()["suggestions"] == ["Boiler"]
 

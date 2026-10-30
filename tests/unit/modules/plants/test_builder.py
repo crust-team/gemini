@@ -5,8 +5,9 @@ import json
 import pytest
 
 import gemini as gm
-from gemini.errors import NotImplementedYet, UnknownNameError, ValidationError
+from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules.plants import library
+from tests.fixtures.errors import raises
 
 
 @pytest.fixture
@@ -130,7 +131,7 @@ def test_a_loop_needs_a_state_connection(chain):
 
 def test_unknown_names_come_with_suggestions(chain):
     """Modules and ports that do not exist suggest the closest ones."""
-    with pytest.raises(UnknownNameError) as caught:
+    with raises(ValidationError, "unknown_name") as caught:
         chain.connect("frist.outlet", "second.inlet")
     assert caught.value.suggestions == ("first",)
     chain.add("Filter", "third")

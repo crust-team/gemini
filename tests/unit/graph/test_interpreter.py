@@ -4,8 +4,9 @@ import numpy as np
 import pytest
 
 from gemini import backends, ops
-from gemini.errors import CallError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.graph import Graph, Interpreter
+from tests.fixtures.errors import raises
 from tests.fixtures.graph_run import graph_outputs
 
 
@@ -21,7 +22,7 @@ def _branch_graph():
     @ops.physics
     def risky(point):
         value = point * 2
-        ops.check(value > -2, PhysicsRangeError, "test: y = {y}; expected y > -2", y=value)
+        ops.check(value > -2, PhysicsError, "test: y = {y}; expected y > -2", y=value)
         return value
 
     with ops.scope.tracing(graph):
@@ -40,7 +41,7 @@ def test_check_in_the_unselected_branch_does_not_raise():
 def test_check_in_the_selected_branch_raises_its_class_message_and_line():
     """The first failing selected row raises the error of the untraced path."""
     graph = _branch_graph()
-    with pytest.raises(PhysicsRangeError, match=r"^test: y = -4.0") as raised:
+    with pytest.raises(PhysicsError, match=r"^test: y = -4.0") as raised:
         graph_outputs(graph, {"x": np.array([5.0, -2.0, -3.0])})
     assert str(raised.value) == "test: y = -4.0; expected y > -2"
     assert "test_interpreter.py" in raised.value.__notes__[0]
@@ -50,13 +51,13 @@ def test_python_backend_runs_one_row_like_numpy():
     """Scalar feeds give the same values on the Python backend."""
     graph = _branch_graph()
     assert graph_outputs(graph, {"x": -0.5}, "python")["outputs.y"] == -1.0
-    with pytest.raises(PhysicsRangeError):
+    with pytest.raises(PhysicsError):
         graph_outputs(graph, {"x": -2.0}, "python")
 
 
 def test_missing_inputs_raise_call_errors():
     """Every graph input needs a value."""
-    with pytest.raises(CallError, match="without a value: \\['x'\\]"):
+    with raises(ValidationError, "invalid_call", match="without a value: \\['x'\\]"):
         graph_outputs(_branch_graph(), {})
 
 

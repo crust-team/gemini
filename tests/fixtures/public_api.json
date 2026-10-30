@@ -93,7 +93,8 @@
    "to_dict": [],
    "to_spec": [],
    "validate_params": [
-    "params"
+    "params",
+    "on_error"
    ]
   },
   "Plant": {
@@ -111,7 +112,9 @@
     "kind"
    ],
    "summary": [],
-   "validate": []
+   "validate": [
+    "on_error"
+   ]
   },
   "Results": {
    "energy_report": [],
@@ -149,6 +152,7 @@
   "invalid_value",
   "out_of_bounds",
   "missing_value",
+  "no_value",
   "invalid_unit",
   "unknown_name",
   "unknown_port",
@@ -164,48 +168,33 @@
   "invalid_binding",
   "missing_column",
   "invalid_data",
-  "physics_range",
-  "solver_failed",
+  "invalid_design",
+  "invalid_definition",
+  "out_of_range",
+  "no_convergence",
+  "missing_chemistry",
+  "too_little_data",
+  "clock",
+  "checkpoint",
+  "step",
   "cancelled",
   "not_implemented"
  ],
  "errors": {
-  "BindingError": "invalid_binding",
-  "CallError": "invalid_call",
   "Cancelled": "cancelled",
-  "CheckpointError": "error",
-  "ClockError": "invalid_data",
-  "ConfigurationError": "invalid_value",
-  "DatasetError": "invalid_data",
-  "DeclarationError": "invalid_value",
-  "FormulaError": "invalid_format",
+  "DefinitionError": "invalid_definition",
   "GeminiError": "error",
-  "InsufficientDataError": "invalid_data",
-  "LegacyFormatError": "invalid_format",
-  "MissingChemistryError": "missing_value",
-  "MissingMeasurementError": "missing_value",
-  "MissingValueError": "missing_value",
   "NotImplementedYet": "not_implemented",
-  "OutletError": "invalid_call",
-  "OutputError": "error",
-  "PhysicsRangeError": "physics_range",
-  "PlantFormatError": "invalid_format",
-  "SolverError": "solver_failed",
-  "StepError": "error",
-  "TraceError": "error",
-  "UnitError": "invalid_unit",
-  "UnknownCorrelationError": "unknown_name",
-  "UnknownMemberError": "unknown_name",
-  "UnknownNameError": "unknown_name",
-  "UnknownPortError": "unknown_port",
-  "UnknownResultError": "unknown_name",
+  "PhysicsError": "out_of_range",
+  "RunError": "step",
   "ValidationError": "invalid_value"
  },
  "evaluate": [
   "module",
   "parameters",
   "inlets",
-  "controls"
+  "controls",
+  "on_error"
  ],
  "kpi": {
   "call": [
@@ -349,7 +338,8 @@
    "nodal": [
     "plant",
     "well",
-    "conditions"
+    "conditions",
+    "on_error"
    ],
    "pump_curve": [
     "plant",
@@ -377,42 +367,50 @@
    "Assumptions": "class",
    "capex": [
     "plant",
-    "assumptions"
+    "assumptions",
+    "on_error"
    ],
    "co2": [
+    "plant",
     "results",
-    "assumptions"
+    "assumptions",
+    "on_error"
    ],
    "lcoc": [
     "plant",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions"
+    "assumptions",
+    "on_error"
    ],
    "lcoh": [
     "plant",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions"
+    "assumptions",
+    "on_error"
    ],
    "npv": [
     "plant",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions"
+    "assumptions",
+    "on_error"
    ],
    "opex": [
     "plant",
     "results",
-    "assumptions"
+    "assumptions",
+    "on_error"
    ],
    "payback": [
     "plant",
     "results",
-    "assumptions"
+    "assumptions",
+    "on_error"
    ]
   },
   "optim": {
@@ -474,7 +472,8 @@
    "spec_schema": [],
    "templates": [],
    "validate": [
-    "spec"
+    "spec",
+    "on_error"
    ]
   },
   "profiles": {
@@ -537,9 +536,9 @@
   "invalid_inlet",
   "missing_value",
   "module_error",
+  "no_convergence",
   "out_of_bounds",
-  "physics_range",
-  "solver_failed"
+  "out_of_range"
  ],
  "run": {
   "live": [

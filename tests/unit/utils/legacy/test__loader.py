@@ -8,9 +8,10 @@ from pathlib import Path
 import pytest
 
 import gemini as gm
-from gemini.errors import GeminiWarning, LegacyFormatError
+from gemini.errors import GeminiWarning, ValidationError
 from gemini.utils import legacy
 from gemini.utils.legacy._loader import load_legacy_design, node_kinds
+from tests.fixtures.errors import raises
 
 OLD = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
 
@@ -92,5 +93,5 @@ def test_unknown_nodes_are_rejected(tmp_path, project):
     edited = project.model_copy(deep=True)
     node_id = next(iter(edited.nodes))
     edited.nodes[node_id] = edited.nodes[node_id].model_copy(update={"name": "boiler_1"})
-    with pytest.raises(LegacyFormatError, match="boiler_1"):
+    with raises(ValidationError, "invalid_format", match="boiler_1"):
         load_legacy_design(edited)

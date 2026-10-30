@@ -15,6 +15,7 @@ from gemini.engine.results import Results
 from gemini.modules.plants.migration import RENAMED_NAMES
 from gemini.types import Control, Output
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
+from tests.fixtures.errors import raises
 from tests.fixtures.frames import path_frame
 
 ROOT = Path(__file__).parents[2]
@@ -288,10 +289,12 @@ def test_error_policies_and_missing_columns(setup):
     assert result.errors()[0]["path"] == "doublet.esp"
     assert result.errors()[0]["code"] == "invalid_inlet"
     assert result["filters.hot"].pressure_drop.notna().all()
-    with pytest.raises(gm.errors.StepError, match="doublet.esp"):
+    with raises(gm.errors.RunError, "step", match="doublet.esp"):
         gm.Engine(plant, on_error="raise").replay(gm.Dataset.from_frame(frame))
-    with pytest.raises(
-        gm.errors.BindingError, match="suction.p, doublet.reservoir.production_rate"
+    with raises(
+        gm.errors.ValidationError,
+        "missing_column",
+        match="suction.p, doublet.reservoir.production_rate",
     ) as caught:
         gm.Engine(plant).replay(
             gm.Dataset.from_frame(
@@ -433,7 +436,7 @@ def test_live_keeps_the_callers_error_policy_and_plant(tmp_path):
     engine.live(data, path, now=index[1])
     assert engine.on_error == "raise"
     assert engine.plant is plant
-    with pytest.raises(gm.errors.CheckpointError, match="plant_class = .*Accumulator"):
+    with raises(gm.errors.RunError, "checkpoint", match="plant_class = .*Accumulator"):
         gm.Engine(NotANumber()).live(data, path, now=index[1])
 
 
@@ -498,7 +501,7 @@ def test_a_dataframe_runs_like_a_dataset():
     pd.testing.assert_frame_equal(replayed.to_frame(), gm.Engine(plant).replay(data).to_frame())
     simulated = gm.Engine(plant).simulate(frame)
     assert simulated[""].value.tolist() == replayed[""].value.tolist()
-    with pytest.raises(gm.errors.DatasetError, match="timezone-aware"):
+    with raises(gm.errors.RunError, "invalid_data", match="timezone-aware"):
         gm.Engine(plant).replay(frame.tz_localize(None))
 
 
@@ -509,7 +512,7 @@ def test_a_run_input_without_the_bound_columns_lists_them_all():
     plant.bindings[""].controls["rat"] = Binding(column="rat", unit="-")
     with pytest.raises(gm.errors.ValidationError, match="rat, speed") as caught:
         gm.Engine(plant).replay(data)
-    assert isinstance(caught.value, gm.errors.BindingError)
+    assert isinstance(caught.value, gm.errors.ValidationError)
     assert caught.value.code == "missing_column"
     assert caught.value.to_dict()["suggestions"] == ["rate"]
 

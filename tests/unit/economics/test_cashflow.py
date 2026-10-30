@@ -5,6 +5,7 @@ import pytest
 import gemini as gm
 from gemini.physics.units import SECONDS_PER_YEAR
 from tests.fixtures.costed_plants import day, heating_plant
+from tests.fixtures.errors import raises
 
 HEAT = 1000.0 * SECONDS_PER_YEAR
 OPEX = 10.0 + 1e-9 * HEAT + 2e-8 * 100.0 * SECONDS_PER_YEAR
@@ -33,7 +34,7 @@ def test_payback_is_the_investment_over_the_net_cash_flow():
 def test_payback_never_comes_when_revenue_does_not_cover_the_cost():
     """A heat price below the running cost gives null with the reason."""
     cheap = gm.economics.Assumptions(electricity_price=2e-8, heat_price=1e-9)
-    result = gm.economics.payback(heating_plant(), day(), cheap)
+    result = gm.economics.payback(heating_plant(), day(), cheap, on_error="record")
     assert result["value"] is None
     assert result["reason"] == "the yearly revenue does not exceed the yearly cost"
 
@@ -50,5 +51,10 @@ def test_a_plant_without_declared_cost_has_no_npv_or_payback():
     """Both are null with the reason of the missing cost."""
     plant = heating_plant(costed=False)
     values = gm.economics.Assumptions(electricity_price=2e-8, heat_price=5e-8)
-    assert gm.economics.npv(plant, day(), 0.05, 20, values)["value"] is None
-    assert "no module declares a cost" in gm.economics.payback(plant, day(), values)["reason"]
+    assert gm.economics.npv(plant, day(), 0.05, 20, values, on_error="record")["value"] is None
+    recorded = gm.economics.payback(plant, day(), values, on_error="record")
+    assert "no module declares a cost" in recorded["reason"]
+    with raises(gm.errors.ValidationError, "no_value", match="no module declares a cost"):
+        gm.economics.npv(plant, day(), 0.05, 20, values)
+    with raises(gm.errors.ValidationError, "no_value", match="no module declares a cost"):
+        gm.economics.payback(plant, day(), values)

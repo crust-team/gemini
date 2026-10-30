@@ -8,9 +8,10 @@ import numpy as np
 import pytest
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import erosion, units
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.errors import raises
 
 GOLDEN = json.loads((Path(__file__).parents[2] / "fixtures/golden_values.json").read_text())
 FLOW = dict(flow_rate=units.m3h_to_m3s(150), rho_fluid=1068, diameter=0.1778)
@@ -34,9 +35,9 @@ def test_model_aliases_are_case_insensitive():
     assert erosion.erosion_rate("dnvgl", **FLOW) == erosion.erosion_rate("DNV", **FLOW)
     assert erosion.erosion_rate(" E/CRC Tulsa ", **FLOW) == erosion.erosion_rate("TULSA", **FLOW)
     assert erosion.erosion_rate("ecrc", **FLOW) == erosion.erosion_rate("TULSA", **FLOW)
-    with pytest.raises(UnknownCorrelationError, match="velocity limit"):
+    with raises(ValidationError, "unknown_name", match="velocity limit"):
         erosion.erosion_rate("API", **FLOW)
-    with pytest.raises(UnknownCorrelationError, match="'X'"):
+    with raises(ValidationError, "unknown_name", match="'X'"):
         erosion.erosion_rate("X", **FLOW)
 
 
@@ -46,7 +47,7 @@ def test_dnv_materials_and_retained_titanium_rejection():
     epoxy = erosion.erosion_rate("DNV", **FLOW, material="GRP/epoxy")
     vinyl = erosion.erosion_rate("DNV", **FLOW, material="grp/vinyl ester")
     assert steel > 0 and epoxy > 0 and vinyl == pytest.approx(2 * epoxy)
-    with pytest.raises(UnknownCorrelationError, match="'titanium'"):
+    with raises(ValidationError, "unknown_name", match="'titanium'"):
         erosion.erosion_rate("DNV", **FLOW, material="titanium")
 
 
@@ -55,7 +56,7 @@ def test_oka_particles_and_tulsa_inputs():
     rates = {p: erosion.erosion_rate("OKA", **FLOW, particle_material=p) for p in ("sio2", "SiC")}
     assert all(rate > 0 for rate in rates.values())
     assert erosion.erosion_rate("OKA", **FLOW, particle_material="glass") > 0
-    with pytest.raises(UnknownCorrelationError, match="'sand'"):
+    with raises(ValidationError, "unknown_name", match="'sand'"):
         erosion.erosion_rate("OKA", **FLOW, particle_material="sand")
     base = erosion.erosion_rate("TULSA", **FLOW)
     assert erosion.erosion_rate("TULSA", **FLOW, shape_factor=1.0) == pytest.approx(2 * base)
@@ -65,9 +66,9 @@ def test_oka_particles_and_tulsa_inputs():
 def test_zero_flow_erodes_nothing_and_bad_inputs_raise(model):
     """Zero flow gives zero; a negative flow or zero angle formerly crashed."""
     assert erosion.erosion_rate(model, **(FLOW | {"flow_rate": 0.0})) == 0
-    with pytest.raises(PhysicsRangeError, match="complex rate"):
+    with pytest.raises(PhysicsError, match="complex rate"):
         erosion.erosion_rate(model, **(FLOW | {"flow_rate": -0.04}))
-    with pytest.raises(PhysicsRangeError, match="alpha = 0"):
+    with pytest.raises(PhysicsError, match="alpha = 0"):
         erosion.erosion_rate(model, **FLOW, alpha=0)
 
 
@@ -84,9 +85,9 @@ def test_api_velocity_limit_and_comparison():
         "velocity_margin_ms": limit / 2,
         "exceeds_api_limit": False,
     }
-    with pytest.raises(PhysicsRangeError, match="rho_fluid = 0"):
+    with pytest.raises(PhysicsError, match="rho_fluid = 0"):
         erosion.api_erosional_velocity(0)
-    with pytest.raises(PhysicsRangeError, match="limit = 0"):
+    with pytest.raises(PhysicsError, match="limit = 0"):
         erosion.api_velocity_comparison(1, 0)
 
 
@@ -158,17 +159,17 @@ def test_erosion_rate_errors_match_arrays():
     bad_flow = ROWS[:2] + [(-0.04, 1068, 0.1778, math.pi / 2)]
     bad_angle = ROWS[:2] + [(0.04, 1068, 0.1778, 0.0)]
     for model in ("DNV", "OKA", "TULSA"):
-        assert_same_error(_rate(model), bad_flow, PhysicsRangeError)
-        assert_same_error(_rate(model), bad_angle, PhysicsRangeError)
+        assert_same_error(_rate(model), bad_flow, PhysicsError)
+        assert_same_error(_rate(model), bad_angle, PhysicsError)
 
 
 def test_api_functions_match_arrays():
     """The API limit and the comparison match on arrays, including the exceedance flag."""
     assert_function_matches(erosion.api_erosional_velocity, [(1.0,), (1068.0,), (250.0,)])
-    assert_same_error(erosion.api_erosional_velocity, [(1068.0,), (0.0,)], PhysicsRangeError)
+    assert_same_error(erosion.api_erosional_velocity, [(1068.0,), (0.0,)], PhysicsError)
     comparison = [(1.0, 2.0), (3.0, 2.0), (2.0, 2.0)]
     assert_function_matches(erosion.api_velocity_comparison, comparison)
-    assert_same_error(erosion.api_velocity_comparison, [(1.0, 2.0), (1.0, 0.0)], PhysicsRangeError)
+    assert_same_error(erosion.api_velocity_comparison, [(1.0, 2.0), (1.0, 0.0)], PhysicsError)
 
 
 @pytest.mark.parametrize("model", ["DNV", "OKA", "TULSA"])
@@ -185,7 +186,7 @@ def test_nan_input_passes_through_and_a_negative_flow_is_complex(model):
     nan = float("nan")
     assert math.isnan(erosion.erosion_rate(model, **(FLOW | {"flow_rate": nan})))
     assert math.isnan(erosion.erosion_rate(model, **(FLOW | {"rho_fluid": nan})))
-    with pytest.raises(PhysicsRangeError, match="complex rate"):
+    with pytest.raises(PhysicsError, match="complex rate"):
         erosion.erosion_rate(model, **(FLOW | {"flow_rate": -0.04}))
 
 
@@ -199,10 +200,10 @@ def test_a_stopped_row_drops_the_complex_rate_error():
 
     rows = [(0.04, 0.0), (-0.04, 1.0), (0.01, 0.0), (float("nan"), 0.0)]
     assert_function_matches(guarded, rows)
-    assert_same_error(guarded, [(0.04, 0.0), (-0.04, 0.0)], PhysicsRangeError)
+    assert_same_error(guarded, [(0.04, 0.0), (-0.04, 0.0)], PhysicsError)
 
 
 def test_a_negative_integer_flow_is_the_complex_rate_error():
     """An integer argument behaves like its float: the complex rate raises the proper class."""
-    with pytest.raises(PhysicsRangeError, match="complex rate"):
+    with pytest.raises(PhysicsError, match="complex rate"):
         erosion.erosion_rate("DNV", flow_rate=-1, rho_fluid=1000, diameter=1)

@@ -1,5 +1,6 @@
 """The plant spec as data: read it, check it, and the plant file is the same document."""
 
+from gemini.errors.base import reported
 from gemini.modules.plants import reader
 from gemini.modules.plants.builder import Plant
 
@@ -9,12 +10,14 @@ def from_spec(spec):
     return reader.read(Plant, spec)
 
 
-def validate(spec):
-    """Return every problem of ``spec`` as ``[{path, message, code, suggestions}]``; never raises.
+def validate(spec, on_error="raise"):
+    """Check ``spec`` and return ``[]``, or raise one ``ValidationError`` with every problem.
 
-    ``path`` points into the spec, for example ``connections[1].target``.
+    With ``on_error="record"`` nothing is raised and the problems are returned, each
+    ``{path, code, message, suggestions}``: the list the error carries in ``problems``. ``path``
+    points into the spec, for example ``connections[1].target``.
     """
-    return reader.problems(Plant, spec)
+    return reported(reader.problems(Plant, spec), on_error)
 
 
 from_dict = from_spec

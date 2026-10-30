@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini.errors import ConfigurationError
+from gemini.errors import ValidationError
 from gemini.types.quantities import AnnualMoney, Money, MoneyPerEnergy
 
 
@@ -31,9 +31,10 @@ def total_cost(module):
         return None
     first = costs[0]
     if any((c.currency, c.price_year) != (first.currency, first.price_year) for c in costs):
-        raise ConfigurationError(
+        raise ValidationError(
             f"{module.path}: costs require the same currency and price year; got "
-            f"{sorted({(c.currency, c.price_year) for c in costs})}"
+            f"{sorted({(c.currency, c.price_year) for c in costs})}",
+            code="invalid_design",
         )
     return Cost(
         capex=sum(c.capex for c in costs),

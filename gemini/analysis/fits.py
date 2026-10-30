@@ -6,7 +6,7 @@ through the physics functions.
 
 import numpy as np
 
-from gemini.errors import InsufficientDataError, UnknownCorrelationError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import constants, heat_transfer, units
 from gemini.types.shapes import value
 
@@ -38,13 +38,17 @@ def fit_head_coefficients(flows, frequencies, heads, stage_count):
     """
     q, f, h = (np.asarray(value, dtype=float) for value in (flows, frequencies, heads))
     if q.shape != f.shape or q.shape != h.shape or q.ndim != 1 or len(q) < CURVE_COEFFICIENTS:
-        raise InsufficientDataError("ESP: at least six matching observations required")
+        raise PhysicsError(
+            "ESP: at least six matching observations required", code="too_little_data"
+        )
     if stage_count <= 0 or np.any(f <= 0) or np.any(q < 0) or not np.isfinite([q, f, h]).all():
-        raise InsufficientDataError("ESP: fitting requires finite positive stages and frequencies")
+        raise PhysicsError(
+            "ESP: fitting requires finite positive stages and frequencies", code="too_little_data"
+        )
     x = units.m3s_to_bbl_per_day(q)
     y = units.pa_to_ft_head(h) / (stage_count * (f / constants.ESP_REFERENCE_FREQUENCY) ** 2)
     if len(np.unique(x)) < CURVE_COEFFICIENTS:
-        raise InsufficientDataError("ESP: six distinct flow values are required")
+        raise PhysicsError("ESP: six distinct flow values are required", code="too_little_data")
     degree = CURVE_COEFFICIENTS - 1
     return value(np.polynomial.Polynomial.fit(x, y, degree).convert().coef.tolist(), "-")
 
@@ -64,7 +68,9 @@ def fit_head_correction(measured, theoretical):
     """
     x, y = (np.asarray(value, dtype=float) for value in (measured, theoretical))
     if x.shape != y.shape or len(x) < 2 or not np.isfinite([x, y]).all() or np.var(x) == 0:
-        raise InsufficientDataError("ESP: two or more finite, distinct measurements required")
+        raise PhysicsError(
+            "ESP: two or more finite, distinct measurements required", code="too_little_data"
+        )
     slope = np.sum((x - x.mean()) * (y - y.mean())) / np.sum((x - x.mean()) ** 2)
     return {
         "slope": value(float(slope), "-"),
@@ -96,12 +102,15 @@ def estimate_reservoir_pressure(flows, bottomhole_pressures):
         or np.any(q == 0)
         or not np.isfinite([q, p]).all()
     ):
-        raise InsufficientDataError(
-            "Reservoir pressure estimation needs at least two matching finite, nonzero samples"
+        raise PhysicsError(
+            "Reservoir pressure estimation needs at least two matching finite, nonzero samples",
+            code="too_little_data",
         )
     x, y = 1 / q, p / q
     if np.ptp(x) == 0 or np.ptp(y) == 0:
-        raise InsufficientDataError("Reservoir pressure regression requires variation")
+        raise PhysicsError(
+            "Reservoir pressure regression requires variation", code="too_little_data"
+        )
     coefficients = np.polyfit(x, y, 1)
     residual = y - np.poly1d(coefficients)(x)
     r_squared = 1 - np.sum(residual**2) / np.sum((y - np.mean(y)) ** 2)
@@ -126,13 +135,14 @@ def estimate_conductance(
     """Return the apparent UA of an exchanger as a value in W/K, from temperatures and mass flows.
 
     Temperatures are in K, mass flows in kg/s and heat capacities in J/kg/K. Raises
-    ``InsufficientDataError`` when the measurements cannot determine UA: a stopped stream, hot and
+    ``PhysicsError`` when the measurements cannot determine UA: a stopped stream, hot and
     cold duties that disagree by more than 5 %, or no positive LMTD; see
     ``heat_transfer.apparent_conductance``.
     """
     if arrangement not in {"counterflow", "parallel"}:
-        raise UnknownCorrelationError(
-            f"HeatExchanger: unknown arrangement {arrangement!r}; expected counterflow or parallel"
+        raise ValidationError(
+            f"HeatExchanger: unknown arrangement {arrangement!r}; expected counterflow or parallel",
+            code="unknown_name",
         )
     apparent, code, hot_duty, cold_duty, delta = heat_transfer.apparent_conductance(
         arrangement,
@@ -146,14 +156,17 @@ def estimate_conductance(
         cp_cold,
     )
     if code == heat_transfer.NONPOSITIVE_INPUT:
-        raise InsufficientDataError(
-            "HeatExchanger: mass flows and heat capacities must be positive"
+        raise PhysicsError(
+            "HeatExchanger: mass flows and heat capacities must be positive", code="too_little_data"
         )
     if code == heat_transfer.DISAGREEING_DUTIES:
-        raise InsufficientDataError(
+        raise PhysicsError(
             f"HeatExchanger: hot/cold duties must agree within 5%; got {hot_duty} W and "
-            f"{cold_duty} W"
+            f"{cold_duty} W",
+            code="too_little_data",
         )
     if code == heat_transfer.NO_LMTD:
-        raise InsufficientDataError(f"HeatExchanger: positive LMTD required; got {delta} K")
+        raise PhysicsError(
+            f"HeatExchanger: positive LMTD required; got {delta} K", code="too_little_data"
+        )
     return value(apparent, "W/K")

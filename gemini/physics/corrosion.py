@@ -12,7 +12,7 @@ from typing import Literal
 import numpy as np
 
 from gemini import ops
-from gemini.errors import MissingChemistryError, PhysicsRangeError, UnknownCorrelationError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.utils.strings import did_you_mean, join_names
 
 from . import geometry, units
@@ -182,9 +182,10 @@ def co2_corrosion_rate(
     without a warning (see ``_hydrogen_ion``).
     """
     if model not in _RATES:
-        raise UnknownCorrelationError(
+        raise ValidationError(
             f"co2_corrosion_rate: model = {model!r}; expected one of "
-            f"{join_names(_RATES)}{did_you_mean(model, _RATES)}"
+            f"{join_names(_RATES)}{did_you_mean(model, _RATES)}",
+            code="unknown_name",
         )
     if fitted:
         coefficients = _DEFAULT_COEFFICIENTS[model] | (coefficients or {})
@@ -208,7 +209,7 @@ def co2_corrosion_rate(
     nan_input = ops.any_nan(temperature, pressure, water_flow_rate, water_density, water_viscosity)
     ops.check(
         ops.logical_or(ops.logical_not(ops.isnan(rate)), nan_input),
-        PhysicsRangeError,
+        PhysicsError,
         "co2_corrosion_rate {model}: water_flow_rate = {water_flow_rate} m3/s gives a "
         "complex rate; expected a nonnegative flow",
         model=model,
@@ -227,13 +228,14 @@ def _conditions(model, *, co2_fraction, co2_partial_pressure, **values):
     elif co2_fraction is not None:
         co2_pressure = co2_fraction * values["pressure"]
     else:
-        raise MissingChemistryError(
+        raise PhysicsError(
             f"co2_corrosion_rate {model}: co2_fraction and co2_partial_pressure are None; "
-            "expected one of them"
+            "expected one of them",
+            code="missing_chemistry",
         )
     ops.check(
         co2_pressure > 0,
-        PhysicsRangeError,
+        PhysicsError,
         "co2_corrosion_rate {model}: CO2 partial pressure = {co2_pressure} bar; expected "
         "a positive value (the correlations take its logarithm)",
         model=model,
@@ -242,7 +244,7 @@ def _conditions(model, *, co2_fraction, co2_partial_pressure, **values):
     if model != "DLM":
         ops.check(
             ops.ne(values["flow_rate"], 0),
-            PhysicsRangeError,
+            PhysicsError,
             "co2_corrosion_rate {model}: water_flow_rate = 0 m3/s; expected a nonzero flow "
             "(the flow-dependent correlations divide by the flow velocity)",
             model=model,
@@ -433,7 +435,7 @@ def _hydrogen_ion(bicarb, co2_pressure, constants):
     denominator = h0 * k0 * k1 * k2 * co2_pressure
     ops.check(
         denominator != 0,
-        PhysicsRangeError,
+        PhysicsError,
         "co2_corrosion_rate NORSOK: equilibrium constants underflow at CO2 pressure = "
         "{co2_pressure} bar; expected a temperature inside the NORSOK range",
         co2_pressure=co2_pressure,
@@ -523,13 +525,13 @@ def wall_loss(
     durations = _series(durations_s)
     if not isinstance(rates, ops.Symbolic) and not isinstance(durations, ops.Symbolic):
         if rates.shape != durations.shape:
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"wall_loss: rates shape = {rates.shape}; expected the durations shape "
                 f"{durations.shape}"
             )
     ops.check(
         durations >= 0,
-        PhysicsRangeError,
+        PhysicsError,
         "wall_loss: durations contain negative values; expected >= 0 s",
     )
     return ops.cumsum(rates * durations / units.SECONDS_PER_YEAR)

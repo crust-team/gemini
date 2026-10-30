@@ -3,7 +3,7 @@
 import pytest
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics import compression
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
@@ -40,7 +40,7 @@ def test_multistage_work_splits_the_ratio_equally():
 )
 def test_out_of_domain_inputs_raise(arguments, match):
     """Expansion, nonpositive temperatures and invalid gas or machine data raise."""
-    with pytest.raises(PhysicsRangeError, match=match):
+    with pytest.raises(PhysicsError, match=match):
         compression.specific_compression_work(*arguments)
 
 
@@ -77,7 +77,7 @@ def test_functions_match_on_arrays():
 )
 def test_checks_match_on_arrays(function, rows):
     """A failing row raises the same error and message on arrays and on floats."""
-    assert_same_error(function, rows, PhysicsRangeError)
+    assert_same_error(function, rows, PhysicsError)
 
 
 @ops.physics

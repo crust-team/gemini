@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import CoolingSubstation, HeatingSubstation, generators
 from gemini.types import Stream
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 HOT = Stream(m_dot=4.0, T=348.15, p=6e5)
@@ -92,9 +93,9 @@ def test_single_consumer_and_invalid_structure(plants):
     assert isinstance(network.substations[0], HeatingSubstation)
     result = network(supply_in=HOT.with_(m_dot=2.0))
     assert result.outputs.heat_supplied == pytest.approx(1.5e5, rel=1e-12)
-    with pytest.raises(gm.errors.ConfigurationError, match="service"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="service"):
         generators.district_network_spec(service="steam")
-    with pytest.raises(gm.errors.ConfigurationError, match="consumers"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="consumers"):
         generators.district_network_spec(consumers=0)
     with pytest.raises(gm.errors.ValidationError, match="service"):
         gm.plants.from_template("DistrictNetwork", {"service": "steam"})

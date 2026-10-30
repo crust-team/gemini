@@ -26,7 +26,7 @@ a ``where`` and a ``check`` to give the failure its error. The Python backend is
 iterations on all rows with a mask (see ``gemini.backends.solvers``).
 """
 
-from gemini.errors import ConfigurationError
+from gemini.errors import ValidationError
 from gemini.ops.dispatch import dispatch
 from gemini.ops.registry import register
 
@@ -46,9 +46,10 @@ def brentq(function, low, high, args=(), xtol=2e-12, rtol=BRENT_RTOL, maxiter=10
     ``scipy.optimize.brentq``: ``xtol + rtol * abs(x)``.
     """
     if xtol <= 0 or rtol < BRENT_RTOL or maxiter < 1:
-        raise ConfigurationError(
+        raise ValidationError(
             f"ops.brentq: xtol = {xtol}, rtol = {rtol}, maxiter = {maxiter}; expected xtol > 0, "
-            f"rtol >= {BRENT_RTOL} and maxiter >= 1"
+            f"rtol >= {BRENT_RTOL} and maxiter >= 1",
+            code="invalid_design",
         )
     attributes = {"function": function, "xtol": xtol, "rtol": rtol, "maxiter": maxiter}
     return dispatch("brentq", low, high, *args, attributes=attributes)

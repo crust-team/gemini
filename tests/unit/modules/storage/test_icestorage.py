@@ -18,6 +18,7 @@ from gemini.types import (
     Stream,
 )
 from tests.fixtures.equivalence import assert_function_matches, assert_module_matches
+from tests.fixtures.errors import raises
 
 MASS = 1000.0
 UA = 2000.0
@@ -110,13 +111,15 @@ def test_stopped_glycol_leaves_the_store_unchanged():
 def test_invalid_states_and_flows_raise():
     """A temperature that contradicts the phase, and reverse flow, are rejected."""
     store = _store()
-    with pytest.raises(gm.errors.ConfigurationError, match="ice_storage: temperature = 270"):
+    with raises(
+        gm.errors.ValidationError, "invalid_design", match="ice_storage: temperature = 270"
+    ):
         store.step({"ice_fraction": 0.5, "temperature": 270.0}, 60, {"inlet": COLD})
-    with pytest.raises(gm.errors.ConfigurationError, match="with ice_fraction = 0"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="with ice_fraction = 0"):
         store.step({"ice_fraction": 0, "temperature": 270.0}, 60, {"inlet": COLD})
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot = -1"):
         store(inlet=COLD.with_(m_dot=-1))
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         store.step({"ice_fraction": 1.5, "temperature": FREEZING}, 60, {"inlet": COLD})
 
 

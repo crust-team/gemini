@@ -36,7 +36,7 @@ def bounds(plant, results):
     ----------
     plant : Module
         The plant that produced ``results``; a path of the results it lacks raises
-        ``UnknownNameError``.
+        ``ValidationError``.
     results : Results
         A finished run.
 

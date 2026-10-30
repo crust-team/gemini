@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.pumps import InjectionPump
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
@@ -43,5 +43,5 @@ def test_curves_match_traced():
 
 def test_setpoint_below_suction_raises():
     """A setpoint below the suction pressure is a physics range error."""
-    with pytest.raises(PhysicsRangeError, match="below suction pressure"):
+    with pytest.raises(PhysicsError, match="below suction pressure"):
         InjectionPump()(suction=Stream(m_dot=1, T=300, p=2e6), pressure_setpoint=1e6)

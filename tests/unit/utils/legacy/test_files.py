@@ -4,11 +4,11 @@ import json
 from datetime import datetime
 
 import pandas as pd
-import pytest
 
-from gemini.errors import LegacyFormatError
+from gemini.errors import ValidationError
 from gemini.utils import legacy
 from gemini.utils.legacy.files import GeminiLink, GeminiNode, GeminiParam, GeminiProject, GeminiTags
+from tests.fixtures.errors import raises
 
 
 def test_project_and_csv_round_trip(tmp_path):
@@ -84,18 +84,18 @@ def test_write_csv_applies_the_old_timestamp_format(tmp_path):
 def test_read_csv_rejects_ambiguous_dates(tmp_path):
     """Day-first dates are not silently parsed month-first."""
     (tmp_path / "old.csv").write_text("Timestamp;Q\n07/06/2024;1\n", encoding="utf-8")
-    with pytest.raises(LegacyFormatError, match="Timestamp"):
+    with raises(ValidationError, "invalid_format", match="Timestamp"):
         legacy.read_csv(tmp_path / "old.csv")
     (tmp_path / "iso.csv").write_text("Timestamp;Q\n2024-06-07T01:00:00;1\n", encoding="utf-8")
     assert legacy.read_csv(tmp_path / "iso.csv").Timestamp[0] == pd.Timestamp("2024-06-07 01:00")
 
 
 def test_read_project_errors_name_the_file(tmp_path):
-    """Malformed files and time-varying tags raise LegacyFormatError naming the source."""
+    """Malformed files and time-varying tags raise ValidationError naming the source."""
     _write_project(tmp_path / "varying", {"measured": {"flow": ["Q", "R"]}})
-    with pytest.raises(LegacyFormatError, match="pump.param.*flow"):
+    with raises(ValidationError, "invalid_format", match="pump.param.*flow"):
         legacy.read_project(tmp_path / "varying")
-    with pytest.raises(LegacyFormatError, match="diagram.json"):
+    with raises(ValidationError, "invalid_format", match="diagram.json"):
         legacy.read_project(tmp_path / "missing")
 
 
@@ -118,7 +118,7 @@ def test_write_project_rejects_edited_topology(tmp_path):
     project.links.append(
         GeminiLink(source="node-1", source_port="in", target="node-1", target_port="in")
     )
-    with pytest.raises(LegacyFormatError, match="nodes or links"):
+    with raises(ValidationError, "invalid_format", match="nodes or links"):
         legacy.write_project(project, tmp_path / "out")
 
 

@@ -6,7 +6,7 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
-from gemini.errors import DatasetError
+from gemini.errors import RunError
 from gemini.utils.time import DEFAULT_STEP, interval_seconds
 
 
@@ -85,7 +85,10 @@ class Loader:
     ):
         """Validate the alignment options; reading starts on iteration."""
         if align not in {"exact", "previous", "mean"}:
-            raise DatasetError(f"Loader: align = {align!r}; expected 'exact', 'previous' or 'mean'")
+            raise RunError(
+                f"Loader: align = {align!r}; expected 'exact', 'previous' or 'mean'",
+                code="invalid_data",
+            )
         self.dataset, self.ticks, self.align = dataset, ticks, align
         self.columns = tuple(dataset.names if columns is None else columns)
         self.durations = durations
@@ -94,9 +97,10 @@ class Loader:
         )
         self.chunk = pd.Timedelta(chunk)
         if self.max_gap < pd.Timedelta(0) or self.chunk <= pd.Timedelta(0):
-            raise DatasetError(
+            raise RunError(
                 f"Loader: max_gap = {self.max_gap}, chunk = {self.chunk}; expected a "
-                "nonnegative max_gap and a positive chunk"
+                "nonnegative max_gap and a positive chunk",
+                code="invalid_data",
             )
 
     def __iter__(self):

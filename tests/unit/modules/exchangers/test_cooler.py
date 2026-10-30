@@ -2,11 +2,12 @@
 
 import pytest
 
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.exchangers import Cooler
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 HOT = Stream(m_dot=20, T=313.15, p=3e5)
@@ -66,16 +67,16 @@ def test_capacity_cap_and_no_cooling():
 
 def test_invalid_inputs_raise():
     """A wet cooler needs a wet bulb at or below the dry bulb; flow must not be reversed."""
-    with pytest.raises(ConfigurationError, match="wet_bulb_temperature = None"):
+    with raises(ValidationError, "invalid_design", match="wet_bulb_temperature = None"):
         cooler("wet")(inlet=HOT, temperature_setpoint=290, ambient_temperature=300)
-    with pytest.raises(PhysicsRangeError, match="wet_bulb_temperature = 305"):
+    with pytest.raises(PhysicsError, match="wet_bulb_temperature = 305"):
         cooler("wet")(
             inlet=HOT,
             temperature_setpoint=290,
             ambient_temperature=300,
             wet_bulb_temperature=305,
         )
-    with pytest.raises(PhysicsRangeError, match="inlet.m_dot = -1"):
+    with pytest.raises(PhysicsError, match="inlet.m_dot = -1"):
         cooler("dry")(inlet=HOT.with_(m_dot=-1), temperature_setpoint=290, ambient_temperature=300)
 
 

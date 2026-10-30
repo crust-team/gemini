@@ -67,12 +67,12 @@ def test_stopped_network_and_invalid_inputs(plants):
     substation = plants["cooling_substation"](CoolingSubstation())
     out = substation(network_in=NETWORK.with_(m_dot=0.0)).outputs
     assert out.heat_absorbed == 0 and out.unmet_sensible == 6e4
-    with pytest.raises(gm.errors.PhysicsRangeError):
+    with pytest.raises(gm.errors.PhysicsError):
         substation(network_in=NETWORK.with_(m_dot=-1.0))
 
 
 def test_loop_without_a_steady_state_raises(plants):
     """At the dew-point threshold the on/off latent test leaves no fixed point of the loop."""
     substation = plants["cooling_substation"](CoolingSubstation(), latent=5e4)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="did not converge"):
+    with pytest.raises(gm.errors.PhysicsError, match="did not converge"):
         substation(network_in=NETWORK.with_(T=281.15))

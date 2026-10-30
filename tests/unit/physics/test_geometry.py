@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics import geometry
 from tests.fixtures.equivalence import assert_function_matches
 
@@ -48,9 +48,9 @@ def test_build_path_splits_intervals_at_tally_joints():
 
 def test_build_path_rejects_invalid_trajectories():
     """A path needs two points, increasing MD and |dTVD| <= dMD."""
-    with pytest.raises(PhysicsRangeError, match="at least 2"):
+    with pytest.raises(PhysicsError, match="at least 2"):
         geometry.build_path(TRAJECTORY[:1])
-    with pytest.raises(PhysicsRangeError, match="row 1"):
+    with pytest.raises(PhysicsError, match="row 1"):
         geometry.build_path([TRAJECTORY[0], {"MD": 10, "TVD": 20, "ID": 0.2, "roughness": 0}])
 
 
@@ -60,12 +60,12 @@ def test_index_at_measured_depth_and_subpath():
     assert path.index_at_measured_depth(0) == 0
     assert path.index_at_measured_depth(100) == 1
     assert path.index_at_measured_depth(300) == 1
-    with pytest.raises(PhysicsRangeError, match="measured depth = 301"):
+    with pytest.raises(PhysicsError, match="measured depth = 301"):
         path.index_at_measured_depth(301)
     piece = path.subpath(250, 50)
     assert [s.length for s in piece.sections] == [50, 150]
     assert piece.sections[1].inner_diameter == 0.15
-    with pytest.raises(PhysicsRangeError, match="depth interval"):
+    with pytest.raises(PhysicsError, match="depth interval"):
         path.subpath(-1, 10)
 
 

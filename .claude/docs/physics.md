@@ -536,12 +536,12 @@ Health-scoring relations shared by the modules: drift, bounded score, margin, li
   `Stream` and `Fluid` for type checking only).
 - Do not hide undefined diagnostics as valid numbers. The receiving aquifer's unconfigured
   drainage radius leaves radial estimates unavailable while its pressure-flow model works.
-- Inputs outside a correlation's domain raise `gm.errors.PhysicsRangeError` instead of dividing
+- Inputs outside a correlation's domain raise `gm.errors.PhysicsError` instead of dividing
   by zero or returning NaN: zero flow or CO2 pressure where a correlation divides by them or
   takes their logarithm, a negative flow that gives a complex corrosion or erosion rate, NORSOK
   underflow near 360 °C, and a zero liquid superficial velocity in Beggs–Brill. Unsupported
-  model names raise `UnknownCorrelationError` and missing chemistry raises
-  `MissingChemistryError`.
+  model names raise `ValidationError` and missing chemistry raises
+  `PhysicsError`.
 - The Beggs–Brill flow-regime map follows Beggs and Brill as revised by Brill and Beggs, with
   boundaries at no-slip holdup λ = 0.01 and λ = 0.4. A no-slip holdup of exactly 0.4 takes the
   upper range (intermittent for L3 < Fr <= L4, distributed for Fr > L4); it formerly matched no
@@ -577,9 +577,9 @@ Salinity, CO2 and free gas are mass fractions; glycol is a volume fraction. Brin
 viscosity are not inferred from salinity: supply the overrides. A `steam` fluid carries the
 liquid-water snapshot, not vapour properties (use `steam.py`). Mass fractions summing above one,
 a glycol fraction on another kind, or a glycol fraction other than 0.3 raise a pydantic
-`ValueError`, not `PhysicsRangeError`. `FluidProperties` and `Stream` are frozen slots dataclasses:
+`ValueError`, not `PhysicsError`. `FluidProperties` and `Stream` are frozen slots dataclasses:
 invalid physical values (a non-positive property, a gas mass fraction outside [0, 1), a
-non-finite flow, `T <= 0`, `p < 0`) raise `PhysicsRangeError`; on arrays and traced values the same
+non-finite flow, `T <= 0`, `p < 0`) raise `PhysicsError`; on arrays and traced values the same
 limits are `gemini.ops.check` calls.
 
 ## Hydraulics
@@ -633,9 +633,9 @@ test on the gas mass flow, so a liquid-only fluid never evaluates Beggs-Brill; z
 `where`. The regime is an integer code, because `where` selects numbers.
 
 Beggs-Brill needs a nonzero liquid and mixture velocity and a positive holdup after clamping,
-and a point inside the regime map; otherwise `PhysicsRangeError`. `build_path` raises it for
+and a point inside the regime map; otherwise `PhysicsError`. `build_path` raises it for
 fewer than two points, nonincreasing MD or `|delta TVD| > delta MD`; unsupported correlation
-names or a direction other than `up` or `down` raise `UnknownCorrelationError`.
+names or a direction other than `up` or `down` raise `ValidationError`.
 
 ## Reservoir inflow
 
@@ -649,7 +649,7 @@ conditions, `Q = m_dot / rho_l`.
 - `hydraulics.productivity_index(Q, p_res, p_bh)` = `Q / (p_res - p_bh)` and
   `hydraulics.injectivity_index` = `Q / (p_bh - p_res)`. The reservoir methods
   `productivity_from_measurements` and `injectivity_from_measurements` call them and raise
-  `PhysicsRangeError` for equal pressures, a check the physics functions do not make; the
+  `PhysicsError` for equal pressures, a check the physics functions do not make; the
   functions then return infinity. `productivity_pressure` and `injectivity_pressure` are the two
   inflow relations above.
 - `gm.analysis.estimate_reservoir_pressure(flows, bottomhole_pressures)` (not in `physics`) fits
@@ -662,10 +662,10 @@ conditions, `Q = m_dot / rho_l`.
   m/s2; the reservoir reports it for `rho_l` and the top depth, the pipe and the path functions
   pass `s = sin(theta)`.
 
-A nonpositive `k`, `h`, `r_e` or `r_w` raises `PhysicsRangeError`;
+A nonpositive `k`, `h`, `r_e` or `r_w` raises `PhysicsError`;
 `estimate_reservoir_pressure` needs at
-least two finite, nonzero, varying samples (`InsufficientDataError`). Both indices default to
-`None` and a missing one raises `ConfigurationError`. The linear relations take the viscosity
+least two finite, nonzero, varying samples (`PhysicsError`). Both indices default to
+`None` and a missing one raises `ValidationError`. The linear relations take the viscosity
 and density only through the flow; `mu_l` and `rho_l` come from the reservoir fluid with its
 `liquid_density` and `liquid_viscosity` overrides.
 
@@ -791,9 +791,9 @@ Rates are in mm/year, the explicit literature-unit exception of the package.
   infinity for a nonpositive or nonfinite rate and NaN for missing values.
 
 A CO2 partial pressure of zero, a zero flow for NORSOK and DLD, a negative flow (complex rate)
-and equilibrium-constant underflow near 360 degC raise `PhysicsRangeError`; neither
-`co2_fraction` nor `co2_partial_pressure` raises `MissingChemistryError`; another model name
-raises `UnknownCorrelationError`.
+and equilibrium-constant underflow near 360 degC raise `PhysicsError`; neither
+`co2_fraction` nor `co2_partial_pressure` raises `PhysicsError`; another model name
+raises `ValidationError`.
 
 ## Erosion
 
@@ -827,8 +827,8 @@ radians as each formula needs, the hardness in GPa and the Oka particle diameter
 
 Model names are case-insensitive (`DNV`, `DNVGL`, `OKA`, `TULSA`, `E/CRC Tulsa`, `ECRC`); `API`
 is a velocity limit, not a rate. Unknown names, DNV materials (titanium is rejected) and Oka
-particle materials raise `UnknownCorrelationError`. A zero impact angle, a negative flow (complex
-rate) and a nonpositive density or API limit raise `PhysicsRangeError`.
+particle materials raise `ValidationError`. A zero impact angle, a negative flow (complex
+rate) and a nonpositive density or API limit raise `PhysicsError`.
 
 ## Compression
 
@@ -843,13 +843,13 @@ rate) and a nonpositive density or API limit raise `PhysicsRangeError`.
 
 A pressure ratio below one (expansion) or non-finite, a nonpositive or non-finite inlet
 temperature, `k <= 1`, an efficiency outside (0, 1], a nonpositive `cp` or fewer than one stage
-raise `PhysicsRangeError`. Valid for near-ideal gases and stage ratios up to about 4.
+raise `PhysicsError`. Valid for near-ideal gases and stage ratios up to about 4.
 
 ## Refrigeration
 
 `refrigeration.py` holds the heat pump, chiller and sorption-machine relations of `HeatPump`,
 `AbsorptionUnit` and `AdsorptionChiller`. Inputs and outputs are SI (K, W, W/K); NaN and
-out-of-domain inputs raise `PhysicsRangeError`.
+out-of-domain inputs raise `PhysicsError`.
 
 - `carnot_cop_heating(sink, source, minimum_lift=0)` = `T_sink / max(T_sink - T_source,
   minimum_lift)` and `carnot_cop_cooling(...)` = `T_source / max(...)`. Nonpositive
@@ -911,7 +911,7 @@ J. Eng. Gas Turbines Power 122, 150-182; DiPippo (2016), Geothermal Power Plants
 `ground.py` holds ground and aquifer heat transport for the subsurface equipment. Out-of-domain
 inputs (nonpositive sizes or properties, NaN, a negative volume ratio, a cell radius not above
 the borehole radius, `ln(4L/D) < 1`, Ramey below `alpha t / r^2 = 25`) raise
-`PhysicsRangeError`; modules convert geometry and time errors into `ConfigurationError`.
+`PhysicsError`; modules convert geometry and time errors into `ValidationError`.
 
 - `aquifer_volumetric_heat_capacity(phi, (rho c)_w, (rho c)_r)` = `phi (rho c)_w + (1 - phi)
   (rho c)_r`, assuming local thermal equilibrium (Bear 1972).
@@ -933,7 +933,7 @@ the borehole radius, `ln(4L/D) < 1`, Ramey below `alpha t / r^2 = 25`) raise
 - `ramey_time_function(t, alpha, r)` = `ln(2 sqrt(alpha t) / r) - gamma / 2`, the line-source
   long-time asymptote (Ramey 1962), within about 1 % of `E1(r^2 / (4 alpha t)) / 2` for
   `alpha t / r^2 >= MIN_RAMEY_FOURIER = 25`, a `Constant`. Its keyword-only `error` and `context`
-  let `DownholeHeatExchanger` report an early time as `ConfigurationError`: a `try` around a
+  let `DownholeHeatExchanger` report an early time as `ValidationError`: a `try` around a
   physics call cannot work in a trace.
 - `ramey_fluid_temperature(T_in, T_top, G, z, A)`: Ramey's exact steady profile in a linear
   gradient with the relaxation length `A = m_dot cp R_total`.

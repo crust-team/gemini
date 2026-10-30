@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import HeatingSubstation
 from gemini.types import Stream
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 NETWORK = Stream(m_dot=2.0, T=348.15, p=6e5)
@@ -68,10 +69,10 @@ def test_invalid_inputs_raise(plants):
     """A closed valve with flow and reverse flow raise; missing data names the parameters."""
     substation = plants["heating_substation"](HeatingSubstation())
     substation.valve.opening = 0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="closed valve"):
+    with pytest.raises(gm.errors.PhysicsError, match="closed valve"):
         substation(network_in=NETWORK)
     substation.valve.opening = 0.8
-    with pytest.raises(gm.errors.PhysicsRangeError):
+    with pytest.raises(gm.errors.PhysicsError):
         substation(network_in=NETWORK.with_(m_dot=-1.0))
-    with pytest.raises(gm.errors.MissingValueError, match="building_flow"):
+    with raises(gm.errors.ValidationError, "missing_value", match="building_flow"):
         HeatingSubstation()(network_in=NETWORK)

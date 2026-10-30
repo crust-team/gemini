@@ -38,7 +38,6 @@ import numpy as np
 
 from gemini.backends import PLAIN, WRAP
 from gemini.backends.scalars import scope_mode, scope_variable
-from gemini.errors import TraceError
 from gemini.ops.dispatch import Symbolic
 from gemini.ops.failed import Failed, is_marked
 from gemini.utils.context import ContextSetting
@@ -266,8 +265,6 @@ def _framed(function, args, kwargs):
     except Exception as error:
         graph.abandon_frame()
         if is_marked(error):
-            raise TraceError(
-                f"{function.__name__}: a check failed on constant values: {error}"
-            ) from error
+            raise graph.constant_failure(function.__name__, error) from error
         raise
     return graph.close_frame(result, start)

@@ -2,10 +2,11 @@
 
 import pytest
 
-from gemini.errors import DeclarationError, MissingValueError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules import HeatConsumer, energy_balance, mass_balance
 from gemini.types import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 SUPPLY = Stream(m_dot=2.0, T=343.15, p=3e5)
@@ -56,13 +57,13 @@ def test_zero_flow_cold_supply_and_zero_demand_deliver_nothing():
 def test_invalid_inputs_raise():
     """Reverse flow, negative demand and a missing demand or floor are rejected."""
     consumer = _consumer()
-    with pytest.raises(PhysicsRangeError, match="supply_in.m_dot = -1"):
+    with pytest.raises(PhysicsError, match="supply_in.m_dot = -1"):
         consumer(supply_in=SUPPLY.with_(m_dot=-1), heat_demand=1e4)
-    with pytest.raises(DeclarationError):
+    with pytest.raises(ValidationError):
         consumer(supply_in=SUPPLY, heat_demand=-1)
-    with pytest.raises(MissingValueError):
+    with raises(ValidationError, "missing_value"):
         consumer(supply_in=SUPPLY)
-    with pytest.raises(MissingValueError):
+    with raises(ValidationError, "missing_value"):
         HeatConsumer()(supply_in=SUPPLY, heat_demand=1e4)
 
 

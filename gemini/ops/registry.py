@@ -11,7 +11,7 @@ traced, row by row on the plain path; its outputs are ``break_output`` nodes.
 
 from dataclasses import dataclass
 
-from gemini.errors import UnknownNameError
+from gemini.errors import ValidationError
 from gemini.utils.strings import did_you_mean
 
 KINDS = ("elementwise", "index", "reduction", "interp", "check", "solver", "scan", "break")
@@ -31,7 +31,9 @@ class OpDef:
 def register(name, kind, arity):
     """Register an op and return its definition; the kind must be one of ``KINDS``."""
     if kind not in KINDS:
-        raise UnknownNameError(f"ops.register: kind = {kind!r}; expected one of {KINDS}")
+        raise ValidationError(
+            f"ops.register: kind = {kind!r}; expected one of {KINDS}", code="unknown_name"
+        )
     _OPS[name] = OpDef(name, kind, arity)
     return _OPS[name]
 
@@ -39,7 +41,9 @@ def register(name, kind, arity):
 def get(name):
     """Return the definition of the op called ``name``."""
     if name not in _OPS:
-        raise UnknownNameError(f"ops: op = {name!r} is unknown{did_you_mean(name, _OPS)}")
+        raise ValidationError(
+            f"ops: op = {name!r} is unknown{did_you_mean(name, _OPS)}", code="unknown_name"
+        )
     return _OPS[name]
 
 

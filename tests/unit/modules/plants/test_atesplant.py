@@ -120,7 +120,7 @@ def test_idle_moves_no_groundwater_and_flow_is_required_to_stop():
     assert result.outlets.building_out.T == SUMMER.T
     assert result.outputs.electricity == 0
     plant.groundwater_flow = 30.0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="idle"):
+    with pytest.raises(gm.errors.PhysicsError, match="idle"):
         plant(building_in=SUMMER)
 
 

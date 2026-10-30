@@ -1,7 +1,7 @@
 """Building or process cooling demand on a chilled-water circuit, with latent load."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, psychrometrics
 from gemini.types import (
@@ -116,7 +116,7 @@ class CoolingConsumer(Module):
         """Return the met sensible and latent loads [W]."""
         ops.check(
             supply_in.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: supply_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=supply_in.m_dot,

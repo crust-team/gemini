@@ -1,50 +1,23 @@
-"""Every GEMINI exception and warning class, available as ``gm.errors.<Name>``.
+"""The seven public classes and the fixed code lists, available as ``gm.errors.<Name>``.
 
-Each class also derives from the matching built-in exception, so ``except ValueError`` keeps
-catching, for example, ``gm.errors.UnitError``. Nothing in this package imports from the rest
-of ``gemini``.
+What a former class meant is a ``code``: ``CODES`` and ``ROW_CODES`` are the fixed lists. A built-in
+base appears only where Python needs one: ``ValidationError`` is a ``ValueError``, and the private
+classes of ``gemini.errors.lookup`` add ``KeyError`` and ``AttributeError`` for ``hasattr``,
+``getattr`` with a default and mapping lookups. Nothing in this package imports from the rest of
+``gemini``.
 """
 
 from gemini.errors.base import (
     CODES,
     ROW_CODES,
     Cancelled,
+    DefinitionError,
     GeminiError,
     GeminiWarning,
     NotImplementedYet,
+    PhysicsError,
+    RunError,
     ValidationError,
-)
-from gemini.errors.engine import (
-    BindingError,
-    CheckpointError,
-    ClockError,
-    DatasetError,
-    MissingMeasurementError,
-    PlantFormatError,
-    StepError,
-    UnknownResultError,
-)
-from gemini.errors.legacy import LegacyFormatError
-from gemini.errors.module import (
-    CallError,
-    ConfigurationError,
-    DeclarationError,
-    FormulaError,
-    MissingValueError,
-    OutletError,
-    OutputError,
-    TraceError,
-    UnknownMemberError,
-    UnknownNameError,
-    UnknownPortError,
-)
-from gemini.errors.physics import (
-    InsufficientDataError,
-    MissingChemistryError,
-    PhysicsRangeError,
-    SolverError,
-    UnitError,
-    UnknownCorrelationError,
 )
 
 __all__ = [
@@ -53,32 +26,9 @@ __all__ = [
     "GeminiError",
     "GeminiWarning",
     "ValidationError",
+    "DefinitionError",
+    "PhysicsError",
+    "RunError",
     "Cancelled",
     "NotImplementedYet",
-    "DeclarationError",
-    "UnknownNameError",
-    "UnknownPortError",
-    "UnknownMemberError",
-    "CallError",
-    "OutletError",
-    "MissingValueError",
-    "OutputError",
-    "FormulaError",
-    "TraceError",
-    "ConfigurationError",
-    "DatasetError",
-    "ClockError",
-    "BindingError",
-    "MissingMeasurementError",
-    "StepError",
-    "CheckpointError",
-    "PlantFormatError",
-    "UnknownResultError",
-    "UnitError",
-    "PhysicsRangeError",
-    "SolverError",
-    "UnknownCorrelationError",
-    "MissingChemistryError",
-    "InsufficientDataError",
-    "LegacyFormatError",
 ]

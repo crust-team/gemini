@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from gemini.errors import TraceError
 from gemini.graph import Graph
+from gemini.graph.errors import TraceError
 
 
 @pytest.fixture

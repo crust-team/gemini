@@ -53,7 +53,9 @@ def row_error(check, view):
     if "break" in attributes:
         return view.exception(attributes["break"])
     values = {name: view.value(value) for name, value in attributes["values"].items()}
-    error = _declared(values) or failure(attributes["error"], attributes["message"], values, 0)
+    error = _declared(values) or failure(
+        attributes["error"], attributes["message"], values, 0, attributes["code"]
+    )
     error.add_note(f"raised by the check at {check.source}")
     return error
 

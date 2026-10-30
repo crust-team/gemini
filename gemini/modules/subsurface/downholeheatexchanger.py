@@ -1,7 +1,7 @@
 """Deep closed-loop downhole heat exchanger in a linear geothermal gradient."""
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import ground, heat_transfer
 from gemini.types import (
@@ -102,7 +102,7 @@ class DownholeHeatExchanger(Module):
         """
         ops.check(
             inlet.m_dot >= 0,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
@@ -130,6 +130,7 @@ class DownholeHeatExchanger(Module):
             self.ground_diffusivity,
             self.borehole_radius,
             self.ground_conductivity,
-            error=ConfigurationError,
+            error=ValidationError,
+            code="invalid_design",
             context=f"{self.path}: operating_time rejected: ",
         )

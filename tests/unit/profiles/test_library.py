@@ -7,6 +7,7 @@ import pytest
 
 import gemini as gm
 from gemini.profiles import library
+from tests.fixtures.errors import raises
 
 PROFILE = {
     "name": "heating_demand",
@@ -31,7 +32,7 @@ def test_a_profile_without_data_says_which_file_is_missing():
 
 def test_an_unknown_profile_has_close_matches():
     """A misspelt name carries suggestions."""
-    with pytest.raises(gm.errors.UnknownNameError) as unknown:
+    with raises(gm.errors.ValidationError, "unknown_name") as unknown:
         gm.profiles.get("heating_demnd")
     assert unknown.value.suggestions[0] == "heating_demand"
 

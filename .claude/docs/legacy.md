@@ -8,7 +8,7 @@ through typed `GeminiProject` models; the in-memory project, including edits to 
 conversion reads. `read_csv`/`write_csv` handle semicolon data and old timestamps
 (`%Y-%m-%d %H:%M:%S`, or ISO 8601 when reading). Parsed projects write the same values after
 JSON whitespace normalisation, keeping each `.param` file's tag-name order; auxiliary files are
-copied byte-for-byte. Malformed or unconvertible files raise `gm.errors.LegacyFormatError`.
+copied byte-for-byte. Malformed or unconvertible files raise `gm.errors.ValidationError`.
 
 `to_plant(project, plant)` fills an existing handwritten plant with converted SI parameters,
 dated histories, fluids, bindings and explicit assumptions (`plant.boundary`), and returns it.

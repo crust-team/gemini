@@ -30,7 +30,7 @@ class HeatingSubstation(Module):
 
     The building return temperature closes the loop within one call: ``loops.close_loop`` finds
     the return temperature that one pass through exchanger and consumer reproduces (Wegstein
-    iteration, tolerance 1e-9 K, at most 50 passes, ``PhysicsRangeError`` otherwise), with
+    iteration, tolerance 1e-9 K, at most 50 passes, ``PhysicsError`` otherwise), with
     trial passes evaluated by ``Module.trial_outlets``; then every child is called once. The
     iteration starts at the consumer's ``minimum_return_temperature`` (or the network
     temperature, if colder) and never exceeds the network temperature after the valve, where

@@ -5,8 +5,9 @@ import json
 import pytest
 
 import gemini as gm
-from gemini.errors import PlantFormatError, ValidationError
+from gemini.errors import ValidationError
 from gemini.modules import serialization
+from tests.fixtures.errors import raises
 
 
 def test_a_handwritten_root_writes_its_class_and_flat_params():
@@ -33,7 +34,7 @@ def test_fluids_bindings_and_history_round_trip():
 
 def test_old_files_are_refused_with_the_migration_named():
     """Format 1 raises ``old_format`` and names ``gm.plants.migrate``."""
-    with pytest.raises(PlantFormatError) as caught:
+    with raises(ValidationError, "old_format") as caught:
         gm.modules.HeatExchanger.from_dict({"version": 1, "modules": {}})
     assert caught.value.code == "old_format"
     assert "gm.plants.migrate" in str(caught.value)

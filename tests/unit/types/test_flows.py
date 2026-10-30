@@ -10,10 +10,11 @@ import pytest
 from pydantic_core import to_jsonable_python
 
 from gemini.backends import runtime
-from gemini.errors import CallError, PhysicsRangeError, UnitError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.physics.units import Quantity
 from gemini.types.flows import Stream
 from gemini.types.fluid import BRINE, WATER, Fluid
+from tests.fixtures.errors import raises
 
 
 def test_mass_flow_inputs_and_units():
@@ -36,13 +37,13 @@ def test_volume_flow_uses_the_stream_fluid_density():
 def test_flow_text_without_a_unit_is_a_unit_error():
     """Flow text must carry a unit; formerly this raised IndexError."""
     for text in ("10", "abc", "  "):
-        with pytest.raises(UnitError, match="Stream.flow"):
+        with raises(ValidationError, "invalid_unit", match="Stream.flow"):
             Stream(flow=text, T=300, p=1e5)
 
 
 def test_flow_and_mass_flow_together_are_rejected():
     """Supplying both flow and m_dot is ambiguous; formerly m_dot was silently dropped."""
-    with pytest.raises(TypeError, match="either flow or m_dot"):
+    with pytest.raises(ValidationError, match="either flow or m_dot"):
         Stream(flow=1, m_dot=2, T=300, p=1e5)
 
 
@@ -51,9 +52,9 @@ def test_default_fluid_and_physical_limits():
     assert Stream(m_dot=1, T=300, p=1e5).fluid == BRINE
     with runtime.settings(default_fluid=WATER):
         assert Stream(m_dot=1, T=300, p=1e5).fluid == WATER
-    with pytest.raises(PhysicsRangeError):
+    with pytest.raises(PhysicsError):
         Stream(m_dot=1, T=0, p=1e5)
-    with pytest.raises(PhysicsRangeError):
+    with pytest.raises(PhysicsError):
         Stream(m_dot=1, T=300, p=-1)
 
 
@@ -61,7 +62,7 @@ def test_with_revalidates_the_copy():
     """Copies keep the fluid and revalidate changed fields."""
     stream = Stream(m_dot=-1, T=300, p=1e5, fluid=WATER)
     assert stream.with_(p=2e5) == Stream(m_dot=-1, T=300, p=2e5, fluid=WATER)
-    with pytest.raises(PhysicsRangeError):
+    with pytest.raises(PhysicsError):
         stream.with_(T=-1)
 
 
@@ -71,11 +72,11 @@ def test_stream_carries_array_values_and_keeps_the_physical_limits():
     stream = Stream(m_dot=np.array([10.68, 21.36]), T=np.array([300.0, 310.0]), p=1e5, fluid=fluid)
     assert stream.volumetric_flow().tolist() == pytest.approx([0.01, 0.02], rel=1e-15)
     assert stream.with_(p=np.array([2e5, 3e5])).p.tolist() == [2e5, 3e5]
-    with pytest.raises(PhysicsRangeError, match="p = -1.0 Pa"):
+    with pytest.raises(PhysicsError, match="p = -1.0 Pa"):
         stream.with_(p=np.array([1e5, -1.0]))
-    with pytest.raises(PhysicsRangeError, match="T = 0.0 K"):
+    with pytest.raises(PhysicsError, match="T = 0.0 K"):
         stream.with_(T=0.0)
-    with pytest.raises(PhysicsRangeError, match="T = -5.0 K"):
+    with pytest.raises(PhysicsError, match="T = -5.0 K"):
         Stream(m_dot=1, T=np.array([300.0, -5.0]), p=1e5)
 
 
@@ -85,19 +86,19 @@ def test_numbers_become_python_floats_and_limits_include_non_finite_values():
     assert [type(value) for value in (stream.m_dot, stream.T, stream.p)] == [float] * 3
     assert type(stream.with_(p=np.float32(2e5)).p) is float
     for field in ({"m_dot": float("nan")}, {"T": float("inf")}, {"p": float("nan")}):
-        with pytest.raises(PhysicsRangeError, match="expected"):
+        with pytest.raises(PhysicsError, match="expected"):
             Stream(**({"m_dot": 1, "T": 300, "p": 1e5} | field))
 
 
 def test_unknown_and_missing_arguments_are_call_errors():
     """Constructor and ``with_`` reject unknown keywords with a suggestion."""
-    with pytest.raises(CallError, match="unknown argument 'Temp'"):
+    with raises(ValidationError, "invalid_call", match="unknown argument 'Temp'"):
         Stream(m_dot=1, Temp=300, p=1e5)
-    with pytest.raises(CallError, match="did you mean 'fluid'"):
+    with raises(ValidationError, "invalid_call", match="did you mean 'fluid'"):
         Stream(m_dot=1, T=300, p=1e5, flui=WATER)
-    with pytest.raises(CallError, match="missing argument p"):
+    with raises(ValidationError, "invalid_call", match="missing argument p"):
         Stream(m_dot=1, T=300)
-    with pytest.raises(CallError, match="did you mean 'fluid'"):
+    with raises(ValidationError, "invalid_call", match="did you mean 'fluid'"):
         Stream(m_dot=1, T=300, p=1e5).with_(fluids=WATER)
 
 
@@ -105,9 +106,9 @@ def test_fluids_are_validated():
     """A mapping builds a ``Fluid``; ``with_`` validates a new fluid; a bare string is rejected."""
     assert Stream(m_dot=1, T=300, p=1e5, fluid={"kind": "water"}).fluid == WATER
     assert Stream(m_dot=1, T=300, p=1e5).with_(fluid={"kind": "water"}).fluid == WATER
-    with pytest.raises(CallError, match="expected a Fluid"):
+    with raises(ValidationError, "invalid_call", match="expected a Fluid"):
         Stream(m_dot=1, T=300, p=1e5, fluid="brine")
-    with pytest.raises(CallError, match="expected a Fluid"):
+    with raises(ValidationError, "invalid_call", match="expected a Fluid"):
         Stream(m_dot=1, T=300, p=1e5).with_(fluid="brine")
 
 

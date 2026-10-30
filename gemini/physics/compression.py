@@ -9,7 +9,7 @@ low reduced pressure) with a constant heat capacity ratio ``k = cp / cv`` over t
 """
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 
 
 @ops.physics
@@ -40,7 +40,7 @@ def isentropic_outlet_temperature(
     _check_stage("isentropic_outlet_temperature", inlet_temperature, pressure_ratio)
     ops.check(
         heat_capacity_ratio > 1,
-        PhysicsRangeError,
+        PhysicsError,
         "isentropic_outlet_temperature: heat_capacity_ratio = {heat_capacity_ratio}; expected > 1",
         heat_capacity_ratio=heat_capacity_ratio,
     )
@@ -74,12 +74,12 @@ def stage_outlet_temperature(
     temperature from the isentropic efficiency.
 
     Validity: inlet_temperature positive, pressure_ratio at least one, heat_capacity_ratio greater
-    than one, isentropic_efficiency in (0, 1]; other values raise PhysicsRangeError. Ideal gas with
+    than one, isentropic_efficiency in (0, 1]; other values raise PhysicsError. Ideal gas with
     Z = 1 and constant k.
     """
     ops.check(
         ops.logical_and(isentropic_efficiency > 0, isentropic_efficiency <= 1),
-        PhysicsRangeError,
+        PhysicsError,
         "stage_outlet_temperature: isentropic_efficiency = {isentropic_efficiency}; "
         "expected in (0, 1]",
         isentropic_efficiency=isentropic_efficiency,
@@ -173,7 +173,7 @@ def specific_compression_work(
     """
     ops.check(
         ops.logical_and(specific_heat > 0, ops.logical_not(stages < 1)),
-        PhysicsRangeError,
+        PhysicsError,
         "specific_compression_work: specific_heat = {specific_heat} J/kg/K, stages = "
         "{stages}; expected a positive heat capacity and at least one stage",
         specific_heat=specific_heat,
@@ -250,14 +250,14 @@ def _check_stage(name, inlet_temperature, pressure_ratio):
     """Reject a nonpositive or non-finite temperature and a pressure ratio below one."""
     ops.check(
         ops.logical_and(ops.isfinite(inlet_temperature), inlet_temperature > 0),
-        PhysicsRangeError,
+        PhysicsError,
         "{name}: inlet_temperature = {inlet_temperature} K; expected a positive temperature",
         name=name,
         inlet_temperature=inlet_temperature,
     )
     ops.check(
         ops.logical_and(ops.isfinite(pressure_ratio), pressure_ratio >= 1),
-        PhysicsRangeError,
+        PhysicsError,
         "{name}: pressure_ratio = {pressure_ratio}; expected >= 1 (no expansion)",
         name=name,
         pressure_ratio=pressure_ratio,

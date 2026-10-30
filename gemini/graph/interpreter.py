@@ -15,7 +15,7 @@ import math
 import numpy as np
 
 from gemini import backends
-from gemini.errors import CallError
+from gemini.errors import ValidationError
 from gemini.graph.breaks import evaluate_break
 from gemini.graph.node import Node
 
@@ -32,7 +32,10 @@ class Interpreter:
         """Run the value pass, then the error pass; return the node values and error codes."""
         missing = [name for name in self.graph.inputs if name not in feeds]
         if missing:
-            raise CallError(f"{self.graph.module_path}: graph inputs without a value: {missing}")
+            raise ValidationError(
+                f"{self.graph.module_path}: graph inputs without a value: {missing}",
+                code="invalid_call",
+            )
         values = {}
         for node in self.graph.nodes:
             values[node] = self._evaluate(node, values, feeds)

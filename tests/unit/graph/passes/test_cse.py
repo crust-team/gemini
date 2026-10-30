@@ -8,7 +8,7 @@ import pytest
 
 import gemini as gm
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.graph import Graph, GraphCache, run
 from gemini.graph.limits import certain
 from gemini.graph.passes import eliminate_common_subexpressions
@@ -22,7 +22,7 @@ def _outcome(graph, xs=XS):
     """Return the outputs of ``graph`` over ``xs``, or the error it raises as (class, text)."""
     try:
         values = graph_outputs(graph, {"x": xs})
-    except PhysicsRangeError as error:
+    except PhysicsError as error:
         return type(error), str(error)
     return {name: np.asarray(value).tolist() for name, value in values.items()}
 
@@ -46,7 +46,7 @@ def _count(graph, op):
 
 
 def _check_positive(value, label="v"):
-    ops.check(value > -2, PhysicsRangeError, label + " = {v}; expected > -2", v=value)
+    ops.check(value > -2, PhysicsError, label + " = {v}; expected > -2", v=value)
 
 
 @ops.physics
@@ -94,7 +94,7 @@ def test_esp_graph_raises_the_same_error(esp, week):
     rows[3, 0] = -abs(rows[3, 0]) - 1.0
     messages = []
     for cache in (GraphCache(optimize=False), GraphCache()):
-        with pytest.raises(PhysicsRangeError) as raised:
+        with pytest.raises(PhysicsError) as raised:
             run(esp, {"suction": _suction(esp, rows)}, {"frequency": rows[:, 3]}, cache=cache)
         messages.append(str(raised.value))
     assert messages[0] == messages[1]
@@ -158,7 +158,7 @@ def test_repeated_checks_merge_renumber_and_follow_merged_values():
     def build(graph, x):
         first, second = x * 2, x * 2
         _check_positive(first)
-        ops.check(x > -10, PhysicsRangeError, "x = {x}", x=x)
+        ops.check(x > -10, PhysicsError, "x = {x}", x=x)
         _check_positive(second)
         graph.output("y", first + second)
 
@@ -172,18 +172,18 @@ def test_repeated_checks_merge_renumber_and_follow_merged_values():
     )
     assert merged.nodes[merged.outputs["y"].index] is merged.outputs["y"]
     assert _outcome(plain) == _outcome(merged)
-    assert _outcome(plain)[0] is PhysicsRangeError
+    assert _outcome(plain)[0] is PhysicsError
 
 
 def test_checks_with_other_message_or_values_do_not_merge():
     """A different message, error class or message value keeps the checks apart."""
 
     def build(graph, x):
-        ops.check(x > 0, PhysicsRangeError, "a = {v}", v=x)
-        ops.check(x > 0, PhysicsRangeError, "b = {v}", v=x)
-        ops.check(x > 0, PhysicsRangeError, "a = {v}", v=x * 2)
-        ops.check(x > 0, PhysicsRangeError, "a = {v}", v=1.0)
-        ops.check(x > 0, PhysicsRangeError, "a = {v}", v=1)
+        ops.check(x > 0, PhysicsError, "a = {v}", v=x)
+        ops.check(x > 0, PhysicsError, "b = {v}", v=x)
+        ops.check(x > 0, PhysicsError, "a = {v}", v=x * 2)
+        ops.check(x > 0, PhysicsError, "a = {v}", v=1.0)
+        ops.check(x > 0, PhysicsError, "a = {v}", v=1)
         graph.output("y", x)
 
     _, merged = _merged(build)
@@ -194,9 +194,9 @@ def test_lowest_code_still_wins_after_merging():
     """With several failing checks the first one in creation order is still raised."""
 
     def build(graph, x):
-        ops.check(x > 0, PhysicsRangeError, "first {v}", v=x)
-        ops.check(x > 1, PhysicsRangeError, "second {v}", v=x)
-        ops.check(x > 0, PhysicsRangeError, "first {v}", v=x)
+        ops.check(x > 0, PhysicsError, "first {v}", v=x)
+        ops.check(x > 1, PhysicsError, "second {v}", v=x)
+        ops.check(x > 0, PhysicsError, "first {v}", v=x)
         graph.output("y", x)
 
     plain, merged = _merged(build)
@@ -224,8 +224,8 @@ def test_guard_lists_are_united_in_order_without_duplicates():
 
     def build(graph, x):
         first, second = x * 2, x * 2
-        ops.check(first > -9, PhysicsRangeError, "one {v}", v=first)
-        ops.check(second > -8, PhysicsRangeError, "two {v}", v=second)
+        ops.check(first > -9, PhysicsError, "one {v}", v=first)
+        ops.check(second > -8, PhysicsError, "two {v}", v=second)
         graph.output("y", first + second)
 
     plain, merged = _merged(build)
@@ -262,7 +262,7 @@ def test_twins_merge_when_the_guard_reaches_an_output_anyway():
     assert _count(merged, "mul") == 1 and _count(plain, "mul") == 2
     for rows in (np.array([-3.0, 1.0]), np.array([1.0, 2.0])):
         assert _outcome(plain, rows) == _outcome(merged, rows)
-    assert _outcome(merged, np.array([-3.0]))[0] is PhysicsRangeError
+    assert _outcome(merged, np.array([-3.0]))[0] is PhysicsError
 
 
 def test_twin_checks_in_the_same_branch_stay_correct():
@@ -293,7 +293,7 @@ def test_where_condition_errors_always_surface():
     plain, merged = _merged(build)
     assert _count(merged, "mul") == 1
     assert _outcome(plain) == _outcome(merged)
-    assert _outcome(merged)[0] is PhysicsRangeError
+    assert _outcome(merged)[0] is PhysicsError
 
 
 def test_pass_is_idempotent_and_describes_the_graph():

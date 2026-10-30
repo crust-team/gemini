@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import diagnostics
 from gemini.physics import fluid as fluid_physics
@@ -128,7 +128,7 @@ class _Reservoir(Module):
         """Return injectivity [m3/s/Pa] from one measurement."""
         ops.check(
             p_bh != self.pressure,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
             "injectivity needs a pressure differential",
             path=self.path,
@@ -141,7 +141,7 @@ class _Reservoir(Module):
         """Return productivity [m3/s/Pa] from one measurement."""
         ops.check(
             p_bh != self.pressure,
-            PhysicsRangeError,
+            PhysicsError,
             "{path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
             "productivity needs a pressure differential",
             path=self.path,
@@ -216,7 +216,9 @@ class ProductionReservoir(_Reservoir):
         ``gemini.modules.plants.nodal`` uses it for trial rates without a call.
         """
         if self.productivity_index is None:
-            raise ConfigurationError(f"{self.path}: productivity_index is required")
+            raise ValidationError(
+                f"{self.path}: productivity_index is required", code="invalid_design"
+            )
         flow = fluid_physics.volume_flow(
             production_rate, self.fluid.properties(self.pressure, self.temperature).rho_l
         )
@@ -238,7 +240,9 @@ class InjectionReservoir(_Reservoir):
         """Receive the sandface stream; the aquifer has no outlet."""
 
         if self.injectivity_index is None:
-            raise ConfigurationError(f"{self.path}: injectivity_index is required")
+            raise ValidationError(
+                f"{self.path}: injectivity_index is required", code="invalid_design"
+            )
         outlets = dict()
         return outlets
 
@@ -260,7 +264,9 @@ class InjectionReservoir(_Reservoir):
         this value.
         """
         if self.injectivity_index is None:
-            raise ConfigurationError(f"{self.path}: injectivity_index is required")
+            raise ValidationError(
+                f"{self.path}: injectivity_index is required", code="invalid_design"
+            )
         flow = fluid_physics.volume_flow(
             ops.abs(sandface.m_dot), self.fluid.properties(sandface.p, sandface.T).rho_l
         )

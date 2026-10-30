@@ -10,7 +10,7 @@ temperature profile of a well in a linear geothermal gradient (Ramey 1962).
 import math
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.ops import Constant
 from gemini.physics import heat_transfer, units
 
@@ -58,7 +58,7 @@ def aquifer_volumetric_heat_capacity(
     _require_positive("aquifer_volumetric_heat_capacity", rock=rock_heat_capacity)
     ops.check(
         ops.logical_and(porosity >= 0, porosity <= 1),
-        PhysicsRangeError,
+        PhysicsError,
         "aquifer_volumetric_heat_capacity: porosity = {porosity}; expected a value in [0, 1]",
         porosity=porosity,
     )
@@ -130,7 +130,7 @@ def doublet_cold_fraction(volume_ratio: float) -> float:
     """
     ops.check(
         volume_ratio >= 0,
-        PhysicsRangeError,
+        PhysicsError,
         "doublet_cold_fraction: volume_ratio = {volume_ratio}; expected a value >= 0",
         volume_ratio=volume_ratio,
     )
@@ -184,7 +184,7 @@ def cylinder_store_conductance(
     _require_positive("cylinder_store_conductance", period=period)
     ops.check(
         ops.logical_not(ops.logical_or(ops.isnan(volume), volume < 0)),
-        PhysicsRangeError,
+        PhysicsError,
         "cylinder_store_conductance: volume = {volume} m3; expected >= 0",
         volume=volume,
     )
@@ -199,7 +199,8 @@ def vertical_cylinder_conductance(
     length: float,
     diameter: float,
     *,
-    error: type[Exception] = PhysicsRangeError,
+    error: type[Exception] = PhysicsError,
+    code: str | None = None,
     context: str = "",
 ) -> float:
     """Return the steady conductance [W/K] of a vertical cylinder below an isothermal surface.
@@ -213,6 +214,8 @@ def vertical_cylinder_conductance(
     error : type of Exception, optional
         Class raised for an invalid input; a caller that reports the failure as its own
         configuration error passes it with a ``context`` prefix for the message.
+    code : str, optional
+        The ``gm.errors.CODES`` entry of that error, the default of its class when ``None``.
     context : str, optional
         Text placed before the function name in the message of an error.
 
@@ -224,19 +227,20 @@ def vertical_cylinder_conductance(
     Notes
     -----
     Reference: Incropera et al., Fundamentals of Heat and Mass Transfer, table 4.1, vertical
-    cylinder in a semi-infinite medium, derived for L >> D. Raises ``PhysicsRangeError`` for
+    cylinder in a semi-infinite medium, derived for L >> D. Raises ``PhysicsError`` for
     ln(4 L / D) < 1 (L < 0.68 D), where the shape factor no longer applies.
     """
     function = f"{context}vertical_cylinder_conductance"
-    _require_positive(function, error, conductivity=conductivity)
-    _require_positive(function, error, length=length)
-    _require_positive(function, error, diameter=diameter)
+    _require_positive(function, error, code, conductivity=conductivity)
+    _require_positive(function, error, code, length=length)
+    _require_positive(function, error, code, diameter=diameter)
     logarithm = ops.log(4 * length / diameter)
     ops.check(
         ops.logical_not(logarithm < 1),
         error,
         "{function}: length = {length} m, diameter = {diameter} m; "
         "expected ln(4 length / diameter) >= 1",
+        code=code,
         function=function,
         length=length,
         diameter=diameter,
@@ -251,7 +255,8 @@ def steady_flux_resistance(
     borehole_radius: float,
     cell_radius: float,
     *,
-    error: type[Exception] = PhysicsRangeError,
+    error: type[Exception] = PhysicsError,
+    code: str | None = None,
     context: str = "",
 ) -> float:
     """Return the ground resistance [m K/W] between a borehole wall and its cell's mean.
@@ -265,6 +270,8 @@ def steady_flux_resistance(
     error : type of Exception, optional
         Class raised for an invalid input; a caller that reports the failure as its own
         configuration error passes it with a ``context`` prefix for the message.
+    code : str, optional
+        The ``gm.errors.CODES`` entry of that error, the default of its class when ``None``.
     context : str, optional
         Text placed before the function name in the message of an error.
 
@@ -283,13 +290,14 @@ def steady_flux_resistance(
     (2 pi k). The regime is reached after about r_e**2 / (4 alpha).
     """
     function = f"{context}steady_flux_resistance"
-    _require_positive(function, error, conductivity=conductivity)
-    _require_positive(function, error, borehole_radius=borehole_radius)
+    _require_positive(function, error, code, conductivity=conductivity)
+    _require_positive(function, error, code, borehole_radius=borehole_radius)
     ops.check(
         ops.logical_not(cell_radius <= borehole_radius),
         error,
         "{function}: cell_radius = {cell_radius} m; expected more than "
         "borehole_radius = {borehole_radius} m",
+        code=code,
         function=function,
         cell_radius=cell_radius,
         borehole_radius=borehole_radius,
@@ -305,7 +313,8 @@ def ramey_time_function(
     diffusivity: float,
     radius: float,
     *,
-    error: type[Exception] = PhysicsRangeError,
+    error: type[Exception] = PhysicsError,
+    code: str | None = None,
     context: str = "",
 ) -> float:
     """Return Ramey's dimensionless transient conduction function f(t) [-].
@@ -321,6 +330,8 @@ def ramey_time_function(
     error : type of Exception, optional
         Class raised for an invalid input; a caller that reports the failure as its own
         configuration error passes it with a ``context`` prefix for the message.
+    code : str, optional
+        The ``gm.errors.CODES`` entry of that error, the default of its class when ``None``.
     context : str, optional
         Text placed before the function name in the message of an error.
 
@@ -335,18 +346,19 @@ def ramey_time_function(
     Reference: Ramey (1962), Wellbore heat transmission, J. Petroleum Technology 14(4),
     427-435, long-time line-source approximation f(t) = -ln(r / (2 sqrt(alpha t))) - 0.290;
     gamma / 2 = 0.2886 is the exact constant of the exponential-integral asymptote. Raises
-    ``PhysicsRangeError`` below alpha t / r**2 = 25, where the approximation error exceeds
+    ``PhysicsError`` below alpha t / r**2 = 25, where the approximation error exceeds
     about 1 % (roughly the first days of operation).
     """
     function = f"{context}ramey_time_function"
-    _require_positive(function, error, time=time)
-    _require_positive(function, error, diffusivity=diffusivity)
-    _require_positive(function, error, radius=radius)
+    _require_positive(function, error, code, time=time)
+    _require_positive(function, error, code, diffusivity=diffusivity)
+    _require_positive(function, error, code, radius=radius)
     fourier = diffusivity * time / radius**2
     ops.check(
         ops.logical_not(fourier < MIN_RAMEY_FOURIER),
         error,
         "{function}: alpha t / r**2 = {fourier}; expected >= {minimum}",
+        code=code,
         function=function,
         fourier=fourier,
         minimum=MIN_RAMEY_FOURIER,
@@ -392,7 +404,7 @@ def ramey_fluid_temperature(
     _require_positive("ramey_fluid_temperature", relaxation_length=relaxation_length)
     ops.check(
         ops.logical_not(length < 0),
-        PhysicsRangeError,
+        PhysicsError,
         "ramey_fluid_temperature: length = {length} m; expected >= 0",
         length=length,
     )
@@ -712,7 +724,8 @@ def borehole_loop_conductance(
     conductivity: float,
     borehole_resistance: float,
     *,
-    error: type[Exception] = PhysicsRangeError,
+    error: type[Exception] = PhysicsError,
+    code: str | None = None,
     context: str = "",
 ) -> float:
     """Return the inlet-to-ground conductance of the loops of a borehole field.
@@ -728,7 +741,7 @@ def borehole_loop_conductance(
         Positive ground conductivity [W/m/K].
     borehole_resistance : float
         Fluid-to-wall resistance R_b of a borehole [m K/W].
-    error, context : optional
+    error, code, context : optional
         Error class and message prefix of an invalid field geometry
         (``steady_flux_resistance``).
 
@@ -746,7 +759,7 @@ def borehole_loop_conductance(
     Hellstrom (1991, Ground Heat Storage, Lund University).
     """
     cell = steady_flux_resistance(
-        conductivity, radius, spacing / math.sqrt(math.pi), error=error, context=context
+        conductivity, radius, spacing / math.sqrt(math.pi), error=error, code=code, context=context
     )
     length = count * depth
     conductance = length / (borehole_resistance + cell)
@@ -761,7 +774,8 @@ def borehole_field_surroundings_conductance(
     depth: float,
     conductivity: float,
     *,
-    error: type[Exception] = PhysicsRangeError,
+    error: type[Exception] = PhysicsError,
+    code: str | None = None,
     context: str = "",
 ) -> float:
     """Return the conductance [W/K] between a borehole field volume and the undisturbed ground.
@@ -772,7 +786,7 @@ def borehole_field_surroundings_conductance(
         Number of boreholes [-], their spacing [m] and depth [m]; the plan area is ``N s**2``.
     conductivity : float
         Positive ground conductivity [W/m/K].
-    error, context : optional
+    error, code, context : optional
         Error class and message prefix of an invalid geometry
         (``vertical_cylinder_conductance``).
 
@@ -790,7 +804,7 @@ def borehole_field_surroundings_conductance(
     area = count * spacing**2
     diameter = 2 * ops.sqrt(area / math.pi)
     return vertical_cylinder_conductance(
-        conductivity, depth, diameter, error=error, context=context
+        conductivity, depth, diameter, error=error, code=code, context=context
     )
 
 
@@ -874,7 +888,8 @@ def ramey_rock_resistance(
     borehole_radius: float,
     conductivity: float,
     *,
-    error: type[Exception] = PhysicsRangeError,
+    error: type[Exception] = PhysicsError,
+    code: str | None = None,
     context: str = "",
 ) -> float:
     """Return the transient rock resistance [m K/W] of a well at an operating time.
@@ -886,7 +901,7 @@ def ramey_rock_resistance(
         (``ramey_time_function``).
     conductivity : float
         Positive rock conductivity [W/m/K].
-    error, context : optional
+    error, code, context : optional
         Error class and message prefix of an operating time too early for the asymptote.
 
     Returns
@@ -899,7 +914,9 @@ def ramey_rock_resistance(
     Reference: Ramey (1962, Wellbore heat transmission, J. Petroleum Technology 14(4),
     427-435).
     """
-    function = ramey_time_function(time, diffusivity, borehole_radius, error=error, context=context)
+    function = ramey_time_function(
+        time, diffusivity, borehole_radius, error=error, code=code, context=context
+    )
     return function / (2 * math.pi * conductivity)
 
 
@@ -948,13 +965,14 @@ def _dipole_travel_time(theta):
     return 3 * difference / ops.sin(theta) ** 3
 
 
-def _require_positive(function, error=PhysicsRangeError, **values):
-    """Raise ``error`` (``PhysicsRangeError`` by default) unless every value is positive."""
+def _require_positive(function, error=PhysicsError, code=None, **values):
+    """Raise ``error`` with ``code`` unless every value is positive."""
     for name, value in values.items():
         ops.check(
             ops.logical_not(ops.logical_or(ops.isnan(value), value <= 0)),
             error,
             "{function}: {name} = {value}; expected a positive value",
+            code=code,
             function=function,
             name=name,
             value=value,

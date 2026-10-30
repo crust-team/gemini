@@ -14,6 +14,7 @@ from gemini.types.fluid import WATER
 from gemini.types.results import NOT_ASSESSED
 from gemini.utils.legacy import tables as mapping
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
+from tests.fixtures.errors import raises
 
 DATA = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
 BRINE_DENSITY = 1050
@@ -109,7 +110,7 @@ def test_first_law_equal_capacity_and_limits(arrangement):
 
 def test_invalid_measurements():
     """A temperature cross or a gross heat-balance mismatch cannot identify a valid UA."""
-    with pytest.raises(gm.errors.InsufficientDataError):
+    with raises(gm.errors.PhysicsError, "too_little_data"):
         gm.analysis.estimate_conductance(350, 340, 300, 340, 10, 10)
 
 
@@ -133,7 +134,7 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
     assert exchanger.health(running, measured) is not None
     exchanger.update_params(thermal_conductance=0)
     assert exchanger.health(running, measured) is None
-    with pytest.raises(gm.errors.UnknownCorrelationError, match="arrangement"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="arrangement"):
         gm.analysis.estimate_conductance(350, 340, 300, 310, 10, 10, arrangement="cross")
 
 

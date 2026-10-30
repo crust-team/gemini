@@ -30,7 +30,7 @@ class CoolingSubstation(Module):
 
     The building return temperature closes the loop within one call: ``loops.close_loop`` finds
     the return temperature that one pass through exchanger and consumer reproduces (Wegstein
-    iteration, tolerance 1e-9 K, at most 50 passes, ``PhysicsRangeError`` otherwise), with
+    iteration, tolerance 1e-9 K, at most 50 passes, ``PhysicsError`` otherwise), with
     trial passes evaluated by ``Module.trial_outlets``; then every child is called once. The
     iteration starts at the consumer's return limit, the lower of its
     ``maximum_return_temperature`` and ``indoor_temperature`` (or the network temperature, if
@@ -40,7 +40,7 @@ class CoolingSubstation(Module):
     That test is on or off, so near the threshold the loop can lack a steady state: meeting the
     latent load warms the supply above the threshold and dropping it cools the supply below.
     The real coil would then dehumidify partly; the consumer model cannot, and the iteration
-    raises ``PhysicsRangeError`` (for the test configuration a band of about 2 K of network
+    raises ``PhysicsError`` (for the test configuration a band of about 2 K of network
     temperature). Lower the network temperature, raise the building flow or the exchanger UA.
 
     The valve only throttles: the network flow is imposed by ``network_in`` and the valve

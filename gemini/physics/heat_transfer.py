@@ -1,7 +1,7 @@
 """Pipe heat loss and standard heat-exchanger effectiveness relations."""
 
 from gemini import ops
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.physics.fluid import FluidProperties
 
 DEFAULT_CP = FluidProperties().cp_l
@@ -56,7 +56,7 @@ def pipe_temperature_change(
     total_mass_flow = liquid_mass_flow + gas_mass_flow
     ops.check(
         total_mass_flow != 0,
-        PhysicsRangeError,
+        PhysicsError,
         "pipe_temperature_change: total mass flow = {total_mass_flow} kg/s; expected a "
         "nonzero flow",
         total_mass_flow=total_mass_flow,
@@ -94,7 +94,7 @@ def lmtd(dt1: float, dt2: float) -> float:
     ops.check_numbers("lmtd", dt1=dt1, dt2=dt2)
     ops.check(
         ops.logical_and(dt1 >= 0, dt2 >= 0),
-        PhysicsRangeError,
+        PhysicsError,
         "lmtd: dt1 = {dt1} K, dt2 = {dt2} K; expected nonnegative terminal differences",
         dt1=dt1,
         dt2=dt2,
@@ -127,7 +127,7 @@ def ntu(ua: float, c_min: float) -> float:
     ops.check_numbers("ntu", ua=ua, c_min=c_min)
     ops.check(
         ops.logical_and(ua >= 0, c_min > 0),
-        PhysicsRangeError,
+        PhysicsError,
         "ntu: ua = {ua} W/K, c_min = {c_min} W/K; expected ua >= 0 and c_min > 0",
         ua=ua,
         c_min=c_min,
@@ -189,7 +189,7 @@ def _check_effectiveness_inputs(function, transfer_units, c_ratio):
     ops.check_numbers(function, transfer_units=transfer_units, c_ratio=c_ratio)
     ops.check(
         ops.logical_and(transfer_units >= 0, ops.logical_and(c_ratio >= 0, c_ratio <= 1)),
-        PhysicsRangeError,
+        PhysicsError,
         "{function}: transfer_units = {transfer_units}, c_ratio = {c_ratio}; expected "
         "transfer_units >= 0 and c_ratio in [0, 1]",
         function=function,

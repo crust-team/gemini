@@ -7,6 +7,7 @@ from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.treatment import Desander
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 INLET = Stream(m_dot=20, T=350, p=1e6)
 
@@ -36,13 +37,13 @@ def test_limits():
     module = desander()
     stopped = module(inlet=INLET.with_(m_dot=0), sand_concentration=0.05).outputs
     assert stopped.pressure_drop == 0 and stopped.sand_removal_rate == 0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot"):
         module(inlet=INLET.with_(m_dot=-1), sand_concentration=0.05)
-    with pytest.raises(gm.errors.PhysicsRangeError, match="pressure_drop"):
+    with pytest.raises(gm.errors.PhysicsError, match="pressure_drop"):
         module(inlet=INLET.with_(m_dot=200, p=2e5), sand_concentration=0.05)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         module(inlet=INLET, sand_concentration=-1)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         Desander()(inlet=INLET, sand_concentration=0.05)
 
 

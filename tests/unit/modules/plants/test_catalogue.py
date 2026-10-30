@@ -7,6 +7,7 @@ from gemini.modules import registry
 from gemini.modules.plants import catalogue
 from gemini.utils.files import read_json
 from tests.fixtures import SHARED
+from tests.fixtures.errors import raises
 
 
 def test_names_are_the_registered_plants():
@@ -29,10 +30,10 @@ def test_get_returns_a_new_plant_without_values():
 
 def test_get_refuses_unknown_names_and_modules_that_are_not_plants():
     """An unknown name has close matches; a pump is not a plant."""
-    with pytest.raises(gm.errors.UnknownNameError) as unknown:
+    with raises(gm.errors.ValidationError, "unknown_name") as unknown:
         catalogue.get("DubletHeatPlant")
     assert "DoubletHeatPlant" in unknown.value.suggestions
-    with pytest.raises(gm.errors.UnknownNameError):
+    with raises(gm.errors.ValidationError, "unknown_name"):
         catalogue.get("ESP")
 
 
@@ -77,7 +78,7 @@ def test_a_registered_plant_without_values_names_itself(monkeypatch):
 
 def test_example_refuses_unknown_names_with_close_matches():
     """A misspelt plant name has suggestions."""
-    with pytest.raises(gm.errors.UnknownNameError) as unknown:
+    with raises(gm.errors.ValidationError, "unknown_name") as unknown:
         catalogue.example("Doublt")
     assert "Doublet" in unknown.value.suggestions
 

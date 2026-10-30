@@ -3,7 +3,7 @@
 import numpy as np
 
 from gemini import backends
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.graph import GraphCache
 from gemini.graph.failures import RowView, row_error
 from gemini.graph.interpreter import Interpreter
@@ -42,4 +42,4 @@ def test_row_error_fills_the_message_of_the_row(gain):
     values, errors = interpreter.execute(feeds)
     codes = interpreter.reached(errors)
     error = row_error(graph.checks[int(codes[1]) - 1], RowView(values, 1, feeds))
-    assert isinstance(error, PhysicsRangeError) and "gain = -1.0" in str(error)
+    assert isinstance(error, PhysicsError) and "gain = -1.0" in str(error)

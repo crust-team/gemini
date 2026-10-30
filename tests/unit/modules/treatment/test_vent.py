@@ -9,6 +9,7 @@ from gemini.modules.treatment import Degasser, Vent
 from gemini.physics import constants
 from gemini.types import Fluid, Inlet, Outlet, Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 GAS = Stream(m_dot=0.2, T=330, p=1.2e5)
 
@@ -79,10 +80,10 @@ def test_limits():
     """Zero flow emits nothing; reverse flow and an impossible composition raise."""
     module = vent("flare")
     assert module(inlet=GAS.with_(m_dot=0)).outputs.co2_emission == 0
-    with pytest.raises(gm.errors.PhysicsRangeError, match="inlet.m_dot"):
+    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot"):
         module(inlet=GAS.with_(m_dot=-0.1))
     module.update_params(methane_mass_fraction=0.2)
-    with pytest.raises(gm.errors.ConfigurationError, match="expected at most 1"):
+    with raises(gm.errors.ValidationError, "invalid_design", match="expected at most 1"):
         module(inlet=GAS)
 
 

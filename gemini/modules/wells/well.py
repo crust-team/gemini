@@ -6,7 +6,7 @@ Both wells traverse a geothermal pipe path using the original GEMINI DPDT equati
 
 from typing import Literal
 
-from gemini.errors import PhysicsRangeError
+from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import geometry, hydraulics
 from gemini.types import (
@@ -48,7 +48,7 @@ class _Well(Module):
     def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):
         """Traverse an arbitrary depth interval [m], returning uncorrected SI conditions."""
         if (direction == "up" and to_md > from_md) or (direction == "down" and to_md < from_md):
-            raise PhysicsRangeError(
+            raise PhysicsError(
                 f"{self.path}: depth interval {from_md} m -> {to_md} m conflicts with "
                 f"direction {direction}"
             )

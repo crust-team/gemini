@@ -2,13 +2,14 @@
 
 import pytest
 
-from gemini.errors import ConfigurationError, PhysicsRangeError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.balance import energy_balance, mass_balance
 from gemini.modules.heating import HeatPump
 from gemini.physics import refrigeration
 from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 CP = 4217.4
 
@@ -97,15 +98,15 @@ def test_machine_off_without_demand_flow_or_part_load():
 def test_invalid_operating_points_raise():
     """Negative flow, a hopeless heating lift and a too small sink flow are out of range."""
     source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
-    with pytest.raises(PhysicsRangeError, match="source_in.m_dot = -1"):
+    with pytest.raises(PhysicsError, match="source_in.m_dot = -1"):
         heat_pump("heating")(
             source_in=source.with_(m_dot=-1), sink_in=sink, temperature_setpoint=340
         )
-    with pytest.raises(PhysicsRangeError, match="heating COP above 1"):
+    with pytest.raises(PhysicsError, match="heating COP above 1"):
         heat_pump("heating", carnot_fraction=0.2)(
             source_in=source.with_(T=270), sink_in=sink, temperature_setpoint=340
         )
-    with pytest.raises(PhysicsRangeError, match="to reject the cooling duty"):
+    with pytest.raises(PhysicsError, match="to reject the cooling duty"):
         heat_pump("cooling")(
             source_in=Stream(m_dot=100, T=290, p=3e5),
             sink_in=Stream(m_dot=0.1, T=300, p=3e5),
@@ -141,11 +142,11 @@ def test_lorenz_heating_reproduces_the_upstream_gemini_case():
 def test_lorenz_mode_limits():
     """Lorenz cooling is undefined and a source too cold for a COP above 1 is out of range."""
     source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
-    with pytest.raises(ConfigurationError, match="cop_model = 'lorenz'"):
+    with raises(ValidationError, "invalid_design", match="cop_model = 'lorenz'"):
         heat_pump("cooling", cop_model="lorenz")(
             source_in=source, sink_in=sink, temperature_setpoint=290
         )
-    with pytest.raises(PhysicsRangeError, match="heating COP above 1"):
+    with pytest.raises(PhysicsError, match="heating COP above 1"):
         heat_pump("heating", cop_model="lorenz", lorenz_fraction=0.1)(
             source_in=source.with_(T=250), sink_in=sink, temperature_setpoint=340
         )

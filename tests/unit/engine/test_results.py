@@ -12,6 +12,7 @@ from gemini.engine.chunks import PathColumns, ResultChunk
 from gemini.engine.results import Results
 from gemini.types import Health, ModuleResult, Values
 from gemini.types.shapes import problem
+from tests.fixtures.errors import raises
 
 
 def result(**outputs):
@@ -59,9 +60,9 @@ def test_access_conversion_and_suggestions():
     assert rows["pump"].head.tolist() == [2e5, 2e5]
     assert rows["pump"].get("head", unit="bar").tolist() == pytest.approx([2.0, 2.0])
     assert rows["pump"].get("head", unit="barg").tolist() == pytest.approx([2.0, 2.0])
-    with pytest.raises(gm.errors.UnknownResultError, match="did you mean 'pump'"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'pump'"):
         rows["pumps"]
-    with pytest.raises(gm.errors.UnknownResultError, match="did you mean 'head'"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'head'"):
         rows["pump"].heads
     with pytest.raises(ValueError, match="for unit conversion"):
         rows["pump"].get("electricity", unit="kW")
@@ -138,9 +139,9 @@ def test_get_returns_time_values_and_unit_as_json():
         "value"
     ] == [True]
     assert rows.get("pump", "health_score")["unit"] == "-"
-    with pytest.raises(gm.errors.UnknownResultError, match="did you mean 'head'"):
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'head'"):
         rows.get("pump", "heads")
-    with pytest.raises(gm.errors.UnknownResultError, match="did you mean 'pump'") as caught:
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'pump'") as caught:
         rows.get("pumps", "head")
     assert caught.value.suggestions == ("pump",)
 
@@ -158,7 +159,7 @@ def test_summary_reports_min_max_mean_and_unit_per_numeric_field():
     late = rows.summary("pump", start="2024-01-01T01:00:00Z")
     assert late["pump"]["electricity"]["min"]["value"] == 3000.0
     json.dumps(summary, allow_nan=False)
-    with pytest.raises(gm.errors.UnknownResultError):
+    with raises(gm.errors.ValidationError, "unknown_name"):
         rows.summary("pumps")
 
 

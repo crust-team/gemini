@@ -1,6 +1,6 @@
 """The outputs of a built plant: sums, copies of one module's value and ratios, from the spec."""
 
-from gemini.errors import UnknownNameError, ValidationError
+from gemini.errors import ValidationError
 from gemini.modules.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
 from gemini.types.declarations import Output
 from gemini.utils.strings import close_matches, did_you_mean, join_names
@@ -19,9 +19,10 @@ def declare_automatic(plant):
 
 
 def _unknown(subject, name, valid):
-    return UnknownNameError(
+    return ValidationError(
         f"{subject}: unknown name {name!r}; valid: {join_names(valid)}{did_you_mean(name, valid)}",
         suggestions=close_matches(name, valid),
+        code="unknown_name",
     )
 
 
@@ -30,10 +31,11 @@ def _target(plant, spec):
     module = plant._find_submodule(path) if path else None
     if module is None:
         paths = [item for item, _ in plant.named_modules() if item]
-        raise UnknownNameError(
+        raise ValidationError(
             f"of = {spec['of']!r}: no module {path!r}{did_you_mean(path, paths)}",
             path="of",
             suggestions=close_matches(path, paths),
+            code="unknown_name",
         )
     if "field" in spec:
         if local not in module._outlets:

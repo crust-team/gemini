@@ -3,8 +3,9 @@
 import numpy as np
 import pytest
 
-from gemini.errors import UnknownPortError
+from gemini.errors import ValidationError
 from gemini.types import BRINE, Ports, Stream
+from tests.fixtures.errors import raises
 
 
 @pytest.fixture
@@ -42,7 +43,9 @@ def test_unknown_names_include_path_valid_names_and_suggestion(streams):
         AttributeError, match="plant.esp.*suctoin.*valid names: suction.*did you mean 'suction'"
     ):
         ports.suctoin
-    with pytest.raises(UnknownPortError, match="plant.esp.*discharge.*valid names: suction"):
+    with raises(
+        ValidationError, "unknown_port", match="plant.esp.*discharge.*valid names: suction"
+    ):
         ports["discharge"]
 
 
@@ -65,7 +68,7 @@ def test_ports_are_immutable_and_copy_the_source_mapping(streams):
 
 def test_ports_reject_non_stream_values(streams):
     """The port mapping never carries scalar controls or computed outputs."""
-    with pytest.raises(TypeError, match="plant.esp.*suction.*Stream.*valid names: suction"):
+    with pytest.raises(ValidationError, match="plant.esp.*suction.*Stream.*valid names: suction"):
         Ports({"suction": 1.0}, path="plant.esp")
 
 

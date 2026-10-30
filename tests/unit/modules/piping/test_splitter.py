@@ -7,6 +7,7 @@ from gemini.modules import energy_balance, mass_balance
 from gemini.modules.piping import Splitter
 from gemini.types import WATER, Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.errors import raises
 
 FEED = Stream(m_dot=10, T=353.15, p=5e5, fluid=WATER)
 
@@ -34,11 +35,11 @@ def test_limits_of_the_split():
 
 def test_invalid_inputs_raise():
     """Reverse feed, a fraction outside [0, 1] and a missing command are rejected."""
-    with pytest.raises(gm.errors.PhysicsRangeError, match="splitter: feed_in.m_dot = -1"):
+    with pytest.raises(gm.errors.PhysicsError, match="splitter: feed_in.m_dot = -1"):
         Splitter()(feed_in=FEED.with_(m_dot=-1), split_fraction=0.5)
-    with pytest.raises(gm.errors.DeclarationError):
+    with pytest.raises(gm.errors.ValidationError):
         Splitter()(feed_in=FEED, split_fraction=1.2)
-    with pytest.raises(gm.errors.MissingValueError):
+    with raises(gm.errors.ValidationError, "missing_value"):
         Splitter()(feed_in=FEED)
 
 
