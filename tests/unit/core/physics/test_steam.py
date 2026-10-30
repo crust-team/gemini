@@ -4,6 +4,7 @@ import pytest
 
 from gemini.core.physics import steam
 from gemini.errors import PhysicsRangeError
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 IF97 = 1e-8
 """Relative tolerance for the nine-digit IAPWS-IF97 verification values."""
@@ -141,3 +142,53 @@ def test_baumann_expansion_limits():
             steam.baumann_expansion(*args)
     with pytest.raises(PhysicsRangeError, match="wet exhaust"):
         steam.baumann_expansion(6e5, 4e5, 0.2, 1)
+
+
+def test_functions_match_on_arrays():
+    """Every public function on arrays equals one call per row, across all region branches."""
+    temperatures = [(300.0,), (500.0,), (600.0,), (640.0,)]
+    assert_function_matches(steam.saturation_pressure, temperatures)
+    assert_function_matches(steam.saturation_temperature, [(1e3,), (1e5,), (1e6,), (1.5e7,)])
+    assert_function_matches(steam.b23_pressure, [(623.15,), (700.0,), (863.15,)])
+    liquid = [(3e6, 300.0), (8e7, 300.0), (3e6, 500.0), (1.7e7, 620.0)]
+    assert_function_matches(steam.liquid_enthalpy, liquid)
+    assert_function_matches(steam.liquid_entropy, liquid)
+    vapour = [(3.5e3, 300.0), (1e5, 450.0), (1e6, 700.0), (3e7, 700.0), (3e7, 900.0)]
+    assert_function_matches(steam.vapour_enthalpy, vapour)
+    assert_function_matches(steam.vapour_entropy, vapour)
+    assert_function_matches(steam.saturation_properties, [(1e3,), (1e5,), (6e5,), (1.6e7,)])
+
+
+def test_flash_and_expansion_match_on_arrays():
+    """Flash fraction and Baumann expansion on arrays equal one call per row."""
+    h_f = steam.saturation_properties(6e5).liquid_enthalpy
+    assert_function_matches(
+        steam.flash_fraction, [(h_f - 1e3, 6e5), (h_f + 4e5, 6e5), (1e6, 1e5), (2e6, 1e6)]
+    )
+    rows = [(6e5, 1e4, 0.85, 1.0), (6e5, 1e4, 0.85, 0.0), (1e6, 2e4, 0.7, 0.5)]
+    assert_function_matches(steam.baumann_expansion, rows)
+
+
+@pytest.mark.parametrize(
+    ("function", "rows"),
+    [
+        (steam.saturation_pressure, [(300.0,), (650.0,)]),
+        (steam.saturation_temperature, [(1e5,), (500.0,)]),
+        (steam.b23_pressure, [(700.0,), (900.0,)]),
+        (steam.liquid_enthalpy, [(3e6, 300.0), (1e5, 400.0)]),
+        (steam.liquid_entropy, [(3e6, 300.0), (1e6, 630.0)]),
+        (steam.vapour_enthalpy, [(1e6, 700.0), (1e6, 400.0)]),
+        (steam.vapour_entropy, [(1e6, 700.0), (0.0, 400.0)]),
+        (steam.vapour_enthalpy, [(1e6, 700.0), (4e7, 700.0)]),
+        (steam.vapour_enthalpy, [(1e6, 700.0), (1e6, 1100.0)]),
+        (steam.saturation_properties, [(1e5,), (1.7e7,)]),
+        (steam.flash_fraction, [(1e6, 6e5), (3e6, 6e5)]),
+        (steam.baumann_expansion, [(6e5, 1e4, 0.85, 1.0), (1e4, 6e5, 0.85, 1.0)]),
+        (steam.baumann_expansion, [(6e5, 1e4, 0.85, 1.0), (6e5, 1e4, 0.0, 1.0)]),
+        (steam.baumann_expansion, [(6e5, 1e4, 0.85, 1.0), (6e5, 1e4, 0.85, -1.0)]),
+        (steam.baumann_expansion, [(6e5, 1e4, 0.85, 1.0), (6e5, 4e5, 0.2, 1.0)]),
+    ],
+)
+def test_checks_match_on_arrays(function, rows):
+    """A failing row raises the same error and message on arrays and on floats."""
+    assert_same_error(function, rows, PhysicsRangeError)

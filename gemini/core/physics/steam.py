@@ -20,19 +20,21 @@ Saturated properties need regions 1 and 2, which border the saturation line only
 salts and non-condensable gases are not represented.
 """
 
-import math
 from dataclasses import dataclass
 
+from gemini import ops
 from gemini.errors import PhysicsRangeError
+from gemini.ops import Constant
 
-GAS_CONSTANT = 461.526
-"""IF97 specific gas constant of water R [J/kg/K]."""
+GAS_CONSTANT = Constant(
+    "WATER_GAS_CONSTANT", 461.526, "J/kg/K", "IF97 specific gas constant of water R"
+)
 
-CRITICAL_TEMPERATURE = 647.096
-"""Critical temperature [K], the upper end of the saturation line."""
+CRITICAL_TEMPERATURE = Constant(
+    "WATER_CRITICAL_TEMPERATURE", 647.096, "K", "critical temperature, end of the saturation line"
+)
 
-CRITICAL_PRESSURE = 22.064e6
-"""Critical pressure [Pa]."""
+CRITICAL_PRESSURE = Constant("WATER_CRITICAL_PRESSURE", 22.064e6, "Pa", "critical pressure")
 
 MINIMUM_TEMPERATURE = 273.15
 """Lowest temperature of regions 1, 2 and 4 [K]."""
@@ -224,12 +226,7 @@ def saturation_pressure(temperature: float) -> float:
         MINIMUM_TEMPERATURE,
         CRITICAL_TEMPERATURE,
     )
-    n = _REGION_4
-    theta = temperature + n[8] / (temperature - n[9])
-    a = theta**2 + n[0] * theta + n[1]
-    b = n[2] * theta**2 + n[3] * theta + n[4]
-    c = n[5] * theta**2 + n[6] * theta + n[7]
-    return (2 * c / (-b + math.sqrt(b**2 - 4 * a * c))) ** 4 * 1e6
+    return _saturation_pressure(temperature)
 
 
 def saturation_temperature(pressure: float) -> float:
@@ -250,8 +247,8 @@ def saturation_temperature(pressure: float) -> float:
     e = beta**2 + n[2] * beta + n[5]
     f = n[0] * beta**2 + n[3] * beta + n[6]
     g = n[1] * beta**2 + n[4] * beta + n[7]
-    d = 2 * g / (-f - math.sqrt(f**2 - 4 * e * g))
-    return (n[9] + d - math.sqrt((n[9] + d) ** 2 - 4 * (n[8] + n[9] * d))) / 2
+    d = 2 * g / (-f - ops.sqrt(f**2 - 4 * e * g))
+    return (n[9] + d - ops.sqrt((n[9] + d) ** 2 - 4 * (n[8] + n[9] * d))) / 2
 
 
 def liquid_enthalpy(pressure: float, temperature: float) -> float:
@@ -302,8 +299,7 @@ def b23_pressure(temperature: float) -> float:
         REGION_1_MAXIMUM_TEMPERATURE,
         B23_MAXIMUM_TEMPERATURE,
     )
-    n = _B23
-    return (n[0] + n[1] * temperature + n[2] * temperature**2) * 1e6
+    return _b23_pressure(temperature)
 
 
 def saturation_properties(pressure: float) -> SaturationProperties:
@@ -336,12 +332,18 @@ def flash_fraction(enthalpy: float, pressure: float) -> float:
     Butterworth-Heinemann, section 5.2 (single-flash plants).
     """
     saturation = saturation_properties(pressure)
-    if enthalpy >= saturation.vapour_enthalpy:
-        raise PhysicsRangeError(
-            f"flash_fraction: enthalpy = {enthalpy} J/kg; expected below the saturated vapour "
-            f"enthalpy {saturation.vapour_enthalpy} J/kg at {pressure} Pa"
-        )
-    return max(0.0, (enthalpy - saturation.liquid_enthalpy) / saturation.evaporation_enthalpy)
+    ops.check(
+        enthalpy < saturation.vapour_enthalpy,
+        PhysicsRangeError,
+        "flash_fraction: enthalpy = {enthalpy} J/kg; expected below the saturated vapour "
+        "enthalpy {vapour_enthalpy} J/kg at {pressure} Pa",
+        enthalpy=enthalpy,
+        vapour_enthalpy=saturation.vapour_enthalpy,
+        pressure=pressure,
+    )
+    return ops.maximum(
+        0.0, (enthalpy - saturation.liquid_enthalpy) / saturation.evaporation_enthalpy
+    )
 
 
 def baumann_expansion(
@@ -375,16 +377,25 @@ def baumann_expansion(
     J. Inst. Electr. Eng. 59, 565-623; DiPippo, R. (2016), Geothermal Power Plants, 4th ed.,
     section 5.5.
     """
-    if not 0 < dry_efficiency <= 1 or baumann_factor < 0:
-        raise PhysicsRangeError(
-            f"baumann_expansion: dry_efficiency = {dry_efficiency}, baumann_factor = "
-            f"{baumann_factor}; expected 0 < dry_efficiency <= 1 and baumann_factor >= 0"
-        )
-    if outlet_pressure >= inlet_pressure:
-        raise PhysicsRangeError(
-            f"baumann_expansion: outlet_pressure = {outlet_pressure} Pa; expected below "
-            f"inlet_pressure = {inlet_pressure} Pa"
-        )
+    ops.check(
+        ops.logical_and(
+            ops.logical_and(dry_efficiency > 0, dry_efficiency <= 1),
+            ops.logical_not(baumann_factor < 0),
+        ),
+        PhysicsRangeError,
+        "baumann_expansion: dry_efficiency = {dry_efficiency}, baumann_factor = "
+        "{baumann_factor}; expected 0 < dry_efficiency <= 1 and baumann_factor >= 0",
+        dry_efficiency=dry_efficiency,
+        baumann_factor=baumann_factor,
+    )
+    ops.check(
+        ops.logical_not(outlet_pressure >= inlet_pressure),
+        PhysicsRangeError,
+        "baumann_expansion: outlet_pressure = {outlet_pressure} Pa; expected below "
+        "inlet_pressure = {inlet_pressure} Pa",
+        outlet_pressure=outlet_pressure,
+        inlet_pressure=inlet_pressure,
+    )
     inlet, outlet = saturation_properties(inlet_pressure), saturation_properties(outlet_pressure)
     h_in = inlet.vapour_enthalpy
     isentropic_quality = (inlet.vapour_entropy - outlet.liquid_entropy) / outlet.evaporation_entropy
@@ -393,10 +404,12 @@ def baumann_expansion(
     quality = (h_in - outlet.liquid_enthalpy - drop * (1 - baumann_factor / 2)) / (
         outlet.evaporation_enthalpy + baumann_factor * drop / 2
     )
-    if quality >= 1:
-        raise PhysicsRangeError(
-            f"baumann_expansion: exhaust quality = {quality}; expected a wet exhaust below 1"
-        )
+    ops.check(
+        ops.logical_not(quality >= 1),
+        PhysicsRangeError,
+        "baumann_expansion: exhaust quality = {quality}; expected a wet exhaust below 1",
+        quality=quality,
+    )
     h_out = outlet.liquid_enthalpy + quality * outlet.evaporation_enthalpy
     return Expansion(h_in, h_s, h_out, quality, (h_in - h_out) / (h_in - h_s))
 
@@ -417,7 +430,7 @@ def _region_2(pressure, temperature):
     """Return (h [J/kg], s [J/kg/K]) from the IF97 region 2 Gibbs free energy."""
     pi = pressure / 1e6
     tau = 540 / temperature
-    gamma = math.log(pi)
+    gamma = ops.log(pi)
     gamma_tau = 0.0
     for j, n in _REGION_2_IDEAL:
         gamma += n * tau**j
@@ -429,12 +442,35 @@ def _region_2(pressure, temperature):
     return rt * tau * gamma_tau, GAS_CONSTANT * (tau * gamma_tau - gamma)
 
 
+def _saturation_pressure(temperature):
+    """Return IF97 eq. 30 without a range check, for the branches of ``_check_vapour``."""
+    n = _REGION_4
+    theta = temperature + ops.truediv(n[8], temperature - n[9])
+    a = theta**2 + n[0] * theta + n[1]
+    b = n[2] * theta**2 + n[3] * theta + n[4]
+    c = n[5] * theta**2 + n[6] * theta + n[7]
+    return ops.pow(ops.truediv(2 * c, -b + ops.sqrt(b**2 - 4 * a * c)), 4) * 1e6
+
+
+def _b23_pressure(temperature):
+    """Return IF97 eq. 5 without a range check, for the branches of ``_check_vapour``."""
+    n = _B23
+    return (n[0] + n[1] * temperature + n[2] * temperature**2) * 1e6
+
+
 def _check_range(function, name, value, unit, lower, upper):
     """Raise ``PhysicsRangeError`` unless lower <= value <= upper (NaN fails)."""
-    if not lower <= value <= upper:
-        raise PhysicsRangeError(
-            f"{function}: {name} = {value} {unit}; expected {lower} {unit} to {upper} {unit}"
-        )
+    ops.check(
+        ops.logical_and(lower <= value, value <= upper),
+        PhysicsRangeError,
+        "{function}: {name} = {value} {unit}; expected {lower} {unit} to {upper} {unit}",
+        function=function,
+        name=name,
+        value=value,
+        unit=unit,
+        lower=lower,
+        upper=upper,
+    )
 
 
 def _check_liquid(function, pressure, temperature):
@@ -442,7 +478,7 @@ def _check_liquid(function, pressure, temperature):
     _check_range(
         function, "temperature", temperature, "K", MINIMUM_TEMPERATURE, REGION_1_MAXIMUM_TEMPERATURE
     )
-    lower = saturation_pressure(temperature) * (1 - SATURATION_TOLERANCE)
+    lower = _saturation_pressure(temperature) * (1 - SATURATION_TOLERANCE)
     _check_range(function, "pressure", pressure, "Pa", lower, MAXIMUM_PRESSURE)
 
 
@@ -451,14 +487,22 @@ def _check_vapour(function, pressure, temperature):
     _check_range(
         function, "temperature", temperature, "K", MINIMUM_TEMPERATURE, REGION_2_MAXIMUM_TEMPERATURE
     )
-    if temperature <= REGION_1_MAXIMUM_TEMPERATURE:
-        upper = saturation_pressure(temperature) * (1 + SATURATION_TOLERANCE)
-    elif temperature <= B23_MAXIMUM_TEMPERATURE:
-        upper = b23_pressure(temperature)
-    else:
-        upper = MAXIMUM_PRESSURE
-    if not 0 < pressure <= upper:
-        raise PhysicsRangeError(
-            f"{function}: pressure = {pressure} Pa; expected 0 Pa < pressure <= {upper} Pa in "
-            f"region 2 at {temperature} K"
-        )
+    upper = ops.where(
+        temperature <= REGION_1_MAXIMUM_TEMPERATURE,
+        _saturation_pressure(temperature) * (1 + SATURATION_TOLERANCE),
+        ops.where(
+            temperature <= B23_MAXIMUM_TEMPERATURE,
+            _b23_pressure(temperature),
+            MAXIMUM_PRESSURE,
+        ),
+    )
+    ops.check(
+        ops.logical_and(pressure > 0, pressure <= upper),
+        PhysicsRangeError,
+        "{function}: pressure = {pressure} Pa; expected 0 Pa < pressure <= {upper} Pa in "
+        "region 2 at {temperature} K",
+        function=function,
+        pressure=pressure,
+        upper=upper,
+        temperature=temperature,
+    )

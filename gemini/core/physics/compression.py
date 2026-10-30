@@ -116,7 +116,7 @@ def specific_compression_work(
     (2017), Section 13, multistage compression).
     """
     ops.check(
-        ops.logical_and(specific_heat > 0, stages >= 1),
+        ops.logical_and(specific_heat > 0, ops.logical_not(stages < 1)),
         PhysicsRangeError,
         "specific_compression_work: specific_heat = {specific_heat} J/kg/K, stages = "
         "{stages}; expected a positive heat capacity and at least one stage",
