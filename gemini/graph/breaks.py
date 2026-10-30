@@ -16,6 +16,7 @@ row whose outlet fluid differs from the probed one counts as failed.
 
 import numpy as np
 
+from gemini import backends
 from gemini.core.modules.module import _Call, _current_call
 from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
@@ -145,7 +146,8 @@ def evaluate_break(node, operands):
     exceptions = {}
     for row in range(rows):
         try:
-            values = _call_row(attributes, [_item(array, row) for array in arrays])
+            with backends.settings(backend=None):
+                values = _call_row(attributes, [_item(array, row) for array in arrays])
         except Exception as error:
             ok[row] = False
             exceptions[row] = error

@@ -1,11 +1,13 @@
 """The tracer records a whole module call with named inputs by role."""
 
+import re
+
 import numpy as np
 import pytest
 
 import gemini as gm
 from gemini.core.types.declarations import UNSET
-from gemini.errors import MissingValueError, OutputError, PhysicsRangeError, TraceError
+from gemini.errors import MissingValueError, OutputError, PhysicsRangeError
 from gemini.graph import Tracer, run
 from gemini.graph.tracer import parameter_shape
 from gemini.utils.hooks import observer
@@ -57,8 +59,8 @@ def test_hooks_are_classified_by_what_they_do(gain):
     assert graph.observers == [reads]
     assert graph.outputs["outputs.boost"].op == "mul"
     gain.register_forward_hook(lambda module, inlets, outlets: float(module.rise))
-    with pytest.raises(TraceError, match="forward hook .*float"):
-        Tracer().trace(gain, {"inlet": gain.fluid})
+    broken = Tracer().trace(gain, {"inlet": gain.fluid})
+    assert broken.root is gain and re.search("forward hook .*float", broken.breaks[0][1])
 
 
 def test_unassigned_outputs_fail_at_trace_time(gain):
@@ -74,13 +76,13 @@ def test_unassigned_outputs_fail_at_trace_time(gain):
 
 
 def test_untraceable_modules_name_every_reason(gain, tank):
-    """Stateful modules, pre-hooks and float32 precision are graph breaks."""
-    with pytest.raises(TraceError, match="stateful"):
-        Tracer().trace(tank, {"inlet": gain.fluid})
+    """Stateful modules, pre-hooks and float32 precision make the root a break, never an error."""
+    graph = Tracer().trace(tank, {"inlet": gain.fluid})
+    assert graph.root is tank and "stateful" in graph.breaks[0][1]
     gain.register_forward_pre_hook(lambda module, inlets: None)
     with gm.runtime.settings(precision="float32"):
-        with pytest.raises(TraceError, match="pre-hooks; runtime precision"):
-            Tracer().trace(gain, {"inlet": gain.fluid})
+        graph = Tracer().trace(gain, {"inlet": gain.fluid})
+    assert graph.root is gain and "pre-hooks; runtime precision" in graph.breaks[0][1]
 
 
 def test_parameter_shapes():
@@ -161,8 +163,8 @@ def test_uninitialized_parameters_of_the_tree_are_refused(line):
 def test_marked_observers_on_a_child_are_a_graph_break(line):
     """An observer is replayed per row for the root only, so one on a child breaks the root."""
     line.gain.register_forward_hook(observer(lambda module, inlets, outlets: None))
-    with pytest.raises(TraceError, match="gain: observer hooks on a child"):
-        Tracer().trace(line, {"inlet": line.fluid})
+    graph = Tracer().trace(line, {"inlet": line.fluid})
+    assert graph.root is line and "gain: observer hooks on a child" in graph.breaks[0][1]
 
 
 def test_a_reading_hook_on_a_leaf_child_makes_it_a_break_node(line):

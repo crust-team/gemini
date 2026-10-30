@@ -38,7 +38,7 @@ def test_graph_break_runs_untraced_with_the_same_results(gain, inlet):
     """A pre-hook breaks the graph; the reason is reported and the values are unchanged."""
     gain.register_forward_pre_hook(lambda module, inlets: None)
     result = run(gain, {"inlet": inlet}, {"gain": 1.0})
-    assert result.graph is None and "pre-hooks" in result.breaks[0]
+    assert result.graph.root is gain and "pre-hooks" in result.breaks[0]
     assert result.outputs["rise"].tolist() == [6.0, 6.0, 6.0]
 
 
@@ -205,7 +205,7 @@ def test_a_composite_child_that_cannot_be_traced_breaks_the_whole_root(chain_inl
     """A composite is never a node: its leaves' records feed the parent, so the root breaks."""
     chain = Chain(Opaque())
     result = run(chain, {"inlet": chain_inlet}, {"drive": 1.0})
-    assert result.graph is None and "float()" in result.breaks[0]
+    assert result.graph.root is chain and "float()" in result.breaks[0]
 
 
 def test_a_marked_observer_on_a_leaf_child_is_not_a_break_node(chain_inlet):
@@ -213,7 +213,7 @@ def test_a_marked_observer_on_a_leaf_child_is_not_a_break_node(chain_inlet):
     middle = Gain().update_params(scale=3.0)
     middle.register_forward_hook(observer(lambda module, inlets, outlets: None))
     result = run(Chain(middle), {"inlet": chain_inlet}, {"drive": 1.0})
-    assert result.graph is None and "observer" in result.breaks[0]
+    assert result.graph.root is not None and "observer" in result.breaks[0]
 
 
 def test_a_row_whose_outlet_fluid_differs_from_the_probe_fails(chain_inlet):

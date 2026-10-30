@@ -195,5 +195,5 @@ def test_hooks_on_the_traced_esp(esp, week, plain_week, motor_loss_week, untrace
 
     esp.register_forward_hook(_untraceable)
     broken = run(esp, inlets, inputs)
-    assert broken.graph is None and "forward hook" in broken.breaks[0]
+    assert broken.graph.root is esp and "forward hook" in broken.breaks[0]
     _assert_equal(broken, untraceable_week)

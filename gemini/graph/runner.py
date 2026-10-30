@@ -1,12 +1,16 @@
-"""Run one module over whole time series: one traced call, or row by row on a graph break.
+"""Run one module over whole time series: ``evaluate`` plus a raise, and the observer replay.
 
 ``run(module, inlets, inputs)`` is the prototype's stand-in for the engine integration. Inlets
 are ``Stream`` objects whose fields are arrays over time (validated when built);
 ``inputs`` maps control and boundary names to arrays or scalars, and the module's persisted
-values fill the rest. Parameters and constants come from the module and the graph. A module
-that cannot be traced runs untraced, one call per row, with the same results, and the reason
-is reported in ``Run.breaks``. Observer hooks are replayed per row after a traced run, pre-hooks
-first. The row count is the longest array among the inlet fields and inputs, one without arrays.
+values fill the rest. Parameters and constants come from the module and the graph. It is a thin
+form over ``evaluate``: the graph (a root break when the module cannot be traced, its reason in
+``Run.breaks``) is evaluated on the backend you name and the first failing row raises its
+exception. Observer hooks are replayed per row after a traced run, pre-hooks first. The row
+count is the longest array among the inlet fields and inputs, one without arrays.
+
+``graph_feeds`` gives the value of every graph input and ``replay_row`` calls the observer hooks
+of one row; the engine uses both with ``evaluate``.
 
 ``run_function(function, *args, **fixed)`` does the same for a plain function (a physics
 function, a module's helper): the numeric positional arguments become graph inputs, the
@@ -23,12 +27,9 @@ import numpy as np
 
 from gemini import backends, ops
 from gemini.core.modules.module import _Call, _current_call
-from gemini.core.types.flows import Stream
-from gemini.core.types.ports import Ports
-from gemini.errors import TraceError
 from gemini.graph.cache import GraphCache
+from gemini.graph.evaluation import evaluate
 from gemini.graph.graph import Graph
-from gemini.graph.interpreter import Interpreter
 from gemini.graph.limits import certain
 from gemini.graph.proxy import Proxy
 from gemini.graph.tracer import STREAM_FIELDS
@@ -49,25 +50,26 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
     inputs = dict(inputs or {})
     rows = _row_count(inlets, inputs)
     fluids = {name: inlets[name].fluid for name in module._inlets}
-    try:
-        graph = (cache or GraphCache()).graph(module, fluids)
-    except TraceError as error:
-        return _untraced(module, inlets, inputs, rows, str(error))
-    values = _evaluate(graph, graph_feeds(graph, module, inlets, inputs), backend, rows)
-    outputs = _stacked_vectors(
-        graph,
-        {
-            name.removeprefix("outputs."): value
-            for name, value in values.items()
-            if name.startswith("outputs.")
-        },
-    )
+    graph = (cache or GraphCache()).graph(module, fluids)
+    feeds = graph_feeds(graph, module, inlets, inputs)
+    with backends.settings(backend=backend):
+        evaluation = evaluate(graph, feeds, rows)
+    _raise_first(evaluation)
+    result = evaluation.result
     outlets = {
-        port: {field: values[f"outlets.{port}.{field}"] for field, _ in STREAM_FIELDS}
+        port: {field: getattr(result.outlets[port], field) for field, _ in STREAM_FIELDS}
         for port in module._outlets
     }
-    _replay_observers(graph, module, inlets, inputs, outputs, outlets, rows)
-    return Run(outputs=outputs, outlets=outlets, breaks=[], graph=graph)
+    if graph.root is None:
+        _replay_observers(graph, module, result, rows)
+    breaks = [reason for _, reason in graph.breaks] if graph.root is not None else []
+    return Run(outputs=dict(result.outputs.items()), outlets=outlets, breaks=breaks, graph=graph)
+
+
+def _raise_first(evaluation):
+    """Raise the exception of the first failed row of ``evaluation``, if any."""
+    if evaluation.failed.any():
+        raise evaluation.error(int(np.flatnonzero(evaluation.failed)[0]))
 
 
 def _row_count(inlets, inputs):
@@ -79,29 +81,13 @@ def _row_count(inlets, inputs):
     return max(sizes, default=1)
 
 
-def _evaluate(graph, feeds, backend, rows):
-    """Return every graph output as an array of ``rows``: in one call, or per row in Python."""
-    interpreter = Interpreter(graph, backends.get(backend))
-    if backend != "python":
-        values = interpreter.run(feeds)
-        return {name: np.broadcast_to(value, (rows,)) for name, value in values.items()}
-    per_row = [interpreter.run(_row_feeds(graph, feeds, row)) for row in range(rows)]
-    return {name: np.array([values[name] for values in per_row]) for name in graph.outputs}
-
-
-def _row_feeds(graph, feeds, row):
-    """Return the Python scalars of one row; vector parameters become Python lists."""
-    return {
-        name: np.asarray(value).tolist() if graph.inputs[name].shape else _row(value, row)
-        for name, value in feeds.items()
-    }
-
-
 def graph_feeds(graph, module, inlets, inputs):
     """Return the value of every graph input; ``inputs`` maps names to arrays or scalars.
 
     A control or boundary without a value (``None``, for an optional one) is NaN, like every
-    value-dependent ``None`` in a graph.
+    value-dependent ``None`` in a graph. A parameter keeps the value it was given, so a message
+    prints it as the plain path does (``2``, not ``2.0``). A root break takes only the inputs
+    supplied: it reads the others from the module as any call does.
     """
     feeds = {}
     for name, stream in inlets.items():
@@ -110,23 +96,19 @@ def graph_feeds(graph, module, inlets, inputs):
         }
     for name in graph.by_role("control") | graph.by_role("boundary"):
         owner, local = _owner(module, name)
-        value = inputs[name] if name in inputs else owner._input_value(local)
+        if name in inputs:
+            value = inputs[name]
+        elif graph.root is None:
+            value = owner._input_value(local)
+        else:
+            continue
         feeds[name] = np.asarray(np.nan if value is None else value)
     for name in graph.by_role("parameter"):
         owner, local = _owner(module, name)
-        feeds[name] = np.asarray(owner._parameter_value(local), dtype=float)
+        feeds[name] = np.asarray(owner._parameter_value(local))
     for name, constant in graph.constants.items():
         feeds[name] = constant.value
     return feeds
-
-
-def _stacked_vectors(graph, outputs):
-    """Replace the items of every list-valued output by one array of shape ``(rows, length)``."""
-    for name, length in graph.vectors.items():
-        key = name.removeprefix("outputs.")
-        items = [outputs.pop(f"{key}[{index}]") for index in range(length)]
-        outputs[key] = np.stack(items, axis=1)
-    return outputs
 
 
 def _owner(module, name):
@@ -135,61 +117,11 @@ def _owner(module, name):
     return (module.get_submodule(path) if path else module), local
 
 
-def _row(value, row):
-    array = np.asarray(value)
-    return array[row].item() if array.ndim else array.item()
-
-
-def _row_streams(inlets, row):
-    return {
-        name: Stream(
-            m_dot=_row(state.m_dot, row),
-            T=_row(state.T, row),
-            p=_row(state.p, row),
-            fluid=state.fluid,
-        )
-        for name, state in inlets.items()
-    }
-
-
-def _untraced(module, inlets, inputs, rows, reason):
-    """Run ``module`` untraced, one call per row, and stack its results like a traced run."""
-    results = []
-    for row in range(rows):
-        row_inputs = {name: _row(value, row) for name, value in inputs.items()}
-        results.append(module(**_row_streams(inlets, row), **row_inputs))
-    outputs = {name: np.array([r.outputs[name] for r in results]) for name in results[0].outputs}
-    outlets = {
-        port: {
-            field: np.array([getattr(r.outlets[port], field) for r in results])
-            for field, _ in STREAM_FIELDS
-        }
-        for port in module._outlets
-    }
-    return Run(outputs=outputs, outlets=outlets, breaks=[reason], graph=None)
-
-
-def _replay_observers(graph, module, inlets, inputs, outputs, outlets, rows):
+def _replay_observers(graph, module, result, rows):
     """Call every observer hook once per row with that row's inlets, outlets and outputs."""
-    for row in range(rows if graph.observers or graph.pre_observers else 0):
-        row_outlets = Ports(
-            {
-                port: Stream(
-                    **{field: _row(value, row) for field, value in fields.items()},
-                    fluid=graph.outlet_fluids[port],
-                )
-                for port, fields in outlets.items()
-            },
-            path=module.path,
-        )
-        replay_row(
-            graph,
-            module,
-            Ports(_row_streams(inlets, row), path=module.path),
-            row_outlets,
-            module._resolve_inputs({k: _row(v, row) for k, v in inputs.items()}),
-            {name: _row(value, row) for name, value in outputs.items()},
-        )
+    for index in range(rows if graph.observers or graph.pre_observers else 0):
+        row = result.row(index)
+        replay_row(graph, module, row.inlets, row.outlets, row.inputs, dict(row.outputs.items()))
 
 
 def replay_row(graph, module, inlets, outlets, inputs, outputs):
@@ -235,9 +167,14 @@ def run_function(function, *args, backend="numpy", **fixed):
     }
     feeds |= {name: constant.value for name, constant in graph.constants.items()}
     rows = max([np.size(value) for value in feeds.values()], default=1)
-    values = _evaluate(graph, feeds, backend, rows)
+    with backends.settings(backend=backend):
+        evaluation = evaluate(graph, feeds, rows)
+    _raise_first(evaluation)
     scalar = all(np.ndim(value) == 0 for value in feeds.values())
-    values = {name: value[0] if scalar else value for name, value in values.items()}
+    values = {
+        name: evaluation.output(name)[0] if scalar else evaluation.output(name)
+        for name in graph.outputs
+    }
     return _rebuilt(result, values)
 
 

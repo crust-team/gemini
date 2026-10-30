@@ -22,6 +22,11 @@ class Graph:
     ``pre_observers`` the marked read-only pre-hooks and ``observers`` the forward hooks that
     only read, replayed per row after a run. ``breaks`` lists the children that run untraced, as
     ``(module path, reason)`` and ``vectors`` the length of every list-valued output.
+
+    ``result`` is the ``ModuleResult`` tree of the trace, with children, whose values are traced
+    values; an evaluation maps it to arrays. ``root`` is the module of a **root break**, a graph
+    without nodes whose evaluation calls the real module row by row (``inlet_fluids`` are the
+    fluids of its inlets and ``stepped`` tells that it advances states with ``Module.step``).
     """
 
     def __init__(self, module_path):
@@ -39,6 +44,10 @@ class Graph:
         self.unframed = []
         self.pre_observers = []
         self.observers = []
+        self.result = None
+        self.root = None
+        self.stepped = False
+        self.inlet_fluids = {}
 
     def input(self, name, role, unit=None, shape=()):
         """Add a named graph input and return its traced value."""
@@ -220,6 +229,8 @@ class Graph:
         lines.append("outputs:")
         lines.extend(f"  {name} = {_describe(value)}" for name, value in self.outputs.items())
         lines.extend(f"break: {path}: {reason}" for path, reason in self.breaks)
+        if self.root is not None:
+            lines.append(f"root break: {self.root.path} runs eagerly, row by row")
         lines.extend(f"pre-observer: {hook!r}" for hook in self.pre_observers)
         lines.extend(f"observer: {hook!r}" for hook in self.observers)
         return "\n".join(lines)

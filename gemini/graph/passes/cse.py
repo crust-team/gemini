@@ -19,8 +19,8 @@ branch merges with nothing, so no error moves onto a branch it did not belong to
 
 Checks merge like any other node: same condition, error class, message and message values. The
 merged check keeps the lowest code, codes are renumbered in creation order, and the traced
-message values of every check follow the merged nodes. The pass costs one dictionary lookup
-per node.
+message values of every check and the proxies of ``Graph.result`` follow the merged nodes. The
+pass costs one dictionary lookup per node.
 """
 
 import struct
@@ -85,6 +85,8 @@ class _Numbering:
         self.graph.outputs = {
             name: self._merged(operand) for name, operand in self.graph.outputs.items()
         }
+        if self.graph.result is not None:
+            self.graph.result = self.graph.result.mapped(self._merged_value)
 
     def _keep(self, node):
         self.survivor[node] = node
@@ -108,6 +110,8 @@ class _Numbering:
     def _merged_value(self, value):
         if isinstance(value, Proxy):
             return Proxy(self.survivor[value.node], value.graph)
+        if isinstance(value, (list, tuple)):
+            return type(value)(self._merged_value(item) for item in value)
         return value
 
 
@@ -140,10 +144,15 @@ def _attributes_key(attributes):
 
 
 def _values_key(values):
-    return tuple(
-        (name, ("node", value.node) if isinstance(value, Proxy) else _literal_key(value))
-        for name, value in values.items()
-    )
+    return tuple((name, _value_key(value)) for name, value in values.items())
+
+
+def _value_key(value):
+    if isinstance(value, Proxy):
+        return ("node", value.node)
+    if isinstance(value, (list, tuple)):
+        return (type(value), tuple(map(_value_key, value)))
+    return _literal_key(value)
 
 
 def _literal_key(value):

@@ -10,7 +10,10 @@ values are trace guards (see ``cache``). A forward hook that writes an
 output is part of the graph; one that only reads is an observer, replayed per row after a run.
 A hook marked with ``gemini.utils.hooks.observer`` is never called on traced values: it is an
 observer by declaration, and so are marked pre-hooks. Any other pre-hook is a graph break.
-Anything the trace cannot follow raises ``TraceError``, which makes the module a graph break.
+Anything the trace cannot follow raises ``TraceError`` inside the trace; a root that cannot be
+traced is never an error: ``Tracer.trace`` returns a graph with one **root break** (see
+``rootbreak``) whose reason is in ``graph.breaks``. So is a root that holds a stateful module
+when the run is ``stepped``: ``Module.step`` is the one implementation of a step.
 """
 
 import numbers
@@ -26,6 +29,7 @@ from gemini.graph.breaks import record_break
 from gemini.graph.graph import Graph
 from gemini.graph.limits import certain, check_declared_limits
 from gemini.graph.node import STREAM_FIELDS
+from gemini.graph.rootbreak import root_break_graph
 from gemini.utils.hooks import is_observer
 from gemini.utils.strings import join_path
 
@@ -33,15 +37,28 @@ from gemini.utils.strings import join_path
 class Tracer:
     """Trace one call of a root module, a leaf or a composite with all its child calls."""
 
-    def trace(self, module, fluids):
-        """Return the graph of one call of ``module``; ``fluids`` maps inlet names to fluids."""
-        _check_traceable(module)
+    def trace(self, module, fluids, stepped=False):
+        """Return the graph of one call of ``module``; ``fluids`` maps inlet names to fluids.
+
+        ``stepped`` tells that the graph is evaluated with a time step and states: a stateful
+        module in the tree then makes the root a break, stepped by ``Module.step``. A root that
+        cannot be traced gives a root break graph; nothing is raised for it.
+        """
         missing = module.missing_parameters()
         if missing:
             raise MissingValueError(
                 f"{module.path}: uninitialized parameters: {', '.join(missing)}"
             )
         module._resolve_formula_outputs()
+        reason = _untraceable(module, stepped)
+        if reason is None:
+            try:
+                return self._traced(module, fluids)
+            except TraceError as error:
+                reason = str(error)
+        return root_break_graph(module, fluids, stepped, reason)
+
+    def _traced(self, module, fluids):
         graph = Graph(module.path)
         with ops.scope.tracing(graph):
             return self._record(module, graph, fluids)
@@ -56,6 +73,15 @@ class Tracer:
         graph.pre_observers.extend(module._pre_hooks.values())
         trace.limit_checks.extend(graph.checks)
         outlets, call = trace.run(module, inlets, {}, None)
+        graph.result = ModuleResult(
+            outputs=Values(call.outputs or {}, module._outputs),
+            outlets=outlets,
+            inlets=inlets,
+            inputs=dict(call.inputs),
+            children=dict(call.call_records),
+            call_records=tuple(call.call_records),
+            is_leaf=module.is_leaf,
+        )
         for port, stream in outlets.items():
             graph.outlet_fluids[port] = stream.fluid
             for field, _ in STREAM_FIELDS:
@@ -213,17 +239,20 @@ class Trace:
         self.graph.observers.append(hook)
 
 
-def _check_traceable(module):
-    """Refuse what the root of a trace cannot be; each refusal is a graph break."""
+def _untraceable(module, stepped):
+    """Return why the root of a trace must be a break, or ``None``."""
     reasons = []
-    if module.stateful:
+    if stepped and any(member.stateful for member in module.modules()):
+        reasons.append("stateful (stepped, needs scan)")
+    elif module.stateful:
         reasons.append("stateful (needs scan)")
     if not all(is_observer(hook) for hook in module._pre_hooks.values()):
         reasons.append("has forward pre-hooks")
     if runtime.get_precision() != "float64":
         reasons.append("runtime precision is not float64")
     if reasons:
-        raise TraceError(f"{module.path}: cannot be traced: {'; '.join(reasons)}")
+        return f"{module.path}: cannot be traced: {'; '.join(reasons)}"
+    return None
 
 
 def _unrecordable(module):

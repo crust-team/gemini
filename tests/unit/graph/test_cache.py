@@ -1,9 +1,6 @@
 """The cache retraces only when a guard changes."""
 
-import pytest
-
 import gemini as gm
-from gemini.errors import TraceError
 from gemini.graph import GraphCache
 
 
@@ -34,12 +31,12 @@ def test_a_changed_module_fluid_retraces(gain):
 
 
 def test_graph_breaks_are_remembered(gain):
-    """A module that cannot be traced raises its cached ``TraceError`` without retracing."""
+    """A module that cannot be traced is a cached root break graph, never an error."""
     cache = GraphCache()
     gain.register_forward_pre_hook(lambda module, inlets: None)
-    for _ in range(2):
-        with pytest.raises(TraceError, match="pre-hooks"):
-            cache.graph(gain, {"inlet": gain.fluid})
+    graphs = [cache.graph(gain, {"inlet": gain.fluid}) for _ in range(2)]
+    assert graphs[0] is graphs[1] and graphs[0].root is gain
+    assert "pre-hooks" in graphs[0].breaks[0][1]
     assert cache.traces == 1
 
 
@@ -79,3 +76,13 @@ def test_a_hook_below_the_root_is_a_guard(line):
     line.gain.register_forward_hook(lambda module, inlets, outlets: setattr(module, "rise", 1.0))
     cache.graph(line, fluids)
     assert cache.traces == 2
+
+
+def test_stepped_is_a_guard(tank):
+    """A stepped graph of a stateful module is a different graph from the unstepped one."""
+    cache = GraphCache()
+    fluids = {"inlet": tank.fluid}
+    unstepped = cache.graph(tank, fluids)
+    stepped = cache.graph(tank, fluids, stepped=True)
+    assert stepped is not unstepped and stepped.stepped and not unstepped.stepped
+    assert cache.graph(tank, fluids, stepped=True) is stepped and cache.traces == 2
