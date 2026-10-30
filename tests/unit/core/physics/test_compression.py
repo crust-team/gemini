@@ -66,11 +66,11 @@ def test_functions_match_on_arrays():
         (compression.stage_outlet_temperature, [(300, 2, 1.4, 0.8), (300, 2, 1.4, 1.5)]),
         (
             compression.specific_compression_work,
-            [(300, 2, 1.4, 1005, 0.8, 1), (300, 2, 1.4, 0.0, 0.8, 1)],
+            [(300, 2, 1.4, 1005, 0.8, 1.0), (300, 2, 1.4, 0.0, 0.8, 1.0)],
         ),
         (
             compression.specific_compression_work,
-            [(300, 2, 1.4, 1005, 0.8, 1), (300, 2, 1.4, 1005, 0.8, 0.0)],
+            [(300, 2, 1.4, 1005.0, 0.8, 1.0), (300, 2, 1.4, 1005.0, 0.8, 0.0)],
         ),
     ],
 )
