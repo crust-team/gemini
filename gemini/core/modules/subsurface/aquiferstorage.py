@@ -205,7 +205,7 @@ class AquiferStorage(Module):
         source, target = SOURCE_AND_TARGET.get(self.mode, (None, None))
         if store == target:
             mixed = store_volume + volume
-            blended = ops.truediv(store_volume * change + volume * injected_change, mixed)
+            blended = (store_volume * change + volume * injected_change) / mixed
             return ops.where(volume > 0, mixed, store_volume), ops.where(
                 volume > 0, blended, change
             )
@@ -219,9 +219,7 @@ class AquiferStorage(Module):
         return ops.where(
             store_volume == 0,
             0.0,
-            ops.exp(
-                ops.truediv(-dt * conductance, self._fluid_heat_capacity(injection) * store_volume)
-            ),
+            ops.exp(-dt * conductance / (self._fluid_heat_capacity(injection) * store_volume)),
         )
 
     def _production_temperature(self, states):
@@ -286,4 +284,4 @@ class AquiferStorage(Module):
 
 def _enthalpy_flow(stream):
     """Return the sensible enthalpy flow m_dot cp T [W] of a stream, as ``energy_balance``."""
-    return stream.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l * stream.T
+    return stream.heat_capacity_rate() * stream.T

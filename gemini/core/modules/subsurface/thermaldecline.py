@@ -99,7 +99,7 @@ class ThermalDecline(Module):
         inlet = inlets.inlet
         flow = self._liquid_flow(inlet)
         volume = self._breakthrough_volume(inlet)
-        self.breakthrough_time = ops.where(flow != 0, ops.truediv(volume, flow), None)
+        self.breakthrough_time = ops.where(flow != 0, volume / flow, None)
         self.temperature_drop = self._temperature_drop(inlet)
         self.outlet_T = outlets.outlet.T
 

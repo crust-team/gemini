@@ -101,9 +101,7 @@ class BoreholeField(Module):
         inlet = inlets.inlet
         capacity_rate = self._capacity_rate(inlet)
         rate = self._effective_conductance(inlet) * (self._ground_temperature() - inlet.T)
-        outlet_T = ops.where(
-            capacity_rate != 0, inlet.T + ops.truediv(rate, capacity_rate), inlet.T
-        )
+        outlet_T = ops.where(capacity_rate != 0, inlet.T + rate / capacity_rate, inlet.T)
         outlet = inlet.with_(T=outlet_T)
 
         outlets = dict(outlet=outlet)
@@ -129,6 +127,11 @@ class BoreholeField(Module):
         change = equilibrium + (self.ground_temperature_change - equilibrium) * decay
         return {"ground_temperature_change": change}
 
+    @property
+    def _rejection(self):
+        """Return the message prefix of a field geometry outside the range of its relations."""
+        return f"{self.path}: field geometry rejected: "
+
     def _ground_temperature(self):
         """Return the mean field ground temperature [K] at the start of the step."""
         return self.undisturbed_ground_temperature + self.ground_temperature_change
@@ -136,30 +139,28 @@ class BoreholeField(Module):
     def _effective_conductance(self, inlet):
         """Return K = eps m_dot cp [W/K], the inlet-to-ground conductance of the loop."""
         capacity_rate = self._capacity_rate(inlet)
-        stopped = capacity_rate == 0
-        cell_radius = ops.where(
-            stopped, 2 * self.borehole_radius, self.borehole_spacing / math.sqrt(math.pi)
-        )
-        cell = self._design(
-            ground.steady_flux_resistance,
-            ops.where(stopped, 1.0, self.ground_conductivity),
+        cell = ground.steady_flux_resistance(
+            self.ground_conductivity,
             self.borehole_radius,
-            cell_radius,
+            self.borehole_spacing / math.sqrt(math.pi),
+            error=ConfigurationError,
+            context=self._rejection,
         )
         length = self.borehole_count * self.borehole_depth
         conductance = length / (self.borehole_resistance + cell)
-        exchange = -ops.expm1(ops.truediv(-conductance, capacity_rate)) * capacity_rate
-        return ops.where(stopped, 0.0, exchange)
+        exchange = -ops.expm1(-conductance / capacity_rate) * capacity_rate
+        return ops.where(capacity_rate == 0, 0.0, exchange)
 
     def _surroundings_conductance(self):
         """Return the conductance [W/K] between the field volume and the undisturbed ground."""
         area = self.borehole_count * self.borehole_spacing**2
         diameter = 2 * ops.sqrt(area / math.pi)
-        return self._design(
-            ground.vertical_cylinder_conductance,
+        return ground.vertical_cylinder_conductance(
             self.ground_conductivity,
             self.borehole_depth,
             diameter,
+            error=ConfigurationError,
+            context=self._rejection,
         )
 
     def _ground_heat_capacity(self):
@@ -176,11 +177,4 @@ class BoreholeField(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        return inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
-
-    def _design(self, relation, *values):
-        """Evaluate a geometry relation; a geometry outside its range is bad design data."""
-        try:
-            return relation(*values)
-        except PhysicsRangeError as error:
-            raise ConfigurationError(f"{self.path}: field geometry rejected: {error}") from error
+        return inlet.heat_capacity_rate()

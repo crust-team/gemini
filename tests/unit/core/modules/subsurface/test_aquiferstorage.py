@@ -5,6 +5,7 @@ import math
 import pytest
 
 import gemini as gm
+from gemini import ops
 from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.heat import Boiler
 from gemini.core.modules.subsurface import AquiferStorage
@@ -219,6 +220,7 @@ def test_store_arithmetic_matches_on_arrays():
     """The conduction conductance and the exponential decay agree on arrays for empty stores."""
     module = storage()
 
+    @ops.physics
     def numbers(volume, dt):
         return dict(
             conductance=module._store_conductance(volume, WARM),
@@ -235,6 +237,7 @@ def test_moved_store_matches_on_arrays(mode):
     """Mixing into the target and drawing down the source agree on arrays, empty store included."""
     module = storage(mode)
 
+    @ops.physics
     def moved(volume, change):
         warm = module._moved_store("warm", volume, change)
         cold = module._moved_store("cold", volume, change)

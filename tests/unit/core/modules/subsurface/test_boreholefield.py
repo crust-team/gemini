@@ -5,6 +5,7 @@ import math
 import pytest
 
 import gemini as gm
+from gemini import ops
 from gemini.core.modules import Module, energy_balance, mass_balance
 from gemini.core.modules.heat import Boiler
 from gemini.core.modules.subsurface import BoreholeField
@@ -149,6 +150,7 @@ def test_field_arithmetic_matches_on_arrays():
     """The loop conductance, surroundings and ground heat capacity agree on arrays."""
     module = field()
 
+    @ops.physics
     def numbers(m_dot, T, p):
         inlet = Stream(m_dot=m_dot, T=T, p=p)
         return dict(
@@ -165,6 +167,7 @@ def test_field_arithmetic_matches_on_arrays():
 def test_zero_flow_does_not_evaluate_the_cell_geometry():
     """A cell no wider than the borehole is bad design data only where the loop flows."""
     module = field().update_params(borehole_spacing=0.1)
-    assert module._effective_conductance(BRINE.with_(m_dot=0)) == 0
+    conductance = ops.physics(module._effective_conductance)
+    assert conductance(BRINE.with_(m_dot=0)) == 0
     with pytest.raises(gm.errors.ConfigurationError, match="field geometry rejected"):
-        module._effective_conductance(BRINE)
+        conductance(BRINE)

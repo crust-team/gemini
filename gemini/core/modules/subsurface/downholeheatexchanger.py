@@ -91,7 +91,7 @@ class DownholeHeatExchanger(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         outlet = outlets.outlet
-        rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l * (outlet.T - inlet.T)
+        rate = inlet.heat_capacity_rate() * (outlet.T - inlet.T)
         self.heat_extraction_rate = rate
         self.outlet_T = outlet.T
         self.heat_absorbed = ops.maximum(rate, 0)
@@ -100,9 +100,8 @@ class DownholeHeatExchanger(Module):
     def _outlet_temperature(self, inlet):
         """Return the bottom-hole fluid temperature [K] from Ramey's profile.
 
-        Zero flow returns the inlet temperature. Both results are always evaluated, so at zero
-        flow the profile receives a relaxation length of 1 m and an operating time of twice
-        the earliest valid one, which keeps its checks quiet; ``where`` discards the profile.
+        Zero flow returns the inlet temperature. Both results are always evaluated: at zero flow
+        the profile's check of the relaxation length fails and ``where`` drops its error.
         """
         ops.check(
             inlet.m_dot >= 0,
@@ -111,27 +110,26 @@ class DownholeHeatExchanger(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        stopped = inlet.m_dot == 0
-        capacity_rate = inlet.m_dot * inlet.fluid.properties(inlet.p, inlet.T).cp_l
-        relaxation = capacity_rate * (self.borehole_resistance + self._rock_resistance(stopped))
+        relaxation = inlet.heat_capacity_rate() * (
+            self.borehole_resistance + self._rock_resistance()
+        )
         profile = ground.ramey_fluid_temperature(
             inlet.T,
             self.surface_temperature,
             self.geothermal_gradient,
             self.depth,
-            ops.where(stopped, 1.0, relaxation),
+            relaxation,
         )
-        return ops.where(stopped, inlet.T, profile)
+        return ops.where(inlet.m_dot == 0, inlet.T, profile)
 
-    def _rock_resistance(self, stopped):
+    def _rock_resistance(self):
         """Return the transient rock resistance f(t) / (2 pi k) [m K/W].
 
         An operating time that is too early for Ramey's asymptote is a configuration error,
-        except at zero flow, which never evaluates the resistance.
+        except at zero flow, whose profile never uses the resistance.
         """
-        earliest = ground.MIN_RAMEY_FOURIER * self.borehole_radius**2 / self.rock_diffusivity
         function = ground.ramey_time_function(
-            ops.where(stopped, 2 * earliest, self.operating_time),
+            self.operating_time,
             self.rock_diffusivity,
             self.borehole_radius,
             error=ConfigurationError,

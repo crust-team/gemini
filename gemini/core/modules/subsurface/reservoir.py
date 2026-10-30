@@ -30,6 +30,9 @@ from gemini.core.types import (
 from gemini.core.types.fluid import Fluid
 from gemini.errors import ConfigurationError, InsufficientDataError, PhysicsRangeError
 
+NOT_ASSESSED = "No diagnostic model or sufficient measurements"
+"""Health message of a row that was not assessed, as the engine reports a module without health."""
+
 FLUID_OVERRIDES = ("liquid_density", "liquid_viscosity")
 """Reservoir parameters that, when set, replace the matching property of the module fluid."""
 
@@ -140,47 +143,58 @@ class _Reservoir(Module):
         r_squared = 1 - np.sum(residual**2) / np.sum((y - np.mean(y)) ** 2)
         return float(coefficients[0]), float(r_squared)
 
+    @ops.physics
     def injectivity_from_measurements(self, flow, p_bh):
         """Return injectivity [m3/s/Pa] from one measurement."""
-        if p_bh == self.pressure:
-            raise PhysicsRangeError(
-                f"{self.path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
-                "injectivity needs a pressure differential"
-            )
+        ops.check(
+            p_bh != self.pressure,
+            PhysicsRangeError,
+            "{path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
+            "injectivity needs a pressure differential",
+            path=self.path,
+            p_bh=p_bh,
+        )
         return flow / (p_bh - self.pressure)
 
+    @ops.physics
     def productivity_from_measurements(self, flow, p_bh):
         """Return productivity [m3/s/Pa] from one measurement."""
-        if p_bh == self.pressure:
-            raise PhysicsRangeError(
-                f"{self.path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
-                "productivity needs a pressure differential"
-            )
+        ops.check(
+            p_bh != self.pressure,
+            PhysicsRangeError,
+            "{path}: bottomhole pressure = reservoir pressure = {p_bh} Pa; "
+            "productivity needs a pressure differential",
+            path=self.path,
+            p_bh=p_bh,
+        )
         return flow / (self.pressure - p_bh)
 
     def health(self, result, measured):
         """Alarm on declining measured PI or II relative to design.
 
-        Returns ``None`` (not assessed) without both measurements, without a nonzero design
-        index, or when the measured bottomhole pressure equals the reservoir pressure.
+        Returns ``None`` (not assessed) without both measurements or without a nonzero design
+        index. Where the measured bottomhole pressure equals the reservoir pressure the row is
+        not assessed: ``assessed`` is false, the score is one, no alarm, the message is
+        ``NOT_ASSESSED`` and the metrics hold the design index and a ratio of one.
         """
         production = self.role == "production"
         nominal = self.productivity_index if production else self.injectivity_index
         if not {"flow", "bottomhole_pressure"} <= measured.keys() or not nominal:
             return None
-        if measured["bottomhole_pressure"] == self.pressure:
-            return None
-        estimate = (
-            self.productivity_from_measurements
-            if production
-            else self.injectivity_from_measurements
-        )
-        actual = estimate(measured["flow"], measured["bottomhole_pressure"])
+        pressure = measured["bottomhole_pressure"]
+        assessed = pressure != self.pressure
+        differential = self.pressure - pressure if production else pressure - self.pressure
+        actual = ops.where(assessed, ops.truediv(measured["flow"], differential), nominal)
         ratio = actual / nominal
         return Health(
-            score=min(1, max(0, ratio)),
+            assessed=assessed,
+            score=ops.minimum(1, ops.maximum(0, ratio)),
             alarm=ratio < 1 - self.decline_threshold,
-            message=("Productivity" if production else "Injectivity") + " index comparison",
+            message=ops.where(
+                assessed,
+                ("Productivity" if production else "Injectivity") + " index comparison",
+                NOT_ASSESSED,
+            ),
             metrics={"index": actual, "ratio": ratio},
         )
 

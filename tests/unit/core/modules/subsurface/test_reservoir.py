@@ -9,7 +9,7 @@ from gemini.core.modules.subsurface import InjectionReservoir, ProductionReservo
 from gemini.core.types import Inlet
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import Fluid
-from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
 
@@ -139,3 +139,59 @@ def test_fluid_is_rebuilt_only_when_an_override_changes():
     assert producer.fluid.liquid_density == 1010.0
     producer.fluid = Fluid(salinity=0.1)
     assert producer.fluid.salinity == 0.1 and producer.fluid.liquid_density == 1010.0
+
+
+def _health_rows(module, call):
+    """Return results of module(**call) and measurements crossing alarms, clamps, equal pressure."""
+    nominal = module.productivity_index or module.injectivity_index
+    sign = 1 if module.role == "production" else -1
+    pressure = module.pressure
+    measured = [
+        dict(flow=nominal * 1e5 * scale, bottomhole_pressure=pressure - sign * 1e5)
+        for scale in (1.0, 0.9, 0.5, 2.0, -0.3)
+    ]
+    measured.append(dict(flow=0.01, bottomhole_pressure=pressure))
+    return [module(**call) for _ in measured], measured
+
+
+def test_production_health_matches_on_arrays():
+    """Nominal, declining, clamped, reversed and unassessed rows give the same health."""
+    producer = _producer()
+    results, measured = _health_rows(producer, dict(production_rate=5.0, rows=ROW))
+    assert_health_matches(producer, results, measured)
+    assert [producer.health(r, m).alarm for r, m in zip(results, measured)] == [
+        False,
+        False,
+        True,
+        False,
+        True,
+        False,
+    ]
+
+
+def test_injection_health_matches_on_arrays():
+    """The injectivity comparison agrees on arrays, including the unassessed row."""
+    sink = InjectionReservoir().update_params(
+        pressure=240e5,
+        temperature=353.15,
+        permeability=1e-12,
+        thickness=100,
+        drainage_radius=1000,
+        top_depth=2400,
+        wellbore_radius=0.1,
+        injectivity_index=10 / 3.6e8,
+        decline_threshold=0.2,
+    )
+    results, measured = _health_rows(sink, dict(sandface=Stream(m_dot=-5.0, T=300, p=230e5)))
+    assert_health_matches(sink, results, measured)
+
+
+def test_health_without_a_nominal_index_or_measurements_is_not_assessed():
+    """A structural lack of data returns None; an equal pressure gives an unassessed health."""
+    producer = _producer(productivity_index=None)
+    assert producer.health(None, dict(flow=1.0, bottomhole_pressure=1e5)) is None
+    producer = _producer()
+    assert producer.health(None, dict(flow=1.0)) is None
+    health = producer.health(None, dict(flow=1.0, bottomhole_pressure=producer.pressure))
+    assert not health.assessed and not health.alarm and health.score == 1
+    assert health.message == "No diagnostic model or sufficient measurements"
