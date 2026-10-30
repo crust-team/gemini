@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 
+from gemini.analysis.fits import fit_head_correction
 from gemini.errors import (
     ConfigurationError,
     InsufficientDataError,
@@ -221,7 +222,7 @@ def _points(measured):
 def _correction(pump, points):
     """Return the affine correction of theoretical head on measured head, or why it has none."""
     try:
-        slope, offset = ESP.fit_head_correction(
+        slope, offset = fit_head_correction(
             [point["head"] for point in points], [point["theoretical_head"] for point in points]
         )
     except InsufficientDataError as error:
@@ -254,7 +255,7 @@ def pump_curve(plant, pump, measured=None):
         at its flow and frequency. ``correction`` is ``{slope, offset}`` of the least-squares line
         ``theoretical_head = slope * head + offset`` (offset in Pa); it is ``None`` with the
         ``reason`` when fewer than two distinct measured heads are given. This is the retained
-        ``ESP.fit_head_correction``; no module applies the correction yet, so it is a diagnosis,
+        ``fit_head_correction``; no module applies the correction yet, so it is a diagnosis,
         not a parameter to set.
     """
     module = plant.get_module(pump)

@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.optimize import least_squares
 
+from gemini.analysis.fits import fit_head_coefficients
 from gemini.engine.engine import Engine
 from gemini.errors import BindingError, ConfigurationError, InsufficientDataError
 from gemini.modules.exchangers import HeatExchanger
@@ -231,7 +232,7 @@ def _head_coefficient_guess(module, path, observed, measured, valid):
             "the head-curve guess"
         )
     frequencies = observed.values(observed.bindings.controls["frequency"])[valid]
-    return module.fit_head_coefficients(
+    return fit_head_coefficients(
         flows[valid], frequencies, measured["head"][valid], module.no_stages
     )
 

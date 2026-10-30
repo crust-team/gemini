@@ -9,6 +9,7 @@ import json
 
 import pytest
 
+from gemini.analysis import estimate_reservoir_pressure
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell
@@ -133,9 +134,7 @@ def _injectivity(inputs):
 
 def _reservoir_estimate(inputs):
     """Fit the reservoir pressure line through measured flows and bottomhole pressures."""
-    pressure, r_squared = ProductionReservoir.estimate_pressure(
-        inputs["flow"], inputs["bottomhole_pressure"]
-    )
+    pressure, r_squared = estimate_reservoir_pressure(inputs["flow"], inputs["bottomhole_pressure"])
     return dict(reservoir_pressure=pressure, r_squared=r_squared)
 
 
