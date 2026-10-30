@@ -102,15 +102,14 @@ class ORC(Module):
         brine_in = inlets.brine_in
         brine_out = outlets.brine_out
         design = self._design(brine_in)
-        cp = brine_in.fluid.properties(brine_in.p, brine_in.T).cp_l
-        self.heat_input = brine_in.m_dot * cp * (brine_in.T - brine_out.T)
+        self.heat_input = brine_in.heat_capacity_rate() * (brine_in.T - brine_out.T)
         self.gross_power = design["cycle_efficiency"] * self.heat_input
         self.parasitic_power = self.parasitic_fraction * self.gross_power
         self.electricity_generated = self.gross_power - self.parasitic_power
         self.condenser_duty = self.heat_input - self.gross_power
         self.heat_loss = self.condenser_duty + self.parasitic_power
         self.thermal_efficiency = ops.where(
-            self.heat_input > 0, ops.truediv(self.electricity_generated, self.heat_input), None
+            self.heat_input > 0, self.electricity_generated / self.heat_input, None
         )
         self.condensing_temperature = design["condensing_T"]
         self.brine_out_T = brine_out.T
@@ -129,12 +128,12 @@ class ORC(Module):
         outlet_T = ops.maximum(self.minimum_brine_outlet_temperature, condensing_T + self.pinch)
         running = brine_in.T > outlet_T
         hot, cold = brine_in.T - self.pinch, outlet_T - self.pinch
-        reversible = 1 - ops.truediv(condensing_T * ops.log(ops.truediv(hot, cold)), hot - cold)
+        reversible = 1 - condensing_T * ops.log(hot / cold) / (hot - cold)
         efficiency = self.fraction_of_carnot * reversible
         cp = brine_in.fluid.properties(brine_in.p, brine_in.T).cp_l
         uncapped = efficiency * brine_in.m_dot * cp * (brine_in.T - outlet_T)
         is_capped = uncapped > self.capacity
-        share = ops.where(is_capped, ops.truediv(self.capacity, uncapped), 1.0)
+        share = ops.where(is_capped, self.capacity / uncapped, 1.0)
         return dict(
             condensing_T=condensing_T,
             outlet_T=outlet_T,

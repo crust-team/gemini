@@ -2,6 +2,7 @@
 
 import pytest
 
+from gemini import ops
 from gemini.core.physics import steam
 from gemini.errors import PhysicsRangeError
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
@@ -192,3 +193,18 @@ def test_flash_and_expansion_match_on_arrays():
 def test_checks_match_on_arrays(function, rows):
     """A failing row raises the same error and message on arrays and on floats."""
     assert_same_error(function, rows, PhysicsRangeError)
+
+
+@ops.physics
+def _vapour_enthalpy_when_wanted(wanted, pressure, temperature):
+    """Return the steam enthalpy on the rows that want it and zero on the others."""
+    return ops.where(wanted > 0, steam.vapour_enthalpy(pressure, temperature), 0.0)
+
+
+def test_the_range_error_of_an_unselected_row_is_dropped():
+    """Rows that do not want steam give zero whatever their state; wanted rows still check."""
+    rows = [(1.0, 5e5, 450.0), (1.0, 1e6, 700.0), (0.0, 1e6, 1100.0), (0.0, 4e7, 500.0)]
+    assert_function_matches(_vapour_enthalpy_when_wanted, rows)
+    assert_same_error(
+        _vapour_enthalpy_when_wanted, [(1.0, 1e6, 700.0), (1.0, 4e7, 500.0)], PhysicsRangeError
+    )
