@@ -90,3 +90,9 @@ def test_mean_velocity_matches_on_arrays():
     """The velocity runs on arrays as on floats for forward, reverse and zero flow."""
     rows = [(flow, 1000.0, 0.1778) for flow in (10.0, -10.0, 0.0)]
     assert_function_matches(geometry.mean_velocity, rows)
+
+
+def test_lateral_area_by_hand_and_on_arrays():
+    """A 0.1 m by 10 m cylinder wall is pi m2."""
+    assert geometry.lateral_area(0.1, 10.0) == pytest.approx(math.pi)
+    assert_function_matches(geometry.lateral_area, [(0.1, 10.0), (0.0, 5.0)])

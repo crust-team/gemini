@@ -2,11 +2,11 @@
 
 from typing import Literal
 
-import numpy as np
-
 from gemini import ops
-from gemini.errors import ConfigurationError, InsufficientDataError, PhysicsRangeError
+from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import diagnostics
+from gemini.physics import fluid as fluid_physics
 from gemini.physics import hydraulics
 from gemini.types import (
     Control,
@@ -59,7 +59,9 @@ class _Reservoir(Module):
         self.wellbore_radius = Parameter(Length, gt=0)
         self.liquid_density = Parameter(Density | None, default=None, structural=True)
         self.liquid_viscosity = Parameter(Viscosity | None, default=None, structural=True)
-        self.decline_threshold = Parameter(Fraction, default=0.15, gt=0, le=1)
+        self.decline_threshold = Parameter(
+            Fraction, default=diagnostics.DEFAULT_DECLINE_THRESHOLD, gt=0, le=1
+        )
 
         # Outputs
         self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
@@ -119,28 +121,6 @@ class _Reservoir(Module):
             "radial_bottomhole_pressure": radial,
         }
 
-    @staticmethod
-    def estimate_pressure(flows, bottomhole_pressures) -> tuple[float, float]:
-        """Fit reservoir pressure [Pa] and R-squared from flow observations."""
-        q, p = map(lambda value: np.asarray(value, dtype=float), (flows, bottomhole_pressures))
-        if (
-            q.shape != p.shape
-            or q.ndim != 1
-            or len(q) < 2
-            or np.any(q == 0)
-            or not np.isfinite([q, p]).all()
-        ):
-            raise InsufficientDataError(
-                "Reservoir pressure estimation needs at least two matching finite, nonzero samples"
-            )
-        x, y = 1 / q, p / q
-        if np.ptp(x) == 0 or np.ptp(y) == 0:
-            raise InsufficientDataError("Reservoir pressure regression requires variation")
-        coefficients = np.polyfit(x, y, 1)
-        residual = y - np.poly1d(coefficients)(x)
-        r_squared = 1 - np.sum(residual**2) / np.sum((y - np.mean(y)) ** 2)
-        return float(coefficients[0]), float(r_squared)
-
     @ops.physics
     def injectivity_from_measurements(self, flow, p_bh):
         """Return injectivity [m3/s/Pa] from one measurement."""
@@ -152,7 +132,7 @@ class _Reservoir(Module):
             path=self.path,
             p_bh=p_bh,
         )
-        return flow / (p_bh - self.pressure)
+        return hydraulics.injectivity_index(flow, self.pressure, p_bh)
 
     @ops.physics
     def productivity_from_measurements(self, flow, p_bh):
@@ -165,7 +145,7 @@ class _Reservoir(Module):
             path=self.path,
             p_bh=p_bh,
         )
-        return flow / (self.pressure - p_bh)
+        return hydraulics.productivity_index(flow, self.pressure, p_bh)
 
     @ops.physics
     def health(self, result, measured):
@@ -182,13 +162,13 @@ class _Reservoir(Module):
             return None
         pressure = measured["bottomhole_pressure"]
         assessed = pressure != self.pressure
-        differential = self.pressure - pressure if production else pressure - self.pressure
-        actual = ops.where(assessed, measured["flow"] / differential, float("nan"))
-        ratio = actual / nominal
+        index = hydraulics.productivity_index if production else hydraulics.injectivity_index
+        actual = ops.where(assessed, index(measured["flow"], self.pressure, pressure), float("nan"))
+        ratio = hydraulics.performance_ratio(actual, nominal)
         return Health(
             assessed=assessed,
-            score=ops.where(assessed, ops.minimum(1, ops.maximum(0, ratio)), 1.0),
-            alarm=ops.logical_and(assessed, ratio < 1 - self.decline_threshold),
+            score=ops.where(assessed, diagnostics.bounded_score(ratio), 1.0),
+            alarm=ops.logical_and(assessed, diagnostics.below_limit(ratio, self.decline_threshold)),
             message=ops.where(
                 assessed,
                 ("Productivity" if production else "Injectivity") + " index comparison",
@@ -235,8 +215,10 @@ class ProductionReservoir(_Reservoir):
         """
         if self.productivity_index is None:
             raise ConfigurationError(f"{self.path}: productivity_index is required")
-        flow = production_rate / self.fluid.properties(self.pressure, self.temperature).rho_l
-        p_bh = self.pressure - flow / self.productivity_index
+        flow = fluid_physics.volume_flow(
+            production_rate, self.fluid.properties(self.pressure, self.temperature).rho_l
+        )
+        p_bh = hydraulics.productivity_pressure(self.pressure, flow, self.productivity_index)
         return Stream(m_dot=production_rate, T=self.temperature, p=p_bh, fluid=self.fluid)
 
 
@@ -261,7 +243,9 @@ class InjectionReservoir(_Reservoir):
     def _compute_outputs(self, inlets, outlets):
         """Calculate the bottomhole pressure the sandface flow requires."""
         sandface = inlets.sandface
-        flow = ops.abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
+        flow = fluid_physics.volume_flow(
+            ops.abs(sandface.m_dot), self.fluid.properties(sandface.p, sandface.T).rho_l
+        )
         for name, value in self._calculate_outputs(flow, self.required_pressure(sandface)).items():
             setattr(self, name, value)
 
@@ -275,5 +259,7 @@ class InjectionReservoir(_Reservoir):
         """
         if self.injectivity_index is None:
             raise ConfigurationError(f"{self.path}: injectivity_index is required")
-        flow = ops.abs(sandface.m_dot) / self.fluid.properties(sandface.p, sandface.T).rho_l
-        return self.pressure + flow / self.injectivity_index
+        flow = fluid_physics.volume_flow(
+            ops.abs(sandface.m_dot), self.fluid.properties(sandface.p, sandface.T).rho_l
+        )
+        return hydraulics.injectivity_pressure(self.pressure, flow, self.injectivity_index)

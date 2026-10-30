@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import separation
 from gemini.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Stream
 
 
@@ -56,8 +57,8 @@ class Blowdown(Module):
             path=self.path,
             m_dot=feed_in.m_dot,
         )
-        bleed = self.blowdown_fraction * feed_in.m_dot
-        retained_out = feed_in.with_(m_dot=feed_in.m_dot - bleed)
+        retained, bleed = separation.split_flow(feed_in.m_dot, self.blowdown_fraction)
+        retained_out = feed_in.with_(m_dot=retained)
         blowdown_out = feed_in.with_(m_dot=bleed)
 
         outlets = dict(retained_out=retained_out, blowdown_out=blowdown_out)

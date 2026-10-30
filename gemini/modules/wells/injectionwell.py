@@ -2,6 +2,7 @@
 
 from gemini import ops
 from gemini.modules.wells.well import _Well
+from gemini.physics import fluid, heat_transfer, hydraulics
 from gemini.types import (
     HeatLoss,
     Inlet,
@@ -52,10 +53,10 @@ class InjectionWell(_Well):
         wellhead = inlets.wellhead
         stream = self._traversal_stream(wellhead)
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
-        a, b = self.correction_factors
+        slope, offset = self.correction_factors
 
         bottom = stream.with_(
-            p=a * result.p_out + b,
+            p=hydraulics.affine_correction(result.p_out, slope, offset),
             T=result.T_out,
             m_dot=wellhead.m_dot,
         )
@@ -74,9 +75,10 @@ class InjectionWell(_Well):
         self.dp_gravity = result.dp_gravity
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
-        self.heat_loss = (
-            bottom.m_dot * stream.fluid.properties(stream.p, stream.T).cp_l * (stream.T - bottom.T)
+        capacity_rate = fluid.heat_capacity_rate(
+            bottom.m_dot, stream.fluid.properties(stream.p, stream.T).cp_l
         )
+        self.heat_loss = heat_transfer.heat_rate(capacity_rate, stream.T - bottom.T)
 
     def _traversal_stream(self, stream):
         """Return the stream with the negative flow the legacy injection DPDT expects."""

@@ -55,7 +55,7 @@ class Valve(Module):
         self.characteristic = Parameter(
             Literal["linear", "equal_percentage"], default="equal_percentage"
         )
-        self.rangeability = Parameter(Ratio, default=50, gt=1)
+        self.rangeability = Parameter(Ratio, default=hydraulics.DEFAULT_VALVE_RANGEABILITY, gt=1)
 
         # Inlets
         self.inlet = Inlet(Stream)
@@ -96,12 +96,12 @@ class Valve(Module):
 
     def _effective_flow_coefficient(self):
         """Return the flow coefficient [m3/s/Pa^0.5] at the commanded opening."""
-        floor = 1 / self.rangeability
-        if self.characteristic == "linear":
-            coefficient = self.flow_coefficient * (floor + (1 - floor) * self.opening)
-        else:
-            coefficient = self.flow_coefficient * self.rangeability ** (self.opening - 1)
-        return ops.where(self.opening == 0, 0.0, coefficient)
+        return hydraulics.valve_flow_coefficient(
+            self.flow_coefficient,
+            self.opening,
+            self.rangeability,
+            self.characteristic == "equal_percentage",
+        )
 
     def _pressure_drop(self, inlet):
         """Return the pressure drop [Pa] of the inlet flow at the commanded opening."""

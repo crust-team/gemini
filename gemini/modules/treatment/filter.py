@@ -2,7 +2,7 @@
 
 from gemini import ops
 from gemini.modules.module import Module
-from gemini.physics import hydraulics, units
+from gemini.physics import diagnostics, hydraulics, separation, units
 from gemini.types import (
     Health,
     Inlet,
@@ -14,14 +14,8 @@ from gemini.types import (
     Stream,
 )
 
-NOMINAL_MASS_FLOW = 149 / 3600 * 1068
-"""Default clean-filter design flow [kg/s]: 149 m3/h of brine at 1068 kg/m3.
-
-NOTE(refactor): nominal clean loss from the example (0.016 bar at 149 m3/h).
-"""
-
-DEFAULT_CLOGGING_BAR = 0.5
-"""Default clogging pressure-loss limit [bar] of a filter, also that of an old project."""
+DEFAULT_CLOGGING_BAR = separation.FILTER_CLOGGING_BAR
+"""Alias of ``separation.FILTER_CLOGGING_BAR``, read by the legacy table converter."""
 
 
 class Filter(Module):
@@ -35,10 +29,12 @@ class Filter(Module):
         super().__init__()
 
         # Parameters
-        self.dp_nominal = Parameter(PressureDifference, default=1600, ge=0)
-        self.m_dot_nominal = Parameter(MassFlow, default=NOMINAL_MASS_FLOW, gt=0)
+        self.dp_nominal = Parameter(
+            PressureDifference, default=separation.FILTER_NOMINAL_DROP, ge=0
+        )
+        self.m_dot_nominal = Parameter(MassFlow, default=separation.FILTER_NOMINAL_MASS_FLOW, gt=0)
         self.clogging_dp = Parameter(
-            PressureDifference, default=units.bar_to_pa(DEFAULT_CLOGGING_BAR), gt=0
+            PressureDifference, default=units.bar_to_pa(separation.FILTER_CLOGGING_BAR), gt=0
         )
 
         # Inlets
@@ -68,10 +64,10 @@ class Filter(Module):
         if "pressure_drop" not in measured:
             return None
         dp = measured["pressure_drop"]
-        ratio = ops.maximum(0, dp) / self.clogging_dp
+        ratio = hydraulics.performance_ratio(ops.maximum(0, dp), self.clogging_dp)
         alarm = dp > self.clogging_dp
         return Health(
-            score=ops.maximum(0, 1 - ratio),
+            score=diagnostics.remaining_margin(ratio),
             alarm=alarm,
             message=ops.where(
                 alarm, "Filter pressure drop exceeds limit", "Filter pressure drop within limit"

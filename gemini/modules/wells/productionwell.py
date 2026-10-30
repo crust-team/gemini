@@ -4,6 +4,7 @@ from typing import Literal
 
 from gemini.errors import ConfigurationError
 from gemini.modules.wells.well import _Well
+from gemini.physics import fluid, heat_transfer
 from gemini.types import (
     HeatLoss,
     Inlet,
@@ -76,11 +77,10 @@ class ProductionWell(_Well):
         self.dp_gravity = result.dp_gravity
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
-        self.heat_loss = (
-            wellhead.m_dot
-            * bottom.fluid.properties(bottom.p, bottom.T).cp_l
-            * (bottom.T - wellhead.T)
+        capacity_rate = fluid.heat_capacity_rate(
+            wellhead.m_dot, bottom.fluid.properties(bottom.p, bottom.T).cp_l
         )
+        self.heat_loss = heat_transfer.heat_rate(capacity_rate, bottom.T - wellhead.T)
 
     def intake_conditions(self, bottom_stream):
         """Traverse from the sandface to ESP intake, returning a stream in SI units."""

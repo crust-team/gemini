@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import separation
 from gemini.types import Control, Fraction, Inlet, Outlet, Stream
 
 
@@ -44,8 +45,8 @@ class Splitter(Module):
             path=self.path,
             m_dot=feed_in.m_dot,
         )
-        second_flow = self.split_fraction * feed_in.m_dot
-        first_out = feed_in.with_(m_dot=feed_in.m_dot - second_flow)
+        first_flow, second_flow = separation.split_flow(feed_in.m_dot, self.split_fraction)
+        first_out = feed_in.with_(m_dot=first_flow)
         second_out = feed_in.with_(m_dot=second_flow)
 
         outlets = dict(first_out=first_out, second_out=second_out)

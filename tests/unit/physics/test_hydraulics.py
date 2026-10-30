@@ -400,3 +400,66 @@ def test_hydrostatic_dp_matches_on_arrays():
     """The inclination factor runs on arrays as on floats, with and without its default."""
     assert_function_matches(hydraulics.hydrostatic_dp, [(1000.0, 100.0), (850.0, -20.0)])
     assert_function_matches(hydraulics.hydrostatic_dp, [(1000.0, 100.0, 0.5), (850.0, -20.0, -1.0)])
+
+
+def test_pipe_friction_drop_by_hand_in_each_regime():
+    """Laminar water in a 0.1 m pipe follows 32 mu L u / D^2; turbulent follows Darcy-Weisbach."""
+    laminar = hydraulics.pipe_friction_drop(0.01, 1000.0, 1e-3, 0.1, 4.5e-5, 100.0)
+    assert laminar == pytest.approx(32 * 1e-3 * 100 * 0.01 / 0.1**2)
+    turbulent = hydraulics.pipe_friction_drop(2.0, 1000.0, 1e-3, 0.1, 4.5e-5, 100.0)
+    assert turbulent == hydraulics.darcy_weisbach_dp(2.0, 1000.0, 0.0, 1e-3, 0.1, 4.5e-5, 100.0)[0]
+    assert hydraulics.pipe_friction_drop(0.0, 1000.0, 1e-3, 0.1, 4.5e-5, 100.0) == 0.0
+
+
+def test_pipe_friction_drop_bridges_the_transition_and_matches_on_arrays():
+    """The drop is continuous across Re 2300 to 4000 and every regime agrees on arrays."""
+    low = hydraulics.pipe_friction_drop(0.0229999, 1000.0, 1e-3, 0.1, 4.5e-5, 100.0)
+    high = hydraulics.pipe_friction_drop(0.0230001, 1000.0, 1e-3, 0.1, 4.5e-5, 100.0)
+    assert low == pytest.approx(high, rel=1e-4)
+    velocities = (0.0, 0.01, 0.03, 0.04, 0.05, 2.0)
+    rows = [(v, 1000.0, 1e-3, 0.1, 4.5e-5, 100.0) for v in velocities]
+    assert_function_matches(hydraulics.pipe_friction_drop, rows)
+
+
+def test_pipe_conductance_by_hand_and_on_arrays():
+    """UA = U pi D L: 10 W/m2/K on 0.1 m by 100 m is 100 pi W/K."""
+    assert hydraulics.pipe_conductance(10.0, 0.1, 100.0) == pytest.approx(100 * math.pi)
+    assert_function_matches(hydraulics.pipe_conductance, [(10.0, 0.1, 100.0), (0.0, 0.2, 5.0)])
+
+
+def test_valve_flow_coefficient_by_hand_and_on_arrays():
+    """Equal percentage gives R^(h-1), linear gives 1/R at the floor, closed gives zero."""
+    assert hydraulics.valve_flow_coefficient(2.0, 1.0, 50.0, True) == pytest.approx(2.0)
+    assert hydraulics.valve_flow_coefficient(1.0, 0.5, 50.0, True) == pytest.approx(50**-0.5)
+    assert hydraulics.valve_flow_coefficient(1.0, 0.5, 50.0, False) == pytest.approx(0.51)
+    assert hydraulics.valve_flow_coefficient(1.0, 0.0, 50.0, True) == 0.0
+    rows = [(1.0, h, 50.0) for h in (0.0, 0.3, 1.0)]
+    assert_function_matches(hydraulics.valve_flow_coefficient, rows, equal_percentage=True)
+    assert_function_matches(hydraulics.valve_flow_coefficient, rows, equal_percentage=False)
+
+
+def test_affine_correction_and_inflow_relations_by_hand():
+    """a p + b, p -/+ q / J, and the indices that invert them."""
+    assert hydraulics.affine_correction(1e7, 1.1, -5e4) == pytest.approx(1.095e7)
+    assert hydraulics.productivity_pressure(2e7, 0.01, 1e-7) == pytest.approx(1.99e7)
+    assert hydraulics.injectivity_pressure(2e7, 0.01, 1e-7) == pytest.approx(2.01e7)
+    assert hydraulics.productivity_index(0.01, 2e7, 1.99e7) == pytest.approx(1e-7)
+    assert hydraulics.injectivity_index(0.01, 2e7, 2.01e7) == pytest.approx(1e-7)
+    assert hydraulics.performance_ratio(0.8, 2.0) == 0.4
+
+
+def test_affine_correction_and_inflow_relations_match_on_arrays():
+    """Each relation runs on arrays as on floats."""
+    rows = [(2e7, 0.01, 1e-7), (1.5e7, 0.02, 3e-7)]
+    for function in (
+        hydraulics.affine_correction,
+        hydraulics.productivity_pressure,
+        hydraulics.injectivity_pressure,
+        hydraulics.productivity_index,
+        hydraulics.injectivity_index,
+        hydraulics.performance_ratio,
+    ):
+        assert_function_matches(
+            function,
+            rows if function is not hydraulics.performance_ratio else [(0.8, 2.0), (3.0, 1.5)],
+        )

@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
+from gemini.physics import heat_transfer
 from gemini.types import Inlet, Outlet, Output, PressureDifference, Stream, Temperature
 
 
@@ -78,11 +79,9 @@ class Mixer(Module):
 
     def _mixed_temperature(self, first_in, second_in):
         """Return the adiabatic mixing temperature [K] weighted by heat capacity rates."""
-        first_rate = first_in.heat_capacity_rate()
-        second_rate = second_in.heat_capacity_rate()
-        total_rate = first_rate + second_rate
-        return ops.where(
-            total_rate == 0,
-            (first_in.T + second_in.T) / 2,
-            (first_rate * first_in.T + second_rate * second_in.T) / total_rate,
+        return heat_transfer.mixed_temperature(
+            first_in.heat_capacity_rate(),
+            first_in.T,
+            second_in.heat_capacity_rate(),
+            second_in.T,
         )

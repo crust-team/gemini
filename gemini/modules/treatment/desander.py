@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import hydraulics
+from gemini.physics import fluid, hydraulics, separation
 from gemini.types import (
     Boundary,
     Fraction,
@@ -77,12 +77,13 @@ class Desander(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         properties = inlet.fluid.properties(inlet.p, inlet.T)
-        liquid_flow = inlet.m_dot * (1 - properties.gmf) / properties.rho_l
+        liquid_flow = fluid.liquid_volume_flow(inlet.m_dot, properties.gmf, properties.rho_l)
+        sand = separation.cyclone_sand(
+            self.separation_efficiency, self.sand_concentration, liquid_flow
+        )
         self.pressure_drop = self._pressure_drop(inlet)
-        self.sand_removal_rate = self.separation_efficiency * self.sand_concentration * liquid_flow
-        self.residual_sand_concentration = (
-            1 - self.separation_efficiency
-        ) * self.sand_concentration
+        self.sand_removal_rate = sand[0]
+        self.residual_sand_concentration = sand[1]
 
     def _pressure_drop(self, inlet):
         """Return the cyclone loss [Pa], quadratic in forward mass flow."""

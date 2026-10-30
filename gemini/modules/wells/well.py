@@ -38,7 +38,12 @@ class _Well(Module):
             tuple[Dimensionless, PressureDifference], default=(1, 0), calibratable=True
         )
         self.soil_temperature = Parameter(Temperature)
-        self.u_value = Parameter(HeatTransferCoefficient, default=10, ge=0, calibratable=True)
+        self.u_value = Parameter(
+            HeatTransferCoefficient,
+            default=hydraulics.DEFAULT_WELL_U_VALUE,
+            ge=0,
+            calibratable=True,
+        )
 
     def traverse(self, stream, from_md: float, to_md: float, direction: Literal["up", "down"]):
         """Traverse an arbitrary depth interval [m], returning uncorrected SI conditions."""
@@ -60,8 +65,9 @@ class _Well(Module):
 
     def corrected(self, stream, result):
         """Return ``stream`` at the traversal outlet, with the affine pressure correction."""
-        a, b = self.correction_factors
-        return stream.with_(p=a * result.p_out + b, T=result.T_out)
+        slope, offset = self.correction_factors
+        pressure = hydraulics.affine_correction(result.p_out, slope, offset)
+        return stream.with_(p=pressure, T=result.T_out)
 
     def corrosion_profile(
         self, stream, chemistry: dict | None = None, model: str = "NORSOK"

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Literal
 
 from gemini import ops
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
+from gemini.ops import Constant
 
 from . import corrosion, erosion
 from . import fluid as fluid_physics
@@ -37,6 +38,32 @@ _SEGREGATED, _TRANSITION, _INTERMITTENT, _DISTRIBUTED, _OUTSIDE_MAP = 0, 1, 2, 3
 _DOWNHILL = (4.7, -0.3692, 0.1244, -0.5056)
 _SEGREGATED_UPHILL = (0.011, -3.768, 3.539, -1.614)
 _INTERMITTENT_UPHILL = (2.96, 0.305, -0.4473, 0.0978)
+
+
+PIPE_LAMINAR_REYNOLDS = Constant(
+    "PIPE_LAMINAR_REYNOLDS",
+    2300,
+    "-",
+    "Reynolds number up to which pipe flow is taken as laminar (Hagen–Poiseuille)",
+)
+PIPE_TURBULENT_REYNOLDS = Constant(
+    "PIPE_TURBULENT_REYNOLDS",
+    4000,
+    "-",
+    "Reynolds number from which pipe flow is taken as turbulent (Swamee–Jain)",
+)
+
+COMMERCIAL_STEEL_ROUGHNESS = 4.5e-5
+"""Absolute roughness [m] of new commercial steel pipe (Moody 1944, Friction factors for pipe
+flow, Trans. ASME 66; the 0.045 mm of the Moody chart and Crane TP-410)."""
+
+DEFAULT_VALVE_RANGEABILITY = 50
+"""Default inherent rangeability [-] of a control valve, typical of globe valves (Emerson, Control
+Valve Handbook, 5th ed., 2017)."""
+
+DEFAULT_WELL_U_VALUE = 10
+"""Default overall heat transfer coefficient [W/m2/K] between a well and the soil, the value of
+the original GEMINI well model."""
 
 
 @ops.physics
@@ -109,6 +136,284 @@ def darcy_weisbach_dp(
     gravity = hydrostatic_dp(rho, length, ops.sin(inclination))
     friction = friction_factor * rho * length / diameter * (ops.abs(velocity) * velocity) / 2
     return ops.where(velocity == 0, 0.0, friction), gravity
+
+
+@ops.physics
+def pipe_friction_drop(
+    velocity: float,
+    rho: float,
+    mu: float,
+    diameter: float,
+    roughness: float,
+    length: float,
+) -> float:
+    """Return the friction pressure drop [Pa] of a liquid in a straight pipe, any regime.
+
+    Laminar (``Re <= 2300``): ``dp = 32 mu L u / D^2``, that is ``f = 64 / Re``. Turbulent
+    (``Re >= 4000``): Darcy-Weisbach with the Swamee-Jain factor, see ``darcy_weisbach_dp``. In
+    between, ``dp`` is interpolated linearly in ``Re`` between the laminar drop at 2300 and the
+    turbulent drop at 4000.
+
+    Parameters
+    ----------
+    velocity : float
+        Mean velocity [m/s], nonnegative.
+    rho, mu : float
+        Liquid density [kg/m3] and dynamic viscosity [Pa s].
+    diameter, roughness, length : float
+        Internal diameter, absolute roughness and length of the pipe [m].
+
+    Returns
+    -------
+    float
+        Friction pressure drop [Pa], zero at zero velocity.
+
+    Notes
+    -----
+    Valid for single-phase liquid flow with the Swamee-Jain range of ``darcy_weisbach_dp``. The
+    bridge is a continuous interpolation without physical claim for the intermittent transition
+    regime. References: Hagen-Poiseuille (White, Fluid Mechanics, 8th ed., section 6.4) and
+    Swamee and Jain (1976), J. Hydraul. Div. ASCE 102; the bridge is a retained GEMINI
+    formulation.
+    """
+    velocity_per_reynolds = mu / (rho * diameter)
+    reynolds = reynolds_number(velocity, rho, diameter, mu)
+    laminar_limit = _laminar_drop(
+        PIPE_LAMINAR_REYNOLDS * velocity_per_reynolds, mu, diameter, length
+    )
+    turbulent_limit = _turbulent_drop(
+        PIPE_TURBULENT_REYNOLDS * velocity_per_reynolds, rho, mu, diameter, roughness, length
+    )
+    weight = (reynolds - PIPE_LAMINAR_REYNOLDS) / (PIPE_TURBULENT_REYNOLDS - PIPE_LAMINAR_REYNOLDS)
+    return ops.where(
+        reynolds <= PIPE_LAMINAR_REYNOLDS,
+        _laminar_drop(velocity, mu, diameter, length),
+        ops.where(
+            reynolds >= PIPE_TURBULENT_REYNOLDS,
+            _turbulent_drop(velocity, rho, mu, diameter, roughness, length),
+            laminar_limit + weight * (turbulent_limit - laminar_limit),
+        ),
+    )
+
+
+def _laminar_drop(velocity, mu, diameter, length):
+    """Return the Hagen-Poiseuille drop ``32 mu L u / D^2`` [Pa]."""
+    return 32 * mu * length * velocity / diameter**2
+
+
+def _turbulent_drop(velocity, rho, mu, diameter, roughness, length):
+    """Return the friction drop [Pa] of ``darcy_weisbach_dp`` for a horizontal pipe."""
+    return darcy_weisbach_dp(velocity, rho, 0.0, mu, diameter, roughness, length)[0]
+
+
+@ops.physics
+def pipe_conductance(u_value: float, diameter: float, length: float) -> float:
+    """Return the conductance ``UA`` [W/K] of a pipe wall, ``U pi D L``.
+
+    Parameters
+    ----------
+    u_value : float
+        Overall heat transfer coefficient [W/m2/K] referred to the inner wall area.
+    diameter, length : float
+        Internal diameter and length [m].
+
+    Returns
+    -------
+    float
+        Conductance [W/K].
+
+    Notes
+    -----
+    Valid for any real inputs; the convention of the well path model, with the inner wall
+    area ``geometry.lateral_area``. Reference: Incropera et al., Fundamentals of Heat and Mass
+    Transfer, overall heat transfer coefficient ``UA``.
+    """
+    return u_value * geometry.lateral_area(diameter, length)
+
+
+@ops.physics
+def valve_flow_coefficient(
+    rated: float, opening: float, rangeability: float, equal_percentage: bool
+) -> float:
+    """Return the effective flow coefficient of a control valve at an opening.
+
+    ``Phi_0 = 1 / R``; linear ``Phi = Phi_0 + (1 - Phi_0) h``; equal percentage ``Phi = R^(h - 1)``;
+    ``Kv_eff = rated Phi``, zero at ``h = 0`` (seated valve).
+
+    Parameters
+    ----------
+    rated : float
+        Flow coefficient at full opening, in any unit; the result has its unit.
+    opening : float
+        Relative opening ``h`` [-], in [0, 1].
+    rangeability : float
+        Inherent rangeability ``R`` [-], above 1.
+    equal_percentage : bool
+        True for the equal-percentage characteristic, false for the linear one.
+
+    Returns
+    -------
+    float
+        Effective flow coefficient, in the unit of ``rated``.
+
+    Notes
+    -----
+    Theoretical inherent characteristics of IEC 60534-2-4 with a seated closure at zero opening;
+    a real valve deviates below ``Phi_0``.
+    """
+    floor = 1 / rangeability
+    linear = rated * (floor + (1 - floor) * opening)
+    percentage = rated * rangeability ** (opening - 1)
+    return ops.where(opening == 0, 0.0, ops.where(equal_percentage, percentage, linear))
+
+
+@ops.physics
+def affine_correction(pressure: float, slope: float, offset: float) -> float:
+    """Return a pressure with the affine calibration correction, ``a p + b``.
+
+    Parameters
+    ----------
+    pressure : float
+        Calculated pressure [Pa].
+    slope : float
+        Dimensionless factor ``a`` [-].
+    offset : float
+        Additive correction ``b`` [Pa].
+
+    Returns
+    -------
+    float
+        Corrected pressure [Pa].
+
+    Notes
+    -----
+    Calibration convention of the GEMINI well models, fitted to measured pressures; no
+    published source.
+    """
+    return slope * pressure + offset
+
+
+@ops.physics
+def productivity_pressure(reservoir_pressure: float, flow: float, productivity: float) -> float:
+    """Return the bottomhole pressure [Pa] of a producer on a linear IPR, ``p - q / PI``.
+
+    Parameters
+    ----------
+    reservoir_pressure : float
+        Reservoir pressure [Pa].
+    flow : float
+        Volume flow into the well [m3/s].
+    productivity : float
+        Productivity index ``PI`` [m3/s/Pa], nonzero.
+
+    Returns
+    -------
+    float
+        Flowing bottomhole pressure [Pa].
+
+    Notes
+    -----
+    Linear inflow performance of a single-phase liquid well above its bubble point. Reference:
+    Economides et al., Petroleum Production Systems, 2nd ed., chapter 2.
+    """
+    return reservoir_pressure - flow / productivity
+
+
+@ops.physics
+def injectivity_pressure(reservoir_pressure: float, flow: float, injectivity: float) -> float:
+    """Return the bottomhole pressure [Pa] of an injector on a linear law, ``p + q / II``.
+
+    Parameters
+    ----------
+    reservoir_pressure : float
+        Reservoir pressure [Pa].
+    flow : float
+        Volume flow out of the well [m3/s], nonnegative.
+    injectivity : float
+        Injectivity index ``II`` [m3/s/Pa], nonzero.
+
+    Returns
+    -------
+    float
+        Bottomhole pressure [Pa] the injection requires.
+
+    Notes
+    -----
+    Mirror of ``productivity_pressure`` for a single-phase liquid; the injection pressure stays
+    below the fracturing pressure. Reference: Economides et al., Petroleum Production Systems.
+    """
+    return reservoir_pressure + flow / injectivity
+
+
+@ops.physics
+def productivity_index(flow: float, reservoir_pressure: float, bottomhole_pressure: float) -> float:
+    """Return the productivity index [m3/s/Pa] of one measurement, ``q / (p_res - p_bh)``.
+
+    Parameters
+    ----------
+    flow : float
+        Volume flow into the well [m3/s].
+    reservoir_pressure, bottomhole_pressure : float
+        Pressures [Pa]; they must differ.
+
+    Returns
+    -------
+    float
+        Productivity index [m3/s/Pa].
+
+    Notes
+    -----
+    Inverse of ``productivity_pressure``. Reference: Economides et al., Petroleum Production
+    Systems.
+    """
+    return flow / (reservoir_pressure - bottomhole_pressure)
+
+
+@ops.physics
+def injectivity_index(flow: float, reservoir_pressure: float, bottomhole_pressure: float) -> float:
+    """Return the injectivity index [m3/s/Pa] of one measurement, ``q / (p_bh - p_res)``.
+
+    Parameters
+    ----------
+    flow : float
+        Volume flow out of the well [m3/s].
+    reservoir_pressure, bottomhole_pressure : float
+        Pressures [Pa]; they must differ.
+
+    Returns
+    -------
+    float
+        Injectivity index [m3/s/Pa].
+
+    Notes
+    -----
+    Inverse of ``injectivity_pressure``. Reference: Economides et al., Petroleum Production
+    Systems.
+    """
+    return flow / (bottomhole_pressure - reservoir_pressure)
+
+
+@ops.physics
+def performance_ratio(measured: float, reference: float) -> float:
+    """Return a measured performance over its reference, ``measured / reference`` [-].
+
+    Parameters
+    ----------
+    measured, reference : float
+        Quantities in one unit, for example a productivity index and its design value, or a
+        filter pressure loss and its clogging limit; the reference is nonzero.
+
+    Returns
+    -------
+    float
+        Ratio [-], one at the reference.
+
+    Notes
+    -----
+    Definition of the ratio used to score a well index or a filter loss against its design
+    or limit; no published source.
+    """
+    return measured / reference
 
 
 @ops.physics
@@ -612,7 +917,7 @@ def _section_drops(section, p, T, flow, fluid, u_value, ambient_temperature):
     delta_T = heat_transfer.pipe_temperature_change(
         T,
         u_value,
-        math.pi * section.inner_diameter * section.length,
+        geometry.lateral_area(section.inner_diameter, section.length),
         ops.where(stopped, 1.0, m_l),
         m_g,
         f.cp_l,

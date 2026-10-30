@@ -36,6 +36,27 @@ def circle_area(diameter: float) -> float:
 
 
 @ops.physics
+def lateral_area(diameter: float, length: float) -> float:
+    """Return the lateral area [m2] of a cylinder, ``A = pi d L``.
+
+    Parameters
+    ----------
+    diameter, length : float
+        Cylinder diameter and length [m]; the inner wall of a pipe uses its internal diameter.
+
+    Returns
+    -------
+    float
+        Wall area [m2].
+
+    Notes
+    -----
+    Valid for any real inputs. Reference: the elementary lateral area of a cylinder.
+    """
+    return math.pi * diameter * length
+
+
+@ops.physics
 def mean_velocity(mass_flow: float, density: float, diameter: float) -> float:
     """Return the mean velocity [m/s] of a flow through a circular section, ``m / rho / A``.
 

@@ -1,11 +1,8 @@
 """Surface pipeline with wall friction, elevation change and heat exchange with its surroundings."""
 
-import math
-
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.ops import Constant
 from gemini.physics import geometry, heat_transfer, hydraulics
 from gemini.types import (
     Boundary,
@@ -24,24 +21,6 @@ from gemini.types import (
     Temperature,
 )
 
-LAMINAR_REYNOLDS = Constant(
-    "PIPE_LAMINAR_REYNOLDS",
-    2300,
-    "-",
-    "Reynolds number up to which pipe flow is taken as laminar (Hagen–Poiseuille)",
-)
-
-TURBULENT_REYNOLDS = Constant(
-    "PIPE_TURBULENT_REYNOLDS",
-    4000,
-    "-",
-    "Reynolds number from which pipe flow is taken as turbulent (Swamee–Jain)",
-)
-
-COMMERCIAL_STEEL_ROUGHNESS = 4.5e-5
-"""Absolute roughness [m] of new commercial steel pipe (Moody 1944, Friction factors for pipe
-flow, Trans. ASME 66; the 0.045 mm of the Moody chart and Crane TP-410)."""
-
 
 class Pipe(Module):
     """Surface pipeline carrying a single-phase liquid, with friction, elevation and heat loss.
@@ -50,9 +29,9 @@ class Pipe(Module):
     ``elevation_change`` from inlet to outlet (positive when the outlet is higher). The
     friction drop is Darcy–Weisbach ``f L/D rho v^2/2``: laminar ``f = 64/Re`` (Hagen–Poiseuille)
     up to Re = 2300, Swamee and Jain (1976, Explicit equations for pipe-flow problems, J. Hydraul.
-    Div. ASCE 102) through ``hydraulics.darcy_weisbach_dp`` from Re = 4000, and in between a
-    linear interpolation in Re of the friction drop at the two limits, a continuous bridge
-    without physical claim for the intermittent transition regime.
+    Div. ASCE 102) from Re = 4000, and in between a linear interpolation in Re of the friction
+    drop at the two limits, a continuous bridge without physical claim for the intermittent
+    transition regime; all of it in ``hydraulics.pipe_friction_drop``.
 
     Heat: the fluid exchanges heat with surroundings at the fixed ``ambient_temperature``
     through the overall coefficient ``u_value`` referred to the inner wall area ``pi d L`` (the
@@ -83,7 +62,7 @@ class Pipe(Module):
         # Parameters
         self.length = Parameter(Length, gt=0)
         self.inner_diameter = Parameter(Length, gt=0)
-        self.roughness = Parameter(Length, default=COMMERCIAL_STEEL_ROUGHNESS)
+        self.roughness = Parameter(Length, default=hydraulics.COMMERCIAL_STEEL_ROUGHNESS)
         self.elevation_change = Parameter(Elevation)
         self.u_value = Parameter(HeatTransferCoefficient)
 
@@ -129,12 +108,14 @@ class Pipe(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         outlet = outlets.outlet
-        heat = inlet.heat_capacity_rate() * (inlet.T - outlet.T)
+        heat = heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - outlet.T)
+        loss, absorbed = heat_transfer.signed_parts(heat)
         self.pressure_drop = inlet.p - outlet.p
-        self.velocity = self._velocity(inlet)
+        properties = inlet.fluid.properties(inlet.p, inlet.T)
+        self.velocity = geometry.mean_velocity(inlet.m_dot, properties.rho_l, self.inner_diameter)
         self.outlet_T = outlet.T
-        self.heat_loss = ops.maximum(heat, 0.0)
-        self.heat_absorbed = ops.maximum(-heat, 0.0)
+        self.heat_loss = loss
+        self.heat_absorbed = absorbed
 
     def _check(self, inlet):
         """Reject a pipe shorter than its rise, reverse flow and free gas."""
@@ -161,60 +142,23 @@ class Pipe(Module):
                 f"{inlet.fluid.gas_mass_fraction}; expected 0 (single-phase liquid model)"
             )
 
-    def _velocity(self, inlet):
-        """Return the mean liquid velocity [m/s]."""
-        rho = inlet.fluid.properties(inlet.p, inlet.T).rho_l
-        return inlet.m_dot / (rho * geometry.circle_area(self.inner_diameter))
-
     def _friction_drop(self, inlet):
-        """Return the friction pressure drop [Pa] for laminar, transitional or turbulent flow.
-
-        In the transition range the drop is interpolated linearly in Re between the laminar drop
-        at Re = 2300 and the Swamee–Jain drop at Re = 4000.
-        """
+        """Return the friction pressure drop [Pa] for laminar, transitional or turbulent flow."""
         properties = inlet.fluid.properties(inlet.p, inlet.T)
-        velocity = self._velocity(inlet)
-        velocity_per_reynolds = properties.mu_l / (properties.rho_l * self.inner_diameter)
-        reynolds = velocity / velocity_per_reynolds
-        laminar = self._laminar_drop(LAMINAR_REYNOLDS * velocity_per_reynolds, properties)
-        turbulent = self._turbulent_drop(TURBULENT_REYNOLDS * velocity_per_reynolds, properties)
-        weight = (reynolds - LAMINAR_REYNOLDS) / (TURBULENT_REYNOLDS - LAMINAR_REYNOLDS)
-        return ops.where(
-            reynolds <= LAMINAR_REYNOLDS,
-            self._laminar_drop(velocity, properties),
-            ops.where(
-                reynolds >= TURBULENT_REYNOLDS,
-                self._turbulent_drop(velocity, properties),
-                laminar + weight * (turbulent - laminar),
-            ),
-        )
-
-    def _laminar_drop(self, velocity, properties):
-        """Return the Hagen–Poiseuille drop ``32 mu L v / D^2`` [Pa], that is ``f = 64/Re``."""
-        return 32 * properties.mu_l * self.length * velocity / self.inner_diameter**2
-
-    def _turbulent_drop(self, velocity, properties):
-        """Return the Darcy–Weisbach drop [Pa] with the Swamee–Jain friction factor."""
-        friction, _ = hydraulics.darcy_weisbach_dp(
+        velocity = geometry.mean_velocity(inlet.m_dot, properties.rho_l, self.inner_diameter)
+        return hydraulics.pipe_friction_drop(
             velocity,
             properties.rho_l,
-            0.0,
             properties.mu_l,
             self.inner_diameter,
             self.roughness,
             self.length,
         )
-        return friction
 
     def _outlet_temperature(self, inlet):
         """Return the outlet temperature [K] of the exponential ambient-exchange profile."""
-        capacity_rate = inlet.heat_capacity_rate()
-        conductance = self.u_value * math.pi * self.inner_diameter * self.length
-        stopped = inlet.m_dot == 0
-        transfer_units = ops.where(stopped, 0.0, heat_transfer.ntu(conductance, capacity_rate))
-        effectiveness = heat_transfer.effectiveness_parallel(transfer_units, 0.0)
-        return ops.where(
-            stopped,
-            inlet.T,
-            inlet.T - effectiveness * (inlet.T - self.ambient_temperature),
+        conductance = hydraulics.pipe_conductance(self.u_value, self.inner_diameter, self.length)
+        effectiveness = heat_transfer.ambient_effectiveness(conductance, inlet.heat_capacity_rate())
+        return heat_transfer.effectiveness_outlet_temperature(
+            inlet.T, effectiveness, self.ambient_temperature
         )
