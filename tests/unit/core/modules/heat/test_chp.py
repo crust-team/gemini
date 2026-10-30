@@ -5,8 +5,8 @@ import pytest
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.heat import CHP
 from gemini.core.types.flows import Stream
-from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import ConfigurationError, PhysicsRangeError
+from tests.fixtures.equivalence import assert_module_matches
 
 CP = 4217.4
 WATER = Stream(m_dot=20, T=333.15, p=3e5)

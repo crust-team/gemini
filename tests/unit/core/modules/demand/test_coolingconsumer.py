@@ -5,8 +5,8 @@ import pytest
 from gemini.core.modules import CoolingConsumer, energy_balance, mass_balance
 from gemini.core.physics import psychrometrics
 from gemini.core.types import Stream
-from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import DeclarationError, MissingValueError, PhysicsRangeError
+from tests.fixtures.equivalence import assert_module_matches
 
 CP = 4217.4
 SUPPLY = Stream(m_dot=2.0, T=280.15, p=3e5)

@@ -5,8 +5,8 @@ import pytest
 from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.heat import AdsorptionChiller
 from gemini.core.types.flows import Stream
-from tests.fixtures.equivalence import assert_module_matches
 from gemini.errors import ConfigurationError, PhysicsRangeError
+from tests.fixtures.equivalence import assert_module_matches
 
 CP = 4217.4
 GENERATOR = Stream(m_dot=5, T=343.15, p=3e5)
