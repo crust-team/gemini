@@ -1,0 +1,155 @@
+"""The data one twin reads over a stretch of ticks, converted to SI, and what each tick lacks.
+
+``read`` turns the bound columns of a ``Twin`` into SI arrays over ``[start, stop)`` and gives
+every row a ``status`` in the order a plain call would meet its problems: the first missing
+observation (a skip, counted by its reason), or an inlet stream the limits refuse (an error,
+built by the real ``Stream`` constructor). A row with status ``0`` can be evaluated. A control
+set on the module before its state is read keeps its inputs when only a state is missing
+(``late``), as the module's own order of work does.
+"""
+
+from dataclasses import dataclass, field
+
+import numpy as np
+
+from gemini.core.engine.step import VOLUMETRIC_UNITS
+from gemini.core.physics import units
+from gemini.core.types import Fluid, Stream
+from gemini.core.types.flows import stream_valid
+from gemini.errors import MissingMeasurementError
+
+STREAM_FIELDS = ("m_dot", "T", "p")
+"""The fields of an inlet stream, in the order the graph names them."""
+
+
+@dataclass
+class Block:
+    """The SI values of one twin over ``size`` ticks and the status of every tick.
+
+    ``status`` is ``0`` for a tick that can be evaluated, ``k > 0`` for a skip with reason
+    ``reasons[k - 1]`` and ``-k`` for an invalid stream at inlet ``ports[k - 1]``. ``inputs``
+    maps feed names to arrays, ``fields`` maps ``(port, field)`` to arrays, ``measured`` and
+    ``states`` map names to arrays. ``late`` lists the skip statuses of missing states.
+    """
+
+    size: int
+    status: np.ndarray
+    reasons: list
+    ports: list
+    inputs: dict = field(default_factory=dict)
+    fields: dict = field(default_factory=dict)
+    fluids: dict = field(default_factory=dict)
+    measured: dict = field(default_factory=dict)
+    states: dict = field(default_factory=dict)
+    late: tuple = ()
+
+    @property
+    def selected(self):
+        """The ticks that can be evaluated."""
+        return np.flatnonzero(self.status == 0)
+
+    @property
+    def applied(self):
+        """Per tick, whether the module's inputs were set before the tick ended."""
+        return (self.status == 0) | np.isin(self.status, self.late)
+
+    def stream_error(self, tick):
+        """Return the error the ``Stream`` constructor raises for the invalid inlet of a tick."""
+        port = self.ports[-self.status[tick] - 1]
+        values = {
+            name: float(self.fields[port, name][tick])
+            for name in STREAM_FIELDS
+            if (port, name) in self.fields
+        }
+        try:
+            Stream(**values, fluid=self.fluids[port])
+        except Exception as error:
+            return error
+
+
+def read(twin, numbers, start, stop):
+    """Return the ``Block`` of ``twin`` over the ticks ``[start, stop)``.
+
+    ``numbers`` maps a column name to its values over the whole run as floats (NaN for a value
+    that is missing).
+    """
+    block = Block(stop - start, np.zeros(stop - start, dtype=int), [], twin.ports)
+    defaults = {port: _defaults(twin, port) for port in twin.ports}
+    for source in twin.sources:
+        if source.kind == "stream":
+            _check_stream(block, twin, source.key, defaults[source.key])
+            continue
+        values = _convert(source, numbers(source.binding.column)[start:stop])
+        _mark_missing(block, source, values)
+        if source.density is not None:
+            values = values * _density(source.density)
+        _store(block, source, values)
+    return block
+
+
+def _defaults(twin, port):
+    """Return the default stream fields of an inlet as floats."""
+    fields = twin.defaults.get(port, {})
+    return {name: float(value) for name, value in fields.items() if name != "fluid"}
+
+
+def _convert(source, raw):
+    """Return a column in SI as ``units.to_si`` computes one value."""
+    scale, offset = units.si_conversion(source.binding.unit, source.quantity)
+    return raw * scale + offset
+
+
+def _density(module):
+    """Return the density at the reference state of a module's ``pressure`` and ``temperature``."""
+    return module.fluid.properties(module.pressure, module.temperature).density
+
+
+def _mark_missing(block, source, values):
+    """Give the ticks that miss this source, and nothing before, a skip status."""
+    missing = (block.status == 0) & ~np.isfinite(values)
+    if not missing.any():
+        return
+    block.reasons.append(str(MissingMeasurementError(source.binding.column)))
+    block.status[missing] = len(block.reasons)
+    if source.kind == "state":
+        block.late += (len(block.reasons),)
+
+
+def _store(block, source, values):
+    target = {
+        "input": block.inputs,
+        "field": block.fields,
+        "measured": block.measured,
+        "state": block.states,
+    }[source.kind]
+    target[source.key] = values
+
+
+def _check_stream(block, twin, port, defaults):
+    """Complete the fields of an inlet from its defaults and mark the ticks it refuses."""
+    for name, value in defaults.items():
+        block.fields.setdefault((port, name), np.full(block.size, value))
+    fluid = twin.defaults.get(port, {}).get("fluid", twin.module.fluid)
+    block.fluids[port] = Fluid.model_validate(fluid)
+    present = [(port, name) in block.fields for name in STREAM_FIELDS]
+    if not all(present):
+        block.status[block.status == 0] = -(block.ports.index(port) + 1)
+        return
+    m_dot, temperature, pressure = (block.fields[port, name] for name in STREAM_FIELDS)
+    if _volumetric(twin, port):
+        density = block.fluids[port].properties(pressure, temperature).density
+        block.fields[port, "m_dot"] = m_dot = m_dot * density
+    with np.errstate(all="ignore"):
+        valid = stream_valid(m_dot, temperature, pressure)
+    refused = (block.status == 0) & ~np.broadcast_to(valid, (block.size,))
+    block.status[refused] = -(block.ports.index(port) + 1)
+
+
+def _volumetric(twin, port):
+    """Whether the inlet's mass flow is bound to a volumetric flow column."""
+    return any(
+        source.kind == "field"
+        and source.key == (port, "m_dot")
+        and source.binding.unit in VOLUMETRIC_UNITS
+        for source in twin.sources
+    )

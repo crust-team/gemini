@@ -3,24 +3,29 @@
 import json
 import numbers
 from datetime import datetime, timezone
-from functools import partial
 from pathlib import Path
-from time import perf_counter
 
 from pydantic_core import to_jsonable_python
 
 from gemini.errors import ConfigurationError
-from gemini.utils.hooks import observer
+from gemini.utils.strings import join_path
 from gemini.utils.time import parse_duration
 
 
 class Callback:
     """Override any lifecycle hook; callbacks run in registration order between steps.
 
+    A callback that changes the run (the plant, its parameters or inputs, the dataset) sets the
+    class attribute ``changes_run = True``: the engine then evaluates one tick at a time, calling
+    ``on_step_start`` before the tick is evaluated. Otherwise the engine may evaluate many ticks
+    at once and replays the callbacks from the results.
+
     ``on_error`` observes only a failure that ends the run. Module failures recorded under
     ``on_error="record"`` are results: they are in ``engine.results.errors`` when
     ``on_step_end`` runs.
     """
+
+    changes_run = False
 
     def on_run_start(self, engine):
         """Observe a new or resumed finite run."""
@@ -46,20 +51,18 @@ def _jsonable(value):
 class EventLog(Callback):
     """Append events to a JSON-lines file, or retain them in memory when no path is supplied.
 
-    Every module is observed through a forward pre-hook and a forward hook, both marked as
-    observers so the graph engine replays them per row, attached at run
-    start and removed when the run ends or fails. Logging never changes a run: non-finite
-    floats are written as ``NaN``/``Infinity`` and other unknown values as strings.
+    After each tick it logs one ``forward`` event for every module call of the tick's results
+    (``engine.step_results``), children before the module that called them, with the call's
+    inlets and inputs and its outputs. Logging never changes a run: non-finite floats are
+    written as ``NaN``/``Infinity`` and other unknown values as strings.
     """
 
     def __init__(self, path=None):
-        """Create a detached event sink."""
+        """Create an event sink."""
         self.path = Path(path) if path is not None else None
         if self.path is not None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
         self.events = []
-        self._handles = []
-        self._starts = {}
         self._logged_errors = 0
 
     def log(self, kind, **payload):
@@ -72,52 +75,31 @@ class EventLog(Callback):
             handle.write(json.dumps(event) + "\n")
         return event
 
-    def attach(self, plant):
-        """Register pre/post hooks on every module without changing forward calculations."""
-        self.detach()
-        for path, module in plant.named_modules():
-            module_path = path or plant.path
-            before = observer(partial(self._before, module_path))
-            after = observer(partial(self._after, module_path))
-            self._handles.append(module.register_forward_pre_hook(before))
-            self._handles.append(module.register_forward_hook(after))
-        return self
-
-    def _before(self, path, module, inlets):
-        """Remember the start time and the inlets, controls and boundaries of one call."""
-        inputs = dict(inlets) | {
-            name: getattr(module, name) for name in module.inputs(recurse=False)
+    def _calls(self, plant, path, result):
+        """Log the calls of a result tree in completion order: children first, then itself."""
+        for name, child in result.call_records:
+            self._calls(plant, join_path(path, name), child)
+        module = plant.get_submodule(path)
+        inputs = dict(result.inlets) | {
+            name: result.inputs[name] for name in module.inputs(recurse=False)
         }
-        self._starts[path] = perf_counter(), _jsonable(inputs)
-
-    def _after(self, path, module, inlets, outlets):
-        """Log one module call with its inputs, outputs and duration."""
-        start, inputs = self._starts.pop(path)
+        outputs = {name: result.outputs[name] for name in module.outputs(recurse=False)}
         self.log(
             "forward",
-            module_path=path,
-            inputs=inputs,
-            outputs=_jsonable(
-                {name: getattr(module, name) for name in module.outputs(recurse=False)}
-            ),
-            duration_ms=(perf_counter() - start) * 1000,
+            module_path=path or plant.path,
+            inputs=_jsonable(inputs),
+            outputs=_jsonable(outputs),
         )
 
-    def detach(self):
-        """Remove all owned hooks, leaving other observers intact."""
-        for handle in self._handles:
-            handle.remove()
-        self._handles.clear()
-        self._starts.clear()
-
     def on_run_start(self, engine):
-        """Record run mode and attach equipment observers."""
+        """Record run mode."""
         self.log("run_start", run_kind=engine.run_kind)
         self._logged_errors = len(engine.results.errors)
-        self.attach(engine.plant)
 
     def on_step_end(self, engine, sample):
-        """Record the step's recorded module errors, then the completed tick timing."""
+        """Record the tick's module calls, its recorded errors, then the completed tick timing."""
+        for path, result in engine.step_results.items():
+            self._calls(engine.plant, path, result)
         for error in engine.results.errors[self._logged_errors :]:
             self.log(
                 "error", module=error["module"], message=error["message"], error_type=error["type"]
@@ -126,14 +108,12 @@ class EventLog(Callback):
         self.log("step_end", time=sample.t.isoformat(), dt=sample.dt)
 
     def on_error(self, engine, error):
-        """Record the failure that ended the run and remove owned observers."""
+        """Record the failure that ended the run."""
         self.log("error", message=str(error), error_type=type(error).__name__)
-        self.detach()
 
     def on_run_end(self, engine):
-        """Record completion and remove owned observers."""
+        """Record completion."""
         self.log("run_end", steps=len(engine.results))
-        self.detach()
 
 
 class AutoCheckpoint(Callback):

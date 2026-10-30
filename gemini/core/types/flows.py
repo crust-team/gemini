@@ -181,18 +181,28 @@ def _validated(**values):
     """
     values = {name: _number(name, value) for name, value in values.items()}
     for name, value in values.items():
-        lower, strict, unit = _LIMITS[name]
-        above = value > lower if strict else value >= lower
         ops.check(
-            above & (value < math.inf),
+            _within(name, value),
             PhysicsRangeError,
             "Stream: {name} = {value} {unit}; expected {expected}",
             name=name,
             value=value,
-            unit=unit,
+            unit=_LIMITS[name][2],
             expected=_EXPECTED[name],
         )
     return values
+
+
+def _within(name, value):
+    """Return whether ``value`` satisfies the limit of stream field ``name``; any array shape."""
+    lower, strict, _ = _LIMITS[name]
+    above = value > lower if strict else value >= lower
+    return above & (value < math.inf)
+
+
+def stream_valid(m_dot, T, p):
+    """Return, per row, whether ``Stream(m_dot, T, p)`` accepts the values: the limits' one rule."""
+    return _within("m_dot", m_dot) & _within("T", T) & _within("p", p)
 
 
 _LIMITS = {"m_dot": (-math.inf, True, "kg/s"), "T": (0, True, "K"), "p": (0, False, "Pa")}

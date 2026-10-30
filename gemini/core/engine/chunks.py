@@ -51,10 +51,47 @@ class PathColumns:
         columns = {name: values[start:stop] for name, values in self.columns.items()}
         return PathColumns(self.present[start:stop], columns)
 
+    def without(self, ticks):
+        """Return these columns with the ticks at the positions ``ticks`` marked absent."""
+        if not len(ticks):
+            return self
+        present = self.present.copy()
+        present[ticks] = False
+        return PathColumns(present, self.columns)
+
+    def spread(self, ticks, size):
+        """Return the columns of ``size`` ticks whose entries sit at the positions ``ticks``.
+
+        The columns of this object have one entry per evaluated row; the other ticks are absent.
+        """
+        present = np.zeros(size, dtype=bool)
+        present[ticks] = True
+        return PathColumns(
+            present, {name: _spread(values, ticks, size) for name, values in self.columns.items()}
+        )
+
+
+def _spread(values, ticks, size):
+    """Return a column of ``size`` entries holding ``values`` at ``ticks``."""
+    if len(ticks) == size:
+        return values
+    if isinstance(values, list):
+        full = [None] * size
+        for tick, value in zip(ticks, values):
+            full[tick] = value
+        return full
+    shape = (size, *values.shape[1:])
+    full = np.full(shape, np.nan) if values.dtype.kind == "f" else np.zeros(shape, values.dtype)
+    full[ticks] = values
+    return full
+
 
 def _result_columns(result, health, length, column):
     """Return the output, ``operating`` and health columns of a path, in the row order."""
-    columns = {name: column(value) for name, value in result.outputs.items()}
+    columns = {
+        name: column(_with_none(value, result.outputs.accepts_none(name)))
+        for name, value in result.outputs.items()
+    }
     columns["operating"] = _operating(result, length)
     if health is None:
         return columns
@@ -65,6 +102,15 @@ def _result_columns(result, health, length, column):
     for name, value in health.metrics.items():
         columns["health_metric_" + name] = column(value)
     return columns
+
+
+def _with_none(value, nullable):
+    """Return a declared ``X | None`` float array with NaN as a list with ``None``, else as is."""
+    if not (nullable and isinstance(value, np.ndarray) and value.dtype.kind == "f"):
+        return value
+    if value.ndim != 1 or not np.isnan(value).any():
+        return value
+    return [None if item != item else item for item in value.tolist()]
 
 
 def _operating(result, length):
@@ -144,15 +190,19 @@ class ResultChunk:
         paths = sorted((path for path in self.tables if first[path] is not None), key=first.get)
         return [(path, name) for path in paths for name in self.tables[path].columns]
 
+    def rows(self, start, stop):
+        """Return the ticks ``start:stop``."""
+        return ResultChunk(
+            self.times[start:stop],
+            self.durations[start:stop],
+            {path: table.sliced(start, stop) for path, table in self.tables.items()},
+            None if self.skips is None else self.skips[start:stop],
+            [(row - start, error) for row, error in self.errors if start <= row < stop],
+        )
+
     def sliced(self, start):
         """Return the ticks from ``start`` on."""
-        return ResultChunk(
-            self.times[start:],
-            self.durations[start:],
-            {path: table.sliced(start, None) for path, table in self.tables.items()},
-            None if self.skips is None else self.skips[start:],
-            [(row - start, error) for row, error in self.errors if row >= start],
-        )
+        return self.rows(start, len(self))
 
 
 def first_present(table):

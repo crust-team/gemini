@@ -23,6 +23,7 @@ from gemini.core.types import (
     TemperatureDifference,
     ThermalConductance,
 )
+from gemini.core.types.results import NOT_ASSESSED
 from gemini.errors import InsufficientDataError, PhysicsRangeError, UnknownCorrelationError
 
 _DETERMINED, _NONPOSITIVE_INPUT, _DISAGREEING_DUTIES, _NO_LMTD = 0, 1, 2, 3
@@ -206,7 +207,7 @@ class HeatExchanger(Module):
         come from the call's inlet streams. Returns ``None`` (not assessed) when a measurement is
         missing, the design UA is zero, or no row of the measurements can determine an apparent
         UA (see ``ua_from_measurements``). On arrays the rows that cannot are not ``assessed``,
-        with score 0, no alarm and zero metrics.
+        as a module without health reports them: score one, no alarm, ``NOT_ASSESSED``, NaN metrics.
         """
         if {"hot_out_T", "cold_out_T"} <= measured.keys():
             measured = measured | _inlet_measurements(result.inlets)
@@ -226,16 +227,16 @@ class HeatExchanger(Module):
         alarm = ratio < 1 - self.fouling_threshold
         return Health(
             assessed=assessed,
-            score=ops.where(assessed, ops.minimum(1, ops.maximum(0, ratio)), 0.0),
+            score=ops.where(assessed, ops.minimum(1, ops.maximum(0, ratio)), 1.0),
             alarm=ops.where(assessed, alarm, False),
             message=ops.where(
                 assessed,
                 ops.where(alarm, "Apparent UA below fouling limit", "Apparent UA within limit"),
-                "Apparent UA not determined",
+                NOT_ASSESSED,
             ),
             metrics={
-                "apparent_ua": ops.where(assessed, apparent, 0.0),
-                "ua_ratio": ops.where(assessed, ratio, 0.0),
+                "apparent_ua": ops.where(assessed, apparent, float("nan")),
+                "ua_ratio": ops.where(assessed, ratio, float("nan")),
             },
         )
 

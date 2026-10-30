@@ -1,6 +1,5 @@
 """One finite execution loop for assumed inputs, measured history and periodic live windows."""
 
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,13 +8,13 @@ import pandas as pd
 from gemini.core import runtime
 from gemini.core.data.loader import Loader
 from gemini.core.engine import checkpoint as storage
-from gemini.core.engine.batch import Batch
 from gemini.core.engine.clock import Clock
 from gemini.core.engine.results import Results
-from gemini.core.engine.step import BindingPlan, chained_step, twin_step
+from gemini.core.engine.runner import Runner
+from gemini.core.engine.step import BindingPlan
 from gemini.core.modules.module import class_path, import_class
 from gemini.errors import CheckpointError, ConfigurationError
-from gemini.graph import GraphCache, traced_enabled
+from gemini.graph import GraphCache
 from gemini.utils.time import parse_duration, to_utc
 
 
@@ -56,11 +55,12 @@ class Engine:
         self._max_gap = None
         self._in_step = False
         self._graph_cache = GraphCache()
-        self.batch = None
+        self.graph_breaks = {}
+        self.step_results = {}
 
     def simulate(self, plant, dataset, clock):
         """Evaluate the handwritten plant chain using assumed, root-bound inputs."""
-        return self._run("simulate", plant, dataset, clock, chained_step)
+        return self._run("simulate", plant, dataset, clock)
 
     def replay(self, plant, dataset, clock=None, start=None, end=None, only=None):
         """Evaluate measured equipment boundaries; infer observation ticks unless supplied."""
@@ -70,7 +70,7 @@ class Engine:
                 clock = clock.window(start, end)
         if clock is None:
             clock = Clock.from_data(dataset)
-        return self._run("replay", plant, dataset, clock, twin_step, only=only)
+        return self._run("replay", plant, dataset, clock, only=only)
 
     def live(self, plant, dataset, checkpoint, step=None, now=None, sink=None):
         """Process newly available ticks once, then save; an external scheduler calls again.
@@ -94,7 +94,7 @@ class Engine:
         clock = self._live_clock(dataset, step, now)
         offset = len(self.results)
         with self._saved_settings():
-            self._run("live", plant, dataset, clock, twin_step, continuing=True)
+            self._run("live", plant, dataset, clock, continuing=True)
         self.save_checkpoint(checkpoint)
         fresh = self.results.slice(offset)
         if sink is not None and len(fresh):
@@ -142,7 +142,7 @@ class Engine:
         for callback in self.callbacks:
             getattr(callback, method)(self, *args)
 
-    def _run(self, kind, plant, dataset, clock, step_fn, only=None, continuing=False, max_gap=None):
+    def _run(self, kind, plant, dataset, clock, only=None, continuing=False, max_gap=None):
         """Run the unfinished ticks of ``clock``; ``max_gap`` overrides the Loader default."""
         if not continuing:
             self.runtime_state = runtime.state()
@@ -158,6 +158,7 @@ class Engine:
         if not continuing or kind == "live" or self._dataset_fingerprint is None:
             self._dataset_fingerprint = dataset.fingerprint()
         self.only = list(only) if only is not None else None
+        self.graph_breaks = {}
         remaining = clock.after(self.position) if self.position is not None else clock
         loader = Loader(
             dataset,
@@ -169,60 +170,13 @@ class Engine:
         self._max_gap = loader.max_gap
         try:
             self._notify("on_run_start")
-            plan.batch = self.batch = self._batch(kind, plan, plant, loader)
-            try:
-                self._commit(step_fn, plant, loader, plan)
-            finally:
-                if plan.batch is not None:
-                    plan.batch.flush()
+            Runner(self, plan, loader.arrays()).run()
             self._notify("on_run_end")
         except BaseException as exc:
             self._in_step = False
             self._notify("on_error", exc)
             raise
         return self.results
-
-    def _commit(self, step_fn, plant, loader, plan):
-        """Run the tick loop: each sample is one step, committed to the results and callbacks."""
-        for sample in loader:
-            self._notify("on_step_start", sample)
-            outputs, skips, errors = self._step(step_fn, plant, sample, plan)
-            self.results.append(sample.t, outputs, sample.dt, skips, errors)
-            self.position = sample.t
-            self._notify("on_step_end", sample)
-
-    def _batch(self, kind, plan, plant, loader):
-        """Return the precomputed rows of a replay's twins, or ``None`` when not applicable.
-
-        Only a replay is evaluated through the graph, and only while ``gemini.graph.settings``
-        allows it; ``simulate`` and ``live`` run tick by tick. Rows that are not claimed, and
-        twins the graph cannot carry, run on the plain path in the commit loop.
-        """
-        if kind != "replay" or not traced_enabled():
-            return None
-        aligned = loader.arrays()
-        if not aligned.times:
-            return None
-        return Batch.compute(plan, plant, aligned, self._graph_cache, bool(self.callbacks))
-
-    def _step(self, step_fn, plant, sample, plan):
-        """Run one step; a failure restores the module states as they were before it.
-
-        Under ``on_error="record"`` an ordinary exception becomes one whole-step error with
-        module path ``""`` (the plant). States are deep-copied before every step, which is
-        cheap for JSON-sized states.
-        """
-        previous_states = deepcopy(self.module_states)
-        self._in_step = True
-        try:
-            return step_fn(plant, sample, self.module_states, plan)
-        except BaseException as exc:
-            self.module_states = previous_states
-            if not isinstance(exc, Exception) or self.on_error == "raise":
-                raise
-            return {}, {}, [dict(module="", message=str(exc), type=type(exc).__name__)]
-        finally:
-            self._in_step = False
 
     def save_checkpoint(self, path):
         """Save at a step boundary; assign engine.plant to save before the first run."""
@@ -304,14 +258,12 @@ class Engine:
                 f"{self.run_kind} checkpoint: {len(remaining)} unfinished ticks and no stored "
                 "rows; expected the rows saved with an unfinished simulation or replay"
             )
-        step_fn = chained_step if self.run_kind == "simulate" else twin_step
         with self._saved_settings():
             return self._run(
                 self.run_kind,
                 self.plant,
                 self.dataset,
                 self.clock,
-                step_fn,
                 only=self.only,
                 continuing=True,
                 max_gap=self._max_gap,

@@ -14,6 +14,9 @@ from gemini.errors import PhysicsRangeError, UnitError, UnknownPortError
 from gemini.utils.mappings import AttributeMapping
 from gemini.utils.strings import did_you_mean, join_names, join_path
 
+NOT_ASSESSED = "No diagnostic model or sufficient measurements"
+"""Health message of a row that was not assessed, as a module without health reports it."""
+
 
 @dataclass(slots=True, kw_only=True)
 class Health:
@@ -99,10 +102,13 @@ class Values(AttributeMapping):
         values = {}
         for name, value in self._values.items():
             plain = row_value(value, index)
-            declaration = self._declarations.get(name)
-            nullable = declaration is not None and declaration.accepts_none()
-            values[name] = None if nullable and plain != plain else plain
+            values[name] = None if self.accepts_none(name) and plain != plain else plain
         return Values._trusted(values, self._declarations)
+
+    def accepts_none(self, name):
+        """Return whether output ``name`` is declared ``X | None``."""
+        declaration = self._declarations.get(name)
+        return declaration is not None and declaration.accepts_none()
 
     def get(self, name, default=None, *, unit=None):
         """Return one value, optionally converted from its declared SI unit.

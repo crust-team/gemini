@@ -28,10 +28,8 @@ from gemini.core.types import (
     Viscosity,
 )
 from gemini.core.types.fluid import Fluid
+from gemini.core.types.results import NOT_ASSESSED
 from gemini.errors import ConfigurationError, InsufficientDataError, PhysicsRangeError
-
-NOT_ASSESSED = "No diagnostic model or sufficient measurements"
-"""Health message of a row that was not assessed, as the engine reports a module without health."""
 
 FLUID_OVERRIDES = ("liquid_density", "liquid_viscosity")
 """Reservoir parameters that, when set, replace the matching property of the module fluid."""

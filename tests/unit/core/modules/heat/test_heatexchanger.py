@@ -12,6 +12,7 @@ from gemini.core.modules.heat import HeatExchanger
 from gemini.core.physics import units
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import WATER
+from gemini.core.types.results import NOT_ASSESSED
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 
 DATA = Path(__file__).parents[5] / "examples/legacy/gemini_project_bridge/old_project"
@@ -205,7 +206,7 @@ def test_health_on_arrays_marks_undetermined_rows_not_assessed():
     )
     health = exchanger.health(result, measured)
     assert health.assessed.tolist() == [True, False]
-    assert health.score[1] == 0.0 and not health.alarm[1]
-    assert health.message[1] == "Apparent UA not determined"
+    assert health.score[1] == 1.0 and not health.alarm[1]
+    assert health.message[1] == NOT_ASSESSED and np.isnan(health.metrics["apparent_ua"][1])
     assert health.score[0] == exchanger.health(result, {k: v[0] for k, v in measured.items()}).score
     assert exchanger.health(result, {k: v[1:] for k, v in measured.items()}) is None
