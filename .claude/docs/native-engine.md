@@ -240,6 +240,23 @@ Where the prototype differs from sections 1 to 11, and why:
 - **Literals in a graph** are numbers, `None` (a `where` branch without a value, NaN on arrays,
   read back as `None` for an `X | None` output) and tuples of numbers (the fixed table of an
   `interp`).
+- **Solvers.** `ops.brentq` and `ops.newton` (kind `solver`) record one node whose operands are
+  the bounds or start plus `args` and whose attributes hold the function and settings. The
+  function is module-level, written with ops, takes no traced closure and holds no check that
+  can fail on some row; the interpreter calls it with concrete arrays. A failing solve returns NaN
+  instead of raising, followed by a `where` and a `check` with the old message. The Python backend
+  is `scipy.optimize.brentq` and the handwritten Newton loop. **The NumPy backend is not the
+  SciPy routines of section 3**: `gemini/backends/solvers.py` repeats the scalar iterations step
+  for step with an active-row mask. `find_root` lands up to 1.4e-12 relative from the Python
+  result (Brent's own error is within `xtol`, so no setting meets 1e-12) and array
+  `scipy.optimize.newton` returns a different iterate, which moved the rounded NORSOK pH on 34 %
+  of random rows. The vectorised versions differ by at most 6.4e-16. CSE never merges solvers.
+- **Checked functions called inside a branch.** Both branches of `where` always run, so a check
+  in a public function called from a branch would fire for the unselected one. Such a function
+  splits into a checked wrapper and an unchecked private helper (`steam._saturation_pressure`,
+  `psychrometrics._saturation_pressure`). A value-dependent `break` becomes a fixed number of
+  passes with a finished mask (`IceStorage`). `ntu` raises on a zero rate, so a `where`-selected
+  call passes a safe rate.
 - **An `index` op kind** (`getitem`) selects one item of a vector parameter such as a curve
   coefficient, on the last axis so a scenario axis can lead.
 - **No `named_constants` or `named_states`.** A module's constants are known only by tracing
