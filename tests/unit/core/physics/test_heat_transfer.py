@@ -7,6 +7,7 @@ import pytest
 
 from gemini.core.physics import heat_transfer
 from gemini.errors import PhysicsRangeError
+from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 GOLDEN = json.loads((Path(__file__).parents[3] / "fixtures/golden_values.json").read_text())
 
@@ -60,3 +61,46 @@ def test_nan_inputs_are_rejected(call):
     """Reject NaN inputs, which formerly returned NaN as if it were a valid result."""
     with pytest.raises(PhysicsRangeError, match="nan"):
         call()
+
+
+def test_pipe_temperature_change_on_arrays_matches_floats():
+    """Single-phase, mixed and reverse flows agree on arrays and floats."""
+    rows = [
+        (350.0, 10.0, 20.0, 40.0, 0.0, 4200.0, 800.0, 300.0),
+        (350.0, 10.0, 20.0, 30.0, 10.0, 4200.0, 800.0, 300.0),
+        (300.0, 10.0, 20.0, -40.0, 0.0, 4200.0, 800.0, 310.0),
+    ]
+    assert_function_matches(heat_transfer.pipe_temperature_change, rows)
+    assert_same_error(
+        heat_transfer.pipe_temperature_change,
+        [rows[0], (350.0, 10.0, 20.0, 1.0, -1.0, 4200.0, 800.0, 300.0)],
+        PhysicsRangeError,
+    )
+
+
+def test_lmtd_on_arrays_matches_floats_on_every_branch():
+    """Equal, pinched, ordinary and reversed terminal differences agree."""
+    rows = [(10.0, 10.0), (10.0, 0.0), (0.0, 5.0), (0.0, 0.0), (20.0, 10.0), (3.0, 40.0)]
+    assert_function_matches(heat_transfer.lmtd, rows)
+    assert_same_error(heat_transfer.lmtd, [(10.0, 5.0), (10.0, -1.0)], PhysicsRangeError)
+    assert_same_error(heat_transfer.lmtd, [(10.0, 5.0), (float("nan"), 1.0)], PhysicsRangeError)
+
+
+def test_ntu_on_arrays_matches_floats():
+    """The ratio agrees, and a zero capacity rate or NaN raises the same error."""
+    assert_function_matches(heat_transfer.ntu, [(1000.0, 500.0), (0.0, 10.0), (5.0, 1e-3)])
+    assert_same_error(heat_transfer.ntu, [(1.0, 2.0), (1.0, 0.0)], PhysicsRangeError)
+    assert_same_error(heat_transfer.ntu, [(1.0, 2.0), (-1.0, 3.0)], PhysicsRangeError)
+    assert_same_error(heat_transfer.ntu, [(1.0, 2.0), (float("nan"), 3.0)], PhysicsRangeError)
+
+
+@pytest.mark.parametrize(
+    "function", [heat_transfer.effectiveness_counterflow, heat_transfer.effectiveness_parallel]
+)
+def test_effectiveness_on_arrays_matches_floats(function):
+    """Balanced, unbalanced, zero and infinite NTU agree on arrays and floats."""
+    rows = [(1.0, 1.0), (0.0, 0.5), (2.5, 0.0), (3.0, 0.7), (float("inf"), 1.0), (1e6, 0.5)]
+    assert_function_matches(function, rows)
+    assert_same_error(function, [(1.0, 0.5), (1.0, 2.0)], PhysicsRangeError)
+    assert_same_error(function, [(1.0, 0.5), (-1.0, 0.5)], PhysicsRangeError)
+    assert_same_error(function, [(1.0, 0.5), (1.0, float("nan"))], PhysicsRangeError)

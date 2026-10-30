@@ -1,7 +1,6 @@
 """Pipe heat loss and standard heat-exchanger effectiveness relations."""
 
-import math
-
+from gemini import ops
 from gemini.errors import PhysicsRangeError
 
 
@@ -39,11 +38,13 @@ def pipe_temperature_change(
     UA*(T-T_ambient)/(m_dot*cp_mix). Zero-flow handling belongs to the path marcher.
     """
     total_mass_flow = liquid_mass_flow + gas_mass_flow
-    if total_mass_flow == 0:
-        raise PhysicsRangeError(
-            f"pipe_temperature_change: total mass flow = {total_mass_flow} kg/s; expected a "
-            "nonzero flow"
-        )
+    ops.check(
+        total_mass_flow != 0,
+        PhysicsRangeError,
+        "pipe_temperature_change: total mass flow = {total_mass_flow} kg/s; expected a "
+        "nonzero flow",
+        total_mass_flow=total_mass_flow,
+    )
     liquid_fraction = liquid_mass_flow / total_mass_flow
     gas_fraction = gas_mass_flow / total_mass_flow
     heat_capacity = liquid_fraction * liquid_heat_capacity + gas_fraction * gas_heat_capacity
@@ -74,15 +75,17 @@ def lmtd(dt1: float, dt2: float) -> float:
     heat-exchanger LMTD method: (dt1-dt2)/ln(dt1/dt2).
     """
     _check_numbers("lmtd", dt1=dt1, dt2=dt2)
-    if dt1 < 0 or dt2 < 0:
-        raise PhysicsRangeError(
-            f"lmtd: dt1 = {dt1} K, dt2 = {dt2} K; expected nonnegative terminal differences"
-        )
-    if dt1 == dt2:
-        return dt1
-    if dt1 == 0 or dt2 == 0:
-        return 0.0
-    return (dt1 - dt2) / math.log(dt1 / dt2)
+    ops.check(
+        ops.logical_and(dt1 >= 0, dt2 >= 0),
+        PhysicsRangeError,
+        "lmtd: dt1 = {dt1} K, dt2 = {dt2} K; expected nonnegative terminal differences",
+        dt1=dt1,
+        dt2=dt2,
+    )
+    logarithmic = ops.truediv(dt1 - dt2, ops.log(ops.truediv(dt1, dt2)))
+    return ops.where(
+        dt1 == dt2, dt1, ops.where(ops.logical_or(dt1 == 0, dt2 == 0), 0.0, logarithmic)
+    )
 
 
 def ntu(ua: float, c_min: float) -> float:
@@ -104,10 +107,13 @@ def ntu(ua: float, c_min: float) -> float:
     effectiveness–NTU method.
     """
     _check_numbers("ntu", ua=ua, c_min=c_min)
-    if ua < 0 or c_min <= 0:
-        raise PhysicsRangeError(
-            f"ntu: ua = {ua} W/K, c_min = {c_min} W/K; expected ua >= 0 and c_min > 0"
-        )
+    ops.check(
+        ops.logical_and(ua >= 0, c_min > 0),
+        PhysicsRangeError,
+        "ntu: ua = {ua} W/K, c_min = {c_min} W/K; expected ua >= 0 and c_min > 0",
+        ua=ua,
+        c_min=c_min,
+    )
     return ua / c_min
 
 
@@ -130,10 +136,11 @@ def effectiveness_counterflow(transfer_units: float, c_ratio: float) -> float:
     counterflow effectiveness–NTU relation, including the equal-capacity limit.
     """
     _check_effectiveness_inputs("effectiveness_counterflow", transfer_units, c_ratio)
-    if c_ratio == 1:
-        return 1.0 if math.isinf(transfer_units) else transfer_units / (1 + transfer_units)
-    term = math.exp(-transfer_units * (1 - c_ratio))
-    return (1 - term) / (1 - c_ratio * term)
+    balanced = ops.where(
+        ops.isinf(transfer_units), 1.0, ops.truediv(transfer_units, 1 + transfer_units)
+    )
+    term = ops.exp(ops.mul(-transfer_units, 1 - c_ratio))
+    return ops.where(c_ratio == 1, balanced, ops.truediv(1 - term, 1 - c_ratio * term))
 
 
 def effectiveness_parallel(transfer_units: float, c_ratio: float) -> float:
@@ -155,21 +162,31 @@ def effectiveness_parallel(transfer_units: float, c_ratio: float) -> float:
     parallel-flow relation: (1-exp(-NTU*(1+Cr)))/(1+Cr).
     """
     _check_effectiveness_inputs("effectiveness_parallel", transfer_units, c_ratio)
-    return -math.expm1(-transfer_units * (1 + c_ratio)) / (1 + c_ratio)
+    return -ops.expm1(-transfer_units * (1 + c_ratio)) / (1 + c_ratio)
 
 
 def _check_numbers(function, **values):
     """Reject NaN inputs, which would otherwise return NaN as if it were a valid result."""
     for name, value in values.items():
-        if math.isnan(value):
-            raise PhysicsRangeError(f"{function}: {name} = nan; expected a number")
+        ops.check(
+            ops.logical_not(ops.isnan(value)),
+            PhysicsRangeError,
+            "{function}: {name} = nan; expected a number",
+            function=function,
+            name=name,
+            value=value,
+        )
 
 
 def _check_effectiveness_inputs(function, transfer_units, c_ratio):
     """Require a nonnegative NTU and a capacity ratio in [0, 1]."""
     _check_numbers(function, transfer_units=transfer_units, c_ratio=c_ratio)
-    if transfer_units < 0 or not 0 <= c_ratio <= 1:
-        raise PhysicsRangeError(
-            f"{function}: transfer_units = {transfer_units}, c_ratio = {c_ratio}; expected "
-            "transfer_units >= 0 and c_ratio in [0, 1]"
-        )
+    ops.check(
+        ops.logical_and(transfer_units >= 0, ops.logical_and(c_ratio >= 0, c_ratio <= 1)),
+        PhysicsRangeError,
+        "{function}: transfer_units = {transfer_units}, c_ratio = {c_ratio}; expected "
+        "transfer_units >= 0 and c_ratio in [0, 1]",
+        function=function,
+        transfer_units=transfer_units,
+        c_ratio=c_ratio,
+    )

@@ -184,9 +184,6 @@ def test_ice_storage_matches_per_row():
     assert_module_matches(_store(), rows, breaks=True)
 
 
-@pytest.mark.xfail(
-    raises=TypeError, reason="needs heat_transfer.ntu rewritten with ops; remove at the merge"
-)
 @pytest.mark.parametrize("dt", [600, 20000, 400000])
 def test_ice_storage_advance_matches_per_row(monkeypatch, dt):
     """The piecewise phase integration on stacked states equals one step per row."""
