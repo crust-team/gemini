@@ -132,9 +132,9 @@ class ESP(Module):
         return ops.where(
             power < MIN_EFFICIENCY_POWER,
             0.0,
-            lambda: units.m3s_to_bbl_per_day(flow)
+            units.m3s_to_bbl_per_day(flow)
             / constants.ESP_EFFICIENCY_FLOW_FACTOR
-            * (head / power)
+            * ops.truediv(head, power)
             * (units.bhp_to_w(1) / units.ft_head_to_pa(1)),
         )
 

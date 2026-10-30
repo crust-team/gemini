@@ -17,7 +17,9 @@ class Backend:
 
     A method receives concrete values only and has the op's name, for example
     ``add(left, right)``. An op a backend does not define runs on the NumPy backend.
-    ``where(condition, if_true, if_false)`` may receive zero-argument callables as branches.
+    ``where(condition, if_true, if_false)`` receives both branches as plain values (or ``None``),
+    so every op must return ``inf`` or ``nan`` on an operand that is invalid in a branch that is
+    not selected, never raise and never warn.
     """
 
     name = None

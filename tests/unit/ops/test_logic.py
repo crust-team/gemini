@@ -16,13 +16,14 @@ def test_comparisons_and_logical_and():
     assert ops.logical_and(X >= 0, X <= 1).tolist() == [True, False]
 
 
-def test_where_on_scalars_evaluates_only_the_selected_callable():
-    """A scalar condition never calls the branch that would divide by zero."""
-    assert ops.where(0.0 < 0.1, 0.0, lambda: 1 / 0.0) == 0.0
-    assert ops.where(X < 1, 0.0, lambda: 1 / X).tolist() == [0.0, 0.5]
+def test_where_on_scalars_and_arrays_selects_a_plain_value():
+    """Both branches are values; the unselected division by zero is silent, not an error."""
+    assert ops.where(0.0 < 0.1, 0.0, ops.truediv(1.0, 0.0)) == 0.0
+    assert ops.where(X < 1, 0.0, ops.truediv(1.0, X)).tolist() == [0.0, 0.5]
+    assert ops.where(True, None, 1.0) is None
 
 
-def test_traced_condition_calls_both_branches_before_recording():
+def test_traced_condition_records_both_branch_values():
     """A symbolic condition records ``where`` with both branch values."""
 
     class Recorder(Symbolic):
@@ -30,4 +31,4 @@ def test_traced_condition_calls_both_branches_before_recording():
             return definition.name, operands
 
     condition = Recorder()
-    assert ops.where(condition, lambda: 1, 2) == ("where", (condition, 1, 2))
+    assert ops.where(condition, 1, 2) == ("where", (condition, 1, 2))

@@ -31,8 +31,14 @@ def test_division_by_zero_in_an_unselected_branch_is_silent():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         ratio = BACKEND.truediv(1.0, X)
-        selected = BACKEND.where(X == 0, 0.0, lambda: 1.0 / X)
+        selected = BACKEND.where(X == 0, 0.0, BACKEND.truediv(1.0, X))
     assert np.isinf(ratio[0]) and selected.tolist() == [0.0, 1.0, 0.5]
+
+
+def test_where_turns_a_none_branch_into_nan():
+    """An array cannot hold ``None``: the missing branch becomes NaN."""
+    result = BACKEND.where(X > 0, None, 1.0)
+    assert np.isnan(result[1:]).all() and result[0] == 1.0 and result.dtype == float
 
 
 def test_check_codes_and_vector_indexing_on_the_last_axis():

@@ -1,13 +1,14 @@
 """Comparison ops, ``logical_and`` and ``where``, the branch choice of traced physics.
 
 ``where(condition, if_true, if_false)`` replaces a value-dependent ``if``: write
-``where(re < 2300, 64 / re, turbulent(re))`` instead of an ``if`` statement. A branch may be a
-zero-argument callable, such as ``lambda: head / power``: the Python backend calls only the
-selected one, so a branch that would divide by zero on a Python float is never evaluated, while
-a trace and the NumPy backend evaluate both (NumPy warnings silenced).
+``where(re < 2300, 64 / re, turbulent(re))`` instead of an ``if`` statement. Both branches are
+plain values and are always evaluated. A branch that can be invalid where it is not selected
+uses ``ops.truediv`` or ``ops.pow`` rather than ``/`` or ``**``, which give ``inf`` or ``nan``
+silently instead of raising on Python floats. A branch may be ``None``: it stays ``None`` on
+Python values and is NaN in arrays and graphs.
 """
 
-from gemini.ops.dispatch import Symbolic, dispatch
+from gemini.ops.dispatch import dispatch
 from gemini.ops.registry import register
 
 for _name in ("lt", "le", "gt", "ge", "eq", "ne", "logical_and"):
@@ -51,11 +52,5 @@ def logical_and(left, right):
 
 
 def where(condition, if_true, if_false):
-    """Return ``if_true`` where ``condition`` holds and ``if_false`` elsewhere.
-
-    A traced condition records both branches, calling callable branches to trace them.
-    """
-    if isinstance(condition, Symbolic):
-        if_true = if_true() if callable(if_true) else if_true
-        if_false = if_false() if callable(if_false) else if_false
+    """Return ``if_true`` where ``condition`` holds and ``if_false`` elsewhere."""
     return dispatch("where", condition, if_true, if_false)

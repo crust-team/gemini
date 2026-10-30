@@ -1,7 +1,8 @@
 """Array backend: NumPy ufuncs over whole time series, with floating-point warnings silenced.
 
 Both branches of ``where`` are evaluated on every row, so the branch that is not selected may
-divide by zero or overflow; those warnings are silenced here and never reach the user. Vector
+divide by zero or overflow; those warnings are silenced here and never reach the user. A ``None``
+branch of ``where`` becomes NaN. Vector
 values (a parameter of shape ``(n,)``) are indexed on their last axis, which leaves room for a
 leading scenario axis.
 """
@@ -74,11 +75,12 @@ class NumpyBackend(Backend):
         return np.logical_and(left, right)
 
     def where(self, condition, if_true, if_false):
-        """Select per row; callable branches are both evaluated, with warnings silenced."""
-        with np.errstate(all="ignore"):
-            selected = if_true() if callable(if_true) else if_true
-            other = if_false() if callable(if_false) else if_false
-            return np.where(condition, selected, other)
+        """Select per row; a ``None`` branch becomes NaN, as an array cannot hold ``None``."""
+        if if_true is None:
+            if_true = np.nan
+        if if_false is None:
+            if_false = np.nan
+        return np.where(condition, if_true, if_false)
 
     def check(self, condition, code):
         """Return 0 on rows where ``condition`` holds, else the error ``code``."""
