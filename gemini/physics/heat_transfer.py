@@ -7,6 +7,10 @@ from gemini.physics.fluid import FluidProperties
 DEFAULT_CP = FluidProperties().cp_l
 """Liquid heat capacity [J/kg/K] assumed when measurements give none; the ``Fluid`` default."""
 
+DEFAULT_FOULING_THRESHOLD = 0.15
+"""Fractional loss of the design conductance that raises the fouling alarm [-]; a GEMINI
+alarm convention without a published source."""
+
 DUTY_AGREEMENT_TOLERANCE = 0.05
 """Largest relative difference [-] of the hot and cold duties for which an apparent UA is taken."""
 
@@ -527,6 +531,82 @@ def mean_temperature(first: float, second: float) -> float:
     Ziegler 1999).
     """
     return (first + second) / 2
+
+
+@ops.physics
+def conductance_ratio(apparent: float, design: float) -> float:
+    """Return the apparent conductance as a fraction of the design conductance.
+
+    Parameters
+    ----------
+    apparent, design : float
+        Apparent (measured) and design conductance UA [W/K]; the design value is positive.
+
+    Returns
+    -------
+    float
+        ``UA / UA_design`` [-], one for a clean exchanger; fouling lowers it.
+
+    Notes
+    -----
+    Fouling indicator from the heat-exchanger conductance method, Incropera et al.,
+    Fundamentals of Heat and Mass Transfer, fouling factors.
+    """
+    return apparent / design
+
+
+@ops.physics
+def exchanger_balance(
+    hot_inlet: float,
+    cold_inlet: float,
+    hot_rate: float,
+    cold_rate: float,
+    conductance: float,
+    counterflow: bool,
+) -> tuple:
+    """Return the effectiveness-NTU balance of a two-stream heat exchanger.
+
+    Parameters
+    ----------
+    hot_inlet, cold_inlet : float
+        Inlet temperatures [K] of the hot and the cold stream.
+    hot_rate, cold_rate : float
+        Heat capacity rates ``m cp`` [W/K], nonnegative.
+    conductance : float
+        Overall conductance UA [W/K], nonnegative.
+    counterflow : bool
+        True for counterflow, false for parallel flow (a static choice of the arrangement).
+
+    Returns
+    -------
+    tuple of float
+        ``(effectiveness, NTU, duty, hot outlet, cold outlet)`` [-, -, W, K, K]:
+        ``NTU = UA / C_min``, ``Q = eps C_min (T_hot - T_cold)``, ``T_hot,out = T_hot - Q /
+        C_hot`` and ``T_cold,out = T_cold + Q / C_cold``. A stopped stream (``C_min = 0``)
+        transfers no heat: all of effectiveness, NTU and duty are zero and the outlets equal the
+        inlets.
+
+    Notes
+    -----
+    Reference: Incropera et al., Fundamentals of Heat and Mass Transfer, effectiveness-NTU
+    method, with ``effectiveness_counterflow`` or ``effectiveness_parallel``. Read the result
+    by index when the check on a negative conductance can fail.
+    """
+    c_min, c_max = ops.minimum(hot_rate, cold_rate), ops.maximum(hot_rate, cold_rate)
+    stopped = c_min == 0
+    transfer_units = ntu(conductance, c_min)
+    method = effectiveness_counterflow if counterflow else effectiveness_parallel
+    effectiveness = method(transfer_units, c_min / c_max)
+    duty = effectiveness * c_min * (hot_inlet - cold_inlet)
+    hot_outlet = hot_inlet - duty / hot_rate
+    cold_outlet = cold_inlet + duty / cold_rate
+    return (
+        ops.where(stopped, 0.0, effectiveness),
+        ops.where(stopped, 0.0, transfer_units),
+        ops.where(stopped, 0.0, duty),
+        ops.where(stopped, hot_inlet, hot_outlet),
+        ops.where(stopped, cold_inlet, cold_outlet),
+    )
 
 
 @ops.physics

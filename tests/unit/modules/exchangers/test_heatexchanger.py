@@ -64,7 +64,7 @@ def test_measured_heat_exchanger_performance():
     rows = pd.read_csv(DATA / "doublet_2024_old.csv", sep=";", nrows=5)
     for _, row in rows.iterrows():
         measured = measured_row(row)
-        ua = HeatExchanger.ua_from_measurements(**measured)
+        ua = gm.analysis.estimate_conductance(**measured)
         exchanger, streams = exchanger_for(row, measured, ua)
         result = exchanger(**streams)
         out = result.outputs
@@ -110,7 +110,7 @@ def test_first_law_equal_capacity_and_limits(arrangement):
 def test_invalid_measurements():
     """A temperature cross or a gross heat-balance mismatch cannot identify a valid UA."""
     with pytest.raises(gm.errors.InsufficientDataError):
-        HeatExchanger.ua_from_measurements(350, 340, 300, 340, 10, 10)
+        gm.analysis.estimate_conductance(350, 340, 300, 340, 10, 10)
 
 
 def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
@@ -134,7 +134,7 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
     exchanger.update_params(ua=0)
     assert exchanger.health(running, measured) is None
     with pytest.raises(gm.errors.UnknownCorrelationError, match="arrangement"):
-        HeatExchanger.ua_from_measurements(350, 340, 300, 310, 10, 10, arrangement="cross")
+        gm.analysis.estimate_conductance(350, 340, 300, 310, 10, 10, arrangement="cross")
 
 
 @pytest.mark.parametrize("arrangement", ["parallel", "counterflow"])

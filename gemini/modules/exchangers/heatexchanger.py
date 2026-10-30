@@ -5,9 +5,9 @@ from typing import Literal
 import numpy as np
 
 from gemini import ops
-from gemini.errors import InsufficientDataError, PhysicsRangeError, UnknownCorrelationError
+from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer, hydraulics
+from gemini.physics import diagnostics, heat_transfer, hydraulics
 from gemini.types import (
     Duty,
     Fraction,
@@ -43,7 +43,9 @@ class HeatExchanger(Module):
         self.dp_cold_nominal = Parameter(PressureDifference, ge=0)
         self.m_dot_hot_nominal = Parameter(MassFlow, gt=0)
         self.m_dot_cold_nominal = Parameter(MassFlow, gt=0)
-        self.fouling_threshold = Parameter(Fraction, default=0.15, gt=0, le=1)
+        self.fouling_threshold = Parameter(
+            Fraction, default=heat_transfer.DEFAULT_FOULING_THRESHOLD, gt=0, le=1
+        )
 
         # Inlets
         self.hot_in = Inlet(Stream)
@@ -104,17 +106,23 @@ class HeatExchanger(Module):
             hot_T=hot_in.T,
             cold_T=cold_in.T,
         )
-        effectiveness, ntu, duty, hot_T, cold_T = self._heat_balance(hot_in, cold_in)
+        effectiveness, ntu, duty, hot_T, cold_T = heat_transfer.exchanger_balance(
+            hot_in.T,
+            cold_in.T,
+            hot_in.heat_capacity_rate(),
+            cold_in.heat_capacity_rate(),
+            self.ua,
+            self.arrangement == "counterflow",
+        )
         dp_hot = hydraulics.quadratic_pressure_drop(
             self.dp_hot_nominal, hot_in.m_dot, self.m_dot_hot_nominal
         )
         dp_cold = hydraulics.quadratic_pressure_drop(
             self.dp_cold_nominal, cold_in.m_dot, self.m_dot_cold_nominal
         )
-        if self.arrangement == "counterflow":
-            dt1, dt2 = hot_in.T - cold_T, hot_T - cold_in.T
-        else:
-            dt1, dt2 = hot_in.T - cold_in.T, hot_T - cold_T
+        dt1, dt2 = heat_transfer.terminal_differences(
+            hot_in.T, hot_T, cold_in.T, cold_T, self.arrangement == "counterflow"
+        )
         return {
             "duty": duty,
             "effectiveness": effectiveness,
@@ -127,85 +135,15 @@ class HeatExchanger(Module):
             "approach_T": ops.minimum(dt1, dt2),
         }
 
-    def _heat_balance(self, hot_in, cold_in):
-        """Return effectiveness, NTU, duty [W] and both outlet temperatures [K].
-
-        A stopped stream (zero heat capacity rate) transfers no heat.
-        """
-        c_hot, c_cold = hot_in.heat_capacity_rate(), cold_in.heat_capacity_rate()
-        c_min, c_max = ops.minimum(c_hot, c_cold), ops.maximum(c_hot, c_cold)
-        stopped = c_min == 0
-        ntu = heat_transfer.ntu(self.ua, c_min)
-        method = (
-            heat_transfer.effectiveness_counterflow
-            if self.arrangement == "counterflow"
-            else heat_transfer.effectiveness_parallel
-        )
-        effectiveness = method(ntu, c_min / c_max)
-        duty = effectiveness * c_min * (hot_in.T - cold_in.T)
-        hot_T = hot_in.T - duty / c_hot
-        cold_T = cold_in.T + duty / c_cold
-        return (
-            ops.where(stopped, 0.0, effectiveness),
-            ops.where(stopped, 0.0, ntu),
-            ops.where(stopped, 0.0, duty),
-            ops.where(stopped, hot_in.T, hot_T),
-            ops.where(stopped, cold_in.T, cold_T),
-        )
-
-    @classmethod
-    def ua_from_measurements(
-        cls,
-        hot_in_T,
-        hot_out_T,
-        cold_in_T,
-        cold_out_T,
-        m_dot_hot,
-        m_dot_cold,
-        *,
-        cp_hot=heat_transfer.DEFAULT_CP,
-        cp_cold=heat_transfer.DEFAULT_CP,
-        arrangement="counterflow",
-    ):
-        """Estimate apparent UA [W/K] from measured temperatures and mass flows.
-
-        Raises ``InsufficientDataError`` when the measurements cannot determine UA: a stopped
-        stream, hot and cold duties that disagree by more than 5 %, or no positive LMTD.
-        """
-        name = cls.__name__
-        if arrangement not in {"counterflow", "parallel"}:
-            raise UnknownCorrelationError(
-                f"{name}: unknown arrangement {arrangement!r}; expected counterflow or parallel"
-            )
-        apparent, code, qh, qc, delta = heat_transfer.apparent_conductance(
-            arrangement,
-            hot_in_T,
-            hot_out_T,
-            cold_in_T,
-            cold_out_T,
-            m_dot_hot,
-            m_dot_cold,
-            cp_hot,
-            cp_cold,
-        )
-        if code == heat_transfer.NONPOSITIVE_INPUT:
-            raise InsufficientDataError(f"{name}: mass flows and heat capacities must be positive")
-        if code == heat_transfer.DISAGREEING_DUTIES:
-            raise InsufficientDataError(
-                f"{name}: hot/cold duties must agree within 5%; got {qh} W and {qc} W"
-            )
-        if code == heat_transfer.NO_LMTD:
-            raise InsufficientDataError(f"{name}: positive LMTD required; got {delta} K")
-        return apparent
-
     def health(self, result, measured):
         """Alarm when apparent conductance falls below the configured design fraction.
 
         With measured outlet temperatures, the inlet temperatures, mass flows and heat capacities
         come from the call's inlet streams. Returns ``None`` (not assessed) when a measurement is
         missing, the design UA is zero, or no row of the measurements can determine an apparent
-        UA (see ``ua_from_measurements``). On arrays the rows that cannot are not ``assessed``,
-        as a module without health reports them: score one, no alarm, ``NOT_ASSESSED``, NaN metrics.
+        UA (see ``gm.analysis.estimate_conductance``). On arrays the rows that cannot are not
+        ``assessed``, as a module without health reports them: score one, no alarm,
+        ``NOT_ASSESSED``, NaN metrics.
         """
         if {"hot_out_T", "cold_out_T"} <= measured.keys():
             measured = measured | _inlet_measurements(result.inlets)
@@ -221,11 +159,11 @@ class HeatExchanger(Module):
         assessed = code == heat_transfer.DETERMINED
         if not np.any(assessed):
             return None
-        ratio = apparent / self.ua
-        alarm = ratio < 1 - self.fouling_threshold
+        ratio = heat_transfer.conductance_ratio(apparent, self.ua)
+        alarm = diagnostics.below_limit(ratio, self.fouling_threshold)
         return Health(
             assessed=assessed,
-            score=ops.where(assessed, ops.minimum(1, ops.maximum(0, ratio)), 1.0),
+            score=ops.where(assessed, diagnostics.bounded_score(ratio), 1.0),
             alarm=ops.where(assessed, alarm, False),
             message=ops.where(
                 assessed,
