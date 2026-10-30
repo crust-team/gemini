@@ -87,7 +87,11 @@ def _row_feeds(graph, feeds, row):
 
 
 def graph_feeds(graph, module, inlets, inputs):
-    """Return the value of every graph input; ``inputs`` maps names to arrays or scalars."""
+    """Return the value of every graph input; ``inputs`` maps names to arrays or scalars.
+
+    A control or boundary without a value (``None``, for an optional one) is NaN, like every
+    value-dependent ``None`` in a graph.
+    """
     feeds = {}
     for name, stream in inlets.items():
         feeds |= {
@@ -95,7 +99,8 @@ def graph_feeds(graph, module, inlets, inputs):
         }
     for name in graph.by_role("control") | graph.by_role("boundary"):
         owner, local = _owner(module, name)
-        feeds[name] = np.asarray(inputs[name] if name in inputs else owner._input_value(local))
+        value = inputs[name] if name in inputs else owner._input_value(local)
+        feeds[name] = np.asarray(np.nan if value is None else value)
     for name in graph.by_role("parameter"):
         owner, local = _owner(module, name)
         feeds[name] = np.asarray(owner._parameter_value(local), dtype=float)

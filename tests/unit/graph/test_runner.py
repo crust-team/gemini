@@ -229,3 +229,12 @@ def test_list_outputs_are_stacked_per_row(chain_inlet):
     assert result.outputs["profile"].tolist() == [[1e5, 1e5 + 1], [2e5, 2e5 + 1], [3e5, 3e5 + 1]]
     row = middle(inlet=gm.Stream(m_dot=1.0, T=300.0, p=2e5, fluid=gm.WATER))
     assert row.outputs.profile == [2e5, 2e5 + 1]
+
+
+def test_a_control_without_a_value_is_nan_in_the_graph(optional):
+    """An optional control that is ``None`` is fed as NaN, like every graph ``None``."""
+    assert run(optional, {}, {"rate": np.array([1.0, 2.0])}).outputs["double"].tolist() == [
+        2.0,
+        4.0,
+    ]
+    assert run(optional, {}, {}).outputs["double"].tolist() == [-1.0]

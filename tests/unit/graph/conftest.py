@@ -504,3 +504,32 @@ class Bounded(Module):
 def bounded():
     """Return a ``Bounded`` module."""
     return Bounded()
+
+
+class Optional(Module):
+    """Report ``-1`` while its optional control has no value, else the control doubled."""
+
+    def __init__(self):
+        """Declare an optional control, an output and no streams."""
+        super().__init__()
+
+        # Controls
+        self.rate = Control(float | None, default=None)
+
+        # Outputs
+        self.double = Output(float)
+
+    def forward(self, inlets):
+        """Expose no fluid outlets."""
+
+        outlets = dict()
+        return outlets
+
+    def _compute_outputs(self, inlets, outlets):
+        self.double = ops.where(ops.isnan(self.rate), -1.0, 2 * self.rate)
+
+
+@pytest.fixture
+def optional():
+    """Return an ``Optional`` module."""
+    return Optional()
