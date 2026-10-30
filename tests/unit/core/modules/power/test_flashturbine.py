@@ -7,6 +7,7 @@ from gemini.core.modules import Module, mass_balance
 from gemini.core.modules.power import FlashTurbine, Separator
 from gemini.core.physics import steam
 from gemini.core.types import STEAM, WATER, Inlet, Outlet, Output, Stream
+from gemini.errors import PhysicsRangeError
 from tests.fixtures.equivalence import assert_module_matches
 
 STEAM_FEED = Stream(m_dot=20, T=431.98, p=6e5, fluid=STEAM)
@@ -116,3 +117,14 @@ def test_traced_call_matches_one_call_per_row():
         for m_dot, p in [(20.0, 6e5), (0.0, 6e5), (5.0, 2e6), (12.0, 2e5)]
     ]
     assert_module_matches(turbine(), rows)
+
+
+def test_a_bad_expansion_rejects_the_call_without_outputs_too():
+    """``forward`` uses no number of the expansion, but its error still fails the call."""
+    module = turbine().update_params(condenser_pressure="7 bar")
+    with pytest.raises(PhysicsRangeError) as with_outputs:
+        module(inlet=STEAM_FEED)
+    with gm.no_outputs():
+        with pytest.raises(PhysicsRangeError) as without_outputs:
+            module(inlet=STEAM_FEED)
+    assert str(without_outputs.value) == str(with_outputs.value)

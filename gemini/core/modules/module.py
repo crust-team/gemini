@@ -875,8 +875,9 @@ class Module:
         self._check_outlet_names(returned)
         validated = []
         for name, declaration in self._outlets.items():
+            outlet = _plain_outlet(returned[name])
             try:
-                validated.append((name, declaration.validate(_plain_outlet(returned[name]))))
+                validated.append((name, declaration.validate(outlet)))
             except (TypeError, ValueError) as exc:
                 raise OutletError(
                     f"{self.path}: invalid outlet {name!r}; "

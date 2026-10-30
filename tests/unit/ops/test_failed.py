@@ -5,6 +5,7 @@ import pytest
 
 from gemini import ops
 from gemini.errors import PhysicsRangeError
+from gemini.graph import run_function
 from gemini.ops import Constant, Failed
 
 MESSAGE = "{path}: x = {x} m; expected x >= 0"
@@ -131,3 +132,51 @@ def test_a_check_on_an_eager_array_raises_at_once_for_the_first_failing_row():
         checked(values)
     with pytest.raises(PhysicsRangeError, match="x = -2.0 m"):
         inner(values)
+
+
+def test_a_failed_argument_short_circuits_so_the_earliest_failure_wins():
+    """A physics function given a ``Failed`` returns it, with the error of the first check."""
+
+    @ops.physics
+    def inner(value):
+        ops.check(value > 0, PhysicsRangeError, "inner: value = {value}", value=value)
+        return value
+
+    @ops.physics
+    def outer(value):
+        ops.check(value > 1, PhysicsRangeError, "outer: value = {value}", value=value)
+        return value
+
+    @ops.physics
+    def chained(value):
+        return outer(inner(value))
+
+    with pytest.raises(PhysicsRangeError, match="inner: value = -1"):
+        chained(-1.0)
+
+
+def test_require_surfaces_the_error_of_a_value_whose_number_is_not_used():
+    """Without ``require`` a failed result that is discarded raises nothing; with it, it does."""
+
+    @ops.physics
+    def checked(value):
+        ops.check(value > 0, PhysicsRangeError, "checked: value = {value}", value=value)
+        return value
+
+    @ops.physics
+    def discards(value):
+        checked(value)
+        return 1.0
+
+    @ops.physics
+    def requires(value):
+        ops.require(checked(value))
+        return 1.0
+
+    assert discards(-1.0) == 1.0
+    assert requires(1.0) == 1.0
+    with pytest.raises(PhysicsRangeError, match="checked: value = -1"):
+        requires(-1.0)
+    with pytest.raises(PhysicsRangeError, match="checked: value = -1"):
+        run_function(requires, np.array([1.0, -1.0]))
+    assert np.all(run_function(discards, np.array([1.0, -1.0])) == 1.0)

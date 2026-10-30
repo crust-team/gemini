@@ -23,6 +23,7 @@ as the graph, evaluated on the Python backend. One mechanism makes plain operato
   and guards every traced value it returns with them, so the graph attaches an error to the
   results of the function exactly as the eager ``Failed`` does. A check recorded outside any
   physics function is certain: it guards every graph output, as it raises at once when eager.
+- **A result used for its validity only** is passed to ``require``, or its error is dropped.
 
 Do not put ``repr`` of a physical value in a message (``np.float64(1.0)``), and note that
 ``round(np.float64, n)`` is NumPy's rounding: use ``ops.round``.
@@ -179,13 +180,11 @@ def physics(function):
         mode = scope_mode()
         if mode is None:
             return _outermost(function, args, kwargs)
+        failed = _first_failed(args, kwargs)
+        if failed is not None:
+            return failed
         if mode is WRAP:
-            for value in args:
-                if type(value) is float:
-                    args = tuple([_scalar(item) for item in args])
-                    break
-            if kwargs:
-                kwargs = _wrapped_keywords(kwargs)
+            args, kwargs = _wrapped_nested(args, kwargs)
         try:
             return function(*args, **kwargs) if mode is WRAP else _framed(function, args, kwargs)
         except Exception as error:
@@ -194,6 +193,40 @@ def physics(function):
             return Failed(error)
 
     return wrapper
+
+
+def _wrapped_nested(args, kwargs):
+    """Return the arguments of a nested call with their exact floats as ``np.float64``."""
+    for value in args:
+        if type(value) is float:
+            args = tuple([_scalar(item) for item in args])
+            break
+    return args, _wrapped_keywords(kwargs) if kwargs else kwargs
+
+
+def _first_failed(args, kwargs):
+    """Return a ``Failed`` argument, so a function never runs on a value that has failed."""
+    for value in args:
+        if type(value) is Failed:
+            return value
+    for value in kwargs.values():
+        if type(value) is Failed:
+            return value
+    return None
+
+
+def require(value):
+    """Surface the error of ``value`` where its number is not used, as if it reached an output.
+
+    A failed result that nothing reads is dropped on every backend. ``forward`` calls this for a
+    physics result it computes only for its validity: a ``Failed`` raises and, in a trace, the
+    traced values of ``value`` become graph outputs, so a failing row fails.
+    """
+    if isinstance(value, Failed):
+        raise value.error
+    graph = _traced.get()
+    if graph is not None:
+        graph.require(value)
 
 
 def _outermost(function, args, kwargs):

@@ -75,7 +75,7 @@ class FlashTurbine(Module):
 
         # Outlets
         inlet = inlets.inlet
-        self._expansion(inlet)
+        ops.require(self._expansion(inlet))
         condenser = steam.saturation_properties(self.condenser_pressure)
 
         outlet = inlet.with_(T=condenser.temperature, p=self.condenser_pressure, fluid=WATER)

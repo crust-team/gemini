@@ -131,6 +131,11 @@ class Graph:
             return result
         return guarded[0]
 
+    def require(self, value):
+        """Make the traced values of ``value`` extra outputs: their errors now reach an output."""
+        for proxy in _proxies(value):
+            self.output(f"required.{len(self.outputs)}", proxy)
+
     def _guarded(self, value, checks, start):
         """Return ``(value with guarded proxies,)``, or ``None`` if ``value`` holds no proxy."""
         if isinstance(value, Proxy):
@@ -218,6 +223,21 @@ class Graph:
         lines.extend(f"pre-observer: {hook!r}" for hook in self.pre_observers)
         lines.extend(f"observer: {hook!r}" for hook in self.observers)
         return "\n".join(lines)
+
+
+def _proxies(value):
+    """Yield the traced values held in a result: a value, a sequence, a mapping or a dataclass."""
+    if isinstance(value, Proxy):
+        yield value
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _proxies(item)
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            yield from _proxies(item)
+    elif dataclasses.is_dataclass(value) and not isinstance(value, type):
+        for field in dataclasses.fields(value):
+            yield from _proxies(getattr(value, field.name))
 
 
 def _holds_traced(values):

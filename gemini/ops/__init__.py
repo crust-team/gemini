@@ -48,7 +48,7 @@ from gemini.ops.failed import Failed
 from gemini.ops.logic import eq, ge, gt, le, logical_and, lt, ne, where
 from gemini.ops.math import add, floordiv, getitem, mod, mul, neg, pow, sub, truediv
 from gemini.ops.reductions import cumsum, interp, mean, sum
-from gemini.ops.scope import physics
+from gemini.ops.scope import physics, require
 from gemini.ops.solvers import brentq, newton
 
 __all__ = [
@@ -99,6 +99,7 @@ __all__ = [
     "neg",
     "newton",
     "physics",
+    "require",
     "pow",
     "round",
     "scope",
