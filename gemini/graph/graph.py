@@ -19,7 +19,7 @@ class Graph:
     ``outlets.<port>.<field>`` to the node (or literal) that computes them, ``checks`` lists the
     check nodes (their codes are their position plus one), ``constants`` the ``Constant``
     objects behind the constant inputs, ``outlet_fluids`` the fixed fluid of every outlet,
-    ``breaks`` lists the children that run untraced, as
+    ``breaks`` lists the children that run as plain calls, as
     ``(module path, reason)`` and ``vectors`` the length of every list-valued output.
 
     ``result`` is the ``ModuleResult`` tree of the trace, with children, whose values are traced

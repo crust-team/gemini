@@ -182,8 +182,7 @@ class Constant:
     op is recorded and the constant becomes one graph input named ``name``, so a sensitivity
     study can release it without retracing. As with floats, ``/``, ``//``, ``%`` and ``**`` on
     invalid operands raise outside an eager scope; inside one (``gemini.ops.scope``) the operators
-    compute on ``np.float64`` and are silent like the ops. Use ``ops.truediv`` and ``ops.pow``
-    where a ``where`` branch can be invalid outside a scope.
+    compute on ``np.float64`` and are silent like the ops.
     """
 
     __slots__ = ("name", "value", "unit", "description", "_scalar")

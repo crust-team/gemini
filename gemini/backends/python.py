@@ -1,6 +1,6 @@
 """Scalar backend: plain Python operators on floats, NumPy scalars and bools.
 
-This is the untraced, tick-by-tick path and the reference of every other backend. Operators are
+This is the plain-call, row-by-row path and the reference of every other backend. Operators are
 applied as written, so NumPy float32 scalars keep their float32 arithmetic and promotion.
 
 ``where`` evaluates both of its branches, so an op never raises and never warns on an operand

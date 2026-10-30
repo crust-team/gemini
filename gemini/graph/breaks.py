@@ -1,4 +1,4 @@
-"""Break nodes: a leaf child that cannot be traced runs untraced, row by row, inside a graph.
+"""Break nodes: a leaf child that cannot be traced runs as a plain call, row by row, inside a graph.
 
 ``record_break`` records one ``break`` node for the call of a stateful, pre-hooked or
 untraceable leaf child. Its operands are the fields of the inlets and the supplied control and

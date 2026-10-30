@@ -75,4 +75,4 @@ class ConfigurationError(GeminiError, ValueError):
 
 
 class TraceError(GeminiError, TypeError):
-    """A module cannot be traced into a computation graph, so it runs untraced (graph break)."""
+    """A module cannot be traced into a graph, so it runs as a plain call (graph break)."""

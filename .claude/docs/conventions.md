@@ -197,10 +197,10 @@ reason it is needed:
   `backends.settings(backend=...)` take the full `dispatch` path. A `Constant` is not a `float`.
 - The eager scope (`gemini/ops/scope.py`, `gemini/ops/failed.py`), entered by `@ops.physics` and
   by `Module._run`, is what makes a direct call behave like the graph. The outermost entry enters
-  `np.errstate(all="ignore")` and gives plain Python floats to the function as `np.float64` (exact
-  `float` only; a module call wraps its parameters, on first read, its controls, states and
-  inlet fields), so `/` by zero, an invalid `**` and an overflow give `inf` or `nan` silently, as
-  on arrays. Leaving the outermost scope converts scalars back to `float`, `np.bool_` to `bool`,
+  `np.errstate(all="ignore")` and gives plain Python numbers to the function as NumPy scalars (an exact
+  `float` as `np.float64`, an exact `int` as `np.int64`; a module call wraps its parameters, on
+  first read, its controls, states and inlet fields), so `/` by zero, an invalid `**` and an overflow give `inf` or `nan` silently, as
+  on arrays. Leaving the outermost scope converts scalars back to `float` and `int`, `np.bool_` to `bool`,
   recursively, so results, outputs and outlet streams never hold NumPy scalars. Recorded outputs
   read back inside a call are wrapped too; results of child calls stay plain floats, so a
   composite that divides child values uses `ops.truediv`. Arrays or traced values among the

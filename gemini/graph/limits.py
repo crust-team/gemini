@@ -2,7 +2,7 @@
 
 ``check_declared_limits(module, call)`` adds one ``ops.check`` per bound (``Declaration.limits``)
 of every control, boundary and output a traced call holds, each item of a list separately, with
-``DeclarationError`` as ``Declaration.validate`` raises on the untraced path. A declared
+``DeclarationError`` as ``Declaration.validate`` raises on a plain call. A declared
 ``X | None`` lets NaN pass, which is how ``None`` is stored on arrays. Each check keeps its
 ``Declaration`` and the whole value among its message values (``declaration`` and ``whole``), so
 an evaluation words the error of a failing row with ``declaration.validate``. ``certain`` marks the

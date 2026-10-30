@@ -25,8 +25,8 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
 - `DeclarationError(TypeError, ValueError)`: a class or tree defined wrongly: declarations before
   `super().__init__()`, replaced declarations, invalid child names, cycles, invalid declaration
   values, hook signatures (`module.py`, `declarations.py`). A traced call raises it from the
-  graph checks of the declared bounds (`gemini/graph/limits.py`) with the class of the untraced
-  `Declaration.validate`.
+  graph checks of the declared bounds (`gemini/graph/limits.py`) with the class
+  `Declaration.validate` raises on a plain call.
 - `UnknownNameError(ValueError)`: unknown module path, parameter, control, boundary or runtime
   setting (`module.py`, `runtime.py`).
 - `UnknownPortError(KeyError, AttributeError)`: unknown name in a `Ports` or `Values` mapping.
@@ -46,7 +46,7 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
 - `TraceError(TypeError)`: a module cannot be traced into a computation graph: Python control
   flow or a conversion on a traced value (`if`, `and`, `float()`, formatting), a stateful root,
   float32 precision, a pre-hook on the root, a forward hook that only reads, or a composite child that
-  cannot be recorded. The graph runner catches it and runs that module untraced (a graph break,
+  cannot be recorded. The graph runner catches it and runs that module as a plain call (a graph break,
   `gemini/graph/runner.py`); a leaf child of a composite that raises it becomes a break node
   instead. Break nodes also use it for a probe or row that fails to build the traced fluids, and
   `Engine` keeps the reason of a twin it could not trace in `engine.graph_breaks`.

@@ -2,7 +2,7 @@
 
 ``RowView`` reads the value of a node at one row (a parameter prints as it was given, ``2`` and
 not ``2.0``). ``row_error`` turns the error code that reaches an output on that row into the
-exception of the untraced path: the check's class with its message filled from the row's values
+exception of a plain call: the check's class with its message filled from the row's values
 by ``failure``; for a declared bound the text of ``Declaration.validate``; for a break node the
 exception the module raised. The exception is noted with the source line of the check.
 """
