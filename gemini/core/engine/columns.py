@@ -15,11 +15,8 @@ import numpy as np
 from gemini.core.engine.step import VOLUMETRIC_UNITS
 from gemini.core.physics import units
 from gemini.core.types import Fluid, Stream
-from gemini.core.types.flows import stream_valid
+from gemini.core.types.flows import STREAM_FIELDS, stream_valid
 from gemini.errors import MissingMeasurementError
-
-STREAM_FIELDS = ("m_dot", "T", "p")
-"""The fields of an inlet stream, in the order the graph names them."""
 
 
 @dataclass

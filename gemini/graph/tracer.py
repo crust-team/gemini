@@ -7,9 +7,8 @@ The module is a leaf or a composite: child calls are recorded by ``Trace`` into 
 whose ``Fluid`` is the concrete, static one), controls, boundaries, numeric parameters and the
 constants the physics uses become named graph inputs; non-numeric and structural parameter
 values are trace guards (see ``cache``). A forward hook that writes an
-output is part of the graph; one that only reads is an observer, replayed per row after a run.
-A hook marked with ``gemini.utils.hooks.observer`` is never called on traced values: it is an
-observer by declaration, and so are marked pre-hooks. Any other pre-hook is a graph break.
+output is part of the graph; one that only reads, and any pre-hook, is a graph break: it is
+called on the module's real values, row by row.
 Anything the trace cannot follow raises ``TraceError`` inside the trace; a root that cannot be
 traced is never an error: ``Tracer.trace`` returns a graph with one **root break** (see
 ``rootbreak``) whose reason is in ``graph.breaks``. So is a root that holds a stateful module
@@ -30,7 +29,6 @@ from gemini.graph.graph import Graph
 from gemini.graph.limits import certain, check_declared_limits
 from gemini.graph.node import STREAM_FIELDS
 from gemini.graph.rootbreak import root_break_graph
-from gemini.utils.hooks import is_observer
 from gemini.utils.strings import join_path
 
 
@@ -70,7 +68,6 @@ class Tracer:
             {name: _inlet(graph, name, fluids[name]) for name in module._inlets},
             path=module.path,
         )
-        graph.pre_observers.extend(module._pre_hooks.values())
         trace.limit_checks.extend(graph.checks)
         outlets, call = trace.run(module, inlets, {}, None)
         graph.result = ModuleResult(
@@ -120,9 +117,8 @@ class Trace:
 
         A stateful or pre-hooked leaf, and a leaf whose trace raises ``TraceError``, become one
         break node and the rest of the graph is kept; a composite child that cannot be
-        recorded, or any child with an observer, raises ``TraceError`` instead.
+        recorded raises ``TraceError`` instead.
         """
-        _check_observers(module)
         reason = _unrecordable(module)
         mark = self._mark()
         try:
@@ -207,36 +203,20 @@ class Trace:
         return self._parameters[module]
 
     def _trace_outputs(self, module, call, inlets, outlets):
-        """Trace the output step and classify each forward hook as part of the graph or observer.
-
-        A marked observer is never called; a hook that writes no output is an observer too.
-        Observers are replayed per row for the root only, so one on a child is a graph break.
-        """
+        """Trace the output step; a forward hook must write an output to be part of the graph."""
         module._compute_outputs(inlets, outlets)
         module._compute_formula_outputs(call)
         for hook in tuple(module._hooks.values()):
-            if is_observer(hook):
-                self._observe(module, hook)
-                continue
             before = dict(call.outputs)
             try:
                 hook(module, inlets, outlets)
             except TraceError as error:
                 raise TraceError(f"{module.path}: forward hook {hook!r}: {error}") from error
-            written = [
-                name for name, value in call.outputs.items() if before.get(name) is not value
-            ]
-            if not written:
-                self._observe(module, hook)
+            if all(before.get(name) is value for name, value in call.outputs.items()):
+                raise TraceError(
+                    f"{module.path}: forward hook {hook!r} only reads and runs on real values"
+                )
         module._check_outputs(call.outputs)
-
-    def _observe(self, module, hook):
-        if module is not self.root:
-            raise TraceError(
-                f"{module.path}: forward hook {hook!r} only reads and cannot be replayed on a "
-                "child of a composite"
-            )
-        self.graph.observers.append(hook)
 
 
 def _untraceable(module, stepped):
@@ -246,7 +226,7 @@ def _untraceable(module, stepped):
         reasons.append("stateful (stepped, needs scan)")
     elif module.stateful:
         reasons.append("stateful (needs scan)")
-    if not all(is_observer(hook) for hook in module._pre_hooks.values()):
+    if module._pre_hooks:
         reasons.append("has forward pre-hooks")
     if runtime.get_precision() != "float64":
         reasons.append("runtime precision is not float64")
@@ -262,15 +242,6 @@ def _unrecordable(module):
     if module._pre_hooks:
         return "has forward pre-hooks"
     return None
-
-
-def _check_observers(module):
-    """Refuse a child with an observer: it is replayed per row for the root only."""
-    hooks = (*module._pre_hooks.values(), *module._hooks.values())
-    if any(is_observer(hook) for hook in hooks):
-        raise TraceError(
-            f"{module.path}: observer hooks on a child of a composite cannot be replayed"
-        )
 
 
 def _inlet(graph, name, fluid):

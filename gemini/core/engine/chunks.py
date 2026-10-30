@@ -43,7 +43,7 @@ class PathColumns:
         from the flows of the ports: any port with a non-zero mass flow, or no port at all.
         """
         length = len(present)
-        columns = _result_columns(result, health, length, lambda value: _column(value, length))
+        columns = _result_columns(result, health, length)
         return cls(present, columns)
 
     def sliced(self, start, stop):
@@ -86,21 +86,21 @@ def _spread(values, ticks, size):
     return full
 
 
-def _result_columns(result, health, length, column):
+def _result_columns(result, health, length):
     """Return the output, ``operating`` and health columns of a path, in the row order."""
     columns = {
-        name: column(_with_none(value, result.outputs.accepts_none(name)))
+        name: _column(_with_none(value, result.outputs.accepts_none(name)), length)
         for name, value in result.outputs.items()
     }
     columns["operating"] = _operating(result, length)
     if health is None:
         return columns
-    columns["health_assessed"] = column(health.assessed)
-    columns["health_score"] = column(health.score)
-    columns["health_alarm"] = column(health.alarm)
-    columns["health_message"] = column(health.message)
+    columns["health_assessed"] = _column(health.assessed, length)
+    columns["health_score"] = _column(health.score, length)
+    columns["health_alarm"] = _column(health.alarm, length)
+    columns["health_message"] = _column(health.message, length)
     for name, value in health.metrics.items():
-        columns["health_metric_" + name] = column(value)
+        columns["health_metric_" + name] = _column(value, length)
     return columns
 
 
@@ -120,18 +120,6 @@ def _operating(result, length):
         return np.ones(length, dtype=bool)
     moving = [np.broadcast_to(np.asarray(flow.m_dot) != 0, (length,)) for flow in flows]
     return np.logical_or.reduce(moving)
-
-
-def _same(value):
-    """Return ``value`` unchanged: the plain-row form of a column."""
-    return value
-
-
-def row_cells(path, result, health):
-    """Return ``{(path, field): value}`` of one tick of plain values, in column order."""
-    columns = _result_columns(result, health, 1, _same)
-    columns["operating"] = bool(columns["operating"][0])
-    return {(path, name): value for name, value in columns.items()}
 
 
 def _column(value, length):
@@ -211,38 +199,6 @@ def first_present(table):
         return 0 if len(table.present) else None
     found = np.flatnonzero(table.present)
     return int(found[0]) if found.size else None
-
-
-def rows_chunk(times, durations, rows, skips, errors):
-    """Return the chunk of plain-valued rows, each a ``{(path, field): value}`` dict.
-
-    A path is present in a row when it has its ``operating`` cell. A field a present row lacks
-    is NaN, as it was in a table built from row dicts; floats and flags become typed arrays.
-    """
-    keys, last = {}, None
-    for row in rows:
-        if row.keys() != last:
-            keys.update(dict.fromkeys(row))
-            last = row.keys()
-    blank = dict.fromkeys(keys, MISSING)
-    columns = zip(keys, zip(*((blank | row).values() for row in rows)))
-    tables = {}
-    for (path, name), values in columns:
-        if path not in tables:
-            present = np.array([(path, "operating") in row for row in rows])
-            tables[path] = PathColumns(present, {})
-        tables[path].columns[name] = _typed(values)
-    return ResultChunk(times, durations, tables, skips, errors)
-
-
-def _typed(values):
-    """Return a list of Python values as a typed array when all are floats or all are flags."""
-    kinds = set(map(type, values))
-    if kinds == {float}:
-        return np.array(values)
-    if kinds == {bool}:
-        return np.array(values, dtype=bool)
-    return list(values)
 
 
 def merge(chunks):

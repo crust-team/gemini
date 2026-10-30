@@ -1,4 +1,4 @@
-"""Run one module over whole time series: ``evaluate`` plus a raise, and the observer replay.
+"""Run one module over whole time series: ``evaluate`` plus a raise.
 
 ``run(module, inlets, inputs)`` is the prototype's stand-in for the engine integration. Inlets
 are ``Stream`` objects whose fields are arrays over time (validated when built);
@@ -6,11 +6,9 @@ are ``Stream`` objects whose fields are arrays over time (validated when built);
 values fill the rest. Parameters and constants come from the module and the graph. It is a thin
 form over ``evaluate``: the graph (a root break when the module cannot be traced, its reason in
 ``Run.breaks``) is evaluated on the backend you name and the first failing row raises its
-exception. Observer hooks are replayed per row after a traced run, pre-hooks first. The row
-count is the longest array among the inlet fields and inputs, one without arrays.
+exception. The row count is the longest array among the inlet fields and inputs, one without arrays.
 
-``graph_feeds`` gives the value of every graph input and ``replay_row`` calls the observer hooks
-of one row; the engine uses both with ``evaluate``.
+``graph_feeds`` gives the value of every graph input; the engine uses it with ``evaluate``.
 
 ``run_function(function, *args, **fixed)`` does the same for a plain function (a physics
 function, a module's helper): the numeric positional arguments become graph inputs, the
@@ -26,13 +24,12 @@ from dataclasses import dataclass
 import numpy as np
 
 from gemini import backends, ops
-from gemini.core.modules.module import _Call, _current_call
 from gemini.graph.cache import GraphCache
 from gemini.graph.evaluation import evaluate
 from gemini.graph.graph import Graph
 from gemini.graph.limits import certain
+from gemini.graph.node import STREAM_FIELDS
 from gemini.graph.proxy import Proxy
-from gemini.graph.tracer import STREAM_FIELDS
 
 
 @dataclass
@@ -60,8 +57,6 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
         port: {field: getattr(result.outlets[port], field) for field, _ in STREAM_FIELDS}
         for port in module._outlets
     }
-    if graph.root is None:
-        _replay_observers(graph, module, result, rows)
     breaks = [reason for _, reason in graph.breaks] if graph.root is not None else []
     return Run(outputs=dict(result.outputs.items()), outlets=outlets, breaks=breaks, graph=graph)
 
@@ -115,30 +110,6 @@ def _owner(module, name):
     """Return the module that owns the graph input ``name`` and the input's local name."""
     path, _, local = name.rpartition(".")
     return (module.get_submodule(path) if path else module), local
-
-
-def _replay_observers(graph, module, result, rows):
-    """Call every observer hook once per row with that row's inlets, outlets and outputs."""
-    for index in range(rows if graph.observers or graph.pre_observers else 0):
-        row = result.row(index)
-        replay_row(graph, module, row.inlets, row.outlets, row.inputs, dict(row.outputs.items()))
-
-
-def replay_row(graph, module, inlets, outlets, inputs, outputs):
-    """Call the observer hooks of ``graph`` for one row: pre-hooks first, then forward hooks.
-
-    The hooks run inside a call record holding the row's ``inputs`` and ``outputs``, so
-    ``module.<control>`` and ``module.<output>`` read that row.
-    """
-    call = _Call(module=module, inputs=inputs, outputs=outputs, parent=None)
-    token = _current_call.set(call)
-    try:
-        for pre_hook in graph.pre_observers:
-            pre_hook(module, inlets)
-        for hook in graph.observers:
-            hook(module, inlets, outlets)
-    finally:
-        _current_call.reset(token)
 
 
 def run_function(function, *args, backend="numpy", **fixed):

@@ -14,7 +14,10 @@ from gemini.errors import CallError, PhysicsRangeError, UnitError
 from gemini.utils.strings import did_you_mean, join_names
 
 _ARGUMENTS = ("m_dot", "flow", "T", "p", "fluid")
-_FIELDS = ("m_dot", "T", "p", "fluid")
+STREAM_FIELDS = ("m_dot", "T", "p")
+"""The numeric fields of a stream, in order; every other list of them is derived from this."""
+
+_FIELDS = (*STREAM_FIELDS, "fluid")
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -54,13 +57,13 @@ class Stream:
         else:
             mass_flow = _mass_flow(data["flow"], fluid, pressure, temperature)
         values = _validated(m_dot=mass_flow, T=temperature, p=pressure)
-        for name in _FIELDS[:3]:
+        for name in STREAM_FIELDS:
             object.__setattr__(self, name, values[name])
         object.__setattr__(self, "fluid", fluid)
 
     def __str__(self):
         """Return the fields as ``name=value`` pairs."""
-        m_dot, T, p = (_shown(getattr(self, name)) for name in _FIELDS[:3])
+        m_dot, T, p = (_shown(getattr(self, name)) for name in STREAM_FIELDS)
         return f"m_dot={m_dot!r} T={T!r} p={p!r} fluid={self.fluid!r}"
 
     def _numpy(self):
@@ -85,7 +88,7 @@ class Stream:
 
         Returns the stream itself when nothing needs converting.
         """
-        fields = [getattr(self, name) for name in _FIELDS[:3]]
+        fields = [getattr(self, name) for name in STREAM_FIELDS]
         converted = [ops.scope.plain(value) for value in fields]
         if all(new is old for new, old in zip(converted, fields)):
             return self

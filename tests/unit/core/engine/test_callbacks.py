@@ -12,7 +12,6 @@ from gemini.core.engine.callbacks import AutoCheckpoint, EventLog
 from gemini.core.modules import Module
 from gemini.core.types import Control, Output, Ports
 from gemini.core.types.bindings import Binding, ModuleBindings
-from gemini.utils.hooks import is_observer
 
 
 class Gauge(Module):
@@ -49,8 +48,8 @@ def run(levels, *callbacks):
     return plant, gm.Engine(list(callbacks)).replay(plant, data)
 
 
-def test_event_log_records_calls_in_order_and_detaches():
-    """Run, forward and step events are logged in order; hooks are gone afterwards."""
+def test_event_log_records_calls_in_order_without_hooks():
+    """Run, forward and step events are logged in order; the plant never gets a hook."""
     events = EventLog()
     plant, _ = run([1.0, 2.0], events)
     kinds = [event["kind"] for event in events.events]
@@ -101,12 +100,3 @@ def test_auto_checkpoint_intervals(tmp_path):
     path = tmp_path / "auto.ckpt"
     run([1.0, 2.0, 3.0], AutoCheckpoint(path, every=np.int64(2)))
     assert len(gm.Engine.load_checkpoint(path).results) == 2
-
-
-def test_event_log_hooks_are_marked_as_observers():
-    """The graph engine replays EventLog's hooks per row instead of calling them on traces."""
-    events = EventLog()
-    plant = Module()
-    events.attach(plant)
-    assert all(is_observer(hook) for hook in (*plant._pre_hooks.values(), *plant._hooks.values()))
-    events.detach()

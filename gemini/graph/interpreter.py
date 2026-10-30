@@ -15,7 +15,7 @@ import math
 import numpy as np
 
 from gemini import backends
-from gemini.errors import CallError, TraceError
+from gemini.errors import CallError
 from gemini.graph.breaks import evaluate_break
 from gemini.graph.failures import RowView, row_error
 from gemini.graph.node import Node
@@ -25,13 +25,7 @@ class Interpreter:
     """Run one graph on one backend."""
 
     def __init__(self, graph, backend):
-        """Prepare to run ``graph`` on the backend object ``backend``.
-
-        A root break has no nodes: ``evaluate`` calls its module, so it is refused here with
-        its reason.
-        """
-        if graph.root is not None:
-            raise TraceError(graph.breaks[0][1])
+        """Prepare to run ``graph`` on the backend object ``backend``."""
         self.graph = graph
         self.backend = backend
 
@@ -49,16 +43,6 @@ class Interpreter:
         row = int(np.flatnonzero(codes)[0])
         check = self.graph.checks[int(codes[row]) - 1]
         raise row_error(check, RowView(values, row, feeds))
-
-    def evaluate(self, feeds):
-        """Return the outputs and a boolean array of the rows whose error reaches an output.
-
-        Nothing is raised. The mask is ``None`` when no row failed.
-        """
-        values, errors = self.execute(feeds)
-        outputs = {name: _value(operand, values) for name, operand in self.graph.outputs.items()}
-        codes = self.reached(errors)
-        return outputs, None if codes is None else codes != 0
 
     def execute(self, feeds):
         """Run the value pass, then the error pass; return the node values and error codes."""

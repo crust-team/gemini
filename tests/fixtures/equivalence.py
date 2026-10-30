@@ -18,12 +18,12 @@ import numpy as np
 import pytest
 
 from gemini.core.types import Stream
+from gemini.core.types.flows import STREAM_FIELDS
 from gemini.core.types.ports import Ports
 from gemini.core.types.results import ModuleResult, Values
 from gemini.graph import run, run_function
 
 RTOL = 1e-12
-STREAM_FIELDS = ("m_dot", "T", "p")
 
 
 def flatten(value):

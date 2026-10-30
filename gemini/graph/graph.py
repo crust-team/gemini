@@ -19,8 +19,7 @@ class Graph:
     ``outlets.<port>.<field>`` to the node (or literal) that computes them, ``checks`` lists the
     check nodes (their codes are their position plus one), ``constants`` the ``Constant``
     objects behind the constant inputs, ``outlet_fluids`` the fixed fluid of every outlet,
-    ``pre_observers`` the marked read-only pre-hooks and ``observers`` the forward hooks that
-    only read, replayed per row after a run. ``breaks`` lists the children that run untraced, as
+    ``breaks`` lists the children that run untraced, as
     ``(module path, reason)`` and ``vectors`` the length of every list-valued output.
 
     ``result`` is the ``ModuleResult`` tree of the trace, with children, whose values are traced
@@ -42,8 +41,6 @@ class Graph:
         self.breaks = []
         self.frames = []
         self.unframed = []
-        self.pre_observers = []
-        self.observers = []
         self.result = None
         self.root = None
         self.stepped = False
@@ -231,8 +228,6 @@ class Graph:
         lines.extend(f"break: {path}: {reason}" for path, reason in self.breaks)
         if self.root is not None:
             lines.append(f"root break: {self.root.path} runs eagerly, row by row")
-        lines.extend(f"pre-observer: {hook!r}" for hook in self.pre_observers)
-        lines.extend(f"observer: {hook!r}" for hook in self.observers)
         return "\n".join(lines)
 
 

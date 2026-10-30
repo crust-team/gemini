@@ -6,9 +6,8 @@ import pytest
 import gemini as gm
 from gemini import ops
 from gemini.errors import PhysicsRangeError, TraceError
-from gemini.graph import GraphCache, Proxy, run, run_function
+from gemini.graph import GraphCache, run, run_function
 from gemini.ops import Constant
-from gemini.utils.hooks import observer
 
 from .conftest import Chain, Gain, Opaque, Stubborn, Switcher, Tank, Vectored
 
@@ -42,15 +41,12 @@ def test_graph_break_runs_untraced_with_the_same_results(gain, inlet):
     assert result.outputs["rise"].tolist() == [6.0, 6.0, 6.0]
 
 
-def test_observer_hooks_are_replayed_per_row(gain, inlet):
-    """A reading hook sees every row's values after the traced run.
-
-    It also ran once during the trace, on traced values, which is what classifies it.
-    """
+def test_a_reading_hook_makes_the_root_a_break_that_sees_every_real_row(gain, inlet):
+    """The trace calls the hook once on traced values to classify it; then every row is real."""
     seen = []
     gain.register_forward_hook(lambda module, inlets, outlets: seen.append(module.rise))
-    run(gain, {"inlet": inlet}, {"gain": 1.0})
-    assert isinstance(seen[0], Proxy) and seen[1:] == [6.0, 6.0, 6.0]
+    result = run(gain, {"inlet": inlet}, {"gain": 1.0})
+    assert "only reads" in result.breaks[0] and seen[1:] == [6.0, 6.0, 6.0]
 
 
 def test_errors_raise_after_the_run(gain, inlet):
@@ -85,13 +81,13 @@ def test_module_without_inlets_or_arrays_has_one_row(source):
     assert run(source, {}, {"rate": 5.0}).outputs["double"].tolist() == [10.0]
 
 
-def test_marked_hooks_are_never_called_on_traced_values(gain, inlet):
-    """Marked pre-hooks and forward hooks only see rows, pre-hooks first, and keep the graph."""
+def test_pre_hooks_and_reading_hooks_see_every_row_of_the_break(gain, inlet):
+    """A pre-hook and a reading hook run in a call's order for each row of the break."""
     seen = []
-    gain.register_forward_pre_hook(observer(lambda module, inlets: seen.append("pre")))
-    gain.register_forward_hook(observer(lambda module, inlets, outlets: seen.append(module.rise)))
+    gain.register_forward_pre_hook(lambda module, inlets: seen.append("pre"))
+    gain.register_forward_hook(lambda module, inlets, outlets: seen.append(module.rise))
     result = run(gain, {"inlet": inlet}, {"gain": 1.0})
-    assert result.graph is not None and result.breaks == []
+    assert result.graph.root is gain
     assert seen == ["pre", 6.0, "pre", 6.0, "pre", 6.0]
 
 
@@ -206,14 +202,6 @@ def test_a_composite_child_that_cannot_be_traced_breaks_the_whole_root(chain_inl
     chain = Chain(Opaque())
     result = run(chain, {"inlet": chain_inlet}, {"drive": 1.0})
     assert result.graph.root is chain and "float()" in result.breaks[0]
-
-
-def test_a_marked_observer_on_a_leaf_child_is_not_a_break_node(chain_inlet):
-    """Replaying it per row is only possible at the root, so the root falls back as a whole."""
-    middle = Gain().update_params(scale=3.0)
-    middle.register_forward_hook(observer(lambda module, inlets, outlets: None))
-    result = run(Chain(middle), {"inlet": chain_inlet}, {"drive": 1.0})
-    assert result.graph.root is not None and "observer" in result.breaks[0]
 
 
 def test_a_row_whose_outlet_fluid_differs_from_the_probe_fails(chain_inlet):

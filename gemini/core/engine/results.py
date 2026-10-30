@@ -12,8 +12,6 @@ from gemini.core.engine.chunks import (
     assemble,
     first_present,
     merge,
-    row_cells,
-    rows_chunk,
 )
 from gemini.core.physics import units
 from gemini.errors import UnitError, UnknownResultError
@@ -108,7 +106,7 @@ class Results:
 
     def __init__(self):
         """Start an independent result table."""
-        self._chunks, self._order, self._pending = [], {}, []
+        self._chunks, self._order = [], {}
         self._times, self._dt = [], []
         self.skip_counts, self.errors = {}, []
         self._energy = set()
@@ -117,21 +115,8 @@ class Results:
 
     def commit(self, chunk):
         """Commit a chunk of ticks: its columns, durations, skips and errors."""
-        self._flush()
         self._register(chunk)
         self._record(chunk.times, chunk.durations, chunk.skips, chunk.errors)
-
-    def append(self, at, results, dt=0, skips=None, errors=None):
-        """Commit one completed step of plain results.
-
-        The one-tick form of ``commit``: the row waits as plain cells and joins the columns as
-        one chunk with the rows appended after it, when a table, a file or a slice is wanted.
-        """
-        row = {}
-        for path, (result, health) in results.items():
-            row.update(row_cells(path, result, health))
-        self._pending.append(row)
-        self._record([at], [dt], [skips or {}], [(0, error) for error in errors or []])
 
     def _record(self, times, durations, skips, errors):
         """Keep the times, durations, skips and errors of committed ticks."""
@@ -153,14 +138,6 @@ class Results:
                 self._energy.update((path, name) for name in ENERGY_FIELDS if name in table.columns)
         self._chunks.append(chunk)
 
-    def _flush(self):
-        """Turn the appended rows into one chunk."""
-        if not self._pending:
-            return
-        rows, self._pending = self._pending, []
-        first = len(self._times) - len(rows)
-        self._register(rows_chunk(self._times[first:], self._dt[first:], rows, None, ()))
-
     def __len__(self):
         """Count completed ticks, including skipped or failed rows."""
         return len(self._times)
@@ -178,7 +155,6 @@ class Results:
 
     def _cached_frame(self):
         """Return the shared table, built once after each append; callers must not change it."""
-        self._flush()
         if self._frame is None:
             self._chunks = [merge(self._chunks)] if self._chunks else []
             chunk = self._chunks[0] if self._chunks else ResultChunk([], [], {})
@@ -329,7 +305,6 @@ class Results:
 
     def slice(self, start):
         """Return the new rows of a live call, with matching durations and diagnostics."""
-        self._flush()
         result = Results()
         if self._chunks:
             self._chunks = [merge(self._chunks)]

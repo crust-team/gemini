@@ -8,6 +8,7 @@ exception of the failing row, or the exception of its health.
 """
 
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -15,6 +16,7 @@ import numpy as np
 from gemini.core.engine.chunks import PathColumns
 from gemini.core.engine.health import assess
 from gemini.core.types import Stream
+from gemini.core.types.flows import STREAM_FIELDS
 from gemini.graph import evaluate, graph_feeds
 
 UNCHANGED = object()
@@ -90,7 +92,7 @@ def _streams(twin, block, selected):
     for port in twin.module._inlets:
         if port in block.fluids:
             m_dot, temperature, pressure = (
-                block.fields[port, name][selected] for name in ("m_dot", "T", "p")
+                block.fields[port, name][selected] for name in STREAM_FIELDS
             )
             streams[port] = Stream._trusted(m_dot, temperature, pressure, block.fluids[port])
             continue
@@ -102,18 +104,21 @@ def _constant(twin, port, count):
     """Return an inlet that is not bound as a stream of ``count`` equal rows."""
     stream = twin.module._inlets[port].validate(twin.constants[port])
     return Stream._trusted(
-        *(np.full(count, getattr(stream, name)) for name in ("m_dot", "T", "p")), stream.fluid
+        *(np.full(count, getattr(stream, name)) for name in STREAM_FIELDS), stream.fluid
     )
 
 
 def _start_state(twin, block, selected, state):
-    """Return the state a stepped twin starts from: the measured one, else the run's."""
+    """Return the state a stepped twin starts from: the measured, the run's, else the initial.
+
+    The initial state is passed explicitly, because a module may override ``step``.
+    """
     if not twin.stepped:
         return None
     measured = twin.kinds("state")
     if measured:
         return {source.key: float(block.states[source.key][selected[0]]) for source in measured}
-    return state
+    return deepcopy(state) if state is not None else twin.module.initial_state()
 
 
 def _advance(outcome, tick):

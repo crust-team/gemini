@@ -4,12 +4,14 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from gemini.core.types import flows
+
 _TRACING_PACKAGES = tuple(
     str(Path(__file__).parents[1] / package) for package in ("graph", "ops", "backends")
 )
 
 
-STREAM_FIELDS = (("m_dot", "kg/s"), ("T", "K"), ("p", "Pa"))
+STREAM_FIELDS = tuple(zip(flows.STREAM_FIELDS, ("kg/s", "K", "Pa")))
 """Stream fields of every inlet and outlet in the graph, with their units."""
 
 

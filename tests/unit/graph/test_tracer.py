@@ -10,7 +10,6 @@ from gemini.core.types.declarations import UNSET
 from gemini.errors import MissingValueError, OutputError, PhysicsRangeError
 from gemini.graph import Tracer, run
 from gemini.graph.tracer import parameter_shape
-from gemini.utils.hooks import observer
 
 
 def test_trace_names_inputs_by_role_and_records_outputs(gain):
@@ -45,7 +44,7 @@ def test_no_outputs_traces_only_the_fluid_step(gain):
 
 
 def test_hooks_are_classified_by_what_they_do(gain):
-    """A writing hook joins the graph, a reading one is an observer, a failing one breaks."""
+    """A writing hook joins the graph; a reading one and a failing one break the root."""
 
     def doubles(module, inlets, outlets):
         module.boost = module.boost * 2
@@ -53,11 +52,14 @@ def test_hooks_are_classified_by_what_they_do(gain):
     def reads(module, inlets, outlets):
         return module.rise
 
-    gain.register_forward_hook(doubles)
-    gain.register_forward_hook(reads)
+    handle = gain.register_forward_hook(doubles)
     graph = Tracer().trace(gain, {"inlet": gain.fluid})
-    assert graph.observers == [reads]
-    assert graph.outputs["outputs.boost"].op == "mul"
+    assert graph.root is None and graph.outputs["outputs.boost"].op == "mul"
+    handle_reads = gain.register_forward_hook(reads)
+    reading = Tracer().trace(gain, {"inlet": gain.fluid})
+    assert reading.root is gain and "only reads and runs on real values" in reading.breaks[0][1]
+    handle.remove()
+    handle_reads.remove()
     gain.register_forward_hook(lambda module, inlets, outlets: float(module.rise))
     broken = Tracer().trace(gain, {"inlet": gain.fluid})
     assert broken.root is gain and re.search("forward hook .*float", broken.breaks[0][1])
@@ -158,13 +160,6 @@ def test_uninitialized_parameters_of_the_tree_are_refused(line):
     line.gain._parameters["scale"].value = UNSET
     with pytest.raises(MissingValueError, match="line: uninitialized parameters"):
         Tracer().trace(line, {"inlet": line.fluid})
-
-
-def test_marked_observers_on_a_child_are_a_graph_break(line):
-    """An observer is replayed per row for the root only, so one on a child breaks the root."""
-    line.gain.register_forward_hook(observer(lambda module, inlets, outlets: None))
-    graph = Tracer().trace(line, {"inlet": line.fluid})
-    assert graph.root is line and "gain: observer hooks on a child" in graph.breaks[0][1]
 
 
 def test_a_reading_hook_on_a_leaf_child_makes_it_a_break_node(line):

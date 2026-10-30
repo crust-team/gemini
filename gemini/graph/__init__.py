@@ -13,8 +13,7 @@ from gemini.graph.graph import Graph
 from gemini.graph.interpreter import Interpreter
 from gemini.graph.node import Node
 from gemini.graph.proxy import Proxy
-from gemini.graph.runner import Run, graph_feeds, replay_row, run, run_function
-from gemini.graph.setting import settings, traced_enabled
+from gemini.graph.runner import Run, graph_feeds, run, run_function
 from gemini.graph.tracer import Tracer
 
 __all__ = [
@@ -28,9 +27,6 @@ __all__ = [
     "Tracer",
     "evaluate",
     "graph_feeds",
-    "replay_row",
     "run",
     "run_function",
-    "settings",
-    "traced_enabled",
 ]

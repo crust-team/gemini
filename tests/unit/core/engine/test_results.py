@@ -2,10 +2,12 @@
 
 from datetime import datetime, timezone
 
+import numpy as np
 import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.core.engine.chunks import PathColumns, ResultChunk
 from gemini.core.engine.results import Results
 from gemini.core.types import Health, ModuleResult, Values
 
@@ -15,16 +17,29 @@ def result(**outputs):
     return ModuleResult(outputs=Values(outputs), outlets=gm.Ports({}))
 
 
+def commit(rows, time, path, outputs, health, dt, skips):
+    """Commit one tick of one path: its outputs and health as columns of one entry."""
+    table = PathColumns.of(
+        result(**{name: np.array([value]) for name, value in outputs.items()}),
+        health,
+        np.ones(1, dtype=bool),
+    )
+    rows.commit(ResultChunk([time], [dt], {path: table}, [skips]))
+
+
 def results():
     """Return two rows: one pump with power and electricity, one skip."""
     rows = Results()
     times = [datetime(2024, 1, 1, hour, tzinfo=timezone.utc) for hour in (0, 1)]
     health = Health(score=1, alarm=True, message="low")
     for time, power in zip(times, (1000.0, 3000.0)):
-        rows.append(
+        commit(
+            rows,
             time,
-            {"pump": (result(head=2e5, electricity=power), health)},
-            3600,
+            "pump",
+            dict(head=2e5, electricity=power),
+            health,
+            3600.0,
             {"pump": {"pump.suction.p": 1}},
         )
     return rows

@@ -8,9 +8,22 @@ import pytest
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
-from gemini.core.engine.step import prepare
-from gemini.core.types import Binding
+from gemini.core.engine.columns import read
+from gemini.core.engine.step import BindingPlan
+from gemini.core.types import Binding, Stream
 from gemini.errors import ConfigurationError, InsufficientDataError
+
+
+def _kwargs(plant, path, row):
+    """Return the call keywords of the twin at ``path`` for one row, as the engine builds them."""
+    data = gm.Dataset.from_frame(pd.DataFrame([row], index=[pd.Timestamp("2024-01-01", tz="UTC")]))
+    (twin,) = BindingPlan(plant, data, "replay", only=[path]).twins
+    block = read(twin, lambda column: np.array([float(row[column])]), 0, 1)
+    kwargs = {name: values[0] for name, values in block.inputs.items()}
+    for port, fluid in block.fluids.items():
+        fields = {name: block.fields[port, name][0] for name in ("m_dot", "T", "p")}
+        kwargs[port] = Stream(**fields, fluid=fluid)
+    return kwargs
 
 
 def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
@@ -54,7 +67,7 @@ def test_esp_head_coefficients(fresh_plant, fast_dataset):
     for flow in np.linspace(90, 160, 16):
         row = first.to_dict()
         row["doublet.esp.suction.m_dot"] = flow / 3600
-        kwargs, _ = prepare(pump, plant.bindings["doublet.esp"], row)
+        kwargs = _kwargs(plant, "doublet.esp", row)
         predicted = pump(**kwargs).outputs
         row["doublet.esp.head"] = predicted.head * 0.8
         row["doublet.esp.discharge_pressure"] = (
@@ -83,7 +96,7 @@ def _head_rows(plant, source, flows, column_scale=1.0):
     for flow in flows:
         row = first.to_dict()
         row[column] = flow * column_scale
-        kwargs, _ = prepare(pump, bindings, row)
+        kwargs = _kwargs(plant, "doublet.esp", row)
         row["doublet.esp.head"] = pump(**kwargs).outputs.head * 0.8
         row["doublet.esp.discharge_pressure"] = (
             row["doublet.esp.suction.p"] + row["doublet.esp.head"]

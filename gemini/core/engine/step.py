@@ -173,8 +173,10 @@ class BindingPlan:
         """Return the ``(start, stop)`` index ranges of ticks that share one parameter snapshot.
 
         The snapshot is applied at the first tick and again at the first tick at or after each
-        later date.
+        later date. No ticks give no stretch.
         """
+        if not len(times):
+            return []
         starts, change = [0], self._change_after(times[0])
         for index, at in enumerate(times):
             if change is not None and at >= change:

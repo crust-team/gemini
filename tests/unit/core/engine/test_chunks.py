@@ -99,16 +99,6 @@ def result_of(path, rows, plain):
     return result, Health(**fields, metrics=metrics)
 
 
-def build_by_rows(rows=range(SIZE)):
-    """Return a Results built one row at a time, as the tick loop does."""
-    results = Results()
-    for row in rows:
-        paths = {path: result_of(path, [row], True) for path in PRESENT if PRESENT[path][row]}
-        errors = [error for r, error in ERRORS if r == row]
-        results.append(TIMES[row], paths, DURATIONS[row], SKIPS[row], errors)
-    return results
-
-
 def chunk_of(start, stop):
     """Return the rows ``start:stop`` as one chunk of arrays."""
     rows = np.arange(start, stop)
@@ -126,6 +116,11 @@ def chunk_of(start, stop):
         SKIPS[start:stop],
         [(row - start, error) for row, error in ERRORS if start <= row < stop],
     )
+
+
+def build_by_rows():
+    """Return a Results committed one tick at a time, as a run with callbacks does."""
+    return build_by_chunks([1] * SIZE)
 
 
 def build_by_chunks(cuts):
@@ -170,8 +165,8 @@ def reference_rows():
     return rows
 
 
-def test_a_row_build_equals_the_former_row_dict_storage():
-    """The reference itself: one-row commits give the frame of the old row dicts."""
+def test_a_tick_by_tick_build_equals_the_former_row_dict_storage():
+    """One-tick commits give the frame of the former row-dict storage."""
     frame = build_by_rows().to_frame()
     pd.testing.assert_frame_equal(frame, reference_frame(reference_rows(), TIMES))
     assert frame[("pump", "flag")].dtype == object
@@ -184,7 +179,7 @@ def test_a_row_build_equals_the_former_row_dict_storage():
 
 
 @pytest.mark.parametrize("cuts", CUTS)
-def test_chunks_equal_the_row_by_row_build(cuts):
+def test_chunks_equal_the_tick_by_tick_build(cuts):
     """One chunk or several give the same table, column order, dtypes and diagnostics."""
     expected, built = build_by_rows(), build_by_chunks(cuts)
     pd.testing.assert_frame_equal(built.to_frame(), expected.to_frame())
@@ -202,7 +197,7 @@ def test_save_load_and_slice_equal_the_row_by_row_build(tmp_path):
     expected, built = build_by_rows(), build_by_chunks([3, 5])
     loaded = Results.load(built.save(tmp_path / "chunks.csv"))
     pd.testing.assert_frame_equal(loaded.to_frame(), expected.to_frame())
-    loaded.append(START + timedelta(hours=SIZE), {}, 3600.0)
+    loaded.commit(ResultChunk([START + timedelta(hours=SIZE)], [3600.0], {}))
     assert len(loaded) == SIZE + 1 and len(loaded.to_frame()) == SIZE + 1
     for start in (2, 5):
         tail, reference = built.slice(start), expected.slice(start)
@@ -305,9 +300,10 @@ def test_rows_with_different_fields_fill_the_missing_cells_with_nan():
     """A field a later row adds, or an earlier row lacks, is NaN there, as in row dicts."""
     results, rows = Results(), []
     for row, names in enumerate((("a",), ("a", "b"), ("b",))):
-        outputs = {name: float(row) for name in names}
+        outputs = {name: np.array([float(row)]) for name in names}
         result = ModuleResult(outputs=Values(outputs), outlets=Ports({}))
-        results.append(TIMES[row], {"p": (result, None)}, 3600.0)
+        table = PathColumns.of(result, None, np.ones(1, dtype=bool))
+        results.commit(ResultChunk(TIMES[row : row + 1], [3600.0], {"p": table}))
         rows.append({("p", name): float(row) for name in names} | {("p", "operating"): True})
     pd.testing.assert_frame_equal(results.to_frame(), reference_frame(rows, TIMES[:3]))
     assert results.to_frame()[("p", "a")].isna().tolist() == [False, False, True]

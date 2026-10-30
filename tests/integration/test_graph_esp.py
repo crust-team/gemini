@@ -177,14 +177,15 @@ def test_reverse_flow_raises_the_untraced_error_at_the_physics_line(esp, week):
 
 
 def test_hooks_on_the_traced_esp(esp, week, plain_week, motor_loss_week, untraceable_week):
-    """A reading hook is replayed, a gm-op hook joins the graph, an untraceable one breaks."""
+    """A reading hook breaks the root and sees real rows, a gm-op hook joins the graph."""
     inlets, inputs = {"suction": _suction(esp, week)}, {"frequency": week[:, 3]}
     seen = []
     reader = esp.register_forward_hook(lambda module, inlets, outlets: seen.append(module.head))
     traced = run(esp, inlets, inputs)
     reader.remove()
     expected_heads = [row.outputs.head for row in plain_week]
-    assert traced.graph.observers and isinstance(seen[0], Proxy)
+    assert traced.graph.root is esp and "only reads" in traced.breaks[0]
+    assert isinstance(seen[0], Proxy)
     assert seen[1:] == pytest.approx(expected_heads, rel=RTOL)
 
     writer = esp.register_forward_hook(_motor_loss)
