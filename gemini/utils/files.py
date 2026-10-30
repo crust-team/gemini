@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import pandas as pd
+
 
 def read_json(path):
     """Read one UTF-8 JSON file."""
@@ -34,3 +36,27 @@ def encode_cells(frame):
 def decode_cells(frame):
     """Decode a table written by ``encode_cells`` and read back with every cell as text."""
     return frame.map(json.loads)
+
+
+def write_cells(path, frame, metadata, index_label=None):
+    """Write ``frame`` as JSON cells (Parquet for a ``.parquet`` path, else CSV) and its sidecar.
+
+    ``metadata`` goes to the JSON file ``<path>.json``; ``index_label`` heads the index column
+    of a CSV.
+    """
+    encoded = encode_cells(frame)
+    if Path(path).suffix == ".parquet":
+        encoded.to_parquet(path)
+    else:
+        encoded.to_csv(path, index_label=index_label)
+    write_json(str(path) + ".json", metadata)
+
+
+def read_cells(path):
+    """Return the decoded frame (index not yet converted) and the metadata of ``write_cells``."""
+    metadata = read_json(str(path) + ".json")
+    if Path(path).suffix == ".parquet":
+        frame = pd.read_parquet(path)
+    else:
+        frame = pd.read_csv(path, index_col=0, dtype=str, keep_default_na=False)
+    return decode_cells(frame), metadata

@@ -3,7 +3,15 @@
 import numpy as np
 import pandas as pd
 
-from gemini.utils.files import decode_cells, encode_cell, encode_cells, read_json, write_json
+from gemini.utils.files import (
+    decode_cells,
+    encode_cell,
+    encode_cells,
+    read_cells,
+    read_json,
+    write_cells,
+    write_json,
+)
 
 
 def test_json_files_round_trip_with_trailing_newline(tmp_path):
@@ -40,3 +48,16 @@ def test_numpy_scalars_encode_as_python_numbers():
     assert encode_cell(np.bool_(True)) == "true"
     assert encode_cell(np.float32(0.5)) == "0.5"
     assert encode_cell(float("inf")) == "Infinity"
+
+
+def test_cells_and_their_sidecar_round_trip_through_one_pair_of_functions(tmp_path):
+    """``write_cells`` writes a CSV and its JSON sidecar; ``read_cells`` reads both back."""
+    index = pd.DatetimeIndex(["2024-07-01 00:00", "2024-07-01 00:15"], tz="UTC")
+    frame = pd.DataFrame({"x": [0.1 + 0.2, np.nan], "items": [[1.5, 2.0], None]}, index=index)
+    path = tmp_path / "cells.csv"
+    write_cells(path, frame, {"note": 1}, index_label="time")
+    assert path.read_text().splitlines()[0] == "time,x,items"
+    decoded, metadata = read_cells(path)
+    assert metadata == {"note": 1}
+    assert decoded["x"].iloc[0] == 0.1 + 0.2 and np.isnan(decoded["x"].iloc[1])
+    assert decoded["items"].tolist() == [[1.5, 2.0], None]

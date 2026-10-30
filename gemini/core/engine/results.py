@@ -1,6 +1,5 @@
 """Per-module series, energy integration and lossless result persistence."""
 
-import json
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +14,7 @@ from gemini.core.engine.chunks import (
 )
 from gemini.core.physics import units
 from gemini.errors import UnitError, UnknownResultError
-from gemini.utils.files import decode_cells, encode_cells, read_json
+from gemini.utils.files import read_cells, write_cells
 from gemini.utils.strings import did_you_mean, join_names
 
 ENERGY_FIELDS = ("electricity", "fuel", "heat_loss")
@@ -252,12 +251,6 @@ class Results:
         elif path.suffix == ".parquet" and suffix == ".csv":
             path = path.with_suffix(".csv")
         frame = self.to_frame()
-        encoded = encode_cells(frame)
-        encoded.columns = [str(i) for i in range(len(frame.columns))]
-        if path.suffix == ".parquet":
-            encoded.to_parquet(path)
-        else:
-            encoded.to_csv(path)
         metadata = dict(
             columns=list(frame.columns),
             dt=self._dt,
@@ -266,7 +259,9 @@ class Results:
             skips=self._skips,
             energy=sorted(self._energy),
         )
-        Path(str(path) + ".json").write_text(json.dumps(metadata, indent=2))
+        write_cells(
+            path, frame.set_axis([str(i) for i in range(len(frame.columns))], axis=1), metadata
+        )
         return path
 
     @classmethod
@@ -282,13 +277,7 @@ class Results:
                 ),
                 path,
             )
-        metadata = read_json(str(path) + ".json")
-        frame = (
-            pd.read_parquet(path)
-            if path.suffix == ".parquet"
-            else pd.read_csv(path, index_col=0, dtype=str, keep_default_na=False)
-        )
-        frame = decode_cells(frame)
+        frame, metadata = read_cells(path)
         frame.columns = pd.MultiIndex.from_tuples(
             metadata["columns"], names=["module_path", "field"]
         )

@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from gemini.core.data.dataset import Dataset
 from gemini.errors import CheckpointError
-from gemini.utils.files import decode_cells, encode_cells, read_json, write_json
+from gemini.utils.files import read_cells, read_json, write_cells
 
 
 class Checkpoint(BaseModel):
@@ -50,19 +50,15 @@ def _write_dataset(path, dataset, max_gap):
     The names are unique per generation and unreferenced until the manifest is replaced, so the
     files are written in place.
     """
-    metadata_path = Path(str(path) + ".json")
-    encode_cells(dataset.to_frame()).to_csv(path, index_label="time")
     units = {name: info.model_dump(mode="json") for name, info in dataset.columns.items()}
     gap = str(max_gap) if max_gap is not None else None
-    write_json(metadata_path, {"units": units, "max_gap": gap})
-    _fsync(path, metadata_path)
+    write_cells(path, dataset.to_frame(), {"units": units, "max_gap": gap}, index_label="time")
+    _fsync(path, Path(str(path) + ".json"))
 
 
 def read_dataset(path):
     """Return the checkpoint-owned rows and the stored ``max_gap`` (None when not recorded)."""
-    path = Path(path)
-    metadata = read_json(str(path) + ".json")
-    frame = decode_cells(pd.read_csv(path, index_col="time", dtype=str, keep_default_na=False))
+    frame, metadata = read_cells(path)
     frame.index = pd.to_datetime(frame.index, utc=True)
     gap = metadata.get("max_gap")
     return (
