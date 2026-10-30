@@ -58,7 +58,7 @@ def test_values_equal_the_hand_computed_ratios(plant, results):
 def test_a_plant_without_consumers_gives_none_with_a_reason(fresh_plant, fast_dataset):
     """The doublet heat plant has no consumer leaf: every KPI is null and says why."""
     window = fast_dataset.window(None, "2024-07-01T01:00:00Z")
-    replay = gm.Engine(fresh_plant).replay(window)
+    replay = gm.replay(fresh_plant, window)
     kpis = gm.kpi(fresh_plant, replay)
     assert list(kpis) == gm.kpi.names()
     assert all(item["value"] is None and item["reason"] for item in kpis.values())

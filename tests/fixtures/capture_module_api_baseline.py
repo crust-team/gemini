@@ -28,7 +28,7 @@ def main():
     )
 
     started = perf_counter()
-    replay = gm.Engine(plant).replay(data)
+    replay = gm.replay(plant, data)
     replay_seconds = perf_counter() - started
     path_frame(replay).to_csv(OUTPUT / "replay.csv.gz", compression="gzip")
 
@@ -38,7 +38,7 @@ def main():
         "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
-    simulation = gm.Engine(plant).simulate(gm.Dataset.from_profiles(profiles), clock=clock)
+    simulation = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     path_frame(simulation).to_csv(OUTPUT / "simulate.csv.gz", compression="gzip")
 
     (OUTPUT / "state_dict.json").write_text(

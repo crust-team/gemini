@@ -17,7 +17,7 @@ def plant():
 def results(plant, fast_dataset):
     """Give a replay of six hours of the short-window dataset."""
     window = fast_dataset.window(end=fast_dataset.start + gm.Clock.days(2024, 7, 1).step * 6)
-    return gm.Engine(plant).replay(window)
+    return gm.replay(plant, window)
 
 
 CALLS = {

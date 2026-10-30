@@ -46,6 +46,6 @@ def test_a_path_the_plant_lacks_is_refused():
 
 def test_the_example_plant_run_stays_inside_its_limits(fresh_plant, fast_dataset):
     """A six-hour replay records no output outside a declared limit."""
-    replay = gm.Engine(fresh_plant).replay(fast_dataset.window(None, "2024-07-01T06:00:00Z"))
+    replay = gm.replay(fresh_plant, fast_dataset.window(None, "2024-07-01T06:00:00Z"))
     result = gm.checks.bounds(fresh_plant, replay)
     assert result["passed"] is True and result["value"] == 0

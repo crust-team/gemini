@@ -33,9 +33,7 @@ def generate_golden():
     data = gm.Dataset.from_frame(frame, time_column="time")
     plant = gm.Plant.load(SHARED / "plant.json")
     GOLDEN.parent.mkdir(parents=True, exist_ok=True)
-    path_frame(gm.Engine(plant).replay(data)).to_csv(
-        GOLDEN, compression={"method": "gzip", "mtime": 0}
-    )
+    path_frame(gm.replay(plant, data)).to_csv(GOLDEN, compression={"method": "gzip", "mtime": 0})
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ FLAGS = {
 
 def _run(spec):
     plant = configure(gm.plants.from_spec(spec))
-    results = gm.Engine(plant, on_error="raise").simulate(two_ticks())
+    results = gm.simulate(plant, two_ticks(), on_error="raise")
     return plant, results
 
 

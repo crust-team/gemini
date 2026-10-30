@@ -20,4 +20,4 @@ with TemporaryDirectory() as directory:
     for end in (start + pd.Timedelta(days=1), start + pd.Timedelta(days=2)):
         rows = frame[frame["time"] < end]
         data = gm.Dataset.from_frame(rows, time_column="time")
-        print(end, len(gm.Engine(plant).live(data, checkpoint, now=end)))
+        print(end, len(gm.live(plant, data, checkpoint, now=end)))

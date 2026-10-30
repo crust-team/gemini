@@ -96,7 +96,7 @@ def engine_and_calibration(plant):
     dataset_path = os.environ.get("GEMINI_EXAMPLE_DATASET", f"{SHARED}/doublet_2024_15min.csv")
     frame = pd.read_csv(dataset_path, parse_dates=["time"])
     data = gm.Dataset.from_frame(frame, time_column="time")
-    results = gm.Engine(plant).replay(data)
+    results = gm.replay(plant, data)
     print(results["doublet.esp"].get("head", unit="bar").head())
     fit = gm.optim.calibrate(
         plant, data, params=[plant.get_parameter("heat_exchanger.thermal_conductance")]

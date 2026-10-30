@@ -5,7 +5,19 @@ simulation, historical replay, and externally scheduled live updates.
 
 ## Quickstart
 
-Run from the repository root with Python 3.11, 3.12, 3.13 or 3.14:
+The short form, with `profile` a DataFrame or `gm.Dataset` of the plant's inputs:
+
+```python
+import gemini as gm
+
+plant = gm.plants.example("DoubletHeatPlant")
+results = gm.simulate(plant, profile)
+```
+
+`gm.simulate`, `gm.replay`, `gm.live` and `gm.resume` cover a run in one call; `gm.Engine` is the
+level for complex tasks, such as a run held in memory or a callback that reads the engine.
+
+The longer tour, from the repository root with Python 3.11, 3.12, 3.13 or 3.14:
 
 ```python
 import pandas as pd
@@ -33,14 +45,10 @@ plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
 frame = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
 
-engine = gm.Engine(plant)
-results = engine.replay(data)
+results = gm.replay(plant, data, checkpoint="runs/replay.ckpt")
 print(results.energy_report())
 print(results["doublet.esp"].power)
-
-engine.save_checkpoint("runs/replay.ckpt")
-restored = gm.Engine.load_checkpoint("runs/replay.ckpt")
-assert len(restored.resume()) == len(results)
+assert len(gm.resume("runs/replay.ckpt")) == len(results)
 
 fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.thermal_conductance")])
 print(fit)

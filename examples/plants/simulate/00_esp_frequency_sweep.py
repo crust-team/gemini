@@ -17,6 +17,6 @@ for frequency in (55, 60, 65):
         "doublet.esp.frequency": gm.Profile.constant(frequency, unit="Hz", clock=clock),
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
-    results = gm.Engine(plant).simulate(gm.Dataset.from_profiles(profiles), clock=clock)
+    results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     assert not results.errors(), results.errors()[0]
     print(frequency, results.energy_report())

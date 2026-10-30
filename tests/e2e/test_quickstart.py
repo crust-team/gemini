@@ -25,15 +25,12 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     df = pd.read_csv(dataset_path, parse_dates=["time"])
     data = gm.Dataset.from_frame(df, time_column="time")
 
-    engine = gm.Engine(plant)
-    res = engine.replay(data)
+    res = gm.replay(plant, data, checkpoint="runs/replay.ckpt")
     print(res.energy_report())
     esp_power = res["doublet.esp"].power
     assert len(esp_power) == len(df)
 
-    engine.save_checkpoint("runs/replay.ckpt")
-    engine2 = gm.Engine.load_checkpoint("runs/replay.ckpt")
-    res2 = engine2.resume()
+    res2 = gm.resume("runs/replay.ckpt")
 
     fit = gm.optim.calibrate(
         plant, data, params=[plant.get_parameter("heat_exchanger.thermal_conductance")]
@@ -48,7 +45,7 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
         "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
-    sim = engine.simulate(gm.Dataset.from_profiles(profiles), clock=clock)
+    sim = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     print(sim.energy_report())
 
     start = df["time"].iloc[0]
@@ -56,15 +53,11 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     third = start + pd.Timedelta(days=2)
     day1 = df[df["time"] < second]
     day2 = df[(df["time"] >= second) & (df["time"] < third)]
-    out1 = engine.live(
-        gm.Dataset.from_frame(day1, time_column="time"),
-        checkpoint="runs/live.ckpt",
-        now=second,
+    out1 = gm.live(
+        plant, gm.Dataset.from_frame(day1, time_column="time"), "runs/live.ckpt", now=second
     )
-    out2 = engine.live(
-        gm.Dataset.from_frame(day2, time_column="time"),
-        checkpoint="runs/live.ckpt",
-        now=third,
+    out2 = gm.live(
+        plant, gm.Dataset.from_frame(day2, time_column="time"), "runs/live.ckpt", now=third
     )
     assert len(res) == len(res2) == len(df)
     assert len(sim) == 24

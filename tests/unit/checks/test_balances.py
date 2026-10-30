@@ -58,6 +58,6 @@ def test_mass_ledger_without_a_mass_flow_is_undecided():
 
 def test_the_example_plant_run_passes_both_ledgers(fresh_plant, fast_dataset):
     """A six-hour replay of the doublet heat plant has non-negative powers and mass flows."""
-    replay = gm.Engine(fresh_plant).replay(fast_dataset.window(None, "2024-07-01T06:00:00Z"))
+    replay = gm.replay(fresh_plant, fast_dataset.window(None, "2024-07-01T06:00:00Z"))
     assert gm.checks.energy_balance(replay)["passed"] is True
     assert gm.checks.mass_balance(replay)["passed"] is True

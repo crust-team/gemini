@@ -25,7 +25,7 @@ PROFILE_SOURCE = (
 def _results(plant):
     """Return a replay of the first rows of the example data."""
     frame = pd.read_csv(DATA, parse_dates=["time"]).iloc[:ROWS]
-    return gm.Engine(plant).replay(gm.Dataset.from_frame(frame, time_column="time"))
+    return gm.replay(plant, gm.Dataset.from_frame(frame, time_column="time"))
 
 
 def _profile_sample(results):

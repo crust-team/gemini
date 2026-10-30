@@ -24,7 +24,7 @@ plant.save(target / "plant.json")
 frame = data.to_frame()
 frame.index.name = "time"
 frame.reset_index().to_csv(target / "doublet_2024_15min.csv", index=False, float_format="%.17g")
-results = gm.Engine(plant).replay(data.window(end="2024-06-07T01:00:00Z"))
+results = gm.replay(plant, data.window(end="2024-06-07T01:00:00Z"))
 legacy.write_csv(legacy.results_to_frame(results, project), target / "results_old.csv")
 legacy.write_project(legacy.from_plant(plant, project), target / "old_project")
 print("Converted", len(data), "rows; wiring:", legacy.check_wiring(plant, project))

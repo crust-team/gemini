@@ -32,7 +32,7 @@ VALUES = gm.economics.Assumptions(
 def example_run(shared_plant, fast_dataset):
     """Return a copy of the example plant and a six-hour replay of it."""
     plant = copy.deepcopy(shared_plant)
-    return plant, gm.Engine(plant).replay(fast_dataset.window(None, "2024-07-01T06:00:00Z"))
+    return plant, gm.replay(plant, fast_dataset.window(None, "2024-07-01T06:00:00Z"))
 
 
 def real_calls(example_run):

@@ -124,7 +124,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
         assert old["fluid"] == new["fluid"]
 
     started = perf_counter()
-    replay = path_frame(gm.Engine(plant).replay(selected_dataset))
+    replay = path_frame(gm.replay(plant, selected_dataset))
     elapsed = perf_counter() - started
     assert elapsed < 60
     baseline = BASELINE if dataset_name == "slow" else FAST_BASELINE
@@ -137,9 +137,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
         "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
         "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
     }
-    simulation = path_frame(
-        gm.Engine(plant).simulate(gm.Dataset.from_profiles(profiles), clock=clock)
-    )
+    simulation = path_frame(gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock))
     _assert_values_identical(
         simulation, _baseline_frame(BASELINE, "simulate.csv.gz"), SIMULATE_RTOL
     )
