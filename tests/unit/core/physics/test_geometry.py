@@ -8,6 +8,7 @@ import pytest
 
 from gemini.core.physics import geometry
 from gemini.errors import PhysicsRangeError
+from tests.fixtures.equivalence import assert_function_matches
 
 TRAJECTORY = [
     {"MD": 0, "TVD": 0, "ID": 0.2, "roughness": 2e-5},
@@ -19,6 +20,11 @@ TRAJECTORY = [
 def test_circle_area():
     """Circle area is pi d^2 / 4."""
     assert geometry.circle_area(2) == math.pi
+
+
+def test_circle_area_matches_on_arrays():
+    """The area runs on arrays as on floats."""
+    assert_function_matches(geometry.circle_area, [(2.0,), (0.1778,), (0.0,)])
 
 
 def test_build_path_angles_and_end_point_geometry():
