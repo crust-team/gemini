@@ -4,6 +4,8 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
+from gemini.core.physics import units
+
 
 def quantity(name: str, unit: str, *, additive: bool = False, **bounds) -> Any:
     """Return Pydantic metadata describing a physical quantity and its bounds.
@@ -11,6 +13,7 @@ def quantity(name: str, unit: str, *, additive: bool = False, **bounds) -> Any:
     An ``additive`` quantity is summed over descendant leaf calls by a composite that declares
     an output of it without a formula (see ``Module``).
     """
+    units.define_quantity(name, unit)
     extra = {"quantity": name, "unit": unit} | ({"additive": True} if additive else {})
     return Field(json_schema_extra=extra, **bounds)
 

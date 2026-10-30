@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from gemini.core.physics import units
-from gemini.errors import UnitError
+from gemini.errors import UnitError, UnknownNameError
 
 
 @pytest.mark.parametrize(
@@ -121,3 +121,66 @@ def test_si_conversion_gives_the_bits_of_to_si_on_arrays(unit, quantity):
     assert units.array_to_si(values, unit, quantity).tolist() == expected
     with pytest.raises(UnitError, match="units.si_conversion"):
         units.si_conversion("furlong")
+
+
+@pytest.mark.parametrize(
+    ("unit", "value", "expected"),
+    [
+        ("km", 2.5, 2500.0),
+        ("mm", 4.0, 0.004),
+        ("in", 2.0, 0.0508),
+        ("kPa", 300.0, 3e5),
+        ("MPa", 1.2, 1.2e6),
+        ("rpm", 3000.0, 50.0),
+        ("degC", 20.0, 293.15),
+        ("m3/h", 36.0, 0.01),
+        ("MW", 2.0, 2e6),
+        ("kW", 5.0, 5000.0),
+        ("bar(g)", 1.0, 201325.0),
+    ],
+)
+def test_public_units_convert_to_si(unit, value, expected):
+    """The units the backend accepts convert to SI, and rpm is one sixtieth of a hertz."""
+    assert units.to_si(value, unit) == pytest.approx(expected, rel=1e-15)
+    assert units.convert(value, unit, units.si_unit(unit)) == pytest.approx(expected, rel=1e-15)
+
+
+def test_gauge_pressure_spellings_are_one_entry():
+    """bar(g) and barg are the same gauge convention."""
+    assert units.to_si(2.5, "bar(g)") == units.to_si(2.5, "barg")
+
+
+def test_names_list_every_unit_or_those_of_one_quantity():
+    """Without a quantity every unit is listed; with one, the units of its SI unit."""
+    assert "rpm" in units.names() and units.names() == sorted(units.names())
+    assert {"Pa", "bar", "bar(g)", "kPa", "MPa"} <= set(units.names("pressure"))
+    assert "m3/h" in units.names("volume_flow") and "bar" not in units.names("volume_flow")
+    with pytest.raises(UnknownNameError, match="did you mean 'pressure'") as caught:
+        units.names("pressur")
+    assert caught.value.suggestions[0] == "pressure"
+
+
+def test_parse_splits_a_number_and_a_known_unit():
+    """Text gives its value in the unit it states; unknown units and bare numbers raise."""
+    assert units.parse("150 m3/h") == (150.0, "m3/h")
+    assert units.parse("-2.5e3 bar(g)") == (-2500.0, "bar(g)")
+    with pytest.raises(UnitError, match="'furlong'"):
+        units.parse("3 furlong")
+    with pytest.raises(UnitError, match="expected '<number> <unit>'"):
+        units.parse("150")
+
+
+def test_fits_checks_a_unit_against_a_quantity():
+    """A unit fits a quantity when it converts to the quantity's SI unit."""
+    assert units.fits("MPa", "pressure") and units.fits("barg", "pressure_difference")
+    assert units.fits("rpm", "frequency") and units.fits("degC", "temperature")
+    assert not units.fits("kW", "pressure") and not units.fits("furlong", "pressure")
+    with pytest.raises(UnknownNameError):
+        units.fits("bar", "pressur")
+
+
+def test_a_quantity_keeps_one_unit():
+    """Defining a known quantity again with the same unit is fine; another unit raises."""
+    units.define_quantity("pressure", "Pa")
+    with pytest.raises(UnitError, match="already 'Pa'"):
+        units.define_quantity("pressure", "K")

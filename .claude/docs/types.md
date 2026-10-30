@@ -99,6 +99,18 @@ SI `m_dot` field remains supported. Without `fluid` the constructor uses the run
 fluid. All public numeric declarations accept a unit string or `gm.Quantity(value, unit)`.
 `gm.units.convert(value, from_unit, to_unit, quantity=None)` handles explicit output conversion.
 
+`gm.units` is the one unit implementation (`core/physics/units.py`, one table). Its public names:
+`names(quantity=None)` lists every unit, or those of a named quantity such as `"pressure"`;
+`parse("150 m3/h")` returns `(150.0, "m3/h")` (a number, a space and a known unit, else
+`UnitError`); `convert(value, from_unit, to_unit, quantity=None)`; and `fits(unit, quantity)` tells
+whether a unit converts to the quantity's SI unit, which is how bindings and CSV headers
+`name [unit]` are checked. An unknown unit does not fit and an unknown quantity raises
+`UnknownNameError` with suggestions. The table includes `km`, `mm`, `in`, `kPa`, `MPa`, `rpm`
+(1/60 Hz, since frequency is stored in Hz), `degC`, `m3/h`, `kW`, `MW` and `bar(g)`, the same
+gauge entry as `barg` (offset 101325 Pa). The SI unit of each quantity name comes from
+`quantity(name, unit)` in `core/types/quantities.py`, which calls `units.define_quantity` once per
+quantity, so physics needs no upward import and the quantity list has one source.
+
 `Stream` is one frozen slots dataclass (`m_dot`, `T`, `p`, `fluid`) for every path: plain calls,
 batched runs and traces. It has dataclass equality, hash, `repr`, pickling and `copy`; its JSON
 (`pydantic_core.to_jsonable_python`) lists `m_dot`, `T`, `p` and `fluid`, and `Stream(**data)`

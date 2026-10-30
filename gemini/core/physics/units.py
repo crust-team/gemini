@@ -3,7 +3,9 @@
 The ``*_to_*`` functions convert at correlation boundaries that use US or laboratory units.
 ``_UNITS`` is the single table of public data units: every unit maps to its SI unit, a scale
 and an offset, ``si = value * scale + offset``. ``to_si``, ``convert``, ``value_in_si``,
-``si_unit`` and the unit sets of ``Profile`` and ``Stream`` all read it.
+``si_unit``, ``names``, ``parse``, ``fits`` and the unit sets of ``Profile`` and ``Stream`` all
+read it. ``define_quantity`` records the SI unit of each named quantity (the types package calls
+it once per quantity), so ``names(quantity)`` and ``fits(unit, quantity)`` need no upward import.
 """
 
 import math
@@ -12,12 +14,73 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from gemini.errors import UnitError
-from gemini.utils.strings import did_you_mean
+from gemini.errors import UnitError, UnknownNameError
+from gemini.utils.strings import close_matches, did_you_mean, join_names
 
 SECONDS_PER_DAY = 24 * 3600
 SECONDS_PER_YEAR = 365.25 * SECONDS_PER_DAY
 API_VELOCITY_FACTOR = 0.3048 / math.sqrt(0.0283 / 0.454)
+
+__all__ = [
+    "API_VELOCITY_FACTOR",
+    "Quantity",
+    "SECONDS_PER_DAY",
+    "SECONDS_PER_YEAR",
+    "array_to_si",
+    "bar_to_pa",
+    "bar_to_psi",
+    "bbl_per_day_to_m3s",
+    "bhp_to_w",
+    "c_to_f",
+    "c_to_k",
+    "convert",
+    "cp_to_pas",
+    "define_quantity",
+    "deg_to_rad",
+    "dyne_cm_to_nm",
+    "fits",
+    "ft_head_to_pa",
+    "ft_to_m",
+    "gpa_to_pa",
+    "inch_to_m",
+    "index_from_si",
+    "index_to_si",
+    "k_to_c",
+    "kgh_to_kgs",
+    "kgm3_to_lbmft3",
+    "kgm3_to_mgl",
+    "lbmft3_to_kgm3",
+    "m2_to_md",
+    "m2_to_mm2",
+    "m3day_to_m3s",
+    "m3h_to_m3s",
+    "m3s_per_bar_to_si",
+    "m3s_to_bbl_per_day",
+    "m3s_to_m3day",
+    "m3s_to_m3h",
+    "m_to_ft",
+    "m_to_inch",
+    "m_to_mm",
+    "md_to_m2",
+    "mgl_to_kgm3",
+    "mm_to_m",
+    "mol_l_bar_to_mol_m3_pa",
+    "ms_to_mm_year",
+    "names",
+    "nm_to_dyne_cm",
+    "pa_to_bar",
+    "pa_to_ft_head",
+    "pa_to_gpa",
+    "parse",
+    "pas_to_cp",
+    "rad_to_deg",
+    "si_conversion",
+    "si_unit",
+    "split_quantity",
+    "to_si",
+    "value_in_si",
+    "w_to_bhp",
+]
 
 
 def bar_to_pa(x: float) -> float:
@@ -239,6 +302,9 @@ _UNITS = {
     "Pa": ("Pa", 1, 0),
     "bar": ("Pa", 1e5, 0),
     "barg": ("Pa", 1e5, 101325),
+    "bar(g)": ("Pa", 1e5, 101325),
+    "kPa": ("Pa", 1e3, 0),
+    "MPa": ("Pa", 1e6, 0),
     "K": ("K", 1, 0),
     "degC": ("K", 1, 273.15),
     "C": ("K", 1, 273.15),
@@ -249,6 +315,7 @@ _UNITS = {
     "kg/s": ("kg/s", 1, 0),
     "t/h": ("kg/s", 1000 / 3600, 0),
     "Hz": ("Hz", 1, 0),
+    "rpm": ("Hz", 1 / 60, 0),
     "W": ("W", 1, 0),
     "kW": ("W", 1000, 0),
     "MW": ("W", 1e6, 0),
@@ -261,6 +328,9 @@ _UNITS = {
     "currency/s": ("currency/s", 1, 0),
     "currency/h": ("currency/s", 1 / 3600, 0),
     "m": ("m", 1, 0),
+    "km": ("m", 1000, 0),
+    "mm": ("m", 1e-3, 0),
+    "in": ("m", 0.0254, 0),
     "ft": ("m", 0.3048, 0),
     "s": ("s", 1, 0),
     "min": ("s", 60, 0),
@@ -300,6 +370,9 @@ _UNITS = {
 }
 
 _NUMBER_AND_UNIT = re.compile(r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+(.+?)\s*")
+
+
+_QUANTITY_UNITS = {}
 
 
 @dataclass(frozen=True)
@@ -403,3 +476,59 @@ def convert(value, from_unit, to_unit, quantity=None):
         )
     si = to_si(value, from_unit, quantity)
     return (si - _offset(to_unit, quantity)) / target[1]
+
+
+def define_quantity(name, unit):
+    """Record that the quantity ``name`` is stored in the SI unit ``unit``.
+
+    Defining a name again with the same unit changes nothing; another unit raises ``UnitError``.
+    """
+    known = _QUANTITY_UNITS.setdefault(name, unit)
+    if known != unit:
+        raise UnitError(f"units.define_quantity: quantity {name!r} = {unit!r}; already {known!r}")
+
+
+def _quantity_si_unit(quantity):
+    """Return the SI unit of a named quantity, or raise with the closest names."""
+    if quantity not in _QUANTITY_UNITS:
+        raise UnknownNameError(
+            f"units: quantity = {quantity!r}; expected one of "
+            f"{join_names(sorted(_QUANTITY_UNITS))}{did_you_mean(quantity, _QUANTITY_UNITS)}",
+            suggestions=close_matches(quantity, _QUANTITY_UNITS),
+        )
+    return _QUANTITY_UNITS[quantity]
+
+
+def names(quantity=None):
+    """Return the sorted unit names, or those of one quantity such as ``"pressure"``.
+
+    Every unit name returned converts with ``convert``; an unknown quantity raises
+    ``UnknownNameError`` with the closest names.
+    """
+    if quantity is None:
+        return sorted(_UNITS)
+    target = _quantity_si_unit(quantity)
+    return sorted(unit for unit, entry in _UNITS.items() if entry[0] == target)
+
+
+def parse(text):
+    """Return ``(value, unit)`` of ``"<number> <unit>"`` text such as ``"150 m3/h"``.
+
+    The value stays in the given unit; the unit must be known. Text that is not a number and a
+    unit separated by a space raises ``UnitError``.
+    """
+    value, unit = split_quantity(text)
+    if unit is None:
+        raise UnitError(
+            f"units.parse: text = {text!r}; expected '<number> <unit>', e.g. '150 m3/h'"
+        )
+    _entry(unit, "units.parse")
+    return value, unit
+
+
+def fits(unit, quantity):
+    """Whether ``unit`` is a known unit of the named ``quantity`` (``"pressure"``, ``"power"``).
+
+    An unknown unit does not fit; an unknown quantity raises ``UnknownNameError``.
+    """
+    return si_unit(unit) == _quantity_si_unit(quantity)
