@@ -94,6 +94,13 @@ field default `BRINE`. `stream.with_(**changes)` returns a validated copy. All p
 declarations accept a unit string or `gm.Quantity(value, unit)`. `gm.units.convert(value,
 from_unit, to_unit, quantity=None)` handles explicit output conversion.
 
+`StreamState(m_dot, T, p, fluid, density)` is a frozen slots dataclass with the same
+`volumetric_flow()` and `with_(**changes)`, without pydantic, for traced and batched calls: its
+fields may be floats, arrays over time or traced values, `StreamState.from_fluid(...,
+properties)` computes the density from `rho_l`, `rho_g` and `gmf`, and `with_` keeps the
+`p >= 0` and `T > 0` limits as `gemini.ops.check` (raising `PhysicsRangeError`, where a `Stream`
+raises pydantic's `ValidationError`). `Ports` accept both types.
+
 `BRINE` and `WATER` use the defaults of `core.physics.fluid.FluidProperties`, the original
 constant-water numbers. `Fluid` carries salinity, dissolved CO2 and free-gas mass fractions.
 Density, viscosity, heat capacity and conductivity overrides are validated and immutable.

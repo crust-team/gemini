@@ -43,7 +43,8 @@ returns one cached snapshot per complete `Fluid` value.
   `gmf` = 0, `mu_l` = 0.001 Pa s, `mu_g` = 21.29e-6 Pa s, `cp_l` = 4217.4 J/kg/K, `cp_g` =
   819 J/kg/K, `k_l` = 1.6 W/m/K, `k_g` = 0.0147 W/m/K, `sigma` = 0.0728 N/m.
 - `density` = `1 / (gmf / rho_g + (1 - gmf) / rho_l)` [kg/m3], the homogeneous mixture density
-  from the gas mass fraction `gmf`.
+  from the gas mass fraction `gmf`; `mixture_density(rho_l, rho_g, gmf)` is the same formula
+  for floats, arrays and traced values.
 - `kind` is `brine` (default), `water`, `glycol_water` or `steam`. `glycol_water` replaces the
   liquid values by DOWFROST HD, 30 % propylene glycol by volume at 40 degC: `rho_l` = 1029.85,
   `cp_l` = 3841, `k_l` = 0.4622, `mu_l` = 0.0016295 (SI). `liquid_density`, `liquid_viscosity`,
@@ -146,6 +147,11 @@ stage:
   cube of the frequency ratio (affinity laws).
 - `ESP.efficiency_function(Q, H, P)` = `(q / 135773) (H / P) (745.7 / 2988.30167)` [-], a
   fraction, and 0 when `P < 0.1` W (it is in `modules/pumps/esp.py`).
+- `ESP_REFERENCE_FREQUENCY`, `ESP_EFFICIENCY_FLOW_FACTOR` and the ESP's `MIN_EFFICIENCY_POWER`
+  are `gemini.ops.Constant` objects: plain floats on concrete values (bit for bit, float32
+  promotion included) and named graph inputs when the ESP is traced. The ESP's validity check
+  and branch are `ops.check` and `ops.where`, so the same code is traced (see
+  [native-engine.md](native-engine.md)).
 
 The polynomials are only valid inside the flow range of the manufacturer curve; the functions
 do not check it and raise nothing. Any number of coefficients is accepted.

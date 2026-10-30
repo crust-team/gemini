@@ -10,8 +10,12 @@ regression evidence, and list lasting decisions in [refactor-notes.md](refactor-
 
 A package may import only the packages to its left:
 
-`gemini.utils`, `gemini.errors` ← `core.physics` ← `core.types` ← `core.runtime` ← `core.modules`
-← `core.data` ← `core.engine` ← `core.legacy` ← `optim` ← `gemini/__init__`.
+`gemini.utils`, `gemini.errors` ← `gemini.backends` ← `gemini.ops` ← `core.physics`
+← `core.types` ← `core.runtime` ← `core.modules` ← `core.data` ← `core.engine` ← `core.legacy`
+← `optim` ← `gemini/__init__`.
+
+`gemini.backends` and `gemini.ops` sit below the physics because physics is written with the
+ops (see [native-engine.md](native-engine.md)).
 
 `gemini.utils` and `gemini.errors` are leaf packages: they import only the standard library,
 installed dependencies and themselves, never another part of `gemini`
@@ -162,5 +166,9 @@ reason it is needed:
   own cost for `gemini.core.types.cost.total_cost(plant)`, which looks the method up by name; a
   module that overrides `health(result, measured)` gets a diagnostic, which the engine calls
   after each replayed twin (the base method returns `None`, meaning not assessed).
+
+- Operator overloading on `gemini.ops.Operators`: a `Constant` (`core/physics/constants.py`)
+  routes `+`, `*`, `<`, ... through `gemini.ops.dispatch`, so one physics source runs on floats,
+  arrays and, later, traced values. A constant acts as its float on concrete values.
 
 Adding another implicit mechanism needs a reason of the same weight and an entry here.

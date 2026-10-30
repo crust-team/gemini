@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from gemini import ops
 from gemini.core import runtime
 from gemini.core.modules.module import Module
 from gemini.core.physics import constants, pumps, units
@@ -27,9 +28,14 @@ from gemini.core.types import (
     VolumeFlow,
 )
 from gemini.errors import ConfigurationError, InsufficientDataError, PhysicsRangeError
+from gemini.ops import Constant
 
-MIN_EFFICIENCY_POWER = 0.1
-"""Shaft power [W] below which the pump is treated as stopped and its efficiency as zero."""
+MIN_EFFICIENCY_POWER = Constant(
+    "ESP_MIN_EFFICIENCY_POWER",
+    0.1,
+    "W",
+    "shaft power below which the pump is treated as stopped and its efficiency as zero",
+)
 
 DRIFT_FLOOR = 1e-12
 """Smallest prediction magnitude used as a drift denominator, so a zero prediction is finite."""
@@ -83,10 +89,13 @@ class ESP(Module):
         # Outlets
         suction = inlets.suction
         flow = suction.volumetric_flow()
-        if flow < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: suction volume flow = {flow} m3/s; reverse flow is unsupported"
-            )
+        ops.check(
+            flow >= 0,
+            PhysicsRangeError,
+            "{path}: suction volume flow = {flow} m3/s; reverse flow is unsupported",
+            path=self.path,
+            flow=flow,
+        )
         head = self.head_function(flow, self.frequency)
 
         discharge = suction.with_(p=suction.p + head)
@@ -103,7 +112,9 @@ class ESP(Module):
         self.efficiency = self.efficiency_function(self.flow, self.head, self.power)
         scale = self.frequency / constants.ESP_REFERENCE_FREQUENCY
         self.discharge_pressure = discharge.p
-        self.in_operating_window = self.min_flow * scale <= self.flow <= self.max_flow * scale
+        self.in_operating_window = ops.logical_and(
+            self.min_flow * scale <= self.flow, self.flow <= self.max_flow * scale
+        )
         self.bep_ratio = self.flow / (self.bep_flow * scale)
         self.electricity = self.power / self.motor_efficiency
 
@@ -117,14 +128,14 @@ class ESP(Module):
 
     @staticmethod
     def efficiency_function(flow: float, head: float, power: float) -> float:
-        """Return retained hydraulic efficiency as a fraction."""
-        if power < MIN_EFFICIENCY_POWER:
-            return 0.0
-        return (
-            units.m3s_to_bbl_per_day(flow)
+        """Return retained hydraulic efficiency as a fraction, zero for a stopped pump."""
+        return ops.where(
+            power < MIN_EFFICIENCY_POWER,
+            0.0,
+            lambda: units.m3s_to_bbl_per_day(flow)
             / constants.ESP_EFFICIENCY_FLOW_FACTOR
             * (head / power)
-            * (units.bhp_to_w(1) / units.ft_head_to_pa(1))
+            * (units.bhp_to_w(1) / units.ft_head_to_pa(1)),
         )
 
     def health(self, result, measured):

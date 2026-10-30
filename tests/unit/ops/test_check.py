@@ -1,0 +1,44 @@
+"""``check`` raises the given error with the formatted message, or records a check node."""
+
+import numpy as np
+import pytest
+
+from gemini import ops
+from gemini.errors import PhysicsRangeError
+from gemini.ops import Constant, Symbolic
+
+MESSAGE = "{path}: flow = {flow} m3/s; reverse flow is unsupported"
+
+
+def test_scalar_check_raises_the_message_of_the_former_f_string():
+    """The message equals the f-string it replaces; a passing check returns nothing."""
+    flow = -0.25
+    assert ops.check(flow < 0, PhysicsRangeError, MESSAGE, path="esp", flow=flow) is None
+    with pytest.raises(PhysicsRangeError) as raised:
+        ops.check(flow >= 0, PhysicsRangeError, MESSAGE, path="esp", flow=flow)
+    assert str(raised.value) == f"esp: flow = {flow} m3/s; reverse flow is unsupported"
+
+
+def test_array_check_raises_for_the_first_failing_row():
+    """On arrays the first failing row fills the message; constants give their value."""
+    flow = np.array([0.1, -0.5, -0.7])
+    limit = Constant("LIMIT", 0, "m3/s", "lowest flow")
+    with pytest.raises(PhysicsRangeError, match=r"^esp: flow = -0.5 m3/s"):
+        ops.check(
+            flow >= 0, PhysicsRangeError, MESSAGE + " {limit}", path="esp", flow=flow, limit=limit
+        )
+
+
+def test_traced_check_is_recorded_with_its_attributes():
+    """A symbolic value records one ``check`` op with the error, message and values."""
+    recorded = []
+
+    class Recorder(Symbolic):
+        def record(self, definition, operands, attributes=None):
+            recorded.append((definition.name, operands, attributes))
+
+    flow = Recorder()
+    assert ops.check(True, PhysicsRangeError, MESSAGE, path="esp", flow=flow) is None
+    name, operands, attributes = recorded[0]
+    assert (name, operands, attributes["error"]) == ("check", (True,), PhysicsRangeError)
+    assert attributes["values"] == {"path": "esp", "flow": flow}

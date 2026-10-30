@@ -2,7 +2,8 @@
 
 import pytest
 
-from gemini.core.types import Ports, Stream
+from gemini.core.types import BRINE, Ports, Stream
+from gemini.core.types.flows import StreamState
 from gemini.errors import UnknownPortError
 
 
@@ -66,3 +67,9 @@ def test_ports_reject_non_stream_values(streams):
     """The port mapping never carries scalar controls or computed outputs."""
     with pytest.raises(TypeError, match="plant.esp.*suction.*Stream.*valid names: suction"):
         Ports({"suction": 1.0}, path="plant.esp")
+
+
+def test_ports_accept_stream_states():
+    """Traced and batched calls pass ``StreamState`` values through the same mapping."""
+    state = StreamState(m_dot=1.0, T=300.0, p=1e5, fluid=BRINE, density=1000.0)
+    assert Ports({"inlet": state}).inlet is state

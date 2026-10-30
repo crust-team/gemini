@@ -1,13 +1,14 @@
 """Stream construction from public units, validation and copies."""
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
 from gemini.core import runtime
 from gemini.core.physics.units import Quantity
-from gemini.core.types.flows import Stream
+from gemini.core.types.flows import Stream, StreamState
 from gemini.core.types.fluid import BRINE, WATER, Fluid
-from gemini.errors import UnitError
+from gemini.errors import PhysicsRangeError, UnitError
 
 
 def test_mass_flow_inputs_and_units():
@@ -57,3 +58,21 @@ def test_with_revalidates_the_copy():
     assert stream.with_(p=2e5) == Stream(m_dot=-1, T=300, p=2e5, fluid=WATER)
     with pytest.raises(ValidationError):
         stream.with_(T=-1)
+
+
+def test_stream_state_carries_array_values_and_keeps_the_physical_limits():
+    """A state over time computes volume flow from its density; copies keep p >= 0, T > 0."""
+    properties = {"rho_l": 1068.0, "rho_g": 1.976, "gmf": 0.0}
+    state = StreamState.from_fluid(
+        m_dot=np.array([10.68, 21.36]),
+        T=np.array([300.0, 310.0]),
+        p=1e5,
+        fluid=BRINE,
+        properties=properties,
+    )
+    assert state.volumetric_flow().tolist() == pytest.approx([0.01, 0.02], rel=1e-15)
+    assert state.with_(p=np.array([2e5, 3e5])).p.tolist() == [2e5, 3e5]
+    with pytest.raises(PhysicsRangeError, match="p = -1.0 Pa"):
+        state.with_(p=np.array([1e5, -1.0]))
+    with pytest.raises(PhysicsRangeError, match="T = 0.0 K"):
+        state.with_(T=0.0)

@@ -40,6 +40,8 @@ gemini/
 ├── __init__.py       # curated import gemini as gm API
 ├── utils/            # general helpers; leaf package that imports nothing else from gemini
 ├── errors/           # every gm.errors class; leaf package that imports nothing else from gemini
+├── backends/         # python (scalar) and numpy (array) implementations of the ops
+├── ops/              # op registry, dispatch, Constant, where and check used by physics
 ├── core/
 │   ├── physics/      # SI correlations and unit conversions
 │   ├── types/        # quantities, streams, fluids, declarations, profiles, bindings, costs

@@ -25,4 +25,13 @@ class FluidProperties(BaseModel):
     @property
     def density(self) -> float:
         """Return homogeneous mixture density [kg/m3]."""
-        return 1 / (self.gmf / self.rho_g + (1 - self.gmf) / self.rho_l)
+        return mixture_density(self.rho_l, self.rho_g, self.gmf)
+
+
+def mixture_density(liquid_density, gas_density, gas_mass_fraction):
+    """Return the homogeneous mixture density [kg/m3] of a gas mass fraction [-].
+
+    ``1 / (gmf / rho_g + (1 - gmf) / rho_l)``; the operands may be floats, arrays or traced
+    values.
+    """
+    return 1 / (gas_mass_fraction / gas_density + (1 - gas_mass_fraction) / liquid_density)

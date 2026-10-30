@@ -1,9 +1,10 @@
 """Constant fluid property snapshot: original defaults, mixture density and validation."""
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from gemini.core.physics.fluid import FluidProperties
+from gemini.core.physics.fluid import FluidProperties, mixture_density
 
 
 def test_original_defaults():
@@ -31,3 +32,10 @@ def test_mixture_density_and_validation():
             FluidProperties(**override)
     with pytest.raises(ValidationError):
         FluidProperties().rho_l = 1
+
+
+def test_mixture_density_is_the_snapshot_density():
+    """The shared density function gives the snapshot's value, also on arrays."""
+    values = FluidProperties(rho_l=1068, gmf=0.25)
+    assert mixture_density(values.rho_l, values.rho_g, values.gmf) == values.density
+    assert mixture_density(np.array([1000.0, 1068.0]), 1.976, 0.0).tolist() == [1000.0, 1068.0]
