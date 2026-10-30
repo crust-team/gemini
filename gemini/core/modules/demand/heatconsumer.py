@@ -75,9 +75,9 @@ class HeatConsumer(Module):
         # Outlets
         supply_in = inlets.supply_in
         delivered = self._delivered_heat(supply_in)
-        capacity_rate = supply_in.m_dot * supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
+        capacity_rate = supply_in.heat_capacity_rate()
         cooled = ops.maximum(
-            self.minimum_return_temperature, supply_in.T - ops.truediv(delivered, capacity_rate)
+            self.minimum_return_temperature, supply_in.T - delivered / capacity_rate
         )
         return_T = ops.where(delivered == 0, supply_in.T, cooled)
         return_out = supply_in.with_(T=return_T)
@@ -103,6 +103,5 @@ class HeatConsumer(Module):
             path=self.path,
             m_dot=supply_in.m_dot,
         )
-        cp = supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
         drop = ops.maximum(0, supply_in.T - self.minimum_return_temperature)
-        return ops.minimum(self.heat_demand, supply_in.m_dot * cp * drop)
+        return ops.minimum(self.heat_demand, supply_in.heat_capacity_rate() * drop)

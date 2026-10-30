@@ -90,9 +90,8 @@ class CoolingConsumer(Module):
         supply_in = inlets.supply_in
         sensible, latent = self._met_loads(supply_in)
         absorbed = sensible + latent
-        cp = supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
         warmed = ops.minimum(
-            self._return_limit(), supply_in.T + ops.truediv(absorbed, supply_in.m_dot * cp)
+            self._return_limit(), supply_in.T + absorbed / supply_in.heat_capacity_rate()
         )
         return_T = ops.where(absorbed == 0, supply_in.T, warmed)
         return_out = supply_in.with_(T=return_T)
@@ -118,8 +117,9 @@ class CoolingConsumer(Module):
             path=self.path,
             m_dot=supply_in.m_dot,
         )
-        cp = supply_in.fluid.properties(supply_in.p, supply_in.T).cp_l
-        available = supply_in.m_dot * cp * ops.maximum(0, self._return_limit() - supply_in.T)
+        available = supply_in.heat_capacity_rate() * ops.maximum(
+            0, self._return_limit() - supply_in.T
+        )
         sensible = ops.minimum(self.sensible_cooling_demand, available)
         latent = ops.minimum(self.latent_cooling_demand, available - sensible)
         dry = supply_in.T > self._dew_point() - self.dew_point_margin
