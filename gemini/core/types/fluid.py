@@ -36,7 +36,7 @@ class Fluid(BaseModel):
     kind: Literal["brine", "water", "glycol_water", "steam"] = "brine"
     salinity: Fraction = 0.0
     co2_mass_fraction: Fraction = 0.0
-    gas_mass_fraction: Fraction = Field(0, lt=1)
+    gas_mass_fraction: Fraction = Field(0.0, lt=1)
     glycol_fraction: Fraction = 0.0
     property_model: Literal["constant_stp"] = "constant_stp"
     liquid_density: Density | None = None

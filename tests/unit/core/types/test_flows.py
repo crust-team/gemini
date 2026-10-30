@@ -141,3 +141,10 @@ def test_json_round_trip_keeps_the_event_log_layout():
     }
     assert list(data) == ["m_dot", "T", "p", "fluid"]
     assert Stream(**json.loads(json.dumps(data))) == stream
+
+
+def test_text_of_a_stream_lists_its_fields():
+    """``str`` is the field listing printed by examples; every fluid fraction is a float."""
+    stream = Stream(m_dot=1, T=300, p=1e5, fluid=BRINE)
+    assert str(stream) == f"m_dot=1.0 T=300.0 p=100000.0 fluid={stream.fluid!r}"
+    assert isinstance(BRINE.gas_mass_fraction, float)

@@ -58,6 +58,10 @@ class Stream:
             object.__setattr__(self, name, values[name])
         object.__setattr__(self, "fluid", fluid)
 
+    def __str__(self):
+        """Return the fields as ``name=value`` pairs."""
+        return f"m_dot={self.m_dot!r} T={self.T!r} p={self.p!r} fluid={self.fluid!r}"
+
     def volumetric_flow(self):
         """Return signed mixture volume flow [m3/s] using the stream fluid."""
         return self.m_dot / self.fluid.properties(self.p, self.T).density
