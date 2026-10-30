@@ -67,12 +67,10 @@ class AbsorptionUnit(Module):
         self.minimum_driving_difference = Parameter(TemperatureDifference)
         self.rejection_coefficient = Parameter(Dimensionless)
         self.evaporator_coefficient = Parameter(Dimensionless)
-        self.thermal_cop = Parameter(
-            Ratio, default=refrigeration.DEFAULT_ABSORPTION_THERMAL_COP, gt=0
-        )
+        self.thermal_cop = Parameter(Ratio, default=refrigeration.ABSORPTION_THERMAL_COP, gt=0)
         self.auxiliary_power_ratio = Parameter(Ratio)
         self.minimum_driving_temperature = Parameter(
-            Temperature, default=refrigeration.DEFAULT_ABSORPTION_MINIMUM_DRIVING_TEMPERATURE
+            Temperature, default=refrigeration.ABSORPTION_MINIMUM_DRIVING_TEMPERATURE
         )
 
         # Inlets

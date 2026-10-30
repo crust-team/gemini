@@ -88,24 +88,7 @@ class HeatExchanger(Module):
             setattr(self, name, value)
 
     def _performance(self, hot_in, cold_in):
-        ops.check(
-            ops.logical_and(hot_in.m_dot >= 0, cold_in.m_dot >= 0),
-            PhysicsRangeError,
-            "{path}: negative mass flow hot_in.m_dot = {hot_m_dot} kg/s, "
-            "cold_in.m_dot = {cold_m_dot} kg/s; expected >= 0",
-            path=self.path,
-            hot_m_dot=hot_in.m_dot,
-            cold_m_dot=cold_in.m_dot,
-        )
-        ops.check(
-            hot_in.T >= cold_in.T,
-            PhysicsRangeError,
-            "{path}: hot inlet is below cold inlet: hot_in.T = {hot_T} K, "
-            "cold_in.T = {cold_T} K",
-            path=self.path,
-            hot_T=hot_in.T,
-            cold_T=cold_in.T,
-        )
+        self._check_inlets(hot_in, cold_in)
         effectiveness, ntu, duty, hot_T, cold_T = heat_transfer.exchanger_balance(
             hot_in.T,
             cold_in.T,
@@ -134,6 +117,27 @@ class HeatExchanger(Module):
             "dp_cold": dp_cold,
             "approach_T": ops.minimum(dt1, dt2),
         }
+
+    def _check_inlets(self, hot_in, cold_in):
+        """Reject negative flow and a hot inlet below the cold inlet."""
+        ops.check(
+            ops.logical_and(hot_in.m_dot >= 0, cold_in.m_dot >= 0),
+            PhysicsRangeError,
+            "{path}: negative mass flow hot_in.m_dot = {hot_m_dot} kg/s, "
+            "cold_in.m_dot = {cold_m_dot} kg/s; expected >= 0",
+            path=self.path,
+            hot_m_dot=hot_in.m_dot,
+            cold_m_dot=cold_in.m_dot,
+        )
+        ops.check(
+            hot_in.T >= cold_in.T,
+            PhysicsRangeError,
+            "{path}: hot inlet is below cold inlet: hot_in.T = {hot_T} K, "
+            "cold_in.T = {cold_T} K",
+            path=self.path,
+            hot_T=hot_in.T,
+            cold_T=cold_in.T,
+        )
 
     def health(self, result, measured):
         """Alarm when apparent conductance falls below the configured design fraction.

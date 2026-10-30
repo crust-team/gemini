@@ -57,22 +57,19 @@ class AdsorptionChiller(Module):
     def __init__(self):
         """Declare adsorption chiller design data, its three circuits and performance."""
         super().__init__()
-
         # Parameters
         self.capacity = Parameter(Power, gt=0)
         self.characteristic_slope = Parameter(ThermalConductance, gt=0)
         self.minimum_driving_difference = Parameter(TemperatureDifference)
         self.rejection_coefficient = Parameter(Dimensionless)
         self.evaporator_coefficient = Parameter(Dimensionless)
-        self.thermal_cop = Parameter(
-            Ratio, default=refrigeration.DEFAULT_ADSORPTION_THERMAL_COP, gt=0
-        )
+        self.thermal_cop = Parameter(Ratio, default=refrigeration.ADSORPTION_THERMAL_COP, gt=0)
         self.auxiliary_power_ratio = Parameter(Ratio)
         self.minimum_driving_temperature = Parameter(
-            Temperature, default=refrigeration.DEFAULT_ADSORPTION_MINIMUM_DRIVING_TEMPERATURE
+            Temperature, default=refrigeration.ADSORPTION_MINIMUM_DRIVING_TEMPERATURE
         )
         self.maximum_driving_temperature = Parameter(
-            Temperature, default=refrigeration.DEFAULT_ADSORPTION_MAXIMUM_DRIVING_TEMPERATURE
+            Temperature, default=refrigeration.ADSORPTION_MAXIMUM_DRIVING_TEMPERATURE
         )
 
         # Inlets
