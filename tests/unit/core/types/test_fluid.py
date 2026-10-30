@@ -1,11 +1,15 @@
 """Stream dtype identity, composition and reference property models."""
 
+import json
+
 import pytest
 from pydantic import ValidationError
+from pydantic_core import to_jsonable_python
 
 from gemini.core.physics.fluid import FluidProperties
 from gemini.core.types.flows import Stream
 from gemini.core.types.fluid import BRINE, GLYCOL_30, STEAM, WATER, Fluid
+from gemini.errors import CallError
 
 
 def test_fluid_properties_and_identity():
@@ -23,12 +27,12 @@ def test_fluid_properties_and_identity():
     assert Fluid(gas_mass_fraction=0.1, specific_heat=4000).properties(1e5, 300) == (
         FluidProperties(gmf=0.1, cp_l=4000)
     )
-    assert Stream.model_validate_json(stream.model_dump_json()) == stream
+    assert Stream(**json.loads(json.dumps(to_jsonable_python(stream)))) == stream
     with pytest.raises(ValidationError):
         brine.salinity = 0.5
     with pytest.raises(ValidationError):
         Fluid(salinity=0.9, co2_mass_fraction=0.2)
-    with pytest.raises(ValidationError):
+    with pytest.raises(CallError):
         Stream(m_dot=1, T=300, p=1e5, fluid="brine")
 
 
@@ -37,7 +41,7 @@ def test_steam_kind_labels_vapour_without_changing_other_fluids():
     assert STEAM == Fluid(kind="steam") and STEAM not in (BRINE, WATER)
     assert STEAM.properties(6e5, 432) == FluidProperties()
     stream = Stream(m_dot=20, T=432, p=6e5, fluid=STEAM)
-    assert Stream.model_validate_json(stream.model_dump_json()).fluid.kind == "steam"
+    assert Stream(**json.loads(json.dumps(to_jsonable_python(stream)))).fluid.kind == "steam"
     assert BRINE.kind == "brine" and WATER.kind == "water"
 
 

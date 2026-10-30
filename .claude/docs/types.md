@@ -88,20 +88,26 @@ helpers remain in `physics.units`.
 `Stream(flow=..., T=..., p=..., fluid=None)` accepts mass flow (`kg/s`, `t/h`) or volumetric flow
 (`m3/s`, `m3/h`, `l/s`) and converts it with the stream's fluid density. Plain `flow` numbers are
 kg/s; text without a unit such as `flow="150"` raises `gm.errors.UnitError`, and passing both
-`flow` and `m_dot` raises `TypeError`. The explicit SI `m_dot` field remains supported. Without
-`fluid` the constructor uses the runtime default fluid, while `Stream.model_validate` uses the
-field default `BRINE`. `stream.with_(**changes)` returns a validated copy. All public numeric
-declarations accept a unit string or `gm.Quantity(value, unit)`. `gm.units.convert(value,
-from_unit, to_unit, quantity=None)` handles explicit output conversion.
+`flow` and `m_dot` raises `gm.errors.CallError`, as do an unknown keyword (with a did-you-mean),
+a missing field and a `fluid` that is neither a `Fluid` nor a mapping of its fields. The explicit
+SI `m_dot` field remains supported. Without `fluid` the constructor uses the runtime default
+fluid. All public numeric declarations accept a unit string or `gm.Quantity(value, unit)`.
+`gm.units.convert(value, from_unit, to_unit, quantity=None)` handles explicit output conversion.
 
-`StreamState(m_dot, T, p, fluid, density)` is a frozen slots dataclass with the same
-`volumetric_flow()` and `with_(**changes)`, without pydantic, for traced and batched calls: its
-fields may be floats, arrays over time or traced values, `StreamState.from_fluid(...,
-properties)` computes the density from `rho_l`, `rho_g` and `gmf`, and `with_` keeps the
-`p >= 0` and `T > 0` limits as `gemini.ops.check` (raising `PhysicsRangeError`, where a `Stream`
-raises pydantic's `ValidationError`). `Ports` accept both types.
+`Stream` is one frozen slots dataclass (`m_dot`, `T`, `p`, `fluid`) for every path: plain calls,
+batched runs and traces. It has dataclass equality, hash, `repr`, pickling and `copy`; its JSON
+(`pydantic_core.to_jsonable_python`) lists `m_dot`, `T`, `p` and `fluid`, and `Stream(**data)`
+builds it back. The constructor validates at the boundary: numbers become Python `float`,
+`m_dot` must be finite, `T > 0` and finite, `p >= 0` and finite, else `PhysicsRangeError`. When a
+field is an array over time or a traced value it is kept as given and the limits become
+`gemini.ops.check` calls, so an invalid row raises the same class. `stream.with_(**changes)` is
+a trusted fast copy: it reuses the `Fluid`, checks only the changed fields against the same
+limits and raises `CallError` for an unknown field. A traced inlet is a `Stream` of graph
+inputs with the concrete `Fluid`, so `volumetric_flow()` divides by a plain float density.
+`Ports` accept only `Stream`. Ports have no JSON schema, quantity or unit in `Declaration`.
 
-`BRINE` and `WATER` use the defaults of `core.physics.fluid.FluidProperties`, the original
+`BRINE` and `WATER` use the defaults of `core.physics.fluid.FluidProperties` (a frozen slots
+dataclass: numbers become `float`, bounds raise `PhysicsRangeError`), the original
 constant-water numbers. `Fluid` carries salinity, dissolved CO2 and free-gas mass fractions.
 Density, viscosity, heat capacity and conductivity overrides are validated and immutable.
 `fluid.properties(p, T)` returns a `FluidProperties` snapshot cached by the complete Fluid value.

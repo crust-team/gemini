@@ -5,11 +5,12 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic_core import to_jsonable_python
 
 import gemini as gm
 from gemini.core.engine.callbacks import AutoCheckpoint, EventLog
 from gemini.core.modules import Module
-from gemini.core.types import Control, Output
+from gemini.core.types import Control, Output, Ports
 from gemini.core.types.bindings import Binding, ModuleBindings
 
 
@@ -56,6 +57,19 @@ def test_event_log_records_calls_in_order_and_detaches():
     forward = events.events[1]
     assert forward["inputs"] == {"level": 1.0} and forward["outputs"] == {"value": 1.0}
     assert not plant._hooks and not plant._pre_hooks
+
+
+def test_event_log_serialises_a_stream_inlet_as_before():
+    """A stream is logged with ``m_dot``, ``T``, ``p`` and its fluid, in that order."""
+    stream = gm.Stream(m_dot=2, T=300, p=1e5, fluid=gm.WATER)
+    logged = to_jsonable_python(dict(Ports({"inlet": stream})), fallback=str)
+    assert list(logged["inlet"]) == ["m_dot", "T", "p", "fluid"]
+    assert logged["inlet"] == {
+        "m_dot": 2.0,
+        "T": 300.0,
+        "p": 100000.0,
+        "fluid": gm.WATER.model_dump(mode="json"),
+    }
 
 
 def test_event_log_reports_recorded_errors_with_their_type(tmp_path):

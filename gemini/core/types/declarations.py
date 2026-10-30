@@ -1,7 +1,8 @@
 """Declarations registered by :class:`gemini.core.modules.Module`."""
 
+from collections.abc import Mapping
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -155,7 +156,11 @@ class Parameter(Declaration):
 
 
 class _StreamPort(Declaration):
-    """Fluid port declaration; ``kind`` must be a ``Stream`` type."""
+    """Fluid port declaration; ``kind`` must be a ``Stream`` type.
+
+    A port has no JSON schema, quantity or unit: ``schema`` is empty, ``quantity`` and ``unit``
+    are ``None`` and ``additive`` is false. Stream dataclasses do not go through Pydantic.
+    """
 
     def __init__(self, kind=Stream, *, description=None):
         """Declare a fluid port carrying streams of ``kind``."""
@@ -163,7 +168,23 @@ class _StreamPort(Declaration):
             raise DeclarationError(
                 f"{type(self).__name__}: kind = {kind!r}; expected a fluid Stream type"
             )
-        super().__init__(kind, description=description)
+        self.kind = kind
+        self.default = UNSET
+        self.description = description
+        self.bounds = {}
+        self.name = None
+        self.owner = None
+        self.schema, self.quantity, self.unit, self.additive = {}, None, None, False
+
+    def validate(self, value):
+        """Return a stream of ``kind``: an instance passes, a mapping of its fields builds one."""
+        if isinstance(value, self.kind):
+            return value
+        if isinstance(value, Mapping):
+            return self.kind(**value)
+        raise DeclarationError(
+            f"{self.path}: invalid {self.section} value {value!r}; expected a {self.kind.__name__}"
+        )
 
 
 class Inlet(_StreamPort):
@@ -238,10 +259,11 @@ class Outlet(_StreamPort):
 
     def field(self, name):
         """Return a reference to one ``Stream`` field of this outlet for ``Output.of``."""
-        if name not in self.kind.model_fields:
+        names = [field.name for field in fields(self.kind)]
+        if name not in names:
             raise DeclarationError(
                 f"{self.path}.{name}: unknown stream field; valid: "
-                f"{join_names(self.kind.model_fields)}{did_you_mean(name, self.kind.model_fields)}"
+                f"{join_names(names)}{did_you_mean(name, names)}"
             )
         return PortField(self, name)
 
@@ -256,7 +278,7 @@ class PortField:
     @property
     def kind(self):
         """Return the annotated kind of the stream field."""
-        return self.port.kind.model_fields[self.name].annotation
+        return next(field.type for field in fields(self.port.kind) if field.name == self.name)
 
     @property
     def path(self):

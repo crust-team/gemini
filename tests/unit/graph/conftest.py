@@ -6,7 +6,6 @@ import pytest
 from gemini import ops
 from gemini.core.modules import Module
 from gemini.core.types import Control, Inlet, Outlet, Output, Parameter, Stream
-from gemini.core.types.flows import StreamState
 from gemini.errors import PhysicsRangeError
 from gemini.ops import Constant
 
@@ -68,10 +67,9 @@ def gain():
 @pytest.fixture
 def inlet():
     """Return a three-row inlet state."""
-    return StreamState(
+    return Stream(
         m_dot=np.array([1.0, 1.0, 1.0]),
         T=np.array([300.0, 310.0, 320.0]),
         p=np.array([1e5, 2e5, 3e5]),
         fluid=Gain().fluid,
-        density=None,
     )

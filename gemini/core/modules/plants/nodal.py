@@ -18,7 +18,6 @@ can drive the traversed pressure below zero, and a trial there raises ``PhysicsR
 naming the trial value.
 """
 
-from pydantic import ValidationError
 from scipy.optimize import brentq
 
 from gemini.errors import ConfigurationError, PhysicsRangeError
@@ -152,7 +151,7 @@ def _evaluate(function, name, unit, residual, value):
     """Return ``residual(value)``; a trial outside the well model's domain names the value."""
     try:
         return residual(value)
-    except (PhysicsRangeError, ValidationError) as error:
+    except PhysicsRangeError as error:
         raise PhysicsRangeError(
             f"{function}: {name} = {value} {unit}; expected a trial inside the well model's "
             f"domain (narrow the bracket): {error}"

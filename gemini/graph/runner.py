@@ -1,7 +1,7 @@
 """Run one module over whole time series: one traced call, or row by row on a graph break.
 
 ``run(module, inlets, inputs)`` is the prototype's stand-in for the engine integration. Inlets
-are ``StreamState`` objects whose fields are arrays over time (validated by the caller);
+are ``Stream`` objects whose fields are arrays over time (validated when built);
 ``inputs`` maps control and boundary names to arrays or scalars, and the module's persisted
 values fill the rest. Parameters and constants come from the module and the graph. A module
 that cannot be traced runs untraced, one call per row, with the same results, and the reason
@@ -19,7 +19,7 @@ from gemini.core.types.ports import Ports
 from gemini.errors import TraceError
 from gemini.graph.cache import GraphCache
 from gemini.graph.interpreter import Interpreter
-from gemini.graph.tracer import FLUID_PROPERTIES, STREAM_FIELDS
+from gemini.graph.tracer import STREAM_FIELDS
 
 
 @dataclass
@@ -76,12 +76,10 @@ def _row_feeds(graph, feeds, row):
 def _feeds(graph, module, inlets, inputs):
     """Return the value of every graph input."""
     feeds = {}
-    for name, state in inlets.items():
-        properties = state.fluid.properties(None, None)
+    for name, stream in inlets.items():
         feeds |= {
-            f"{name}.{field}": np.asarray(getattr(state, field)) for field, _ in STREAM_FIELDS
+            f"{name}.{field}": np.asarray(getattr(stream, field)) for field, _ in STREAM_FIELDS
         }
-        feeds |= {f"{name}.{prop}": getattr(properties, prop) for prop, _ in FLUID_PROPERTIES}
     for name in graph.by_role("control") | graph.by_role("boundary"):
         feeds[name] = np.asarray(inputs[name] if name in inputs else module._input_value(name))
     for name in graph.by_role("parameter"):

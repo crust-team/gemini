@@ -1,9 +1,9 @@
 """Immutable named fluid-port mappings."""
 
+import numpy as np
 import pytest
 
 from gemini.core.types import BRINE, Ports, Stream
-from gemini.core.types.flows import StreamState
 from gemini.errors import UnknownPortError
 
 
@@ -69,7 +69,7 @@ def test_ports_reject_non_stream_values(streams):
         Ports({"suction": 1.0}, path="plant.esp")
 
 
-def test_ports_accept_stream_states():
-    """Traced and batched calls pass ``StreamState`` values through the same mapping."""
-    state = StreamState(m_dot=1.0, T=300.0, p=1e5, fluid=BRINE, density=1000.0)
+def test_ports_accept_streams_of_arrays():
+    """Batched calls pass ``Stream`` values of arrays through the same mapping."""
+    state = Stream(m_dot=np.array([1.0, 2.0]), T=300.0, p=1e5, fluid=BRINE)
     assert Ports({"inlet": state}).inlet is state

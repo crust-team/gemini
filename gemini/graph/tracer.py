@@ -2,9 +2,10 @@
 
 The trace follows the fixed order of ``Module._evaluate``: ``forward``, then (unless
 ``no_outputs()`` is active) ``_compute_outputs``, formula outputs, forward hooks and
-``_check_outputs``, which runs once here. Inlet stream fields and fluid properties, controls,
-boundaries, numeric parameters and the constants the physics uses become named graph inputs;
-non-numeric parameter values are trace guards (see ``cache``). A forward hook that writes an
+``_check_outputs``, which runs once here. Inlet stream fields (a ``Stream`` of traced values
+whose ``Fluid`` is the concrete, static one), controls, boundaries, numeric parameters and the
+constants the physics uses become named graph inputs; non-numeric parameter values are trace
+guards (see ``cache``). A forward hook that writes an
 output is part of the graph; one that only reads is an observer, replayed per row after a run.
 Anything the trace cannot follow raises ``TraceError``, which makes the module a graph break.
 """
@@ -13,13 +14,10 @@ import numbers
 
 from gemini.core import runtime
 from gemini.core.modules.module import _Call, _current_call, outputs_enabled
-from gemini.core.types.flows import StreamState
+from gemini.core.types.flows import Stream
 from gemini.core.types.ports import Ports
 from gemini.errors import TraceError
 from gemini.graph.graph import Graph
-
-FLUID_PROPERTIES = (("rho_l", "kg/m3"), ("rho_g", "kg/m3"), ("gmf", "-"))
-"""Fluid properties of an inlet that become graph inputs, with their units."""
 
 STREAM_FIELDS = (("m_dot", "kg/s"), ("T", "K"), ("p", "Pa"))
 """Stream fields of every inlet and outlet in the graph, with their units."""
@@ -75,12 +73,9 @@ def _check_traceable(module):
 
 
 def _inlet(graph, name, fluid):
-    """Return the traced state of one inlet stream and its fluid properties."""
+    """Return the traced stream of one inlet: graph inputs for its fields, the fixed fluid."""
     fields = {field: graph.input(f"{name}.{field}", "inlet", unit) for field, unit in STREAM_FIELDS}
-    properties = {
-        prop: graph.input(f"{name}.{prop}", "inlet", unit) for prop, unit in FLUID_PROPERTIES
-    }
-    return StreamState.from_fluid(fluid=fluid, properties=properties, **fields)
+    return Stream._trusted(fluid=fluid, **fields)
 
 
 def _inputs(graph, module):

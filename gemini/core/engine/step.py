@@ -67,7 +67,7 @@ def _inlet_stream(module, fields, row, defaults):
     values["fluid"] = Fluid.model_validate(values["fluid"])
     if "m_dot" in fields and fields["m_dot"].unit in VOLUMETRIC_UNITS:
         values["m_dot"] *= values["fluid"].properties(values["p"], values["T"]).density
-    return Stream.model_validate(values)
+    return Stream(**values)
 
 
 def prepare(module, bindings, row, defaults=None):

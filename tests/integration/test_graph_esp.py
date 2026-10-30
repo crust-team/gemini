@@ -11,7 +11,7 @@ import pytest
 
 import gemini as gm
 from gemini.core.modules.pumps import esp as esp_file
-from gemini.core.types.flows import StreamState
+from gemini.core.types.flows import Stream
 from gemini.errors import PhysicsRangeError
 from gemini.graph import GraphCache, Proxy, run
 
@@ -34,9 +34,7 @@ def esp(shared_plant):
 
 def _suction(esp, week):
     density = esp.fluid.properties(None, None).density
-    return StreamState(
-        m_dot=week[:, 0] * density, T=week[:, 1], p=week[:, 2], fluid=esp.fluid, density=None
-    )
+    return Stream(m_dot=week[:, 0] * density, T=week[:, 1], p=week[:, 2], fluid=esp.fluid)
 
 
 def _untraced(esp, week):
@@ -129,13 +127,7 @@ def test_no_outputs_traces_the_fluid_step_only(esp, week):
 def test_reverse_flow_raises_the_untraced_error_at_the_physics_line(esp, week):
     """A negative flow row raises ``PhysicsRangeError`` with the untraced message and line."""
     suction = _suction(esp, week[:3])
-    reversed_flow = StreamState(
-        m_dot=suction.m_dot * np.array([1, -1, -1]),
-        T=suction.T,
-        p=suction.p,
-        fluid=esp.fluid,
-        density=None,
-    )
+    reversed_flow = suction.with_(m_dot=suction.m_dot * np.array([1, -1, -1]))
     with pytest.raises(PhysicsRangeError) as untraced:
         esp(
             suction=gm.Stream(

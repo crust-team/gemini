@@ -1,6 +1,6 @@
 """Immutable named fluid ports passed through module calls."""
 
-from gemini.core.types.flows import Stream, StreamState
+from gemini.core.types.flows import Stream
 from gemini.errors import CallError, UnknownPortError
 from gemini.utils.mappings import AttributeMapping
 from gemini.utils.strings import did_you_mean, join_names
@@ -9,7 +9,7 @@ from gemini.utils.strings import did_you_mean, join_names
 class Ports(AttributeMapping):
     """Read-only, ordered mapping of port names to fluid streams.
 
-    Values are ``Stream`` objects, or ``StreamState`` objects on the traced and batched path.
+    Values are ``Stream`` objects, whose fields may be floats, arrays or traced values.
     """
 
     key_error = UnknownPortError
@@ -24,7 +24,7 @@ class Ports(AttributeMapping):
                 raise CallError(
                     f"{path}: port name = {name!r}; expected a string; valid names: {valid}"
                 )
-            if not isinstance(value, (Stream, StreamState)):
+            if not isinstance(value, Stream):
                 raise CallError(
                     f"{path}: port {name!r} = {value!r}; expected a Stream; valid names: {valid}"
                 )

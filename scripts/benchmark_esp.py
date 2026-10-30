@@ -16,7 +16,7 @@ import pandas as pd
 
 import gemini as gm
 from examples.shared.doublet_heat.plant import DoubletHeatPlant
-from gemini.core.types.flows import StreamState
+from gemini.core.types.flows import Stream
 from gemini.graph import GraphCache, run
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,9 +49,7 @@ def untraced(esp, rows):
 
 def traced(esp, rows, cache):
     """Evaluate the ESP on all rows in one traced NumPy call."""
-    suction = StreamState(
-        m_dot=rows[:, 0], T=rows[:, 1], p=rows[:, 2], fluid=esp.fluid, density=None
-    )
+    suction = Stream(m_dot=rows[:, 0], T=rows[:, 1], p=rows[:, 2], fluid=esp.fluid)
     return run(esp, {"suction": suction}, {"frequency": rows[:, 3]}, cache=cache)
 
 

@@ -1,25 +1,23 @@
 """The tracer records a whole module call with named inputs by role."""
 
+import numpy as np
 import pytest
 
 import gemini as gm
 from gemini.core.modules.plants import Doublet
-from gemini.errors import OutputError, TraceError
-from gemini.graph import Tracer
+from gemini.errors import OutputError, PhysicsRangeError, TraceError
+from gemini.graph import Tracer, run
 from gemini.graph.tracer import parameter_shape
 
 
 def test_trace_names_inputs_by_role_and_records_outputs(gain):
-    """Inlet fields, fluid properties, controls, parameters and constants are inputs."""
+    """Inlet fields (the fluid is static), controls, parameters and constants are inputs."""
     graph = Tracer().trace(gain, {"inlet": gain.fluid})
     roles = {name: node.role for name, node in graph.inputs.items()}
     assert roles == {
         "inlet.m_dot": "inlet",
         "inlet.T": "inlet",
         "inlet.p": "inlet",
-        "inlet.rho_l": "inlet",
-        "inlet.rho_g": "inlet",
-        "inlet.gmf": "inlet",
         "gain": "control",
         "scale": "parameter",
         "REFERENCE": "constant",
@@ -89,3 +87,28 @@ def test_parameter_shapes():
     assert parameter_shape(2) == () and parameter_shape([1.0, 2.0]) == (2,)
     assert parameter_shape(True) is None and parameter_shape("x") is None
     assert parameter_shape(None) is None and parameter_shape([]) is None
+
+
+def test_a_stream_built_in_forward_traces_and_keeps_its_limits(gain):
+    """Building a ``Stream`` from traced values records its limit checks as ``ops.check``."""
+
+    class Drop(type(gain)):
+        def forward(self, inlets):
+            inlet = inlets.inlet
+            drop = self.gain * 1e6
+            return {
+                "outlet": gm.Stream(
+                    m_dot=inlet.m_dot, T=inlet.T, p=inlet.p - drop, fluid=inlet.fluid
+                )
+            }
+
+    module = Drop().update_params(scale=1.0)
+    graph = Tracer().trace(module, {"inlet": module.fluid})
+    assert any(node.op == "check" for node in graph.nodes)
+    stream = gm.Stream(m_dot=np.array([1.0, 1.0]), T=300.0, p=np.array([2e5, 1e5]))
+    assert run(module, {"inlet": stream}, {"gain": 0.0}).outlets["outlet"]["p"].tolist() == [
+        2e5,
+        1e5,
+    ]
+    with pytest.raises(PhysicsRangeError, match="p = -800000.0 Pa"):
+        run(module, {"inlet": stream}, {"gain": 1.0})
