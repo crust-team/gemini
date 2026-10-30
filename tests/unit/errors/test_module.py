@@ -10,6 +10,7 @@ BASES = {
     "DeclarationError": (TypeError, ValueError),
     "UnknownNameError": (ValueError,),
     "UnknownPortError": (KeyError, AttributeError),
+    "UnknownMemberError": (AttributeError,),
     "CallError": (TypeError,),
     "OutletError": (TypeError, ValueError),
     "MissingValueError": (RuntimeError, TypeError),

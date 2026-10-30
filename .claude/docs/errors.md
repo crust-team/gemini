@@ -9,7 +9,7 @@ exception, so `except ValueError` keeps catching `gm.errors.UnitError`. Catch `G
 handle every GEMINI error. New code raises one of these classes for every deliberate error; the
 exceptions are `gemini.utils`, which cannot import them, pydantic validators, which must raise
 `ValueError` (pydantic reports it as a `ValidationError`), and the Python protocol errors
-(`AttributeError` from `__getattr__`, `NotImplementedError`).
+(`NotImplementedError`, and `AttributeError` from the `__getattr__` of non-module classes).
 `test_package_code_raises_gemini_errors` in `tests/unit/test_code_quality.py` enforces this.
 
 ## Hierarchy and use
@@ -28,6 +28,11 @@ exceptions are `gemini.utils`, which cannot import them, pydantic validators, wh
 - `UnknownNameError(ValueError)`: unknown module path, parameter, control, boundary or runtime
   setting (`module.py`, `runtime.py`).
 - `UnknownPortError(KeyError, AttributeError)`: unknown name in a `Ports` or `Values` mapping.
+- `UnknownMemberError(AttributeError)`: a module has no child, declaration or port with the
+  requested attribute name (`Module.__getattr__`). It is an `AttributeError` for `hasattr`,
+  `getattr` with a default, `copy` and `pickle`. The close-match suggestion is built only when
+  the message is read, from the module the error holds; copying or pickling stores the finished
+  message.
 - `CallError(TypeError)`: wrong, missing, duplicate or invalid call arguments and inlet streams.
 - `OutletError(TypeError, ValueError)`: `forward` returned something other than the declared
   outlet dictionary.

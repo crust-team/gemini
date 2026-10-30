@@ -49,6 +49,7 @@ from gemini.errors import (
     OutletError,
     OutputError,
     PlantFormatError,
+    UnknownMemberError,
     UnknownNameError,
 )
 from gemini.utils.context import ContextSetting
@@ -78,6 +79,19 @@ _REGISTRIES = (
     (Output, "_outputs"),
     (Outlet, "_outlets"),
 )
+
+
+def _describe_unknown_member(name, module):
+    """Name the module path and the closest child, declaration or port for a missing attribute.
+
+    Reads only the instance dictionary, so it also works before ``super().__init__()``.
+    """
+    registries = module.__dict__
+    candidates = list(registries.get("_children", ()))
+    for _, registry in _REGISTRIES:
+        candidates.extend(registries.get(registry, ()))
+    path = registries.get("_path") or module.name
+    return f"{path}: unknown member {name!r}{did_you_mean(name, candidates)}"
 
 
 def no_outputs():
@@ -393,7 +407,7 @@ class Module:
         for registry in ("_inlets", "_outlets"):
             if name in registries.get(registry, {}):
                 return registries[registry][name]
-        raise AttributeError(name)
+        raise UnknownMemberError(name, self, _describe_unknown_member)
 
     def _parameter_value(self, name):
         parameter = self._parameters[name]

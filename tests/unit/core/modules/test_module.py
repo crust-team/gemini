@@ -1,5 +1,6 @@
 """Registration, calls, state and output-recording contracts."""
 
+import pickle
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 
@@ -769,6 +770,97 @@ def test_formula_typo_fails_when_the_class_is_built():
     """A misspelled reference fails in ``__init__``, before any call."""
     with pytest.raises(AttributeError, match="ues"):
         FormulaOf(lambda module: {"value": Output.of(module.power.ues)})
+
+
+def test_misspelled_child_names_path_and_suggestion():
+    """A misspelled child fails with the module path and the closest child."""
+    with pytest.raises(gm.errors.UnknownMemberError) as caught:
+        FormulaOf(lambda module: {"value": Output.of(module.powerr.use)})
+    message = str(caught.value)
+    assert message.startswith("formula_of: unknown member 'powerr'")
+    assert "did you mean 'power'?" in message
+
+
+def test_misspelled_output_on_a_child_names_the_child_path():
+    """A misspelled output on a real child names that child and suggests the output."""
+    with pytest.raises(gm.errors.UnknownMemberError) as caught:
+        FormulaOf(lambda module: {"value": Output.of(module.power.ues)})
+    assert "power: unknown member 'ues'" in str(caught.value)
+    assert "did you mean 'use'?" in str(caught.value)
+
+
+class OutletFormula(Module):
+    """Composite referencing a named attribute of a child."""
+
+    def __init__(self, reference):
+        """Copy the output named by ``reference`` on the pass-through child."""
+        super().__init__()
+
+        # Modules
+        self.pass_through = PassThrough()
+
+        # Outputs
+        self.copied = Output.of(getattr(self.pass_through, reference))
+
+
+def test_misspelled_outlet_suggests_the_outlet():
+    """A misspelled outlet is suggested from the ports of the child."""
+    with pytest.raises(gm.errors.UnknownMemberError, match="did you mean 'outlet'"):
+        OutletFormula("outlett")
+
+
+class RatioTypo(Module):
+    """Composite whose ratio misspells an earlier output."""
+
+    def __init__(self):
+        """Declare a copied output, then a ratio that misspells it."""
+        super().__init__()
+
+        # Modules
+        self.power = PowerUse()
+
+        # Outputs
+        self.value = Output.of(self.power.use)
+        self.ratio = Output.ratio(self.valuee, self.value)
+
+
+def test_ratio_operand_typo_is_reported():
+    """A misspelled ``Output.ratio`` operand fails the same way."""
+    with pytest.raises(gm.errors.UnknownMemberError, match="did you mean 'value'"):
+        RatioTypo()
+
+
+def test_unknown_member_stays_an_attribute_error():
+    """``hasattr`` and ``getattr`` with a default treat the miss as before."""
+    module = FormulaOf(lambda module: {"value": Output.of(module.power.use)})
+    assert not hasattr(module, "missing")
+    assert getattr(module, "missing", None) is None
+    with pytest.raises(AttributeError):
+        module.missing
+
+
+def test_unknown_member_before_super_init_has_no_registries():
+    """Reading a name before ``super().__init__()`` still raises ``AttributeError``."""
+
+    class Early(Module):
+        """Reads an attribute before the base initializer."""
+
+        def __init__(self):
+            """Probe a missing name first."""
+            self.probe = getattr(self, "missing", "absent")
+            super().__init__()
+
+    assert Early().probe == "absent"
+
+
+def test_unknown_member_survives_pickle_and_copy():
+    """The error round-trips with its message intact."""
+    module = FormulaOf(lambda module: {"value": Output.of(module.power.use)})
+    with pytest.raises(gm.errors.UnknownMemberError) as caught:
+        module.powerr
+    for clone in (pickle.loads(pickle.dumps(caught.value)), deepcopy(caught.value)):
+        assert str(clone) == str(caught.value)
+        assert "did you mean 'power'?" in str(clone)
 
 
 def test_formula_strings_are_rejected():

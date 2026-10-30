@@ -129,7 +129,9 @@ Formulas take declaration references, not path strings. Children are assigned fi
 it while the class is built: an `Output.of` target outside the descendant tree (or a string), or a
 ratio operand that is not an earlier output of the module, raises `FormulaError`, an unknown
 outlet field raises `DeclarationError` with a close-match suggestion, and a misspelled reference
-fails as an ordinary `AttributeError`. The first call resolves each reference to its descendant
+(`self.heat_exchanger.dutyy`, `self.heat_exchangerr.duty`) raises `UnknownMemberError` with the
+module path and the closest child, parameter, input, output, state or port (an `AttributeError`,
+so `hasattr` stays false). The first call resolves each reference to its descendant
 path by identity, so deep copies and nested trees resolve to their own children.
 
 ```python
