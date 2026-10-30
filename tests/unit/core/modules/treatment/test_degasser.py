@@ -6,6 +6,7 @@ from gemini.core.modules.balance import energy_balance, mass_balance
 from gemini.core.modules.treatment import Degasser
 from gemini.core.types import Fluid
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 GASSY = Fluid(gas_mass_fraction=0.02)
 
@@ -54,3 +55,14 @@ def test_full_efficiency_and_zero_flow():
     assert result.outlets.gas.m_dot == pytest.approx(0.1)
     stopped = degasser(inlet=Stream(m_dot=0, T=350, p=1e6, fluid=GASSY))
     assert stopped.outlets.gas.m_dot == 0 and stopped.outlets.liquid.m_dot == 0
+
+
+def test_degasser_matches_traced():
+    """The split traces for a gassy fluid, a gas-free fluid and a set vessel pressure."""
+    for fluid in (GASSY, Fluid()):
+        for settings in (dict(separation_efficiency=0.75), dict(p_out=2e5)):
+            module = Degasser().update_params(**settings)
+            rows = [
+                dict(inlet=Stream(m_dot=m_dot, T=350, p=1e6, fluid=fluid)) for m_dot in (0, 1, 10)
+            ]
+            assert_module_matches(module, rows)

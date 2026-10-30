@@ -2,6 +2,7 @@
 
 from gemini.core.modules.treatment import Filter
 from gemini.core.types.flows import Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 
 def test_equipment_forward():
@@ -19,3 +20,9 @@ def test_clogging_alarm():
     assert not c.health(None, {"pressure_drop": 40000}).alarm
     assert c.health(None, {"pressure_drop": 51000}).alarm
     assert c.health(None, {}) is None
+
+
+def test_filter_matches_traced():
+    """The quadratic loss traces and equals one call per row."""
+    rows = [dict(inlet=Stream(m_dot=m_dot, T=300, p=1e6)) for m_dot in (0, 20, 44.2, 60)]
+    assert_module_matches(Filter(), rows)

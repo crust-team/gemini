@@ -38,6 +38,8 @@ class Degasser(Module):
     ``cp_g`` of ``FluidProperties``). The sensible audit values every stream at ``cp_l``, which
     the degasser therefore closes exactly; the gas enthalpy at ``cp_l`` is an audit convention.
 
+    NOTE(refactor): ``separation_efficiency`` is structural: it sets the gas fraction of the liquid
+    outlet's ``Fluid``, which is static during a trace, so a trace reads it as a plain number.
     NOTE(refactor): the 0.149 bar default loss comes from Sep_Pin/Sep_Pout in the example.
     NOTE(refactor): the default ``separation_efficiency = 0`` reproduces the former liquid-only
     model exactly for every fluid (zero gas flow, liquid unchanged but for the pressure loss);
@@ -53,7 +55,7 @@ class Degasser(Module):
         self.p_out = Parameter(Pressure | None, default=None)
         self.dp = Parameter(PressureDifference, default=14900, ge=0)
         self.heat_transfer_coeff = Parameter(float, default=0, ge=0)
-        self.separation_efficiency = Parameter(Fraction, default=0)
+        self.separation_efficiency = Parameter(Fraction, default=0, structural=True)
 
         # Inlets
         self.inlet = Inlet(Stream)
