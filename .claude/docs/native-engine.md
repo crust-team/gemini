@@ -251,5 +251,17 @@ Where the prototype differs from sections 1 to 11, and why:
   told from a writing one), so anything an observer stores then is a `Proxy`; afterwards they
   are replayed per row. A hook that raises `TraceError` is a graph break even when it would
   only have read, because the trace cannot tell.
-- **No common-subexpression elimination**: `forward` and `_compute_outputs` both compute head
-  and power, so the ESP graph holds four polynomials (141 nodes).
+- **Common-subexpression elimination** (`gemini/graph/passes/cse.py`,
+  `eliminate_common_subexpressions(graph)`, in place) runs once per trace in `GraphCache`;
+  `GraphCache(optimize=False)` turns it off. It merges `elementwise`, `index` and `check` nodes
+  with the same op, operands and attributes. A literal operand is its type and exact value (`1`,
+  `1.0` and `True` differ; `0.0` and `-0.0` differ; NaN equals itself). Graph inputs are never
+  merged. The ESP graph goes from 141 to 100 nodes (two polynomials instead of four) with
+  bit-identical outputs. A merged node carries the union of its guards. Because the raised error
+  is the lowest code over all outputs and `where` keeps only the selected branch's codes, two
+  twins merge only if each one is certain (it reaches a graph output through operands that are
+  not a `where` branch) or has no guards, so no error moves onto a `where` branch it did not
+  belong to; guarded twins that stay below a `where` branch are kept apart. Twin checks merge,
+  codes are renumbered in creation order so the lowest code still wins, and the `Proxy` message
+  values follow the merged nodes. Cost is linear in the node count. Not done: commutative
+  operands, `reduction`/`interp`/`solver`/`scan` nodes, and guarded twins inside one branch.
