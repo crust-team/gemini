@@ -60,6 +60,17 @@ Normal users do not construct loaders.
 `Profile.constant(value, unit=..., clock=...)` and `Profile.from_series(series, unit=...)`
 convert in-memory raw values to SI. Profiles combined into a dataset must share a clock.
 
+## Demand profiles
+
+`gm.profiles` is the home of the heating and cooling design-year demand profiles.
+`names()` lists them (`heating_demand`, `cooling_demand`), `get(name)` returns a DataFrame in the
+run-input format (a UTC `DatetimeIndex` called `time`, one column per quantity, units in
+`frame.attrs["units"]`) and `profile_schema()` is the JSON Schema of the profile file in
+`gemini/profiles/data/<name>.json`: `name`, `description`, `source`, `columns` (unit and quantity),
+`time` and `values`. No demand data is in the repository, so `get` raises `NotImplementedYet`
+naming the file to add; a profile column becomes a run input when a plant binding names it as its
+`column` with the same unit.
+
 The committed example CSVs under `examples/shared/doublet_heat/` are immutable source data. Two
 of their naming choices predate the naming rule and stay: columns named `*.m_dot` hold volumetric
 flow in m3/s (their bindings declare `"unit": "m3/s"`), and the unbound status columns
