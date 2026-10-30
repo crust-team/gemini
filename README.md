@@ -50,6 +50,12 @@ A module is built without arguments and configured with `update_params`, which r
 accept inlets by keyword, mapping or position; controls given at the call apply to that call only,
 while assignment (`esp.frequency = 50.0`) or `plant.set_inputs` persists them by dotted path.
 
+Plants are data. `gm.plants.names()` lists the shipped plants, `gm.plants.example(name)` returns
+one with real values, `gm.plants.from_template("heating_cooling", {"absorption_chiller.enabled":
+False})` fills a template with switchable units (`gm.plants.templates()` lists them), and
+`gm.plants.convert_legacy(folder)` turns an old project folder into a plant spec. `gm.profiles`
+holds the demand profiles of the heating and cooling challenge; no demand data ships yet.
+
 The application, not the package, reads CSV, databases, or APIs. `Dataset` accepts pandas, dicts,
 records, NumPy, and profiles already in memory. A plant owns bindings and dated parameters, so
 engine and optimizer calls never take a separate configuration.

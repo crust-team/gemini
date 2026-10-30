@@ -26,7 +26,8 @@ the order. `core.physics.hydraulics` imports `Stream` and `Fluid` for type check
 `Stream.__init__` in `core.types.flows` imports `core.runtime` inside the function to read the
 default fluid, because a module-level import would form a cycle through `core.types.fluid`.
 `Plant.simulate` imports `core.engine.engine.Engine` inside the function, because the engine
-imports the module package that defines `Plant`.
+imports the module package that defines `Plant`, and `gm.plants.convert_legacy` imports
+`core.legacy` inside the function, because the legacy bridge sits above `core.modules`.
 `core.data` imports no module or engine code and `core.legacy` imports no engine code.
 
 Core packages outside `core.legacy` never interpret old project names, tags, tables or node

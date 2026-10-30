@@ -18,6 +18,15 @@ tag columns and converts values to SI; old timestamps are taken as UTC wall time
 one step on a copy of the plant with its assumed root inputs and `tables.TRACE_CONTROLS`, so the
 caller's plant is not changed, and returns an empty list when the wiring matches.
 
+`gm.plants.convert_legacy(folder)` returns the format 2 spec of an old project folder: it reads the
+folder with `read_project`, fills `DoubletHeatPlant` (`gm.plants.get`) with `to_plant` and writes
+`to_spec()`. The folder holds `diagram.json`, one `.param` file per diagram node and any other file
+(the data CSV, `well_trajectory.csv`, `plant.conf`), which is read as-is and not converted; the data
+CSV is converted with `to_dataset`. On the example project the result equals
+`examples/shared/doublet_heat/plant.json` exactly (`tests/unit/core/modules/plants/
+test_legacy_project.py`). The function lives in `core/modules/plants/legacy_project.py` and imports
+`core.legacy` inside the function, because `core.legacy` sits above `core.modules`.
+
 The bridge maps exactly the example project: its ten old nodes (`tables.NODE_PATHS`), a project
 folder with exactly one data CSV besides trajectory files, and its data columns and assumptions.
 Any other node set is rejected rather than guessed. Type, property, port, tag and old-node path

@@ -5,6 +5,7 @@ from .builder import Plant
 from .catalogue import example, get, names, templates
 from .coolingsubstation import CoolingSubstation
 from .heatingsubstation import HeatingSubstation
+from .legacy_project import convert_legacy
 from .library import register_shipped
 from .migration import migrate
 from .schema import spec_schema
@@ -21,6 +22,7 @@ __all__ = [
     "names",
     "get",
     "example",
+    "convert_legacy",
     "templates",
     "from_template",
     "HeatingSubstation",
