@@ -86,6 +86,12 @@ and waiting do not count. A worker runs one test at a time, so the process clock
 test. The budget stays one second; the failure message shows CPU and elapsed time. Never raise
 the budget, skip a test or mark it flaky to get under it.
 
+CPU time is much steadier than elapsed time but not immune to load: on an oversubscribed
+machine (load average several times the core count) the same work can use up to about 2.5 times
+the CPU seconds, because threads land on slower cores and share caches. A test that needs 0.4 s
+alone can then read 1.0 s. Keep tests well under half a second of CPU time alone, and rerun a
+borderline failure on a quiet machine before believing it.
+
 To see how close tests are, run `--durations=10` (wall time, serial with `-n 0` for stable
 numbers). Parse-heavy checks cache per process: `functions(path)` in
 `tests/unit/test_code_quality.py` parses each file once, and the long-function exception check
