@@ -1,7 +1,6 @@
 """Binary organic Rankine cycle plant driven by geothermal brine, with an air-cooled condenser."""
 
-import math
-
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import (
     Boundary,
@@ -110,8 +109,8 @@ class ORC(Module):
         self.electricity_generated = self.gross_power - self.parasitic_power
         self.condenser_duty = self.heat_input - self.gross_power
         self.heat_loss = self.condenser_duty + self.parasitic_power
-        self.thermal_efficiency = (
-            self.electricity_generated / self.heat_input if self.heat_input > 0 else None
+        self.thermal_efficiency = ops.where(
+            self.heat_input > 0, ops.truediv(self.electricity_generated, self.heat_input), None
         )
         self.condensing_temperature = design["condensing_T"]
         self.brine_out_T = brine_out.T
@@ -119,26 +118,27 @@ class ORC(Module):
 
     def _design(self, brine_in):
         """Return the cycle temperatures, gross cycle efficiency and processed brine share."""
-        if brine_in.m_dot < 0:
-            raise PhysicsRangeError(
-                f"{self.path}: brine_in.m_dot = {brine_in.m_dot} kg/s; expected >= 0"
-            )
-        condensing_T = self.ambient_temperature + self.condenser_approach
-        outlet_T = max(self.minimum_brine_outlet_temperature, condensing_T + self.pinch)
-        design = dict(
-            condensing_T=condensing_T,
-            outlet_T=outlet_T,
-            cycle_efficiency=0.0,
-            share=0.0,
-            is_capped=False,
+        ops.check(
+            brine_in.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: brine_in.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=brine_in.m_dot,
         )
-        if brine_in.T <= outlet_T:
-            return design
+        condensing_T = self.ambient_temperature + self.condenser_approach
+        outlet_T = ops.maximum(self.minimum_brine_outlet_temperature, condensing_T + self.pinch)
+        running = brine_in.T > outlet_T
         hot, cold = brine_in.T - self.pinch, outlet_T - self.pinch
-        reversible = 1 - condensing_T * math.log(hot / cold) / (hot - cold)
+        reversible = 1 - ops.truediv(condensing_T * ops.log(ops.truediv(hot, cold)), hot - cold)
         efficiency = self.fraction_of_carnot * reversible
         cp = brine_in.fluid.properties(brine_in.p, brine_in.T).cp_l
         uncapped = efficiency * brine_in.m_dot * cp * (brine_in.T - outlet_T)
         is_capped = uncapped > self.capacity
-        share = self.capacity / uncapped if is_capped else 1.0
-        return design | dict(cycle_efficiency=efficiency, share=share, is_capped=is_capped)
+        share = ops.where(is_capped, ops.truediv(self.capacity, uncapped), 1.0)
+        return dict(
+            condensing_T=condensing_T,
+            outlet_T=outlet_T,
+            cycle_efficiency=ops.where(running, efficiency, 0.0),
+            share=ops.where(running, share, 0.0),
+            is_capped=ops.where(running, is_capped, False),
+        )

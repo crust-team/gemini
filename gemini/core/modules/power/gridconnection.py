@@ -1,5 +1,6 @@
 """Electricity exchange of a plant with the public grid through a limited connection."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.types import Boundary, MoneyPerEnergy, MoneyRate, Output, Parameter, Power
 
@@ -52,8 +53,8 @@ class GridConnection(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        demand = max(0.0, self.consumption - self.generation)
-        surplus = max(0.0, self.generation - self.consumption)
+        demand = ops.maximum(0.0, self.consumption - self.generation)
+        surplus = ops.maximum(0.0, self.generation - self.consumption)
         self.net_import = _limited(demand, self.import_limit)
         self.net_export = _limited(surplus, self.export_limit)
         self.unserved_consumption = demand - self.net_import
@@ -65,4 +66,4 @@ class GridConnection(Module):
 
 def _limited(power, limit):
     """Return ``power`` [W] capped at ``limit`` [W]; ``None`` means unlimited."""
-    return power if limit is None else min(power, limit)
+    return power if limit is None else ops.minimum(power, limit)

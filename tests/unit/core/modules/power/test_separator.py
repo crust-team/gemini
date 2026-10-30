@@ -7,6 +7,7 @@ from gemini.core.modules import mass_balance
 from gemini.core.modules.power import Separator
 from gemini.core.physics import steam
 from gemini.core.types import STEAM, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 GEOFLUID = Stream(m_dot=100, T=523.15, p=40e5)
 """Liquid at 250 degC and 40 bar, a typical liquid-dominated wellhead feed."""
@@ -70,3 +71,17 @@ def test_invalid_inlets_and_setpoints_raise():
             separator(inlet=inlet, pressure_setpoint=setpoint)
     with pytest.raises(gm.errors.PhysicsRangeError, match="separator: pressure_setpoint"):
         separator(inlet=GEOFLUID, pressure_setpoint=50e5)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Flashing and subcooled rows at several setpoints trace and equal one call per row."""
+    rows = [
+        dict(inlet=Stream(m_dot=m_dot, T=T, p=p), pressure_setpoint=setpoint)
+        for m_dot, T, p, setpoint in [
+            (100.0, 523.15, 40e5, 6e5),
+            (50.0, 523.15, 8e5, 6e5),
+            (80.0, 400.0, 20e5, 5e5),
+            (0.0, 500.0, 30e5, 2e5),
+        ]
+    ]
+    assert_module_matches(Separator(), rows)

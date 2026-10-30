@@ -7,6 +7,7 @@ from gemini.core.modules import Module, mass_balance
 from gemini.core.modules.power import FlashTurbine, Separator
 from gemini.core.physics import steam
 from gemini.core.types import STEAM, WATER, Inlet, Outlet, Output, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 STEAM_FEED = Stream(m_dot=20, T=431.98, p=6e5, fluid=STEAM)
 
@@ -106,3 +107,12 @@ def test_single_flash_plant_closure():
         + condensate.m_dot * steam.saturation_properties(1e4).liquid_enthalpy
     )
     assert outgoing == pytest.approx(incoming, rel=1e-12)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Several flows and inlet pressures trace and equal one call per row."""
+    rows = [
+        dict(inlet=Stream(m_dot=m_dot, T=420.0, p=p, fluid=STEAM))
+        for m_dot, p in [(20.0, 6e5), (0.0, 6e5), (5.0, 2e6), (12.0, 2e5)]
+    ]
+    assert_module_matches(turbine(), rows)

@@ -6,6 +6,7 @@ from gemini.core.modules import Module, collect_flows, energy_balance
 from gemini.core.modules.heat import Boiler
 from gemini.core.modules.power import ORC, GridConnection
 from gemini.core.types import Inlet, Outlet, Output, Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 
 def grid(**changes):
@@ -100,3 +101,24 @@ def test_grid_is_not_counted_in_the_energy_audit():
         orc.electricity_generated - boiler.electricity, rel=1e-12
     )
     assert energy_balance(plant, result)["relative_residual"] < 1e-12
+
+
+class RowCarrier(GridConnection):
+    """A connection with a dummy inlet whose length gives the runner its number of rows."""
+
+    def __init__(self):
+        """Declare the connection and the row-carrying inlet."""
+        super().__init__()
+        self.rows = Inlet(Stream)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Import, export, limited and unlimited rows trace and equal one call per row."""
+    rows = [
+        dict(rows=Stream(m_dot=1.0, T=300.0, p=1e5), consumption=consumption, generation=generation)
+        for consumption, generation in [(3e6, 1e6), (1e6, 4e6), (0.0, 2e6), (5e5, 5e5), (4e6, 0.0)]
+    ]
+    prices = dict(import_price="0.2 currency/kWh", export_price="0.08 currency/kWh")
+    assert_module_matches(RowCarrier().update_params(**prices), rows)
+    limited = RowCarrier().update_params(import_limit="1 MW", export_limit="0.5 MW", **prices)
+    assert_module_matches(limited, rows)

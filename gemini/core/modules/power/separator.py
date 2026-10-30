@@ -1,5 +1,6 @@
 """Two-phase flash separator splitting geofluid into saturated steam and brine."""
 
+from gemini import ops
 from gemini.core.modules.module import Module
 from gemini.core.physics import steam
 from gemini.core.types import (
@@ -68,7 +69,7 @@ class Separator(Module):
         inlet = inlets.inlet
         fraction, saturation = self._flash(inlet)
         steam_flow = fraction * inlet.m_dot
-        liquid_T = saturation.temperature if fraction > 0 else inlet.T
+        liquid_T = ops.where(fraction > 0, saturation.temperature, inlet.T)
 
         liquid = inlet.with_(m_dot=inlet.m_dot - steam_flow, T=liquid_T, p=self.pressure_setpoint)
         gas = inlet.with_(
@@ -86,18 +87,27 @@ class Separator(Module):
 
     def _flash(self, inlet):
         """Return the steam fraction [-] and the saturation state at the setpoint pressure."""
-        if inlet.m_dot < 0:
-            raise PhysicsRangeError(f"{self.path}: inlet.m_dot = {inlet.m_dot} kg/s; expected >= 0")
+        ops.check(
+            inlet.m_dot >= 0,
+            PhysicsRangeError,
+            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            path=self.path,
+            m_dot=inlet.m_dot,
+        )
         if inlet.fluid.kind == "steam":
             raise PhysicsRangeError(
                 f"{self.path}: inlet.fluid.kind = 'steam'; expected a liquid geofluid"
             )
-        if self.pressure_setpoint > inlet.p:
-            raise PhysicsRangeError(
-                f"{self.path}: pressure_setpoint = {self.pressure_setpoint} Pa; expected at most "
-                f"the inlet pressure {inlet.p} Pa"
-            )
-        liquid_pressure = max(inlet.p, steam.saturation_pressure(inlet.T))
+        ops.check(
+            self.pressure_setpoint <= inlet.p,
+            PhysicsRangeError,
+            "{path}: pressure_setpoint = {setpoint} Pa; expected at most the inlet pressure "
+            "{p} Pa",
+            path=self.path,
+            setpoint=self.pressure_setpoint,
+            p=inlet.p,
+        )
+        liquid_pressure = ops.maximum(inlet.p, steam.saturation_pressure(inlet.T))
         enthalpy = steam.liquid_enthalpy(liquid_pressure, inlet.T)
         fraction = steam.flash_fraction(enthalpy, self.pressure_setpoint)
         return fraction, steam.saturation_properties(self.pressure_setpoint)

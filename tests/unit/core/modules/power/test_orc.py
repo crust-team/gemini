@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.core.modules import energy_balance, mass_balance
 from gemini.core.modules.power import ORC
 from gemini.core.types import Stream
+from tests.fixtures.equivalence import assert_module_matches
 
 BRINE = Stream(m_dot=100, T=423.15, p=10e5)
 """Brine at 150 degC and 100 kg/s."""
@@ -81,3 +82,18 @@ def test_idle_zero_flow_and_reverse_flow():
     assert stopped.heat_input == 0 and stopped.gross_power == 0 and not stopped.is_capped
     with pytest.raises(gm.errors.PhysicsRangeError, match="brine_in.m_dot = -1"):
         orc()(brine_in=BRINE.with_(m_dot=-1), ambient_temperature=288.15)
+
+
+def test_traced_call_matches_one_call_per_row():
+    """Running, capped, idle (inlet too cold) and stopped rows trace and equal one call per row."""
+    rows = [
+        dict(brine_in=Stream(m_dot=m_dot, T=T, p=10e5), ambient_temperature=ambient)
+        for m_dot, T, ambient in [
+            (100.0, 423.15, 288.15),
+            (400.0, 423.15, 288.15),
+            (100.0, 330.0, 288.15),
+            (0.0, 423.15, 288.15),
+            (50.0, 400.0, 303.15),
+        ]
+    ]
+    assert_module_matches(orc(), rows)
