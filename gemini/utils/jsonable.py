@@ -6,14 +6,15 @@ from datetime import date, datetime
 
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel
 
 
 def to_plain(value):
     """Return ``value`` as plain JSON: NumPy to Python, NaN and infinity to ``None``.
 
-    Mappings get text keys; lists, tuples, arrays and pandas series become lists; a time becomes
-    ISO 8601 text. The result passes ``json.dumps(result, allow_nan=False)``. Anything else
-    raises ``TypeError``.
+    A Pydantic model becomes its JSON fields; mappings get text keys; lists, tuples, arrays and
+    pandas series become lists; a time becomes ISO 8601 text. The result passes
+    ``json.dumps(result, allow_nan=False)``. Anything else raises ``TypeError``.
     """
     if value is None or isinstance(value, (bool, str)):
         return value
@@ -23,6 +24,8 @@ def to_plain(value):
         return float(value) if math.isfinite(value) else None
     if isinstance(value, int):
         return value
+    if isinstance(value, BaseModel):
+        return to_plain(value.model_dump(mode="json"))
     if isinstance(value, Mapping):
         return {str(key): to_plain(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, np.ndarray, pd.Series, pd.Index)):

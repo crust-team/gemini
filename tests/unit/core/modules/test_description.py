@@ -188,3 +188,10 @@ def test_validate_params_reports_every_problem():
     assert all(set(problem) >= {"path", "message", "code"} for problem in problems)
     assert {problem["code"] for problem in problems} <= set(gm.errors.CODES)
     assert_plain_json(problems)
+
+
+def test_the_example_plant_describes_itself_with_its_values(shared_plant):
+    """Pipe paths and every other stored value serialise, for the agent's ``read_plant``."""
+    description = shared_plant.describe()
+    assert json.dumps(description, allow_nan=False)
+    assert "doublet.esp.no_stages" in description["values"]["parameters"]

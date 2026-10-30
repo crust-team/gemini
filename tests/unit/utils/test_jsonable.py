@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import BaseModel
 
 from gemini.utils.jsonable import to_plain
 
@@ -31,6 +32,17 @@ def test_containers_times_and_keys():
     result = to_plain(value)
     assert result == {"1": [1.0, None], "t": "2024-07-01T00:00:00+00:00", "s": [1.0, None]}
     assert json.dumps(result, allow_nan=False)
+
+
+def test_a_pydantic_model_becomes_its_fields():
+    """A declared value such as a pipe path is data."""
+
+    class Section(BaseModel):
+        """One field."""
+
+        length: float
+
+    assert to_plain([Section(length=2.0)]) == [{"length": 2.0}]
 
 
 def test_an_unknown_value_is_refused():
