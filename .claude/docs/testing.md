@@ -122,6 +122,12 @@ per-test budget. Never mutate these objects. Request `fresh_plant` for a functio
 copy or `module_plant` when one workflow shares a copied plant across assertions. Prefer the
 shortest `Dataset.window` that still crosses every boundary relevant to the property.
 
+`tests/fixtures/equivalence.py` compares the paths of one source within `RTOL` (1e-12):
+`assert_function_matches` a physics function on floats against arrays, `assert_same_error` its
+failing row, and `assert_module_matches` a module called per row against one traced call. Every
+physics function and module has such a test, over rows that cross every branch. A module with no
+inlets, and a stateful module's `_advance_states`, are tested on arrays directly.
+
 ## Parallel-test rules
 
 The suite must remain safe under `pytest -n auto`:

@@ -100,11 +100,7 @@ def test_invalid_inputs_raise():
 
 
 def test_pipe_matches_traced_across_regimes():
-    """Laminar, transition, turbulent, stopped and heat-absorbing rows equal one call per row.
-
-    NOTE: needs the hydraulics and heat_transfer rewrites with ops; until they merge the
-    module is a graph break, hence ``breaks=True``.
-    """
+    """Laminar, transition, turbulent, stopped and heat-absorbing rows equal one call per row."""
     rows = [
         dict(inlet=Stream(m_dot=m_dot, T=T, p=5e5), ambient_temperature=ambient)
         for m_dot, T, ambient in [
@@ -115,4 +111,4 @@ def test_pipe_matches_traced_across_regimes():
             (10, 283.15, 320.0),
         ]
     ]
-    assert_module_matches(pipe(), rows, breaks=True)
+    assert_module_matches(pipe(), rows)

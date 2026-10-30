@@ -28,6 +28,12 @@ Shared conventions, stated once here and not repeated per module:
   tested. Otherwise the documented residual is named; it is never hidden by an invented loss.
 - Stateful modules integrate their `State` values in `_advance_states`; call them with
   `module.step(state, dt, inlets)`. A plain call evaluates at the initial states.
+- Every leaf is written with `gemini.ops`, so it traces into a computation graph. The exceptions
+  are the graph breaks, which run tick by tick: `ThermalDecline`, `AquiferStorage`,
+  `BoreholeField`, `ThermalStorage`, `IceStorage` and `PIDController`, stateful until `scan` exists
+  (see [native-engine.md](native-engine.md)). Structural parameters, fixed in a trace and a graph
+  cache guard, are `ProductionReservoir`/`InjectionReservoir` `drainage_radius`, `liquid_density`
+  and `liquid_viscosity`, `ProductionWell.esp_depth` and `Degasser.separation_efficiency`.
 
 ## Overview
 

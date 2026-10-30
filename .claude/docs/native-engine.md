@@ -257,6 +257,18 @@ Where the prototype differs from sections 1 to 11, and why:
   `psychrometrics._saturation_pressure`). A value-dependent `break` becomes a fixed number of
   passes with a finished mask (`IceStorage`). `ntu` raises on a zero rate, so a `where`-selected
   call passes a safe rate.
+- **Inputs of the unselected path.** Because `check` raises at once on Python floats and `where`
+  runs both branches, a call whose checks belong to one path gets harmless inputs on the other
+  (Beggs-Brill, Ramey and the borehole cell at zero flow). An unselected solve must not poison a
+  `where`, so the inputs of later checked functions are masked with `where(selected, root,
+  fallback)`. A solve that can fail needs its own `check` for its selected rows; `HeatPump` adds
+  two, where scipy's `ValueError` surfaced before.
+- **Discrete choices and error rewraps.** A string-valued choice decided by values becomes an
+  integer code selected by `where` (the Beggs-Brill regime). A `try` around a physics call cannot
+  work in a trace, so the physics function takes the `error` class (`ramey_time_function`).
+- **`ops.interp` is not bit-identical** to `a + (x - xl) * (b - a) / (xu - xl)`, so the NORSOK `Kt`
+  table folds `where`s in the order of the old search. `ops.pow` gives NaN where Python gave a
+  complex number, so a check on a complex result is `not isnan`.
 - **An `index` op kind** (`getitem`) selects one item of a vector parameter such as a curve
   coefficient, on the last axis so a scenario axis can lead.
 - **No `named_constants` or `named_states`.** A module's constants are known only by tracing

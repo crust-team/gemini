@@ -7,6 +7,15 @@ IAPWS-IF97 steam, ground heat transport and psychrometrics (sections below, the 
 correlations first).
 
 - Use plain typed functions and SI inputs/outputs; small structured return models are allowed.
+- Every function runs on floats, arrays and traced values: it is written with `gemini.ops`, a
+  value-dependent `if` is `ops.where`, a `raise` is `ops.check` with the same class and message
+  and `math.*` is an op (see [native-engine.md](native-engine.md)). Both branches of `where`
+  always run, so a division or power that can be invalid in a branch is `ops.truediv` or
+  `ops.pow`; these and the other ops return `inf` or `nan` silently, so an out-of-domain number
+  in a correlation with no check gives NaN instead of a `math` exception. A function whose
+  checks belong to one path gets harmless inputs on the other (`ntu` needs a positive `c_min`,
+  so a caller passes a safe rate through `where`; Beggs-Brill at zero flow gets a unit liquid
+  velocity).
 - State dimensions, reference formulas and assumptions in docstrings.
 - Keep correlation-specific US or laboratory bases explicit at the formula boundary.
 - `units._UNITS` is the single table of public data units (SI unit, scale, offset). A declared
@@ -102,6 +111,10 @@ signed so that the pressure rises by both when flowing down and falls by both wh
   `sin(theta) = delta_TVD / delta_MD`, rounded to 0.01 degree as in WIMS, with the diameter and
   roughness of the interval's end point, split at tally joints (a tally interval covering the
   piece midpoint overrides them). Example roughness 2e-5 is metres.
+
+The two-phase choice is the structural test `fluid.gas_mass_fraction == 0`, equal to the former
+test on the gas mass flow, so a liquid-only fluid never evaluates Beggs-Brill; zero flow is a
+`where`. The regime is an integer code, because `where` selects numbers.
 
 Beggs-Brill needs a nonzero liquid and mixture velocity and a positive holdup after clamping,
 and a point inside the regime map; otherwise `PhysicsRangeError`. `build_path` raises it for
@@ -359,7 +372,9 @@ the borehole radius, `ln(4L/D) < 1`, Ramey below `alpha t / r^2 = 25`) raise
   `r_e^2 / (4 alpha)`.
 - `ramey_time_function(t, alpha, r)` = `ln(2 sqrt(alpha t) / r) - gamma / 2`, the line-source
   long-time asymptote (Ramey 1962), within about 1 % of `E1(r^2 / (4 alpha t)) / 2` for
-  `alpha t / r^2 >= MIN_RAMEY_FOURIER = 25`.
+  `alpha t / r^2 >= MIN_RAMEY_FOURIER = 25`, a `Constant`. Its keyword-only `error` and `context`
+  let `DownholeHeatExchanger` report an early time as `ConfigurationError`: a `try` around a
+  physics call cannot work in a trace.
 - `ramey_fluid_temperature(T_in, T_top, G, z, A)`: Ramey's exact steady profile in a linear
   gradient with the relaxation length `A = m_dot cp R_total`.
 
