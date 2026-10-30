@@ -275,7 +275,6 @@ def test_borehole_field_relations_by_hand():
         ground.vertical_cylinder_conductance(2.0, 150.0, diameter)
     )
     assert ground.borehole_field_capacity(2.2e6, 100, 6.0, 150.0) == 2.2e6 * 100 * 36 * 150
-    assert ground.mean_fluid_temperature(280.0, 284.0) == 282.0
     far = ground.borehole_field_temperature_change(0.0, 50.0, 10.0, 290.0, 283.0, 1e12, 1e12)
     assert far == pytest.approx(50.0 * 7.0 / 60.0, rel=1e-3)
     assert ground.borehole_field_temperature_change(2.0, 50.0, 10.0, 283.0, 283.0, 0.0, 1e9) == 2.0
@@ -291,7 +290,6 @@ def test_borehole_field_relations_match_on_arrays():
         ground.borehole_field_surroundings_conductance, [(100.0, 6.0, 150.0, 2.0)]
     )
     assert_function_matches(ground.borehole_field_capacity, [(2.2e6, 100.0, 6.0, 150.0)])
-    assert_function_matches(ground.mean_fluid_temperature, [(280.0, 284.0)])
     assert_function_matches(
         ground.borehole_field_temperature_change,
         [(0.0, 50.0, 10.0, 290.0, 283.0, 3600.0, 1e12), (2.0, 0.0, 10.0, 283.0, 283.0, 1e5, 1e9)],

@@ -125,30 +125,6 @@ def cycle_design(
     )
 
 
-@ops.physics
-def brine_outlet_temperature(
-    brine_temperature: float, processed_share: float, design_outlet_temperature: float
-) -> float:
-    """Return the brine outlet temperature when only a share of the brine is processed.
-
-    Parameters
-    ----------
-    brine_temperature : float
-        Brine inlet temperature [K].
-    processed_share : float
-        Share of the brine through the cycle [-], in [0, 1].
-    design_outlet_temperature : float
-        Outlet temperature of the processed brine [K].
-
-    Returns
-    -------
-    float
-        ``T_in - s (T_in - T_out)`` [K], the adiabatic mix of bypassed and cooled brine for a
-        constant heat capacity.
-    """
-    return brine_temperature - processed_share * (brine_temperature - design_outlet_temperature)
-
-
 @dataclass(frozen=True)
 class PlantBalance:
     """Powers [W] and efficiency of a binary plant."""

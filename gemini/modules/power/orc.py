@@ -92,7 +92,7 @@ class ORC(Module):
         # Outlets
         brine_in = inlets.brine_in
         design = self._design(brine_in)
-        brine_out_T = power_cycles.brine_outlet_temperature(
+        brine_out_T = heat_transfer.effectiveness_outlet_temperature(
             brine_in.T, design.processed_share, design.outlet_temperature
         )
 

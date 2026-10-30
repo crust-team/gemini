@@ -19,30 +19,6 @@ FLARE_EFFICIENCY = 0.98
 
 
 @ops.physics
-def fuel_input(duty: float, efficiency: float) -> float:
-    """Return the fuel or electric power a boiler needs for a heat duty.
-
-    Parameters
-    ----------
-    duty : float
-        Heat delivered to the water [W].
-    efficiency : float
-        Thermal efficiency on the fuel (lower heating value) or electric basis [-], positive.
-
-    Returns
-    -------
-    float
-        ``F = Q / eta`` [W]; ``F - Q`` is the heat loss.
-
-    Notes
-    -----
-    Steady-state efficiency definition for a boiler, a constant efficiency over load (a
-    retained GEMINI simplification).
-    """
-    return duty / efficiency
-
-
-@ops.physics
 def willans_fuel_input(
     load: float, electric_capacity: float, electric_efficiency: float, no_load_fraction: float
 ) -> float:

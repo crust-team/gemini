@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer, pumps
+from gemini.physics import energy, heat_transfer, pumps
 from gemini.types import (
     Control,
     Efficiency,
@@ -104,9 +104,7 @@ class CentrifugalPump(Module):
         performance = self._performance(inlets.suction)
         for name, value in performance.items():
             setattr(self, name, value)
-        self.electricity = pumps.motor_electricity(
-            performance["shaft_power"], self.motor_efficiency
-        )
+        self.electricity = energy.input_power(performance["shaft_power"], self.motor_efficiency)
         self.heat_loss = self.electricity - performance["shaft_power"]
         self.discharge_T = outlets.discharge.T
 
@@ -144,6 +142,6 @@ class CentrifugalPump(Module):
             flow=ops.where(stopped, 0.0, flow),
             head=ops.where(stopped, 0.0, head),
             hydraulic_power=ops.where(stopped, 0.0, hydraulic_power),
-            shaft_power=ops.where(stopped, 0.0, pumps.shaft_power(hydraulic_power, efficiency)),
+            shaft_power=ops.where(stopped, 0.0, energy.input_power(hydraulic_power, efficiency)),
             efficiency=ops.where(stopped, 0.0, efficiency),
         )

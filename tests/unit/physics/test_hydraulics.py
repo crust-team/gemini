@@ -9,7 +9,7 @@ import pytest
 
 from gemini import ops
 from gemini.errors import PhysicsRangeError, UnknownCorrelationError
-from gemini.physics import geometry, hydraulics
+from gemini.physics import diagnostics, geometry, hydraulics
 from gemini.types.flows import Stream
 from gemini.types.fluid import BRINE, Fluid
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
@@ -445,7 +445,7 @@ def test_affine_correction_and_inflow_relations_by_hand():
     assert hydraulics.injectivity_pressure(2e7, 0.01, 1e-7) == pytest.approx(2.01e7)
     assert hydraulics.productivity_index(0.01, 2e7, 1.99e7) == pytest.approx(1e-7)
     assert hydraulics.injectivity_index(0.01, 2e7, 2.01e7) == pytest.approx(1e-7)
-    assert hydraulics.performance_ratio(0.8, 2.0) == 0.4
+    assert diagnostics.performance_ratio(0.8, 2.0) == 0.4
 
 
 def test_affine_correction_and_inflow_relations_match_on_arrays():
@@ -457,9 +457,6 @@ def test_affine_correction_and_inflow_relations_match_on_arrays():
         hydraulics.injectivity_pressure,
         hydraulics.productivity_index,
         hydraulics.injectivity_index,
-        hydraulics.performance_ratio,
     ):
-        assert_function_matches(
-            function,
-            rows if function is not hydraulics.performance_ratio else [(0.8, 2.0), (3.0, 1.5)],
-        )
+        assert_function_matches(function, rows)
+    assert_function_matches(diagnostics.performance_ratio, [(0.8, 2.0), (3.0, 1.5)])

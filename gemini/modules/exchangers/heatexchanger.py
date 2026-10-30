@@ -44,7 +44,7 @@ class HeatExchanger(Module):
         self.m_dot_hot_nominal = Parameter(MassFlow, gt=0)
         self.m_dot_cold_nominal = Parameter(MassFlow, gt=0)
         self.fouling_threshold = Parameter(
-            Fraction, default=heat_transfer.DEFAULT_FOULING_THRESHOLD, gt=0, le=1
+            Fraction, default=diagnostics.DEFAULT_FOULING_THRESHOLD, gt=0, le=1
         )
 
         # Inlets
@@ -163,7 +163,7 @@ class HeatExchanger(Module):
         assessed = code == heat_transfer.DETERMINED
         if not np.any(assessed):
             return None
-        ratio = heat_transfer.conductance_ratio(apparent, self.ua)
+        ratio = diagnostics.performance_ratio(apparent, self.ua)
         alarm = diagnostics.below_limit(ratio, self.fouling_threshold)
         return Health(
             assessed=assessed,

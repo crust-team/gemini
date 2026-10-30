@@ -17,6 +17,7 @@ ICE = dict(
 
 
 def ice(fraction, temperature, duration, inlet, conductance):
+    """Advance the default ice store of these tests."""
     return storage.ice_advance(fraction, temperature, duration, inlet, conductance, **ICE)
 
 

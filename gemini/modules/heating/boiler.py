@@ -5,7 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import combustion, heat_transfer
+from gemini.physics import energy, heat_transfer
 from gemini.types import (
     Control,
     Duty,
@@ -82,7 +82,7 @@ class Boiler(Module):
             inlet.heat_capacity_rate(), self.temperature_setpoint - inlet.T
         )
         self.duty = ops.minimum(requested, self.capacity)
-        self.fuel_or_power = combustion.fuel_input(self.duty, self.efficiency)
+        self.fuel_or_power = energy.input_power(self.duty, self.efficiency)
         self.outlet_T = outlet.T
         self.capped = requested > self.capacity
         self.electricity = self.fuel_or_power if self.fuel_type == "electric" else 0

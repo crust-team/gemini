@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.physics import constants, pumps, units
+from gemini.physics import constants, energy, pumps, units
 from tests.fixtures.equivalence import assert_function_matches
 
 
@@ -48,8 +48,8 @@ def test_power_chain_and_window():
     """Q H = 2000 W, shaft power 2500 W at 0.8, electricity 2778 W at 0.9."""
     hydraulic = pumps.hydraulic_power(0.02, 1e5)
     assert hydraulic == pytest.approx(2000)
-    assert pumps.shaft_power(hydraulic, 0.8) == pytest.approx(2500)
-    assert pumps.motor_electricity(2500, 0.9) == pytest.approx(2500 / 0.9)
+    assert energy.input_power(hydraulic, 0.8) == pytest.approx(2500)
+    assert energy.input_power(2500, 0.9) == pytest.approx(2500 / 0.9)
     assert pumps.speed_ratio(45, 60) == pytest.approx(0.75)
     assert pumps.line_shaft_friction_power(2.0, 100, 0.75) == pytest.approx(150)
     assert pumps.in_operating_window(0.02, 0.01, 0.04, 0.75)

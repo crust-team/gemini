@@ -6,7 +6,7 @@ from gemini import backends, ops
 from gemini.backends import runtime
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import constants, diagnostics, pumps
+from gemini.physics import constants, diagnostics, energy, pumps
 from gemini.types import (
     Control,
     Count,
@@ -131,7 +131,7 @@ class ESP(Module):
             self.flow, self.min_flow, self.max_flow, scale
         )
         self.bep_ratio = pumps.best_efficiency_ratio(self.flow, scale, self.bep_flow)
-        self.electricity = pumps.motor_electricity(self.power, self.motor_efficiency)
+        self.electricity = energy.input_power(self.power, self.motor_efficiency)
 
     def head_function(self, flow: float, frequency: float) -> float:
         """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""

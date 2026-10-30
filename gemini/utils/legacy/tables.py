@@ -14,9 +14,8 @@ from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.treatment import Degasser, Filter
-from gemini.modules.treatment.filter import DEFAULT_CLOGGING_BAR
 from gemini.modules.wells import InjectionWell, ProductionWell
-from gemini.physics import geometry, units
+from gemini.physics import geometry, separation, units
 from gemini.utils.files import read_json
 
 PORTS = {
@@ -448,7 +447,9 @@ def degasser_params_from_gemini(properties: dict) -> dict:
 
 def filter_params_from_gemini(properties: dict) -> dict:
     """Map an optional filter clogging limit [bar] to [Pa]."""
-    return dict(clogging_dp=units.bar_to_pa(properties.get("clogging_dp", DEFAULT_CLOGGING_BAR)))
+    return dict(
+        clogging_dp=units.bar_to_pa(properties.get("clogging_dp", separation.FILTER_CLOGGING_BAR))
+    )
 
 
 def heatexchanger_params_from_gemini(properties: dict) -> dict:

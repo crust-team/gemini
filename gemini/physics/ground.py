@@ -25,7 +25,7 @@ MIN_RAMEY_FOURIER = Constant(
 )
 
 HALF_YEAR = 182.625 * units.SECONDS_PER_DAY
-"""Default storage period [s] of an aquifer store: one charge or discharge season of seasonal ATES."""
+"""Default storage period [s] of an aquifer store: one charge or discharge season."""
 
 _SMALL_ANGLE = 0.1
 """Streamline angle [rad] below which ``sin - theta*cos`` uses its Taylor series."""
@@ -835,27 +835,6 @@ def borehole_field_temperature_change(
     equilibrium = exchange * (inlet_temperature - undisturbed_temperature) / total
     factor = heat_transfer.relaxation_factor(total, duration, capacity)
     return heat_transfer.exponential_relaxation(change, equilibrium, factor)
-
-
-@ops.physics
-def mean_fluid_temperature(inlet_temperature: float, outlet_temperature: float) -> float:
-    """Return the arithmetic mean fluid temperature of a loop.
-
-    Parameters
-    ----------
-    inlet_temperature, outlet_temperature : float
-        Loop inlet and outlet temperatures [K].
-
-    Returns
-    -------
-    float
-        ``T_m = (T_in + T_out) / 2`` [K].
-
-    Notes
-    -----
-    The usual design convention for the fluid temperature of a borehole loop.
-    """
-    return (inlet_temperature + outlet_temperature) / 2
 
 
 @ops.physics

@@ -210,52 +210,6 @@ def hydraulic_power(flow, head):
 
 
 @ops.physics
-def shaft_power(hydraulic_power, efficiency):
-    """Return the shaft power of a pump from its hydraulic power and efficiency.
-
-    Parameters
-    ----------
-    hydraulic_power : float
-        Power given to the liquid [W].
-    efficiency : float
-        Pump efficiency [-], positive.
-
-    Returns
-    -------
-    float
-        ``P_shaft = P_hyd / eta`` [W].
-
-    Notes
-    -----
-    Karassik et al., Pump Handbook, 4th ed., chapter 2 (brake horsepower).
-    """
-    return hydraulic_power / efficiency
-
-
-@ops.physics
-def motor_electricity(shaft_power, motor_efficiency):
-    """Return the electricity drawn by a motor that delivers a shaft power.
-
-    Parameters
-    ----------
-    shaft_power : float
-        Mechanical power at the motor shaft [W].
-    motor_efficiency : float
-        Motor efficiency [-], positive.
-
-    Returns
-    -------
-    float
-        ``P_el = P_shaft / eta_motor`` [W].
-
-    Notes
-    -----
-    The motor loss ``P_el - P_shaft`` leaves as heat.
-    """
-    return shaft_power / motor_efficiency
-
-
-@ops.physics
 def pump_efficiency(flow, head, power):
     """Return the SI efficiency of a pump from a measured or modelled power; zero when stopped.
 

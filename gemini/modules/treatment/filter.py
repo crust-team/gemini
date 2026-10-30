@@ -14,9 +14,6 @@ from gemini.types import (
     Stream,
 )
 
-DEFAULT_CLOGGING_BAR = separation.FILTER_CLOGGING_BAR
-"""Alias of ``separation.FILTER_CLOGGING_BAR``, read by the legacy table converter."""
-
 
 class Filter(Module):
     """Filter with a quadratic clean-filter pressure loss and a clogging alarm.
@@ -64,7 +61,7 @@ class Filter(Module):
         if "pressure_drop" not in measured:
             return None
         dp = measured["pressure_drop"]
-        ratio = hydraulics.performance_ratio(ops.maximum(0, dp), self.clogging_dp)
+        ratio = diagnostics.performance_ratio(ops.maximum(0, dp), self.clogging_dp)
         alarm = dp > self.clogging_dp
         return Health(
             score=diagnostics.remaining_margin(ratio),

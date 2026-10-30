@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from gemini.errors import PhysicsRangeError
-from gemini.physics import heat_transfer
+from gemini.physics import diagnostics, heat_transfer
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 GOLDEN = json.loads((Path(__file__).parents[2] / "fixtures/golden_values.json").read_text())
@@ -235,9 +235,8 @@ def test_exchanger_balance_matches_effectiveness_ntu():
 
 def test_conductance_ratio_and_mean_temperature():
     """The fouling ratio is UA over the design UA; the mean is arithmetic."""
-    assert heat_transfer.conductance_ratio(80.0, 100.0) == 0.8
     assert heat_transfer.mean_temperature(300.0, 310.0) == 305
-    assert_function_matches(heat_transfer.conductance_ratio, [(80.0, 100.0), (120.0, 100.0)])
+    assert_function_matches(diagnostics.performance_ratio, [(80.0, 100.0), (120.0, 100.0)])
     assert_function_matches(heat_transfer.mean_temperature, [(300.0, 310.0), (280.0, 300.0)])
 
 

@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import compression, pumps
+from gemini.physics import compression, energy
 from gemini.types import (
     Control,
     Count,
@@ -111,7 +111,7 @@ class GasCompressor(Module):
             self.stage_count,
         )
         self.shaft_power = compression.shaft_power(suction.m_dot, work)
-        self.electricity = pumps.motor_electricity(self.shaft_power, self.motor_efficiency)
+        self.electricity = energy.input_power(self.shaft_power, self.motor_efficiency)
         self.discharge_T = discharge.T
         self.heat_loss = compression.heat_rejected(
             self.electricity, self.shaft_power, self.stage_count

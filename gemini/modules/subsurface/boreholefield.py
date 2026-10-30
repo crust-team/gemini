@@ -109,7 +109,7 @@ class BoreholeField(Module):
         inlet = inlets.inlet
         rate = self._extraction_rate(inlet)
         self.heat_extraction_rate = rate
-        self.fluid_mean_T = ground.mean_fluid_temperature(inlet.T, outlets.outlet.T)
+        self.fluid_mean_T = heat_transfer.mean_temperature(inlet.T, outlets.outlet.T)
         self.ground_T = self._ground_temperature()
         self.outlet_T = outlets.outlet.T
         self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)

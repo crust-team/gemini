@@ -6,12 +6,6 @@ from gemini.physics import combustion
 from tests.fixtures.equivalence import assert_function_matches
 
 
-def test_fuel_input_is_duty_over_efficiency():
-    """A 90 % boiler needs 1.111 W of fuel per watt of heat."""
-    assert combustion.fuel_input(900.0, 0.9) == 1000
-    assert_function_matches(combustion.fuel_input, [(900.0, 0.9), (0.0, 0.8)])
-
-
 def test_willans_line_and_engine_flows():
     """Full load needs capacity over efficiency; no load needs the idle share; off is zero."""
     assert combustion.willans_fuel_input(1.0, 400.0, 0.4, 0.1) == pytest.approx(1000)

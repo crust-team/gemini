@@ -394,29 +394,6 @@ def injectivity_index(flow: float, reservoir_pressure: float, bottomhole_pressur
 
 
 @ops.physics
-def performance_ratio(measured: float, reference: float) -> float:
-    """Return a measured performance over its reference, ``measured / reference`` [-].
-
-    Parameters
-    ----------
-    measured, reference : float
-        Quantities in one unit, for example a productivity index and its design value, or a
-        filter pressure loss and its clogging limit; the reference is nonzero.
-
-    Returns
-    -------
-    float
-        Ratio [-], one at the reference.
-
-    Notes
-    -----
-    Definition of the ratio used to score a well index or a filter loss against its design
-    or limit; no published source.
-    """
-    return measured / reference
-
-
-@ops.physics
 def beggs_brill_dp(
     us_g: float,
     us_l: float,

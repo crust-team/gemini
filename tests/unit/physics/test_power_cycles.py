@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from gemini.physics import power_cycles
+from gemini.physics import heat_transfer, power_cycles
 from tests.fixtures.equivalence import assert_function_matches
 
 DESIGN = dict(
@@ -44,7 +44,7 @@ def test_plant_balance_closes_the_first_law():
 
 def test_brine_outlet_temperature_mixes_the_bypass():
     """Half the brine cooled from 400 K to 340 K gives 370 K."""
-    assert power_cycles.brine_outlet_temperature(400, 0.5, 340) == pytest.approx(370)
+    assert heat_transfer.effectiveness_outlet_temperature(400, 0.5, 340) == pytest.approx(370)
 
 
 def test_rows_match_arrays():
@@ -56,5 +56,5 @@ def test_rows_match_arrays():
         power_cycles.plant_balance, [(1000.0, 0.1), (0.0, 0.0)], parasitic_fraction=0.2
     )
     assert_function_matches(
-        power_cycles.brine_outlet_temperature, [(400.0, 0.5, 340.0), (330.0, 0.0, 340.0)]
+        heat_transfer.effectiveness_outlet_temperature, [(400.0, 0.5, 340.0), (330.0, 0.0, 340.0)]
     )

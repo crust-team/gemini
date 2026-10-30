@@ -72,7 +72,7 @@ class _Reservoir(Module):
         self.hydrostatic_dp = Output(PressureDifference)
         self.radial_bottomhole_pressure = Output(Pressure | None)
 
-        self._fluid_cache = None
+        self._fluid_cache = (None, None, None)
 
     @property
     def fluid(self):
@@ -83,9 +83,9 @@ class _Reservoir(Module):
         """
         overrides = {name: self._parameter_value(name) for name in FLUID_OVERRIDES}
         values = tuple(overrides.values())
-        cache = self._fluid_cache
-        if cache is not None and cache[0] is self._fluid and cache[1] == values:
-            return cache[2]
+        source, stored_values, stored_fluid = self._fluid_cache
+        if source is self._fluid and stored_values == values:
+            return stored_fluid
         set_overrides = {name: value for name, value in overrides.items() if value is not None}
         fluid = Fluid.model_validate(self._fluid.model_dump() | set_overrides)
         self._fluid_cache = (self._fluid, values, fluid)
@@ -164,7 +164,7 @@ class _Reservoir(Module):
         assessed = pressure != self.pressure
         index = hydraulics.productivity_index if production else hydraulics.injectivity_index
         actual = ops.where(assessed, index(measured["flow"], self.pressure, pressure), float("nan"))
-        ratio = hydraulics.performance_ratio(actual, nominal)
+        ratio = diagnostics.performance_ratio(actual, nominal)
         return Health(
             assessed=assessed,
             score=ops.where(assessed, diagnostics.bounded_score(ratio), 1.0),

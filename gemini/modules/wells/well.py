@@ -81,7 +81,7 @@ class _Well(Module):
         if chemistry is None:
             chemistry = stream.fluid.corrosion_inputs(stream.p, stream.T)
             if stream.fluid.co2_mass_fraction == 0:
-                return [0.0] * len(self.pipe_path.sections)
+                return [0.0 for _ in self.pipe_path.sections]
         return hydraulics.corrosion_profile(
             self.pipe_path,
             self._traversal_stream(stream),

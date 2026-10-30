@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import ConfigurationError, PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import pumps
+from gemini.physics import energy, pumps
 from gemini.types import (
     Control,
     Count,
@@ -86,7 +86,7 @@ class InjectionPump(Module):
         if self.head_coeff is not None and self.power_coeff is not None:
             self.power = pumps.power(flow, self.frequency, self.no_stages, self.power_coeff)
         else:
-            self.power = pumps.shaft_power(pumps.hydraulic_power(flow, self.head), self.efficiency)
+            self.power = energy.input_power(pumps.hydraulic_power(flow, self.head), self.efficiency)
         self.discharge_pressure = discharge.p
         self.electricity = self.power
 

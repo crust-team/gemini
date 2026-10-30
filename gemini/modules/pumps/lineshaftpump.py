@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsRangeError
 from gemini.modules.module import Module
-from gemini.physics import constants, pumps
+from gemini.physics import constants, energy, pumps
 from gemini.types import (
     Control,
     Count,
@@ -118,7 +118,7 @@ class LineShaftPump(Module):
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction
         self.efficiency = pumps.pump_efficiency(flow, self.head, pump_power)
-        self.electricity = pumps.motor_electricity(self.shaft_power, self.motor_efficiency)
+        self.electricity = energy.input_power(self.shaft_power, self.motor_efficiency)
 
     def _head(self, flow):
         """Return the pump-curve pressure rise [Pa] at a suction volume flow [m3/s]."""

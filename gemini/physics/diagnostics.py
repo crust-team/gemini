@@ -104,3 +104,21 @@ def below_limit(ratio: float, threshold: float) -> bool:
     Alarm convention for a decline or fouling test, without a published source.
     """
     return ratio < 1 - threshold
+
+
+@ops.physics
+def performance_ratio(measured: float, reference: float) -> float:
+    """Return a measured performance over its reference value, ``measured / reference`` [-].
+
+    Parameters
+    ----------
+    measured, reference : float
+        Two values of one quantity, for example an apparent and a design conductance [W/K], a
+        measured and a design productivity index [m3/s/Pa] or a pressure drop and its limit [Pa].
+
+    Returns
+    -------
+    float
+        The ratio [-]; valid for a nonzero reference. A plain definition, no published source.
+    """
+    return measured / reference

@@ -7,7 +7,6 @@ from gemini.physics.fluid import FluidProperties
 DEFAULT_CP = FluidProperties().cp_l
 """Liquid heat capacity [J/kg/K] assumed when measurements give none; the ``Fluid`` default."""
 
-DEFAULT_FOULING_THRESHOLD = 0.15
 """Fractional loss of the design conductance that raises the fouling alarm [-]; a GEMINI
 alarm convention without a published source."""
 
@@ -531,28 +530,6 @@ def mean_temperature(first: float, second: float) -> float:
     Ziegler 1999).
     """
     return (first + second) / 2
-
-
-@ops.physics
-def conductance_ratio(apparent: float, design: float) -> float:
-    """Return the apparent conductance as a fraction of the design conductance.
-
-    Parameters
-    ----------
-    apparent, design : float
-        Apparent (measured) and design conductance UA [W/K]; the design value is positive.
-
-    Returns
-    -------
-    float
-        ``UA / UA_design`` [-], one for a clean exchanger; fouling lowers it.
-
-    Notes
-    -----
-    Fouling indicator from the heat-exchanger conductance method, Incropera et al.,
-    Fundamentals of Heat and Mass Transfer, fouling factors.
-    """
-    return apparent / design
 
 
 @ops.physics
