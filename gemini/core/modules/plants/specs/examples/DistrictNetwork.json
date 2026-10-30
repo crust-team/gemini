@@ -1,0 +1,144 @@
+{
+  "format": 2,
+  "name": "DistrictNetwork",
+  "modules": {
+    "pump": {
+      "type": "CentrifugalPump",
+      "params": {
+        "head_coeff": [
+          400000.0,
+          0.0,
+          -1000000000.0
+        ],
+        "rated_frequency": 50.0,
+        "best_efficiency": 0.75,
+        "best_efficiency_flow": 0.004,
+        "motor_efficiency": 0.9
+      }
+    },
+    "supply_pipe": {
+      "type": "Pipe",
+      "params": {
+        "length": 500.0,
+        "inner_diameter": 0.1,
+        "elevation_change": 0.0,
+        "u_value": 1.0
+      }
+    },
+    "splitters": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "Splitter",
+          "params": {}
+        }
+      }
+    },
+    "substations": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "HeatingSubstation",
+          "params": {
+            "building_flow": 3.0,
+            "building_pressure": 300000.0,
+            "valve.flow_coefficient": 1.756820922315766e-05,
+            "heat_exchanger.ua": 20000.0,
+            "heat_exchanger.dp_hot_nominal": 20000.0,
+            "heat_exchanger.dp_cold_nominal": 20000.0,
+            "heat_exchanger.m_dot_hot_nominal": 2.0,
+            "heat_exchanger.m_dot_cold_nominal": 3.0,
+            "consumer.minimum_return_temperature": 303.15
+          }
+        },
+        "1": {
+          "type": "HeatingSubstation",
+          "params": {
+            "building_flow": 3.0,
+            "building_pressure": 300000.0,
+            "valve.flow_coefficient": 1.756820922315766e-05,
+            "heat_exchanger.ua": 20000.0,
+            "heat_exchanger.dp_hot_nominal": 20000.0,
+            "heat_exchanger.dp_cold_nominal": 20000.0,
+            "heat_exchanger.m_dot_hot_nominal": 2.0,
+            "heat_exchanger.m_dot_cold_nominal": 3.0,
+            "consumer.minimum_return_temperature": 303.15
+          }
+        }
+      }
+    },
+    "mixers": {
+      "type": "ModuleList",
+      "modules": {
+        "0": {
+          "type": "Mixer",
+          "params": {}
+        }
+      }
+    },
+    "return_pipe": {
+      "type": "Pipe",
+      "params": {
+        "length": 500.0,
+        "inner_diameter": 0.1,
+        "elevation_change": 0.0,
+        "u_value": 1.0
+      }
+    }
+  },
+  "connections": [
+    {
+      "source": "pump.discharge",
+      "target": "supply_pipe.inlet"
+    },
+    {
+      "source": "supply_pipe.outlet",
+      "target": "splitters.0.feed_in"
+    },
+    {
+      "source": "splitters.0.second_out",
+      "target": "substations.0.network_in"
+    },
+    {
+      "source": "splitters.0.first_out",
+      "target": "substations.1.network_in"
+    },
+    {
+      "source": "substations.0.network_out",
+      "target": "mixers.0.first_in"
+    },
+    {
+      "source": "substations.1.network_out",
+      "target": "mixers.0.second_in"
+    },
+    {
+      "source": "mixers.0.mixed_out",
+      "target": "return_pipe.inlet"
+    }
+  ],
+  "inlets": {
+    "supply_in": "pump.suction"
+  },
+  "outlets": {
+    "return_out": "return_pipe.outlet"
+  },
+  "outputs": {
+    "heat_supplied": {
+      "sum": "heat_supplied"
+    },
+    "heat_absorbed": {
+      "sum": "heat_absorbed"
+    },
+    "heat_loss": {
+      "sum": "heat_loss"
+    },
+    "electricity": {
+      "sum": "electricity"
+    },
+    "return_out_T": {
+      "of": "return_pipe.outlet_T"
+    }
+  },
+  "bindings": {},
+  "param_history": {}
+}

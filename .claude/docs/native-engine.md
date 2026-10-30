@@ -427,9 +427,12 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   variable size are written by `generators.py` (`multi_well_spec`, `district_network_spec`): the
   generator orders the connections to reproduce the call order of the classes they replaced, and
   the shipped file of the default size equals its output. `templates/` holds template files and
-  `templates.py` fills them: `from_template(name, parameters)` sets `"<module>.<parameter>"`
+  `templating.py` fills them: `from_template(name, parameters)` sets `"<module>.<parameter>"`
   values, removes every unit whose `"<module>.enabled"` is false with its connections, ports and
   outputs (the template's `bypass` connections close the gap), validates the plain spec and builds
-  the plant. `catalogue.py` has `names()` and `get(name)`. The special cases
+  the plant. `catalogue.py` has `names()`, `get(name)` (a new plant, parameters unset),
+  `example(name)` (a plant with real values from `specs/examples/`: the `doublet_heat` values for
+  `Doublet` and `DoubletHeatPlant`, the values of the unit tests for the others, design parameters
+  only; `NotImplementedYet` naming a plant that has none) and `templates()`. The special cases
   (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) stay classes, because a loop closed by
   `loops.close_loop` inside one call or a `mode` that chooses which children run is not wiring.

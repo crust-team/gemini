@@ -1,9 +1,9 @@
-"""Templates: listing, filling with parameters, leaving units out and validation."""
+"""Template filling: listing, filling with parameters, leaving units out and validation."""
 
 import pytest
 
 import gemini as gm
-from gemini.core.modules.plants import library, templates
+from gemini.core.modules.plants import library, templating
 
 
 def _chain_template():
@@ -47,8 +47,8 @@ def _chain_template():
 
 def test_listing_names_every_template_with_its_summary():
     """Each entry has the name, title, description and a purpose of the fixed three."""
-    rows = templates.listing()
-    assert [row["name"] for row in rows] == templates.template_names()
+    rows = templating.listing()
+    assert [row["name"] for row in rows] == templating.template_names()
     assert {"MultiWellPlant", "DistrictNetwork"} <= {row["name"] for row in rows}
     for row in rows:
         assert set(row) == {"name", "title", "description", "purpose"}
@@ -57,8 +57,8 @@ def test_listing_names_every_template_with_its_summary():
 
 def test_every_template_fills_with_its_defaults_into_a_valid_spec():
     """The defaults of each shipped template give a spec without problems."""
-    for name in templates.template_names():
-        spec = templates.fill(templates.load(name), {})
+    for name in templating.template_names():
+        spec = templating.fill(templating.load(name), {})
         assert gm.plants.validate(spec) == [], name
 
 
@@ -70,14 +70,14 @@ def test_default_sizes_build_the_shipped_plants():
 
 def test_a_parameter_sets_a_module_parameter_in_the_spec():
     """A name ``<module>.<parameter>`` states the value, unit strings included."""
-    spec = templates.fill(_chain_template(), {"last.dp_nominal": "2 bar"})
+    spec = templating.fill(_chain_template(), {"last.dp_nominal": "2 bar"})
     assert spec["modules"]["last"]["params"] == {"dp_nominal": "2 bar"}
     assert spec["modules"]["first"]["params"] == {}
 
 
 def test_a_disabled_unit_leaves_with_its_wiring_and_the_bypass_closes_the_gap():
     """The middle filter, its connections and its output go; the bypass joins its neighbours."""
-    spec = templates.fill(_chain_template(), {"middle.enabled": False})
+    spec = templating.fill(_chain_template(), {"middle.enabled": False})
     assert list(spec["modules"]) == ["first", "last"]
     assert spec["connections"] == [{"source": "first.outlet", "target": "last.inlet"}]
     assert list(spec["outputs"]) == ["last_drop"]
@@ -86,7 +86,7 @@ def test_a_disabled_unit_leaves_with_its_wiring_and_the_bypass_closes_the_gap():
 
 def test_a_disabled_end_unit_drops_its_ports_and_its_connections():
     """Without a bypass the neighbour's port becomes free and the plant port goes."""
-    spec = templates.fill(_chain_template(), {"first.enabled": False})
+    spec = templating.fill(_chain_template(), {"first.enabled": False})
     assert spec["inlets"] == {}
     assert spec["connections"] == [{"source": "middle.outlet", "target": "last.inlet"}]
 
@@ -94,7 +94,7 @@ def test_a_disabled_end_unit_drops_its_ports_and_its_connections():
 def test_the_original_template_is_not_changed_by_filling():
     """Two fills of one template are independent."""
     template = _chain_template()
-    templates.fill(template, {"middle.enabled": False, "last.dp_nominal": "1 bar"})
+    templating.fill(template, {"middle.enabled": False, "last.dp_nominal": "1 bar"})
     assert template == _chain_template()
 
 
@@ -111,9 +111,9 @@ def test_unknown_names_and_wrong_flags_are_listed_together():
 def test_a_template_value_of_the_wrong_unit_is_a_problem_of_the_spec(monkeypatch):
     """The filled spec is validated, so a wrong unit names the module and parameter."""
     template = _chain_template()
-    monkeypatch.setattr(templates, "load", lambda name: template)
+    monkeypatch.setattr(templating, "load", lambda name: template)
     with pytest.raises(gm.errors.ValidationError, match="last"):
-        templates.from_template("Chain", {"last.dp_nominal": "2 m"})
+        templating.from_template("Chain", {"last.dp_nominal": "2 m"})
     with pytest.raises(gm.errors.ValidationError, match="expected true or false"):
-        templates.from_template("Chain", {"middle.enabled": "no"})
-    assert templates.from_template("Chain", {"middle.enabled": False}).name == "Chain"
+        templating.from_template("Chain", {"middle.enabled": "no"})
+    assert templating.from_template("Chain", {"middle.enabled": False}).name == "Chain"
