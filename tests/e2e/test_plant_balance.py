@@ -5,6 +5,7 @@ import pytest
 import gemini as gm
 from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.heating_cooling import RULES, two_days
+from tests.fixtures.sample_problems import template_plant
 
 pytestmark = pytest.mark.e2e
 PLANTS = (
@@ -19,7 +20,7 @@ PLANTS = (
 @pytest.mark.parametrize("name", PLANTS)
 def test_a_heating_and_cooling_plant_closes(name):
     """The root's in and out are the ports of its grids, its air and its aquifers."""
-    plant = gm.plants.example(name)
+    plant = template_plant(name)
     results = gm.simulate(plant, gm.schedule(plant, two_days(), RULES), on_error="raise")
     assert_plant_closes(plant, results)
 

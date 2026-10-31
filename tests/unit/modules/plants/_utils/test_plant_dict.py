@@ -5,6 +5,7 @@ import json
 import pytest
 
 import gemini as gm
+from tests.fixtures.sample_problems import filled_plant
 
 
 def test_from_dict_and_from_dict_are_one_function():
@@ -162,7 +163,7 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
 @pytest.mark.parametrize("name", gm.plants.names())
 def test_every_plant_rebuilds_from_its_dict_with_the_same_values(name):
     """The class form and the structure form both give the same plant."""
-    plant = gm.plants.example(name)
+    plant = filled_plant(name)
     data, structure = plant.to_dict(), plant.to_dict(structure=True)
     assert "modules" not in data and data["type"] == name
     rebuilt = gm.plants.from_dict(data)

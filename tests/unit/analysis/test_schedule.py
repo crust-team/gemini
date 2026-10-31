@@ -12,6 +12,7 @@ from gemini.backends import settings
 from gemini.physics import constants
 from tests.fixtures.errors import raises
 from tests.fixtures.parity import BACKENDS
+from tests.fixtures.sample_problems import treatment_plant
 
 BRINE = gm.Fluid(density=1030.0, viscosity=4e-4, specific_heat=4000.0)
 DESIGN = {
@@ -426,8 +427,8 @@ def test_an_adsorption_chiller_is_dispatched_with_its_own_cop():
 
 
 def test_the_bypass_keeps_the_supply_at_the_setpoint_and_delivers_the_demand():
-    """Three summer days of the hackathon plant: drive water passes the users, not through them."""
-    plant = gm.plants.example("HackathonPlant")
+    """Three summer days of a plant with a bypass: drive water passes the users, not through them."""
+    plant = treatment_plant()
     frame = pd.concat([gm.profiles.get(name) for name in gm.profiles.names()], axis=1)
     days = frame.loc["2027-07-18":"2027-07-20"]
     plan = gm.schedule(plant, days, RULES)

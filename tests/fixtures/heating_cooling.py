@@ -1,12 +1,11 @@
-"""The heating and cooling plants of ``inputs/plants/`` and two days of their demand.
+"""The heating and cooling plants of the sample problem and two days of their demand.
 
-The values are the challenge's, or the sizes the example files state as assumptions. The days are
-round numbers every plant covers.
+The days are round numbers every plant covers.
 """
 
 import pandas as pd
 
-import gemini as gm
+from tests.fixtures.sample_problems import template_plant
 
 HEAT = 12e6
 """Heating demand of the days [W]."""
@@ -16,8 +15,8 @@ RULES = {"doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"}, "max_brine_cooli
 
 
 def filled_dict(name):
-    """Return the plant dict of plant class ``name`` with the values of its example."""
-    return gm.plants.example(name).to_dict(structure=True)
+    """Return the plant dict of plant class ``name`` with the values of the sample problem."""
+    return template_plant(name).to_dict(structure=True)
 
 
 def two_days():

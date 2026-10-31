@@ -1,0 +1,22 @@
+{
+  "limits": [
+    {
+      "pattern": "d*.reservoir",
+      "output": "liquid_flow",
+      "min": "50 m3/h",
+      "max": "300 m3/h"
+    },
+    {
+      "pattern": "d*",
+      "output": "brine_cooling",
+      "min": null,
+      "max": "40 K"
+    },
+    {
+      "pattern": "heat_users",
+      "output": "supply_in.temperature",
+      "min": "100 degC",
+      "max": null
+    }
+  ]
+}

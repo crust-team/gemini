@@ -1,11 +1,11 @@
-# Hackathon inputs
+# Hackathon 2027 sample problem
 
-The inputs of the GEMINI agentic geothermal design hackathon, as the organisers released them on
+One sample problem of gemini: only `examples/` and `tests/` read this folder, and nothing under
+`gemini/` knows it. The inputs of the GEMINI agentic geothermal design hackathon, as the organisers released them on
 2026-10-29. The requirements document is dated 28 October 2026. These files are unchanged:
 `GEMINI_Heating_Demand_Daily_2027.csv`, `GEMINI_Cooling_Demand_Daily_2027.csv` and
 `GEMINI_Hackathon_Challenge_Requirements.pdf`.
 
-`gm.profiles.get("heating_demand")` and `gm.profiles.get("cooling_demand")` read the two CSV files.
 The profiles are synthetic: 365 daily-average power values, 1 January to 31 December 2027.
 
 | Profile | Peak | Peak date | Year |
@@ -54,3 +54,20 @@ standard conditions.
 | Annual operation of a doublet | 330 daily steps | Daily power and energy balance |
 | Heating supply temperature | 100 °C | Fixed |
 | Cooling supply temperature | 20 °C | Fixed |
+
+## Files added for the examples
+
+These are not the organisers' files: they hold the requirements above, and the assumptions the
+requirements leave open, in the shapes of gemini.
+
+| File | Holds | Read by |
+| --- | --- | --- |
+| `plant.json` | A plant dict of class `HeatingCoolingPlant` on two doublets | `examples/cases/challenge_year.py` |
+| `plant_with_treatment.json` | A plant dict in the structure form: two doublets, desander, inhibitor dosing, one absorption chiller | `examples/cases/hackathon.py` |
+| `rules.json` | The rules of `gm.schedule` | both |
+| `limits.json`, `limits_with_treatment.json` | The requirement checks of each design, a `gm.checks.Limits` dict | one each |
+| `assumptions.json` | Fields of `gm.economics.Assumptions`, in SI: placeholders, not data | both |
+| `templates/<Class>.json` | Plant dicts of the other template plants on these requirements | tests |
+
+The prices are SI numbers, EUR/J for energy. Sizes of equipment, return temperatures, the air and the
+injection pressure are assumptions of the examples, which print them.

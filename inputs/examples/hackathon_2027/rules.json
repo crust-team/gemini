@@ -1,0 +1,18 @@
+{
+  "order": [
+    "geothermal",
+    "heat_pump",
+    "boiler"
+  ],
+  "cooling_order": [
+    "absorption",
+    "adsorption",
+    "compression"
+  ],
+  "doublet_flow": {
+    "min": "50 m3/h",
+    "max": "300 m3/h"
+  },
+  "max_brine_cooling": "40 K",
+  "operating_days": 330
+}

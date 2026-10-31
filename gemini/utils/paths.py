@@ -28,7 +28,7 @@ def _input(relative):
 
 def hackathon(name):
     """Return the path of the file ``name`` of the hackathon inputs."""
-    return _input(f"hackathon/{name}")
+    return _input(f"examples/hackathon_2027/{name}")
 
 
 def plant_values(name):
