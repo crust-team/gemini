@@ -1,7 +1,7 @@
 """Plants that ship as spec files."""
 
 import gemini as gm
-from gemini.modules.plants import library
+from gemini.modules.plants._utils import library
 from gemini.utils.paths import ASSET_PLANTS
 
 

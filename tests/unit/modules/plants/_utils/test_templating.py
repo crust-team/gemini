@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from gemini.modules.plants import library, templating
+from gemini.modules.plants._utils import library, templating
 from tests.fixtures.errors import raises
 
 

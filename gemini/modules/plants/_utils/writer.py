@@ -11,7 +11,7 @@ from gemini.modules._utils.serialization import (
     tree_params,
     write_sections,
 )
-from gemini.modules.plants.plan import is_group
+from gemini.modules.plants._utils.plan import is_group
 from gemini.utils.strings import join_path
 
 

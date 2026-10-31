@@ -5,6 +5,7 @@ import json
 import pytest
 
 import gemini as gm
+from gemini.modules.plants._utils import library
 
 
 def test_from_dict_and_from_spec_are_one_function():
@@ -74,7 +75,7 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
 
 def test_an_opened_plant_round_trips_its_nested_wiring():
     """The shipped heat plant opens its doublet and still writes it as one child."""
-    plant = gm.plants.library.build("DoubletHeatPlant")
+    plant = library.build("DoubletHeatPlant")
     spec = plant.to_spec()
     assert spec["modules"]["doublet"] == {"type": "Doublet", "params": {}}
     assert gm.plants.from_spec(spec).to_spec() == spec

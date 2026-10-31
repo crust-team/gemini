@@ -3,6 +3,7 @@
 import json
 
 import gemini as gm
+from gemini.modules.plants._utils import library
 
 
 def test_the_schema_is_plain_json_listing_every_module_type_and_group():
@@ -22,5 +23,5 @@ def test_the_schema_requires_the_always_written_keys():
 
 def test_the_schema_accepts_only_the_keys_a_spec_writes():
     """Every key a built plant writes is declared."""
-    plant = gm.plants.library.build("DoubletHeatPlant")
+    plant = library.build("DoubletHeatPlant")
     assert set(plant.to_spec()) <= set(gm.plants.spec_schema()["properties"])

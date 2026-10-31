@@ -5,7 +5,7 @@ from functools import partial
 from gemini.modules._utils import registry
 from gemini.modules._utils.serialization import Report
 from gemini.modules.plant import Plant
-from gemini.modules.plants import reader
+from gemini.modules.plants._utils import reader
 from gemini.utils.files import read_json
 from gemini.utils.paths import ASSET_PLANTS
 

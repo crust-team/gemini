@@ -4,7 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import ValidationError
-from gemini.modules.plants import ports
+from gemini.modules.plants._utils import ports
 
 
 @pytest.fixture

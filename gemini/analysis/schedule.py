@@ -17,8 +17,8 @@ from gemini.modules.cooling import AbsorptionUnit
 from gemini.modules.grids import CoolingGrid, HeatingGrid
 from gemini.modules.heating import Boiler, HeatPump
 from gemini.modules.piping import Mixer, Splitter
+from gemini.modules.plants._utils.plan import members, split_end
 from gemini.modules.plants.doublet import Doublet
-from gemini.modules.plants.plan import members, split_end
 from gemini.physics import constants, dispatch, units
 from gemini.physics.fluid import mixture_mass_flow
 from gemini.utils.strings import join_names, join_path

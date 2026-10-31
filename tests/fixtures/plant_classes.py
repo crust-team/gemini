@@ -1,6 +1,7 @@
 """A class per shipped spec plant, so tests written for module classes run on every plant."""
 
-from gemini.modules.plants import Plant, library
+from gemini.modules.plants import Plant
+from gemini.modules.plants._utils import library
 from gemini.utils.paths import ASSET_PLANTS
 
 

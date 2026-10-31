@@ -4,7 +4,7 @@ from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.grids import HeatingGrid
 from gemini.modules.module import Module
 from gemini.modules.piping import Valve
-from gemini.modules.plants import loops
+from gemini.modules.plants._utils import loops
 from gemini.types import (
     Inlet,
     MassFlow,

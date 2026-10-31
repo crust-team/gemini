@@ -3,8 +3,8 @@
 import pytest
 
 import gemini as gm
-from gemini.modules.plants import generators, library
-from gemini.modules.plants.plan import compile_plan
+from gemini.modules.plants._utils import generators, library
+from gemini.modules.plants._utils.plan import compile_plan
 from tests.fixtures.errors import raises
 
 SIZES = [(1, 1), (2, 1), (1, 3), (3, 2)]

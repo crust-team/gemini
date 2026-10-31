@@ -3,7 +3,7 @@
 from gemini.modules.environment import Atmosphere
 from gemini.modules.grids import ElectricityGrid
 from gemini.modules.module import Module
-from gemini.modules.plants import templating
+from gemini.modules.plants._utils import templating
 from gemini.modules.plants.atesplant import ATESPlant
 from gemini.types import Inlet, Outlet, Output, Stream
 

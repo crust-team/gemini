@@ -8,7 +8,7 @@ ESP at 650 m, reservoirs at 250 and 240 bar with 10 m3/h/bar indices, constant-p
 import pytest
 
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules.plants import nodal
+from gemini.modules.plants._utils import nodal
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell

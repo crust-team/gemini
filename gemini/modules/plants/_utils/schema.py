@@ -1,7 +1,7 @@
 """The JSON Schema of the plant spec, the input schema of a tool that builds plants."""
 
 from gemini.modules._utils import registry
-from gemini.modules.plants.factory import GROUPS
+from gemini.modules.plants._utils.factory import GROUPS
 
 SECTION = {"type": "object", "additionalProperties": {"type": "object"}}
 BINDINGS = {

@@ -13,10 +13,10 @@ from gemini.modules._utils.serialization import (
     read_params,
     read_sections,
 )
-from gemini.modules.plants import outputs
-from gemini.modules.plants.factory import make_module
-from gemini.modules.plants.plan import is_group, unconnected_port
-from gemini.modules.plants.writer import baseline_of
+from gemini.modules.plants._utils import outputs
+from gemini.modules.plants._utils.factory import make_module
+from gemini.modules.plants._utils.plan import is_group, unconnected_port
+from gemini.modules.plants._utils.writer import baseline_of
 from gemini.utils.strings import close_matches, did_you_mean, join_path
 
 TYPES = {

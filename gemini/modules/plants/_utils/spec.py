@@ -2,7 +2,7 @@
 
 from gemini.errors.base import reported
 from gemini.modules.plant import Plant
-from gemini.modules.plants import reader
+from gemini.modules.plants._utils import reader
 
 
 def from_spec(spec):

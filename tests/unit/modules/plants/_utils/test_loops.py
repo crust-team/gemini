@@ -5,7 +5,7 @@ import pytest
 import gemini as gm
 from gemini.backends import runtime
 from gemini.modules import Module
-from gemini.modules.plants import loops
+from gemini.modules.plants._utils import loops
 from gemini.modules.storage import ThermalStorage
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.errors import raises

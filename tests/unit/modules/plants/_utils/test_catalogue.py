@@ -7,7 +7,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules._utils import registry
-from gemini.modules.plants import catalogue
+from gemini.modules.plants._utils import catalogue
 from gemini.utils import paths
 from tests.fixtures.errors import raises
 

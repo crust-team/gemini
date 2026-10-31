@@ -1,6 +1,6 @@
 """Convert an old GEMINI project folder into a plant spec."""
 
-from gemini.modules.plants.catalogue import get
+from gemini.modules.plants._utils.catalogue import get
 
 
 def convert_legacy(folder):

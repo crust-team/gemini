@@ -5,7 +5,7 @@ import numpy as np
 from gemini.backends import settings
 from gemini.engine.chunks import PathColumns
 from gemini.modules._utils import balance
-from gemini.modules.plants.plan import inner_ends, is_plant, leaf_ends
+from gemini.modules.plants._utils.plan import inner_ends, is_plant, leaf_ends
 from gemini.types.results import ModuleResult
 from gemini.types.shapes import check, value
 from gemini.utils.strings import join_path

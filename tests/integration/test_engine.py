@@ -12,7 +12,7 @@ from gemini import backends
 from gemini.engine import checkpoint
 from gemini.engine.callbacks import AutoCheckpoint, Callback, EventLog
 from gemini.engine.results import Results
-from gemini.modules.plants.migration import RENAMED_NAMES
+from gemini.modules.plants._utils.migration import RENAMED_NAMES
 from gemini.types import Control, Output
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from tests.fixtures.errors import raises

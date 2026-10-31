@@ -25,8 +25,8 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.modules.plants import migration
-from gemini.modules.plants.migration import FLUID_NAMES, RENAMED_NAMES
+from gemini.modules.plants._utils import migration
+from gemini.modules.plants._utils.migration import FLUID_NAMES, RENAMED_NAMES
 from tests.fixtures import FIXTURES
 from tests.fixtures.frames import on_ports, path_frame
 

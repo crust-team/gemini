@@ -2,7 +2,7 @@
 
 from gemini.errors import ValidationError
 from gemini.modules.module import Module
-from gemini.modules.plants.plan import is_group, members, port_ends, split_end
+from gemini.modules.plants._utils.plan import is_group, members, port_ends, split_end
 from gemini.types.declarations import Declaration
 from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
 

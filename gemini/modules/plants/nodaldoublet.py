@@ -2,7 +2,7 @@
 
 from gemini.modules.environment import Formation
 from gemini.modules.module import Module
-from gemini.modules.plants import nodal
+from gemini.modules.plants._utils import nodal
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell

@@ -1,7 +1,7 @@
 """Views of a plant's wiring."""
 
 import gemini as gm
-from gemini.modules.plants import listing
+from gemini.modules.plants._utils import listing
 
 
 def test_summary_counts_parameters_of_a_nested_plant():

@@ -2,17 +2,17 @@
 
 from gemini.modules.plant import Plant
 
+from ._utils.catalogue import example, get, names, templates
+from ._utils.legacy_project import convert_legacy
+from ._utils.library import register_shipped
+from ._utils.migration import migrate
+from ._utils.schema import spec_schema
+from ._utils.spec import from_dict, from_spec, validate
+from ._utils.templating import from_template
 from .atesplant import ATESPlant
-from .catalogue import example, get, names, templates
 from .coolingsubstation import CoolingSubstation
 from .doublet import Doublet
 from .heatingsubstation import HeatingSubstation
-from .legacy_project import convert_legacy
-from .library import register_shipped
-from .migration import migrate
-from .schema import spec_schema
-from .spec import from_dict, from_spec, validate
-from .templating import from_template
 
 __all__ = [
     "Plant",

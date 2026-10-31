@@ -6,7 +6,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import ValidationError
-from gemini.modules.plants import reader
+from gemini.modules.plants._utils import reader
 
 
 @pytest.fixture

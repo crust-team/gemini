@@ -10,7 +10,7 @@ import json
 import pytest
 
 from gemini.analysis import estimate_reservoir_pressure
-from gemini.modules.plants.migration import RENAMED_NAMES
+from gemini.modules.plants._utils.migration import RENAMED_NAMES
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell

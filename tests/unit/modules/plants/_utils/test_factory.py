@@ -3,7 +3,7 @@
 import gemini as gm
 from gemini.errors import ValidationError
 from gemini.modules.container import ModuleDict
-from gemini.modules.plants.factory import make_module
+from gemini.modules.plants._utils.factory import make_module
 from tests.fixtures.errors import raises
 
 

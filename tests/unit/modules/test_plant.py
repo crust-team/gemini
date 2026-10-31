@@ -6,7 +6,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import NotImplementedYet, ValidationError
-from gemini.modules.plants import library
+from gemini.modules.plants._utils import library
 from tests.fixtures.errors import raises
 
 

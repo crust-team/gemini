@@ -4,9 +4,9 @@ from gemini.errors import ValidationError
 from gemini.errors.base import reported
 from gemini.modules.container import ModuleList
 from gemini.modules.module import Module
-from gemini.modules.plants import listing, outputs, reader, writer
-from gemini.modules.plants.factory import make_module
-from gemini.modules.plants.plan import (
+from gemini.modules.plants._utils import listing, outputs, reader, writer
+from gemini.modules.plants._utils.factory import make_module
+from gemini.modules.plants._utils.plan import (
     STATE,
     Link,
     compile_plan,
@@ -14,7 +14,7 @@ from gemini.modules.plants.plan import (
     loop_through,
     port_ends,
 )
-from gemini.modules.plants.ports import PortResolver
+from gemini.modules.plants._utils.ports import PortResolver
 from gemini.physics import energy
 from gemini.types.declarations import Inlet, Outlet
 from gemini.utils.strings import join_path, snake_case

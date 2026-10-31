@@ -189,7 +189,7 @@ class ProductionReservoir(_Reservoir):
 
         ``p_bh = pressure - Q / productivity_index`` with the volume flow Q at reservoir
         conditions. ``forward`` uses it for the commanded rate; the nodal solve of
-        ``gemini.modules.plants.nodal`` uses it for trial rates without a call.
+        ``gemini.modules.plants._utils.nodal`` uses it for trial rates without a call.
         """
         if self.productivity_index is None:
             raise ValidationError(
@@ -236,7 +236,7 @@ class InjectionReservoir(_Reservoir):
 
         ``p_bh = pressure + Q / injectivity_index`` with Q the absolute volume flow of the
         stream. The aquifer accepts any arriving stream; the nodal solve of
-        ``gemini.modules.plants.nodal`` matches the injection well's bottom pressure to
+        ``gemini.modules.plants._utils.nodal`` matches the injection well's bottom pressure to
         this value.
         """
         if self.injectivity_index is None:

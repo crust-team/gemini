@@ -4,7 +4,7 @@ from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules._utils import registry
 from gemini.modules._utils.serialization import SECTIONS, Report, read_sections
 from gemini.modules.plant import Plant
-from gemini.modules.plants import templating
+from gemini.modules.plants._utils import templating
 from gemini.utils import paths
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names

@@ -4,7 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules import energy_balance, mass_balance
-from gemini.modules.plants import generators
+from gemini.modules.plants._utils import generators
 from gemini.types import Stream
 from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.errors import raises

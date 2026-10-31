@@ -25,8 +25,8 @@ from copy import deepcopy
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
 from gemini.modules._utils.serialization import located
-from gemini.modules.plants import generators
-from gemini.modules.plants.spec import from_spec
+from gemini.modules.plants._utils import generators
+from gemini.modules.plants._utils.spec import from_spec
 from gemini.utils.files import read_json
 from gemini.utils.paths import ASSET_TEMPLATES
 from gemini.utils.strings import close_matches, did_you_mean, join_names

@@ -1,6 +1,6 @@
 """Text and data views of a plant's wiring."""
 
-from gemini.modules.plants.plan import members, split_end
+from gemini.modules.plants._utils.plan import members, split_end
 
 
 def connection_list(plant):
