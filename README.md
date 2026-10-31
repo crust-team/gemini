@@ -27,8 +27,7 @@ import pandas as pd
 
 import gemini as gm
 
-SHARED = "datasets/doublet_heat"
-plant = gm.Plant.load(f"{SHARED}/plant.json")
+plant = gm.plants.example("DoubletHeatPlant")
 design = {name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
 esp = gm.modules.ESP().update_params(**design)
 stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
@@ -45,7 +44,7 @@ assert dict(fluid_only.outputs) == {}
 esp.frequency = 50.0
 plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
 
-frame = pd.read_csv(f"{SHARED}/doublet_2024_15min.csv", parse_dates=["time"])
+frame = pd.read_csv("inputs/doublet_heat/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
 
 results = gm.replay(plant, data, checkpoint="runs/replay.ckpt")
@@ -66,6 +65,20 @@ one with real values, `gm.plants.from_template("heating_cooling", {"absorption_c
 False})` fills a template with switchable units (`gm.plants.templates()` lists them), and
 `gm.plants.convert_legacy(folder)` turns an old project folder into a plant spec. `gm.profiles`
 holds the 2027 demand of the heating and cooling challenge, read from the organisers' files.
+
+Data has two homes. `gm.plants.example` and `gm.profiles.get` read `inputs/`, which is in a source
+checkout and not installed, and outside one they raise `inputs_missing`:
+
+```text
+gemini/assets/      # installed, read by gemini functions
+  plants/           # plant structures, no parameter values
+  templates/        # plant templates
+inputs/             # repository only
+  hackathon/        # the organisers' demand files and requirements, with a README
+  plants/           # example values of plants
+  doublet_heat/     # measured data
+  legacy_project/   # an old project folder
+```
 
 A plant can be designed from its depth. A `Doublet` derives its reservoir, wells and pump from a few
 design values, `gm.schedule` plans each day from the demand with no bindings to write, and

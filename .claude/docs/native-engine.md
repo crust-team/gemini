@@ -6,7 +6,7 @@ the implementation differs and why, and section 13 how composites and replay wor
 
 ## 1. Why
 
-Profiling `datasets/doublet_heat` (one-month replay, 2976 ticks, 8 twins, 9.7 s) showed physics
+Profiling `inputs/doublet_heat` (one-month replay, 2976 ticks, 8 twins, 9.7 s) showed physics
 is only 6.5 % of the time; about 90 % is framework overhead per tick (`Module` 22 %, `difflib`
 15 %, engine/results 10 %, types 10 %, pydantic 4 %). The win is changing the execution model from
 "one tick at a time" to "the whole time range at once", via a traced computation graph. The graph
@@ -385,7 +385,7 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
 - **Files.** `builder.py` (`Plant`: `add`, `connect`, `summary`, `validate`, `simulate`,
   `to_spec`), `ports.py` (port lookup and the connection rules), `plan.py` (order and wiring of
   the steps), `outputs.py` (sum, copy and ratio outputs), `reader.py` and `writer.py` (spec in and
-  out), `spec.py`, `schema.py`, `migration.py`, `library.py` (shipped spec files in `specs/`,
+  out), `spec.py`, `schema.py`, `migration.py`, `library.py` (shipped structure files in `gemini/assets/plants/`,
   registered with `registry.register_plant`), `factory.py` (a registry type or a group to a module).
   The dated parameters and bindings of `Module` are `modules/_utils/design.py`; the sections every
   tree shares are `modules/_utils/serialization.py`.
@@ -425,18 +425,20 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   plant takes that plant's wiring with the stored values that differ from the starting values,
   any other root becomes a handwritten root. `scripts/migrate_plants.py` runs it over files.
   Loading an old file raises `ValidationError` with code `old_format`, naming the function.
-- **Shipped plants and templates.** `specs/` holds the plants that ship as specs (`Doublet`,
-  `DoubletHeatPlant`, `MultiWellPlant`, `DistrictNetwork`), registered by file name. The two of
+- **Shipped plants and templates.** `gemini/assets/plants/` holds the plants that ship as specs
+  (`Doublet`, `DoubletHeatPlant`, `MultiWellPlant`, `DistrictNetwork`, `HackathonPlant`), registered
+  by file name. The two of
   variable size are written by `generators.py` (`multi_well_spec`, `district_network_spec`): the
   generator orders the connections to reproduce the call order of the classes they replaced, and
-  the shipped file of the default size equals its output. `templates/` holds template files and
+  the shipped file of the default size equals its output. `gemini/assets/templates/` holds template
+  files and
   `templating.py` fills them: `from_template(name, parameters)` sets `"<module>.<parameter>"`
   values, removes every unit whose `"<module>.enabled"` is false with its connections, ports and
   outputs, validates the plain spec and builds the plant. An optional unit is a module id, or a
   group of `modules` one switch removes together; its `bypass` items `{source: "<id>.<inlet>",
   target: "<id>.<outlet>"}` join what fed the inlet to what the outlet fed, one unit at a time, so
   neighbouring units can leave together. `catalogue.py` has `names()`, `get(name)` (a new plant,
-  parameters unset), `example(name)` (a plant with real values from `specs/examples/`: the
+  parameters unset), `example(name)` (`get(name)` with the values of `inputs/plants/`: the
   `doublet_heat` values for `Doublet` and `DoubletHeatPlant`, the values of the unit tests for the
   others, design parameters only; `NotImplementedYet` naming a plant that has none) and
   `templates()`. The special cases (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) stay

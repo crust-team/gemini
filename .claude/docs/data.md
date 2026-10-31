@@ -66,14 +66,33 @@ convert in-memory raw values to SI. Profiles combined into a dataset must share 
 (`heating_demand`, `cooling_demand`). `get(name)` returns a DataFrame in the run-input format: 365
 UTC days of 2027, a `DatetimeIndex` called `time`, one column named after the profile in W, and
 `frame.attrs` with `units`, `quantities`, `description` and `source`, which names the organiser
-file. The two files in `gemini/profiles/data/` are the organisers' CSV files, unchanged; their
-name, unit and description live in Python in `PROFILES` of `profiles/library.py`. `profile_schema()`
+file. The two files in `inputs/hackathon/` are the organisers' CSV files, unchanged; their
+name, unit and description live in Python in `PROFILES` of `profiles/library.py`, and `get` raises
+`inputs_missing` outside a source checkout. `profile_schema()`
 is the JSON Schema of the same frame as a document: `name`, `description`, `source`, `columns` (unit
 and quantity), `time` and `values`. A profile column becomes a run input when a plant binding names
 it as its `column`.
 
-The committed CSVs under `datasets/doublet_heat/` are immutable source data. Two
+The committed CSVs under `inputs/doublet_heat/` are immutable source data. Two
 of their naming choices predate the naming rule and stay: columns named `*.m_dot` hold volumetric
 flow in m3/s (their bindings declare `"unit": "m3/s"`), and the unbound status columns
 (`esp_status`, `hex_status`, `filterA_status`, `filterB_status`) and
 `production_wellhead_pressure` keep their old names.
+
+## Where data lives
+
+Two folders hold data, with one rule between them:
+
+- `gemini/assets/` is inside the package and installed. It holds only small files that a public
+  function needs to work: `plants/`, the structure of each plant with no parameter values, and
+  `templates/`.
+- `inputs/` is at the repository root, next to `gemini/`, and is not installed. It holds everything
+  else that code reads: `hackathon/` (the organisers' files, with a README), `plants/` (example
+  values), `doublet_heat/` (measured data) and `legacy_project/`. A function that needs it raises
+  `RunError` with code `inputs_missing` when it is absent, as in an installed wheel, and the message
+  names the file. Nothing fails at import time, and `gm.plants.get` and `gm.plants.from_template`
+  work without it.
+
+`docs/schemas/` is generated documentation, not data. `tests/fixtures/` holds goldens and
+`tests/e2e/expected/` example outputs. `gemini/utils/paths.py` is the one place that knows where the
+two folders are, and `tests/unit/test_code_quality.py` checks the layout.

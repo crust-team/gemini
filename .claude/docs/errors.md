@@ -60,7 +60,7 @@ Built-in bases appear only where Python needs them, never two error meanings in 
   and runs that module as a plain call (a graph break); users never see it.
 
 The other exceptions to raising these classes are the topic files of `gemini.utils`, which cannot
-import them, pydantic validators, which must raise `ValueError` (pydantic reports it as its own
+import them (`paths.py` alone can, and raises `inputs_missing`), pydantic validators, which must raise `ValueError` (pydantic reports it as its own
 validation error), and `NotImplementedError` for an abstract method.
 `test_package_code_raises_gemini_errors` and `test_package_code_raises_only_the_allowed_classes` in
 `tests/unit/test_code_quality.py` enforce this.
@@ -104,6 +104,7 @@ code is never renamed without raising the minor number of `gm.__version__`.
 | `missing_chemistry` | `PhysicsError` | A correlation needs fluid chemistry that was not given |
 | `too_little_data` | `PhysicsError` | A fit or estimate has too few valid observations |
 | `invalid_data` | `RunError` | A dataset or profile cannot be built or read |
+| `inputs_missing` | `RunError` | A file of `inputs/` is needed and the folder is absent: it takes a source checkout, because `inputs/` is not installed |
 | `clock` | `RunError` | An invalid clock, or a timestamp that is not a tick |
 | `checkpoint` | `RunError` | A checkpoint cannot be saved, loaded or resumed |
 | `step` | `RunError` | A replayed twin failed under `on_error="raise"`; the cause is chained |

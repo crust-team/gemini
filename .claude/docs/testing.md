@@ -38,8 +38,9 @@ module that imports a changed module, directly or transitively:
    affected test file runs; imports made by `conftest.py` files are not followed;
 4. any changed file under `examples/` selects `tests/e2e/test_examples.py`;
 5. any other changed file selects the tests (or `conftest.py` scopes) whose source names its path;
-   a file below `datasets/` also selects those that name its folder or a constant of
-   `tests/fixtures/__init__.py` that holds it;
+   a file below `inputs/` also selects its readers: those that name its folder, what `INPUT_READERS`
+   gives for a folder read through the public API, or a constant of `tests/fixtures/__init__.py`
+   that holds it, and `tests/e2e/test_examples.py`;
 6. `tests/unit/test_code_quality.py` always runs, whatever changed and also when nothing else is
    selected, and its reason is printed.
 
@@ -105,7 +106,7 @@ budget.
 ## Fast and slow datasets
 
 `--dataset=fast` selects the committed 2,976-row July 2024 calendar month at
-`datasets/doublet_heat/doublet_2024_15min_month.csv`. July is the first complete month
+`inputs/doublet_heat/doublet_2024_15min_month.csv`. July is the first complete month
 after the source begins on June 7 and retains 15-minute cadence, daily boundaries, calibration
 and holdout periods, replay, simulation, checkpoints and live paths. Behaviour tests use short
 windows, normally one point to seven days. The shared `fast_dataset` fixture is independent of
@@ -113,7 +114,7 @@ the e2e option. The 96-row `reference_dataset` is the narrow June window require
 pre-refactor engine-frame goldens.
 
 `--dataset=slow` selects the unchanged 17,280-row source at
-`datasets/doublet_heat/doublet_2024_15min.csv`. Never delete, replace or shrink either
+`inputs/doublet_heat/doublet_2024_15min.csv`. Never delete, replace or shrink either
 dataset or any golden. Full-year replay/simulate goldens remain under
 `tests/fixtures/module_api_baseline/`; the fast replay golden is under
 `tests/fixtures/module_api_fast/`.
@@ -143,7 +144,7 @@ the graph, and checks that they agree.
 Read-only expensive setup belongs in session or module fixtures. `dataset_path`,
 `selected_frame` and `selected_dataset` load the chosen e2e data once; `fast_frame`,
 `fast_dataset` and `reference_dataset` serve short behaviour checks; `shared_plant` validates
-`plant.json` once; a test that takes `module_class` runs once per shipped module class and
+`gm.plants.example("DoubletHeatPlant")` once; a test that takes `module_class` runs once per shipped module class and
 example plant (`pytest_generate_tests` in `tests/conftest.py`), so each class stays within the
 per-test budget. Never mutate these objects. Request `fresh_plant` for a function-scoped deep
 copy or `module_plant` when one workflow shares a copied plant across assertions. Prefer the
@@ -198,6 +199,12 @@ The suite must remain safe under `pytest -n auto`:
 
 ## Structure and quality tests
 
+`tests/unit/test_code_quality.py` also enforces the [data layout](data.md#where-data-lives): no data
+file in `gemini/` outside `gemini/assets/`, no parameter value in a structure file, only the allowed
+keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the data
+folders outside `gemini/utils/paths.py`.
+`test_every_example_equals_the_plant_of_its_former_file` in
+`tests/unit/modules/plants/test_catalogue.py` pins the hash of each example plant.
 `tests/unit/test_mirror.py` enforces source mirroring: every `gemini/<path>/<name>.py` except
 `__init__.py`, including `gemini/utils/` and `gemini/errors/`, has a mirrored
 `tests/unit/<path>/test_<name>.py` that defines at least one test. Its `PLACEHOLDERS` set of
@@ -226,7 +233,7 @@ the `check_wiring` audit in `tests/e2e/test_full_replay.py`, and the golden reco
 build equipment from the original `.param` files: the subsurface, wells and exchangers unit tests,
 `tests/unit/physics/test_geometry.py`, `tests/integration/test_plant.py` and the historical
 `tests/fixtures/capture_golden.py`. Shared paths live in `tests/fixtures/__init__.py` (`ROOT`,
-`FIXTURES`, `SHARED`, `OLD_PROJECT`).
+`FIXTURES`, `OLD_PROJECT`), and test code reaches `inputs/` through `gemini/utils/paths.py`.
 
 `tests/e2e/test_examples.py` has one case per `.py` file under `examples/`. The cases run in both
 profiles (the development profile selects them when any file under `examples/` changes) and are

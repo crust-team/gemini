@@ -26,7 +26,9 @@ ops; `gemini.graph` sits above `gemini.modules` because its tracer runs module c
 
 `gemini.utils` (its topic files, not `data/` and `legacy/`) and `gemini.errors` are leaf packages:
 they import only the standard library, installed dependencies and themselves, never another part
-of `gemini` (`tests/unit/test_package_boundaries.py` enforces this). There are two documented exceptions to
+of `gemini` (`tests/unit/test_package_boundaries.py` enforces this). One topic file differs:
+`gemini/utils/paths.py` imports `gemini.errors`, the other leaf, because a missing `inputs/` folder
+raises `inputs_missing` wherever it is needed. There are two documented exceptions to
 the order. `gemini.physics.hydraulics` imports `Stream` and `Fluid` for type checking only, and
 `Stream.__init__` in `gemini.types.flows` imports `gemini.backends.runtime` inside the function to read the
 default fluid, because a module-level import would form a cycle through `gemini.types.fluid`.
@@ -114,7 +116,16 @@ are unit strings, prints are labelled in MW, kW, °C, bar and m³/h, and an assu
 source data is printed as one. A case stays within about 150 lines: plant building beyond that
 belongs in gemini, as a registered plant. `GEMINI_EXAMPLE_DATASET` is the one way to change the
 dataset, the fast month by default. `tests/unit/test_code_quality.py` checks what can be checked.
-Data lives in `datasets/`, and generated output goes under ignored `runs/`.
+Generated output goes under ignored `runs/`.
+
+## Data files
+
+`gemini/assets/` is for what a public function needs and is installed: plant structures and
+templates. `inputs/` is for everything else that code reads, is not installed, and raises
+`inputs_missing` when absent. `docs/schemas/` is generated documentation. There is no other home for
+data ([data.md](data.md#where-data-lives)). `gemini/utils/paths.py` is the only code that builds a
+path to the first two, except an example, which finds `inputs/` from `__file__` because it uses the
+public API alone. `tests/unit/test_code_quality.py` checks these rules.
 
 ## Naming
 

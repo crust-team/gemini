@@ -1595,7 +1595,7 @@ which children run, is not wiring alone.
 ### Doublet
 
 Reusable production and reinjection limbs of a geothermal doublet (`gm.plants.get("Doublet")`).
-A plant built from a spec: `plants/specs/Doublet.json`, no handwritten class.
+A plant built from a spec: `gemini/assets/plants/Doublet.json`, no handwritten class.
 
 - **Children**: `reservoir` (`ProductionReservoir`), `well` (`ProductionWell` below the ESP),
   `esp` (`ESP`), `riser` (`ProductionWell` above the ESP), `injector` (`InjectionWell`),
@@ -1613,7 +1613,7 @@ A plant built from a spec: `plants/specs/Doublet.json`, no handwritten class.
 ```python
 import gemini as gm
 
-doublet = gm.Plant.load("datasets/doublet_heat/plant.json").doublet
+doublet = gm.plants.example("DoubletHeatPlant").doublet
 doublet.set_inputs({"reservoir.production_rate": "42.4 kg/s", "esp.frequency": "55.5 Hz"})
 result = doublet(return_in=gm.Stream(m_dot=40, T="45 C", p="20 bar", fluid=doublet.fluid))
 assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
@@ -1651,9 +1651,9 @@ stays explicit. `esp.frequency` remains a control; the pump head is the design h
 ### MultiWellPlant
 
 Purpose: geothermal well field with N production limbs mixed into one supply and M injection
-limbs fed from one return. A spec plant of variable size: `gm.plants.from_template("MultiWellPlant",
+limbs fed from one return. A spec plant of variable size: `gm.plants.from_template("multi_well",
 {"producers": 3, "injectors": 2})` returns the plant of that size; the file
-`plants/specs/MultiWellPlant.json` is the default size (2 and 1) and equals the output of
+`gemini/assets/plants/MultiWellPlant.json` is the default size (2 and 1) and equals the output of
 `multi_well_spec` in `plants/generators.py`.
 
 - Structure: `producers` (default 2) `ModuleList` of `ModuleDict(reservoir=ProductionReservoir,
@@ -1682,8 +1682,8 @@ limbs fed from one return. A spec plant of variable size: `gm.plants.from_templa
 ```python
 import gemini as gm
 
-doublet = gm.Plant.load("datasets/doublet_heat/plant.json").doublet
-field = gm.plants.from_template("MultiWellPlant", {"producers": 2, "injectors": 2})
+doublet = gm.plants.example("DoubletHeatPlant").doublet
+field = gm.plants.from_template("multi_well", {"producers": 2, "injectors": 2})
 for limb, rate in zip(field.producers, (40.0, 30.0)):
     for name in ("reservoir", "well", "esp", "riser"):
         getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
@@ -1792,8 +1792,8 @@ print(out.unmet_latent)  # 0.0
 ### DistrictNetwork
 
 Purpose: two-pipe district heating or cooling network with parallel substations. A spec plant of
-variable size: `gm.plants.from_template("DistrictNetwork", {"consumers": 3, "service": "cooling"})`;
-the file `plants/specs/DistrictNetwork.json` is the default size (2 heating consumers) and equals
+variable size: `gm.plants.from_template("district_network", {"consumers": 3, "service": "cooling"})`;
+the file `gemini/assets/plants/DistrictNetwork.json` is the default size (2 heating consumers) and equals
 `district_network_spec()` in `plants/generators.py`.
 
 - Structure: `pump` (`CentrifugalPump`, network circulation), `supply_pipe` (`Pipe`),
@@ -1819,7 +1819,7 @@ the file `plants/specs/DistrictNetwork.json` is the default size (2 heating cons
 import gemini as gm
 from gemini.modules import energy_balance
 
-network = gm.plants.from_template("DistrictNetwork", {"consumers": 2, "service": "heating"})
+network = gm.plants.from_template("district_network", {"consumers": 2, "service": "heating"})
 network.pump.update_params(
     head_coefficients=[4e5, 0.0, -1e9], rated_frequency="50 Hz", best_efficiency=0.75,
     best_efficiency_flow=0.004, motor_efficiency=0.9,
@@ -1996,18 +1996,18 @@ boundaries stay inputs of the run.
   substations on `hot_in`, and an `ATESPlant` in charge mode chilling a `DistrictNetwork` of one
   cooling substation. `Module.step` carries the storage; the caller feeds `cold_out` back to
   `cold_in` at the next step. Its grid and air are children called in `forward`.
-- `HackathonPlant` (`specs/HackathonPlant.json`): the challenge plant as a spec, with no plant
+- `HackathonPlant` (`gemini/assets/plants/HackathonPlant.json`): the challenge plant as a spec, with no plant
   ports. Two designed `Doublet`s, `Mixer`, `Degasser`, `Desander`, `InhibitorDosing`, `HeatExchanger`,
   the source side of `HeatPump` and a `Splitter` back to the doublets; heating water from
   `HeatingGrid` through exchanger, heat pump and `Boiler`, part of it to the generator of an
   `AbsorptionUnit`; co-produced gas through `GasMakeup` to the boiler and a `Flare`; a dry `Cooler`
   on the chiller; `ElectricityGrid`, `GasGrid`, `WasteGrid`, `ChemicalGrid` and `Atmosphere` at the
-  edge. The sizes in `specs/examples/HackathonPlant.json` are assumptions of the case.
+  edge. The sizes in `inputs/plants/HackathonPlant.json` are assumptions of the case.
 
 ### Heating and cooling template
 
 `heating_cooling` (`gm.plants.from_template("heating_cooling", parameters)`, file
-`plants/templates/heating_cooling.json`) is the Challenge 2 plant: one integrated heating and
+`gemini/assets/templates/heating_cooling.json`) is the Challenge 2 plant: one integrated heating and
 cooling spec whose units switch on and off. It is a plain template: no value ships, every size is a
 `null` default, and the physics is that of the modules below.
 

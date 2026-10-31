@@ -11,7 +11,8 @@ python examples/recipes/calibrate.py
 ```
 
 Each file runs alone from any folder, with `gemini` installed (`pip install -e .`); it needs no
-`PYTHONPATH`. It finds its data through its own path, in `datasets/` or `gm.profiles`, and writes
+`PYTHONPATH`. It finds its data through its own path, in `inputs/`, or through `gm.plants.example` and
+`gm.profiles`, and writes
 nothing to the repository.
 
 ## The dataset
@@ -20,7 +21,7 @@ The examples that read measurements use the fast dataset, the July 2024 month. P
 `GEMINI_EXAMPLE_DATASET` at another file to change that, for example at the full source:
 
 ```bash
-GEMINI_EXAMPLE_DATASET=datasets/doublet_heat/doublet_2024_15min.csv python examples/quickstart.py
+GEMINI_EXAMPLE_DATASET=inputs/doublet_heat/doublet_2024_15min.csv python examples/quickstart.py
 ```
 
 ## Quickstart

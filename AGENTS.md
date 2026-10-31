@@ -11,7 +11,9 @@ Physics lives in `gemini/physics/` or `gemini/modules/<category>/_physics.py`: a
 wires, and calls physics functions. Helpers of the module package live in `gemini/modules/_utils/`.
 
 Learn the package from [examples/README.md](examples/README.md): quickstart, basics 01 to 06, any
-recipe, then the cases. Data lives in `datasets/`, never in `examples/`.
+recipe, then the cases. Data has two homes, never `examples/`: `gemini/assets/` holds what a public
+function needs and is installed, `inputs/` holds everything else and is not
+([data](.claude/docs/data.md#where-data-lives)).
 
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
@@ -37,7 +39,7 @@ Read every file in `.claude/docs/` before changing the repository:
   here to use the package.
 - [Plants](.claude/docs/plants.md): the builder, the spec, templates, dates and bindings.
 - [Conventions](.claude/docs/conventions.md): dependencies, naming, comments and code quality.
-- [Data](.claude/docs/data.md): in-memory datasets, sampling and gaps.
+- [Data](.claude/docs/data.md): in-memory datasets, sampling, gaps and where data lives.
 - [Engine](.claude/docs/engine.md): clocks, runs, callbacks, results, checkpoints and live.
 - [Economics](.claude/docs/economics.md): economics, KPIs, checks and well analysis.
 - [Equipment](.claude/docs/equipment.md): every shipped module, its model and energy audit.
@@ -68,6 +70,7 @@ branch unless the user explicitly asks for one, and open a pull request only whe
 ```text
 gemini/
 ├── __init__.py       # curated import gemini as gm API
+├── assets/           # installed data a public function needs: plants/ (structures), templates/
 ├── utils/            # general helpers; the topic files are a leaf that imports nothing else from gemini
 │   ├── data/         # in-memory Dataset and Loader only
 │   └── legacy/       # all old-format I/O, tables and conversion
@@ -86,8 +89,8 @@ gemini/
 ├── checks/           # balances and bounds over a finished run
 ├── testing/          # check_module for a new module class
 └── profiles/         # demand profiles
-docs/schemas/         # JSON Schemas and samples of the exchanged documents
-datasets/             # committed data: doublet_heat/ (plant file and CSVs), legacy_project/
+docs/schemas/         # generated JSON Schemas and samples of the exchanged documents
+inputs/               # not installed: hackathon/, plants/ (example values), doublet_heat/, legacy_project/
 examples/             # quickstart.py, basics/, recipes/, cases/, scripts only
 scripts/              # test_changed.py, write_schemas.py, migrate_plants.py
 tests/                # unit mirror, integration, e2e (expected/ holds example outputs), fixtures

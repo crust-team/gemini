@@ -128,7 +128,7 @@ Three levels and one representation: see [plants.md](plants.md). The spec schema
 | `gm.plants.migrate(old)` | spec; every older stored format to format 2 | real |
 | `gm.plants.names()` | plant names, the `plants` category | real |
 | `gm.plants.get(name)` | a new plant without values | real |
-| `gm.plants.example(name)` | a plant with real values | real |
+| `gm.plants.example(name)` | a plant with real values, from `inputs/plants/`; `RunError` (code `inputs_missing`) outside a source checkout | real |
 | `gm.plants.templates()` | `[{name, title, description, purpose}]`, purpose `heating`, `cooling`, `both` | real |
 | `gm.plants.from_template(name, parameters=None)` | a plant; `parameters` are `{"<id>.<param>": value, "<id>.enabled": bool}`, or sizes such as `{"producers": 3}` | real |
 | `gm.plants.convert_legacy(folder)` | spec; expected files in [legacy.md](legacy.md) | real |
@@ -284,6 +284,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | Data layout: `gemini/assets/` (installed: plant structures, templates) and `inputs/` (repository only: hackathon inputs, example values, measured data, legacy project); `datasets/` is gone. New code `inputs_missing`: `gm.profiles.get` and `gm.plants.example` raise it outside a source checkout. Templates `DistrictNetwork` and `MultiWellPlant` are now `district_network` and `multi_well`. `gm.plants.example("Doublet")` is the registered class, with the outputs of its structure file. No change to a name of this page. |
 | 0.2.0, unreleased changes | | Plants `NodalDoublet`, `ParallelExchangerPlant`, `BoilerChpPlant`, `DistrictEnergyPlant`, `HackathonPlant`: catalogue only, no change to a name of this page. |
 | 0.2.0, unreleased changes | | `gm.kpi.totals(plant, results)`: heat and cold delivered, electricity bought and sold, gas bought, emissions, waste, chemicals and losses, read from the ports of the edge modules. The hackathon example has all seven edge modules, a desander and inhibitor dosing. |
 | 0.2.0, unreleased changes | | `gm.checks.plant_balance(plant, run)`: a `Check` of mass and of energy per module and for the plant, whose in and out are the ports of the grids and environment modules. `Flare` has `fuel` and `loss_out`. |

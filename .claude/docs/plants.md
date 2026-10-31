@@ -142,13 +142,21 @@ They are in the registry (`gm.plants.names()`), so a spec can use them as a `typ
 ## Registered plants and templates
 
 `gm.plants.names()` lists them, `gm.plants.get(name)` gives a plant without values and
-`gm.plants.example(name)` one with real values. Specs live in `gemini/modules/plants/specs/`,
-example values in `specs/examples/` and templates in `plants/templates/`; a new
-`specs/<Name>.json` is registered by its file name.
+`gm.plants.example(name)` one with real values. Plant structures live in `gemini/assets/plants/`
+and templates in `gemini/assets/templates/`, as data files; a new `gemini/assets/plants/<Name>.json`
+is registered by its file name. A structure file holds modules, connections, ports and outputs, and
+no parameter values.
+
+Example values live in `inputs/plants/<Name>.json`, in a source checkout only:
+`{"plant": "<Name>", "params": {"<dotted path>": <value>, ...}}`, numbers as unit strings where the
+text parses to the same float, plus `fluids`, `boundary`, `bindings` and `param_history` under the
+names of a plant file. `example(name)` is `get(name)`, then `set_params` with `params` and these
+sections, and `to_dict()` writes the values in SI. A plant with no file raises `NotImplementedYet`
+and a missing `inputs/` raises `inputs_missing`.
 
 `gm.plants.from_template(name, parameters)` fills a template:
 
-- `MultiWellPlant` and `DistrictNetwork` take sizes: `{"producers": 3, "injectors": 2}`,
+- `multi_well` and `district_network` take sizes: `{"producers": 3, "injectors": 2}`,
   `{"consumers": 3, "service": "cooling"}`.
 - `heating_cooling` is the integrated heating-and-cooling plant, with sizes as parameters.
   `"<unit>.enabled": false` removes an optional unit and closes the gap, when the spec is filled,

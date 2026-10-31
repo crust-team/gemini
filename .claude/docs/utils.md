@@ -4,7 +4,8 @@
 or the engine. Its topic files are a leaf package: they import only the standard library and
 installed dependencies, never another part of `gemini` (`tests/unit/test_package_boundaries.py`
 enforces this). They therefore cannot raise `gm.errors` classes; their helpers raise built-in exceptions such
-as `TypeError` and `ValueError`, and callers that need a GEMINI error convert them. Import helpers
+as `TypeError` and `ValueError`, and callers that need a GEMINI error convert them. `paths.py` is the
+one exception: it imports `gemini.errors`, the other leaf, to raise `inputs_missing`. Import helpers
 from their topic module, for example `from gemini.utils.strings import did_you_mean`;
 `gemini/utils/__init__.py` exports nothing.
 
@@ -19,6 +20,10 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
 - `context.py`: `ContextSetting`, a context variable change usable as `with` and as a decorator.
 - `files.py`: `read_json`, `write_json` and the lossless JSON-cell tables (`encode_cell`,
   `encode_cells`, `decode_cells`) used by the rows a checkpoint keeps.
+- `paths.py`: where the data folders are, and the only code that knows ([data.md](data.md#where-data-lives)):
+  `ASSET_PLANTS`, `ASSET_TEMPLATES`, and `hackathon(name)`, `plant_values(name)`,
+  `doublet_heat(name)` and `legacy_project()` below `inputs/`, which raise `inputs_missing` when it
+  is absent.
 - `version.py`: `package_version`, read from `pyproject.toml` or the package metadata, and
   `is_older`, the rule that refuses files written before `OLDEST_READABLE`.
 - `collect_env.py`: `python -m gemini.utils.collect_env` prints the versions a bug report needs.
