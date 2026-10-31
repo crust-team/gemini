@@ -1,457 +1,136 @@
 {
   "plant": "HeatingFullCoolingPlant",
+  "size": {
+    "doublets": 2
+  },
   "params": {
-    "d0.reservoir.pressure": 22000000.0,
-    "d0.reservoir.temperature": 353.15,
-    "d0.reservoir.permeability": 9.869233e-12,
-    "d0.reservoir.aquifer_thickness": 45.0,
-    "d0.reservoir.drainage_radius": 1000.0,
-    "d0.reservoir.top_depth": 1800.0,
-    "d0.reservoir.productivity_index": 5.833333333333333e-08,
-    "d0.reservoir.wellbore_radius": 0.0765,
-    "d0.well.pipe_path": {
-      "sections": [
-        {
-          "length": 400.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 150.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 150.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 362.0,
-          "inclination": 1.312662130424935,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 188.0,
-          "inclination": 0.9238027730805987,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 100.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 250.0,
-          "inclination": 0.9272934315845873,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 550.0,
-          "inclination": 0.814370628980554,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 250.0,
-          "inclination": 0.9272934315845873,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 100.0,
-          "inclination": 0.5235987755982988,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 300.0,
-          "inclination": 0.5235987755982988,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        }
-      ]
-    },
-    "d0.well.soil_temperature": 288.15,
-    "d0.well.segment": "below_esp",
-    "d0.well.esp_depth": 600.0,
-    "d0.esp.stage_count": 15,
-    "d0.esp.head_coefficients": [
-      125.518426,
-      -0.0020852856,
-      2.28955651e-07,
-      -1.45640214e-11,
-      2.37859645e-16,
-      -1.18258356e-21
-    ],
-    "d0.esp.power_coefficients": [
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0
-    ],
-    "d0.esp.pump_type": "DEFAULT-PUMP",
-    "d0.esp.setting_depth": 600.0,
-    "d0.esp.minimum_flow": 0.02277777777777778,
-    "d0.esp.maximum_flow": 0.049444444444444444,
-    "d0.esp.best_efficiency_flow": 0.03610555555555555,
-    "d0.esp.tubing": 0.1778,
-    "d0.riser.pipe_path": {
-      "sections": [
-        {
-          "length": 400.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 150.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 150.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 362.0,
-          "inclination": 1.312662130424935,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 188.0,
-          "inclination": 0.9238027730805987,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 100.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 250.0,
-          "inclination": 0.9272934315845873,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 550.0,
-          "inclination": 0.814370628980554,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 250.0,
-          "inclination": 0.9272934315845873,
-          "inner_diameter": 0.273,
-          "roughness": 2e-05
-        },
-        {
-          "length": 100.0,
-          "inclination": 0.5235987755982988,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 300.0,
-          "inclination": 0.5235987755982988,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        }
-      ]
-    },
-    "d0.riser.soil_temperature": 288.15,
-    "d0.riser.segment": "above_esp",
-    "d0.riser.esp_depth": 600.0,
-    "d0.injector.pipe_path": {
-      "sections": [
-        {
-          "length": 500.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 500.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        },
-        {
-          "length": 1000.0,
-          "inclination": 1.5707963267948966,
-          "inner_diameter": 0.1778,
-          "roughness": 2e-05
-        }
-      ]
-    },
-    "d0.injector.soil_temperature": 288.15,
-    "d0.sink.pressure": 22000000.0,
-    "d0.sink.temperature": 353.15,
-    "d0.sink.permeability": 9.869233e-12,
-    "d0.sink.aquifer_thickness": 45.0,
-    "d0.sink.drainage_radius": 0.0,
-    "d0.sink.top_depth": 0.0,
-    "d0.sink.injectivity_index": 5.5555555555555555e-08,
-    "d0.sink.wellbore_radius": 0.0765,
-    "degasser.heat_transfer_coefficient": 100000.0,
-    "heat_exchanger.thermal_conductance": 100000.0,
-    "heat_exchanger.hot_nominal_pressure_drop": 0.0,
-    "heat_exchanger.cold_nominal_pressure_drop": 0.0,
-    "heat_exchanger.hot_nominal_mass_flow": 1.0,
-    "heat_exchanger.cold_nominal_mass_flow": 1.0,
-    "injection_pump.stage_count": 10,
-    "injection_pump.pump_type": "DEFAULT-PUMP",
-    "injection_pump.efficiency": 0.8,
-    "heating_return_pipe.length": 100.0,
-    "heating_return_pipe.inner_diameter": 0.3,
-    "heating_return_pipe.elevation_change": 0.0,
-    "heating_return_pipe.heat_transfer_coefficient": 0.8,
-    "peak_boiler.capacity": 15000000.0,
+    "depth": "2500 m",
+    "d0.thickness": "100 m",
+    "d0.permeability": "200 mD",
+    "d0.well_diameter": "0.244 m",
+    "d0.nominal_flow": "300 m3/h",
+    "d0.pump_efficiency": 0.7,
+    "d0.nominal_wellhead_pressure": "10 bar",
+    "d0.reservoir.pressure": "250 barg",
+    "d0.sink.pressure": "250 barg",
+    "d1.thickness": "100 m",
+    "d1.permeability": "200 mD",
+    "d1.well_diameter": "0.244 m",
+    "d1.nominal_flow": "300 m3/h",
+    "d1.pump_efficiency": 0.7,
+    "d1.nominal_wellhead_pressure": "10 bar",
+    "d1.reservoir.pressure": "250 barg",
+    "d1.sink.pressure": "250 barg",
+    "degasser.separation_efficiency": 1.0,
+    "heat_exchanger.thermal_conductance": "1500000 W/K",
+    "heat_exchanger.hot_nominal_pressure_drop": "0 bar",
+    "heat_exchanger.cold_nominal_pressure_drop": "0 bar",
+    "heat_exchanger.hot_nominal_mass_flow": "171.7 kg/s",
+    "heat_exchanger.cold_nominal_mass_flow": "178 kg/s",
+    "injection_pump.efficiency": 0.7,
+    "peak_boiler.capacity": "30 MW",
     "peak_boiler.efficiency": 0.9,
+    "heating_consumer.return_temperature": "60 degC",
+    "heating_consumer.return_pressure": "6 bar",
+    "heating_return_pipe.length": "100 m",
+    "heating_return_pipe.inner_diameter": "0.5 m",
+    "heating_return_pipe.elevation_change": "0 m",
+    "heating_return_pipe.heat_transfer_coefficient": 0.0,
+    "heating_supply_pipe.length": "100 m",
+    "heating_supply_pipe.inner_diameter": "0.5 m",
+    "heating_supply_pipe.elevation_change": "0 m",
+    "heating_supply_pipe.heat_transfer_coefficient": 0.0,
+    "cooling_consumer.dew_point_margin": "1 K",
+    "cooling_consumer.return_temperature": "25 degC",
+    "cooling_consumer.return_pressure": "4 bar",
+    "cooling_return_pipe.length": "100 m",
+    "cooling_return_pipe.inner_diameter": "0.5 m",
+    "cooling_return_pipe.elevation_change": "0 m",
+    "cooling_return_pipe.heat_transfer_coefficient": 0.0,
+    "cooling_supply_pipe.length": "100 m",
+    "cooling_supply_pipe.inner_diameter": "0.5 m",
+    "cooling_supply_pipe.elevation_change": "0 m",
+    "cooling_supply_pipe.heat_transfer_coefficient": 0.0,
     "absorption_chiller.mode": "chiller",
-    "absorption_chiller.capacity": 300000.0,
-    "adsorption_chiller.capacity": 100000.0,
-    "heating_supply_pipe.length": 100.0,
-    "heating_supply_pipe.inner_diameter": 0.3,
-    "heating_supply_pipe.elevation_change": 0.0,
-    "heating_supply_pipe.heat_transfer_coefficient": 0.8,
-    "heating_consumer.return_temperature": 294.85,
-    "heating_consumer.return_pressure": 500000.0,
-    "cooling_return_pipe.length": 100.0,
-    "cooling_return_pipe.inner_diameter": 0.3,
-    "cooling_return_pipe.elevation_change": 0.0,
-    "cooling_return_pipe.heat_transfer_coefficient": 0.8,
-    "compression_chiller.mode": "cooling",
-    "compression_chiller.capacity": 500000.0,
-    "cooling_supply_pipe.length": 100.0,
-    "cooling_supply_pipe.inner_diameter": 0.3,
-    "cooling_supply_pipe.elevation_change": 0.0,
-    "cooling_supply_pipe.heat_transfer_coefficient": 0.8,
-    "cooling_consumer.dew_point_margin": 3.0,
-    "cooling_consumer.return_temperature": 285.15,
-    "cooling_consumer.return_pressure": 500000.0,
-    "absorption_cooler.cooler_type": "dry",
-    "absorption_cooler.capacity": 10000000.0,
-    "absorption_cooler.approach": 5.0,
-    "absorption_cooler.specific_fan_power": 0.02,
-    "absorption_cooler.loop_pressure": 300000.0,
-    "adsorption_cooler.cooler_type": "dry",
-    "adsorption_cooler.capacity": 10000000.0,
-    "adsorption_cooler.approach": 5.0,
-    "adsorption_cooler.specific_fan_power": 0.02,
-    "adsorption_cooler.loop_pressure": 300000.0,
-    "compression_cooler.cooler_type": "dry",
-    "compression_cooler.capacity": 10000000.0,
-    "compression_cooler.approach": 5.0,
-    "compression_cooler.specific_fan_power": 0.02,
-    "compression_cooler.loop_pressure": 300000.0,
-    "absorption_chiller.characteristic_slope": 20000,
-    "absorption_chiller.minimum_driving_difference": 10,
+    "absorption_chiller.characteristic_slope": "700000 W/K",
+    "absorption_chiller.minimum_driving_difference": "10 K",
     "absorption_chiller.rejection_coefficient": 2.2,
     "absorption_chiller.evaporator_coefficient": 1.2,
     "absorption_chiller.auxiliary_power_ratio": 0.01,
-    "adsorption_chiller.characteristic_slope": 2000,
-    "adsorption_chiller.minimum_driving_difference": 5,
+    "absorption_chiller.capacity": "7 MW",
+    "absorption_cooler.cooler_type": "dry",
+    "absorption_cooler.approach": "5 K",
+    "absorption_cooler.specific_fan_power": 0.02,
+    "absorption_cooler.loop_pressure": "3 bar",
+    "absorption_cooler.capacity": "40 MW",
+    "adsorption_chiller.capacity": "1 MW",
+    "adsorption_chiller.characteristic_slope": "70000 W/K",
+    "adsorption_chiller.minimum_driving_difference": "5 K",
     "adsorption_chiller.rejection_coefficient": 2.0,
     "adsorption_chiller.evaporator_coefficient": 1.0,
-    "adsorption_chiller.auxiliary_power_ratio": 0.02
+    "adsorption_chiller.auxiliary_power_ratio": 0.02,
+    "adsorption_cooler.cooler_type": "dry",
+    "adsorption_cooler.approach": "5 K",
+    "adsorption_cooler.specific_fan_power": 0.02,
+    "adsorption_cooler.loop_pressure": "3 bar",
+    "adsorption_cooler.capacity": "10 MW",
+    "compression_chiller.mode": "cooling",
+    "compression_chiller.capacity": "5 MW",
+    "compression_cooler.cooler_type": "dry",
+    "compression_cooler.approach": "5 K",
+    "compression_cooler.specific_fan_power": 0.02,
+    "compression_cooler.loop_pressure": "3 bar",
+    "compression_cooler.capacity": "20 MW"
   },
   "fluids": {
-    "": {
+    "d0": {
       "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      }
     },
-    "d0.reservoir": {
+    "d1": {
       "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      }
     },
-    "d0.well": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
+    "heating_consumer": {
+      "kind": "water"
     },
-    "d0.esp": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
+    "cooling_consumer": {
+      "kind": "water"
     },
-    "d0.riser": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
+    "absorption_cooler": {
+      "kind": "water"
     },
-    "d0.injector": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
+    "adsorption_cooler": {
+      "kind": "water"
     },
-    "d0.sink": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
-    },
-    "degasser": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
-    },
-    "filters.hot": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
-    },
-    "filters.cold": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
-    },
-    "heat_exchanger": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
-    },
-    "injection_pump": {
-      "kind": "brine",
-      "salinity": 0.0,
-      "co2_mass_fraction": 0.0,
-      "gas_mass_fraction": 0.0,
-      "gas_liquid_ratio": null,
-      "gas_composition": null,
-      "grid_composition": null,
-      "glycol_fraction": 0.0,
-      "property_model": "constant_stp",
-      "density": 1068.0,
-      "viscosity": 0.00065,
-      "specific_heat": 4129.213483146067,
-      "thermal_conductivity": null
+    "compression_cooler": {
+      "kind": "water"
     }
+  },
+  "inputs": {
+    "peak_boiler.temperature_setpoint": "100 degC",
+    "injection_pump.pressure_setpoint": "30 bar",
+    "atmosphere.temperature": "10 degC",
+    "cooling_consumer.indoor_temperature": "26 degC",
+    "cooling_consumer.indoor_relative_humidity": 0.5,
+    "absorption_cooler.temperature_setpoint": "15 degC",
+    "absorption_cooler.flow": "800 kg/s",
+    "adsorption_cooler.temperature_setpoint": "15 degC",
+    "adsorption_cooler.flow": "200 kg/s",
+    "compression_cooler.temperature_setpoint": "25 degC",
+    "compression_cooler.flow": "400 kg/s",
+    "compression_chiller.temperature_setpoint": "20 degC"
   }
 }

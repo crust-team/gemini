@@ -370,5 +370,17 @@
       "specific_heat": null,
       "thermal_conductivity": null
     }
+  },
+  "inputs": {
+    "heat_pump.temperature_setpoint": "100 degC",
+    "boiler.temperature_setpoint": "100 degC",
+    "chiller.temperature_setpoint": "20 degC",
+    "cool_users.indoor_temperature": "26 degC",
+    "cool_users.indoor_relative_humidity": 0.5,
+    "chiller_cooler.temperature_setpoint": "15 degC",
+    "chiller_cooler.flow": "800 kg/s",
+    "air.temperature": "10 degC",
+    "desander.sand_concentration": "20 mg/l",
+    "dosing.dose": "10 ppm"
   }
 }

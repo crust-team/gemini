@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from tests.fixtures.heating_cooling import configure, filled_dict, two_ticks
+from tests.fixtures.heating_cooling import HEAT, RULES, filled_dict, two_days
 
 pytestmark = pytest.mark.slow
 
@@ -16,9 +16,8 @@ PLANTS = (
 
 
 def _run(data):
-    plant = configure(gm.plants.from_dict(data))
-    results = gm.simulate(plant, two_ticks(), on_error="raise")
-    return plant, results
+    plant = gm.plants.from_dict(data)
+    return plant, gm.simulate(plant, gm.schedule(plant, two_days(), RULES), on_error="raise")
 
 
 @pytest.mark.parametrize("name", PLANTS)
@@ -31,7 +30,7 @@ def test_every_plant_runs_one_simulate(name):
     frame = results.to_frame()
     delivered = frame["heating_consumer.supply_in.enthalpy_flow"]
     delivered = delivered - frame["heating_consumer.return_out.enthalpy_flow"]
-    assert delivered.min() >= 1e5
+    assert delivered.min() == pytest.approx(HEAT)
 
 
 def _without(data, modules, joined):
@@ -44,7 +43,12 @@ def _without(data, modules, joined):
         and item["target"].partition(".")[0] not in modules
     ]
     links = [{"source": source, "target": target} for source, target in joined]
-    return data | {"modules": kept, "connections": connections + links}
+    inputs = {
+        path: value
+        for path, value in data["inputs"].items()
+        if path.partition(".")[0] not in modules
+    }
+    return data | {"modules": kept, "connections": connections + links, "inputs": inputs}
 
 
 def _sources(data, target):
@@ -66,4 +70,4 @@ def test_an_agent_removes_a_unit_by_editing_the_plant_dict():
     plant, results = _run(edited)
     assert results.errors() == []
     assert "peak_boiler" not in results.names()
-    assert results.get("heating_consumer", "unmet_demand")["value"] == [0.0, 0.0]
+    assert max(results.get("heating_consumer", "unmet_demand")["value"]) < 1e-6

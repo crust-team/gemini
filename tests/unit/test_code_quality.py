@@ -72,7 +72,7 @@ BUILDS_NO_DATA_PATH = {
     "tests/unit/test_code_quality.py",
 }
 """Files allowed to name the data folders; the first is the one that knows where they are."""
-VALUE_KEYS = {"plant", "params", "inputs", *SECTIONS}
+VALUE_KEYS = {"plant", "size", "params", "inputs", *SECTIONS}
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
 FRAMEWORK_STEM = "tor" + "ch"
 """Lowercase text that every ``FRAMEWORK`` match contains, checked before the slower regex."""

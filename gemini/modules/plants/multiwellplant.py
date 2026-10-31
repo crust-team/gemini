@@ -33,6 +33,9 @@ class MultiWellPlant(Plant):
     each injection limb of ``well`` and ``sink``, in the lists ``producers`` and ``injectors``. The
     risers join through ``producers - 1`` mixers and the return divides over ``injectors - 1``
     splitters. The field produces from every limb, mixes, then injects.
+
+    A building block, not schedulable: ``gm.schedule`` plans ``Doublet`` children, and this field
+    has none; a run sets each rate, frequency and split.
     """
 
     purpose = "both"

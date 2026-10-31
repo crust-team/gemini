@@ -19,19 +19,19 @@ FORMER_EXAMPLES = {
     "DistrictNetwork": "3475084a865a4a441eb0743ab9ae81356d0412ab69144c6a0b0a02e31cd2a9e6",
     "Doublet": "7e38703b880e458aef5d3957bc7cc7d51ffc8c9b067d8da0b6c3568dd88249e2",
     "DoubletHeatPlant": "8ef986a72459b8b04d5cd1f6534644c3c8584428ab1e1b2368d2c7c21bad22ee",
-    "HackathonPlant": "d94d8dc1ab8489f92296c1582067cff9e6fd434812193c4abe895cb790ad1abf",
+    "HackathonPlant": "18ecaf9a7853e3f5d4c3f63ed2944711eb601f0992c0d6965d5474fc39a6dfb2",
     "HeatingSubstation": "f1306278048f262a2b088d3d895882f802aff702f69358c6615de849fc4bddf5",
     "MultiWellPlant": "30c96f8dec0a190ffb5333e40465dd2437c43fae1952736ee8356344252d4251",
     "NodalDoublet": "012940e8e779020cd6212111cf8b0fafeae60bd517979cfe1632358b66a918f7",
     "ParallelExchangerPlant": "d8b21e47275c3b8d0c0d88241c05a1fcd95951dc5cec38e3775ad31ef43eea8b",
-    "HeatingPlant": "b0406f5198d2f66c6c4c8e16214a4e673d48dd3a401d6f645c1ed29c5112cf9f",
-    "HeatingCoolingPlant": ("fafe92455473385a1b38dd469fc31fea834b4a30ead22799bd6a1ffd3ea2cb99"),
-    "HeatingFullCoolingPlant": ("739333f44d36a46a9a01ff337751a80a50c8cb9b3727742aff6d62d35128d188"),
+    "HeatingPlant": "7cfac5547e2715c08863736a4c31d016669b04f88fbd4b3f6d49967781e4b44e",
+    "HeatingCoolingPlant": ("e9b9e6a0611b43d29b8eaa40d9c155d0d3bc83ba128ae579769e16e58a5b60f1"),
+    "HeatingFullCoolingPlant": ("c259287c9f46d964292ac2205f29c70bccad7810be6379c83fcbcf0bc2f53934"),
     "HeatingAbsorptionCoolingPlant": (
-        "f47f1330a9cbbd2a665d5bc09881e95d2b0f2f7e48291f1dda3e539377cdbfa5"
+        "82429bb666d470a1ebf6c85cbea2fbedccff84e2310388c243c6f3e657962707"
     ),
     "HeatingHeatPumpCoolingPlant": (
-        "b552a6f19cee4e70eb7656576deeb14eda58cf2a34d11917e8071766b1f58080"
+        "ca2846828473e49abb5bfe1369a99a3e3f409683170d57f5f02f9e87f5021f86"
     ),
 }
 """Hash of ``to_dict()`` of the plant built from each whole example file these values replaced.

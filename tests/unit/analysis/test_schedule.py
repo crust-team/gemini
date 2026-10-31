@@ -428,20 +428,6 @@ def test_an_adsorption_chiller_is_dispatched_with_its_own_cop():
 def test_the_bypass_keeps_the_supply_at_the_setpoint_and_delivers_the_demand():
     """Three summer days of the hackathon plant: drive water passes the users, not through them."""
     plant = gm.plants.example("HackathonPlant")
-    plant.set_inputs(
-        {
-            "heat_pump.temperature_setpoint": "100 degC",
-            "boiler.temperature_setpoint": "100 degC",
-            "chiller.temperature_setpoint": "20 degC",
-            "cool_users.indoor_temperature": "26 degC",
-            "cool_users.indoor_relative_humidity": 0.5,
-            "chiller_cooler.temperature_setpoint": "15 degC",
-            "chiller_cooler.flow": "800 kg/s",
-            "air.temperature": "10 degC",
-            "desander.sand_concentration": "20 mg/l",
-            "dosing.dose": "10 ppm",
-        }
-    )
     frame = pd.concat([gm.profiles.get(name) for name in gm.profiles.names()], axis=1)
     days = frame.loc["2027-07-18":"2027-07-20"]
     plan = gm.schedule(plant, days, RULES)
@@ -454,3 +440,37 @@ def test_the_bypass_keeps_the_supply_at_the_setpoint_and_delivers_the_demand():
         days["heating_demand"].sum() * 86400, rel=1e-9
     )
     assert totals["heat_surplus"]["value"] == pytest.approx(0, abs=1e-3)
+
+
+def test_a_plan_states_its_units_so_a_binding_in_another_unit_does_not_misread_it():
+    """A binding that reads the rate in m3/s meets a column in kg/s: the plan's unit wins."""
+    plant = plant_of_two()
+    plant.set_bindings("d0.reservoir", {"production_rate": {"column": "rate", "unit": "m3/s"}})
+    plan = gm.schedule(plant, demand(0.5 * FULL), RULES).rename(
+        columns={"d0.reservoir.production_rate": "rate"}
+    )
+    assert plan.attrs["units"]["d1.reservoir.production_rate"] == "kg/s"
+    plan.attrs["units"]["rate"] = "kg/s"
+    results = gm.simulate(plant, plan)
+    flow = results.get("d0.reservoir", "liquid_flow")["value"][0]
+    assert flow == pytest.approx(150 / 3600)
+
+
+def test_a_plan_keeps_the_unit_of_the_demand():
+    """What the demand stated stays, and every driven column adds its own."""
+    frame = demand(FULL)
+    frame.attrs["units"] = {"heating_demand": "W"}
+    plan = gm.schedule(plant_of_two(), frame, RULES)
+    assert plan.attrs["units"]["heating_demand"] == "W"
+    assert plan.attrs["units"]["d0.esp.frequency"] == "Hz"
+    assert plan.attrs["units"]["boiler.temperature_setpoint"] == "K"
+
+
+def test_the_doublet_heat_plant_runs_a_plan_within_its_pump_curve():
+    """Its bindings read m3/s and a plan is in kg/s: the flow is what was planned, in range."""
+    plant = gm.plants.example("DoubletHeatPlant")
+    rules = RULES | {"doublet_flow": {"min": "50 m3/h", "max": "165 m3/h"}}
+    results = gm.simulate(plant, gm.schedule(plant, demand(5e6, 3e7), rules), on_error="record")
+    assert results.errors() == []
+    flows = results.get("doublet.reservoir", "liquid_flow")["value"]
+    assert 50 / 3600 <= min(flows) and max(flows) == pytest.approx(165 / 3600)

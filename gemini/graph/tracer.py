@@ -72,8 +72,24 @@ class Tracer:
             _record_outlet(graph, port, value)
         for name, value in call.kept_outputs().items():
             graph.output(f"outputs.{name}", value)
+        if not graph.outputs:
+            graph.result.mapped(_required(graph))
         certain(graph, trace.limit_checks + graph.unframed)
         return graph
+
+
+def _required(graph):
+    """Return a function that makes a value of the result tree an output of ``graph``.
+
+    A root plant has no port, so nothing of its call reaches an output, and an error only fails a
+    row when it does. Everything its leaves report then is what the run reads.
+    """
+
+    def required(value):
+        graph.require(value)
+        return value
+
+    return required
 
 
 class Trace:

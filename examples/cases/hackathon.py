@@ -14,18 +14,6 @@ import gemini as gm
 
 MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
-INPUTS = {
-    "heat_pump.temperature_setpoint": "100 degC",
-    "boiler.temperature_setpoint": "100 degC",
-    "chiller.temperature_setpoint": "20 degC",
-    "cool_users.indoor_temperature": "26 degC",
-    "cool_users.indoor_relative_humidity": 0.5,
-    "chiller_cooler.temperature_setpoint": "15 degC",
-    "chiller_cooler.flow": "800 kg/s",
-    "air.temperature": "10 degC",
-    "desander.sand_concentration": "20 mg/l",
-    "dosing.dose": "10 ppm",
-}
 RULES = {
     "order": ["geothermal", "heat_pump", "boiler"],
     "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
@@ -56,13 +44,6 @@ ASSUMPTIONS = """Assumptions of this case, not of the challenge:
   20 mg/l sand, 90 % desander, 10 ppm inhibitor
   heat exchanger, heat pump, boiler and chiller sizes; 1000 m drainage radius
   discount rate, lifetime, every price and the cost factors without a source"""
-
-
-def command(plant, inputs):
-    """Set each control or boundary, named by its path, on its module."""
-    for path, value in inputs.items():
-        declaration = plant.get(path)
-        setattr(declaration.owner, declaration.name, value)
 
 
 def hackathon_limits():
@@ -156,7 +137,6 @@ def print_economics(plant, results):
 def main():
     """Plan and simulate the year, then print what it delivered and what it costs."""
     plant = gm.plants.example("HackathonPlant")
-    command(plant, INPUTS)
     profiles = [gm.profiles.get("heating_demand"), gm.profiles.get("cooling_demand")]
     print(ASSUMPTIONS)
     results = gm.simulate(plant, gm.schedule(plant, pd.concat(profiles, axis=1), RULES))

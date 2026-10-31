@@ -62,7 +62,11 @@ def param_history(module, path):
 
 def parameter(module, name):
     """Return the parameter declaration ``name`` below ``module``; an unknown name suggests one."""
-    declarations = {path: item for path, item in module.named_parameters()}
+    path, _, local = name.rpartition(".")
+    owner = module._find_submodule(path) if path else module
+    if owner is not None and local in owner._parameters:
+        return owner._parameters[local]
+    declarations = dict(module.named_parameters())
     if name not in declarations:
         raise ValidationError(
             f"{module.path}: unknown parameter {name!r}; valid: {join_names(declarations)}"

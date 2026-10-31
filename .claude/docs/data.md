@@ -57,6 +57,10 @@ text). Iterating yields the `Sample` of each tick built from those arrays, one c
 Tests assert that iteration equals the arrays, gaps, `max_gap` and chunk borders included.
 Normal users do not construct loaders.
 
+A frame may state units in `attrs["units"]`, as a `gm.schedule` plan does; they are the metadata of
+its `Dataset`, so they replace a binding's unit, and a unit of a column the frame no longer has is
+dropped.
+
 `Profile.constant(value, unit=..., clock=...)` and `Profile.from_series(series, unit=...)`
 convert in-memory raw values to SI. Profiles combined into a dataset must share a clock.
 

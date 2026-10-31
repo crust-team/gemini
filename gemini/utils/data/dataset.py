@@ -229,7 +229,8 @@ def as_dataset(data):
     """Return the run input as a ``Dataset``: a ``Dataset`` as it is, a DataFrame wrapped.
 
     A DataFrame needs a timezone-aware ``DatetimeIndex`` (any zone; the instants become UTC) and
-    columns named by the binding ``column``. Its values have the units of the bindings. A naive
+    columns named by the binding ``column``. Its values have the units of the bindings, or those
+    a frame states in ``attrs["units"]``, as a ``gm.schedule`` plan does. A naive
     index raises ``RunError``, because a local time without a zone is ambiguous.
     """
     if isinstance(data, Dataset):
@@ -246,7 +247,8 @@ def as_dataset(data):
             "timezone-aware DatetimeIndex (UTC)",
             code="invalid_data",
         )
-    return Dataset(data)
+    stated = data.attrs.get("units", {})
+    return Dataset(data, {name: unit for name, unit in stated.items() if name in data})
 
 
 def bound_unit(dataset, binding):

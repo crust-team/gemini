@@ -292,11 +292,22 @@ doublets `d0` to `d{n-1}` in parallel through `production_mixers` and `injection
 plant-level `depth` goes to every doublet, which derives its reservoir from it; a value stated on one
 doublet wins, now and later.
 
+**Schedulable or a building block.** `gm.schedule` plans a plant that has `Doublet` children and a
+grid, and its setpoints as `inputs`:
+
+| `gm.plants.example(name)` plus `gm.schedule` | Status |
+| --- | --- |
+| `HeatingPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant`, `HeatingHeatPumpCoolingPlant`, `HackathonPlant` | schedulable: the whole challenge year runs with no failed day |
+| `DoubletHeatPlant` | schedulable up to 165 m3/h: the measured ESP curve, which the replay goldens hold, has no head at 60 Hz for more, so `doublet_flow` must stop there |
+| `Doublet`, `NodalDoublet`, `HeatingSubstation`, `CoolingSubstation`, `DistrictNetwork`, `MultiWellPlant`, `ATESPlant` | building blocks: a run sets their controls and boundaries |
+| `DistrictEnergyPlant`, `BoilerChpPlant`, `ParallelExchangerPlant` | cases: their examples set their inputs |
+
 Example values live in `inputs/plants/<Name>.json`, in a source checkout only:
-`{"plant": "<Name>", "params": {"<dotted path>": <value>, ...}}`, numbers as unit strings where the
-text parses to the same float, plus `fluids`, `boundary`, `bindings` and `param_history` under the
-names of the plant dict. `example(name)` is `get(name)`, then `set_params` with `params` and these
-sections, and `to_dict()` writes the values in SI. A plant with no file raises `NotImplementedYet`
+`{"plant": "<Name>", "size": {...}, "params": {"<dotted path>": <value>, ...}}`, numbers as unit
+strings where the text parses to the same float, plus `fluids`, `boundary`, `bindings`,
+`param_history` and `inputs` under the names of the plant dict. `example(name)` builds the plant of
+that `size`, then `set_params` with `params` and these sections, and `to_dict()` writes the values in
+SI. The five template plants carry the challenge's values on two doublets. A plant with no file raises `NotImplementedYet`
 and a missing `inputs/` raises `inputs_missing`.
 
 `ATESPlant` has one wiring for both seasons: the `split_fraction` of `source_valve` and `load_valve`

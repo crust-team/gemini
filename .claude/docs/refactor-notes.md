@@ -277,6 +277,10 @@ decisions outlast the move.
   that arrives, not `groundwater_pressure`; `production_out` still does.
 - A plant with a loop or a constraint is a root break, as `close_loop` and the nodal solves were:
   not one node of a graph, the same row by row on every backend.
+- Errors of a root plant reach its leaves: such a plant has no outlet, and a row only failed when an
+  error reached a graph output, so on a traced plant a failing check passed unnoticed. Every value of
+  its result tree is now an output of the graph, as a root break already behaved. Nothing in the
+  shipped numbers moved; the `HeatingPlant` example showed 155 rows with a negative pump head.
 - The drive water of a chiller returns through a bypass, so the supply stays at its setpoint. On the
   hackathon year the supply at the users rises from 66.3 to 100.0 degC at its lowest (216 days were
   below 99.9), and heat, cold, boiler and electricity stay the same to within rounding: the same

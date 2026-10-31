@@ -52,6 +52,9 @@ class Doublet(Plant):
     A group of values that is not complete derives nothing, and the old way, setting every child
     value directly, works as it did. A child value in the same call wins over the derived one and
     stays explicit. Setting ``fluid`` gives it to every child and derives again.
+
+    A building block, not schedulable on its own: a run sets ``reservoir.production_rate`` and
+    ``esp.frequency``; ``gm.schedule`` writes them for a doublet inside a plant with a demand.
     """
 
     def __init__(self):

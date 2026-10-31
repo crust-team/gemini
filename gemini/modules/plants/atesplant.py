@@ -44,6 +44,9 @@ class ATESPlant(Plant):
     as ``heat_accumulation``, so ``energy_balance`` closes except for the pump's
     ``hydraulic_power`` (flow work outside the sensible-enthalpy audit). The plant is stateful
     through its storage; ``Module.step`` steps it.
+
+    A building block, not schedulable: ``storage.mode``, ``source_valve.split_fraction`` and
+    ``load_valve.split_fraction`` move together by season and stay inputs of a run.
     """
 
     def __init__(self):

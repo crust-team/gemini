@@ -155,7 +155,9 @@ class AdsorptionChiller(Module):
             code="invalid_design",
         )
         ops.check(
-            driving_T <= self.maximum_driving_temperature,
+            ops.logical_or(
+                inlets.generator_in.m_dot == 0, driving_T <= self.maximum_driving_temperature
+            ),
             PhysicsError,
             "{path}: generator_in.T = {driving_T} K; expected at most "
             "maximum_driving_temperature = {maximum} K",

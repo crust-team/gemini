@@ -59,18 +59,20 @@ def get(name):
 def example(name):
     """Return a new plant ``name`` with real parameter values.
 
-    The plant comes from ``get``; ``inputs/plants/<name>.json`` of a source checkout gives its
-    ``params`` and any ``fluids``, ``boundary``, ``bindings``, ``param_history`` and ``inputs``,
-    under the keys of a plant dict. ``Doublet`` and ``DoubletHeatPlant`` carry the values of the
-    measured doublet; the other plants carry the values their unit tests use, the design parameters
-    only: controls and boundaries are inputs of a run. A registered plant without a file raises
-    ``NotImplementedYet`` naming it, and without ``inputs/`` this raises ``inputs_missing``.
+    The plant comes from its class; ``inputs/plants/<name>.json`` of a source checkout gives its
+    ``size``, ``params`` and any ``fluids``, ``boundary``, ``bindings``, ``param_history`` and
+    ``inputs``, under the keys of a plant dict. ``Doublet`` and ``DoubletHeatPlant`` carry the
+    values of the measured doublet, the five template plants those of the challenge, and the other
+    plants the values their unit tests use, the design parameters only: controls and boundaries
+    are inputs of a run. A registered plant without a file raises ``NotImplementedYet`` naming
+    it, and without ``inputs/`` this raises ``inputs_missing``.
     """
     _check("example", name)
     path = paths.plant_values(name)
     if not path.exists():
         raise NotImplementedYet(f"plants.example: {name!r} has no sourced parameter values yet")
-    plant, values = get(name), read_json(path)
+    values = read_json(path)
+    plant = registry.get(name)(**values.get("size", {}))
     plant.set_params("", values["params"])
     read_sections(plant, values, Report(strict=True))
     plant._sections = {key: values.get(key, {}) for key in SECTIONS}

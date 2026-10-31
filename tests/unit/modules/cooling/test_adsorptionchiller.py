@@ -100,3 +100,25 @@ def test_traced_call_matches_one_call_per_row():
         ]
     ]
     assert_module_matches(machine, rows)
+
+
+def test_a_stopped_drive_circuit_has_no_driving_temperature():
+    """Water that does not flow drives nothing, whatever its temperature: no limit applies."""
+    chiller = AdsorptionChiller().set_params(
+        "",
+        {
+            "capacity": "100 kW",
+            "characteristic_slope": 2000,
+            "minimum_driving_difference": 5,
+            "rejection_coefficient": 2.0,
+            "evaporator_coefficient": 1.0,
+            "auxiliary_power_ratio": 0.02,
+        },
+    )
+    result = chiller(
+        generator_in=Stream(m_dot=0.0, T=373.15, p=3e5),
+        chilled_in=Stream(m_dot=5.0, T=291.15, p=3e5),
+        cooling_in=Stream(m_dot=10.0, T=300.15, p=3e5),
+        temperature_setpoint=285.15,
+    )
+    assert result.outlets.chilled_out.T == 291.15

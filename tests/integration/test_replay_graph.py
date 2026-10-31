@@ -3,8 +3,11 @@
 import copy
 
 import pandas as pd
+import pytest
 
 import gemini as gm
+from gemini.errors import PhysicsError
+from tests.fixtures.parity import BACKENDS
 
 
 def _replay(plant, dataset, backend):
@@ -24,3 +27,29 @@ def test_doublet_heat_replay_is_identical_on_both_backends(shared_plant, fast_fr
         traced.to_frame(table="energy"), plain.to_frame(table="energy"), check_exact=True
     )
     assert all(reasons == [] for reasons in engine.graph_breaks.values())
+
+
+def port_free_plant():
+    """Return a root plant with no plant port, which every root plant must be."""
+    plant = gm.Plant("Closed")
+    plant.add("Valve", name="valve", params={"flow_coefficient": "60 m3/h/bar^0.5"})
+    plant.add(
+        "HeatingGrid",
+        name="users",
+        params={"return_temperature": "60 degC", "return_pressure": "6 bar"},
+    )
+    plant.connect("users.return_out", "valve.fluid_in")
+    plant.connect("valve.fluid_out", "users.supply_in")
+    return plant
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_a_failing_row_of_a_plant_without_ports_is_an_error(backend):
+    """A root plant has no outlet for an error to reach: the row still fails, as called for real."""
+    index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC", name="time")
+    columns = {"users.flow": 10.0, "users.heat_demand": 0.0, "valve.opening": [1.0, 0.0]}
+    frame = pd.DataFrame(columns, index=index)
+    results = gm.simulate(port_free_plant(), frame, on_error="record", backend=backend)
+    assert [item["time"][:10] for item in results.errors()] == ["2027-01-02"]
+    with pytest.raises(PhysicsError):
+        gm.simulate(port_free_plant(), frame, backend=backend)

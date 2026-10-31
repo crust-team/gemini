@@ -38,6 +38,9 @@ class CoolingSubstation(Plant):
 
     Valid in the ranges of the children: liquid circuits, forward flow, a network supply at
     most as warm as the building return.
+
+    A building block, not schedulable on its own: a run sets ``valve.opening``, the demand and the
+    indoor air.
     """
 
     def __init__(self):

@@ -303,7 +303,8 @@ def _doublet_columns(plant, rules, need, off):
     flows, columns = {}, {}
     least = 0.0 if rules.operating_days is None else rules.minimum_flow
     for path, doublet in _of_type(plant, Doublet):
-        fluid = doublet.fluid.properties(0, 0)
+        brine = doublet.reservoir.fluid
+        fluid = brine.properties(0, 0)
         heat_per_flow = fluid.rho_l * fluid.cp_l * rules.brine_cooling
         flow, left = dispatch.doublet_flow(
             need, heat_per_flow, rules.minimum_flow, rules.maximum_flow
@@ -314,7 +315,7 @@ def _doublet_columns(plant, rules, need, off):
         columns[f"{path}.flow"] = flow
         columns[f"{path}.is_running"] = flow > 0
         columns[f"{path}.reservoir.production_rate"] = mixture_mass_flow(
-            flow, doublet.fluid.gas_mass_fraction, fluid.rho_l
+            flow, brine.gas_mass_fraction, fluid.rho_l
         )
         columns[f"{path}.esp.frequency"] = np.full_like(
             flow, float(constants.ESP_REFERENCE_FREQUENCY)
@@ -473,7 +474,7 @@ def schedule(plant, demand, rules):
     checked = _checked_rules(rules)
     outages = _outage_days(plant, demand, checked.operating_days)
     with backends.settings(backend=ARRAY_BACKEND):
-        return _frame(demand, _plan_columns(plant, demand, checked, outages), outages)
+        return _frame(plant, demand, _plan_columns(plant, demand, checked, outages), outages)
 
 
 def _plan_columns(plant, demand, checked, outages):
@@ -519,16 +520,21 @@ def _boiler_duty(plant, rules, need, flows):
     """Return the heat [W] the doublets leave for the boiler, on design values."""
     heat = need.copy()
     for path, doublet in _of_type(plant, Doublet):
-        fluid = doublet.fluid.properties(0, 0)
+        fluid = doublet.reservoir.fluid.properties(0, 0)
         heat -= flows[path] * fluid.rho_l * fluid.cp_l * rules.brine_cooling
     return np.maximum(heat, 0.0)
 
 
-def _frame(demand, columns, outages):
-    """Return the plan on the index of ``demand`` with its units and outages in ``attrs``."""
+def _frame(plant, demand, columns, outages):
+    """Return the plan on the index of ``demand`` with its units and outages in ``attrs``.
+
+    A column that drives an input states the SI unit of it, which wins over the unit of a binding
+    of that name, so a run reads the plan in SI whatever the plant was measured in.
+    """
     data = {name: demand[name].to_numpy() for name in demand}
     frame = pd.DataFrame(data | columns, index=demand.index)
-    frame.attrs["units"] = dict(demand.attrs.get("units", {}))
+    driven = {path: item.unit for path, item in plant.inputs().items() if path in columns}
+    frame.attrs["units"] = dict(demand.attrs.get("units", {})) | driven
     frame.attrs["outage_days"] = {
         path: [day.date().isoformat() for day in dates] for path, dates in outages.items()
     }

@@ -16,6 +16,9 @@ class DistrictEnergyPlant(Plant):
     cooling network that serves one building, and the warmed groundwater is stored in the warm
     well. The return of the cooling network leaves on ``cold_out``; the caller feeds it back to
     ``cold_in`` at the next step.
+
+    Not schedulable: its networks and its aquifer store take their inputs from the run, as
+    ``examples/cases/district_heating_cooling.py`` shows.
     """
 
     def __init__(self):

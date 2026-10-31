@@ -20,6 +20,9 @@ class DistrictNetwork(Plant):
     ``return_pipe``. ``service`` is ``"heating"`` or ``"cooling"``, the substation class. The
     network pumps, splits, serves the substations in order, mixes the returns and passes the
     return pipe.
+
+    A building block, not schedulable on its own: a run sets the pump frequency, each valve and
+    each demand.
     """
 
     purpose = "both"

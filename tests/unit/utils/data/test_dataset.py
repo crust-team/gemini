@@ -138,3 +138,11 @@ def test_run_input_needs_a_timezone_aware_index(bad):
     """A naive index is ambiguous, so it raises RunError instead of guessing a zone."""
     with raises(gm.errors.RunError, "invalid_data", match="run input"):
         as_dataset(bad)
+
+
+def test_a_frame_states_its_units_in_attrs():
+    """The units of ``attrs`` reach the dataset; one of a dropped column is left behind."""
+    index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC")
+    frame = pd.DataFrame({"flow": [1.0, 2.0]}, index=index)
+    frame.attrs["units"] = {"flow": "kg/s", "gone": "W"}
+    assert as_dataset(frame).unit("flow", "m3/s") == "kg/s"
