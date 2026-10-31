@@ -180,6 +180,7 @@ PYTHON_FILES = python_files()
 EXAMPLE_FILES = [path for path in PYTHON_FILES if path.startswith("examples/")]
 IMPORTS_EXAMPLES = re.compile(r"^\s*(from|import) examples\b", re.MULTILINE)
 LAYERED_UTILS = ("gemini/utils/data/", "gemini/utils/legacy/")
+CORE_MODULE_FILES = ("__init__.py", "container.py", "module.py", "plant.py")
 PACKAGE_FILES = [
     path
     for path in PYTHON_FILES
@@ -571,6 +572,24 @@ def test_the_package_holds_data_only_in_its_assets():
         and not path.endswith(".py")
         and not path.startswith(f"{assets}/")
     ] == []
+
+
+def test_the_module_package_holds_only_its_core_classes_and_folders():
+    """``gemini/modules/`` has the classes users subclass or build; the rest is in a folder."""
+    top = [path for path in tracked_files() if re.fullmatch(r"gemini/modules/[^/]+", path)]
+    assert sorted(top) == [f"gemini/modules/{name}" for name in CORE_MODULE_FILES]
+
+
+def test_plants_holds_only_plant_classes():
+    """Every public file of ``gemini/modules/plants/`` defines a registered plant class."""
+    files = [
+        path for path in tracked_files() if re.fullmatch(r"gemini/modules/plants/[^_/][^/]*", path)
+    ]
+    assert files
+    for path in files:
+        tree = ast.parse((ROOT / path).read_text())
+        classes = {node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}
+        assert classes & set(gm.plants.names()), path
 
 
 def module_entries(modules):
