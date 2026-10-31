@@ -1,0 +1,416 @@
+{
+  "plant": "HeatingPlant",
+  "params": {
+    "doublet.reservoir.pressure": 22000000.0,
+    "doublet.reservoir.temperature": 353.15,
+    "doublet.reservoir.permeability": 9.869233e-12,
+    "doublet.reservoir.aquifer_thickness": 45.0,
+    "doublet.reservoir.drainage_radius": 1000.0,
+    "doublet.reservoir.top_depth": 1800.0,
+    "doublet.reservoir.productivity_index": 5.833333333333333e-08,
+    "doublet.reservoir.wellbore_radius": 0.0765,
+    "doublet.well.pipe_path": {
+      "sections": [
+        {
+          "length": 400.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 362.0,
+          "inclination": 1.312662130424935,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 188.0,
+          "inclination": 0.9238027730805987,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 550.0,
+          "inclination": 0.814370628980554,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 300.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        }
+      ]
+    },
+    "doublet.well.soil_temperature": 288.15,
+    "doublet.well.segment": "below_esp",
+    "doublet.well.esp_depth": 600.0,
+    "doublet.esp.stage_count": 15,
+    "doublet.esp.head_coefficients": [
+      125.518426,
+      -0.0020852856,
+      2.28955651e-07,
+      -1.45640214e-11,
+      2.37859645e-16,
+      -1.18258356e-21
+    ],
+    "doublet.esp.power_coefficients": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "doublet.esp.pump_type": "DEFAULT-PUMP",
+    "doublet.esp.setting_depth": 600.0,
+    "doublet.esp.minimum_flow": 0.02277777777777778,
+    "doublet.esp.maximum_flow": 0.049444444444444444,
+    "doublet.esp.best_efficiency_flow": 0.03610555555555555,
+    "doublet.esp.tubing": 0.1778,
+    "doublet.riser.pipe_path": {
+      "sections": [
+        {
+          "length": 400.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 362.0,
+          "inclination": 1.312662130424935,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 188.0,
+          "inclination": 0.9238027730805987,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 550.0,
+          "inclination": 0.814370628980554,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 300.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        }
+      ]
+    },
+    "doublet.riser.soil_temperature": 288.15,
+    "doublet.riser.segment": "above_esp",
+    "doublet.riser.esp_depth": 600.0,
+    "doublet.injector.pipe_path": {
+      "sections": [
+        {
+          "length": 500.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 500.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 1000.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        }
+      ]
+    },
+    "doublet.injector.soil_temperature": 288.15,
+    "doublet.sink.pressure": 22000000.0,
+    "doublet.sink.temperature": 353.15,
+    "doublet.sink.permeability": 9.869233e-12,
+    "doublet.sink.aquifer_thickness": 45.0,
+    "doublet.sink.drainage_radius": 0.0,
+    "doublet.sink.top_depth": 0.0,
+    "doublet.sink.injectivity_index": 5.5555555555555555e-08,
+    "doublet.sink.wellbore_radius": 0.0765,
+    "degasser.heat_transfer_coefficient": 100000.0,
+    "heat_exchanger.thermal_conductance": 100000.0,
+    "heat_exchanger.hot_nominal_pressure_drop": 0.0,
+    "heat_exchanger.cold_nominal_pressure_drop": 0.0,
+    "heat_exchanger.hot_nominal_mass_flow": 1.0,
+    "heat_exchanger.cold_nominal_mass_flow": 1.0,
+    "injection_pump.stage_count": 10,
+    "injection_pump.pump_type": "DEFAULT-PUMP",
+    "injection_pump.efficiency": 0.8,
+    "heating_return_pipe.length": 100.0,
+    "heating_return_pipe.inner_diameter": 0.3,
+    "heating_return_pipe.elevation_change": 0.0,
+    "heating_return_pipe.heat_transfer_coefficient": 0.8,
+    "peak_boiler.capacity": 15000000.0,
+    "peak_boiler.efficiency": 0.9,
+    "heating_supply_pipe.length": 100.0,
+    "heating_supply_pipe.inner_diameter": 0.3,
+    "heating_supply_pipe.elevation_change": 0.0,
+    "heating_supply_pipe.heat_transfer_coefficient": 0.8,
+    "heating_consumer.return_temperature": 294.85,
+    "heating_consumer.return_pressure": 500000.0
+  },
+  "fluids": {
+    "": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "doublet.reservoir": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "doublet.well": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "doublet.esp": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "doublet.riser": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "doublet.injector": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "doublet.sink": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "degasser": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "filters.hot": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "filters.cold": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "heat_exchanger": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "injection_pump": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    }
+  }
+}

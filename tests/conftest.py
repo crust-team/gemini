@@ -12,7 +12,6 @@ import gemini as gm
 from gemini.modules import Module
 from gemini.utils import paths
 from tests.cpu_budget import BUDGET_S, exceeds_budget, measure_cpu
-from tests.fixtures.plant_classes import spec_plant_classes
 
 TIER_MARKERS = {
     "unit": pytest.mark.unit,
@@ -90,7 +89,7 @@ def shipped_module_classes():
         for item in exported
         if isinstance(item, type) and issubclass(item, Module) and item is not Module
     ]
-    return tuple(classes) + spec_plant_classes()
+    return tuple(classes)
 
 
 def pytest_generate_tests(metafunc):

@@ -22,8 +22,17 @@ FORMER_EXAMPLES = {
     "HackathonPlant": "6da42c88a06d8bc97c03b556097cf0e86396d1dc66c8e5bc74638cb987c570b7",
     "HeatingSubstation": "f1306278048f262a2b088d3d895882f802aff702f69358c6615de849fc4bddf5",
     "MultiWellPlant": "30c96f8dec0a190ffb5333e40465dd2437c43fae1952736ee8356344252d4251",
-    "NodalDoublet": "612091520ef3c6d1b1b242f746a5277c85854f7a013aee4a21c2dcaa2d9ae674",
+    "NodalDoublet": "012940e8e779020cd6212111cf8b0fafeae60bd517979cfe1632358b66a918f7",
     "ParallelExchangerPlant": "d8b21e47275c3b8d0c0d88241c05a1fcd95951dc5cec38e3775ad31ef43eea8b",
+    "HeatingPlant": "646c23f96d06925f783cc1aefbd9b0e162d5546fe2b581353b8eba59f63d94f2",
+    "HeatingCoolingPlant": ("865eea7f97f212bd524d296d391aa5590e8b9b90f3349536c9b3bc13b627b823"),
+    "HeatingFullCoolingPlant": ("7f3257667d333a1298f1627d8eda570fa86854bf2702fbac930c561040db027b"),
+    "HeatingAbsorptionCoolingPlant": (
+        "b6c2dfca6d1e5a5fcda3a0ed50b57f3192529fb0475735a2a0f4d54742fbda6e"
+    ),
+    "HeatingHeatPumpCoolingPlant": (
+        "747c546a70255a1cab0b9f2af42667e5dda28bbbc88289a6e473598ed508df0e"
+    ),
 }
 """Hash of ``to_dict()`` of the plant built from each whole example file these values replaced.
 
@@ -66,15 +75,15 @@ def test_get_refuses_unknown_names_and_modules_that_are_not_plants():
 @pytest.mark.parametrize("name", catalogue.names())
 def test_every_spec_plant_and_special_case_has_an_example_that_round_trips(name):
     """An example builds, has no problems and writes the spec it was read from."""
-    spec = catalogue.example(name).to_spec()
+    spec = catalogue.example(name).to_dict()
     assert gm.plants.validate(spec) == []
-    assert gm.plants.from_spec(spec).to_spec() == spec
+    assert gm.plants.from_dict(spec).to_dict() == spec
 
 
 @pytest.mark.parametrize("name", catalogue.names())
 def test_every_example_equals_the_plant_of_its_former_file(name):
-    """``get`` and the values of ``inputs/plants/`` give the plant the whole file gave."""
-    spec = catalogue.example(name).to_dict()
+    """``get`` and the values of ``inputs/plants/`` give the structure and the values pinned."""
+    spec = catalogue.example(name).to_dict(structure=True)
     if name == "Doublet":
         del spec["outputs"]
     text = json.dumps(spec, sort_keys=True)
@@ -83,12 +92,12 @@ def test_every_example_equals_the_plant_of_its_former_file(name):
 
 def test_the_doublet_examples_carry_the_shared_doublet_heat_values():
     """The doublet is the ``doublet`` child of the doublet heat plant."""
-    shared = catalogue.example("DoubletHeatPlant").to_spec()
+    shared = catalogue.example("DoubletHeatPlant").to_dict(structure=True)
     doublet = catalogue.example("Doublet")
     expected = shared["modules"]["doublet"]["params"]
     assert {
         f"{path}.{name}": value
-        for path, entry in doublet.to_spec()["modules"].items()
+        for path, entry in doublet.to_dict(structure=True)["modules"].items()
         for name, value in entry["params"].items()
     } == expected
 
@@ -117,14 +126,14 @@ def test_the_hackathon_plant_has_its_values_only_in_the_example():
     """The registered spec is the wiring, and the example fills every module of it."""
     empty, filled = catalogue.get("HackathonPlant"), catalogue.example("HackathonPlant")
     assert not empty.is_initialized and filled.is_initialized
-    assert empty.to_spec()["connections"] == filled.to_spec()["connections"]
+    assert empty._connections == filled._connections
     assert filled.d0.reservoir.temperature == filled.d1.reservoir.temperature
     assert filled.heat_users.fluid == gm.WATER
 
 
 def test_a_registered_plant_without_values_names_itself(monkeypatch):
     """Only a plant with no sourced values raises, and the message names it."""
-    entry = registry._Entry("plants", build=lambda: gm.Plant("Unsourced"))
+    entry = registry._Entry("plants", module=type("Unsourced", (gm.Plant,), {}))
     monkeypatch.setitem(registry._entries, "Unsourced", entry)
     with pytest.raises(gm.errors.NotImplementedYet, match="Unsourced"):
         catalogue.example("Unsourced")
@@ -146,8 +155,10 @@ def test_example_refuses_unknown_names_with_close_matches():
     assert "Doublet" in unknown.value.suggestions
 
 
-def test_templates_list_name_title_description_and_purpose():
-    """The catalogue lists the templates the way the backend route returns them."""
-    rows = catalogue.templates()
-    assert {row["name"] for row in rows} >= {"multi_well", "district_network"}
-    assert all(set(row) == {"name", "title", "description", "purpose"} for row in rows)
+def test_names_lists_the_plants_of_a_purpose():
+    """``category`` is what a plant serves; a building block serves nothing by itself."""
+    assert catalogue.names("heating") == ["HeatingPlant"]
+    assert "HeatingCoolingPlant" in catalogue.names("both")
+    assert "Doublet" not in catalogue.names("both") + catalogue.names("heating")
+    with raises(gm.errors.ValidationError, "unknown_name"):
+        catalogue.names("steam")

@@ -6,7 +6,6 @@ import pytest
 
 import gemini as gm
 from gemini.errors import NotImplementedYet, ValidationError
-from gemini.modules.plants._utils import library
 from tests.fixtures.errors import raises
 
 
@@ -75,7 +74,7 @@ def test_a_bare_word_names_a_plant_port(chain):
     plant.add("Filter", "filter")
     plant.connect("feed", "filter.fluid_in")
     plant.connect("filter.fluid_out", "product")
-    spec = plant.to_spec()
+    spec = plant.to_dict()
     assert spec["inlets"] == {"feed": "filter.fluid_in"}
     assert spec["outlets"] == {"product": "filter.fluid_out"}
     assert spec["connections"] == []
@@ -189,7 +188,7 @@ def test_connections_reach_through_groups_but_never_into_plants():
 
 def test_a_plant_child_in_a_false_cycle_is_opened():
     """The doublet loop through the surface equipment runs the doublet's children directly."""
-    plant = library.build("DoubletHeatPlant")
+    plant = gm.plants.get("DoubletHeatPlant")
     paths = [step.path for step in plant._compiled().steps]
     assert [path for path in paths if path != "doublet.formation"] == [
         "doublet.reservoir",
@@ -219,7 +218,7 @@ def test_a_plant_child_outside_a_cycle_is_called_as_one_unit():
 
 def test_the_doublet_runs_injection_before_production():
     """Ties go to the first appearance in the connection list, as the handwritten forward."""
-    plant = library.build("Doublet")
+    plant = gm.plants.get("Doublet")
     paths = [step.path for step in plant._compiled().steps]
     assert [path for path in paths if path != "formation"] == [
         "injector",
@@ -233,7 +232,7 @@ def test_the_doublet_runs_injection_before_production():
 
 def test_to_spec_is_json_and_validate_is_empty(chain):
     """The spec is plain JSON, rebuilds an equal plant and has no problems."""
-    spec = chain.to_spec()
+    spec = chain.to_dict()
     assert json.loads(json.dumps(spec, allow_nan=False)) == spec
     found = chain.validate(on_error="record")
     assert {item["code"] for item in found} == {"root_plant_port"}
@@ -242,7 +241,7 @@ def test_to_spec_is_json_and_validate_is_empty(chain):
         "outlets.gas_out",
         "outlets.product",
     ]
-    assert gm.plants.from_spec(spec).to_spec() == spec
+    assert gm.plants.from_dict(spec).to_dict() == spec
 
 
 def test_a_plant_has_no_run_method():

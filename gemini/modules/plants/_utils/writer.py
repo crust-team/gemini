@@ -1,4 +1,4 @@
-"""Write a built plant as its format 2 spec: structure, stated values kept as written."""
+"""Write a plant as its plant dict: a class and its values, or its structure."""
 
 from copy import deepcopy
 
@@ -22,7 +22,7 @@ def baseline_of(module):
 
 def type_name(module):
     """Return the registry name that rebuilds ``module``."""
-    return module.name if hasattr(type(module), "_port_map") else type(module).__name__
+    return type(module).__name__
 
 
 def _same(module, name, stated, current):
@@ -36,7 +36,7 @@ def _plain(module, name, value):
     return plain_value(design.parameter(module, name).validate(value))
 
 
-def params_spec(plant, key, module):
+def params_entry(plant, key, module):
     """Return the ``params`` of one module: stated values while true, others that changed."""
     stated = plant._stated.get(key) or {}
     baseline = plant._baselines.get(key, {})
@@ -51,7 +51,7 @@ def params_spec(plant, key, module):
     return result
 
 
-def modules_spec(plant, container, prefix=""):
+def modules_entry(plant, container, prefix=""):
     """Return the ``modules`` mapping of ``container``, groups nested."""
     result = {}
     for name, child in container.named_children():
@@ -60,9 +60,9 @@ def modules_spec(plant, container, prefix=""):
         if getattr(child, "_size", None):
             entry["size"] = deepcopy(child._size)
         if is_group(child):
-            entry["modules"] = modules_spec(plant, child, key)
+            entry["modules"] = modules_entry(plant, child, key)
         else:
-            params = params_spec(plant, key, child)
+            params = params_entry(plant, key, child)
             if params or plant._stated.get(key) is not None:
                 entry["params"] = params
         result[name] = entry
@@ -76,19 +76,30 @@ def _port_text(ends):
     return join_path(*ends)
 
 
-def plant_spec(plant):
-    """Return the format 2 spec of ``plant``."""
-    spec = {
+def class_dict(plant, fresh):
+    """Return the plant dict of a plant of a class: ``fresh`` is a new one, without values."""
+    plant._baselines[""] = tree_params(fresh)
+    data = {"format": FORMAT, "type": type_name(plant)}
+    if plant._size:
+        data["size"] = deepcopy(plant._size)
+    data["params"] = params_entry(plant, "", plant)
+    fluids = {path: module._fluid for path, module in fresh.named_modules()}
+    return data | write_sections(plant, plant._sections, fluids)
+
+
+def structure_dict(plant):
+    """Return the plant dict of ``plant`` with its modules and connections."""
+    data = {
         "format": FORMAT,
         "name": plant.name,
-        "modules": modules_spec(plant, plant),
+        "modules": modules_entry(plant, plant),
         "connections": deepcopy(plant._connections),
     }
     for side in ("inlets", "outlets"):
         if plant._listed[side]:
-            spec[side] = {name: _port_text(end) for name, end in plant._listed[side].items()}
-    if plant._output_specs is not None:
-        spec["outputs"] = deepcopy(plant._output_specs)
+            data[side] = {name: _port_text(end) for name, end in plant._listed[side].items()}
+    if plant._output_entries is not None:
+        data["outputs"] = deepcopy(plant._output_entries)
     if plant._constraints:
-        spec["constraints"] = [item.as_dict() for item in plant._constraints]
-    return spec | write_sections(plant, plant._sections)
+        data["constraints"] = [item.as_dict() for item in plant._constraints]
+    return data | write_sections(plant, plant._sections)

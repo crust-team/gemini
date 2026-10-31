@@ -1,35 +1,33 @@
-"""Plants built from data, with their spec functions, and the handwritten special cases."""
+"""The plant classes and the functions of the plant dict."""
 
 from gemini.modules.plant import Plant
 
-from ._utils.catalogue import example, get, names, templates
+from ._utils.catalogue import example, from_dict, get, names, validate
 from ._utils.legacy_project import convert_legacy
-from ._utils.migration import migrate
-from ._utils.schema import spec_schema
-from ._utils.spec import from_dict, from_spec, validate
-from ._utils.templating import from_template
+from ._utils.schema import schema
 from .atesplant import ATESPlant
 from .coolingsubstation import CoolingSubstation
 from .districtnetwork import DistrictNetwork
 from .doublet import Doublet
 from .doubletheatplant import DoubletHeatPlant
 from .hackathonplant import HackathonPlant
+from .heatingabsorptioncoolingplant import HeatingAbsorptionCoolingPlant
+from .heatingcoolingplant import HeatingCoolingPlant
+from .heatingfullcoolingplant import HeatingFullCoolingPlant
+from .heatingheatpumpcoolingplant import HeatingHeatPumpCoolingPlant
+from .heatingplant import HeatingPlant
 from .heatingsubstation import HeatingSubstation
 from .multiwellplant import MultiWellPlant
 
 __all__ = [
     "Plant",
-    "from_spec",
     "from_dict",
     "validate",
-    "spec_schema",
-    "migrate",
+    "schema",
     "names",
     "get",
     "example",
     "convert_legacy",
-    "templates",
-    "from_template",
     "HeatingSubstation",
     "CoolingSubstation",
     "ATESPlant",
@@ -38,4 +36,9 @@ __all__ = [
     "DistrictNetwork",
     "MultiWellPlant",
     "HackathonPlant",
+    "HeatingPlant",
+    "HeatingCoolingPlant",
+    "HeatingFullCoolingPlant",
+    "HeatingAbsorptionCoolingPlant",
+    "HeatingHeatPumpCoolingPlant",
 ]

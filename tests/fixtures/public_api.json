@@ -42,16 +42,10 @@
    "describe": [
     "values"
    ],
-   "from_dict": [
-    "data"
-   ],
    "get_module": [
     "path"
    ],
    "help": [],
-   "load": [
-    "path"
-   ],
    "named_modules": [
     "prefix"
    ],
@@ -63,9 +57,6 @@
     "path",
     "time"
    ],
-   "save": [
-    "path"
-   ],
    "set_bindings": [
     "path",
     "bindings"
@@ -75,8 +66,6 @@
     "params",
     "valid_from"
    ],
-   "to_dict": [],
-   "to_spec": [],
    "validate_params": [
     "params",
     "on_error"
@@ -96,7 +85,26 @@
     "target",
     "type"
    ],
+   "constrain": [
+    "target",
+    "by",
+    "bounds",
+    "equals",
+    "at_least"
+   ],
+   "from_dict": [
+    "data"
+   ],
+   "load": [
+    "path"
+   ],
+   "save": [
+    "path"
+   ],
    "summary": [],
+   "to_dict": [
+    "structure"
+   ],
    "validate": [
     "on_error"
    ]
@@ -426,6 +434,11 @@
    "Doublet": "class",
    "DoubletHeatPlant": "class",
    "HackathonPlant": "class",
+   "HeatingAbsorptionCoolingPlant": "class",
+   "HeatingCoolingPlant": "class",
+   "HeatingFullCoolingPlant": "class",
+   "HeatingHeatPumpCoolingPlant": "class",
+   "HeatingPlant": "class",
    "HeatingSubstation": "class",
    "MultiWellPlant": "class",
    "Plant": "class",
@@ -436,26 +449,17 @@
     "name"
    ],
    "from_dict": [
-    "spec"
-   ],
-   "from_spec": [
-    "spec"
-   ],
-   "from_template": [
-    "name",
-    "parameters"
+    "data"
    ],
    "get": [
     "name"
    ],
-   "migrate": [
-    "old"
+   "names": [
+    "category"
    ],
-   "names": [],
-   "spec_schema": [],
-   "templates": [],
+   "schema": [],
    "validate": [
-    "spec",
+    "data",
     "on_error"
    ]
   },
@@ -567,7 +571,7 @@
  "schemas": {
   "check.schema.json": "8a57d8429749d44399831d8dcedf4288c77070665171246949e55476f138c3b3",
   "module_description.schema.json": "f40388d592d69073cba6a90dc83a23e69e7b3a8c7f9e88d48fdd3e19c6d1779e",
-  "plant_spec.schema.json": "7040385f1ef4ee980a3259b8b3515af8da25f9ff1a95d968695e37492a0a0207",
+  "plant_dict.schema.json": "a1d5c52bdc435a83cda0bdb1085326b206501c08607e96775c1260a12f01dcb6",
   "problem.schema.json": "98fbbd71c3cdb8b5c55b3cca2d2829999ab8665e4eb7dd1062fcc77d970383b4",
   "profile.schema.json": "1d516189feaf3a16f2ef7090defeebcde7adfa7b0b509e50fdb577db138531ce",
   "results_summary.schema.json": "733213574165c3f2dc0176924aeb6eb350c38a75864b9dd1d146353fa442edf8",

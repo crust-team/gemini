@@ -1,7 +1,7 @@
 """Write the generated schemas and every sample file of ``docs/schemas/``.
 
 Run from the repository root after a change to a shape: ``python scripts/write_schemas.py``. The
-schemas of the plant spec and the profile come from ``gm.plants.spec_schema()`` and
+schemas of the plant data and the profile come from ``gm.plants.schema()`` and
 ``gm.profiles.profile_schema()`` and those of the three return shapes from
 ``gemini.types.shapes``; the others are written by hand. The samples come from the example plant,
 so other repositories can build against real documents.
@@ -59,14 +59,14 @@ def _problem_sample():
 def documents():
     """Return ``{file name: document}`` of everything this script writes."""
     plant = gm.plants.example("DoubletHeatPlant")
-    spec = plant.to_spec()
+    data = plant.to_dict(structure=True)
     results = _results(plant)
     return {
-        "plant_spec.schema.json": gm.plants.spec_schema(),
+        "plant_dict.schema.json": gm.plants.schema(),
         "profile.schema.json": gm.profiles.profile_schema(),
         **{f"{name}.schema.json": schema for name, schema in shapes.SCHEMAS.items()},
         "module_description.sample.json": gm.plants.example("Doublet").describe(),
-        "plant_spec.sample.json": spec,
+        "plant_dict.sample.json": data,
         "results_summary.sample.json": results.summary(),
         "profile.sample.json": _profile_sample(),
         "value.sample.json": results.summary()["heat_exchanger"]["duty"]["mean"],

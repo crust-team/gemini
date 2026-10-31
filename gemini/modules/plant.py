@@ -3,7 +3,6 @@
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
 from gemini.modules._utils import design
-from gemini.modules._utils.serialization import module_spec, tree_params
 from gemini.modules.container import ModuleList
 from gemini.modules.module import Module
 from gemini.modules.plants._utils import listing, loops, outputs, reader, writer
@@ -13,6 +12,7 @@ from gemini.modules.plants._utils.ports import PortResolver
 from gemini.modules.plants._utils.run import Run
 from gemini.physics import energy
 from gemini.types.declarations import Inlet, Outlet, Output
+from gemini.utils.files import read_json, write_json
 from gemini.utils.strings import join_path, snake_case
 
 
@@ -31,6 +31,8 @@ class Plant(PortResolver, Module):
     never stored, and the fluid of a plant passes to its children.
     """
 
+    purpose = None
+    """What a plant class serves: ``heating``, ``cooling`` or ``both``; else a building block."""
     loop_tolerance = loops.TOLERANCE
     loop_passes = loops.MAX_PASSES
 
@@ -47,7 +49,7 @@ class Plant(PortResolver, Module):
         self._derived_params = set()
         self._stated_child_params = set()
         self._listed = {"inlets": {}, "outlets": {}}
-        self._output_specs = None
+        self._output_entries = None
         self._stated = {}
         self._baselines = {}
         self._sections = {}
@@ -56,7 +58,8 @@ class Plant(PortResolver, Module):
 
     @classmethod
     def _empty(cls, name):
-        plant = cls.__new__(cls)
+        """Return an empty plant of no class: a plant dict with a structure states all of it."""
+        plant = Plant.__new__(Plant)
         Plant.__init__(plant, name)
         return plant
 
@@ -97,8 +100,9 @@ class Plant(PortResolver, Module):
 
     def set_params(self, path, params, valid_from=None):
         """Store parameters as ``Module.set_params`` does and remember what the root was given."""
-        if not path:
-            kept = {key: value for key, value in params.items() if key not in self._derived_params}
+        if valid_from is None:
+            names = {join_path(path, key): value for key, value in params.items()}
+            kept = {key: value for key, value in names.items() if key not in self._derived_params}
             self._stated[""] = self._stated.get("", {}) | kept
         return super().set_params(path, params, valid_from)
 
@@ -242,8 +246,8 @@ class Plant(PortResolver, Module):
         if isinstance(declaration, (Inlet, Outlet)):
             self._declared.add(name)
         if isinstance(declaration, Output) and declaration.formula is not None:
-            self._output_specs = (self._output_specs or {}) | {
-                name: outputs.spec_of(declaration.formula)
+            self._output_entries = (self._output_entries or {}) | {
+                name: outputs.entry_of(declaration.formula)
             }
             declaration = outputs.typed(self, name, declaration.formula)
         super()._register_declaration(name, declaration)
@@ -271,28 +275,42 @@ class Plant(PortResolver, Module):
         """Return a text table of the modules: type, category, inbound connections, parameters."""
         return listing.summary(self)
 
-    def to_spec(self):
-        """Return the plant file: format 2, modules, connections and the sections of the tree.
+    def to_dict(self, structure=False):
+        """Return the plant dict.
 
-        A plant class with design values of its own writes them as flat values instead.
+        A plant of a class stores its class, its size and the values that were given, never its
+        structure or a derived value. A plant built with ``add`` and ``connect``, or a class plant
+        with ``structure=True``, stores its modules and connections, which is how an agent edits
+        a plant: ``gm.plants.from_dict`` reads either.
         """
-        if type(self) is Plant:
-            return writer.plant_spec(self)
-        self._baselines[""] = tree_params(type(self)(**self._size))
-        params = writer.params_spec(self, "", self)
-        if not set(params) & set(self._parameters):
-            return writer.plant_spec(self)
-        return module_spec(self) | {"params": params}
+        if type(self) is Plant or structure:
+            return writer.structure_dict(self)
+        fresh = type(self)(**self._size)
+        if (
+            fresh._connections != self._connections
+            or fresh._children.keys() != self._children.keys()
+        ):
+            return writer.structure_dict(self)
+        return writer.class_dict(self, fresh)
+
+    def save(self, path):
+        """Save the plant dict as JSON."""
+        write_json(path, self.to_dict())
+
+    @classmethod
+    def load(cls, path):
+        """Load a plant from the JSON file of a plant dict."""
+        return cls.from_dict(read_json(path))
 
     @classmethod
     def from_dict(cls, data):
-        """Build a plant of this class from a format 2 plant file."""
+        """Build a plant from a plant dict; one ``ValidationError`` lists every problem."""
         return reader.read(cls, data)
 
     def validate(self, on_error="raise"):
-        """Check the plant's spec as ``gm.plants.validate`` does; the same ``on_error``."""
-        spec = self.to_spec()
-        return reported(reader.problems(type(self), spec) + reader.root_problems(spec), on_error)
+        """Check the plant's structure as ``gm.plants.validate`` does; the same ``on_error``."""
+        data = self.to_dict(structure=True)
+        return reported(reader.problems(Plant, data) + reader.root_problems(data), on_error)
 
     def _compiled(self):
         """Return the plan; which outlets are offered depends on how the modules are set."""

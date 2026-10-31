@@ -1,16 +1,14 @@
 """The one registry of module and plant types: stable names, categories and how to get each.
 
 A module class registers under its class name and its ``category``: for a shipped class the folder
-that holds it (``Module.category``), for a class from outside the value it states. A plant that
-exists as a spec registers under its name with a ``build`` function that returns a new plant. Both
-kinds share one table, so a plant spec can name any of them as the ``type`` of a child.
+that holds it (``Module.category``), for a class from outside the value it states. Plant classes
+are in the same table, so a plant dict can name any of them as the ``type`` of a child.
 """
 
 import importlib.util
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from gemini.errors import ValidationError
 from gemini.modules.module import Module
@@ -37,11 +35,10 @@ CATEGORIES = (
 
 @dataclass(frozen=True)
 class _Entry:
-    """One registered type: a module class, or the function that builds a spec plant."""
+    """One registered type: a module class and its category."""
 
     category: str
-    module: type[Module] | None = None
-    build: Any = None
+    module: type[Module]
 
 
 _entries = {}
@@ -74,13 +71,6 @@ def register(cls):
     return cls
 
 
-def register_plant(name, build):
-    """Add a spec plant under ``name``; ``build()`` returns a new plant without values."""
-    if name in _entries:
-        raise ValidationError(f"plants.register: name {name!r} is already taken", path=name)
-    _entries[name] = _Entry("plants", build=build)
-
-
 def names(category=None):
     """Return the registered names, sorted, of every category or of one."""
     if category is not None:
@@ -111,12 +101,8 @@ def _entry(name):
 
 
 def get(name):
-    """Return the class registered as ``name``, or a new plant for a spec plant.
-
-    Both answer ``describe()``, ``parameter_schema()`` and ``validate_params(params)``.
-    """
-    entry = _entry(name)
-    return entry.module if entry.module is not None else entry.build()
+    """Return the class registered as ``name``."""
+    return _entry(name).module
 
 
 def _import_file(path):
@@ -146,7 +132,7 @@ def load_file(path):
 
     The file is executed, so load only code that is meant to run. Every class the file defines
     that derives from ``Module`` and states a ``category`` is registered with ``register``, in the
-    order of definition, so a plant spec can name it as a ``type``; a base class without a
+    order of definition, so a plant dict can name it as a ``type``; a base class without a
     category is left out. A name is registered once per process: loading another class of an
     already registered name raises ``ValidationError``.
 

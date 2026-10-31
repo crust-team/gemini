@@ -204,9 +204,9 @@ class Constant:
         """Return the value."""
         return self.value
 
-    def __format__(self, spec):
+    def __format__(self, data):
         """Format the value."""
-        return format(self.value, spec)
+        return format(self.value, data)
 
     def __repr__(self):
         """Return ``Constant(name=value unit)``."""

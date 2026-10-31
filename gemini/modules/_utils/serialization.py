@@ -1,9 +1,8 @@
-"""The plant file, format 2: the sections every module tree shares, read and written.
+"""The plant dict, format 2: the sections every plant shares, read and written.
 
-A file holds ``format``, ``name``, ``modules``, ``connections`` and, keyed by dotted path from the
-root (``""`` is the root), ``fluids``, ``boundary``, ``bindings`` and ``param_history``. A
-handwritten root writes its class as ``type`` and every parameter of its tree as flat dotted
-``params``. A stated value stays as written while it still equals the current one.
+Beside ``format`` and what says which plant it is, a plant dict holds, keyed by dotted path from
+the root (``""`` is the root), ``fluids``, ``boundary``, ``bindings`` and ``param_history``. A
+stated value stays as written while it still equals the current one.
 """
 
 from contextlib import contextmanager
@@ -26,7 +25,7 @@ SECTIONS = ("fluids", "boundary", "bindings", "param_history")
 
 
 class Report:
-    """Collect the problems of reading a spec, or raise the first one when ``strict``."""
+    """Collect the problems of reading a data, or raise the first one when ``strict``."""
 
     def __init__(self, strict=False):
         """Start without problems."""
@@ -50,7 +49,7 @@ class Report:
 
 
 def located(path, error):
-    """Return the problem of an error raised at spec ``path``."""
+    """Return the problem of an error raised at data ``path``."""
     inner = getattr(error, "path", None)
     full = f"{path}.{inner}" if path and inner else path or inner or ""
     return problem(full, error.code, error, error.suggestions)
@@ -60,19 +59,18 @@ def format_error(data):
     """Return the ``ValidationError`` for data that is not format 2, else ``None``."""
     if not isinstance(data, dict):
         return ValidationError(
-            f"plant file = {type(data).__name__}; expected a mapping", code="invalid_format"
+            f"plant dict = {type(data).__name__}; expected a mapping", code="invalid_format"
         )
     if data.get("format") == FORMAT:
         return None
     if "version" in data:
         return ValidationError(
-            f"plant file version = {data['version']!r}; expected format {FORMAT}: "
-            "convert it with gm.plants.migrate",
+            f"plant dict version = {data['version']!r}; expected format {FORMAT}",
             code="old_format",
             path="version",
         )
     return ValidationError(
-        f"plant file format = {data.get('format')!r}; expected {FORMAT}",
+        f"plant dict format = {data.get('format')!r}; expected {FORMAT}",
         path="format",
         code="invalid_format",
     )
@@ -165,7 +163,7 @@ def _history(root, stated):
 def write_sections(root, stated=None, baselines=None):
     """Return the ``fluids``, ``boundary``, ``bindings`` and ``param_history`` of a tree.
 
-    ``stated`` holds the sections of the spec the tree was read from and ``baselines`` the
+    ``stated`` holds the sections of the data the tree was read from and ``baselines`` the
     fluid each path had when it was created; empty sections other than ``bindings`` and
     ``param_history`` are left out.
     """
@@ -246,9 +244,9 @@ def _names_below(entries, path):
     return any(name != path and name.startswith(prefix) for name in entries)
 
 
-def read_sections(root, spec, report):
-    """Apply the sections of ``spec`` to the tree, adding each problem to ``report``."""
-    fluids = spec.get("fluids", {})
+def read_sections(root, data, report):
+    """Apply the sections of ``data`` to the tree, adding each problem to ``report``."""
+    fluids = data.get("fluids", {})
     readers = {
         "fluids": lambda path, value: _read_fluid(
             _module_at(root, path), value, _names_below(fluids, path)
@@ -258,7 +256,7 @@ def read_sections(root, spec, report):
         "bindings": lambda path, value: _read_bindings(root, path, value),
     }
     for section, read in readers.items():
-        for path, value in _read_order(section, spec.get(section, {})):
+        for path, value in _read_order(section, data.get(section, {})):
             if report.skips(path):
                 continue
             with report.guard(f"{section}.{path}"):
@@ -272,27 +270,20 @@ def read_params(root, params, report, prefix="params"):
             root.set_params("", {name: value})
 
 
-def written_params(module):
-    """Return the parameters of a tree a file stores: not what a deriving module computed."""
+def tree_dict(module):
+    """Return the parameters and sections of a module tree that is no plant, for a checkpoint."""
     derived = design.derived_names(module)
-    return {name: value for name, value in tree_params(module).items() if name not in derived}
+    params = {name: value for name, value in tree_params(module).items() if name not in derived}
+    return {"format": FORMAT, "params": params} | write_sections(module)
 
 
-def module_spec(module):
-    """Return the format 2 spec of a handwritten module tree."""
-    kind = type(module).__name__
-    spec = {"format": FORMAT, "name": kind, "type": kind, "modules": {}, "connections": []}
-    spec["params"] = written_params(module)
-    return spec | write_sections(module)
-
-
-def module_from_spec(cls, spec):
-    """Build ``cls()`` and fill it from a format 2 spec; raise on the first problem."""
-    error = format_error(spec)
+def tree_from_dict(cls, data):
+    """Build ``cls()`` and fill it from ``tree_dict``; raise on the first problem."""
+    error = format_error(data)
     if error is not None:
         raise error
     report = Report(strict=True)
     root = cls()
-    read_params(root, spec.get("params", {}), report)
-    read_sections(root, spec, report)
+    read_params(root, data.get("params", {}), report)
+    read_sections(root, data, report)
     return root

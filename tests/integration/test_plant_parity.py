@@ -1,8 +1,8 @@
-"""The doublet heat plant built three ways runs bit-identically, on every backend.
+"""The doublet heat plant built two ways runs bit-identically, on every backend.
 
-The builder, the spec and the migrated old file give the same plant, so their replays are equal
-to the last bit (``check_exact``), and the file-based run is the one the committed engine
-reference pins in ``test_engine.py``.
+The builder and the plant dict give the same plant, so their replays are equal to the last bit
+(``check_exact``), and the run is the one the committed engine reference pins in
+``test_engine.py``.
 """
 
 import copy
@@ -12,11 +12,8 @@ import pytest
 
 import gemini as gm
 from gemini.types.bindings import DatedParams
-from gemini.utils.files import read_json
-from tests.fixtures import ROOT
 from tests.fixtures.parity import BACKENDS, on_each_backend, run_engine
 
-OLD_FILE = ROOT / "tests/fixtures/plant_format1.json"
 ROWS = 24
 
 
@@ -56,8 +53,8 @@ def built_by_hand(spec):
 
 @pytest.fixture(scope="module")
 def spec():
-    """Return the spec the old file migrates to."""
-    return gm.plants.migrate(read_json(OLD_FILE))
+    """Return the plant dict of the example, with its structure."""
+    return gm.plants.example("DoubletHeatPlant").to_dict(structure=True)
 
 
 @pytest.fixture(scope="module")
@@ -68,8 +65,7 @@ def window(fast_frame):
 
 BUILDERS = {
     "builder": built_by_hand,
-    "spec": lambda spec: gm.plants.from_spec(copy.deepcopy(spec)),
-    "file": lambda spec: gm.plants.from_dict(copy.deepcopy(spec)),
+    "spec": lambda spec: gm.plants.from_dict(copy.deepcopy(spec)),
 }
 
 
@@ -92,21 +88,20 @@ def runs(spec, window):
     return on_each_backend(run)
 
 
-def test_the_three_ways_give_the_same_plant(spec):
+def test_the_two_ways_give_the_same_plant(spec):
     """Builder, spec and file write the same sections; only the spec states the outputs."""
-    by_hand = built_by_hand(spec).to_spec()
-    assert gm.plants.from_spec(copy.deepcopy(spec)).to_spec() == spec
+    by_hand = built_by_hand(spec).to_dict()
+    assert gm.plants.from_dict(copy.deepcopy(spec)).to_dict() == spec
     assert by_hand.pop("outputs", None) is None
     assert by_hand == {key: value for key, value in spec.items() if key != "outputs"}
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("kind", [0, 1], ids=["replay", "simulate"])
-def test_the_three_ways_run_bit_identically(runs, backend, kind):
+def test_the_two_ways_run_bit_identically(runs, backend, kind):
     """Spec and file are the same frame; the builder's columns equal the spec's, bit for bit."""
     frames = {way: pair[kind].frame for way, pair in runs[backend].items()}
     assert len(frames["spec"]) == ROWS
-    pd.testing.assert_frame_equal(frames["file"], frames["spec"], check_exact=True)
     common = [column for column in frames["builder"].columns if column in frames["spec"].columns]
     assert len(common) == len(frames["builder"].columns)
     pd.testing.assert_frame_equal(frames["builder"], frames["spec"][common], check_exact=True)
@@ -121,7 +116,7 @@ CLASS_BASED_ROOT = {
 """The root outputs of simulate tick 3, written by the handwritten ``DoubletHeatPlant`` class."""
 
 
-@pytest.mark.parametrize("way", ["builder", "spec", "file"])
+@pytest.mark.parametrize("way", ["builder", "spec"])
 def test_root_outputs_equal_the_handwritten_class_to_the_last_bit(runs, way):
     """The root has no output; what the class summed is the same on the leaves."""
     run = runs[BACKENDS[0]][way][1]

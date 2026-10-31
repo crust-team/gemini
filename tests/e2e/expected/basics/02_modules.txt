@@ -7,6 +7,6 @@ Inlets:            fluid_in, power_in
 Controls:          frequency
 Frequency unit:    Hz
 Outputs:           head, power, efficiency, discharge_pressure, is_in_operating_window, best_efficiency_ratio
-Shipped modules:   59
+Shipped modules:   65
 Without outputs:   0 outputs
 Head in float32:   25.56 bar

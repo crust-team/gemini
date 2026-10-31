@@ -70,16 +70,16 @@ def _result_kind(key, kind):
     return (DIFFERENCES.get(unit, kind) if key == "difference" else kind) | None
 
 
-def check(name, spec):
+def check(name, data):
     """Return ``(key, paths)`` of an entry of a plant dict, or raise what is wrong with it."""
-    given = [key for key in KEYS if key in spec]
-    if len(given) != 1 or len(spec) != 1:
+    given = [key for key in KEYS if key in data]
+    if len(given) != 1 or len(data) != 1:
         raise ValidationError(
-            f"{name}: keys = {sorted(spec)}; expected exactly one of {join_names(KEYS)}",
+            f"{name}: keys = {sorted(data)}; expected exactly one of {join_names(KEYS)}",
             path="",
             code="invalid_format",
         )
-    key, paths = given[0], spec[given[0]]
+    key, paths = given[0], data[given[0]]
     two = key != "sum"
     if not isinstance(paths, list) or len(paths) < 2 or (two and len(paths) != 2):
         raise ValidationError(
@@ -90,9 +90,9 @@ def check(name, spec):
     return key, paths
 
 
-def declare(plant, name, spec):
+def declare(plant, name, data):
     """Declare output ``name`` of ``plant`` from an entry of a plant dict."""
-    key, paths = check(name, spec)
+    key, paths = check(name, data)
     if name in plant._children:
         raise ValidationError(f"{name}: an output cannot share the name of a module", path="")
     kinds = [_kind(plant, path) for path in paths]
@@ -107,7 +107,7 @@ def typed(plant, name, formula):
     return declare(plant, name, {key: paths})
 
 
-def spec_of(formula):
+def entry_of(formula):
     """Return the entry of a plant dict of ``formula``."""
     key, *paths = formula
     return {key: list(paths)}
@@ -142,9 +142,9 @@ def read(plant, records, path):
     return getattr(ports[port], name)
 
 
-def ordered(specs):
-    """Return ``(name, spec)`` in given order, an output after the outputs it reads."""
-    result, waiting = [], list(specs.items())
+def ordered(entries):
+    """Return ``(name, data)`` in given order, an output after the outputs it reads."""
+    result, waiting = [], list(entries.items())
 
     def ready(item):
         paths = next((value for key, value in item[1].items() if key in KEYS), ())

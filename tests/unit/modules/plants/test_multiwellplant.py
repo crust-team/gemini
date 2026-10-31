@@ -4,7 +4,6 @@ import pytest
 
 import gemini as gm
 from gemini.modules import energy_balance, mass_balance
-from gemini.modules.plants._utils import generators
 from gemini.types import Stream
 from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.errors import raises
@@ -15,7 +14,7 @@ LIMB = ("reservoir", "well", "esp", "riser")
 
 def _field(doublet, producers=2, injectors=1, rates=(40.0, 30.0)):
     """Return a field whose limbs copy the example doublet's equipment."""
-    field = gm.plants.from_template("multi_well", {"producers": producers, "injectors": injectors})
+    field = gm.plants.MultiWellPlant(producers=producers, injectors=injectors)
     for limb, rate in zip(field.producers, rates):
         for name in LIMB:
             getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
@@ -72,8 +71,8 @@ def test_splitters_share_the_return_over_three_injectors(fresh_plant):
 def test_invalid_structure_raises():
     """A field needs at least one producer and one injector."""
     with raises(gm.errors.ValidationError, "invalid_design", match="producers = 0"):
-        generators.multi_well_spec(producers=0)
+        gm.plants.MultiWellPlant(producers=0)
     with raises(gm.errors.ValidationError, "invalid_design", match="injectors = 0"):
-        generators.multi_well_spec(injectors=0)
+        gm.plants.MultiWellPlant(injectors=0)
     with pytest.raises(gm.errors.ValidationError, match="producers = 0"):
-        gm.plants.from_template("multi_well", {"producers": 0})
+        gm.plants.MultiWellPlant(producers=0)

@@ -1,4 +1,4 @@
-"""The JSON Schema of the plant spec, the input schema of a tool that builds plants."""
+"""The JSON Schema of the plant dict, the input schema of a tool that builds plants."""
 
 from gemini.modules._utils import registry
 from gemini.modules.plants._utils.factory import GROUPS
@@ -22,6 +22,11 @@ BINDINGS = {
         ]
     },
 }
+PATH = {"type": "string", "pattern": r"^[^.\s]+(\.[^.\s]+)*$"}
+SIZE = {
+    "type": "object",
+    "description": 'The structural arguments of a plant class, such as {"consumers": 3}.',
+}
 PORT = {"type": "string", "pattern": r"^[^.\s]+(\.[^.\s]+)+$"}
 
 
@@ -32,6 +37,7 @@ def _module():
         "additionalProperties": False,
         "properties": {
             "type": {"type": "string", "enum": registry.names() + sorted(GROUPS)},
+            "size": SIZE,
             "params": {"type": "object"},
             "modules": {"type": "object", "additionalProperties": {"$ref": "#/$defs/module"}},
         },
@@ -52,37 +58,82 @@ def _connection():
 
 
 def _output():
+    two = {"type": "array", "items": PATH, "minItems": 2, "maxItems": 2}
     return {
         "type": "object",
         "minProperties": 1,
-        "maxProperties": 2,
+        "maxProperties": 1,
         "additionalProperties": False,
         "properties": {
-            "of": PORT,
-            "field": {"type": "string"},
-            "sum": {"type": "string"},
-            "ratio": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2},
-            "difference": {
-                "type": "array",
-                "items": {"type": "string"},
-                "minItems": 2,
-                "maxItems": 2,
+            "difference": two,
+            "ratio": two,
+            "sum": {"type": "array", "items": PATH, "minItems": 2},
+        },
+    }
+
+
+def _constraint():
+    return {
+        "type": "object",
+        "required": ["target", "by", "bounds"],
+        "additionalProperties": False,
+        "properties": {
+            "target": PATH,
+            "equals": PATH,
+            "at_least": PATH,
+            "by": PATH,
+            "bounds": {
+                "anyOf": [
+                    PATH,
+                    {
+                        "type": "array",
+                        "items": {"anyOf": [PATH, {"type": "number"}]},
+                        "minItems": 2,
+                        "maxItems": 2,
+                    },
+                ]
             },
         },
     }
 
 
-def spec_schema():
-    """Return the JSON Schema (draft 2020-12) of a format 2 plant spec."""
+def _sections():
+    return {
+        "fluids": SECTION,
+        "boundary": SECTION,
+        "bindings": {"type": "object", "additionalProperties": {"$ref": "#/$defs/bindings"}},
+        "param_history": {
+            "type": "object",
+            "additionalProperties": {"type": "array", "items": {"type": "object"}},
+        },
+    }
+
+
+def _of_class():
+    """Return the schema of a plant of a class: which one, its size and its values."""
+    return {
+        "type": "object",
+        "required": ["format", "type"],
+        "additionalProperties": False,
+        "properties": {
+            "format": {"const": 2},
+            "type": {"type": "string", "enum": registry.names("plants")},
+            "size": SIZE,
+            "params": {"type": "object"},
+            **_sections(),
+        },
+    }
+
+
+def _with_structure():
+    """Return the schema of a plant that states its modules and connections."""
     ports = {
         "type": "object",
         "additionalProperties": {"anyOf": [PORT, {"type": "array", "items": PORT}]},
     }
     return {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "GEMINI plant spec",
         "type": "object",
-        "required": ["format", "name", "modules", "connections", "bindings", "param_history"],
+        "required": ["format", "name", "modules", "connections"],
         "additionalProperties": False,
         "properties": {
             "format": {"const": 2},
@@ -92,13 +143,17 @@ def spec_schema():
             "inlets": ports,
             "outlets": ports,
             "outputs": {"type": "object", "additionalProperties": _output()},
-            "fluids": SECTION,
-            "boundary": SECTION,
-            "bindings": {"type": "object", "additionalProperties": {"$ref": "#/$defs/bindings"}},
-            "param_history": {
-                "type": "object",
-                "additionalProperties": {"type": "array", "items": {"type": "object"}},
-            },
+            "constraints": {"type": "array", "items": _constraint()},
+            **_sections(),
         },
+    }
+
+
+def schema():
+    """Return the JSON Schema (draft 2020-12) of a plant dict, generated from the code."""
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "GEMINI plant dict",
+        "anyOf": [_of_class(), _with_structure()],
         "$defs": {"module": _module(), "bindings": BINDINGS},
     }

@@ -158,11 +158,11 @@ def test_the_file_holds_the_design_and_rebuilds_the_same_numbers():
 
 
 def test_a_designed_doublet_as_the_root_round_trips():
-    """A doublet alone writes its flat design; a plain one keeps the shipped wiring."""
+    """A doublet stores its class and its flat design, never its structure."""
     doublet = gm.plants.get("Doublet")
-    assert "type" not in doublet.to_spec() and doublet.to_spec()["modules"]
+    assert doublet.to_dict()["params"] == {} and "modules" not in doublet.to_dict()
     doublet.set_params("", DESIGN)
-    spec = doublet.to_spec()
+    spec = doublet.to_dict()
     assert spec["type"] == "Doublet" and spec["params"] == DESIGN
     assert gm.plants.from_dict(spec).reservoir.temperature == pytest.approx(360.15)
 

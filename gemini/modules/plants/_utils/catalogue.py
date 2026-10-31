@@ -1,18 +1,37 @@
 """The plant catalogue: which plants exist and how to get one."""
 
 from gemini.errors import NotImplementedYet, ValidationError
+from gemini.errors.base import reported
 from gemini.modules._utils import registry
 from gemini.modules._utils.serialization import SECTIONS, Report, read_sections
 from gemini.modules.plant import Plant
-from gemini.modules.plants._utils import templating
+from gemini.modules.plants._utils import reader
 from gemini.utils import paths
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
+PURPOSES = ("heating", "cooling", "both")
+"""What a plant serves, the ``category`` of ``names``."""
 
-def names():
-    """Return the registry names of the plants, sorted: the spec plants and the special cases."""
-    return registry.names("plants")
+
+def names(category=None):
+    """Return the names of the plant classes, sorted; ``category`` is what they serve.
+
+    ``heating``, ``cooling`` or ``both``: the plants that serve that, the other plants being
+    building blocks.
+    """
+    found = registry.names("plants")
+    if category is None:
+        return found
+    if category not in PURPOSES:
+        raise ValidationError(
+            f"plants.names: category = {category!r}; expected one of {join_names(PURPOSES)}"
+            f"{did_you_mean(category, PURPOSES)}",
+            path=str(category),
+            suggestions=close_matches(category, PURPOSES),
+            code="unknown_name",
+        )
+    return [name for name in found if registry.get(name).purpose == category]
 
 
 def _check(function, name):
@@ -28,15 +47,13 @@ def _check(function, name):
 
 
 def get(name):
-    """Return a new plant of registry name ``name`` whose parameters are not set.
+    """Return a new plant of class ``name`` whose parameters are not set.
 
-    A spec plant comes back as a ``Plant`` and a special case as an instance of its class. An
-    unknown name, or the name of a module that is not a plant, raises ``ValidationError`` with
+    An unknown name, or the name of a module that is not a plant, raises ``ValidationError`` with
     close matches in ``suggestions``.
     """
     _check("get", name)
-    found = registry.get(name)
-    return found() if isinstance(found, type) else found
+    return registry.get(name)()
 
 
 def example(name):
@@ -44,7 +61,7 @@ def example(name):
 
     The plant comes from ``get``; ``inputs/plants/<name>.json`` of a source checkout gives its
     ``params`` and any ``fluids``, ``boundary``, ``bindings`` and ``param_history``, under the keys
-    of a plant file. ``Doublet`` and ``DoubletHeatPlant`` carry the values of the measured doublet;
+    of a plant dict. ``Doublet`` and ``DoubletHeatPlant`` carry the values of the measured doublet;
     the other plants carry the values their unit tests use, the design parameters only: controls
     and boundaries are inputs of a run. A registered plant without a file raises
     ``NotImplementedYet`` naming it, and without ``inputs/`` this raises ``inputs_missing``.
@@ -56,15 +73,21 @@ def example(name):
     plant, values = get(name), read_json(path)
     plant.set_params("", values["params"])
     read_sections(plant, values, Report(strict=True))
-    if isinstance(plant, Plant):
-        plant._sections = {key: values.get(key, {}) for key in SECTIONS}
+    plant._sections = {key: values.get(key, {}) for key in SECTIONS}
+    plant._stated[""] = {}
     return plant
 
 
-def templates():
-    """Return ``[{name, title, description, purpose}]`` of every template.
+def from_dict(data):
+    """Build a plant from a plant dict; one ``ValidationError`` lists every problem."""
+    return reader.read(Plant, data)
 
-    ``purpose`` is ``heating``, ``cooling`` or ``both``. ``from_template(name, parameters)``
-    fills one.
+
+def validate(data, on_error="raise"):
+    """Check a plant dict and return ``[]``, or raise one ``ValidationError`` with every problem.
+
+    With ``on_error="record"`` nothing is raised and the problems are returned, each
+    ``{path, code, message, suggestions}``: the list the error carries in ``problems``. ``path``
+    points into the dict, for example ``connections[1].target``.
     """
-    return templating.listing()
+    return reported(reader.problems(Plant, data) + reader.root_problems(data), on_error)

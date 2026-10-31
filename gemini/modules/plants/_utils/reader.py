@@ -1,4 +1,4 @@
-"""Read a format 2 spec into a plant, collecting every problem with its path in the spec."""
+"""Read a plant dict into a plant, collecting every problem with its path in the dict."""
 
 from copy import deepcopy
 
@@ -14,7 +14,7 @@ from gemini.modules._utils.serialization import (
     read_sections,
 )
 from gemini.modules.plants._utils import outputs
-from gemini.modules.plants._utils.factory import make_module
+from gemini.modules.plants._utils.factory import built, make_module
 from gemini.modules.plants._utils.plan import is_group, unconnected_port
 from gemini.modules.plants._utils.writer import baseline_of
 from gemini.utils.strings import close_matches, did_you_mean, join_path
@@ -22,6 +22,7 @@ from gemini.utils.strings import close_matches, did_you_mean, join_path
 TYPES = {
     "name": str,
     "type": str,
+    "size": dict,
     "modules": dict,
     "connections": list,
     "inlets": dict,
@@ -37,10 +38,10 @@ TYPES = {
 KEYS = ("format", *TYPES)
 
 
-def _shape(spec, report):
-    """Return ``spec`` without the keys that are unknown or of the wrong JSON type."""
+def _shape(data, report):
+    """Return ``data`` without the keys that are unknown or of the wrong JSON type."""
     clean = {}
-    for key, value in spec.items():
+    for key, value in data.items():
         if key not in KEYS:
             error = ValidationError(
                 f"unknown key {key!r}; valid: {', '.join(KEYS)}{did_you_mean(key, KEYS)}",
@@ -111,31 +112,31 @@ def _port(plant, side, name, ends, report):
             plant._link(end, name, None, explicit=True)
 
 
-def _outputs(plant, specs, report):
-    plant._output_specs = {}
-    for name, spec in outputs.ordered(specs):
+def _outputs(plant, entries, report):
+    plant._output_entries = {}
+    for name, data in outputs.ordered(entries):
         with report.guard(f"outputs.{name}"):
-            if not isinstance(spec, dict):
+            if not isinstance(data, dict):
                 raise ValidationError(f"{name}: expected a mapping", code="invalid_format")
-            key, paths = outputs.check(name, spec)
+            key, paths = outputs.check(name, data)
             if any(report.skips(path) for path in paths):
                 continue
-            plant._register_declaration(name, outputs.declare(plant, name, spec))
+            plant._register_declaration(name, outputs.declare(plant, name, data))
 
 
-def _ends(spec):
-    """Return every port the spec names, also those of an entry that failed to read."""
-    connections = [item for item in spec.get("connections", []) if isinstance(item, dict)]
+def _ends(data):
+    """Return every port the dict names, also those of an entry that failed to read."""
+    connections = [item for item in data.get("connections", []) if isinstance(item, dict)]
     ends = {item.get(end) for item in connections for end in ("source", "target")}
     for side in ("inlets", "outlets"):
-        for named in spec.get(side, {}).values():
+        for named in data.get(side, {}).values():
             ends |= set(named) if isinstance(named, list) else {named}
     return ends
 
 
-def _check_ports(plant, spec, report):
-    """Report each port no entry of ``spec`` names; a named port that failed has its problem."""
-    named = _ends(spec)
+def _check_ports(plant, data, report):
+    """Report each port no entry of ``data`` names; a named port that failed has its problem."""
+    named = _ends(data)
     for _, path, port in plant._unconnected_ports():
         end = join_path(path, port)
         if end not in named and not report.skips(end):
@@ -143,13 +144,13 @@ def _check_ports(plant, spec, report):
                 raise unconnected_port(end)
 
 
-def root_problems(spec):
+def root_problems(data):
     """Return a problem for each plant port of a root plant.
 
     Every edge of a root plant is a module, so it has no plant ports. A registered plant is a
     building block for other plants: its ports are its interface.
     """
-    if not isinstance(spec, dict) or spec.get("name") in registry.names():
+    if not isinstance(data, dict) or data.get("name") in registry.names():
         return []
     return [
         problem(
@@ -159,67 +160,74 @@ def root_problems(spec):
             "the environment",
         )
         for side in ("inlets", "outlets")
-        for name in spec.get(side, {})
+        for name in data.get(side, {})
     ]
 
 
-def populate(plant, spec, report):
-    """Add the modules, connections, ports, outputs and sections of ``spec`` to ``plant``."""
-    for name, entry in spec.get("modules", {}).items():
+def populate(plant, data, report):
+    """Add the modules, connections, ports, outputs and sections of ``data`` to ``plant``."""
+    for name, entry in data.get("modules", {}).items():
         _entry(plant, "", name, entry, report, f"modules.{name}")
-    for index, item in enumerate(spec.get("connections", [])):
+    for index, item in enumerate(data.get("connections", [])):
         with report.guard(f"connections[{index}]"):
             _connection(plant, item, report)
     for side in ("inlets", "outlets"):
-        for name, end in spec.get(side, {}).items():
+        for name, end in data.get(side, {}).items():
             with report.guard(f"{side}.{name}"):
                 _port(plant, side, name, end, report)
-    _check_ports(plant, spec, report)
-    if "outputs" in spec:
-        _outputs(plant, spec["outputs"], report)
-    for index, item in enumerate(spec.get("constraints", [])):
+    _check_ports(plant, data, report)
+    if "outputs" in data:
+        _outputs(plant, data["outputs"], report)
+    for index, item in enumerate(data.get("constraints", [])):
         with report.guard(f"constraints[{index}]"):
             plant.constrain(**item)
-    read_sections(plant, spec, report)
-    plant._sections = {key: deepcopy(spec.get(key, {})) for key in SECTIONS}
+    read_sections(plant, data, report)
+    plant._sections = {key: deepcopy(data.get(key, {})) for key in SECTIONS}
 
 
-def _handwritten(spec, report):
+def _of_class(cls, data, report):
+    """Return the plant of a class: ``data`` names it and holds its size and its values."""
     with report.guard("type"):
-        found = registry.get(spec["type"])
-        module = found() if isinstance(found, type) else found
-        read_params(module, spec.get("params", {}), report)
-        read_sections(module, spec, report)
-        return module
+        found = cls if cls.__name__ == data["type"] else registry.get(data["type"])
+        if found is not cls and registry.category(data["type"]) != "plants":
+            raise ValidationError(
+                f"type = {data['type']!r}; expected a plant class: wrap a module in a plant",
+                code="invalid_value",
+            )
+        plant = built(found, data.get("size"))
+        read_params(plant, data.get("params", {}), report)
+        read_sections(plant, data, report)
+        plant._sections = {key: deepcopy(data.get(key, {})) for key in SECTIONS}
+        return plant
     return None
 
 
-def build(cls, spec):
-    """Return ``(plant or None, problems)`` for a spec; problems are empty when it is valid."""
+def build(cls, data):
+    """Return ``(plant or None, problems)`` of a plant dict; problems are empty when it is valid."""
     report = Report()
-    error = format_error(spec)
+    error = format_error(data)
     if error is not None:
         report.items.append(located("", error))
         return None, report.items
-    spec = _shape(spec, report)
-    if "type" in spec:
-        plant = _handwritten(spec, report)
+    data = _shape(data, report)
+    if "type" in data:
+        plant = _of_class(cls, data, report)
     else:
-        plant = cls._empty(spec.get("name", "plant"))
-        populate(plant, spec, report)
+        plant = cls._empty(data.get("name", "plant"))
+        populate(plant, data, report)
     return plant, report.items
 
 
-def problems(cls, spec):
-    """Return every problem of ``spec`` as ``[{path, code, message, suggestions}]``."""
-    return build(cls, spec)[1]
+def problems(cls, data):
+    """Return every problem of ``data`` as ``[{path, code, message, suggestions}]``."""
+    return build(cls, data)[1]
 
 
-def read(cls, spec):
-    """Return the plant of ``spec``, or raise a ``ValidationError`` that carries every problem."""
-    error = format_error(spec)
+def read(cls, data):
+    """Return the plant of ``data``, or raise a ``ValidationError`` that carries every problem."""
+    error = format_error(data)
     if error is not None:
         raise error
-    plant, items = build(cls, spec)
+    plant, items = build(cls, data)
     reported(items, "raise")
     return plant

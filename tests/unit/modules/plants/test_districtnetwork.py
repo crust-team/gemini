@@ -7,7 +7,6 @@ import pytest
 import gemini as gm
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import CoolingSubstation, HeatingSubstation
-from gemini.modules.plants._utils import generators
 from gemini.types import Stream
 from tests.fixtures.air import air
 from tests.fixtures.balance import assert_plant_closes
@@ -20,8 +19,8 @@ CHILLED = Stream(m_dot=6.0, T=279.15, p=6e5)
 
 
 def _network(**parameters):
-    """Return a district network of the given size from its template."""
-    return gm.plants.from_template("district_network", parameters)
+    """Return a district network of the given size."""
+    return gm.plants.DistrictNetwork(**parameters)
 
 
 def _leaf_sum(result, name):
@@ -98,8 +97,8 @@ def test_single_consumer_and_invalid_structure(plants):
     result = network(supply_in=HOT.with_(m_dot=2.0), air_in=air(283.15))
     assert _leaf_sum(result, "heat_supplied") == pytest.approx(1.5e5, rel=1e-12)
     with raises(gm.errors.ValidationError, "invalid_design", match="service"):
-        generators.district_network_spec(service="steam")
+        gm.plants.DistrictNetwork(service="steam")
     with raises(gm.errors.ValidationError, "invalid_design", match="consumers"):
-        generators.district_network_spec(consumers=0)
+        gm.plants.DistrictNetwork(consumers=0)
     with pytest.raises(gm.errors.ValidationError, match="service"):
-        gm.plants.from_template("district_network", {"service": "steam"})
+        gm.plants.DistrictNetwork(service="steam")

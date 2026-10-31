@@ -33,11 +33,10 @@ CALLS = {
         {"nope": 1}, on_error="record"
     ),
     "plants.names": lambda plant, results: gm.plants.names(),
-    "plants.templates": lambda plant, results: gm.plants.templates(),
     "plants.validate": lambda plant, results: gm.plants.validate({"format": 2}, on_error="record"),
-    "spec_schema": lambda plant, results: gm.plants.spec_schema(),
+    "schema": lambda plant, results: gm.plants.schema(),
     "profile_schema": lambda plant, results: gm.profiles.profile_schema(),
-    "to_spec": lambda plant, results: plant.to_spec(),
+    "to_spec": lambda plant, results: plant.to_dict(),
     "plant.validate": lambda plant, results: plant.validate(),
     "bindable": lambda plant, results: plant.bindable("heat_exchanger"),
     "params_at": lambda plant, results: plant.params_at("heat_exchanger"),

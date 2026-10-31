@@ -1,1 +1,1 @@
-"""Tools of the plants: the spec, its reader and writer, templates, plans and solves."""
+"""Tools of the plants: the data, its reader and writer, templates, plans and solves."""

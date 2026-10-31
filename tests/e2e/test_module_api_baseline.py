@@ -25,10 +25,9 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.modules.plants._utils import migration
-from gemini.modules.plants._utils.migration import FLUID_NAMES, RENAMED_NAMES
 from tests.fixtures import FIXTURES
 from tests.fixtures.frames import on_ports, path_frame
+from tests.fixtures.old_names import FLUID_NAMES, RENAMED_NAMES, fluid_names
 
 pytestmark = pytest.mark.e2e
 BASELINE = FIXTURES / "module_api_baseline"
@@ -140,7 +139,7 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
         if "path" in old_params:
             old_params["pipe_path"] = old_params.pop("path")
         assert old_params | NEW_PARAMS.get(old_path, {}) == new["params"]
-        assert migration._fluid_names(old["fluid"]) == new["fluid"]
+        assert fluid_names(old["fluid"]) == new["fluid"]
 
     started = perf_counter()
     replay = path_frame(gm.replay(plant, selected_dataset))

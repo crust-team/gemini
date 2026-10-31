@@ -9,7 +9,6 @@ round numbers chosen so that every unit runs.
 import pandas as pd
 
 import gemini as gm
-from gemini.modules.plants._utils import templating
 
 SIZES = {
     "heat_exchanger.thermal_conductance": 1e5,
@@ -91,30 +90,9 @@ ROOT_STREAMS = {}
 BRINE_MODULES = ("doublet", "degasser", "heat_exchanger", "injection_pump")
 
 
-def with_pipes(parameters):
-    """Return ``parameters`` and the geometry and insulation of the four network pipes."""
-    pipes = {f"{pipe}.{name}": value for pipe in PIPES for name, value in PIPE_SIZE.items()}
-    return parameters | pipes
-
-
-def example_values():
-    """Return the ``doublet_heat`` example's module values and fluids as a partial spec."""
-    shared = gm.plants.example("DoubletHeatPlant").to_spec()
-    modules = {name: shared["modules"][name] for name in BRINE_MODULES}
-    return {"modules": modules, "fluids": shared["fluids"]}
-
-
-def filled_spec(name, flags=None):
-    """Return the spec of template ``name`` with the run's sizes and the example values."""
-    declared = templating.load(name)["parameters"]
-    sizes = {key: value for key, value in with_pipes(SIZES).items() if key in declared}
-    template = gm.plants.from_template(name, sizes | (flags or {})).to_spec()
-    values = example_values()
-    for module, entry in values["modules"].items():
-        template["modules"][module]["params"] = (
-            template["modules"][module]["params"] | entry["params"]
-        )
-    return template | {"fluids": values["fluids"]}
+def filled_dict(name):
+    """Return the plant dict of plant class ``name`` with the values of its example."""
+    return gm.plants.example(name).to_dict(structure=True)
 
 
 def configure(plant):

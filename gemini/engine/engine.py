@@ -17,7 +17,9 @@ from gemini.engine.step import BindingPlan
 from gemini.errors import RunError, ValidationError
 from gemini.errors.base import check_on_error
 from gemini.graph import graph_cache
+from gemini.modules._utils import serialization
 from gemini.modules.module import Module, class_path, import_class
+from gemini.modules.plant import Plant
 from gemini.utils.data.dataset import as_dataset
 from gemini.utils.data.loader import Loader
 from gemini.utils.jsonable import to_plain
@@ -36,6 +38,18 @@ def _live_ticks(position, start, end, step):
         return pd.date_range(to_utc(start), to_utc(end), freq=step)
     ticks = pd.date_range(to_utc(position), to_utc(end), freq=step)
     return ticks[ticks > pd.Timestamp(to_utc(position))]
+
+
+def _plant_dict(plant):
+    """Return what a checkpoint stores of ``plant``; a root that is no plant has its tree."""
+    return plant.to_dict() if isinstance(plant, Plant) else serialization.tree_dict(plant)
+
+
+def _rebuilt(cls, data):
+    """Return the root ``_plant_dict`` stored, of class ``cls``."""
+    if issubclass(cls, Plant):
+        return cls.from_dict(data)
+    return serialization.tree_from_dict(cls, data)
 
 
 class Engine:
@@ -278,7 +292,7 @@ class Engine:
         checkpoint = storage.Checkpoint(
             run_kind=self.run_kind,
             plant_class=class_path(type(self.plant)),
-            plant=self.plant.to_dict(),
+            plant=_plant_dict(self.plant),
             module_states=self.module_states,
             clock=self.clock.describe() if self.clock is not None else None,
             position=self.position,
@@ -308,7 +322,7 @@ class Engine:
     def load_checkpoint(cls, path, callbacks=None):
         """Restore a plant, dataset handle, finite schedule, states and completed results."""
         checkpoint = storage.load(path)
-        plant = import_class(checkpoint.plant_class).from_dict(checkpoint.plant)
+        plant = _rebuilt(import_class(checkpoint.plant_class), checkpoint.plant)
         engine = cls(plant, checkpoint.backend, callbacks, checkpoint.on_error)
         engine._restore(checkpoint, Path(path).parent)
         return engine

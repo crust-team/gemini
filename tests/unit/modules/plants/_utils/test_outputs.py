@@ -37,7 +37,7 @@ def test_an_output_takes_the_kind_of_its_paths(plant):
     plant.share = Output.ratio("exchanger.duty", "exchanger.duty")
     plant.total = Output.sum("exchanger.duty", "exchanger.duty")
     assert plant.warming.unit == "K" and plant.total.unit == "W"
-    assert plant._output_specs["warming"] == {
+    assert plant._output_entries["warming"] == {
         "difference": ["exchanger.hot_in.T", "exchanger.hot_out.T"]
     }
 

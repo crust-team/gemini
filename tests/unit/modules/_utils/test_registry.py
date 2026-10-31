@@ -138,14 +138,10 @@ def test_a_taken_name_is_refused(monkeypatch):
     assert registry.register(gm.modules.ESP) is gm.modules.ESP
 
 
-def test_a_spec_plant_builds_a_new_plant_each_time(monkeypatch):
-    """A plant entry is its build function."""
-    monkeypatch.setattr(registry, "_entries", dict(registry._entries))
-    registry.register_plant("Example", lambda: gm.Plant("Example"))
-    assert "Example" in gm.modules.names("plants")
-    assert gm.modules.get("Example") is not gm.modules.get("Example")
-    with pytest.raises(ValidationError, match="already taken"):
-        registry.register_plant("Example", lambda: gm.Plant("Example"))
+def test_a_plant_is_a_class_in_the_registry():
+    """A plant class joins the registry as any module does."""
+    assert "Doublet" in gm.modules.names("plants")
+    assert gm.modules.get("Doublet") is gm.plants.Doublet
 
 
 BOOSTER_FILE = Path(__file__).parents[3] / "fixtures" / "booster_module.py"

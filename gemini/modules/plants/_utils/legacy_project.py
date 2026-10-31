@@ -1,10 +1,10 @@
-"""Convert an old GEMINI project folder into a plant spec."""
+"""Convert an old GEMINI project folder into a plant dict."""
 
 from gemini.modules.plants._utils.catalogue import get
 
 
 def convert_legacy(folder):
-    """Return the format 2 spec of the old GEMINI project in ``folder``.
+    """Return the plant dict of the old GEMINI project in ``folder``.
 
     The folder holds what the old application saved: ``diagram.json`` (the nodes and links),
     one ``<node>_<id>.param`` file per diagram node with its properties, dated values and tag
@@ -16,10 +16,10 @@ def convert_legacy(folder):
     internal ``gemini.utils.legacy.to_dataset``.
 
     The result is ``DoubletHeatPlant`` filled with the converted SI parameters, dated histories,
-    fluids, bindings and assumptions, as ``plant.to_spec()`` writes them. ``gemini.utils.legacy``
+    fluids, bindings and assumptions, as ``plant.to_dict()`` writes them. ``gemini.utils.legacy``
     sits above this package in the import order, so it is imported inside the function.
     """
     from gemini.utils.legacy import read_project, to_plant
 
     project = read_project(folder)
-    return to_plant(project, get("DoubletHeatPlant")).to_spec()
+    return to_plant(project, get("DoubletHeatPlant")).to_dict()

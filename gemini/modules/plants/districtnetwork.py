@@ -22,6 +22,8 @@ class DistrictNetwork(Plant):
     return pipe.
     """
 
+    purpose = "both"
+
     def __init__(self, consumers=2, service="heating"):
         """Build a network of the given size; both are structural arguments."""
         super().__init__()

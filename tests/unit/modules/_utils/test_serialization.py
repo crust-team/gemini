@@ -7,17 +7,19 @@ import pytest
 import gemini as gm
 from gemini.errors import ValidationError
 from gemini.modules._utils import serialization
+from gemini.utils.files import read_json
+from tests.fixtures import FIXTURES
 from tests.fixtures.errors import raises
 
 
-def test_a_handwritten_root_writes_its_class_and_flat_params():
-    """Leaf and composite roots use the same format 2 file."""
+def test_a_tree_that_is_no_plant_stores_flat_params():
+    """What a checkpoint keeps of a root that is no plant reads back to itself."""
     exchanger = gm.modules.HeatExchanger().update_params(hot_nominal_pressure_drop="2 bar")
-    spec = exchanger.to_dict()
-    assert spec["type"] == "HeatExchanger" and spec["format"] == 2
-    assert spec["params"]["hot_nominal_pressure_drop"] == 2e5
-    assert json.dumps(spec, allow_nan=False)
-    assert gm.modules.HeatExchanger.from_dict(spec).to_dict() == spec
+    data = serialization.tree_dict(exchanger)
+    assert data["format"] == 2 and data["params"]["hot_nominal_pressure_drop"] == 2e5
+    assert json.dumps(data, allow_nan=False)
+    rebuilt = serialization.tree_from_dict(gm.modules.HeatExchanger, data)
+    assert serialization.tree_dict(rebuilt) == data
 
 
 def test_fluids_bindings_and_history_round_trip():
@@ -26,18 +28,19 @@ def test_fluids_bindings_and_history_round_trip():
     exchanger.fluid = gm.WATER
     exchanger.set_bindings("", {"duty": {"column": "d", "unit": "kW"}})
     exchanger.set_params("", {"thermal_conductance": 2.0}, valid_from="2020-01-01")
-    spec = exchanger.to_dict()
+    spec = serialization.tree_dict(exchanger)
     assert spec["fluids"][""]["kind"] == "water" and "boundary" not in spec
-    loaded = gm.modules.HeatExchanger.from_dict(spec)
-    assert loaded.fluid == gm.WATER and loaded.to_dict() == spec
+    loaded = serialization.tree_from_dict(gm.modules.HeatExchanger, spec)
+    assert loaded.fluid == gm.WATER and serialization.tree_dict(loaded) == spec
 
 
-def test_old_files_are_refused_with_the_migration_named():
-    """Format 1 raises ``old_format`` and names ``gm.plants.migrate``."""
+def test_old_files_are_refused():
+    """Format 1 raises ``old_format``."""
     with raises(ValidationError, "old_format") as caught:
-        gm.modules.HeatExchanger.from_dict({"version": 1, "modules": {}})
+        gm.plants.from_dict({"version": 1, "modules": {}})
     assert caught.value.code == "old_format"
-    assert "gm.plants.migrate" in str(caught.value)
+    with raises(ValidationError, "old_format"):
+        gm.plants.from_dict(read_json(FIXTURES / "plant_format1.json"))
     assert serialization.format_error({"format": 3}).code == "invalid_format"
 
 

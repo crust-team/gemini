@@ -4,22 +4,22 @@ import pytest
 
 import gemini as gm
 from tests.fixtures.balance import assert_plant_closes
-from tests.fixtures.heating_cooling import configure, filled_spec, two_ticks
+from tests.fixtures.heating_cooling import configure, two_ticks
 
 pytestmark = pytest.mark.e2e
-TEMPLATES = (
-    "heating_only",
-    "heating_absorption_cooling",
-    "heating_heat_pump_compression_cooling",
-    "heating_full_cooling",
-    "heating_cooling",
+PLANTS = (
+    "HeatingPlant",
+    "HeatingAbsorptionCoolingPlant",
+    "HeatingHeatPumpCoolingPlant",
+    "HeatingFullCoolingPlant",
+    "HeatingCoolingPlant",
 )
 
 
-@pytest.mark.parametrize("name", TEMPLATES)
+@pytest.mark.parametrize("name", PLANTS)
 def test_a_heating_and_cooling_plant_closes(name):
     """The root's in and out are the ports of its grids, its air and its aquifers."""
-    plant = configure(gm.plants.from_spec(filled_spec(name)))
+    plant = configure(gm.plants.example(name))
     results = gm.simulate(plant, two_ticks(), on_error="raise")
     assert_plant_closes(plant, results)
 

@@ -220,9 +220,9 @@ def test_a_plant_port_shared_by_two_consumers_gives_their_sum():
     plant.connect("second.fluid_out", "product")
     plant.connect("power_in", "first.power_in")
     plant.connect("power_in", "second.power_in")
-    assert plant.to_spec()["inlets"]["power_in"] == ["first.power_in", "second.power_in"]
+    assert plant.to_dict()["inlets"]["power_in"] == ["first.power_in", "second.power_in"]
     assert plant(feed=STREAM).inlets.power_in == 80.0
-    assert gm.plants.from_spec(plant.to_spec()).to_spec() == plant.to_spec()
+    assert gm.plants.from_dict(plant.to_dict()).to_dict() == plant.to_dict()
 
 
 def test_a_second_end_is_refused_on_a_plain_stream_port():

@@ -66,7 +66,7 @@ def problem(path, code, message, suggestions=(), time=None):
 class GeminiError(Exception):
     """Base class of every error GEMINI raises on purpose; catch it to handle them all.
 
-    ``path`` says where the problem is (a dotted module path or a path into a spec),
+    ``path`` says where the problem is (a dotted module path or a path into a data),
     ``suggestions`` lists close valid names and ``code`` is one of ``CODES``, by default the
     class attribute. ``to_dict`` gives the JSON form used in ``422`` details and tool results.
     ``problems`` lists every problem as such a dictionary: all of them when the error comes from

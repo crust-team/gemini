@@ -144,7 +144,7 @@ def test_sections_are_checked_per_path(spec):
 
 
 def test_read_raises_one_error_that_lists_every_problem(spec):
-    """``from_spec`` raises a ``ValidationError`` with all messages and the first path."""
+    """``from_dict`` raises a ``ValidationError`` with all messages and the first path."""
     spec["modules"]["degasser"]["type"] = "Degaser"
     spec["modules"]["pipe"]["params"] = {"lenght": 1}
     with pytest.raises(ValidationError) as caught:

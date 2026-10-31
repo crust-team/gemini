@@ -36,7 +36,7 @@ def bindings(plant):
     plant.set_bindings(
         "doublet.esp", {"frequency": "esp_hz", "fluid_in.p": {"column": "p_in", "unit": "bar"}}
     )
-    print(f"Bound names:           {', '.join(sorted(plant.to_spec()['bindings']['doublet.esp']))}")
+    print(f"Bound names:           {', '.join(sorted(plant.to_dict()['bindings']['doublet.esp']))}")
 
 
 def main():

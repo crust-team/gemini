@@ -83,14 +83,14 @@ class Clock:
         return dict(kind="ticks", ticks=[t.isoformat() for t in self.ticks], step=str(self.step))
 
     @staticmethod
-    def reopen(spec):
+    def reopen(data):
         """Restore the precise finite tick schedule from a checkpoint."""
-        if spec.get("kind") == "fixed":
-            return FixedClock(spec["start"], spec["end"], spec["step"])
-        if spec.get("kind") == "ticks":
-            return Clock(spec["ticks"], spec["step"])
+        if data.get("kind") == "fixed":
+            return FixedClock(data["start"], data["end"], data["step"])
+        if data.get("kind") == "ticks":
+            return Clock(data["ticks"], data["step"])
         raise RunError(
-            f"Clock: kind = {spec.get('kind')!r}; expected 'fixed' or 'ticks'", code="checkpoint"
+            f"Clock: kind = {data.get('kind')!r}; expected 'fixed' or 'ticks'", code="checkpoint"
         )
 
     @staticmethod

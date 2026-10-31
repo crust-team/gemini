@@ -69,7 +69,7 @@ class Failed(Operators, Symbolic):
         """Raise the error."""
         raise self.error
 
-    def __format__(self, spec):
+    def __format__(self, data):
         """Raise the error."""
         raise self.error
 

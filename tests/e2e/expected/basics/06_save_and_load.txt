@@ -1,5 +1,7 @@
-Modules in the spec:     5
-Connections in the spec: 6
-Same spec rebuilt:       True
+Stored class:            DoubletHeatPlant
+Stored values:           44
+Same plant rebuilt:      True
+Modules in the dict:     5
+Connections in the dict: 6
 Conductance after load:  100 kW/K
-Same spec loaded:        True
+Same plant loaded:       True

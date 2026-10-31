@@ -83,7 +83,7 @@ class Proxy(Symbolic, Operators):
         """Refuse use as an index."""
         raise self._untraceable("an index")
 
-    def __format__(self, spec):
+    def __format__(self, data):
         """Refuse string formatting of a value that has no number yet."""
         raise self._untraceable("string formatting")
 

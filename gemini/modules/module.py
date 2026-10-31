@@ -28,7 +28,7 @@ from gemini import backends, ops
 from gemini.backends import runtime
 from gemini.errors import DefinitionError, PhysicsError, ValidationError
 from gemini.errors.lookup import UnknownMember
-from gemini.modules._utils import description, design, serialization
+from gemini.modules._utils import description, design
 from gemini.physics import units
 from gemini.types.bindings import DatedParams
 from gemini.types.declarations import (
@@ -47,7 +47,6 @@ from gemini.types.fluid import Fluid
 from gemini.types.ports import Ports
 from gemini.types.results import ModuleResult
 from gemini.utils.context import ContextSetting
-from gemini.utils.files import read_json, write_json
 from gemini.utils.hooks import RemovableHandle, has_signature
 from gemini.utils.mappings import get_nested, set_nested
 from gemini.utils.strings import (
@@ -1269,19 +1268,6 @@ class Module:
             object.__setattr__(module, "_fluid", fluid)
         return self
 
-    def to_spec(self):
-        """Return the plant file of this tree: format 2, a root ``type`` and flat ``params``."""
-        return serialization.module_spec(self)
-
-    def to_dict(self):
-        """Return the plant file, the same document as ``to_spec``."""
-        return self.to_spec()
-
-    @classmethod
-    def from_dict(cls, data):
-        """Build this class and fill it from a format 2 plant file."""
-        return serialization.module_from_spec(cls, data)
-
     def set_params(self, path, params, valid_from=None):
         """Store validated parameters of the module at ``path`` as a dated snapshot.
 
@@ -1310,15 +1296,6 @@ class Module:
     def set_bindings(self, path, bindings):
         """Replace the bindings of the module at ``path``; units are checked. Returns the module."""
         return design.set_bindings(self, path, bindings)
-
-    def save(self, path):
-        """Save the complete portable module tree as JSON."""
-        write_json(path, self.to_dict())
-
-    @classmethod
-    def load(cls, path):
-        """Load a JSON plant file as this exact self-building class."""
-        return cls.from_dict(read_json(path))
 
     def extra_repr(self):
         """Display up to four initialized scalar parameters."""

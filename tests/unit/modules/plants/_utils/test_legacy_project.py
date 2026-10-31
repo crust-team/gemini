@@ -11,7 +11,7 @@ def test_the_example_project_converts_to_the_shared_plant_file():
     spec = legacy_project.convert_legacy(OLD_PROJECT)
     assert spec == gm.plants.example("DoubletHeatPlant").to_dict()
     assert gm.plants.validate(spec) == []
-    assert gm.plants.from_spec(spec).to_spec() == spec
+    assert gm.plants.from_dict(spec).to_dict() == spec
 
 
 def test_the_public_name_is_the_same_function():

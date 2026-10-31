@@ -35,6 +35,8 @@ class MultiWellPlant(Plant):
     splitters. The field produces from every limb, mixes, then injects.
     """
 
+    purpose = "both"
+
     def __init__(self, producers=2, injectors=1):
         """Build a field of the given size; both are structural arguments."""
         super().__init__()

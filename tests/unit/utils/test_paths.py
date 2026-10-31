@@ -7,9 +7,7 @@ from gemini.utils import paths
 
 
 def test_the_package_finds_its_folders():
-    """The asset folders are inside the package and ``inputs/`` is next to it."""
-    assert paths.ASSET_PLANTS.parent.parent == paths.PACKAGE
-    assert paths.ASSET_TEMPLATES.parent.parent == paths.PACKAGE
+    """``inputs/`` is next to the package."""
     assert paths.INPUTS.parent == paths.PACKAGE.parent
 
 

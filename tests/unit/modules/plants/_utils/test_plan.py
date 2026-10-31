@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from gemini.modules.plants._utils import library, plan
+from gemini.modules.plants._utils import plan
 
 
 def test_split_end_splits_at_the_last_dot():
@@ -30,7 +30,7 @@ def test_members_look_through_groups():
 
 def test_the_plan_names_where_every_inlet_comes_from():
     """Steps take their streams from plant inlets or from an earlier step's outlet."""
-    plant = library.build("Doublet")
+    plant = gm.plants.get("Doublet")
     steps = plant._compiled()
     sink = next(step for step in steps.steps if step.path == "sink")
     assert sink.arguments == {"sandface_in": ("step", "injector", "bottom_out")}

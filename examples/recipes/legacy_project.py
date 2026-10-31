@@ -24,7 +24,7 @@ def main():
     rows = pd.read_csv(PROJECT / "doublet_2024_old.csv", sep=";")
     stored = gm.plants.example("DoubletHeatPlant").to_dict()
     print(f"Old project rows:     {len(rows)}")
-    print(f"Modules converted:    {len(plant.to_spec()['modules'])}")
+    print(f"Modules converted:    {len(plant.to_dict(structure=True)['modules'])}")
     print(f"Same as the stored plant file: {spec == stored}")
 
 

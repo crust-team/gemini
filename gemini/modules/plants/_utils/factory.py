@@ -1,4 +1,4 @@
-"""Make the module a spec or a call to ``Plant.add`` names: a registry type or a group."""
+"""Make the module a plant dict or a call to ``Plant.add`` names: a registry type or a group."""
 
 from gemini.errors import ValidationError
 from gemini.modules._utils import registry
@@ -28,4 +28,16 @@ def make_module(type_name, size=None):
             f"add: type = {type_name!r}; register the class with gm.modules.register first",
             code="invalid_value",
         )
-    return (found(**(size or {})) if isinstance(found, type) else found), name
+    return built(found, size), name
+
+
+def built(cls, size):
+    """Return a new ``cls`` of the structural arguments ``size``."""
+    try:
+        return cls(**(size or {}))
+    except TypeError as error:
+        raise ValidationError(
+            f"size = {size!r}; expected the structural arguments of {cls.__name__}: {error}",
+            path="size",
+            code="invalid_value",
+        ) from error
