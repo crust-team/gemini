@@ -9,7 +9,7 @@ class WasteGrid(Module):
     """Where blowdown, sand and other discarded flows leave the plant.
 
     ``waste_in`` takes any number of connections. What leaves is read from the port; the disposal
-    cost per kg is ``waste_disposal_price`` of ``gm.Assumptions``.
+    cost per kg is ``prices["waste_disposal"]`` of ``gm.Assumptions``.
     """
 
     def __init__(self):

@@ -3,6 +3,7 @@
 CODES = (
     "error",
     "invalid_value",
+    "conflicting_value",
     "out_of_bounds",
     "missing_value",
     "no_value",

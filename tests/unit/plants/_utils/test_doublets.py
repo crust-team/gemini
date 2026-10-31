@@ -156,16 +156,11 @@ def test_the_stored_plant_keeps_the_depth_and_no_derived_value():
     assert plant.to_dict()["params"] == {"depth": "3000 m"} | GEOTHERM
 
 
-def test_depth_without_a_geotherm_names_each_missing_value():
-    """The gradient and the surface temperature have no default: the error names both."""
-    plant = gm.plants.HeatingPlant(doublets=2)
-    with pytest.raises(ValidationError) as caught:
-        plant.set_params("", {"depth": "3000 m"})
-    assert caught.value.code == "missing_value"
-    assert [item["path"] for item in caught.value.problems] == [
-        "gradient",
-        "surface_temperature",
-    ]
+def test_a_depth_on_a_plant_waits_for_the_geotherm_of_each_doublet():
+    """The geotherm may come later, as a site value does."""
+    plant = gm.plants.HeatingPlant(doublets=1).set_params("", {"depth": "3000 m"})
+    assert plant.d0.depth == 3000.0
+    assert plant.d0.reservoir._params_at(None).get("temperature") is None
 
 
 def test_the_geotherm_of_one_doublet_may_come_in_the_call_of_the_depth():

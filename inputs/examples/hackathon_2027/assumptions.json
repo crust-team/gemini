@@ -1,16 +1,18 @@
 {
   "discount_rate": 0.05,
   "lifetime_years": 25,
-  "electricity_price": 2.7777777777777777e-08,
-  "gas_price": 40.0,
-  "heat_price": 1.6666666666666667e-08,
-  "cold_price": 1.6666666666666667e-08,
   "electricity_emission_factor": 8.333333333333333e-08,
   "pump_cost": 0.5,
   "chiller_cost": 0.3,
   "exchanger_cost": 0.5,
   "flare_cost": 100000.0,
   "makeup_cost": 50000.0,
-  "waste_disposal_price": 0.2,
-  "chemical_price": 3.0
+  "prices": {
+    "electricity": 2.7777777777777777e-08,
+    "gas": "40 EUR/MWh",
+    "heat": 1.6666666666666667e-08,
+    "cold": 1.6666666666666667e-08,
+    "waste_disposal": 0.2,
+    "chemical": 3.0
+  }
 }

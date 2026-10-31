@@ -1,9 +1,9 @@
 """Net present value and payback of a plant run."""
 
-from gemini.evaluate.costs import annual_energies, capex, opex
+from gemini.evaluate.costs import annual_energies, capex, mean_price, opex
 from gemini.evaluate.levelised import annuity
 from gemini.evaluate.outcome import currency_of, reported, unavailable
-from gemini.run.assumptions import discounting, require, resolve
+from gemini.run.assumptions import discounting, resolve
 from gemini.types.shapes import value
 
 
@@ -11,9 +11,9 @@ def _revenue(assumptions, annual):
     """Return the yearly revenue from the heat and cold sold; a needed price must be given."""
     revenue = 0.0
     if annual.heat > 0:
-        revenue += annual.heat * require(assumptions, "heat_price")
+        revenue += annual.heat * mean_price(assumptions, "heat")
     if annual.cold > 0:
-        revenue += annual.cold * require(assumptions, "cold_price")
+        revenue += annual.cold * mean_price(assumptions, "cold")
     return revenue
 
 
@@ -32,7 +32,7 @@ def npv(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_
 
     ``A`` is the annuity factor, the sum over the lifetime years of ``1 / (1 + rate) ** t``.
     The yearly revenue is the heat and cold delivered per year (``annual_energies``) at
-    ``heat_price`` and ``cold_price``; the yearly cost is ``opex``. Both are constant over the
+    the prices of ``heat`` and ``cold``; the yearly cost is ``opex``. Both are constant over the
     lifetime, with no degradation, tax, replacement or residual value.
 
     Parameters
@@ -88,7 +88,7 @@ def payback(plant, results, assumptions=None, on_error="raise"):
     plant, results : Module, Results
         A plant and its finished run.
     assumptions : Assumptions, optional
-        ``heat_price``, ``cold_price`` and the energy prices, as for ``npv``; anything needed and
+        the prices of ``heat``, ``cold`` and energy, as for ``npv``; anything needed and
         missing raises ``ValidationError`` (code ``missing_value``).
     on_error : {"raise", "record"}, optional
         A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.

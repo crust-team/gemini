@@ -23,7 +23,9 @@ CORROSION = {
     "minimum_thickness": 0.005,
     "start": "2024-01-01T00:00:00Z",
 }
-VALUES = gm.Assumptions(electricity_price=2e-8, heat_price=5e-8, electricity_emission_factor=1e-7)
+VALUES = gm.Assumptions(
+    electricity_emission_factor=1e-7, prices={"electricity": 2e-8, "heat": 5e-8}
+)
 
 
 @pytest.fixture(scope="module")

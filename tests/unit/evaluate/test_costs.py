@@ -152,7 +152,7 @@ def test_annual_energies_scale_the_window_to_a_year():
 
 def test_opex_adds_fixed_variable_and_energy_bill():
     """10 EUR fixed, 1e-9 EUR/J of heat and the electricity at 2e-8 EUR/J."""
-    values = gm.Assumptions(electricity_price=2e-8)
+    values = gm.Assumptions(prices={"electricity": 2e-8})
     result = gm.evaluate.opex(heating_plant(), day(), values)
     components = {name: item["value"] for name, item in result["components"].items()}
     assert {item["unit"] for item in result["components"].values()} == {"EUR/year"}
@@ -166,30 +166,30 @@ def test_opex_adds_fixed_variable_and_energy_bill():
 
 def test_opex_needs_the_price_of_an_energy_the_run_draws():
     """Electricity is drawn but has no price: the user is asked, not guessed for."""
-    with pytest.raises(gm.errors.ValidationError, match="electricity_price") as error:
+    with pytest.raises(gm.errors.ValidationError, match="electricity") as error:
         gm.evaluate.opex(heating_plant(), day())
     assert error.value.code == "missing_assumption"
 
 
-def test_gas_price_buys_purchased_gas_only():
+def test_the_gas_price_buys_purchased_gas_only():
     """Co-produced gas costs nothing; a price per MWh prices what was purchased."""
     columns = {
         "grid": {"net_import": [0.0] * HOURS},
         "gas": {"gas_out.chemical_flow": [1e6] * HOURS},
     }
-    values = gm.Assumptions(gas_price=40.0)
+    values = gm.Assumptions(prices={"gas": "40.0 EUR/MWh"})
     annual = costs.annual_energies(heating_plant(), make_results(columns))
     bill = costs._bill(values, annual)
     assert bill["fuel"] == pytest.approx(annual.fuel / 3.6e9 * 40.0)
     assert annual.fuel == pytest.approx(1e6 * SECONDS_PER_YEAR)
-    with pytest.raises(gm.errors.ValidationError, match="gas_price") as error:
+    with pytest.raises(gm.errors.ValidationError, match="gas") as error:
         costs._bill(gm.Assumptions(), annual)
     assert error.value.code == "missing_assumption"
 
 
 def test_opex_without_declared_costs_reports_only_the_bill():
     """No declared cost: the value is null and says why; the bill is still given."""
-    values = gm.Assumptions(electricity_price=2e-8)
+    values = gm.Assumptions(prices={"electricity": 2e-8})
     result = gm.evaluate.opex(heating_plant(costed=False), day(), values, on_error="record")
     assert result["value"] is None and result["reason"] == costs.NO_COST
     assert result["components"]["electricity"]["value"] == pytest.approx(
@@ -199,7 +199,7 @@ def test_opex_without_declared_costs_reports_only_the_bill():
 
 def test_opex_refuses_prices_in_another_currency():
     """A cost in EUR and assumptions in USD do not mix."""
-    values = gm.Assumptions(electricity_price=2e-8, currency="USD")
+    values = gm.Assumptions(currency="USD", prices={"electricity": 2e-8})
     with pytest.raises(gm.errors.ValidationError, match="currency"):
         gm.evaluate.opex(heating_plant(), day(), values)
 

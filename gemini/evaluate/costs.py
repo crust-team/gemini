@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass
 
-from gemini import units
+import numpy as np
+
 from gemini.errors import ValidationError
 from gemini.evaluate.outcome import currency_of, reported, unavailable
 from gemini.evaluate.series import edge_total, energy, useful_cold, useful_heat, window_seconds
 from gemini.modules.grids import ChemicalGrid, ElectricityGrid, GasGrid, WasteGrid
-from gemini.run.assumptions import require, resolve
+from gemini.run.assumptions import resolve
 from gemini.types.cost import total_cost
 from gemini.types.shapes import value
 from gemini.units import SECONDS_PER_YEAR
@@ -90,19 +91,23 @@ def capex(plant, assumptions=None, on_error="raise"):
     return reported(on_error, currency_of(assumptions), compute)
 
 
+def mean_price(assumptions, carrier):
+    """Return the price of ``carrier`` in SI, as one number over the run."""
+    return float(np.mean(assumptions.price(carrier)))
+
+
 def _bill(assumptions, annual):
     """Return the yearly bills of what the plant buys and discards; a needed price must be given."""
     electricity = fuel = 0.0
     if annual.grid > 0:
-        electricity = annual.grid * require(assumptions, "electricity_price")
+        electricity = annual.grid * mean_price(assumptions, "electricity")
     if annual.fuel > 0:
-        price = require(assumptions, "gas_price")
-        fuel = annual.fuel * units.convert(price, "currency/MWh", "currency/J")
+        fuel = annual.fuel * mean_price(assumptions, "gas")
     waste = chemical = 0.0
     if annual.waste > 0:
-        waste = annual.waste * require(assumptions, "waste_disposal_price")
+        waste = annual.waste * mean_price(assumptions, "waste_disposal")
     if annual.chemical > 0:
-        chemical = annual.chemical * require(assumptions, "chemical_price")
+        chemical = annual.chemical * mean_price(assumptions, "chemical")
     return {"electricity": electricity, "fuel": fuel, "waste": waste, "chemical": chemical}
 
 
@@ -126,7 +131,7 @@ def opex(plant, results, assumptions=None, on_error="raise"):
     results : Results
         A finished run of the plant.
     assumptions : Assumptions, optional
-        ``electricity_price`` [currency/J] and ``gas_price`` [currency/MWh], needed only for an
+        the prices of ``electricity`` and ``gas``, needed only for an
         energy that the run buys; a missing needed price raises ``ValidationError`` (code
         ``missing_assumption``). Co-produced gas costs nothing.
     on_error : {"raise", "record"}, optional

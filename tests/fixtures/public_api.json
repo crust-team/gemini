@@ -174,6 +174,7 @@
  "codes": [
   "error",
   "invalid_value",
+  "conflicting_value",
   "out_of_bounds",
   "missing_value",
   "no_value",
@@ -615,6 +616,7 @@
  "top_level": [
   "Assumptions",
   "BRINE",
+  "Constraint",
   "Dataset",
   "Engine",
   "Fluid",
@@ -624,6 +626,7 @@
   "Output",
   "Parameter",
   "Plant",
+  "Problem",
   "Results",
   "Stream",
   "WATER",

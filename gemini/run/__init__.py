@@ -2,12 +2,16 @@
 
 from .assumptions import Assumptions
 from .call import evaluate as call
+from .constraint import Constraint
 from .dataset import Dataset
+from .problem import Problem
 from .results import Results
 from .schedule import schedule
 from .simulate import live, replay, resume, simulate
 
 __all__ = [
+    "Problem",
+    "Constraint",
     "Assumptions",
     "schedule",
     "simulate",

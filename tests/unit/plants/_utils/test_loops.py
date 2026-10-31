@@ -91,7 +91,7 @@ class Circuit(Plant):
 
 def circuit(**rule):
     """Return a circuit whose relaxer follows ``rule``."""
-    relaxer = type("Rule", (Relaxer,), rule)
+    relaxer = type("Rule", (Relaxer,), rule | {"abstract": True})
     return type("Ring", (Circuit,), {"relaxer_class": relaxer})()
 
 

@@ -6,6 +6,7 @@ from pydantic import ValidationError as FieldError
 import gemini as gm
 from gemini.run import assumptions as module
 from gemini.run.assumptions import COST_SOURCES, Assumptions
+from tests.fixtures.errors import raises
 
 
 def test_only_the_sourced_defaults_are_set():
@@ -18,12 +19,7 @@ def test_only_the_sourced_defaults_are_set():
     assert [name for name, value in given.items() if value is None] == [
         "discount_rate",
         "lifetime_years",
-        "electricity_price",
-        "gas_price",
-        "waste_disposal_price",
-        "chemical_price",
-        "heat_price",
-        "cold_price",
+        "co2_price",
         "electricity_emission_factor",
         "heat_cost_share",
         "pump_cost",
@@ -49,10 +45,8 @@ def test_the_object_is_frozen_strict_and_checked():
     values = Assumptions(discount_rate=0.05)
     with pytest.raises(FieldError):
         values.discount_rate = 0.1
-    with pytest.raises(FieldError):
+    with raises(gm.errors.ValidationError, "unknown_name"):
         Assumptions(discount_rat=0.05)
-    with pytest.raises(FieldError):
-        Assumptions(heat_price=-1)
 
 
 def test_resolve_gives_the_defaults_for_none_and_refuses_other_types():
@@ -80,3 +74,65 @@ def test_discounting_prefers_the_arguments_and_checks_them():
         module.discounting(values, None, 0)
     with pytest.raises(gm.errors.ValidationError, match="discount_rate"):
         module.discounting(values, -0.1, None)
+
+
+def test_a_round_trip_keeps_the_values():
+    """``from_dict`` of ``to_dict`` gives the same assumptions, and only what differs is stored."""
+    values = Assumptions(discount_rate=0.05, prices={"gas": "40 EUR/MWh"}, co2_price="80 EUR/t")
+    assert values.to_dict() == {
+        "discount_rate": 0.05,
+        "prices": {"gas": "40 EUR/MWh"},
+        "co2_price": "80 EUR/t",
+    }
+    assert Assumptions.from_dict(values.to_dict()) == values
+
+
+def test_the_schema_describes_the_fields():
+    """The schema is plain JSON and names the new fields."""
+    properties = Assumptions.schema()["properties"]
+    assert {"prices", "co2_price", "discount_rate"} <= set(properties)
+
+
+def test_a_price_is_a_number_a_text_or_a_profile():
+    """Every form gives SI numbers."""
+    values = Assumptions(
+        prices={
+            "electricity": 2e-8,
+            "gas": "36 EUR/MWh",
+            "heat": [1.0, 2.0],
+            "cold": {"unit": "EUR/MWh", "values": [3.6, 7.2]},
+            "chemical": "3 EUR/kg",
+        },
+        co2_price="80 EUR/t",
+    )
+    assert values.price("electricity") == 2e-8
+    assert values.price("gas") == pytest.approx(1e-8)
+    assert values.price("heat").tolist() == [1.0, 2.0]
+    assert values.price("cold") == pytest.approx([1e-9, 2e-9])
+    assert values.price("chemical") == 3.0
+    assert values.co2_cost() == pytest.approx(0.08)
+
+
+def test_a_missing_price_names_the_carrier():
+    """Nobody gave it: ``missing_assumption``, or ``None`` when it is not required."""
+    with raises(gm.errors.ValidationError, "missing_assumption", match="prices.gas"):
+        Assumptions().price("gas")
+    assert Assumptions().price("gas", required=False) is None
+
+
+@pytest.mark.parametrize(
+    "fields,code",
+    [
+        ({"discount_rate": -1}, "out_of_bounds"),
+        ({"heat_cost_share": 2}, "out_of_bounds"),
+        ({"discount": 0.05}, "unknown_name"),
+        ({"lifetime_years": "long"}, "invalid_value"),
+        ({"prices": {"steam": 1.0}}, "unknown_name"),
+        ({"prices": {"gas": "1 EUR/kg"}}, "invalid_unit"),
+        ({"co2_price": "1 EUR/MWh"}, "invalid_unit"),
+    ],
+)
+def test_a_field_is_refused_with_its_code(fields, code):
+    """What pydantic and the prices refuse is a ``gm.errors`` code."""
+    with raises(gm.errors.ValidationError, code):
+        Assumptions(**fields)

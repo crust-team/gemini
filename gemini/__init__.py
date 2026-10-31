@@ -20,7 +20,9 @@ from gemini.modules import Inlet, Module, Outlet, Output, Parameter
 from gemini.plants import Plant
 from gemini.run import (
     Assumptions,
+    Constraint,
     Dataset,
+    Problem,
     Results,
     call,
     live,
@@ -43,6 +45,8 @@ __all__ = [
     "Fluid",
     "BRINE",
     "WATER",
+    "Problem",
+    "Constraint",
     "Assumptions",
     "schedule",
     "simulate",

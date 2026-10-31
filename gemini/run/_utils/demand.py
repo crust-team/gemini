@@ -1,8 +1,9 @@
-"""Demand profiles built from a file or from values, in the run-input format.
+"""Demand profiles built from a file, from values or from a frame, in the run-input format.
 
 A profile is a frame with a UTC ``DatetimeIndex`` called ``time`` at a constant step, one column per
-demand quantity in W, and ``attrs["units"]`` and ``attrs["quantities"]``: the input of
-``gm.schedule``. Both loaders validate it the same way.
+demand quantity in W, and ``attrs["units"]`` and ``attrs["quantities"]``: the demand of a
+``gm.Problem``. Every reader validates it the same way. It lives here because a ``gm.Problem`` reads
+it and ``gm.run`` imports no ``gm.data``, which exports ``from_csv`` and ``from_values``.
 """
 
 import numpy as np
@@ -57,14 +58,14 @@ def from_csv(path, columns, unit, time_column=None):
     missing = [name for name in wanted if name not in frame]
     if missing:
         raise ValidationError(
-            f"profiles.from_csv: column {missing[0]!r} not in {path}; expected one of "
+            f"data.from_csv: column {missing[0]!r} not in {path}; expected one of "
             f"{join_names(frame.columns)}{did_you_mean(missing[0], frame.columns)}",
             path=missing[0],
             suggestions=close_matches(missing[0], frame.columns),
             code="missing_column",
         )
     values = {quantity: frame[name] for name, quantity in columns.items()}
-    return _profile(_timestamps(frame[time_column]), values, unit)
+    return _profile(_timestamps(frame[time_column]), values, dict.fromkeys(values, unit))
 
 
 def from_values(values, unit, start, step, quantity):
@@ -99,12 +100,66 @@ def from_values(values, unit, start, step, quantity):
         first = to_utc(start)
     except (TypeError, ValueError) as error:
         raise ValidationError(
-            f"profiles.from_values: step = {step!r}, start = {start!r}; expected a duration and "
+            f"data.from_values: step = {step!r}, start = {start!r}; expected a duration and "
             "an ISO-8601 time",
             code="invalid_value",
         ) from error
     index = pd.DatetimeIndex(pd.date_range(first, periods=len(values), freq=interval), name="time")
-    return _profile(index, {quantity: pd.Series(list(values))}, unit)
+    return _profile(index, {quantity: pd.Series(list(values))}, {quantity: unit})
+
+
+def from_frame(frame):
+    """Return ``frame``, a demand of ``from_csv`` or ``from_values`` or several joined, validated.
+
+    A column without a unit in ``attrs["units"]`` is in W, which is what these functions store;
+    joining frames drops ``attrs``.
+    """
+    if not isinstance(frame, pd.DataFrame) or not isinstance(frame.index, pd.DatetimeIndex):
+        raise ValidationError(
+            f"demand = {type(frame).__name__}; expected the frame of gm.data.from_csv or "
+            "from_values",
+            path="demand",
+            code="invalid_value",
+        )
+    if frame.index.tz is None:
+        raise ValidationError(
+            "demand: time has no zone; expected a UTC index", path="demand", code="invalid_value"
+        )
+    stated = frame.attrs.get("units", {})
+    values = {name: frame[name].reset_index(drop=True) for name in frame}
+    return _profile(frame.index, values, {name: stated.get(name, "W") for name in frame})
+
+
+def from_dict(data):
+    """Return the demand of a dictionary of ``to_dict``, the arguments of ``from_values``."""
+    missing = [name for name in ("start", "step", "units", "values") if name not in data]
+    if missing:
+        raise ValidationError(
+            f"demand: {join_names(missing)} missing; expected start, step, units and values",
+            path=f"demand.{missing[0]}",
+            code="missing_value",
+        )
+    frames = [
+        from_values(column, data["units"].get(name, "W"), data["start"], data["step"], name)
+        for name, column in data["values"].items()
+    ]
+    frame = pd.concat(frames, axis=1)
+    return from_frame(frame)
+
+
+def to_dict(frame):
+    """Return a demand as plain data: start, step, units, quantities and the values per column.
+
+    A demand of one row has no spacing, so it states a step of one second.
+    """
+    seconds = (frame.index[1] - frame.index[0]).total_seconds() if len(frame) > 1 else 1.0
+    return {
+        "start": frame.index[0].isoformat(),
+        "step": seconds,
+        "units": dict(frame.attrs["units"]),
+        "quantities": dict(frame.attrs["quantities"]),
+        "values": {name: frame[name].tolist() for name in frame},
+    }
 
 
 def _timestamps(column):
@@ -113,20 +168,21 @@ def _timestamps(column):
         return to_utc_index(column)
     except (TypeError, ValueError) as error:
         raise RunError(
-            f"profiles: time column = {column.name!r}; expected timestamps ({error})",
+            f"demand: time column = {column.name!r}; expected timestamps ({error})",
             code="invalid_data",
         ) from error
 
 
-def _profile(index, values, unit):
-    """Return the validated frame of ``values`` [``unit``] on ``index``, in W."""
+def _profile(index, values, column_units):
+    """Return the validated frame of ``values`` on ``index`` in W, from ``{column: unit}``."""
     index = pd.DatetimeIndex(index, name="time")
-    for quantity in values:
+    for quantity, unit in column_units.items():
         _checked_quantity(quantity, unit)
     _checked_index(index)
     data = {}
     for quantity, column in values.items():
-        data[quantity] = units.array_convert(_checked_values(quantity, column), unit, "W")
+        number = _checked_values(quantity, column)
+        data[quantity] = units.array_convert(number, column_units[quantity], "W")
     frame = pd.DataFrame(data, index=index)
     frame.attrs["units"] = dict.fromkeys(data, "W")
     frame.attrs["quantities"] = {name: QUANTITIES[name] for name in data}
@@ -137,7 +193,7 @@ def _checked_quantity(quantity, unit):
     """Raise unless ``quantity`` is a demand and ``unit`` a unit of its dimension."""
     if quantity not in QUANTITIES:
         raise ValidationError(
-            f"profiles: quantity = {quantity!r}; expected {join_names(QUANTITIES)}"
+            f"demand: quantity = {quantity!r}; expected {join_names(QUANTITIES)}"
             f"{did_you_mean(quantity, QUANTITIES)}",
             path=str(quantity),
             suggestions=close_matches(quantity, QUANTITIES),
@@ -146,7 +202,7 @@ def _checked_quantity(quantity, unit):
     expected = SI_UNITS[QUANTITIES[quantity]]
     if units.si_unit(unit) != expected:
         raise ValidationError(
-            f"profiles: {quantity} unit = {unit!r}; expected a unit of {expected!r}",
+            f"demand: {quantity} unit = {unit!r}; expected a unit of {expected!r}",
             path=quantity,
             code="invalid_unit",
         )
@@ -155,7 +211,7 @@ def _checked_quantity(quantity, unit):
 def _checked_index(index):
     """Raise unless ``index`` is monotonic, without repeats or gaps, at a constant step."""
     if len(index) == 0 or index.hasnans:
-        raise RunError("profiles: time = empty or NaT; expected timestamps", code="invalid_data")
+        raise RunError("demand: time = empty or NaT; expected timestamps", code="invalid_data")
     steps = np.diff(index.asi8)
     problems = [
         (steps < 0, "increasing timestamps"),
@@ -165,7 +221,7 @@ def _checked_index(index):
     for found, expected in problems:
         if found.any():
             raise RunError(
-                f"profiles: time = {index[1:][found][0].isoformat()}; expected {expected}",
+                f"demand: time = {index[1:][found][0].isoformat()}; expected {expected}",
                 code="invalid_data",
             )
 
@@ -176,13 +232,13 @@ def _checked_values(quantity, column):
     absent = np.isnan(numbers)
     if absent.any():
         raise ValidationError(
-            f"profiles: {quantity} row {int(absent.argmax())} is missing; expected a number",
+            f"demand: {quantity} row {int(absent.argmax())} is missing; expected a number",
             path=quantity,
             code="missing_value",
         )
     if (numbers < 0).any():
         raise ValidationError(
-            f"profiles: {quantity} row {int((numbers < 0).argmax())} = {numbers.min()}; "
+            f"demand: {quantity} row {int((numbers < 0).argmax())} = {numbers.min()}; "
             "expected zero or more",
             path=quantity,
             code="out_of_bounds",

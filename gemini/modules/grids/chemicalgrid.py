@@ -10,8 +10,8 @@ class ChemicalGrid(Module):
     """Where a chemical product enters the plant.
 
     ``chemical_out`` is offered without flow at normal conditions and the dosing module returns what
-    it takes, so the dosed amount is read from the port. The product price is ``chemical_price`` of
-    ``gm.Assumptions``.
+    it takes, so the dosed amount is read from the port. The product price is
+    ``prices["chemical"]`` of ``gm.Assumptions``.
     """
 
     def __init__(self):

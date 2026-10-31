@@ -9,7 +9,7 @@ from gemini.units import SECONDS_PER_YEAR
 from tests.fixtures.costed_plants import cooling_plant, day, heating_plant
 from tests.fixtures.errors import raises
 
-PRICES = gm.Assumptions(electricity_price=2e-8)
+PRICES = gm.Assumptions(prices={"electricity": 2e-8})
 HEAT = 1000.0 * SECONDS_PER_YEAR
 OPEX = 10.0 + 1e-9 * HEAT + 2e-8 * 100.0 * SECONDS_PER_YEAR
 """Yearly cost of the heating plant under ``PRICES``: fixed, variable and electricity."""
@@ -39,7 +39,7 @@ def test_lcoh_at_zero_rate_spreads_the_cost_over_the_years():
 
 def test_the_rate_and_lifetime_come_from_the_assumptions():
     """Given in the assumptions, they give the same value as passed explicitly."""
-    both = gm.Assumptions(electricity_price=2e-8, discount_rate=0.05, lifetime_years=20)
+    both = gm.Assumptions(discount_rate=0.05, lifetime_years=20, prices={"electricity": 2e-8})
     explicit = gm.evaluate.lcoh(heating_plant(), day(), 0.05, 20, PRICES)
     assert gm.evaluate.lcoh(heating_plant(), day(), assumptions=both) == explicit
 
@@ -82,7 +82,7 @@ def test_a_share_splits_the_cost_of_a_plant_with_two_products():
 
 def test_lcoc_divides_by_the_cold_delivered():
     """The cooling plant (2000 EUR, no running cost, 300 W of cold) over 10 years at 0 %."""
-    values = gm.Assumptions(electricity_price=2e-8)
+    values = gm.Assumptions(prices={"electricity": 2e-8})
     result = gm.evaluate.lcoc(cooling_plant(), day(heat=None, cold=300.0), 0.0, 10, values)
     opex = 2e-8 * 100.0 * SECONDS_PER_YEAR
     expected = (2000.0 + opex * 10) / (300.0 * SECONDS_PER_YEAR * 10)
@@ -120,7 +120,7 @@ def both_products():
 def test_lcts_is_the_cost_of_heat_and_cold_together():
     """``lcoh`` with the whole cost on the heat, spread over both products; no share needed."""
     plant, run = both_products(), day(cold=500.0)
-    shared = gm.Assumptions(electricity_price=2e-8, heat_cost_share=1.0)
+    shared = gm.Assumptions(heat_cost_share=1.0, prices={"electricity": 2e-8})
     lcoh = gm.evaluate.lcoh(plant, run, 0.05, 20, shared)
     result = gm.evaluate.lcts(plant, run, 0.05, 20, PRICES)
     heat, cold = result["heat"]["value"], result["cold"]["value"]
@@ -170,4 +170,4 @@ def test_a_missing_rate_or_price_is_asked_for(name):
     with raises(gm.errors.ValidationError, "missing_assumption", match="discount_rate"):
         function(heating_plant(), day(), None, 20, PRICES)
     recorded = function(heating_plant(), day(), 0.05, 20, on_error="record")
-    assert recorded["value"] is None and "electricity_price" in recorded["reason"]
+    assert recorded["value"] is None and "electricity" in recorded["reason"]

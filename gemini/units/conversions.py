@@ -299,6 +299,8 @@ _UNITS = {
     "currency/J": ("currency/J", 1, 0),
     "currency/kWh": ("currency/J", 1 / JOULES_PER_KWH, 0),
     "currency/MWh": ("currency/J", 1 / (KILO * JOULES_PER_KWH), 0),
+    "currency/kg": ("currency/kg", 1, 0),
+    "currency/t": ("currency/kg", 1 / KILO, 0),
     "currency/s": ("currency/s", 1, 0),
     "currency/h": ("currency/s", 1 / SECONDS_PER_HOUR, 0),
     "m": ("m", 1, 0),

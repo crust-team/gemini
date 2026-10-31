@@ -176,22 +176,12 @@ def test_a_dated_design_derives_at_its_date():
     assert plant.params_at("d0.reservoir", "2029-01-01")["temperature"] == pytest.approx(360.15)
 
 
-def test_a_depth_without_its_geotherm_is_missing_each_value():
-    """The geotherm has no default: a depth names the gradient and the surface temperature."""
-    doublet = gm.plants.get("Doublet")
-    with pytest.raises(gm.errors.ValidationError) as caught:
-        doublet.set_params("", {"depth": "2500 m"})
-    assert caught.value.code == "missing_value"
-    assert [item["path"] for item in caught.value.problems] == ["gradient", "surface_temperature"]
-    assert doublet.depth is None
-
-
-def test_one_value_of_the_geotherm_is_still_missing_the_other():
-    """A gradient alone does not make a geotherm."""
-    doublet = gm.plants.get("Doublet")
-    with pytest.raises(gm.errors.ValidationError) as caught:
-        doublet.set_params("", {"depth": "2500 m", "gradient": "30 K/km"})
-    assert [item["path"] for item in caught.value.problems] == ["surface_temperature"]
+def test_a_depth_waits_for_its_geotherm():
+    """A plant may hold the design and a problem the site: nothing is derived until both exist."""
+    doublet = gm.plants.Doublet().set_params("", {"depth": "2500 m", "gradient": "30 K/km"})
+    assert doublet.get_submodule("reservoir")._params_at(None).get("temperature") is None
+    doublet.set_params("", {"surface_temperature": "12 degC"})
+    assert doublet.reservoir.temperature == pytest.approx(285.15 + 75)
 
 
 def test_the_values_of_a_stored_doublet_rebuild_in_any_order():

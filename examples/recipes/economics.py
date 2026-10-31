@@ -16,7 +16,7 @@ INPUTS = {
     "boiler.temperature_setpoint": (90, "degC"),
 }
 ASSUMPTIONS = gm.Assumptions(
-    discount_rate=0.05, lifetime_years=25, gas_price=40.0, heat_price=60.0 / MWH
+    discount_rate=0.05, lifetime_years=25, prices={"gas": "40.0 EUR/MWh", "heat": 60.0 / MWH}
 )
 
 
