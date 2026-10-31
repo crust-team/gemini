@@ -63,7 +63,7 @@ def _is_demand(profile):
     return (
         isinstance(profile, pd.DataFrame)
         and "heating_demand" in profile
-        and "outage_days" not in profile.attrs
+        and "outages" not in profile.attrs
     )
 
 

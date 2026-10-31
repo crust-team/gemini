@@ -14,5 +14,5 @@
     "max": "300 m3/h"
   },
   "max_brine_cooling": "40 K",
-  "operating_days": 330
+  "operating_time": "330 d"
 }

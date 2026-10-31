@@ -135,7 +135,7 @@ def print_economics(plant, results):
 def main():
     """Plan and simulate the year, then print what it delivered and what it costs."""
     plant = gm.plants.from_dict(sample("plant_with_treatment.json"))
-    rules = sample("rules.json") | {"operating_days": None}
+    rules = sample("rules.json") | {"operating_time": None}
     limits = gm.checks.Limits.from_dict(sample("limits_with_treatment.json"))
     print(ASSUMPTIONS)
     results = gm.simulate(plant, gm.schedule(plant, demand(), rules))

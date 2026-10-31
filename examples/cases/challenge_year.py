@@ -5,7 +5,7 @@ a boiler and three chillers, and simulates it. The reservoir, the brine, the lim
 temperatures are the sample problem's; what this case assumes it prints as assumptions.
 
 Shows ``gm.plants.from_dict``, ``gm.profiles.from_csv``, ``gm.schedule``, ``gm.simulate``,
-``gm.checks.Limits.from_dict``, ``gm.checks.limits``, ``gm.checks.operating_days``,
+``gm.checks.Limits.from_dict``, ``gm.checks.limits``, ``gm.checks.operating_time``,
 ``gm.kpi.totals`` and ``gm.economics.lcts``.
 
 Run with ``python examples/cases/challenge_year.py``.
@@ -111,8 +111,8 @@ def main():
     print(f"\nFailed days: {len(results.errors())}")
     print_year(plant, results)
     requirements = gm.checks.Limits.from_dict(sample("limits.json"))
-    days = gm.checks.operating_days(plant, results, rules["operating_days"])
-    print_checks(gm.checks.limits(plant, results, requirements) + days)
+    times = gm.checks.operating_time(plant, results, rules["operating_time"])
+    print_checks(gm.checks.limits(plant, results, requirements) + times)
     lcts = gm.economics.lcts(
         plant, results, assumptions=gm.economics.Assumptions(**sample("assumptions.json"))
     )

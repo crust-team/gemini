@@ -125,7 +125,7 @@ def _ledger_entries(plant, results):
         "plant_balance": lambda: gm.checks.plant_balance(plant, results),
         "limits": lambda: gm.checks.limits(plant, results, _limits()),
         "run_all": lambda: gm.checks.run_all(plant, results),
-        "operating_days": lambda: gm.checks.operating_days(plant, results, 1),
+        "operating_time": lambda: gm.checks.operating_time(plant, results, "1 h"),
         "Limits": lambda: _limits().to_dict(),
     }
 

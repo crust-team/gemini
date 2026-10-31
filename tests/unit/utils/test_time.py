@@ -46,6 +46,13 @@ def test_parse_duration_accepts_seconds_and_pandas_syntax():
             parse_duration(invalid)
 
 
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("text", ["330 d", "330d", "330 D", "330 days"])
+def test_parse_duration_reads_a_day_without_a_deprecated_spelling(text):
+    """``d`` is what a person writes; pandas deprecates it, so the parser never passes it on."""
+    assert parse_duration(text) == pd.Timedelta(days=330)
+
+
 def test_median_step_and_interval_seconds():
     """Spacing uses the median; the last tick takes the supplied final step."""
     index = pd.DatetimeIndex(

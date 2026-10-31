@@ -52,7 +52,7 @@ class CoolingGrid(Module):
     On a closed loop ``return_temperature``, ``return_pressure`` and the control ``flow`` set the
     return water: ``return_out`` is offered before the other modules run, and the loads met are
     those the rise of the water up to the return temperature takes. Bind the demand to
-    ``gm.profiles.get("cooling_demand")``. Without them the return follows from the loads, as in a
+    a ``gm.profiles.from_csv`` column. Without them the return follows from the loads, as in a
     substation. Unmet loads are reported, never an error.
 
     Simplifications: steady state, constant fluid properties (the inlet ``cp``), no pressure

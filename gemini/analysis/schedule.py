@@ -1,12 +1,14 @@
-"""The daily controls of a plant from its demand: an energy balance on design values.
+"""The controls of a plant from its demand at each step: an energy balance on design values.
 
 ``gm.schedule`` runs no simulation. It returns run input whose columns are named after what they
 drive, the dotted path of a control or boundary or ``port.field`` of a plant inlet, in the SI units
 ``attrs["units"]`` states, so ``gm.simulate(plant, plan)`` binds them by the rule of a run: nothing
-is stored on the plant and no caller writes a binding. The role of each unit comes from the wiring,
+is stored on the plant and no caller writes a binding. The demand may have any constant time step,
+hourly or daily; the plan has one row per step. The role of each unit comes from the wiring,
 ``gemini/analysis/roles.py``.
 """
 
+import numbers
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,12 +25,12 @@ from gemini.modules.plants.doublet import Doublet
 from gemini.physics import constants, dispatch, units
 from gemini.physics.fluid import mixture_mass_flow
 from gemini.utils.strings import join_names, join_path
-from gemini.utils.time import to_utc_index
+from gemini.utils.time import parse_duration, to_utc_index
 
 SOURCES = ("geothermal", "heat_pump", "boiler")
-RULES = ("order", "cooling_order", "doublet_flow", "max_brine_cooling", "operating_days")
+RULES = ("order", "cooling_order", "doublet_flow", "max_brine_cooling", "operating_time")
 ARRAY_BACKEND = "numpy"
-"""A plan is a balance over the days, on arrays whatever backend the run takes after it."""
+"""A plan is a balance over the steps, on arrays whatever backend the run takes after it."""
 
 
 @dataclass(frozen=True)
@@ -40,7 +42,7 @@ class Rules:
     minimum_flow: float
     maximum_flow: float
     brine_cooling: float
-    operating_days: int | tuple | None
+    operating_time: pd.Timedelta | float | tuple | None
 
 
 def _quantity(text, unit):
@@ -97,24 +99,59 @@ def _checked_rules(rules):
         _quantity(flow["min"], "m3/s"),
         _quantity(flow["max"], "m3/s"),
         _quantity(rules["max_brine_cooling"], "K"),
-        _operating_days(rules.get("operating_days")),
+        _operating_time(rules.get("operating_time")),
     )
 
 
-def _operating_days(days):
-    """Return the rule ``operating_days``: ``None``, a count, or the outage days as a tuple."""
-    if days is None or (isinstance(days, (int, np.integer)) and not isinstance(days, bool)):
-        return days
+def _operating_time(rule):
+    """Return the rule ``operating_time``.
+
+    ``None``; a ``Timedelta`` for a duration text; a fraction in [0, 1] as a float; or the outages
+    as a tuple of ``(start, end)`` UTC timestamps, a date being its whole day.
+    """
+    if rule is None:
+        return None
     refused = ValidationError(
-        f"schedule: operating_days = {days!r}; expected None, a number of days or a list of dates",
-        path="rules.operating_days",
+        f"schedule: operating_time = {rule!r}; expected None, a duration, a fraction of the "
+        "period or a list of outages",
+        path="rules.operating_time",
     )
-    if not isinstance(days, (list, tuple)):
+    if isinstance(rule, str):
+        return _duration(rule, refused)
+    if isinstance(rule, (list, tuple)):
+        return tuple(_outage(item, refused) for item in rule)
+    if isinstance(rule, bool) or not isinstance(rule, numbers.Real) or not 0 <= rule <= 1:
         raise refused
+    return float(rule)
+
+
+def _duration(text, refused):
+    """Return the duration ``text`` as a ``Timedelta``, or raise ``refused``."""
     try:
-        return tuple(to_utc_index([date])[0].normalize() for date in days)
+        return parse_duration(text)
     except (TypeError, ValueError) as error:
         raise refused from error
+
+
+def _instant(value, refused):
+    """Return ``value``, a date or a time, as a UTC ``Timestamp``, or raise ``refused``."""
+    try:
+        return to_utc_index([value])[0]
+    except (TypeError, ValueError) as error:
+        raise refused from error
+
+
+def _outage(item, refused):
+    """Return the ``(start, end)`` of an outage: an interval, or a date as its whole UTC day."""
+    if not isinstance(item, dict):
+        day = _instant(item, refused).normalize()
+        return day, day + pd.Timedelta(days=1)
+    if set(item) != {"start", "end"}:
+        raise refused
+    start, end = _instant(item["start"], refused), _instant(item["end"], refused)
+    if end <= start:
+        raise refused
+    return start, end
 
 
 def _of_type(plant, kind):
@@ -132,56 +169,80 @@ def _single(plant, kind):
     return found[0] if found else (None, None)
 
 
-def _days(demand):
-    """Return the UTC day of each row of ``demand``."""
-    return to_utc_index(demand.index).normalize()
+def _step(demand):
+    """Return the constant time step of ``demand``, or raise when it has none."""
+    steps = np.diff(to_utc_index(demand.index).as_unit("ns").asi8)
+    if len(steps) == 0 or (steps != steps[0]).any():
+        raise ValidationError(
+            "schedule: operating_time as a duration or a fraction needs a demand of at least two "
+            "rows at a constant step",
+            path="rules.operating_time",
+        )
+    return pd.Timedelta(int(steps[0]), unit="ns")
 
 
-def _lowest_demand_days(demand, days, paths):
-    """Return the outage days of each doublet that runs ``days`` days of the demand.
+def _running_steps(demand, rule):
+    """Return the steps each doublet runs under a duration or a fraction; half a step rounds up."""
+    step = _step(demand)
+    steps = rule * len(demand) if isinstance(rule, float) else rule / step
+    return int(np.floor(steps + 0.5))
 
-    The days of lowest total demand go to the first doublet, the lowest of the rest to the next, so
-    at most one doublet is off on a day; of equal days the earliest goes first.
+
+def _lowest_demand_outages(demand, rule, paths):
+    """Return the outage steps of each doublet that runs the time of ``rule`` in the demand.
+
+    The steps of lowest total demand go to the first doublet, the lowest of the rest to the next,
+    so at most one doublet is off on a step; of equal steps the earliest goes first. A duration or
+    a fraction not a whole number of steps rounds to the nearest whole step.
     """
+    steps = len(demand)
+    running = _running_steps(demand, rule)
+    count = steps - running
+    if not 0 <= running <= steps:
+        raise ValidationError(
+            f"schedule: operating_time = {rule!r}; expected 0 to {steps} steps of the demand",
+            path="rules.operating_time",
+        )
+    if count * len(paths) > steps:
+        raise ValidationError(
+            f"schedule: operating_time = {rule!r}; {len(paths)} doublets need {count} outage "
+            f"steps each, more than the {steps} steps of the demand",
+            path="rules.operating_time",
+        )
     heat, cool = _demand_columns(demand)
-    total = pd.Series(heat + cool).groupby(_days(demand)).sum()
-    count = len(total) - days
-    if not 0 <= days <= len(total):
-        raise ValidationError(
-            f"schedule: operating_days = {days}; expected 0 to {len(total)} days of the demand",
-            path="rules.operating_days",
-        )
-    if count * len(paths) > len(total):
-        raise ValidationError(
-            f"schedule: operating_days = {days}; {len(paths)} doublets need {count} outage days "
-            f"each, more than the {len(total)} days of the demand",
-            path="rules.operating_days",
-        )
-    ranked = total.sort_values(kind="stable").index
+    ranked = np.argsort(heat + cool, kind="stable")
+    index = to_utc_index(demand.index)
     return {
-        path: ranked[place * count : (place + 1) * count].sort_values()
+        path: index[np.sort(ranked[place * count : (place + 1) * count])]
         for place, path in enumerate(paths)
     }
 
 
-def _listed_days(demand, dates, paths):
-    """Return the outage days of every doublet for the listed ``dates``."""
-    days = _days(demand)
-    outside = [date for date in dates if date not in days]
-    if outside:
-        raise ValidationError(
-            f"schedule: operating_days has {outside[0].date()}; expected a day of the demand",
-            path="rules.operating_days",
-        )
-    return dict.fromkeys(paths, pd.DatetimeIndex(sorted(set(dates)), tz="UTC"))
+def _listed_outages(demand, outages, paths):
+    """Return the steps of the listed ``outages`` for every doublet.
+
+    A step is off when its time is in an outage, from its start up to its end.
+    """
+    index = to_utc_index(demand.index)
+    off = np.zeros(len(index), dtype=bool)
+    for start, end in outages:
+        inside = (index >= start) & (index < end)
+        if not inside.any():
+            raise ValidationError(
+                f"schedule: operating_time has {start.isoformat()}; expected an outage that "
+                "covers a step of the demand",
+                path="rules.operating_time",
+            )
+        off |= inside
+    return dict.fromkeys(paths, index[off])
 
 
-def _outage_days(plant, demand, rule):
-    """Return the outage days of each doublet, ``{path: sorted DatetimeIndex}``."""
+def _outage_steps(plant, demand, rule):
+    """Return the outage steps of each doublet, ``{path: DatetimeIndex}``."""
     paths = [path for path, _ in _of_type(plant, Doublet)]
     if rule is None or isinstance(rule, tuple):
-        return _listed_days(demand, rule or (), paths)
-    return _lowest_demand_days(demand, rule, paths)
+        return _listed_outages(demand, rule or (), paths)
+    return _lowest_demand_outages(demand, rule, paths)
 
 
 def _setpoint(plant, path):
@@ -317,11 +378,11 @@ def _covered_before_geothermal(plant, rules, need, heat_pump_stopped):
 def _doublet_columns(plant, rules, need, off):
     """Return the flow of each doublet [m3/s] and the columns that drive them.
 
-    A doublet off on a day has no flow and leaves its need to the next source. Under a rule of
-    ``operating_days`` a doublet runs every other day, at the minimum flow without a need.
+    A doublet off on a step has no flow and leaves its need to the next source. Under a rule of
+    ``operating_time`` a doublet runs every other step, at the minimum flow without a need.
     """
     flows, columns = {}, {}
-    least = 0.0 if rules.operating_days is None else rules.minimum_flow
+    least = 0.0 if rules.operating_time is None else rules.minimum_flow
     for path, doublet in _of_type(plant, Doublet):
         brine = doublet.reservoir.fluid
         fluid = brine.properties(0, 0)
@@ -353,7 +414,7 @@ def _return_flow(path, grid, heat, supply):
 
 
 def _demand_columns(demand):
-    """Return the demand of the days as arrays [W], cooling zero when the column is absent."""
+    """Return the demand of the steps as arrays [W], cooling zero when the column is absent."""
     if "heating_demand" not in demand:
         raise ValidationError(
             "schedule: demand has no column heating_demand", path="demand", code="missing_column"
@@ -436,12 +497,13 @@ def _cooling_columns(plant, cool, taken):
 
 
 def schedule(plant, demand, rules):
-    """Return the run input of ``plant`` for each day of ``demand``.
+    """Return the run input of ``plant`` for each step of ``demand``.
 
-    A daily energy balance on the design values, with no simulation inside. Roles come from the
-    wiring (``gemini/analysis/roles.py``): a unit that feeds the ``CoolingGrid`` is a cooling unit,
-    a ``HeatPump`` included, which is then the compression chiller. Cooling units take the cold in
-    ``rules["cooling_order"]``, each up to its capacity; what they leave is unmet, no error. A
+    An energy balance of each step on the design values, with no simulation inside. Roles come from
+    the wiring (``gemini/analysis/roles.py``): a unit that feeds the ``CoolingGrid`` is a cooling
+    unit, a ``HeatPump`` included, which is then the compression chiller. Cooling units take
+    the cold in ``rules["cooling_order"]``, each up to its capacity; what they leave is unmet, no
+    error. A
     heat-driven unit needs its cold over its ``thermal_cop`` of heat, and the compression chiller
     adds electricity, its condenser heat going to its cooler. Heat comes from the sources in
     ``rules["order"]``: geothermal heat first by default, doublets in plant order, each at the flow
@@ -449,13 +511,16 @@ def schedule(plant, demand, rules):
     below the minimum at the minimum with less cooling. The heat pump lifts to its setpoint and the
     boiler covers the rest, co-produced gas first. Unmet demand is no error: the run reports it.
 
-    ``rules["operating_days"]`` takes doublets out of service. An integer ``n`` runs each doublet
-    exactly ``n`` days of the demand: its outage days are the days of lowest total demand, heating
-    plus cooling, the first doublet taking the lowest, the next the lowest left, so at most one
-    doublet is off on a day. A list of dates takes every doublet off on those UTC days. On an
-    outage day a doublet has no flow and its heat goes to the next sources in ``order``, and a heat
-    pump fed only by doublets that are off stops. Every other day a doublet runs, at the minimum
-    flow when no need is left for it.
+    ``rules["operating_time"]`` takes doublets out of service, in whole steps. A duration such as
+    ``"330 d"`` or ``"7920 h"``, or a fraction of the period (a number in [0, 1]), runs each
+    doublet that long, rounded to the nearest whole step; its outage steps are the steps of lowest
+    total demand, heating plus cooling, the first doublet taking the lowest, the next the lowest
+    left, so at most one doublet is off on a step. It needs a demand of at least two rows at a
+    constant step. A list of outages takes every doublet off in each: a date is that whole UTC day,
+    an interval ``{"start": ..., "end": ...}`` runs from its start up to, not including, its end.
+    On an outage step a doublet has no flow and its heat goes to the next sources in ``order``, and
+    a heat pump fed only by doublets that are off stops. Every other step a doublet runs, at the
+    minimum flow when no need is left for it.
 
     Parameters
     ----------
@@ -468,12 +533,12 @@ def schedule(plant, demand, rules):
         Plant ports named ``heating_return`` and ``cooling_return`` take their temperature from
         the inputs (``heating_return.T``) and get their flow from the plan.
     demand : DataFrame
-        UTC index, columns ``heating_demand`` and, optionally, ``cooling_demand`` in W.
+        UTC index at any step, columns ``heating_demand`` and, optionally, ``cooling_demand`` in W.
     rules : dict
         ``order`` (names of ``SOURCES``), ``cooling_order`` (names of ``roles.COOLING_KINDS``,
         heat-driven first by default), ``doublet_flow`` (``{min, max}``), ``max_brine_cooling``
-        and ``operating_days``: ``None`` (every doublet on every day that has a need), an integer
-        or a list of outage dates.
+        and ``operating_time``: ``None`` (every doublet on every step that has a need), a
+        duration, a fraction of the period or a list of outages.
 
     Returns
     -------
@@ -481,27 +546,30 @@ def schedule(plant, demand, rules):
         The index of ``demand``, the demand columns, one column per scheduled control, named after
         its dotted path, ``port.m_dot`` of the return ports, and ``boiler_duty``,
         ``<doublet>.flow``, ``<doublet>.is_running`` and ``<heat pump>.is_running`` for reading, in
-        SI with units in ``attrs["units"]``. ``attrs["outage_days"]`` is ``{doublet path: [date]}``
-        with ISO dates. ``gm.simulate(plant, plan)`` needs no bindings: a run binds a control to a
-        column of that name, and the schedule changes nothing on the plant.
+        SI with units in ``attrs["units"]``. ``attrs["outages"]`` is
+        ``{doublet path: [time]}``, the ISO time of each outage step. ``gm.simulate(plant, plan)``
+        needs no bindings: a run binds a control to a column of that name, and the schedule changes
+        nothing on the plant.
 
     Raises
     ------
     ValidationError
-        A rule that does not fit; with code ``invalid_value`` an ``operating_days`` that needs more
-        outage days than the demand has, or a date outside the demand.
+        A rule that does not fit; with code ``invalid_value`` an ``operating_time`` that needs more
+        outage steps than the demand has, that is no duration, fraction or list, that needs a
+        constant step the demand lacks, or an outage outside the demand; ``unknown_name`` for a rule
+        that does not exist, such as the old ``operating_days``.
     """
     checked = _checked_rules(rules)
-    outages = _outage_days(plant, demand, checked.operating_days)
+    outages = _outage_steps(plant, demand, checked.operating_time)
     with backends.settings(backend=ARRAY_BACKEND):
         return _frame(plant, demand, _plan_columns(plant, demand, checked, outages), outages)
 
 
 def _plan_columns(plant, demand, checked, outages):
-    """Return the columns of the plan, computed on arrays over the days."""
+    """Return the columns of the plan, computed on arrays over the steps."""
     heat, cool = _demand_columns(demand)
-    days = _days(demand)
-    off = {path: days.isin(dates) for path, dates in outages.items()}
+    index = to_utc_index(demand.index)
+    off = {path: index.isin(times) for path, times in outages.items()}
     stopped = _heat_pump_stopped(plant, off, len(demand))
     taken = _cold_taken(plant, checked, cool)
     generator = _drive_heat(plant, taken, heat)
@@ -555,7 +623,7 @@ def _frame(plant, demand, columns, outages):
     frame = pd.DataFrame(data | columns, index=demand.index)
     driven = {path: item.unit for path, item in plant.inputs().items() if path in columns}
     frame.attrs["units"] = dict(demand.attrs.get("units", {})) | driven
-    frame.attrs["outage_days"] = {
-        path: [day.date().isoformat() for day in dates] for path, dates in outages.items()
+    frame.attrs["outages"] = {
+        path: [time.isoformat() for time in times] for path, times in outages.items()
     }
     return frame
