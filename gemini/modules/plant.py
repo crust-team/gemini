@@ -5,7 +5,7 @@ from gemini.errors.base import reported
 from gemini.modules._utils import design
 from gemini.modules.container import ModuleList
 from gemini.modules.module import Module
-from gemini.modules.plants._utils import listing, loops, outputs, reader, writer
+from gemini.modules.plants._utils import inputs, listing, loops, outputs, reader, writer
 from gemini.modules.plants._utils.factory import make_module
 from gemini.modules.plants._utils.plan import STATE, Constraint, compile_plan, is_group, port_ends
 from gemini.modules.plants._utils.ports import PortResolver
@@ -43,6 +43,7 @@ class Plant(PortResolver, Module):
         object.__setattr__(self, "_name", name)
         super().__init__()
         self._size = {}
+        self._inputs = {}
         self._connections = []
         self._constraints = []
         self._declared = set()
@@ -105,6 +106,32 @@ class Plant(PortResolver, Module):
             kept = {key: value for key, value in names.items() if key not in self._derived_params}
             self._stated[""] = self._stated.get("", {}) | kept
         return super().set_params(path, params, valid_from)
+
+    def set_inputs(self, values):
+        """Set inputs of the plant by path and return it; ``to_dict`` stores them.
+
+        ``values`` maps a path to a number in SI or a unit string, as ``set_params`` does: the
+        dotted path of a control or boundary (``"heat_pump.temperature_setpoint"``), or
+        ``port.field`` of a plant inlet (``"heating_return.T"``, the fields ``m_dot``, ``T``, ``p``
+        and ``fluid``). One value that does not fit raises and changes nothing. A run overrides an
+        input with a column of its name, and a value assigned on a module is not stored.
+        """
+        checked = inputs.checked(self, values)
+        declared = self.inputs()
+        self._set_inputs({path: item for path, item in checked.items() if path in declared})
+        self._inputs |= inputs.as_stated(values, checked)
+        return self
+
+    def input_value(self, path):
+        """Return the input at ``path`` in SI, or ``None`` when it has no value.
+
+        The value of ``set_inputs`` wins; otherwise the value persisted on the module.
+        """
+        return inputs.value(self, path)
+
+    def _root_inputs(self):
+        """Return the plant inlet fields of ``set_inputs`` as ``{port: {field: value}}``."""
+        return inputs.root_streams(self)
 
     def _own_values(self, params, valid_from=None):
         """Return the own parameters in force at ``valid_from`` with those of ``params``, in SI."""

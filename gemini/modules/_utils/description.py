@@ -264,7 +264,8 @@ def parameter_schema(module):
     }
 
 
-def _check_value(name, declaration, value):
+def check_value(name, declaration, value):
+    """Return the problem of ``value`` for a declaration, or ``None``."""
     try:
         declaration.validate(value)
     except ValidationError as error:
@@ -290,7 +291,7 @@ def validate_params(module, params, on_error="raise"):
                 problem(name, "unknown_name", message, close_matches(name, declarations))
             )
             continue
-        found = _check_value(name, declarations[name], value)
+        found = check_value(name, declarations[name], value)
         if found is not None:
             problems.append(found)
     return reported(problems, on_error)

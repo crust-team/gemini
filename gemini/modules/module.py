@@ -699,6 +699,10 @@ class Module:
         values = selected.params | self._param_overrides
         return {name: self._parameters[name].validate(value) for name, value in values.items()}
 
+    def _root_inputs(self):
+        """Return the stated fields of the root inlets; only a plant states them."""
+        return {}
+
     def _has_input_value(self, name):
         """Return whether control or boundary ``name`` has a persisted value."""
         return name in self._input_values

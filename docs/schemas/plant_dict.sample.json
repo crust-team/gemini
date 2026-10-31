@@ -95,33 +95,6 @@
         "Injection-pump scenario setpoint 51.5 bar; twin uses measured setpoint.",
         "Profiles lacking secondary measurements assume 40 kg/s at 20 C and 5 bar."
       ],
-      "inputs": {
-        "injection_pump": {
-          "pressure_setpoint": 5150000.0
-        }
-      },
-      "root_inputs": {
-        "return_in": {
-          "T": 293.15,
-          "fluid": {
-            "co2_mass_fraction": 0.0,
-            "density": 1068.0,
-            "gas_composition": null,
-            "gas_liquid_ratio": null,
-            "gas_mass_fraction": 0.0,
-            "glycol_fraction": 0.0,
-            "grid_composition": null,
-            "kind": "brine",
-            "property_model": "constant_stp",
-            "salinity": 0.0,
-            "specific_heat": 4129.213483146067,
-            "thermal_conductivity": null,
-            "viscosity": 0.00065
-          },
-          "m_dot": 40,
-          "p": 500000.0
-        }
-      },
       "stream_defaults": {
         "heat_exchanger": {
           "cold_in": {
@@ -347,6 +320,27 @@
       "injection_pump.power_in"
     ],
     "return_in": "heat_exchanger.cold_in"
+  },
+  "inputs": {
+    "injection_pump.pressure_setpoint": 5150000.0,
+    "return_in.T": 293.15,
+    "return_in.fluid": {
+      "co2_mass_fraction": 0.0,
+      "density": 1068.0,
+      "gas_composition": null,
+      "gas_liquid_ratio": null,
+      "gas_mass_fraction": 0.0,
+      "glycol_fraction": 0.0,
+      "grid_composition": null,
+      "kind": "brine",
+      "property_model": "constant_stp",
+      "salinity": 0.0,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null,
+      "viscosity": 0.00065
+    },
+    "return_in.m_dot": 40,
+    "return_in.p": 500000.0
   },
   "modules": {
     "degasser": {

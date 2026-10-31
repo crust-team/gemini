@@ -157,16 +157,18 @@ def _outage_days(plant, demand, rule):
     return _lowest_demand_days(demand, rule, paths)
 
 
-def _setpoint(path, module):
-    """Return the persisted ``temperature_setpoint`` of a design module, or raise saying so."""
-    if not module._has_input_value("temperature_setpoint"):
+def _setpoint(plant, path):
+    """Return the ``temperature_setpoint`` of a design module, or raise saying so."""
+    name = join_path(path, "temperature_setpoint")
+    setpoint = plant.input_value(name)
+    if setpoint is None:
         raise ValidationError(
-            f"schedule: {path}.temperature_setpoint has no value; expected the supply setpoint "
-            "of the design",
-            path=f"{path}.temperature_setpoint",
+            f"schedule: {name} has no value; expected the supply setpoint of the design, set "
+            "with plant.set_inputs",
+            path=name,
             code="invalid_design",
         )
-    return module.temperature_setpoint
+    return setpoint
 
 
 def _target(plant, path, port):
@@ -335,9 +337,9 @@ def _heating_columns(plant, heat, generator):
     if path is not None:
         columns[f"{path}.heat_demand"] = heat
     for kind in (HeatPump, Boiler):
-        unit_path, module = _single(plant, kind)
+        unit_path, _ = _single(plant, kind)
         if unit_path is not None:
-            supply = _setpoint(unit_path, module)
+            supply = _setpoint(plant, unit_path)
             columns[f"{unit_path}.temperature_setpoint"] = np.full_like(heat, supply)
     if supply is not None:
         columns |= _return_flow(path, grid, heat + generator, supply)
@@ -351,9 +353,9 @@ def _cooling_columns(plant, cool):
     if path is not None:
         columns[f"{path}.sensible_cooling_demand"] = cool
         columns[f"{path}.latent_cooling_demand"] = np.zeros_like(cool)
-    chiller_path, chiller = _single(plant, AbsorptionUnit)
+    chiller_path, _ = _single(plant, AbsorptionUnit)
     if chiller_path is not None:
-        supply = _setpoint(chiller_path, chiller)
+        supply = _setpoint(plant, chiller_path)
         columns[f"{chiller_path}.temperature_setpoint"] = np.full_like(cool, supply)
         columns |= _return_flow(path, grid, cool, supply)
     return columns
@@ -382,9 +384,9 @@ def schedule(plant, demand, rules):
     plant : Plant
         The design: its ``Doublet`` children, at most one ``HeatPump``, ``Boiler``,
         ``AbsorptionUnit``, ``HeatingGrid`` and ``CoolingGrid``, with the
-        ``temperature_setpoint`` of the heat pump, boiler and chiller set. Plant ports named
-        ``heating_return`` and ``cooling_return`` take their temperature from
-        ``plant.boundary["root_inputs"]`` and get their flow from the plan.
+        ``temperature_setpoint`` of the heat pump, boiler and chiller set with ``set_inputs``.
+        Plant ports named ``heating_return`` and ``cooling_return`` take their temperature from
+        the inputs (``heating_return.T``) and get their flow from the plan.
     demand : DataFrame
         UTC index, columns ``heating_demand`` and, optionally, ``cooling_demand`` in W.
     rules : dict

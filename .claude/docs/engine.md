@@ -87,7 +87,7 @@ drive**, so `gm.simulate(plant, plan)` binds them by the rule of a run, below. L
 boundaries have a column named after their dotted path (`d0.reservoir.production_rate`,
 `injection.split_fraction`), and a plant inlet field a column named `port.field`
 (`heating_return.m_dot`); ports `heating_return` and `cooling_return` take their temperature from
-`plant.boundary["root_inputs"]`. `boiler_duty`, `<doublet>.flow` and `<doublet>.is_running` and
+`inputs` of the plant (`heating_return.T`). `boiler_duty`, `<doublet>.flow` and `<doublet>.is_running` and
 `<heat pump>.is_running` are for reading.
 
 ## The engine
@@ -160,7 +160,7 @@ Simulation binds every leaf control and boundary to its binding's column, or els
 named after its dotted path; an input with neither needs a default or a persisted value. A root
 inlet field binds the same way, to its binding or to a column named `port.field`. Each
 step applies the values to their modules, then calls the plant with the root inlets, built
-from root bindings over `plant.boundary["root_inputs"]`. A missing value skips the whole step,
+from root bindings over the plant inlet fields of `plant.set_inputs`. A missing value skips the whole step,
 counted under the root path `""`. Replay applies each bound twin's controls and boundaries with
 the module before calling it with only its measured inlets, and skips only the twin
 missing a required observation. Both therefore leave the last tick's inputs persisted on the

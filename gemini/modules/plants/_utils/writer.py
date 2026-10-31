@@ -11,7 +11,8 @@ from gemini.modules._utils.serialization import (
     tree_params,
     write_sections,
 )
-from gemini.modules.plants._utils.plan import is_group
+from gemini.modules.plants._utils.plan import is_group, is_plant
+from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import join_path
 
 
@@ -76,6 +77,17 @@ def _port_text(ends):
     return join_path(*ends)
 
 
+def _inputs_section(plant):
+    """Return the ``inputs`` key of the plant dict, empty when nothing below ``plant`` set one."""
+    stated = {
+        join_path(path, name): value
+        for path, module in plant.named_modules()
+        if is_plant(module)
+        for name, value in module._inputs.items()
+    }
+    return {"inputs": to_plain(deepcopy(stated))} if stated else {}
+
+
 def class_dict(plant, fresh):
     """Return the plant dict of a plant of a class: ``fresh`` is a new one, without values."""
     plant._baselines[""] = tree_params(fresh)
@@ -84,7 +96,7 @@ def class_dict(plant, fresh):
         data["size"] = deepcopy(plant._size)
     data["params"] = params_entry(plant, "", plant)
     fluids = {path: module._fluid for path, module in fresh.named_modules()}
-    return data | write_sections(plant, plant._sections, fluids)
+    return data | write_sections(plant, plant._sections, fluids) | _inputs_section(plant)
 
 
 def structure_dict(plant):
@@ -102,4 +114,4 @@ def structure_dict(plant):
         data["outputs"] = deepcopy(plant._output_entries)
     if plant._constraints:
         data["constraints"] = [item.as_dict() for item in plant._constraints]
-    return data | write_sections(plant, plant._sections)
+    return data | write_sections(plant, plant._sections) | _inputs_section(plant)

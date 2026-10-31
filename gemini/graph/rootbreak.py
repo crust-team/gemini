@@ -83,7 +83,7 @@ def _call_row(graph, feeds, row, dt, state):
 def _applied(module, inputs):
     """Hold ``inputs`` (controls and boundaries by dotted path) on their owners for one call.
 
-    A value is validated as ``Module.set_inputs`` does; NaN is the ``None`` of a declared
+    A value is validated as ``Module._set_inputs`` does; NaN is the ``None`` of a declared
     ``X | None``. The previous values are put back afterwards.
     """
     declarations = module.inputs()

@@ -111,7 +111,7 @@ class BindingPlan:
 
     ``twins`` holds one ``Twin`` per evaluated module. In simulate the only twin is the plant,
     reading its root inlets and every leaf control or boundary that has a data column;
-    ``root_inlets`` holds the root inlet values given in ``plant.boundary["root_inputs"]``.
+    ``root_inlets`` holds the plant inlet fields stated with ``plant.set_inputs``.
     ``one_tick`` tells that the run cannot evaluate more than one tick at a time: a stateful
     module is stepped, or a twin sits below another twin and reads what that twin persisted.
     """
@@ -122,10 +122,7 @@ class BindingPlan:
         self.kind = kind
         self.on_error = on_error
         self._dates = _parameter_dates(plant)
-        root_inputs = plant.boundary.get("root_inputs", {})
-        self.root_inlets = {
-            name: value for name, value in root_inputs.items() if name in plant._fed_inlets()
-        }
+        self.root_inlets = plant._root_inputs()
         self.twins, self.columns = [], set()
         if kind == "simulate":
             self._simulation(plant, dataset)
@@ -297,11 +294,11 @@ def _compile_entry(plant, dataset, kind, path, original):
     """Return one plan entry and its columns, with units taken from the dataset.
 
     In simulate, an inlet field whose column is absent is dropped when
-    ``plant.boundary["root_inputs"]`` gives it a default.
+    ``plant.set_inputs`` gives it a default.
     """
     bound = original.model_copy(deep=True)
     module = plant.get_submodule(path)
-    root_inputs = plant.boundary.get("root_inputs", {})
+    root_inputs = plant._root_inputs()
     columns = set()
     for group in (bound.controls, bound.boundaries, bound.measured, bound.state):
         columns |= _resolve_units(group, dataset)

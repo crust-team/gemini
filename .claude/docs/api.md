@@ -126,6 +126,9 @@ plant dict is the JSON form agents use, and `gm.plants.schema()` is its schema.
 | `p.loop_tolerance`, `p.loop_passes` | the settings of a loop, 1e-9 and 50, see [plants.md](plants.md#loops) | real |
 | `p.summary()` | text table | real |
 | `p.validate(on_error="raise")` | as `gm.plants.validate` | real |
+| `p.set_inputs(values)` | the plant; sets inputs by path, the one public way: `{"heat_pump.temperature_setpoint": "100 degC", "heating_return.T": "60 degC"}`, stored by `to_dict` under `inputs`, see [plants.md](plants.md#the-plant-dict) | real |
+| `p.input_value(path)` | the input in SI, or `None` when it has no value | real |
+| `p.target_of(source)`, `p.source_of(target)` | the `"path.port"` an outlet feeds, or that feeds an inlet; `None` for a plant port | real |
 | `p.to_dict(structure=False)` | the plant dict; `structure=True` gives the modules and connections of a plant of a class | real |
 | `p.save(path)`, `gm.Plant.load(path)` | writes or reads the plant dict as JSON | real |
 | `Output.difference(a, b)`, `Output.ratio(a, b)`, `Output.sum(a, b, ...)` | the outputs of a plant, combinations of paths, see [plants.md](plants.md#outputs) | real |
@@ -289,6 +292,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `Plant.set_inputs`, `Plant.input_value`, `Plant.target_of`, `Plant.source_of`. The plant dict has one key `inputs`, `{path: value}`, in both forms; `gm.plants.from_dict`, `gm.schedule` and a run use it. `boundary[""]["inputs"]` and `boundary[""]["root_inputs"]` are gone: a plant inlet field is the path `port.field`. |
 | 0.2.0, unreleased changes | | Leaves compute, plants connect. `_compute_outputs` is gone: a leaf computes once in `forward`. Every composite is a `Plant`, which never writes `forward`, with `HeatingSubstation`, `CoolingSubstation`, `NodalDoublet`, `DistrictEnergyPlant`, `BoilerChpPlant`, `ParallelExchangerPlant` and `ATESPlant` among them. The engine closes loops (`loop_not_converged`) and solves `Plant.constrain`. `CirculationPump` carries the flow of a building circuit, and its electricity is counted. Plant outputs are `Output.difference`, `Output.ratio` and `Output.sum` of paths; `Results` reads a path. |
 | 0.2.0, unreleased changes | | No JSON file in `gemini/`: `gemini/assets/` is gone. A plant of a class stores `{type, size?, params}`, `to_dict(structure=True)` its structure. Templates are the plant classes `HeatingPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant` and `HeatingHeatPumpCoolingPlant`, and `DistrictNetwork` and `MultiWellPlant` take their size. Removed names are listed below. Code `loop_without_state` and `migration_failed` are gone, `loop_not_converged` is new. |
 | 0.2.0, unreleased changes | | `gm.optim.minimize` and `gm.optim.sample` are built, on the metrics of `gm.kpi` and `gm.economics`; each takes `assumptions`. |
@@ -338,7 +342,8 @@ Names removed or renamed in the unreleased changes of 0.2.0:
 | `update_params`, `apply_params_at`, `clear_param_overrides` | `set_params` with `valid_from`; attribute assignment for an override |
 | `get_parameter`, `get_control`, `get_boundary` | `get(path)` |
 | `get_module` | `get_submodule` |
-| `offer`, `set_inputs`, `has_input_value`, `add_module`, `extra_repr` | private; assign a control or boundary on its module, `plant.get(path).owner` |
+| `boundary[""]["inputs"]`, `boundary[""]["root_inputs"]` | the key `inputs` of the plant dict; `{"return_in": {"T": 293.15}}` is `{"return_in.T": 293.15}` |
+| `offer`, `has_input_value`, `add_module`, `extra_repr` | private; assign a control or boundary on its module, `plant.get(path).owner` |
 | `offered_outlets`, `start_states`, `trial_outlets`, `calibratable_parameters` | gone |
 | `describe`, `parameter_schema`, `validate_params` on a class | on an instance, `gm.modules.ESP().describe()` |
 | `docs/schemas/plant_spec.*` | `docs/schemas/plant_dict.*` |

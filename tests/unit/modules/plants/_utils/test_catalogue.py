@@ -18,7 +18,7 @@ FORMER_EXAMPLES = {
     "DistrictEnergyPlant": "64940b883163bc81e59fa8ffa4879dbc6cb3d737786f3e200a1f76787a390e76",
     "DistrictNetwork": "3475084a865a4a441eb0743ab9ae81356d0412ab69144c6a0b0a02e31cd2a9e6",
     "Doublet": "7e38703b880e458aef5d3957bc7cc7d51ffc8c9b067d8da0b6c3568dd88249e2",
-    "DoubletHeatPlant": "af782a504a4e97d36b00003c1c991e26b4a7aed1ae2aa7c1ec786b0dbcdd2af8",
+    "DoubletHeatPlant": "8ef986a72459b8b04d5cd1f6534644c3c8584428ab1e1b2368d2c7c21bad22ee",
     "HackathonPlant": "6da42c88a06d8bc97c03b556097cf0e86396d1dc66c8e5bc74638cb987c570b7",
     "HeatingSubstation": "f1306278048f262a2b088d3d895882f802aff702f69358c6615de849fc4bddf5",
     "MultiWellPlant": "30c96f8dec0a190ffb5333e40465dd2437c43fae1952736ee8356344252d4251",

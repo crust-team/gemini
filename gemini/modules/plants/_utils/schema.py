@@ -22,6 +22,14 @@ BINDINGS = {
         ]
     },
 }
+INPUTS = {
+    "type": "object",
+    "description": (
+        "Inputs by path: a control or boundary such as heat_pump.temperature_setpoint, or a plant "
+        "inlet field such as heating_return.T, to a number in SI or a unit string."
+    ),
+    "additionalProperties": {"anyOf": [{"type": "number"}, {"type": "string"}, {"type": "object"}]},
+}
 PATH = {"type": "string", "pattern": r"^[^.\s]+(\.[^.\s]+)*$"}
 SIZE = {
     "type": "object",
@@ -106,6 +114,7 @@ def _sections():
             "type": "object",
             "additionalProperties": {"type": "array", "items": {"type": "object"}},
         },
+        "inputs": INPUTS,
     }
 
 

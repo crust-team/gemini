@@ -11,6 +11,7 @@ from gemini.errors import ValidationError
 from gemini.types.bindings import Binding, ConfigModel, DatedParams, ModuleBindings
 from gemini.types.fluid import BRINE, Fluid
 from gemini.utils.mappings import set_nested
+from gemini.utils.strings import join_path
 from gemini.utils.time import EARLIEST, to_utc
 
 from . import tables
@@ -31,6 +32,7 @@ class LegacyDesign(ConfigModel):
     modules: dict[str, ModuleDesign]
     bindings: dict[str, ModuleBindings] = Field(default_factory=dict)
     boundary: dict[str, Any] = Field(default_factory=dict)
+    inputs: dict[str, Any] = Field(default_factory=dict)
     unmapped: list[str] = Field(default_factory=list)
 
 
@@ -268,25 +270,24 @@ def _boundary(paths, kinds, columns, fluid):
         for node, kind in kinds.items()
         if kind in tables.STREAM_DEFAULTS and columns
     }
-    inputs = {
-        paths[node]: dict(tables.SCENARIO_INPUTS[kind])
-        for node, kind in kinds.items()
-        if kind in tables.SCENARIO_INPUTS
-    }
     assumptions = [tables.ROOT_ASSUMPTION]
     if tables.HEAT_BALANCE_COLUMNS <= columns:
         assumptions = tables.HEAT_BALANCE_ASSUMPTIONS + assumptions
+    return {"stream_defaults": stream_defaults, "streams": {}, "assumptions": assumptions}
+
+
+def _inputs(paths, kinds, fluid):
+    """Return the inputs a plant takes from the project: scenario controls and inlet streams."""
+    inputs = {
+        join_path(paths[node], name): value
+        for node, kind in kinds.items()
+        for name, value in tables.SCENARIO_INPUTS.get(kind, {}).items()
+    }
     fluid_json = fluid.model_dump(mode="json")
-    root_inputs = {
-        port: values | {"fluid": fluid_json} for port, values in tables.ROOT_DEFAULTS.items()
-    }
-    return {
-        "stream_defaults": stream_defaults,
-        "inputs": inputs,
-        "streams": {},
-        "assumptions": assumptions,
-        "root_inputs": root_inputs,
-    }
+    for port, values in tables.ROOT_DEFAULTS.items():
+        for field, value in (values | {"fluid": fluid_json}).items():
+            inputs[f"{port}.{field}"] = value
+    return inputs
 
 
 def load_legacy_design(project) -> LegacyDesign:
@@ -313,5 +314,6 @@ def load_legacy_design(project) -> LegacyDesign:
         modules=modules,
         bindings=bindings,
         boundary=_boundary(paths, kinds, columns, fluid),
+        inputs=_inputs(paths, kinds, fluid),
         unmapped=unmapped,
     )

@@ -106,9 +106,8 @@ def configure(plant):
             modules[path].set_params("", fit)
     declared = plant.inputs()
     inputs = INPUTS | COOLER_INPUTS
-    plant._set_inputs({path: value for path, value in inputs.items() if path in declared})
-    plant.boundary = {"root_inputs": _root_streams(plant)}
-    return plant
+    plant.set_inputs({path: value for path, value in inputs.items() if path in declared})
+    return plant.set_inputs(_root_streams(plant))
 
 
 def _root_streams(plant):
@@ -116,7 +115,7 @@ def _root_streams(plant):
     for port in plant.inlets():
         flow, temperature = ROOT_STREAMS[port]
         stream = gm.Stream(flow=flow, T=temperature, p="5 bar")
-        streams[port] = {"m_dot": stream.m_dot, "T": stream.T, "p": stream.p}
+        streams |= {f"{port}.m_dot": stream.m_dot, f"{port}.T": stream.T, f"{port}.p": stream.p}
     return streams
 
 

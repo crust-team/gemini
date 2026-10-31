@@ -53,7 +53,7 @@ def test_to_plant_fills_parameters_bindings_and_boundary(converted):
         "doublet.reservoir.production_rate"
     )
     assert converted.bindings[""].inlets["return_in"]["T"].unit == "K"
-    assert converted.boundary["root_inputs"]["return_in"]["m_dot"] == 40
+    assert converted.input_value("return_in.m_dot") == 40
     assert converted.fluid.density == 1068
     assert not hasattr(converted, "legacy_info")
 
@@ -128,7 +128,7 @@ def test_check_wiring_reports_mismatches_and_raises_on_errors(project, converted
     edited.links = edited.links[1:]
     errors = legacy.check_wiring(converted, edited)
     assert len(errors) == 1 and errors[0].startswith("Unexpected connection")
-    with raises(ValidationError, "invalid_format", match="root_inputs"):
+    with raises(ValidationError, "invalid_format", match="plant inlet stream"):
         legacy.check_wiring(gm.plants.get("DoubletHeatPlant"), project)
 
 

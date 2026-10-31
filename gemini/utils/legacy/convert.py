@@ -111,7 +111,7 @@ def to_plant(project, plant):
     plant.load_state_dict(state, strict=False)
     plant.bindings, _ = _converted_bindings(design)
     plant.boundary = deepcopy(design.boundary)
-    return plant
+    return plant.set_inputs(design.inputs)
 
 
 def to_dataset(project, frame):
@@ -242,15 +242,15 @@ def results_to_frame(results, project):
 
 def _traced_edges(plant):
     """Return the stream connections of one step of a copy of ``plant`` with assumed inputs."""
-    if "root_inputs" not in plant.boundary:
+    if not plant._root_inputs():
         raise ValidationError(
-            f"{plant.path}: boundary.root_inputs is missing; expected a plant filled by "
+            f"{plant.path}: inputs has no plant inlet stream; expected a plant filled by "
             "legacy.to_plant",
             code="invalid_format",
         )
     trial = deepcopy(plant)
     trial._set_inputs(tables.TRACE_CONTROLS)
-    return trace_wiring(trial, deepcopy(trial.boundary["root_inputs"]))
+    return trace_wiring(trial, trial._root_inputs())
 
 
 def _endpoint(kinds, paths, node_id, port):

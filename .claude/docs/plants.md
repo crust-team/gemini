@@ -164,6 +164,7 @@ assert plant.to_dict() == data
 | `constraints` | structure | `[{target, equals or at_least, by, bounds}]`; see [constraints](#constraints) |
 | `bindings`, `param_history` | both, always | `{path: {name: column}}`; `{path: [{valid_from, params}]}`; see [bindings](#parameters-by-date-and-bindings) |
 | `fluids`, `boundary` | both | `{path: {...}}`, the fluid and the stored assumptions of a module |
+| `inputs` | both | `{path: value}`, what `plant.set_inputs` was given: controls and boundaries by dotted path, plant inlet fields as `port.field` (`m_dot`, `T`, `p`, `fluid`), numbers in SI or unit strings; left out when empty |
 
 - `type` of a module is a registry name. It may name a plant class, whose parameters are then dotted
   (`"esp.stage_count"`), so a plant can contain plants.
@@ -184,7 +185,14 @@ assert plant.to_dict() == data
 
 `gm.plants.schema()` is generated from the code: the two forms, the enum of registered types, the
 output forms. `validate` reports `unconnected_port`, `unknown_name` with suggestions and the other
-codes of [errors.md](errors.md) on the paths of the dict, such as `connections[1].target`.
+codes of [errors.md](errors.md) on the paths of the dict, such as `connections[1].target`, and on
+`inputs.<path>`: an unknown path, a path that is not an input (`unknown_name`), a wrong unit
+(`invalid_unit`).
+
+`plant.set_inputs` is the one public way to set inputs that are part of the design: a setpoint of a
+stored heat pump is schedulable as it is read, `from_dict` applies it and `gm.schedule` reads it
+through `plant.input_value`. A column of the run wins over it. A value assigned on a module
+(`plant.pump.frequency = 50`) and the last tick a run leaves on a module are not stored.
 `plant.save(path)` and `gm.Plant.load(path)` write and read it as JSON. A plant dict of an older
 format raises `ValidationError` with code `old_format`.
 

@@ -148,6 +148,23 @@
         "format": {
           "const": 2
         },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "description": "Inputs by path: a control or boundary such as heat_pump.temperature_setpoint, or a plant inlet field such as heating_return.T, to a number in SI or a unit string.",
+          "type": "object"
+        },
         "param_history": {
           "additionalProperties": {
             "items": {
@@ -314,6 +331,23 @@
               }
             ]
           },
+          "type": "object"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              }
+            ]
+          },
+          "description": "Inputs by path: a control or boundary such as heat_pump.temperature_setpoint, or a plant inlet field such as heating_return.T, to a number in SI or a unit string.",
           "type": "object"
         },
         "modules": {

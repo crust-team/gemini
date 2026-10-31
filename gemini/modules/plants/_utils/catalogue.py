@@ -60,10 +60,10 @@ def example(name):
     """Return a new plant ``name`` with real parameter values.
 
     The plant comes from ``get``; ``inputs/plants/<name>.json`` of a source checkout gives its
-    ``params`` and any ``fluids``, ``boundary``, ``bindings`` and ``param_history``, under the keys
-    of a plant dict. ``Doublet`` and ``DoubletHeatPlant`` carry the values of the measured doublet;
-    the other plants carry the values their unit tests use, the design parameters only: controls
-    and boundaries are inputs of a run. A registered plant without a file raises
+    ``params`` and any ``fluids``, ``boundary``, ``bindings``, ``param_history`` and ``inputs``,
+    under the keys of a plant dict. ``Doublet`` and ``DoubletHeatPlant`` carry the values of the
+    measured doublet; the other plants carry the values their unit tests use, the design parameters
+    only: controls and boundaries are inputs of a run. A registered plant without a file raises
     ``NotImplementedYet`` naming it, and without ``inputs/`` this raises ``inputs_missing``.
     """
     _check("example", name)
@@ -75,7 +75,7 @@ def example(name):
     read_sections(plant, values, Report(strict=True))
     plant._sections = {key: values.get(key, {}) for key in SECTIONS}
     plant._stated[""] = {}
-    return plant
+    return plant.set_inputs(values.get("inputs", {}))
 
 
 def from_dict(data):

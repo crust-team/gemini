@@ -34,6 +34,7 @@ TYPES = {
     "boundary": dict,
     "bindings": dict,
     "param_history": dict,
+    "inputs": dict,
 }
 KEYS = ("format", *TYPES)
 
@@ -164,6 +165,15 @@ def root_problems(data):
     ]
 
 
+def _read_inputs(plant, data, report):
+    """Set the ``inputs`` of ``data``, each path its own problem."""
+    for path, value in data.get("inputs", {}).items():
+        if report.skips(path):
+            continue
+        with report.guard("inputs"):
+            plant.set_inputs({path: value})
+
+
 def populate(plant, data, report):
     """Add the modules, connections, ports, outputs and sections of ``data`` to ``plant``."""
     for name, entry in data.get("modules", {}).items():
@@ -182,6 +192,7 @@ def populate(plant, data, report):
         with report.guard(f"constraints[{index}]"):
             plant.constrain(**item)
     read_sections(plant, data, report)
+    _read_inputs(plant, data, report)
     plant._sections = {key: deepcopy(data.get(key, {})) for key in SECTIONS}
 
 
@@ -197,6 +208,7 @@ def _of_class(cls, data, report):
         plant = built(found, data.get("size"))
         read_params(plant, data.get("params", {}), report)
         read_sections(plant, data, report)
+        _read_inputs(plant, data, report)
         plant._sections = {key: deepcopy(data.get(key, {})) for key in SECTIONS}
         return plant
     return None

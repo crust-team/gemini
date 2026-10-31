@@ -33,6 +33,7 @@ def _fill_sections(plant, spec):
         plant.set_bindings(path, value)
     for path, history in spec["param_history"].items():
         plant.get_submodule(path)._param_history = [DatedParams.model_validate(i) for i in history]
+    plant.set_inputs(spec.get("inputs", {}))
 
 
 def built_by_hand(spec):
