@@ -15,9 +15,7 @@ LIMB = ("reservoir", "well", "esp", "riser")
 
 def _field(doublet, producers=2, injectors=1, rates=(40.0, 30.0)):
     """Return a field whose limbs copy the example doublet's equipment."""
-    field = gm.plants.from_template(
-        "MultiWellPlant", {"producers": producers, "injectors": injectors}
-    )
+    field = gm.plants.from_template("multi_well", {"producers": producers, "injectors": injectors})
     for limb, rate in zip(field.producers, rates):
         for name in LIMB:
             getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
@@ -78,4 +76,4 @@ def test_invalid_structure_raises():
     with raises(gm.errors.ValidationError, "invalid_design", match="injectors = 0"):
         generators.multi_well_spec(injectors=0)
     with pytest.raises(gm.errors.ValidationError, match="producers = 0"):
-        gm.plants.from_template("MultiWellPlant", {"producers": 0})
+        gm.plants.from_template("multi_well", {"producers": 0})

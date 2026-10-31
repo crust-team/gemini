@@ -107,5 +107,5 @@ def test_example_refuses_unknown_names_with_close_matches():
 def test_templates_list_name_title_description_and_purpose():
     """The catalogue lists the templates the way the backend route returns them."""
     rows = catalogue.templates()
-    assert {row["name"] for row in rows} >= {"MultiWellPlant", "DistrictNetwork"}
+    assert {row["name"] for row in rows} >= {"multi_well", "district_network"}
     assert all(set(row) == {"name", "title", "description", "purpose"} for row in rows)

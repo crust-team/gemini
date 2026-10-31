@@ -20,7 +20,7 @@ CHILLED = Stream(m_dot=6.0, T=279.15, p=6e5)
 
 def _network(**parameters):
     """Return a district network of the given size from its template."""
-    return gm.plants.from_template("DistrictNetwork", parameters)
+    return gm.plants.from_template("district_network", parameters)
 
 
 def _leaf_sum(result, name):
@@ -100,4 +100,4 @@ def test_single_consumer_and_invalid_structure(plants):
     with raises(gm.errors.ValidationError, "invalid_design", match="consumers"):
         generators.district_network_spec(consumers=0)
     with pytest.raises(gm.errors.ValidationError, match="service"):
-        gm.plants.from_template("DistrictNetwork", {"service": "steam"})
+        gm.plants.from_template("district_network", {"service": "steam"})

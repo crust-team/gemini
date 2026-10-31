@@ -1,8 +1,8 @@
 """Generators of the plant specs whose size is a structural argument.
 
 A well field has a number of production and injection limbs and a district network a number of
-substations. Each generator returns the format 2 spec of one size; the file shipped in ``specs/``
-for the default size is exactly the generator's output.
+substations. Each generator returns the format 2 spec of one size; the file in
+``gemini/assets/plants/`` for the default size is exactly the generator's output.
 
 The call order of the handwritten classes these specs replace is reproduced by the order of the
 connections, because the plan breaks ties by the first appearance of a module in the connection

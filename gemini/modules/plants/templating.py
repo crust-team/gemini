@@ -1,7 +1,8 @@
 """Plant templates: a spec with parameters, optional units and a generator for a variable size.
 
-A template file in ``templates/`` holds ``title``, ``description``, ``purpose`` (``heating``,
-``cooling`` or ``both``), ``parameters`` (name to ``default``, ``unit`` and ``description``),
+A template file in ``gemini/assets/templates/`` holds ``title``, ``description``, ``purpose``
+(``heating``, ``cooling`` or ``both``), ``parameters`` (name to ``default``, ``unit`` and
+``description``),
 ``optional`` (unit id to ``bypass`` and ``modules``) and either a ``spec`` or the name of a
 ``generator`` in ``generators.py``.
 
@@ -20,7 +21,6 @@ ports on modules that stay.
 """
 
 from copy import deepcopy
-from pathlib import Path
 
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
@@ -28,9 +28,9 @@ from gemini.modules._utils.serialization import located
 from gemini.modules.plants import generators
 from gemini.modules.plants.spec import from_spec
 from gemini.utils.files import read_json
+from gemini.utils.paths import ASSET_TEMPLATES
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
-TEMPLATES = Path(__file__).parent / "templates"
 GENERATORS = {
     "multi_well_spec": generators.multi_well_spec,
     "district_network_spec": generators.district_network_spec,
@@ -42,7 +42,7 @@ SECTIONS = ("fluids", "boundary", "bindings", "param_history")
 
 def template_names():
     """Return the names of the shipped templates, sorted."""
-    return sorted(path.stem for path in TEMPLATES.glob("*.json"))
+    return sorted(path.stem for path in ASSET_TEMPLATES.glob("*.json"))
 
 
 def load(name):
@@ -56,7 +56,7 @@ def load(name):
             suggestions=close_matches(name, names),
             code="unknown_name",
         )
-    return read_json(TEMPLATES / f"{name}.json")
+    return read_json(ASSET_TEMPLATES / f"{name}.json")
 
 
 def listing():

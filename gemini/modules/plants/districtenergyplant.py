@@ -23,10 +23,10 @@ class DistrictEnergyPlant(Module):
         super().__init__()
 
         # Modules
-        self.heating = templating.from_template("DistrictNetwork", {"consumers": 2})
+        self.heating = templating.from_template("district_network", {"consumers": 2})
         self.ates = ATESPlant()
         self.cooling = templating.from_template(
-            "DistrictNetwork", {"consumers": 1, "service": "cooling"}
+            "district_network", {"consumers": 1, "service": "cooling"}
         )
 
         self.electricity_grid = ElectricityGrid()

@@ -1,6 +1,7 @@
 """A class per shipped spec plant, so tests written for module classes run on every plant."""
 
 from gemini.modules.plants import Plant, library
+from gemini.utils.paths import ASSET_PLANTS
 
 
 def spec_plant_class(name):
@@ -16,4 +17,4 @@ def spec_plant_class(name):
 
 def spec_plant_classes():
     """Return the classes of every plant that ships as a spec file, sorted by name."""
-    return tuple(spec_plant_class(path.stem) for path in sorted(library.SPECS.glob("*.json")))
+    return tuple(spec_plant_class(path.stem) for path in sorted(ASSET_PLANTS.glob("*.json")))

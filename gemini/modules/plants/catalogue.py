@@ -1,13 +1,15 @@
 """The plant catalogue: which plants exist and how to get one."""
 
+from pathlib import Path
+
 from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules._utils import registry
-from gemini.modules.plants import library, templating
+from gemini.modules.plants import templating
 from gemini.modules.plants.spec import from_spec
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
-EXAMPLES = library.SPECS / "examples"
+EXAMPLES = Path(__file__).parent / "specs" / "examples"
 
 
 def names():

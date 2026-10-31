@@ -1,20 +1,18 @@
-"""The plants that ship as spec files in ``specs/``, registered under their file names."""
+"""The plants that ship as structure files in ``gemini/assets/plants/``, under their file names."""
 
 from functools import partial
-from pathlib import Path
 
 from gemini.modules._utils import registry
 from gemini.modules._utils.serialization import Report
 from gemini.modules.plants import reader
 from gemini.modules.plants.builder import Plant
 from gemini.utils.files import read_json
-
-SPECS = Path(__file__).parent / "specs"
+from gemini.utils.paths import ASSET_PLANTS
 
 
 def shipped(name):
     """Return the spec file of the shipped plant ``name`` as a dictionary."""
-    return read_json(SPECS / f"{name}.json")
+    return read_json(ASSET_PLANTS / f"{name}.json")
 
 
 def build(name):
@@ -32,10 +30,10 @@ def register_shipped(classes):
 
     ``classes`` maps a name to the ``Plant`` subclass that builds that spec itself.
     """
-    for path in sorted(SPECS.glob("*.json")):
+    for path in sorted(ASSET_PLANTS.glob("*.json")):
         registry.register_plant(path.stem, classes.get(path.stem, partial(build, path.stem)))
 
 
 def has(name):
     """Return whether a spec file ships for ``name``."""
-    return (SPECS / f"{name}.json").exists()
+    return (ASSET_PLANTS / f"{name}.json").exists()

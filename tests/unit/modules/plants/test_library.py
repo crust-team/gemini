@@ -2,6 +2,7 @@
 
 import gemini as gm
 from gemini.modules.plants import library
+from gemini.utils.paths import ASSET_PLANTS
 
 
 def test_shipped_specs_are_registered_as_plants():
@@ -13,7 +14,7 @@ def test_shipped_specs_are_registered_as_plants():
 
 def test_every_shipped_spec_is_valid_and_round_trips():
     """A shipped file builds without problems and rewrites to itself."""
-    for path in sorted(library.SPECS.glob("*.json")):
+    for path in sorted(ASSET_PLANTS.glob("*.json")):
         spec = library.shipped(path.stem)
         assert library.build(path.stem).to_spec() == spec, path.name
 

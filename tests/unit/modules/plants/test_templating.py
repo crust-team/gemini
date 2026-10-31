@@ -54,7 +54,7 @@ def test_listing_names_every_template_with_its_summary():
     """Each entry has the name, title, description and a purpose of the fixed three."""
     rows = templating.listing()
     assert [row["name"] for row in rows] == templating.template_names()
-    assert {"MultiWellPlant", "DistrictNetwork"} <= {row["name"] for row in rows}
+    assert {"multi_well", "district_network"} <= {row["name"] for row in rows}
     for row in rows:
         assert set(row) == {"name", "title", "description", "purpose"}
         assert row["purpose"] in {"heating", "cooling", "both"}
@@ -69,8 +69,11 @@ def test_every_template_fills_with_its_defaults_into_a_valid_spec(name):
 
 def test_default_sizes_build_the_shipped_plants():
     """The template defaults of a generated plant write the shipped spec file."""
-    for name in ("MultiWellPlant", "DistrictNetwork"):
-        assert gm.plants.from_template(name).to_spec() == library.shipped(name)
+    for template, plant in (
+        ("multi_well", "MultiWellPlant"),
+        ("district_network", "DistrictNetwork"),
+    ):
+        assert gm.plants.from_template(template).to_spec() == library.shipped(plant)
 
 
 def test_a_parameter_sets_a_module_parameter_in_the_spec():
@@ -106,11 +109,11 @@ def test_the_original_template_is_not_changed_by_filling():
 def test_unknown_names_and_wrong_flags_are_listed_together():
     """Every problem comes in one error; an unknown name carries close matches."""
     with pytest.raises(gm.errors.ValidationError) as error:
-        gm.plants.from_template("MultiWellPlant", {"produsers": 3, "injectors": 0})
+        gm.plants.from_template("multi_well", {"produsers": 3, "injectors": 0})
     assert "produsers" in str(error.value) and "producers" in error.value.suggestions
     with raises(gm.errors.ValidationError, "unknown_name") as unknown:
-        gm.plants.from_template("MultiWellPlnt")
-    assert "MultiWellPlant" in unknown.value.suggestions
+        gm.plants.from_template("multi_wel")
+    assert "multi_well" in unknown.value.suggestions
 
 
 def test_a_template_value_of_the_wrong_unit_is_a_problem_of_the_spec(monkeypatch):
