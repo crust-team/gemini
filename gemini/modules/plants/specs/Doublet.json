@@ -25,6 +25,10 @@
     "sink": {
       "type": "InjectionReservoir",
       "params": {}
+    },
+    "formation": {
+      "type": "Formation",
+      "params": {}
     }
   },
   "connections": [

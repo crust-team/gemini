@@ -292,6 +292,10 @@ def grid_gas(composition):
     return Fluid(kind="gas", gas_composition=composition, grid_composition=composition)
 
 
+AIR = Fluid(kind="gas", gas_composition=gas.AIR_COMPOSITION, specific_heat=gas.AIR_SPECIFIC_HEAT)
+FLUE_CO2 = Fluid(kind="gas", gas_composition={"CO2": 1.0})
+"""What a burner releases, as the CO2 that leaves it: combustion air is not modelled."""
+
 BRINE = Fluid()
 WATER = Fluid(kind="water")
 GLYCOL_30 = Fluid(kind="glycol_water", glycol_fraction=0.3)

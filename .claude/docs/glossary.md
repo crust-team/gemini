@@ -45,7 +45,7 @@ above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersi
 Every port is `<role>_in` or `<role>_out` ([conventions.md](conventions.md#naming)). The roles are
 `hot`, `cold`, `source`, `sink`, `generator`, `chilled`, `cooling`, `charge`, `discharge`, `supply`,
 `return`, `gas`, `liquid`, `fuel`, `power`, `loss`, `air`, `waste`, `chemical`, `wellhead`, `bottom`,
-`sandface`, `production`, `injection`, `fluid`, `branch<N>`, `grid` and `excess`.
+`sandface`, `production`, `injection`, `fluid`, `branch<N>`, `grid`, `excess`, `heat`, `flue` and `wet_air`.
 
 ## Retired names
 
@@ -103,7 +103,7 @@ Every port is `<role>_in` or `<role>_out` ([conventions.md](conventions.md#namin
 ## Vocabulary
 
 ```text
-absorbed absorber accumulation active adsorber ambient approach aquifer arrangement auxiliary
+absorbed absorber accumulation active adsorber air ambient approach aquifer arrangement auxiliary
 baumann best blowdown borehole bottom bottomhole branch1 branch2 breakthrough brine building bulb burned capacity
 capped carnot change characteristic charge charged chemical chilled clogging co2 coefficient coefficients
 cold combustion command composition concentration condenser condensing conductance conductivity consumption
@@ -111,11 +111,11 @@ cooler cooling cop coproduced correction correlation cost count curtailed declin
 derivative dew diameter difference diffusivity direction discharge dose drainage drawdown drift
 driving drop dumped duty effective effectiveness efficiency electric electricity elevation
 emission empty energy error esp evaporation evaporator excess exhaust export extraction factor factors
-fan feed first flow fluid fouling fraction freezing frequency friction fuel full gain gas
+fan feed first flow flue fluid fouling fraction freezing frequency friction fuel full gain gas
 generated generation generator geothermal gradient gravity grid gross ground groundwater head heat
 heating hot humidity hydraulic hydrostatic ice imbalance import in index indoor injected
 injection injectivity inlet inner input integral is isentropic latent length lift limit limited
-liquid load log lorenz loss margin mass maximum mean measurement methane minimum mixed mode
+liquid load log loop lorenz loss margin mass maximum mean measurement methane minimum mixed mode
 model motor net network no nominal opening operating or out outlet output overpressure parasitic
 part path period permeability phase pinch pipe point porosity power pressure previous price
 product production productivity proportional pump purchased quality radial radius rangeability rate rated

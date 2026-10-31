@@ -69,7 +69,7 @@ def test_co_produced_gas_is_burned_first_and_the_grid_covers_the_rest():
     assert result.inlets.fuel_in.m_dot == pytest.approx(0.01 + bought)
     expected = available * COPRODUCED.emission_factor()
     expected += out.fuel_purchased * gas.emission_per_energy(gas.GRID_COMPOSITION)
-    assert out.co2_emission == pytest.approx(expected)
+    assert result.outlets.flue_out.m_dot == pytest.approx(expected)
 
 
 def test_enough_co_produced_gas_buys_nothing_and_takes_what_it_burns():
@@ -84,9 +84,10 @@ def test_enough_co_produced_gas_buys_nothing_and_takes_what_it_burns():
 def test_no_co_produced_gas_buys_everything():
     """On a grid alone all fuel is bought and all its CO2 comes from the grid composition."""
     boiler = Boiler().update_params(capacity=1e6, efficiency=0.8)
-    out = boiler(fluid_in=WATER, fuel_in=GRID_GAS, temperature_setpoint=320).outputs
+    result = boiler(fluid_in=WATER, fuel_in=GRID_GAS, temperature_setpoint=320)
+    out = result.outputs
     assert out.fuel_coproduced == 0 and out.fuel_purchased == pytest.approx(out.fuel)
-    assert out.co2_emission == pytest.approx(
+    assert result.outlets.flue_out.m_dot == pytest.approx(
         out.fuel * gas.emission_per_energy(gas.GRID_COMPOSITION)
     )
 

@@ -87,11 +87,9 @@ class Boiler(_BoilerBody):
     ``fuel_in`` comes from a ``GasMakeup`` or a ``GasGrid``, which mark the stream with the grid
     composition; without that mark the fuel energy of the stream limits the duty.
 
-    ``fuel`` is the total, ``fuel_coproduced`` and ``fuel_purchased`` its parts [W],
-    ``burned_mass_flow`` the co-produced gas burned [kg/s] and ``co2_emission`` the CO2 of
-    everything burned, formed and carried in the gas [kg/s]. Purchased gas enters no stream: its
-    mass is not in ``mass_balance``, and its chemical energy is the ``fuel`` input of
-    ``energy_balance``.
+    ``fuel`` is the total, ``fuel_coproduced`` and ``fuel_purchased`` its parts [W] and
+    ``burned_mass_flow`` the co-produced gas burned [kg/s]. ``flue_out`` carries the CO2 of
+    everything burned, formed and carried in the gas, to ``Atmosphere.gas_in``.
     """
 
     def __init__(self):
@@ -106,7 +104,9 @@ class Boiler(_BoilerBody):
         self.fuel_coproduced = Output(Fuel)
         self.fuel_purchased = Output(Fuel)
         self.burned_mass_flow = Output(MassFlow)
-        self.co2_emission = Output(MassFlow)
+
+        # Outlets
+        self.flue_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Heat the stream up to its setpoint and return the gas it burned."""
@@ -115,9 +115,12 @@ class Boiler(_BoilerBody):
         inlet, fuel = inlets.fluid_in, inlets.fuel_in
         duty = ops.minimum(self._requested_duty(inlet), self._duty_limit(fuel))
         outlet = self._heated(inlet, duty)
-        fuel_in = burner.burned_stream(energy.input_power(duty, self.efficiency), fuel)
+        need = energy.input_power(duty, self.efficiency)
+        flue_out = burner.flue_stream(need, fuel)
 
-        outlets = dict(fluid_out=outlet, fuel_in=fuel_in)
+        outlets = dict(
+            fluid_out=outlet, flue_out=flue_out, fuel_in=burner.burned_stream(need, fuel)
+        )
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

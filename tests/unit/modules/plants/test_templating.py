@@ -64,8 +64,7 @@ def test_listing_names_every_template_with_its_summary():
 def test_every_template_fills_with_its_defaults_into_a_valid_spec(name):
     """The defaults of each shipped template give a spec without problems."""
     spec = templating.fill(templating.load(name), {})
-    found = gm.plants.validate(spec, on_error="record")
-    assert {item["code"] for item in found} <= {"root_plant_port"}
+    assert gm.plants.validate(spec) == []
 
 
 def test_default_sizes_build_the_shipped_plants():

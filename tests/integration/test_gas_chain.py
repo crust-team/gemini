@@ -24,6 +24,9 @@ def chain():
     plant.add("GasMakeup", name="makeup")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
     plant.add("Flare", name="flare")
+    plant.add("Atmosphere", name="air")
+    plant.connect("boiler.flue_out", "air.gas_in")
+    plant.connect("flare.flue_out", "air.gas_in")
     plant.connect("produced", "degasser.fluid_in")
     plant.connect("degasser.liquid_out", "fluid_out")
     plant.connect("degasser.gas_out", "makeup.gas_in")
@@ -40,6 +43,7 @@ def run(setpoint):
     """Return the plant and one call at a boiler setpoint."""
     plant = chain()
     plant.boiler.temperature_setpoint = setpoint
+    plant.air.temperature = "15 degC"
     return plant, plant(produced=PRODUCED, water_in=WATER)
 
 
@@ -66,13 +70,17 @@ def test_without_co_produced_gas_the_grid_covers_everything():
     plant = gm.Plant("Grid")
     plant.add("GasGrid", name="grid")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
+    plant.add("Atmosphere", name="air")
+    plant.connect("boiler.flue_out", "air.gas_in")
     plant.connect("grid.gas_out", "boiler.fuel_in")
     plant.connect("water_in", "boiler.fluid_in")
     plant.connect("boiler.fluid_out", "water_out")
     plant.boiler.temperature_setpoint = "70 degC"
-    outputs = plant(water_in=WATER).leaves()["boiler"].outputs
+    plant.air.temperature = "15 degC"
+    leaves = plant(water_in=WATER).leaves()
+    outputs = leaves["boiler"].outputs
     assert outputs.fuel_coproduced == 0 and outputs.fuel_purchased == pytest.approx(outputs.fuel)
-    assert outputs.co2_emission == pytest.approx(
+    assert leaves["air"].outputs.co2_emission == pytest.approx(
         outputs.fuel * gas.emission_per_energy(gas.GRID_COMPOSITION)
     )
 
@@ -96,9 +104,4 @@ def test_the_chain_conserves_the_carbon_it_reports():
     carried = gas.mass_fraction(composition, "CO2")
     expected = boiler_burnt * (formed + carried)
     expected += flared * (carried + combustion.FLARE_EFFICIENCY * formed)
-    reported = sum(
-        leaf.outputs.co2_emission
-        for name, leaf in result.leaves().items()
-        if name in ("boiler", "flare")
-    )
-    assert reported == pytest.approx(expected)
+    assert result.leaves()["air"].outputs.co2_emission == pytest.approx(expected)

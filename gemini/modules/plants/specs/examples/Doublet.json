@@ -239,6 +239,10 @@
         "injectivity_index": 5.5555555555555555e-08,
         "wellbore_radius": 0.0765
       }
+    },
+    "formation": {
+      "type": "Formation",
+      "params": {}
     }
   },
   "connections": [

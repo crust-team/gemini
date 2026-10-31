@@ -3,6 +3,7 @@
   "category": "plants",
   "children": {
     "esp": "ESP",
+    "formation": "Formation",
     "injector": "InjectionWell",
     "reservoir": "ProductionReservoir",
     "riser": "ProductionWell",
@@ -151,6 +152,8 @@
       "esp.setting_depth": 600.0,
       "esp.stage_count": 15,
       "esp.tubing": 0.1778,
+      "formation.geothermal_gradient": null,
+      "formation.surface_temperature": null,
       "injector.correction_factors": [
         1.0,
         0.0

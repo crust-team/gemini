@@ -65,7 +65,6 @@ def configure_pipe(pipe):
     pipe.update_params(
         length=500, inner_diameter=0.1, elevation_change=0, heat_transfer_coefficient=1.0
     )
-    pipe.ambient_temperature = 283.15
     return pipe
 
 

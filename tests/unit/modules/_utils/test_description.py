@@ -149,6 +149,7 @@ def test_a_spec_plant_lists_its_connections():
         "riser",
         "injector",
         "sink",
+        "formation",
     ]
     assert len(description["connections"]) == 4
     assert {item["source"] for item in description["connections"]} >= {"esp.fluid_out"}

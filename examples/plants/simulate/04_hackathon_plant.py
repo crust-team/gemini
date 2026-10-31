@@ -28,11 +28,22 @@ COOLING_GRID = {
     "dew_point_margin": 1.0,
 }
 
+AMBIENT = 283.15
+"""Assumed temperature [K] of the air, 10 degC."""
+
 COOLING_WATER = 288.15
 """Assumed temperature [K] of the water that cools the chiller, 15 degC."""
 
 COOLING_WATER_FLOW = 800.0
 """Assumed flow [kg/s] of the water that cools the chiller."""
+
+CHILLER_COOLER = {
+    "cooler_type": "dry",
+    "capacity": "40 MW",
+    "approach": 5.0,
+    "specific_fan_power": 0.02,
+    "loop_pressure": 3e5,
+}
 
 HEATING_SUPPLY = "100 degC"
 COOLING_SUPPLY = "20 degC"
@@ -111,6 +122,9 @@ def add_modules(plant):
     plant.add("GasMakeup", name="makeup")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
     plant.add("Flare", name="flare")
+    plant.add("ElectricityGrid", name="grid")
+    plant.add("Atmosphere", name="air")
+    plant.add("Cooler", name="chiller_cooler", params=CHILLER_COOLER)
     plant.add("HeatPump", name="heat_pump", params=HEAT_PUMP)
     plant.add("Splitter", name="loads")
     plant.add("Mixer", name="heat_return")
@@ -119,6 +133,7 @@ def add_modules(plant):
     plant.add("CoolingGrid", name="cool_users", params=COOLING_GRID)
     plant.get_module("heat_users").fluid = gm.WATER
     plant.get_module("cool_users").fluid = gm.WATER
+    plant.get_module("chiller_cooler").fluid = gm.WATER
 
 
 def connect_brine(plant):
@@ -134,9 +149,9 @@ def connect_brine(plant):
 
 
 def connect_power(plant):
-    """Name the plant port that takes the electricity of every consumer."""
-    for name in ("d0", "d1", "heat_pump", "chiller"):
-        plant.connect("power_in", f"{name}.power_in")
+    """Wire every consumer of electricity to the grid."""
+    for name in ("d0", "d1", "heat_pump", "chiller", "chiller_cooler"):
+        plant.connect("grid.power_out", f"{name}.power_in")
 
 
 def connect_gas(plant):
@@ -148,7 +163,7 @@ def connect_gas(plant):
 
 
 def connect_water(plant):
-    """Wire the heating, chilled and cooling water, with the plant ports named."""
+    """Wire the heating, chilled and cooling water."""
     plant.connect("heat_users.return_out", "hx.cold_in")
     plant.connect("hx.cold_out", "heat_pump.sink_in")
     plant.connect("heat_pump.sink_out", "boiler.fluid_in")
@@ -159,28 +174,28 @@ def connect_water(plant):
     plant.connect("heat_return.fluid_out", "heat_users.supply_in")
     plant.connect("cool_users.return_out", "chiller.chilled_in")
     plant.connect("chiller.chilled_out", "cool_users.supply_in")
-    plant.connect("chiller_cooling", "chiller.cooling_in")
-    plant.connect("chiller.cooling_out", "chiller_cooling_out")
+    plant.connect("chiller.cooling_out", "chiller_cooler.fluid_in")
+    plant.connect("chiller_cooler.fluid_out", "chiller.cooling_in")
 
 
-def return_stream(temperature, pressure, flow=1.0):
-    """Return a plant inlet of water; the plan replaces the flow of the two return ports."""
-    fluid = gm.WATER.model_dump(mode="json")
-    return {"m_dot": flow, "T": temperature, "p": pressure, "fluid": fluid}
+def connect_air(plant):
+    """Wire what the plant releases and the chiller's cooler to the air."""
+    plant.connect("boiler.flue_out", "air.gas_in")
+    plant.connect("flare.flue_out", "air.gas_in")
+    plant.connect("air.air_out", "chiller_cooler.air_in")
+    plant.connect("chiller_cooler.air_out", "air.air_in")
 
 
 def set_boundaries(plant):
-    """Set the setpoints of the design and the assumed return temperatures of the plant ports."""
+    """Set the setpoints of the design and the assumed cooling water and air."""
     plant.heat_pump.temperature_setpoint = HEATING_SUPPLY
     plant.boiler.temperature_setpoint = HEATING_SUPPLY
     plant.chiller.temperature_setpoint = COOLING_SUPPLY
     plant.cool_users.indoor_temperature = "26 degC"
     plant.cool_users.indoor_relative_humidity = 0.5
-    plant.boundary = {
-        "root_inputs": {
-            "chiller_cooling": return_stream(COOLING_WATER, 3e5, COOLING_WATER_FLOW),
-        }
-    }
+    plant.chiller_cooler.temperature_setpoint = COOLING_WATER
+    plant.chiller_cooler.flow = COOLING_WATER_FLOW
+    plant.air.temperature = AMBIENT
 
 
 def build():
@@ -191,10 +206,9 @@ def build():
     connect_power(plant)
     connect_gas(plant)
     connect_water(plant)
+    connect_air(plant)
     set_boundaries(plant)
-    assert [
-        item for item in plant.validate(on_error="record") if item["code"] != "root_plant_port"
-    ] == []
+    plant.validate()
     return plant
 
 
@@ -211,6 +225,7 @@ def print_assumptions():
     """Say what this example assumes rather than takes from the challenge."""
     print("Assumptions of this example, not of the challenge:")
     print("  heating return 60 degC, cooling return 25 degC, chiller cooling water 15 degC")
+    print("  air 10 degC; the chiller's dry cooler: 5 K approach, 2 % fan power")
     print("  heat exchanger, heat pump, boiler and chiller sizes; 1000 m drainage radius")
     print("  discount rate, lifetime, every price and the cost factors without a source")
 

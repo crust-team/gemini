@@ -21,7 +21,7 @@ def spec():
             "pipe": {"type": "Pipe", "params": {"length": "100 ft"}},
         },
         "connections": [{"source": "degasser.liquid_out", "target": "filters.hot.fluid_in"}],
-        "inlets": {"feed": "degasser.fluid_in", "pipe_in": "pipe.fluid_in"},
+        "inlets": {"feed": "degasser.fluid_in", "pipe_in": "pipe.fluid_in", "air": "pipe.air_in"},
         "outlets": {
             "product": "filters.hot.fluid_out",
             "gas": "degasser.gas_out",

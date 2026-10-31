@@ -3,6 +3,16 @@
   "description": "Heating with a peak boiler, and an absorption chiller cooling the chilled-water loop from the hot water.",
   "purpose": "both",
   "parameters": {
+    "peak_boiler.enabled": {
+      "default": true,
+      "unit": null,
+      "description": "Peak boiler; false leaves the unit out."
+    },
+    "absorption_chiller.enabled": {
+      "default": true,
+      "unit": null,
+      "description": "Absorption chiller driven by the hot water; false leaves the unit out."
+    },
     "heat_exchanger.thermal_conductance": {
       "default": null,
       "unit": "W/K",
@@ -137,9 +147,63 @@
       "default": null,
       "unit": "Pa",
       "description": "Pressure of the cooling return."
+    },
+    "absorption_cooler.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Cooler of the absorption chiller: capacity."
+    },
+    "absorption_cooler.approach": {
+      "default": null,
+      "unit": "K",
+      "description": "Cooler of the absorption chiller: approach to the air."
+    },
+    "absorption_cooler.specific_fan_power": {
+      "default": null,
+      "unit": "-",
+      "description": "Cooler of the absorption chiller: fan power per duty."
+    },
+    "absorption_cooler.loop_pressure": {
+      "default": null,
+      "unit": "Pa",
+      "description": "Cooler of the absorption chiller: pressure of the cooling water."
     }
   },
-  "optional": {},
+  "optional": {
+    "peak_boiler": {
+      "bypass": [
+        {
+          "source": "peak_boiler.fluid_in",
+          "target": "peak_boiler.fluid_out"
+        },
+        {
+          "source": "gas_makeup.gas_in",
+          "target": "gas_makeup.excess_out"
+        }
+      ],
+      "modules": [
+        "peak_boiler",
+        "gas_grid",
+        "gas_makeup"
+      ]
+    },
+    "absorption_chiller": {
+      "bypass": [
+        {
+          "source": "absorption_chiller.generator_in",
+          "target": "absorption_chiller.generator_out"
+        },
+        {
+          "source": "absorption_chiller.chilled_in",
+          "target": "absorption_chiller.chilled_out"
+        }
+      ],
+      "modules": [
+        "absorption_chiller",
+        "absorption_cooler"
+      ]
+    }
+  },
   "spec": {
     "format": 2,
     "name": "HeatingAbsorptionCooling",
@@ -222,6 +286,16 @@
       "flare": {
         "type": "Flare",
         "params": {}
+      },
+      "atmosphere": {
+        "type": "Atmosphere",
+        "params": {}
+      },
+      "absorption_cooler": {
+        "type": "Cooler",
+        "params": {
+          "cooler_type": "dry"
+        }
       }
     },
     "connections": [
@@ -302,6 +376,50 @@
         "target": "cooling_return_pipe.fluid_in"
       },
       {
+        "source": "atmosphere.air_out",
+        "target": "heating_return_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "heating_supply_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "cooling_return_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "cooling_supply_pipe.air_in"
+      },
+      {
+        "source": "peak_boiler.flue_out",
+        "target": "atmosphere.gas_in"
+      },
+      {
+        "source": "flare.flue_out",
+        "target": "atmosphere.gas_in"
+      },
+      {
+        "source": "absorption_chiller.cooling_out",
+        "target": "absorption_cooler.fluid_in"
+      },
+      {
+        "source": "absorption_cooler.fluid_out",
+        "target": "absorption_chiller.cooling_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "absorption_cooler.air_in"
+      },
+      {
+        "source": "absorption_cooler.air_out",
+        "target": "atmosphere.air_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "absorption_cooler.power_in"
+      },
+      {
         "source": "heat_exchanger.cold_out",
         "target": "peak_boiler.fluid_in"
       },
@@ -318,12 +436,6 @@
         "target": "cooling_supply_pipe.fluid_in"
       }
     ],
-    "inlets": {
-      "absorption_cooling_in": "absorption_chiller.cooling_in"
-    },
-    "outlets": {
-      "absorption_cooling_out": "absorption_chiller.cooling_out"
-    },
     "bindings": {},
     "param_history": {}
   }

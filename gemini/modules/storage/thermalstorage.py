@@ -8,7 +8,6 @@ from gemini.modules.module import Module
 from gemini.modules.storage import _physics
 from gemini.physics import heat_transfer
 from gemini.types import (
-    Boundary,
     Energy,
     Fraction,
     HeatAbsorbed,
@@ -84,9 +83,7 @@ class ThermalStorage(Module):
         # Inlets
         self.charge_in = Inlet(Stream, kind="hot_water")
         self.discharge_in = Inlet(Stream, kind="hot_water")
-
-        # Boundaries
-        self.ambient_temperature = Boundary(Temperature)
+        self.air_in = Inlet(Stream, kind="air")
 
         # States
         self.temperature = State(Temperature, default=_physics.DEFAULT_TANK_TEMPERATURE)
@@ -121,7 +118,7 @@ class ThermalStorage(Module):
         charge = self._circuit_heat(inlets.charge_in, self.charge_effectiveness)
         discharge = self._circuit_heat(inlets.discharge_in, self.discharge_effectiveness)
         ambient = heat_transfer.heat_rate(
-            self.heat_loss_conductance, self.temperature - self.ambient_temperature
+            self.heat_loss_conductance, self.temperature - inlets.air_in.T
         )
         reports = _physics.tank_service_report(
             self.service == "hot",
@@ -147,7 +144,7 @@ class ThermalStorage(Module):
             self._conductance(discharge_in, self.discharge_effectiveness),
             discharge_in.T,
             self.heat_loss_conductance,
-            self.ambient_temperature,
+            inlets.air_in.T,
         )
         return {"temperature": relaxed}
 

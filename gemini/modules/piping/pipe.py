@@ -5,7 +5,6 @@ from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import geometry, heat_transfer, hydraulics
 from gemini.types import (
-    Boundary,
     Elevation,
     HeatAbsorbed,
     HeatLoss,
@@ -68,9 +67,7 @@ class Pipe(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream)
-
-        # Boundaries
-        self.ambient_temperature = Boundary(Temperature)
+        self.air_in = Inlet(Stream, kind="air")
 
         # Outputs
         self.pressure_drop = Output(PressureDifference)
@@ -100,7 +97,7 @@ class Pipe(Module):
             outlet_p=outlet_p,
             inlet_p=inlet.p,
         )
-        outlet = inlet.with_(T=self._outlet_temperature(inlet), p=outlet_p)
+        outlet = inlet.with_(T=self._outlet_temperature(inlet, inlets.air_in), p=outlet_p)
 
         outlets = dict(fluid_out=outlet)
         return outlets
@@ -156,12 +153,10 @@ class Pipe(Module):
             self.length,
         )
 
-    def _outlet_temperature(self, inlet):
+    def _outlet_temperature(self, inlet, air):
         """Return the outlet temperature [K] of the exponential ambient-exchange profile."""
         conductance = hydraulics.pipe_conductance(
             self.heat_transfer_coefficient, self.inner_diameter, self.length
         )
         effectiveness = heat_transfer.ambient_effectiveness(conductance, inlet.heat_capacity_rate())
-        return heat_transfer.effectiveness_outlet_temperature(
-            inlet.T, effectiveness, self.ambient_temperature
-        )
+        return heat_transfer.effectiveness_outlet_temperature(inlet.T, effectiveness, air.T)

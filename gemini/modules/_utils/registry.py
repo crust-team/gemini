@@ -28,6 +28,7 @@ CATEGORIES = (
     "storage",
     "piping",
     "grids",
+    "environment",
     "control",
     "plants",
 )

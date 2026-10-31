@@ -1,0 +1,30 @@
+"""The rock around the wells of a doublet."""
+
+from gemini.modules.module import Module
+from gemini.types import Inlet, Parameter, Power, Temperature, TemperatureGradient
+
+
+class Formation(Module):
+    """The rock the wells pass through: their heat loss ends here.
+
+    A ``Doublet`` creates and wires it, so a user never connects it, and passes it the
+    ``geothermal_gradient`` and the ``surface_temperature`` of the design. ``heat_in`` receives the
+    heat each well loses.
+    """
+
+    def __init__(self):
+        """Declare the rock and what it receives."""
+        super().__init__()
+
+        # Parameters
+        self.geothermal_gradient = Parameter(TemperatureGradient | None, default=None)
+        self.surface_temperature = Parameter(Temperature | None, default=None)
+
+        # Inlets
+        self.heat_in = Inlet(Power, kind="heat", many=True)
+
+    def forward(self, inlets):
+        """End the heat of the wells here."""
+
+        outlets = dict()
+        return outlets

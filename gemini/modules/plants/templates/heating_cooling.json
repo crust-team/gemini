@@ -182,6 +182,66 @@
       "default": null,
       "unit": "Pa",
       "description": "Pressure of the cooling return."
+    },
+    "absorption_cooler.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Cooler of the absorption chiller: capacity."
+    },
+    "absorption_cooler.approach": {
+      "default": null,
+      "unit": "K",
+      "description": "Cooler of the absorption chiller: approach to the air."
+    },
+    "absorption_cooler.specific_fan_power": {
+      "default": null,
+      "unit": "-",
+      "description": "Cooler of the absorption chiller: fan power per duty."
+    },
+    "absorption_cooler.loop_pressure": {
+      "default": null,
+      "unit": "Pa",
+      "description": "Cooler of the absorption chiller: pressure of the cooling water."
+    },
+    "adsorption_cooler.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Cooler of the adsorption chiller: capacity."
+    },
+    "adsorption_cooler.approach": {
+      "default": null,
+      "unit": "K",
+      "description": "Cooler of the adsorption chiller: approach to the air."
+    },
+    "adsorption_cooler.specific_fan_power": {
+      "default": null,
+      "unit": "-",
+      "description": "Cooler of the adsorption chiller: fan power per duty."
+    },
+    "adsorption_cooler.loop_pressure": {
+      "default": null,
+      "unit": "Pa",
+      "description": "Cooler of the adsorption chiller: pressure of the cooling water."
+    },
+    "compression_cooler.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Cooler of the compression chiller: capacity."
+    },
+    "compression_cooler.approach": {
+      "default": null,
+      "unit": "K",
+      "description": "Cooler of the compression chiller: approach to the air."
+    },
+    "compression_cooler.specific_fan_power": {
+      "default": null,
+      "unit": "-",
+      "description": "Cooler of the compression chiller: fan power per duty."
+    },
+    "compression_cooler.loop_pressure": {
+      "default": null,
+      "unit": "Pa",
+      "description": "Cooler of the compression chiller: pressure of the cooling water."
     }
   },
   "optional": {
@@ -224,6 +284,10 @@
           "source": "absorption_chiller.chilled_in",
           "target": "absorption_chiller.chilled_out"
         }
+      ],
+      "modules": [
+        "absorption_chiller",
+        "absorption_cooler"
       ]
     },
     "adsorption_chiller": {
@@ -236,6 +300,10 @@
           "source": "adsorption_chiller.chilled_in",
           "target": "adsorption_chiller.chilled_out"
         }
+      ],
+      "modules": [
+        "adsorption_chiller",
+        "adsorption_cooler"
       ]
     },
     "compression_chiller": {
@@ -244,6 +312,10 @@
           "source": "compression_chiller.source_in",
           "target": "compression_chiller.source_out"
         }
+      ],
+      "modules": [
+        "compression_chiller",
+        "compression_cooler"
       ]
     },
     "cooling_loop": {
@@ -253,7 +325,10 @@
         "compression_chiller",
         "cooling_return_pipe",
         "cooling_supply_pipe",
-        "cooling_consumer"
+        "cooling_consumer",
+        "absorption_cooler",
+        "adsorption_cooler",
+        "compression_cooler"
       ]
     }
   },
@@ -355,6 +430,28 @@
       "flare": {
         "type": "Flare",
         "params": {}
+      },
+      "atmosphere": {
+        "type": "Atmosphere",
+        "params": {}
+      },
+      "absorption_cooler": {
+        "type": "Cooler",
+        "params": {
+          "cooler_type": "dry"
+        }
+      },
+      "adsorption_cooler": {
+        "type": "Cooler",
+        "params": {
+          "cooler_type": "dry"
+        }
+      },
+      "compression_cooler": {
+        "type": "Cooler",
+        "params": {
+          "cooler_type": "dry"
+        }
       }
     },
     "connections": [
@@ -481,18 +578,92 @@
       {
         "source": "cooling_consumer.return_out",
         "target": "cooling_return_pipe.fluid_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "heating_return_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "heating_supply_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "cooling_return_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "cooling_supply_pipe.air_in"
+      },
+      {
+        "source": "peak_boiler.flue_out",
+        "target": "atmosphere.gas_in"
+      },
+      {
+        "source": "flare.flue_out",
+        "target": "atmosphere.gas_in"
+      },
+      {
+        "source": "absorption_chiller.cooling_out",
+        "target": "absorption_cooler.fluid_in"
+      },
+      {
+        "source": "absorption_cooler.fluid_out",
+        "target": "absorption_chiller.cooling_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "absorption_cooler.air_in"
+      },
+      {
+        "source": "absorption_cooler.air_out",
+        "target": "atmosphere.air_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "absorption_cooler.power_in"
+      },
+      {
+        "source": "adsorption_chiller.cooling_out",
+        "target": "adsorption_cooler.fluid_in"
+      },
+      {
+        "source": "adsorption_cooler.fluid_out",
+        "target": "adsorption_chiller.cooling_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "adsorption_cooler.air_in"
+      },
+      {
+        "source": "adsorption_cooler.air_out",
+        "target": "atmosphere.air_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "adsorption_cooler.power_in"
+      },
+      {
+        "source": "compression_chiller.sink_out",
+        "target": "compression_cooler.fluid_in"
+      },
+      {
+        "source": "compression_cooler.fluid_out",
+        "target": "compression_chiller.sink_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "compression_cooler.air_in"
+      },
+      {
+        "source": "compression_cooler.air_out",
+        "target": "atmosphere.air_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "compression_cooler.power_in"
       }
     ],
-    "inlets": {
-      "absorption_cooling_in": "absorption_chiller.cooling_in",
-      "adsorption_cooling_in": "adsorption_chiller.cooling_in",
-      "compression_rejection_in": "compression_chiller.sink_in"
-    },
-    "outlets": {
-      "absorption_cooling_out": "absorption_chiller.cooling_out",
-      "adsorption_cooling_out": "adsorption_chiller.cooling_out",
-      "compression_rejection_out": "compression_chiller.sink_out"
-    },
     "bindings": {},
     "param_history": {}
   }

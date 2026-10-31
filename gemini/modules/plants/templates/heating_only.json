@@ -3,6 +3,11 @@
   "description": "Doublet, heat exchanger, peak boiler and the heating consumer; no cooling.",
   "purpose": "heating",
   "parameters": {
+    "peak_boiler.enabled": {
+      "default": true,
+      "unit": null,
+      "description": "Peak boiler; false leaves the unit out."
+    },
     "heat_exchanger.thermal_conductance": {
       "default": null,
       "unit": "W/K",
@@ -74,7 +79,25 @@
       "description": "Pressure of the heating return."
     }
   },
-  "optional": {},
+  "optional": {
+    "peak_boiler": {
+      "bypass": [
+        {
+          "source": "peak_boiler.fluid_in",
+          "target": "peak_boiler.fluid_out"
+        },
+        {
+          "source": "gas_makeup.gas_in",
+          "target": "gas_makeup.excess_out"
+        }
+      ],
+      "modules": [
+        "peak_boiler",
+        "gas_grid",
+        "gas_makeup"
+      ]
+    }
+  },
   "spec": {
     "format": 2,
     "name": "HeatingOnly",
@@ -139,6 +162,10 @@
       "flare": {
         "type": "Flare",
         "params": {}
+      },
+      "atmosphere": {
+        "type": "Atmosphere",
+        "params": {}
       }
     },
     "connections": [
@@ -197,6 +224,22 @@
       {
         "source": "heating_consumer.return_out",
         "target": "heating_return_pipe.fluid_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "heating_return_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "heating_supply_pipe.air_in"
+      },
+      {
+        "source": "peak_boiler.flue_out",
+        "target": "atmosphere.gas_in"
+      },
+      {
+        "source": "flare.flue_out",
+        "target": "atmosphere.gas_in"
       },
       {
         "source": "heat_exchanger.cold_out",

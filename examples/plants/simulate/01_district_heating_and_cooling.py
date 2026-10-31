@@ -46,6 +46,7 @@ class DistrictEnergyPlant(gm.modules.Module):
         # Inlets
         self.heat_supply_in = Inlet(Stream)
         self.cooling_return_in = Inlet(Stream)
+        self.air_in = Inlet(Stream, kind="air")
 
         # Outputs
         self.heat_supplied = Output(HeatSupplied)
@@ -62,9 +63,9 @@ class DistrictEnergyPlant(gm.modules.Module):
         """Serve the heating network, chill the cooling water and serve the cooling network."""
 
         # Modules
-        heated = self.heating(supply_in=inlets.heat_supply_in)
+        heated = self.heating(supply_in=inlets.heat_supply_in, air_in=inlets.air_in)
         chilled = self.ates(return_in=inlets.cooling_return_in)
-        cooled = self.cooling(supply_in=chilled.outlets.supply_out)
+        cooled = self.cooling(supply_in=chilled.outlets.supply_out, air_in=inlets.air_in)
 
         # Outlets
         heat_return_out = heated.outlets.return_out
@@ -88,7 +89,6 @@ def configure_network(network, design_flow):
         pipe.update_params(
             length=400, inner_diameter=0.15, elevation_change=0, heat_transfer_coefficient=0.8
         )
-        pipe.ambient_temperature = "10 degC"
 
 
 def configure_substation(substation, thermal_conductance, network_flow):
@@ -185,7 +185,11 @@ def main():
     state, cooling_return = None, FIRST_COOLING_RETURN
     print("hour  heat kW  cold kW  electricity kW  stored MWh  chilled degC")
     for hour in range(6):
-        inlets = {"heat_supply_in": GEOTHERMAL_SUPPLY, "cooling_return_in": cooling_return}
+        inlets = {
+            "heat_supply_in": GEOTHERMAL_SUPPLY,
+            "cooling_return_in": cooling_return,
+            "air_in": gm.modules.Atmosphere.ambient_air("10 degC"),
+        }
         state, result = plant.step(state, HOUR, inlets)
         check_closure(plant, result)
         out = result.outputs

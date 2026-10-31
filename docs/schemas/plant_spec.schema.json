@@ -45,6 +45,7 @@
             "AbsorptionUnit",
             "AdsorptionChiller",
             "AquiferStorage",
+            "Atmosphere",
             "Blowdown",
             "Boiler",
             "BoreholeField",
@@ -66,6 +67,7 @@
             "Filter",
             "Flare",
             "FlashTurbine",
+            "Formation",
             "GasCompressor",
             "GasGrid",
             "GasMakeup",
@@ -92,7 +94,6 @@
             "ThermalDecline",
             "ThermalStorage",
             "Valve",
-            "Vent",
             "WasteGrid",
             "ModuleDict",
             "ModuleList"

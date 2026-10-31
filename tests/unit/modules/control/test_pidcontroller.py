@@ -10,6 +10,7 @@ from gemini.modules import Module
 from gemini.modules.control import PIDController
 from gemini.modules.storage import ThermalStorage
 from gemini.types import Boundary, Control, Inlet, Outlet, Output, Stream, Temperature
+from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_close
 from tests.fixtures.errors import raises
 
@@ -135,7 +136,7 @@ class ControlledTank(Module):
         charge_in = inlets.charge_in
         throttled = charge_in.with_(m_dot=charge_in.m_dot * control.outputs.command)
         stored = self.storage(
-            charge_in=throttled, discharge_in=inlets.discharge_in, ambient_temperature=293.15
+            charge_in=throttled, discharge_in=inlets.discharge_in, air_in=air(293.15)
         )
 
         # Outlets

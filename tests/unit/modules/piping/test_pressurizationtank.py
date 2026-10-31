@@ -6,14 +6,13 @@ import gemini as gm
 from gemini.modules import Module, energy_balance, mass_balance
 from gemini.modules.piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
 from gemini.types import (
-    Boundary,
     HeatLoss,
     Inlet,
     Outlet,
     Output,
     Stream,
-    Temperature,
 )
+from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
 
@@ -38,9 +37,9 @@ class Network(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream)
+        self.air_in = Inlet(Stream, kind="air")
 
         # Boundaries
-        self.ambient_temperature = Boundary(Temperature)
 
         # Outputs
         self.heat_loss = Output(HeatLoss)
@@ -54,9 +53,7 @@ class Network(Module):
 
         # Modules
         split = self.splitter(fluid_in=inlets.fluid_in, split_fraction=0.4)
-        piped = self.pipe(
-            fluid_in=split.outlets.branch1_out, ambient_temperature=self.ambient_temperature
-        )
+        piped = self.pipe(fluid_in=split.outlets.branch1_out, air_in=inlets.air_in)
         throttled = self.valve(fluid_in=split.outlets.branch2_out, opening=0.8)
         mixed = self.mixer(
             branch1_in=piped.outlets.fluid_out, branch2_in=throttled.outlets.fluid_out
@@ -95,7 +92,7 @@ def test_invalid_setpoint_and_missing_command_raise():
 def test_piping_network_closes_mass_and_energy():
     """A split, pipe, valve, mixer and tank network conserves mass and sensible energy."""
     network = Network()
-    result = network(fluid_in=RETURN.with_(p=4e5), ambient_temperature=283.15)
+    result = network(fluid_in=RETURN.with_(p=4e5), air_in=air(283.15))
     outlet = result.outlets.fluid_out
     assert outlet.m_dot == pytest.approx(10, rel=1e-15) and outlet.p == 3e5
     assert outlet.T < RETURN.T and result.outputs.heat_loss > 0

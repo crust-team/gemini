@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import CoolingSubstation, HeatingSubstation, generators
 from gemini.types import Stream
+from tests.fixtures.air import air
 from tests.fixtures.errors import raises
 
 CP = 4217.4
@@ -28,7 +29,7 @@ def _leaf_sum(result, name):
 def test_heating_network_serves_both_substations(plants):
     """Equal shares feed identical substations; totals and the stream audit add up."""
     network = plants["network"](_network(), plants["heating_substation"])
-    result = network(supply_in=HOT)
+    result = network(supply_in=HOT, air_in=air(283.15))
     out = result.outputs
     children = result.children
     feeds = [children[f"substations.{index}"].inlets.supply_in.m_dot for index in range(2)]
@@ -53,7 +54,7 @@ def test_heating_network_serves_both_substations(plants):
 def test_network_sums_leaf_outputs_by_type_through_nested_substations(plants):
     """The network sums the consumers inside its substations once, not the substation sums."""
     network = plants["network"](_network(consumers=3), plants["heating_substation"])
-    result = network(supply_in=HOT.with_(m_dot=4.5))
+    result = network(supply_in=HOT.with_(m_dot=4.5), air_in=air(283.15))
     substation_sums = [
         result.children[f"substations.{index}"].outputs.heat_supplied for index in range(3)
     ]
@@ -65,7 +66,7 @@ def test_network_sums_leaf_outputs_by_type_through_nested_substations(plants):
 def test_three_way_split_and_mix(plants):
     """The cascades give every substation a third and mix three returns."""
     network = plants["network"](_network(consumers=3), plants["heating_substation"])
-    result = network(supply_in=HOT.with_(m_dot=4.5))
+    result = network(supply_in=HOT.with_(m_dot=4.5), air_in=air(283.15))
     feeds = [result.children[f"substations.{index}"].inlets.supply_in.m_dot for index in range(3)]
     assert feeds == pytest.approx([1.5] * 3, rel=1e-15)
     assert len(network.splitters) == len(network.mixers) == 2
@@ -78,7 +79,7 @@ def test_cooling_network_absorbs_building_and_ground_heat(plants):
     network = plants["network"](_network(service="cooling"), plants["cooling_substation"])
     assert isinstance(network.substations[0], CoolingSubstation)
     assert "heat_supplied" not in network.outputs(recurse=False)
-    result = network(supply_in=CHILLED)
+    result = network(supply_in=CHILLED, air_in=air(283.15))
     out = result.outputs
     assert out.heat_absorbed == pytest.approx(_leaf_sum(result, "heat_absorbed"), rel=1e-14)
     assert out.heat_absorbed > 1.4e5
@@ -91,7 +92,7 @@ def test_single_consumer_and_invalid_structure(plants):
     """One substation needs no tees; bad structural arguments raise."""
     network = plants["network"](_network(consumers=1), plants["heating_substation"])
     assert isinstance(network.substations[0], HeatingSubstation)
-    result = network(supply_in=HOT.with_(m_dot=2.0))
+    result = network(supply_in=HOT.with_(m_dot=2.0), air_in=air(283.15))
     assert result.outputs.heat_supplied == pytest.approx(1.5e5, rel=1e-12)
     with raises(gm.errors.ValidationError, "invalid_design", match="service"):
         generators.district_network_spec(service="steam")

@@ -46,6 +46,8 @@ def test_state_connections_cannot_run_yet():
     plant.add("Pipe", "two")
     plant.connect("one.fluid_out", "two.fluid_in")
     plant.connect("two.fluid_out", "one.fluid_in", type="state")
+    plant.connect("air", "one.air_in")
+    plant.connect("air", "two.air_in")
     with pytest.raises(gm.errors.NotImplementedYet):
         plan.compile_plan(plant)
 
@@ -58,8 +60,7 @@ def test_a_loop_through_a_plant_child_opens_it():
     plant.connect("doublet.supply_out", "pipe.fluid_in")
     plant.connect("pipe.fluid_out", "doublet.return_in")
     plant.connect("power_in", "doublet.power_in")
-    assert [step.path for step in plant._compiled().steps][-2:] == [
-        "doublet.injector",
-        "doublet.sink",
-    ]
+    plant.connect("air", "pipe.air_in")
+    paths = [step.path for step in plant._compiled().steps if step.path != "doublet.formation"]
+    assert paths[-2:] == ["doublet.injector", "doublet.sink"]
     assert plan.open_cycles(plant, plan.all_links(plant)) == {"doublet"}

@@ -46,6 +46,7 @@ def test_traced_calls_match_one_call_per_row():
     plant.connect("makeup.excess_out", "excess")
     plant.connect("water_in", "boiler.fluid_in")
     plant.connect("boiler.fluid_out", "water_out")
+    plant.connect("boiler.flue_out", "flue")
     plant.boiler.temperature_setpoint = 330.0
     water = gm.Stream(m_dot=5.0, T=320.0, p=3e5, fluid=gm.WATER)
     rows = [dict(gas_in=GAS.with_(m_dot=flow), water_in=water) for flow in (0.0, 0.1)]

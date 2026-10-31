@@ -35,7 +35,7 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
             "valve": {"type": "Valve", "params": {}},
         },
         "connections": [{"source": "pipe.fluid_out", "target": "valve.fluid_in"}],
-        "inlets": {"feed": "pipe.fluid_in"},
+        "inlets": {"feed": "pipe.fluid_in", "air": "pipe.air_in"},
         "outlets": {"product": "valve.fluid_out"},
         "bindings": {"pipe": {"heat_loss": {"column": "q", "unit": "kW"}, "velocity": "v"}},
         "param_history": {
@@ -88,6 +88,7 @@ def test_params_set_since_and_validation_agree_with_the_builder():
     plant = gm.Plant("Same")
     plant.add("Pipe", "pipe", params={"length": 5.0})
     plant.connect("feed", "pipe.fluid_in")
+    plant.connect("air", "pipe.air_in")
     plant.connect("pipe.fluid_out", "product")
     found = plant.validate(on_error="record")
     assert found == gm.plants.validate(plant.to_spec(), on_error="record")
@@ -103,7 +104,7 @@ def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
         "name": "DoubletHeatPlant",
         "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe", "params": {"length": -5.0}}},
         "connections": [],
-        "inlets": {"feed": "pipe.fluid_in"},
+        "inlets": {"feed": "pipe.fluid_in", "air": "pipe.air_in"},
         "outlets": {"product": "pipe.fluid_out"},
         "bindings": {},
         "param_history": {},
@@ -155,4 +156,5 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
         "connections[1].target",
         "pipe.fluid_in",
         "pipe.fluid_out",
+        "pipe.air_in",
     }

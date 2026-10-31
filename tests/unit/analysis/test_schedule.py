@@ -79,6 +79,7 @@ def wire(plant):
     plant.connect("users.return_out", "hx.cold_in")
     plant.connect("hx.cold_out", "boiler.fluid_in")
     plant.connect("grid.gas_out", "boiler.fuel_in")
+    plant.connect("boiler.flue_out", "flue")
     plant.connect("boiler.fluid_out", "users.supply_in")
 
 

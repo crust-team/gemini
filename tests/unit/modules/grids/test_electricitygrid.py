@@ -7,6 +7,7 @@ from gemini.modules.grids import ElectricityGrid
 from gemini.modules.heating import ElectricBoiler
 from gemini.modules.power import ORC
 from gemini.types import Control, Inlet, Outlet, Output, Power, Stream
+from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_module_matches
 
 
@@ -69,7 +70,7 @@ class GridPlant(Module):
         """Generate, consume, then settle with the grid."""
 
         # Modules
-        generated = self.orc(fluid_in=inlets.fluid_in, ambient_temperature=288.15)
+        generated = self.orc(fluid_in=inlets.fluid_in, air_in=air(288.15))
         heated = self.boiler(fluid_in=inlets.water_in, temperature_setpoint=353.15)
         self.grid(power_out=[heated.inlets.power_in], power_in=[generated.outlets.power_out])
 

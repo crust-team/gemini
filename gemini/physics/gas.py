@@ -26,6 +26,7 @@ SPECIES = {
     "C3H8": (0.044096, 2043.2e3, 3),
     "CO2": (float(constants.CO2_MOLAR_MASS), 0.0, 0),
     "N2": (0.0280134, 0.0, 0),
+    "O2": (0.0319988, 0.0, 0),
 }
 """Molar mass [kg/mol], lower heating value [J/mol] and carbon atoms burnt to CO2 per species.
 
@@ -276,3 +277,26 @@ def gas_liquid_ratio(fraction: float, density_normal: float, liquid_density: flo
     Source: A plain mass balance; no published source is needed.
     """
     return fraction * liquid_density / ((1 - fraction) * density_normal)
+
+
+AIR_COMPOSITION = {"N2": 0.79, "O2": 0.21}
+"""Dry air as mole fractions, argon and CO2 counted as nitrogen (Incropera et al., Fundamentals of
+Heat and Mass Transfer, 7th ed., table A.4 lists air as one substance)."""
+
+AIR_SPECIFIC_HEAT = 1007.0
+"""Specific heat [J/kg/K] of air at 300 K and 1 atm: Incropera et al., 7th ed., table A.4."""
+
+
+@ops.physics
+def species_flow(mass_flow, composition, species):
+    """Return the mass flow [kg/s] of ``species`` in a gas stream; zero without a composition."""
+    if composition is None:
+        return mass_flow * 0.0
+    return mass_flow * mass_fraction(composition, species)
+
+
+def composition_of_masses(masses):
+    """Return the mole fractions of a gas whose species have the mass shares ``masses``."""
+    moles = {name: share / SPECIES[name][0] for name, share in masses.items()}
+    total = sum(moles.values())
+    return {name: amount / total for name, amount in moles.items()}

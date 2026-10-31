@@ -189,7 +189,7 @@ def test_a_plant_child_in_a_false_cycle_is_opened():
     """The doublet loop through the surface equipment runs the doublet's children directly."""
     plant = library.build("DoubletHeatPlant")
     paths = [step.path for step in plant._compiled().steps]
-    assert paths == [
+    assert [path for path in paths if path != "doublet.formation"] == [
         "doublet.reservoir",
         "doublet.well",
         "doublet.esp",
@@ -219,7 +219,14 @@ def test_the_doublet_runs_injection_before_production():
     """Ties go to the first appearance in the connection list, as the handwritten forward."""
     plant = library.build("Doublet")
     paths = [step.path for step in plant._compiled().steps]
-    assert paths == ["injector", "sink", "reservoir", "well", "esp", "riser"]
+    assert [path for path in paths if path != "formation"] == [
+        "injector",
+        "sink",
+        "reservoir",
+        "well",
+        "esp",
+        "riser",
+    ]
 
 
 def test_to_spec_is_json_and_validate_is_empty(chain):

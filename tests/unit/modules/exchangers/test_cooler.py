@@ -6,6 +6,7 @@ from gemini.errors import PhysicsError, ValidationError
 from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.exchangers import Cooler
 from gemini.types.flows import Stream
+from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
 
@@ -22,17 +23,20 @@ def cooler(cooler_type, **params):
 def test_dry_cooler_approach_limit_and_closure():
     """A dry cooler stops at dry bulb plus approach; fan power leaves as heat to the air."""
     unit = cooler("dry")
-    result = unit(fluid_in=HOT, temperature_setpoint=293.15, ambient_temperature=298.15)
+    result = unit(fluid_in=HOT, temperature_setpoint=293.15, air_in=air(298.15))
     out = result.outputs
     assert out.fluid_out_T == pytest.approx(303.15)
     assert out.duty == pytest.approx(20 * CP * 10)
     assert out.electricity == pytest.approx(0.02 * out.duty)
-    assert out.heat_loss == pytest.approx(1.02 * out.duty)
+    air_out, air_in = result.outlets.air_out, result.inlets.air_in
+    assert air_out.m_dot == air_in.m_dot
+    gained = (air_out.T - air_in.T) * air_in.heat_capacity_rate()
+    assert gained == pytest.approx(1.02 * out.duty)
     assert out.evaporation_rate == 0 and not out.is_capped
     assert result.outlets.fluid_out.m_dot == HOT.m_dot and result.outlets.fluid_out.p == HOT.p
     assert energy_balance(unit, result)["relative_residual"] < 1e-12
     assert mass_balance(unit, result)["residual"] == 0
-    warm = unit(fluid_in=HOT, temperature_setpoint=308.15, ambient_temperature=280).outputs
+    warm = unit(fluid_in=HOT, temperature_setpoint=308.15, air_in=air(280)).outputs
     assert warm.fluid_out_T == pytest.approx(308.15)
 
 
@@ -42,8 +46,7 @@ def test_wet_cooler_uses_wet_bulb_and_reports_evaporation():
     result = unit(
         fluid_in=HOT,
         temperature_setpoint=280,
-        ambient_temperature=303.15,
-        wet_bulb_temperature=295.15,
+        air_in=air(295.15),
     )
     out = result.outputs
     assert out.fluid_out_T == pytest.approx(300.15)
@@ -55,33 +58,34 @@ def test_wet_cooler_uses_wet_bulb_and_reports_evaporation():
 def test_capacity_cap_and_no_cooling():
     """Capacity caps the duty; an inlet below the reachable outlet or no flow rejects nothing."""
     out = cooler("dry", capacity=5e5)(
-        fluid_in=HOT, temperature_setpoint=280, ambient_temperature=280
+        fluid_in=HOT, temperature_setpoint=280, air_in=air(280)
     ).outputs
     assert out.is_capped and out.duty == 5e5
     assert out.fluid_out_T == pytest.approx(HOT.T - 5e5 / (20 * CP))
     for stream, ambient in ((HOT, 310), (HOT.with_(m_dot=0), 280)):
-        result = cooler("dry")(
-            fluid_in=stream, temperature_setpoint=280, ambient_temperature=ambient
-        )
+        result = cooler("dry")(fluid_in=stream, temperature_setpoint=280, air_in=air(ambient))
         assert result.outputs.duty == result.outputs.electricity == 0
         assert result.outlets.fluid_out.T == HOT.T
 
 
 def test_invalid_inputs_raise():
-    """A wet cooler needs a wet bulb at or below the dry bulb; flow must not be reversed."""
-    with raises(ValidationError, "invalid_design", match="wet_bulb_temperature = None"):
-        cooler("wet")(fluid_in=HOT, temperature_setpoint=290, ambient_temperature=300)
-    with pytest.raises(PhysicsError, match="wet_bulb_temperature = 305"):
-        cooler("wet")(
-            fluid_in=HOT,
-            temperature_setpoint=290,
-            ambient_temperature=300,
-            wet_bulb_temperature=305,
-        )
+    """Flow must not be reversed, and a closed loop needs its pressure and flow."""
     with pytest.raises(PhysicsError, match="fluid_in.m_dot = -1"):
-        cooler("dry")(
-            fluid_in=HOT.with_(m_dot=-1), temperature_setpoint=290, ambient_temperature=300
-        )
+        cooler("dry")(fluid_in=HOT.with_(m_dot=-1), temperature_setpoint=290, air_in=air(300))
+    unit = cooler("dry")
+    unit.temperature_setpoint = 290
+    with raises(ValidationError, "invalid_design", match="loop_pressure"):
+        unit.offer()
+
+
+def test_a_closed_loop_offers_the_water_at_the_setpoint():
+    """The chiller's cooling water exists before the chiller runs; the cooler cools it back."""
+    unit = cooler("dry", loop_pressure=3e5)
+    unit.flow = 20.0
+    unit.temperature_setpoint = 303.15
+    offered = unit.offer()["fluid_out"]
+    assert (offered.m_dot, offered.T, offered.p) == (20.0, 303.15, 3e5)
+    assert unit(fluid_in=HOT, air_in=air(288.15)).outlets.fluid_out == offered
 
 
 @pytest.mark.parametrize("cooler_type", ["dry", "wet"])
@@ -92,8 +96,7 @@ def test_traced_call_matches_one_call_per_row(cooler_type):
         dict(
             fluid_in=Stream(m_dot=m_dot, T=T, p=3e5),
             temperature_setpoint=setpoint,
-            ambient_temperature=298.15,
-            wet_bulb_temperature=wet_bulb,
+            air_in=air(wet_bulb),
         )
         for m_dot, T, setpoint, wet_bulb in [
             (20, 313.15, 293.15, 290.0),

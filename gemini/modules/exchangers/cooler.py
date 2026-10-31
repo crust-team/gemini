@@ -5,19 +5,18 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer, psychrometrics
+from gemini.physics import dispatch, heat_transfer, psychrometrics
 from gemini.types import (
-    Boundary,
     Control,
     Duty,
     Electricity,
-    HeatLoss,
     Inlet,
     MassFlow,
     Outlet,
     Output,
     Parameter,
     Power,
+    Pressure,
     Ratio,
     SpecificEnthalpy,
     Stream,
@@ -29,12 +28,14 @@ from gemini.types import (
 class Cooler(Module):
     """Dry or wet (evaporative) closed-circuit cooler rejecting heat to ambient air.
 
-    The fluid is cooled towards ``temperature_setpoint`` but not below the reference air
-    temperature plus ``approach``: the dry-bulb ``ambient_temperature`` for a ``dry`` cooler and
-    the ``wet_bulb_temperature`` for a ``wet`` one (a ``wet`` cooler without a wet-bulb
-    temperature raises ``ValidationError``). The removed duty is capped at ``capacity``.
-    Fans draw electricity = specific_fan_power * duty; the fan work is dissipated into the air
-    stream, so heat_loss = duty + electricity and the model is first-law closed.
+    The fluid is cooled towards ``temperature_setpoint`` but not below the air on ``air_in`` plus
+    ``approach``: connect ``Atmosphere.air_out`` for a ``dry`` cooler and ``Atmosphere.wet_air_out``
+    for a ``wet`` one. The removed duty is capped at ``capacity``. Fans draw electricity =
+    specific_fan_power * duty; the fan work is dissipated into the air stream, so the air on
+    ``air_out`` takes up duty + electricity and the model is first-law closed.
+
+    On a closed water loop ``loop_pressure`` and the control ``flow`` set ``fluid_out``, offered at
+    the setpoint before the other modules run; ``is_capped`` tells when the cooler cannot reach it.
 
     A wet cooler is a closed-circuit evaporative fluid cooler: spray water evaporates on the
     outside of the coil, so the process stream keeps its mass flow and the evaporated water is
@@ -59,50 +60,75 @@ class Cooler(Module):
         self.capacity = Parameter(Power, gt=0)
         self.approach = Parameter(TemperatureDifference, ge=0)
         self.specific_fan_power = Parameter(Ratio)
+        self.loop_pressure = Parameter(Pressure | None, default=None, structural=True)
         self.latent_heat = Parameter(
             SpecificEnthalpy, default=psychrometrics.DEFAULT_LATENT_HEAT, gt=0
         )
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="hot_water")
+        self.air_in = Inlet(Stream, kind="air", drawn=True)
         self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
 
-        # Boundaries
-        self.ambient_temperature = Boundary(Temperature)
-        self.wet_bulb_temperature = Boundary(Temperature | None, default=None)
+        self.flow = Control(MassFlow | None, default=None, ge=0)
 
         # Outputs
         self.duty = Output(Duty)
         self.fluid_out_T = Output(Temperature)
         self.electricity = Output(Electricity)
-        self.heat_loss = Output(HeatLoss)
         self.evaporation_rate = Output(MassFlow)
         self.is_capped = Output(bool)
 
         # Outlets
-        self.fluid_out = Outlet(Stream, kind="hot_water")
+        self.fluid_out = Outlet(Stream, kind="hot_water", offered=True)
+        self.air_out = Outlet(Stream, kind="air")
+
+    def _offer(self, inlets):
+        """Offer the water of a closed loop, at the setpoint and the given flow."""
+        if self.loop_pressure is None or self.flow is None:
+            raise ValidationError(
+                f"{self.path}: loop_pressure and flow are needed to offer fluid_out; expected "
+                "both on a closed loop",
+                code="invalid_design",
+            )
+        offered = Stream(
+            m_dot=self.flow, T=self.temperature_setpoint, p=self.loop_pressure, fluid=self.fluid
+        )
+        return {"fluid_out": offered}
 
     def forward(self, inlets):
-        """Cool the stream by the rejected duty; its mass flow is unchanged."""
+        """Cool the stream by the rejected duty and heat the air by it and by the fan."""
 
         # Outlets
-        inlet = inlets.fluid_in
-        duty, rate, _ = self._duty(inlet)
-        outlet = inlet.with_(T=inlet.T - heat_transfer.temperature_change(duty, rate))
+        inlet, air = inlets.fluid_in, inlets.air_in
+        duty, rate, _ = self._duty(inlet, air)
+        cooled = inlet.with_(T=inlet.T - heat_transfer.temperature_change(duty, rate))
+        outlet = cooled if self.loop_pressure is None else self._offer(inlets)["fluid_out"]
         power_in = heat_transfer.fan_power(duty, self.specific_fan_power)
+        air_in, air_out = self._air(air, cooled.T, duty + power_in)
 
-        outlets = dict(fluid_out=outlet, power_in=power_in)
+        outlets = dict(fluid_out=outlet, air_out=air_out, air_in=air_in, power_in=power_in)
         return outlets
 
+    def _air(self, air, water_T, heat):
+        """Return the air taken and returned: it leaves at the cooled water, at least an approach.
+
+        The flow follows from the heat it takes up. NOTE(refactor): a simple air-side balance; the
+        fan curve is not modelled.
+        """
+        rise = ops.maximum(water_T - air.T, self.approach)
+        specific_heat = air.fluid.properties(air.p, air.T).cp_l
+        flow = ops.where(heat > 0, dispatch.circuit_flow(heat, specific_heat, rise), 0.0)
+        return air.with_(m_dot=flow), air.with_(m_dot=flow, T=air.T + rise)
+
     def _compute_outputs(self, inlets, outlets):
-        duty, _, requested = self._duty(inlets.fluid_in)
+        duty, _, requested = self._duty(inlets.fluid_in, inlets.air_in)
         self.duty = duty
         self.fluid_out_T = outlets.fluid_out.T
         self.electricity = inlets.power_in
-        self.heat_loss = duty + self.electricity
         self.evaporation_rate = (
             psychrometrics.evaporation_rate(duty, self.latent_heat)
             if self.cooler_type == "wet"
@@ -110,7 +136,7 @@ class Cooler(Module):
         )
         self.is_capped = requested > self.capacity
 
-    def _duty(self, inlet):
+    def _duty(self, inlet, air):
         """Return the rejected duty [W], heat capacity rate [W/K] and uncapped request [W]."""
         ops.check(
             inlet.m_dot >= 0,
@@ -119,28 +145,7 @@ class Cooler(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        target = ops.maximum(self.temperature_setpoint, self._air_temperature() + self.approach)
+        target = ops.maximum(self.temperature_setpoint, air.T + self.approach)
         rate = inlet.heat_capacity_rate()
         requested = heat_transfer.setpoint_duty(rate, inlet.T - target)
         return ops.minimum(requested, self.capacity), rate, requested
-
-    def _air_temperature(self):
-        """Return the reference air temperature [K]: dry bulb for dry, wet bulb for wet."""
-        if self.cooler_type == "dry":
-            return self.ambient_temperature
-        wet_bulb = self.wet_bulb_temperature
-        if wet_bulb is None:
-            raise ValidationError(
-                f"{self.path}: wet_bulb_temperature = None; expected a value for a wet cooler",
-                code="invalid_design",
-            )
-        ops.check(
-            wet_bulb <= self.ambient_temperature,
-            PhysicsError,
-            "{path}: wet_bulb_temperature = {wet_bulb} K; expected at most "
-            "ambient_temperature = {ambient} K",
-            path=self.path,
-            wet_bulb=wet_bulb,
-            ambient=self.ambient_temperature,
-        )
-        return wet_bulb

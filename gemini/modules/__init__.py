@@ -7,6 +7,7 @@ from ._utils.registry import categories, get, load_file, names, register
 from ._utils.wiring import trace_wiring
 from .control import PIDController
 from .cooling import AbsorptionUnit, AdsorptionChiller
+from .environment import Atmosphere, Formation
 from .exchangers import Cooler, HeatExchanger
 from .grids import ChemicalGrid, CoolingGrid, ElectricityGrid, GasGrid, HeatingGrid, WasteGrid
 from .heating import CHP, Boiler, ElectricBoiler, HeatPump
@@ -23,7 +24,7 @@ from .subsurface import (
     ProductionReservoir,
     ThermalDecline,
 )
-from .treatment import Blowdown, Degasser, Desander, Filter, Flare, InhibitorDosing, Vent
+from .treatment import Blowdown, Degasser, Desander, Filter, Flare, InhibitorDosing
 from .wells import InjectionWell, ProductionWell
 
 __all__ = [
@@ -34,6 +35,8 @@ __all__ = [
     "ElectricBoiler",
     "Flare",
     "GasGrid",
+    "Atmosphere",
+    "Formation",
     "ElectricityGrid",
     "HeatingGrid",
     "CoolingGrid",
@@ -64,7 +67,6 @@ __all__ = [
     "Filter",
     "Desander",
     "InhibitorDosing",
-    "Vent",
     "Mixer",
     "Pipe",
     "PressurizationTank",

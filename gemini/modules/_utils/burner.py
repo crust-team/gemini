@@ -2,6 +2,7 @@
 
 from gemini import ops
 from gemini.physics import combustion, gas
+from gemini.types.fluid import FLUE_CO2
 
 
 def available_fuel(fuel):
@@ -43,11 +44,13 @@ def _grid_factor(fuel):
 def fuel_outputs(need, fuel):
     """Return the outputs a burner with fuel need ``need`` [W] reports."""
     coproduced, purchased, burnt = fuel_split(need, fuel)
-    return {
-        "fuel_coproduced": coproduced,
-        "fuel_purchased": purchased,
-        "burned_mass_flow": burnt,
-        "co2_emission": combustion.emission_rate(
-            coproduced, fuel.fluid.emission_factor(), purchased, _grid_factor(fuel)
-        ),
-    }
+    return {"fuel_coproduced": coproduced, "fuel_purchased": purchased, "burned_mass_flow": burnt}
+
+
+def flue_stream(need, fuel):
+    """Return the flue of a burner: the CO2 of everything burned, formed and carried in the gas."""
+    coproduced, purchased, _ = fuel_split(need, fuel)
+    released = combustion.emission_rate(
+        coproduced, fuel.fluid.emission_factor(), purchased, _grid_factor(fuel)
+    )
+    return fuel.with_(m_dot=released, fluid=FLUE_CO2)

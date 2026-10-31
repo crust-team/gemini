@@ -3,6 +3,21 @@
   "description": "Heating with a heat pump on the brine and a peak boiler, and a compression chiller for cooling.",
   "purpose": "both",
   "parameters": {
+    "heat_pump.enabled": {
+      "default": true,
+      "unit": null,
+      "description": "Heat pump on the brine after the heat exchanger; false leaves the unit out."
+    },
+    "peak_boiler.enabled": {
+      "default": true,
+      "unit": null,
+      "description": "Peak boiler; false leaves the unit out."
+    },
+    "compression_chiller.enabled": {
+      "default": true,
+      "unit": null,
+      "description": "Compression chiller (heat pump in cooling mode); false leaves the unit out."
+    },
     "heat_exchanger.thermal_conductance": {
       "default": null,
       "unit": "W/K",
@@ -142,9 +157,71 @@
       "default": null,
       "unit": "Pa",
       "description": "Pressure of the cooling return."
+    },
+    "compression_cooler.capacity": {
+      "default": null,
+      "unit": "W",
+      "description": "Cooler of the compression chiller: capacity."
+    },
+    "compression_cooler.approach": {
+      "default": null,
+      "unit": "K",
+      "description": "Cooler of the compression chiller: approach to the air."
+    },
+    "compression_cooler.specific_fan_power": {
+      "default": null,
+      "unit": "-",
+      "description": "Cooler of the compression chiller: fan power per duty."
+    },
+    "compression_cooler.loop_pressure": {
+      "default": null,
+      "unit": "Pa",
+      "description": "Cooler of the compression chiller: pressure of the cooling water."
     }
   },
-  "optional": {},
+  "optional": {
+    "heat_pump": {
+      "bypass": [
+        {
+          "source": "heat_pump.sink_in",
+          "target": "heat_pump.sink_out"
+        },
+        {
+          "source": "heat_pump.source_in",
+          "target": "heat_pump.source_out"
+        }
+      ]
+    },
+    "peak_boiler": {
+      "bypass": [
+        {
+          "source": "peak_boiler.fluid_in",
+          "target": "peak_boiler.fluid_out"
+        },
+        {
+          "source": "gas_makeup.gas_in",
+          "target": "gas_makeup.excess_out"
+        }
+      ],
+      "modules": [
+        "peak_boiler",
+        "gas_grid",
+        "gas_makeup"
+      ]
+    },
+    "compression_chiller": {
+      "bypass": [
+        {
+          "source": "compression_chiller.source_in",
+          "target": "compression_chiller.source_out"
+        }
+      ],
+      "modules": [
+        "compression_chiller",
+        "compression_cooler"
+      ]
+    }
+  },
   "spec": {
     "format": 2,
     "name": "HeatingHeatPumpCompressionCooling",
@@ -233,6 +310,16 @@
       "flare": {
         "type": "Flare",
         "params": {}
+      },
+      "atmosphere": {
+        "type": "Atmosphere",
+        "params": {}
+      },
+      "compression_cooler": {
+        "type": "Cooler",
+        "params": {
+          "cooler_type": "dry"
+        }
       }
     },
     "connections": [
@@ -329,6 +416,50 @@
         "target": "cooling_return_pipe.fluid_in"
       },
       {
+        "source": "atmosphere.air_out",
+        "target": "heating_return_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "heating_supply_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "cooling_return_pipe.air_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "cooling_supply_pipe.air_in"
+      },
+      {
+        "source": "peak_boiler.flue_out",
+        "target": "atmosphere.gas_in"
+      },
+      {
+        "source": "flare.flue_out",
+        "target": "atmosphere.gas_in"
+      },
+      {
+        "source": "compression_chiller.sink_out",
+        "target": "compression_cooler.fluid_in"
+      },
+      {
+        "source": "compression_cooler.fluid_out",
+        "target": "compression_chiller.sink_in"
+      },
+      {
+        "source": "atmosphere.air_out",
+        "target": "compression_cooler.air_in"
+      },
+      {
+        "source": "compression_cooler.air_out",
+        "target": "atmosphere.air_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "compression_cooler.power_in"
+      },
+      {
         "source": "peak_boiler.fluid_out",
         "target": "heating_supply_pipe.fluid_in"
       },
@@ -337,12 +468,6 @@
         "target": "compression_chiller.source_in"
       }
     ],
-    "inlets": {
-      "compression_rejection_in": "compression_chiller.sink_in"
-    },
-    "outlets": {
-      "compression_rejection_out": "compression_chiller.sink_out"
-    },
     "bindings": {},
     "param_history": {}
   }

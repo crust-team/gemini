@@ -24,6 +24,16 @@ SIZES = {
     "cooling_consumer.return_temperature": 285.15,
     "cooling_consumer.return_pressure": 5e5,
     "cooling_consumer.dew_point_margin": 3.0,
+    **{
+        f"{cooler}.{name}": value
+        for cooler in ("absorption_cooler", "adsorption_cooler", "compression_cooler")
+        for name, value in (
+            ("capacity", 1e7),
+            ("approach", 5.0),
+            ("specific_fan_power", 0.02),
+            ("loop_pressure", 3e5),
+        )
+    },
 }
 """Template parameters of the run; the pipes are added by ``with_pipes``."""
 
@@ -60,17 +70,19 @@ INPUTS = {
     "heating_consumer.heat_demand": 1e5,
     "heating_consumer.flow": 48.95,
     "cooling_consumer.flow": 10.0,
-    **{f"{pipe}.ambient_temperature": 283.15 for pipe in PIPES},
+    "atmosphere.temperature": 283.15,
     "cooling_consumer.sensible_cooling_demand": 5e4,
     "cooling_consumer.latent_cooling_demand": 1e4,
     "cooling_consumer.indoor_temperature": 297.15,
     "cooling_consumer.indoor_relative_humidity": 0.5,
 }
-ROOT_STREAMS = {
-    "absorption_cooling_in": ("25 kg/s", "30 degC"),
-    "adsorption_cooling_in": ("10 kg/s", "27 degC"),
-    "compression_rejection_in": ("30 kg/s", "30 degC"),
+COOLERS = {
+    "absorption_cooler": (25.0, 303.15),
+    "adsorption_cooler": (10.0, 300.15),
+    "compression_cooler": (30.0, 303.15),
 }
+"""Flow [kg/s] and temperature [K] of the cooling water of each cooler."""
+ROOT_STREAMS = {}
 BRINE_MODULES = ("doublet", "degasser", "heat_exchanger", "injection_pump")
 
 

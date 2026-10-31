@@ -192,7 +192,11 @@ def district_network_spec(consumers=2, service="heating"):
             + mixing
             + [_link(returned, "return_pipe.fluid_in")]
         ),
-        "inlets": {"supply_in": "pump.fluid_in", "power_in": "pump.power_in"},
+        "inlets": {
+            "supply_in": "pump.fluid_in",
+            "power_in": "pump.power_in",
+            "air_in": ["supply_pipe.air_in", "return_pipe.air_in"],
+        },
         "outlets": {"return_out": "return_pipe.fluid_out"},
         "outputs": _network_outputs(service),
         "bindings": {},

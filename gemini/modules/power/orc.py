@@ -6,7 +6,6 @@ from gemini.modules.module import Module
 from gemini.modules.power import _physics
 from gemini.physics import heat_transfer
 from gemini.types import (
-    Boundary,
     Efficiency,
     ElectricityGenerated,
     Fraction,
@@ -68,9 +67,7 @@ class ORC(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="brine")
-
-        # Boundaries
-        self.ambient_temperature = Boundary(Temperature)
+        self.air_in = Inlet(Stream, kind="air")
 
         # Outputs
         self.heat_input = Output(Power)
@@ -93,7 +90,7 @@ class ORC(Module):
 
         # Outlets
         fluid_in = inlets.fluid_in
-        design = self._design(fluid_in)
+        design = self._design(fluid_in, inlets.air_in)
         fluid_out_T = heat_transfer.effectiveness_outlet_temperature(
             fluid_in.T, design.processed_share, design.outlet_temperature
         )
@@ -107,7 +104,7 @@ class ORC(Module):
     def _compute_outputs(self, inlets, outlets):
         fluid_in = inlets.fluid_in
         fluid_out = outlets.fluid_out
-        design = self._design(fluid_in)
+        design = self._design(fluid_in, inlets.air_in)
         self.heat_input = self._heat_input(fluid_in, fluid_out)
         balance = self._balance(fluid_in, fluid_out, design)
         self.gross_power = balance.gross_power
@@ -130,7 +127,7 @@ class ORC(Module):
             self._heat_input(fluid_in, fluid_out), design.cycle_efficiency, self.parasitic_fraction
         )
 
-    def _design(self, fluid_in):
+    def _design(self, fluid_in, air):
         """Return the ``_physics.cycle_design`` of the brine inlet."""
         ops.check(
             fluid_in.m_dot >= 0,
@@ -144,7 +141,7 @@ class ORC(Module):
             fluid_in.T,
             fluid_in.m_dot,
             cp,
-            self.ambient_temperature,
+            air.T,
             self.condenser_approach,
             self.pinch,
             self.minimum_brine_outlet_temperature,

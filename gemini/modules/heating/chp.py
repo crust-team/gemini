@@ -78,7 +78,6 @@ class CHP(Module):
         self.fuel_coproduced = Output(Fuel)
         self.fuel_purchased = Output(Fuel)
         self.burned_mass_flow = Output(MassFlow)
-        self.co2_emission = Output(MassFlow)
         self.electricity_generated = Output(ElectricityGenerated)
         self.heat_recovered = Output(Power)
         self.dumped_heat = Output(Power)
@@ -87,6 +86,7 @@ class CHP(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
+        self.flue_out = Outlet(Stream, kind="gas")
         self.power_out = Outlet(Power, kind="electricity")
 
     def forward(self, inlets):
@@ -96,9 +96,15 @@ class CHP(Module):
         inlet, fuel = inlets.fluid_in, inlets.fuel_in
         values = self._performance(inlet, fuel)
         outlet = inlet.with_(T=values["fluid_out_T"])
+        flue_out = burner.flue_stream(values["fuel"], fuel)
         fuel_in = burner.burned_stream(values["fuel"], fuel)
 
-        outlets = dict(fluid_out=outlet, power_out=values["electricity_generated"], fuel_in=fuel_in)
+        outlets = dict(
+            fluid_out=outlet,
+            flue_out=flue_out,
+            power_out=values["electricity_generated"],
+            fuel_in=fuel_in,
+        )
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

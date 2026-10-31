@@ -120,7 +120,7 @@ Every port name is `<role>_in` or `<role>_out`. A module with one circuit uses `
 | --- | --- |
 | Two sides of an exchanger or a machine | `hot`, `cold`, `source`, `sink`, `generator`, `chilled`, `cooling` |
 | Storage and circuits | `charge`, `discharge`, `supply`, `return`, `production`, `injection` |
-| Carriers | `gas`, `liquid`, `fuel`, `grid`, `excess`, `power`, `loss`, `air`, `waste`, `chemical` |
+| Carriers | `gas`, `liquid`, `fuel`, `grid`, `excess`, `flue`, `power`, `heat`, `loss`, `air`, `wet_air`, `waste`, `chemical` |
 | Wells and rock | `wellhead`, `bottom`, `sandface` |
 | One circuit and branches | `fluid`, `branch<N>` |
 

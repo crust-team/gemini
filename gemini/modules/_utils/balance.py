@@ -64,7 +64,10 @@ def _scale(incoming, outgoing):
 
 
 def _streams(ports):
-    return [value for value in ports.values() if isinstance(value, Stream)]
+    """Return the streams of ``ports``; the flue is what burning left, already counted as burned."""
+    return [
+        value for name, value in ports.items() if isinstance(value, Stream) and name != "flue_out"
+    ]
 
 
 def _enthalpy(stream):

@@ -205,6 +205,8 @@ def _column(values, density):
     temperature = ground.geotherm_temperature(surface, gradient, depth)
     mean = ground.geotherm_temperature(surface, gradient, depth / 2)
     derived = {f"{well}.soil_temperature": mean for well in WELLS}
+    derived["formation.geothermal_gradient"] = gradient
+    derived["formation.surface_temperature"] = surface
     for name in RESERVOIRS:
         derived[f"{name}.temperature"] = temperature
         derived[f"{name}.pressure"] = hydraulics.hydrostatic_pressure(density, depth)

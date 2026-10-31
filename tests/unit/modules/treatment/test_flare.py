@@ -19,11 +19,14 @@ def stream(flow):
 
 def test_emissions_come_from_the_composition():
     """Carried CO2 plus 98 % of the formed CO2, and 2 % of the methane unburnt."""
-    out = Flare()(gas_in=stream(0.1)).outputs
+    result = Flare()(gas_in=stream(0.1))
+    out, flue = result.outputs, result.outlets.flue_out
     efficiency = combustion.FLARE_EFFICIENCY
     carried, formed = gas.mass_fraction(COMPOSITION, "CO2"), gas.combustion_co2(COMPOSITION)
-    assert out.co2_emission == pytest.approx(0.1 * (carried + efficiency * formed))
-    assert out.methane_emission == pytest.approx(
+    composition = flue.fluid.gas_composition
+    co2 = gas.species_flow(flue.m_dot, composition, "CO2")
+    assert co2 == pytest.approx(0.1 * (carried + efficiency * formed))
+    assert gas.species_flow(flue.m_dot, composition, "CH4") == pytest.approx(
         0.1 * gas.mass_fraction(COMPOSITION, "CH4") * (1 - efficiency)
     )
     assert out.burned_mass_flow == 0.1
@@ -31,7 +34,7 @@ def test_emissions_come_from_the_composition():
 
 def test_a_stream_without_a_composition_emits_nothing():
     """Nothing is known about the gas, so nothing is reported."""
-    assert Flare()(gas_in=gm.Stream(m_dot=0.1, T=330, p=2e5)).outputs.co2_emission == 0
+    assert Flare()(gas_in=gm.Stream(m_dot=0.1, T=330, p=2e5)).outlets.flue_out.m_dot == 0
 
 
 def test_reverse_flow_is_refused():
