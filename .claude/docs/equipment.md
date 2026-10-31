@@ -1052,7 +1052,7 @@ the injected stream as a sink.
 - **Controls**: `ProductionReservoir.production_rate` (`MassFlow`, >= 0).
 - **Outputs**: `bottomhole_pressure` (soft sensor), `drawdown`, `overpressure`,
   `flow_pressure_drop`, `skin_pressure_drop`, `hydrostatic_pressure_drop`,
-  `radial_bottomhole_pressure`, `liquid_flow`.
+  `radial_bottomhole_pressure`, `liquid_flow` (on both reservoirs).
 - **Model**: linear IPR `p_bh = p_res - Q / PI` (production) and `p_bh = p_res + Q / II`
   (injection); radial Darcy diagnostics through `hydraulics.radial_pressure_drops`.
 - **Physics**: `diagnostics.below_limit`, `diagnostics.bounded_score`,
@@ -1696,8 +1696,11 @@ assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
 assert gm.modules.mass_balance(doublet, result)["residual"] == 0
 ```
 
-`brine_cooling` is the production minus the injection temperature, and `reservoir.liquid_flow` the
-liquid volume flow: the two a limit of a doublet reads.
+`brine_cooling` is the production minus the injection temperature, `reservoir.liquid_flow` the
+liquid volume flow, and `volume_imbalance` the produced less the injected liquid volume flow
+(`reservoir.liquid_flow` less `sink.liquid_flow`): what a limit of a doublet reads. Both sides of the
+imbalance are the liquid at the constant density of the brine, so it reads the same at standard and
+at reservoir conditions.
 
 #### A doublet from its depth
 

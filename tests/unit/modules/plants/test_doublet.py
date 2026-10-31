@@ -179,3 +179,33 @@ def test_the_old_way_keeps_working(fresh_plant):
     """A doublet set child by child has no design and derives nothing."""
     assert fresh_plant.doublet.depth is None
     assert fresh_plant.doublet.reservoir.pressure == 22000000.0
+
+
+def test_the_volume_imbalance_of_a_balanced_doublet_is_zero():
+    """Produced and injected liquid at one density: the gas leaves in between, the liquid stays."""
+    doublet = gm.plants.Doublet()
+    doublet.fluid = gm.Fluid(
+        density=1030,
+        viscosity="0.4 mPa*s",
+        gas_liquid_ratio=0.8,
+        gas_composition={"CH4": 0.8, "CO2": 0.2},
+    )
+    doublet.set_params("", DESIGN | PUMP)
+    doublet.reservoir.production_rate = 80.0
+    doublet.esp.frequency = "60 Hz"
+    liquid = doublet.fluid.with_gas_fraction(0.0)
+    produced = doublet.fluid.properties(0, 0)
+    injected = gm.Stream(m_dot=80.0 * (1 - produced.gmf), T=320.0, p=5e6, fluid=liquid)
+    outputs = doublet(return_in=injected).outputs
+    assert outputs.volume_imbalance == pytest.approx(0, abs=1e-14)
+
+
+def test_the_volume_imbalance_is_produced_less_injected():
+    """Less injected than produced is a positive imbalance."""
+    doublet = gm.plants.Doublet()
+    doublet.fluid = gm.Fluid(density=1030, viscosity="0.4 mPa*s")
+    doublet.set_params("", DESIGN | PUMP)
+    doublet.reservoir.production_rate = 80.0
+    doublet.esp.frequency = "60 Hz"
+    injected = gm.Stream(m_dot=70.0, T=320.0, p=5e6, fluid=doublet.fluid)
+    assert doublet(return_in=injected).outputs.volume_imbalance == pytest.approx(10 / 1030)

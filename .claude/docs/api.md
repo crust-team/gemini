@@ -264,8 +264,8 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)` | real, each a check; they are ledger checks, see [economics.md](economics.md) |
 | `gm.checks.operating_days(plant, results, days)` | real: a list of checks, one per doublet: the days it carried flow against `days` |
 | `gm.checks.run_all(plant, results, days=None)` | real: `{passed, checks: [check]}`; `days` adds `operating_days` |
-| `gm.checks.Limits()`, `add(target, min=None, max=None)`, `to_dict()`, `from_dict(data)` | real: limits of `"<path pattern>.<output>"`, built without a plant; a plain dictionary |
-| `gm.checks.limits(plant, results, limits)` | real: a list of checks, one per matched module and output, `value` the worst of the run; an unmatched pattern raises `ValidationError` code `unknown_name` |
+| `gm.checks.Limits()`, `add(target, min=None, max=None)`, `to_dict()`, `from_dict(data)` | real: limits of `"<path pattern>.<output>"` or `"<path pattern>.<parameter>"`, built without a plant; a plain dictionary |
+| `gm.checks.limits(plant, results, limits)` | real: a list of checks, one per matched module and output or parameter, `value` the worst of the run; a run with no value of it gives `passed: null` and a reason `no_value`; an unmatched pattern raises `ValidationError` code `unknown_name` |
 | `gm.testing.check_module(cls, example=None)` | real; for developers of a new module class only: a report, never raises |
 | `gm.optim.calibrate(plant, dataset, params, start=None, end=None, backend="numpy", apply=True)`, `CalibrationResult` | real |
 | `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *, assumptions=None)` | real: `{best: {parameters, value, unit}, history, evaluations}`, `parameters` in SI as `{"path.parameter": value}` for `set_params`; a failed trial has a `reason` and is never `best` |
@@ -293,6 +293,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `Doublet.volume_imbalance` and `InjectionReservoir.liquid_flow`. `gm.checks.Limits` takes a parameter. `gm.checks.limits` on a run whose every row failed gives `passed: null` with a reason `no_value` instead of a `KeyError`. |
 | 0.2.0, unreleased changes | | `HeatingGrid.surplus` and `CoolingGrid.surplus`, what the water gives above the demand. `gm.kpi.totals` adds `heat_useful`, `heat_surplus`, `cold_useful`, `cold_surplus`; `gm.kpi.compute`, `gm.economics.lcoh`, `lcoc` and `lcts` read the useful energy. `HackathonPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant` and `HeatingAbsorptionCoolingPlant` return the drive water of their chillers through a bypass past the users (`loads` and `heat_return`, `drive_splitter` and `drive_mixer`), a loop the engine closes, and `gm.schedule` sets its split: the heating supply stays at its setpoint. |
 | 0.2.0, unreleased changes | | `gm.schedule` finds roles from the wiring: a unit that feeds the `CoolingGrid` is a cooling unit, a `HeatPump` included. `rules["cooling_order"]`, heat-driven first by default, dispatches absorption, adsorption and compression chillers, each up to its capacity. `Plant.feeds`. |
 | 0.2.0, unreleased changes | | Template plants take `size={"doublets": n}`, 1 to 3: `doublet` is now `d0`, with `d1`, `d2`, `production_mixers` and `injection_splitters`, and a plant-level `depth`. `Doublet.gradient` and `surface_temperature` default to the challenge values. |

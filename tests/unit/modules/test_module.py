@@ -577,7 +577,7 @@ def test_listings_recurse_by_default_and_ports_stay_local(fresh_plant):
     assert "esp.head" in doublet.soft_sensors()
     assert "esp.stage_count" in dict(doublet.named_parameters())
     assert list(doublet.controls(recurse=False)) == []
-    assert list(doublet.outputs(recurse=False)) == ["brine_cooling"]
+    assert list(doublet.outputs(recurse=False)) == ["brine_cooling", "volume_imbalance"]
     assert list(doublet.inlets()) == ["return_in", "power_in"]
     assert list(doublet.outlets()) == ["supply_out"]
 

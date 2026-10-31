@@ -45,6 +45,10 @@ class Doublet(Plant):
       depth, the shallowest that keeps that pressure at the intake, and a one-stage ESP of constant
       head that reaches the wellhead pressure at the nominal flow, with that hydraulic efficiency.
 
+    ``volume_imbalance`` is the produced less the injected liquid volume flow. Both sides are the
+    liquid at the density of the brine, which is constant, so it reads the same at standard and at
+    reservoir conditions: the gas a stream carries, or a degasser takes out, does not count.
+
     A group of values that is not complete derives nothing, and the old way, setting every child
     value directly, works as it did. A child value in the same call wins over the derived one and
     stays explicit. Setting ``fluid`` gives it to every child and derives again.
@@ -96,6 +100,7 @@ class Doublet(Plant):
 
         # Outputs
         self.brine_cooling = Output.difference("riser.wellhead_out.T", "injector.wellhead_in.T")
+        self.volume_imbalance = Output.difference("reservoir.liquid_flow", "sink.liquid_flow")
 
     def set_params(self, path, params, valid_from=None):
         """Derive the children's values from the design, unless the same call states them."""

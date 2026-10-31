@@ -10,6 +10,7 @@ from gemini.physics import units
 from gemini.types.flows import FIELD_QUANTITIES
 from gemini.types.shapes import check, value
 from gemini.utils.strings import close_matches, did_you_mean, join_path, split_path
+from gemini.utils.time import to_utc
 
 """The results column of each stream field."""
 
@@ -30,9 +31,10 @@ class Limits:
     """Limits of ``(path pattern, output, min, max)``, built without a plant.
 
     ``add("d*.flow", min="50 m3/h", max="300 m3/h")`` takes a pattern of ``fnmatch`` for the
-    module path, whose ``*`` stays within one name, and an output name after the last dot. A plant
-    is not needed: the pattern is checked against one by ``gm.checks.limits``. The unit of a limit
-    is checked here. ``to_dict`` and ``from_dict`` give a plain dictionary, so limits can be stored.
+    module path, whose ``*`` stays within one name, and an output name or a parameter name after
+    the last dot. A plant is not needed: the pattern is checked against one by
+    ``gm.checks.limits``. The unit of a limit is checked here. ``to_dict`` and ``from_dict`` give a
+    plain dictionary, so limits can be stored.
     """
 
     def __init__(self):
@@ -42,7 +44,8 @@ class Limits:
     def add(self, target, min=None, max=None):
         """Add a limit on ``"<path pattern>.<output>"``; give ``min``, ``max`` or both.
 
-        ``<output>`` is an output or a port quantity (``boiler.fluid_out.temperature``).
+        ``<output>`` is an output, a port quantity (``boiler.fluid_out.temperature``) or a
+        parameter (``d*.pump_efficiency``), which is judged once and not tick by tick.
         """
         pattern, output = _split_target(target)
         if not pattern or not output:
@@ -120,13 +123,39 @@ def _matched(plant, entry):
 
 
 def _fields(plant, path):
-    """Return the ``(unit, quantity)`` of what a limit may judge: outputs and port quantities."""
+    """Return the ``(unit, quantity)`` of what a limit may judge: outputs, ports and parameters."""
     module = plant.get_submodule(path)
-    outputs = {
+    declared = dict(_parameters(module)) | module.outputs(recurse=False)
+    fields = {
         name: (declaration.unit or "-", declaration.quantity)
-        for name, declaration in module.outputs(recurse=False).items()
+        for name, declaration in declared.items()
     }
-    return outputs | port_fields(module)
+    return fields | port_fields(module)
+
+
+def _parameters(module):
+    """Return the ``(name, declaration)`` of the own parameters of a module."""
+    return module.named_parameters(recurse=False)
+
+
+def _parameter_times(plant, frame, path):
+    """Return the instants at which the parameters of ``path`` take their values in the run.
+
+    The start of the run and each date inside it, or the latest values for an undated module.
+    """
+    dates = [item["valid_from"] for item in plant.param_history(path) if item["valid_from"]]
+    if not dates or frame.empty:
+        return [None]
+    start, end = frame.index[0], frame.index[-1]
+    return [start, *(date for date in dates if start < to_utc(date) <= end)]
+
+
+def _parameter_series(plant, frame, path, name):
+    """Return ``(values, active)`` of a parameter: each value it takes in the run."""
+    times = _parameter_times(plant, frame, path)
+    found = [plant.params_at(path, time)[name] for time in times]
+    values = np.array([np.nan if item is None else item for item in found], dtype=float)
+    return values, np.ones(values.shape, dtype=bool)
 
 
 def _port_series(frame, module, port, field):
@@ -136,6 +165,8 @@ def _port_series(frame, module, port, field):
 
 def _column(frame, path, name):
     """Return a leaf column over the run and whether its module carried flow, tick by tick."""
+    if join_path(path, name) not in frame:
+        return np.empty(0), np.empty(0, dtype=bool)
     values = frame[join_path(path, name)].to_numpy(dtype=float)
     active = frame[join_path(path, "operating")].to_numpy(dtype=bool)
     return values, active
@@ -145,18 +176,16 @@ def _series(plant, frame, path, name):
     """Return ``(values, active)`` of an output: a leaf column, or the combination of a plant.
 
     ``Results`` holds leaf columns, so an output of a plant is computed from the paths it names,
-    and a tick counts when every leaf behind it carried flow.
+    and a tick counts when every leaf behind it carried flow. A run without the column, because
+    every row failed, gives nothing.
     """
-    if join_path(path, name) in frame:
-        return _column(frame, path, name)
     module = plant.get_submodule(path)
-    key, *paths = module.outputs(recurse=False)[name].formula or (None,)
+    declared = module.outputs(recurse=False)
+    if name not in declared and name in dict(_parameters(module)):
+        return _parameter_series(plant, frame, path, name)
+    key, *paths = (declared[name].formula if name in declared else None) or (None,)
     if key is None:
-        raise ValidationError(
-            f"limits: {join_path(path, name)}: the results hold no column of this output",
-            path=join_path(path, name),
-            code="no_value",
-        )
+        return _column(frame, path, name)
     series = [_path_series(plant, frame, path, item) for item in paths]
     active = np.logical_and.reduce([flag for _, flag in series])
     return _combined(key, [values for values, _ in series]), active
@@ -202,6 +231,13 @@ def _limit_value(lower, upper, unit):
     return value([lower, upper], unit)
 
 
+def _no_verdict(values):
+    """Return why nothing could be judged: the run gave no value, or the module stood still."""
+    if not values.size or np.isnan(values).all():
+        return "no_value: the run gives no value of this output"
+    return "the module carried no flow in this run"
+
+
 def _check(plant, frame, path, entry):
     """Return the check of one matched module and output."""
     name = entry["output"]
@@ -213,8 +249,7 @@ def _check(plant, frame, path, entry):
     label = join_path(path, name)
     limit = _limit_value(lower, upper, unit)
     if not judged.size:
-        reason = "the module carried no flow in this run"
-        return check(label, None, value(None, unit, reason), limit)
+        return check(label, None, value(None, unit, _no_verdict(values)), limit)
     worst, passed = _worst(judged, lower, upper)
     return check(label, passed, value(worst, unit), limit)
 
@@ -224,7 +259,8 @@ def limits(plant, results, limits):
 
     Each pattern is matched against the module paths of ``plant``, name by name. An output is
     read over the run, a composite's through the leaves its formula names, on the ticks its module
-    carried flow: the minimum flow of a doublet holds while it runs.
+    carried flow: the minimum flow of a doublet holds while it runs. A parameter is judged once, or
+    at each date inside the run when it changes over time.
 
     Parameters
     ----------
@@ -241,7 +277,8 @@ def limits(plant, results, limits):
         One check ``{name, passed, value, limit}`` per matched module and output: ``name`` is
         ``<path>.<output>``, ``value`` the worst value of the run and ``limit`` the limit, in the
         unit of the output, an array ``[min, max]`` with both. ``passed`` is ``None``, with the
-        reason in ``value``, for a module that carried no flow.
+        reason in ``value``, for a module that carried no flow, and with ``no_value`` for a run
+        that holds no value of it, every row having failed.
 
     A pattern that matches no module, or no module with that output, raises ``ValidationError``
     (code ``unknown_name``) with suggestions.

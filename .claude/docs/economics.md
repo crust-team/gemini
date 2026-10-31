@@ -152,13 +152,18 @@ limits.add("heat_users.supply_in_T", min="100 degC")
 checks = gm.checks.limits(plant, results, limits)
 ```
 
+A parameter takes a limit too (`limits.add("d*.pump_efficiency", min=0.7)`): it is judged once
+against its value in the run, or at each date inside the run when it changes, in the same check.
+`d*.volume_imbalance` is the produced less the injected liquid volume flow of a doublet.
+
 `add` checks the units and needs no plant; `to_dict` and `from_dict` give a plain dictionary to store.
 `gm.checks.limits` matches each pattern against the module paths, name by name (`*` stays within one
 name, so `d*.power` is not `d0.esp.power`); a pattern or output that matches nothing raises
 `ValidationError`, code `unknown_name`, with suggestions. It returns one check per matched module and
 output, `value` the worst value of the run and `limit` the limit, `[min, max]` with both. Only ticks
 on which the module carried flow are judged: the minimum flow holds while a doublet runs. A violated
-limit is an answer. `Results` holds leaf columns, so an output of a composite is read through the
+limit is an answer, and a run with no value of it, every row having failed, gives `passed: null` with
+the reason `no_value`. `Results` holds leaf columns, so an output of a composite is read through the
 paths its combination names: `Doublet` declares `brine_cooling`
 (`Output.difference("riser.wellhead_out.T", "injector.wellhead_in.T")`), and the liquid volume flow of
 a doublet is `reservoir.liquid_flow` of its reservoir.

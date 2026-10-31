@@ -211,6 +211,9 @@ class InjectionReservoir(_Reservoir):
         # Inlets
         self.sandface_in = Inlet(Stream, kind="brine")
 
+        # Outputs
+        self.liquid_flow = Output(VolumeFlow)
+
     def forward(self, inlets):
         """Receive the sandface stream; the aquifer has no outlet."""
 
@@ -225,6 +228,10 @@ class InjectionReservoir(_Reservoir):
         )
         for name, value in self._calculate_outputs(flow, self.required_pressure(sandface)).items():
             setattr(self, name, value)
+        properties = sandface.fluid.properties(sandface.p, sandface.T)
+        self.liquid_flow = fluid_physics.liquid_volume_flow(
+            ops.abs(sandface.m_dot), properties.gmf, properties.rho_l
+        )
 
         outlets = dict()
         return outlets

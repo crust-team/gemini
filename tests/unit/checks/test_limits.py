@@ -132,3 +132,54 @@ def test_a_port_field_of_a_plant_reads_by_path(run):
     """``results[path]`` reads a port field as a plant's output path names it."""
     _, results = run
     assert (results["d0.riser.wellhead_out.T"] > 0).all()
+
+
+def test_a_parameter_limit_passes_and_fails(run):
+    """A design value is judged once, against its value in the run."""
+    plant, results = run
+    limits = Limits().add("d*.pump_efficiency", min=0.6).add("d0.pump_efficiency", min=0.8)
+    found = gm.checks.limits(plant, results, limits)
+    assert [item["passed"] for item in found] == [True, True, False]
+    assert found[-1]["name"] == "d0.pump_efficiency"
+    assert found[-1]["value"] == {"value": 0.7, "unit": "-"}
+    assert found[-1]["limit"] == {"value": 0.8, "unit": "-"}
+
+
+def test_a_parameter_limit_takes_a_unit(run):
+    """The limit converts to the unit of the parameter."""
+    plant, results = run
+    found = gm.checks.limits(plant, results, Limits().add("d0.depth", max="3 km"))
+    assert found[0]["passed"] is True and found[0]["value"]["value"] == 2500
+
+
+def test_a_parameter_that_changes_is_judged_at_each_date_of_the_run(run):
+    """The worst value of a date inside the run counts, and one after it does not."""
+    plant, results = run
+    dated = gm.plants.from_dict(plant.to_dict())
+    dated.set_params("d0", {"pump_efficiency": 0.5}, valid_from="2027-01-02")
+    dated.set_params("d0", {"pump_efficiency": 0.1}, valid_from="2030-01-01")
+    found = gm.checks.limits(dated, results, Limits().add("d0.pump_efficiency", min=0.6))
+    assert found[0]["passed"] is False and found[0]["value"]["value"] == 0.5
+
+
+def test_a_parameter_without_a_value_has_nothing_to_judge(run):
+    """An unset design value is no failure."""
+    plant, results = run
+    limits = Limits().add("users.minimum_return_temperature", min="1 degC")
+    assert gm.checks.limits(plant, results, limits)[0]["passed"] is None
+
+
+def test_a_run_with_no_rows_gives_no_verdict_on_any_limit():
+    """Every row failed, so there are no columns: each limit answers, none raises a KeyError."""
+    plant = plant_of_two()
+    plan = gm.schedule(plant, demand(FULL), RULES).drop(columns=["users.flow"])
+    plan["users.flow"] = -1.0
+    results = gm.simulate(plant, plan, on_error="record")
+    limits = Limits().add("d*.reservoir.liquid_flow", min="50 m3/h")
+    limits.add("boiler.fluid_out.temperature", min="100 degC")
+    limits.add("d0.brine_cooling", max="40 K")
+    found = gm.checks.limits(plant, results, limits)
+    assert len(found) == 4
+    for item in found:
+        assert item["passed"] is None and item["value"]["value"] is None
+        assert item["value"]["reason"].startswith("no_value")
