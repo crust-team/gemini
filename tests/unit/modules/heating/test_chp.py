@@ -4,7 +4,7 @@ import pytest
 
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules import GasGrid
-from gemini.modules.balance import energy_balance, mass_balance
+from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.heating import CHP
 from gemini.physics import gas
 from gemini.types.flows import Stream

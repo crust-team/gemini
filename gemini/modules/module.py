@@ -28,7 +28,7 @@ from gemini import backends, ops
 from gemini.backends import runtime
 from gemini.errors import DefinitionError, PhysicsError, ValidationError
 from gemini.errors.lookup import UnknownMember
-from gemini.modules import description, design, serialization
+from gemini.modules._utils import description, design, serialization
 from gemini.physics import units
 from gemini.types.bindings import DatedParams
 from gemini.types.declarations import (
@@ -272,7 +272,7 @@ class _FolderCategory:
         if not owner.__module__.startswith(f"{__package__}."):
             return None
         folder, _, file = owner.__module__.removeprefix(f"{__package__}.").partition(".")
-        return folder if file else None
+        return folder if file and not folder.startswith("_") else None
 
 
 class Module:

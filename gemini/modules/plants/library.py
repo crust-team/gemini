@@ -3,10 +3,10 @@
 from functools import partial
 from pathlib import Path
 
-from gemini.modules import registry
+from gemini.modules._utils import registry
+from gemini.modules._utils.serialization import Report
 from gemini.modules.plants import reader
 from gemini.modules.plants.builder import Plant
-from gemini.modules.serialization import Report
 from gemini.utils.files import read_json
 
 SPECS = Path(__file__).parent / "specs"

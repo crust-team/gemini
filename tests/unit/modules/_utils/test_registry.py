@@ -8,7 +8,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import ValidationError
-from gemini.modules import registry
+from gemini.modules._utils import registry
 from gemini.modules.module import Module
 from tests.fixtures.errors import raises
 
@@ -30,8 +30,8 @@ def test_every_registered_type_has_the_category_of_its_folder():
 
 def test_the_folders_are_the_categories_and_none_is_empty():
     """Every category has its folder and at least one module, and no folder is left over."""
-    package = Path(registry.__file__).parent
-    folders = {path.parent.name for path in package.glob("*/__init__.py")}
+    package = Path(registry.__file__).parents[1]
+    folders = {path.parent.name for path in package.glob("[!_]*/__init__.py")}
     assert folders == set(gm.modules.categories())
     assert all(gm.modules.names(category) for category in gm.modules.categories())
 
@@ -146,7 +146,7 @@ def test_a_spec_plant_builds_a_new_plant_each_time(monkeypatch):
         registry.register_plant("Example", lambda: gm.Plant("Example"))
 
 
-BOOSTER_FILE = Path(__file__).parents[2] / "fixtures" / "booster_module.py"
+BOOSTER_FILE = Path(__file__).parents[3] / "fixtures" / "booster_module.py"
 
 
 def test_load_file_registers_the_module_classes_of_a_file(monkeypatch):

@@ -2,7 +2,7 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
-from gemini.modules.heating import burner
+from gemini.modules._utils import burner
 from gemini.modules.module import Module
 from gemini.physics import energy, heat_transfer
 from gemini.types import (

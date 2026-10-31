@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import steam
+from gemini.modules.power import _physics
 from gemini.types import (
     STEAM,
     Control,
@@ -89,7 +89,7 @@ class Separator(Module):
         self.saturation_temperature = state.saturation_temperature
 
     def _flash(self, inlet):
-        """Return the ``steam.flash_state`` of the inlet at the setpoint pressure."""
+        """Return the ``_physics.flash_state`` of the inlet at the setpoint pressure."""
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
@@ -110,4 +110,4 @@ class Separator(Module):
             setpoint=self.pressure_setpoint,
             p=inlet.p,
         )
-        return steam.flash_state(inlet.m_dot, inlet.T, inlet.p, self.pressure_setpoint)
+        return _physics.flash_state(inlet.m_dot, inlet.T, inlet.p, self.pressure_setpoint)

@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import separation
+from gemini.modules.treatment import _physics
 from gemini.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Parameter, Stream
 
 
@@ -65,7 +65,7 @@ class InhibitorDosing(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        product, active = separation.dosing_flows(
+        product, active = _physics.dosing_flows(
             self.dose, inlets.inlet.m_dot, self.product_concentration
         )
         self.product_mass_flow = product

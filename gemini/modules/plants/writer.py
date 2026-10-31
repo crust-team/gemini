@@ -3,15 +3,15 @@
 from copy import deepcopy
 
 from gemini.errors import GeminiError
-from gemini.modules import design
-from gemini.modules.plants.plan import is_group
-from gemini.modules.serialization import (
+from gemini.modules._utils import design
+from gemini.modules._utils.serialization import (
     FORMAT,
     keep_stated,
     plain_value,
     tree_params,
     write_sections,
 )
+from gemini.modules.plants.plan import is_group
 from gemini.utils.strings import join_path
 
 

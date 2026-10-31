@@ -2,7 +2,8 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
-from gemini.physics import heat_transfer, refrigeration
+from gemini.modules.cooling import _physics
+from gemini.physics import heat_transfer
 
 
 def rates(path, inlets):
@@ -39,7 +40,7 @@ def assign_outputs(module, inlets, outlets, values):
     """Set the performance ``values`` as outputs and the driving temperature difference."""
     for name, value in values.items():
         setattr(module, name, value)
-    module.driving_temperature_difference = refrigeration.characteristic_temperature_difference(
+    module.driving_temperature_difference = _physics.characteristic_temperature_difference(
         heat_transfer.mean_temperature(inlets.generator_in.T, outlets.generator_out.T),
         heat_transfer.mean_temperature(inlets.cooling_in.T, outlets.cooling_out.T),
         heat_transfer.mean_temperature(inlets.chilled_in.T, outlets.chilled_out.T),
@@ -50,7 +51,7 @@ def assign_outputs(module, inlets, outlets, values):
 
 def evaporator_capacity(module, inlets, rates):
     """Return the evaporator duty [W] of the characteristic equation at these inlets."""
-    return refrigeration.sorption_evaporator_capacity(
+    return _physics.sorption_evaporator_capacity(
         inlets.generator_in.T,
         inlets.cooling_in.T,
         inlets.chilled_in.T,

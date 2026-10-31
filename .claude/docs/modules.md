@@ -10,10 +10,16 @@ declarations from `gemini.types`. The base class has no string catalogue, sequen
 container, fidelity flag or cost method. The shipped equipment, with each model's ports, parameters, equations and energy-audit status, is
 listed in [equipment.md](equipment.md); its classes are good references for new modules.
 
-**Physics lives only in `gemini/physics/`.** Modules declare and wire; they never define physics.
-Reuse existing physics functions wherever possible and combine them; add a new physics function
-only when nothing existing can do the job, and generalise an existing one rather than writing a
-second copy. Never write a formula inside a module, and never write the same formula twice.
+**Physics lives in `gemini/physics/` or a `_physics.py`.** Modules declare and wire; they never
+define physics. `gemini/physics/` keeps the textbook formulas and anything more than one category,
+or `analysis`, `optim`, `economics` or `checks`, reads. Physics of one category lives in
+`gemini/modules/<category>/_physics.py`, which imports only `gemini.physics`, `gemini.ops`,
+`gemini.types` and `gemini.errors`, never another category's `_physics.py`; when a second category
+needs a function it moves up into `gemini/physics/`. Its functions keep `@ops.physics` and stay
+traceable on every backend. Reuse existing physics functions wherever possible and combine them; add
+a new physics function only when nothing existing can do the job, and generalise an existing one
+rather than writing a second copy. Never write a formula inside a module, and never write the same
+formula twice.
 Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
 
 ## Construction and metadata
@@ -30,7 +36,7 @@ and checkpoints store the root class as `module:qualname` through `class_path`/`
 
 ## Registry, categories and streams
 
-`gemini/modules/registry.py` is the one registry of module and plant types. A class joins it
+`gemini/modules/_utils/registry.py` is the one registry of module and plant types. A class joins it
 under its class name with `gm.modules.register(cls)`, and every shipped equipment class is
 registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `get(name)` and
 `categories()` read it; an unknown name raises `ValidationError` with its close matches in
@@ -70,7 +76,7 @@ say what may be connected.
 
 `Module.describe()`, `Module.parameter_schema()` and `Module.validate_params(params)` work on a
 class (a new instance answers) or on an instance. They live in
-`gemini/modules/description.py`, return plain JSON (`json.dumps(..., allow_nan=False)`) and
+`gemini/modules/_utils/description.py`, return plain JSON (`json.dumps(..., allow_nan=False)`) and
 never change the module.
 
 `describe()` returns `{name, type, category, summary, doc, parameters, controls, boundaries,

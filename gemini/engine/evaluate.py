@@ -2,7 +2,7 @@
 
 from gemini.errors import GeminiError, ValidationError
 from gemini.errors.base import check_on_error
-from gemini.modules import registry
+from gemini.modules._utils import registry
 from gemini.modules.module import Module
 from gemini.types.flows import STREAM_FIELDS
 from gemini.types.shapes import OutputUnits

@@ -10,7 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 
 from gemini.errors import ValidationError
-from gemini.modules.design import FIELD_UNITS
+from gemini.modules._utils.design import FIELD_UNITS
 from gemini.types.bindings import Binding, ModuleBindings
 from gemini.types.declarations import UNSET
 from gemini.types.flows import STREAM_FIELDS

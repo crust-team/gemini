@@ -2,7 +2,7 @@
 
 import gemini as gm
 from gemini.modules import Filter, Module
-from gemini.modules.wiring import trace_wiring
+from gemini.modules._utils.wiring import trace_wiring
 from gemini.types import Inlet, Outlet, Stream
 from tests.fixtures.errors import raises
 

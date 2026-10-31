@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
+from gemini.modules.pumps import _physics
 from gemini.physics import energy, pumps
 from gemini.types import (
     Control,
@@ -112,7 +113,7 @@ class InjectionPump(Module):
                     f"{self.path}: head_coefficients curves require stage_count",
                     code="invalid_design",
                 )
-            return pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
+            return _physics.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         if self.pressure_setpoint is not None:
             return self.pressure_setpoint - suction.p
         raise ValidationError(

@@ -1,70 +1,38 @@
-"""Pump relations: TNO R11363 polynomials on the US basis, affinity-law curves, efficiencies.
+"""Pump relations: the TNO R11363 power polynomial, affinity-law curves, efficiencies.
 
-Two pump models live here. The ESP and line-shaft pumps use the TNO R11363 polynomials of head
-and power per stage (``head``, ``power``) on the historical US basis, with ``esp_efficiency``
-as the retained US-basis efficiency. The centrifugal pump uses a quadratic head curve in SI with
+The ESP and line-shaft pumps use the TNO R11363 power polynomial on the historical US basis
+(``power``, which the doublet design reads too; the head polynomial and the ESP efficiency are in
+``gemini/modules/pumps/_physics.py``). The centrifugal pump uses a quadratic head curve in SI with
 a parabolic efficiency (``centrifugal_head``, ``parabolic_efficiency``). The shared relations
-are the speed ratio, the hydraulic and shaft power, the motor electricity and the operating
-window.
+are the speed ratio, the hydraulic and shaft power and the operating window.
 """
 
 from gemini import ops
-from gemini.ops import Constant
 
 from . import constants, units
-
-ESP_MIN_EFFICIENCY_POWER = Constant(
-    "ESP_MIN_EFFICIENCY_POWER",
-    0.1,
-    "W",
-    "shaft power below which the pump is treated as stopped and its efficiency as zero",
-)
-
-LINE_SHAFT_MIN_EFFICIENCY_POWER = Constant(
-    "LINE_SHAFT_MIN_EFFICIENCY_POWER",
-    0.1,
-    "W",
-    "pump power below which the pump is treated as stopped and its efficiency as zero",
-)
-
-HYDRAULIC_POWER_PER_HEAD = units.bhp_to_w(1) / units.ft_head_to_pa(1)
-"""Unit factor of the ESP efficiency: [W per bhp] over [Pa per ft of head], computed once."""
 
 POLYNOMIAL_COEFFICIENT_COUNT = 6
 """Number of ascending coefficients of the degree-5 TNO head and power polynomials."""
 
+
 RUNOUT_LOAD = 2
 """Flow over the speed-scaled best-efficiency flow [-] at which the centrifugal curve ends."""
+
 
 CENTRIFUGAL_HEAD_COEFFICIENT_COUNT = 3
 """Number of coefficients ``c0, c1, c2`` of the quadratic centrifugal head curve."""
 
+
 DEFAULT_BEP_FLOW = 0.04
 """Default best-efficiency flow of an ESP [m3/s] (retained GEMINI default)."""
+
 
 DEFAULT_INJECTION_PUMP_EFFICIENCY = 0.7
 """Default constant overall efficiency [-] of an injection pump without a power curve."""
 
+
 DEFAULT_INJECTION_PUMP_FREQUENCY = 60
 """Default drive frequency [Hz] of an injection pump, the ESP catalogue frequency."""
-
-
-@ops.physics
-def head(volume_flow, frequency, stages, coefficients):
-    """Return pressure rise [Pa] from flow [m3/s], frequency [Hz], stages and ft coefficients.
-
-    The polynomial sum(c_i q^i) uses q in bbl/day and gives ft of head per stage at 60 Hz;
-    head scales with the square of the frequency ratio.
-
-    Valid for the fitted flow range of the coefficients and positive frequency and stages. The
-    affinity law follows Takacs, Electrical Submersible Pumps Manual (2009); the polynomial
-    form is the TNO R11363 pump correlation. The builtin ``sum`` over the coefficients is kept:
-    it works on floats, arrays and traced values.
-    """
-    q = units.m3s_to_bbl_per_day(volume_flow)
-    value = stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 2
-    value *= sum(c * q**i for i, c in enumerate(coefficients))
-    return units.ft_head_to_pa(value)
 
 
 @ops.physics
@@ -248,75 +216,6 @@ def hydraulic_power(flow, head):
 
 
 @ops.physics
-def pump_efficiency(flow, head, power):
-    """Return the SI efficiency of a pump from a measured or modelled power; zero when stopped.
-
-    Parameters
-    ----------
-    flow : float
-        Volume flow Q [m3/s].
-    head : float
-        Pressure rise H [Pa].
-    power : float
-        Pump power P [W]; below ``LINE_SHAFT_MIN_EFFICIENCY_POWER`` the efficiency is zero.
-
-    Returns
-    -------
-    float
-        ``eta = Q H / P`` [-].
-
-    Notes
-    -----
-    Karassik et al., Pump Handbook, 4th ed., chapter 2. Not bitwise the same expression as
-    ``esp_efficiency``, which keeps the US-basis factors of the retained ESP model.
-
-    Validity: flow and head nonnegative; power at least LINE_SHAFT_MIN_EFFICIENCY_POWER (below it
-    the result is zero), which keeps the divisor positive. The efficiency is in [0, 1] for a
-    physical pump.
-    """
-    return ops.where(power >= LINE_SHAFT_MIN_EFFICIENCY_POWER, flow * head / power, 0.0)
-
-
-@ops.physics
-def esp_efficiency(flow, head, power):
-    """Return the retained US-basis ESP efficiency; zero for a stopped pump.
-
-    Parameters
-    ----------
-    flow : float
-        Volume flow Q [m3/s].
-    head : float
-        Pressure rise H [Pa].
-    power : float
-        Shaft power P [W]; below ``ESP_MIN_EFFICIENCY_POWER`` the efficiency is zero.
-
-    Returns
-    -------
-    float
-        ``eta = Q[bbl/d] / 135773 * (H / P) * (W per bhp / Pa per ft)`` [-].
-
-    Notes
-    -----
-    The factor 135773 is the historical ESP efficiency factor (``ESP_EFFICIENCY_FLOW_FACTOR``);
-    the result is the SI ``Q H / P`` up to that factor. ``ops.truediv`` keeps the legacy float32
-    arithmetic of the ESP: a plain ``/`` by a zero power raises in the plain scalar mode, where
-    this function must return the discarded branch of ``ops.where`` instead.
-
-    Validity: flow and head nonnegative; power at least ESP_MIN_EFFICIENCY_POWER (below it the
-    result is zero), which keeps the divisor positive. The polynomial pump model can give a value
-    above one.
-    """
-    return ops.where(
-        power < ESP_MIN_EFFICIENCY_POWER,
-        0.0,
-        units.m3s_to_bbl_per_day(flow)
-        / constants.ESP_EFFICIENCY_FLOW_FACTOR
-        * ops.truediv(head, power)
-        * HYDRAULIC_POWER_PER_HEAD,
-    )
-
-
-@ops.physics
 def is_in_operating_window(flow, minimum_flow, maximum_flow, speed):
     """Return whether a flow lies inside the speed-scaled operating window of a pump.
 
@@ -340,35 +239,3 @@ def is_in_operating_window(flow, minimum_flow, maximum_flow, speed):
     Submersible Pumps Manual, 2009).
     """
     return ops.logical_and(minimum_flow * speed <= flow, flow <= maximum_flow * speed)
-
-
-@ops.physics
-def line_shaft_friction_power(friction_loss, depth, speed):
-    """Return the mechanical friction power of a line shaft.
-
-    Parameters
-    ----------
-    friction_loss : float
-        Friction power per shaft length at the catalogue speed [W/m].
-    depth : float
-        Shaft length [m].
-    speed : float
-        Speed ratio [-].
-
-    Returns
-    -------
-    float
-        ``P_f = k L s`` [W].
-
-    Notes
-    -----
-    Friction grows in proportion to speed (constant bearing friction torque), the form of the
-    manufacturer tables of line-shaft friction in ANSI/HI 2.3, Rotodynamic Vertical Pumps for
-    Design and Application.
-
-    Validity: friction_loss, depth and speed nonnegative; no division occurs. Friction in proportion
-    to speed holds for constant bearing friction torque.
-    Source: The form of the manufacturer line-shaft friction tables cited in ANSI/HI 2.3,
-    Rotodynamic Vertical Pumps for Design and Application, as cited for the line-shaft pump model.
-    """
-    return friction_loss * depth * speed

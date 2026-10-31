@@ -4,8 +4,8 @@ from typing import Literal
 
 from gemini import ops
 from gemini.errors import ValidationError
+from gemini.modules.control import _physics
 from gemini.modules.module import Module
-from gemini.physics import control
 from gemini.types import (
     Boundary,
     Control,
@@ -98,17 +98,17 @@ class PIDController(Module):
         unclamped = self._unclamped_command()
         increment = 0.0
         if self.integral_time is not None:
-            increment = control.pid_integral_increment(
+            increment = _physics.pid_integral_increment(
                 self.proportional_gain, dt, self.integral_time, error
             )
-        increment = control.anti_windup_increment(
+        increment = _physics.anti_windup_increment(
             increment, unclamped, self.minimum_output, self.maximum_output
         )
         return {"integral": self.integral + increment, "previous_error": error, "previous_step": dt}
 
     def _error(self):
         """Return the control error in the sense of ``direction``."""
-        return control.pid_error(self.setpoint, self.measurement, self.direction == "reverse")
+        return _physics.pid_error(self.setpoint, self.measurement, self.direction == "reverse")
 
     def _unclamped_command(self):
         """Return K * e + I + D from the start-of-step states, before the output limits."""
@@ -125,10 +125,10 @@ class PIDController(Module):
         error = self._error()
         derivative = 0.0
         if self.previous_error is not None and self.previous_step is not None:
-            derivative = control.pid_derivative(
+            derivative = _physics.pid_derivative(
                 self.proportional_gain,
                 self.derivative_time,
                 error - self.previous_error,
                 self.previous_step,
             )
-        return control.pid_command(self.proportional_gain, error, self.integral, derivative)
+        return _physics.pid_command(self.proportional_gain, error, self.integral, derivative)

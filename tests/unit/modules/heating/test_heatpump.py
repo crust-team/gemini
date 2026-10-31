@@ -3,7 +3,7 @@
 import pytest
 
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules.balance import energy_balance, mass_balance
+from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.heating import HeatPump
 from gemini.physics import refrigeration
 from gemini.types.flows import Stream

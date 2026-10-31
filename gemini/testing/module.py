@@ -4,8 +4,8 @@ import inspect
 import json
 
 from gemini.engine.evaluate import evaluate
+from gemini.modules._utils.registry import CATEGORIES
 from gemini.modules.module import Module
-from gemini.modules.registry import CATEGORIES
 from gemini.utils.jsonable import to_plain
 
 _NUMERIC = ("number", "integer")

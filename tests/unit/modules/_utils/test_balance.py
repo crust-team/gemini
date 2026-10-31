@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from gemini.modules import Module
-from gemini.modules.balance import collect_flows, emissions, energy_balance, mass_balance
+from gemini.modules._utils.balance import collect_flows, emissions, energy_balance, mass_balance
 from gemini.modules.heating import CHP, Boiler, ElectricBoiler
 from gemini.modules.piping import GasGrid
 from gemini.modules.pumps import ESP, InjectionPump

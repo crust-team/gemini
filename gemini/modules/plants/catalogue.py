@@ -1,7 +1,7 @@
 """The plant catalogue: which plants exist and how to get one."""
 
 from gemini.errors import NotImplementedYet, ValidationError
-from gemini.modules import registry
+from gemini.modules._utils import registry
 from gemini.modules.plants import library, templating
 from gemini.modules.plants.spec import from_spec
 from gemini.utils.files import read_json

@@ -1,7 +1,7 @@
 """Degasser separating a share of the free gas from the liquid, with a pressure loss."""
 
 from gemini.modules.module import Module
-from gemini.physics import separation
+from gemini.modules.treatment import _physics
 from gemini.types import (
     Fraction,
     Inlet,
@@ -58,7 +58,7 @@ class Degasser(Module):
         # Parameters
         self.outlet_pressure = Parameter(Pressure | None, default=None)
         self.nominal_pressure_drop = Parameter(
-            PressureDifference, default=separation.DEFAULT_DEGASSER_DROP, ge=0
+            PressureDifference, default=_physics.DEFAULT_DEGASSER_DROP, ge=0
         )
         self.heat_transfer_coefficient = Parameter(float, default=0, ge=0)
         self.separation_efficiency = Parameter(Fraction, default=0, structural=True)
@@ -84,7 +84,7 @@ class Degasser(Module):
             if self.outlet_pressure is not None
             else inlet.p - self.nominal_pressure_drop
         )
-        liquid_flow, gas_flow, remaining = separation.degasser_split(
+        liquid_flow, gas_flow, remaining = _physics.degasser_split(
             inlet.m_dot, inlet.fluid.gas_mass_fraction, self.separation_efficiency
         )
         liquid = inlet.with_(

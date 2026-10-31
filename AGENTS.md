@@ -7,7 +7,8 @@ GEMINI is a composable geothermal digital-twin package. Preserve captured numeri
 Test with the development profile (`make test`); see
 [Testing: Test profiles](.claude/docs/testing.md#test-profiles).
 
-Physics lives only in `gemini/physics/`: a module declares and wires, and calls physics functions.
+Physics lives in `gemini/physics/` or `gemini/modules/<category>/_physics.py`: a module declares and
+wires, and calls physics functions. Helpers of the module package live in `gemini/modules/_utils/`.
 
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
@@ -68,9 +69,9 @@ gemini/
 │   └── runtime.py    # context-local precision, display units and default fluid
 ├── ops/              # op registry, dispatch, Constant, where and check used by physics
 ├── graph/            # Node, Graph, Proxy, Tracer, Interpreter, cache and runner
-├── physics/          # every formula: SI correlations and unit conversions
+├── physics/          # shared formulas: SI correlations and unit conversions
 ├── types/            # quantities, streams, fluids, declarations, profiles, bindings, costs, return shapes
-├── modules/          # Module base class, registry, containers; one folder per category, plants/ too
+├── modules/          # Module base class, _utils/ helpers; one folder per category with its _physics.py
 ├── engine/           # Clock, run functions, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay
 ├── analysis/         # well performance and integrity, fits; kpi.py is the gm.kpi namespace

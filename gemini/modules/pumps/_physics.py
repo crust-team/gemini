@@ -1,4 +1,9 @@
-"""Ideal-gas adiabatic compression with an isentropic efficiency and intercooled stages.
+"""Pump physics of this category: gas compression, the ESP efficiency and line-shaft curves.
+
+The ESP and line-shaft curves are the TNO R11363 polynomials on the historical US basis
+(``head``, with ``esp_efficiency`` the retained US-basis efficiency); the power polynomial lives
+in ``gemini.physics.pumps`` because the doublet design reads it too. Compression is ideal-gas
+adiabatic with an isentropic efficiency and intercooled stages.
 
 The relations are the textbook ideal-gas forms used for compressor sizing, for example GPSA
 Engineering Data Book, 14th ed. (2017), Section 13 "Compressors and Expanders", with the
@@ -10,6 +15,8 @@ low reduced pressure) with a constant heat capacity ratio ``k = cp / cv`` over t
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.ops import Constant
+from gemini.physics import constants, units
 
 
 @ops.physics
@@ -262,3 +269,142 @@ def _check_stage(name, inlet_temperature, pressure_ratio):
         name=name,
         pressure_ratio=pressure_ratio,
     )
+
+
+ESP_MIN_EFFICIENCY_POWER = Constant(
+    "ESP_MIN_EFFICIENCY_POWER",
+    0.1,
+    "W",
+    "shaft power below which the pump is treated as stopped and its efficiency as zero",
+)
+
+
+LINE_SHAFT_MIN_EFFICIENCY_POWER = Constant(
+    "LINE_SHAFT_MIN_EFFICIENCY_POWER",
+    0.1,
+    "W",
+    "pump power below which the pump is treated as stopped and its efficiency as zero",
+)
+
+
+HYDRAULIC_POWER_PER_HEAD = units.bhp_to_w(1) / units.ft_head_to_pa(1)
+"""Unit factor of the ESP efficiency: [W per bhp] over [Pa per ft of head], computed once."""
+
+
+@ops.physics
+def head(volume_flow, frequency, stages, coefficients):
+    """Return pressure rise [Pa] from flow [m3/s], frequency [Hz], stages and ft coefficients.
+
+    The polynomial sum(c_i q^i) uses q in bbl/day and gives ft of head per stage at 60 Hz;
+    head scales with the square of the frequency ratio.
+
+    Valid for the fitted flow range of the coefficients and positive frequency and stages. The
+    affinity law follows Takacs, Electrical Submersible Pumps Manual (2009); the polynomial
+    form is the TNO R11363 pump correlation. The builtin ``sum`` over the coefficients is kept:
+    it works on floats, arrays and traced values.
+    """
+    q = units.m3s_to_bbl_per_day(volume_flow)
+    value = stages * (frequency / constants.ESP_REFERENCE_FREQUENCY) ** 2
+    value *= sum(c * q**i for i, c in enumerate(coefficients))
+    return units.ft_head_to_pa(value)
+
+
+@ops.physics
+def pump_efficiency(flow, head, power):
+    """Return the SI efficiency of a pump from a measured or modelled power; zero when stopped.
+
+    Parameters
+    ----------
+    flow : float
+        Volume flow Q [m3/s].
+    head : float
+        Pressure rise H [Pa].
+    power : float
+        Pump power P [W]; below ``LINE_SHAFT_MIN_EFFICIENCY_POWER`` the efficiency is zero.
+
+    Returns
+    -------
+    float
+        ``eta = Q H / P`` [-].
+
+    Notes
+    -----
+    Karassik et al., Pump Handbook, 4th ed., chapter 2. Not bitwise the same expression as
+    ``esp_efficiency``, which keeps the US-basis factors of the retained ESP model.
+
+    Validity: flow and head nonnegative; power at least LINE_SHAFT_MIN_EFFICIENCY_POWER (below it
+    the result is zero), which keeps the divisor positive. The efficiency is in [0, 1] for a
+    physical pump.
+    """
+    return ops.where(power >= LINE_SHAFT_MIN_EFFICIENCY_POWER, flow * head / power, 0.0)
+
+
+@ops.physics
+def esp_efficiency(flow, head, power):
+    """Return the retained US-basis ESP efficiency; zero for a stopped pump.
+
+    Parameters
+    ----------
+    flow : float
+        Volume flow Q [m3/s].
+    head : float
+        Pressure rise H [Pa].
+    power : float
+        Shaft power P [W]; below ``ESP_MIN_EFFICIENCY_POWER`` the efficiency is zero.
+
+    Returns
+    -------
+    float
+        ``eta = Q[bbl/d] / 135773 * (H / P) * (W per bhp / Pa per ft)`` [-].
+
+    Notes
+    -----
+    The factor 135773 is the historical ESP efficiency factor (``ESP_EFFICIENCY_FLOW_FACTOR``);
+    the result is the SI ``Q H / P`` up to that factor. ``ops.truediv`` keeps the legacy float32
+    arithmetic of the ESP: a plain ``/`` by a zero power raises in the plain scalar mode, where
+    this function must return the discarded branch of ``ops.where`` instead.
+
+    Validity: flow and head nonnegative; power at least ESP_MIN_EFFICIENCY_POWER (below it the
+    result is zero), which keeps the divisor positive. The polynomial pump model can give a value
+    above one.
+    """
+    return ops.where(
+        power < ESP_MIN_EFFICIENCY_POWER,
+        0.0,
+        units.m3s_to_bbl_per_day(flow)
+        / constants.ESP_EFFICIENCY_FLOW_FACTOR
+        * ops.truediv(head, power)
+        * HYDRAULIC_POWER_PER_HEAD,
+    )
+
+
+@ops.physics
+def line_shaft_friction_power(friction_loss, depth, speed):
+    """Return the mechanical friction power of a line shaft.
+
+    Parameters
+    ----------
+    friction_loss : float
+        Friction power per shaft length at the catalogue speed [W/m].
+    depth : float
+        Shaft length [m].
+    speed : float
+        Speed ratio [-].
+
+    Returns
+    -------
+    float
+        ``P_f = k L s`` [W].
+
+    Notes
+    -----
+    Friction grows in proportion to speed (constant bearing friction torque), the form of the
+    manufacturer tables of line-shaft friction in ANSI/HI 2.3, Rotodynamic Vertical Pumps for
+    Design and Application.
+
+    Validity: friction_loss, depth and speed nonnegative; no division occurs. Friction in proportion
+    to speed holds for constant bearing friction torque.
+    Source: The form of the manufacturer line-shaft friction tables cited in ANSI/HI 2.3,
+    Rotodynamic Vertical Pumps for Design and Application, as cited for the line-shaft pump model.
+    """
+    return friction_loss * depth * speed

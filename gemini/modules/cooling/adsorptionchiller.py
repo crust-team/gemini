@@ -2,7 +2,8 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules.cooling import _sorption as sorption
+from gemini.modules._utils import sorption
+from gemini.modules.cooling import _physics
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
@@ -35,7 +36,7 @@ class AdsorptionChiller(Module):
     cycle (minutes), so it suits 15-minute or hourly steps. Its characteristic map is the
     characteristic equation of the sorption machine, Q_E = s * (ddt - ddt_min) with
     ddt = t_G - a * t_AC + r * t_E at the mean circuit temperatures in degC, solved in closed form
-    from the inlet temperatures (``refrigeration.sorption_evaporator_capacity``); its own
+    from the inlet temperatures (``_physics.sorption_evaporator_capacity``); its own
     coefficients are fitted to the adsorption machine. The delivered evaporator duty is the
     smallest of that, the setpoint request and the capacity. Q_G = Q_E / thermal_cop,
     electricity (pumps, valves and controls) is auxiliary_power_ratio * Q_E and
@@ -63,13 +64,13 @@ class AdsorptionChiller(Module):
         self.minimum_driving_difference = Parameter(TemperatureDifference)
         self.rejection_coefficient = Parameter(Dimensionless)
         self.evaporator_coefficient = Parameter(Dimensionless)
-        self.thermal_cop = Parameter(Ratio, default=refrigeration.ADSORPTION_THERMAL_COP, gt=0)
+        self.thermal_cop = Parameter(Ratio, default=_physics.ADSORPTION_THERMAL_COP, gt=0)
         self.auxiliary_power_ratio = Parameter(Ratio)
         self.minimum_driving_temperature = Parameter(
-            Temperature, default=refrigeration.ADSORPTION_MINIMUM_DRIVING_TEMPERATURE
+            Temperature, default=_physics.ADSORPTION_MINIMUM_DRIVING_TEMPERATURE
         )
         self.maximum_driving_temperature = Parameter(
-            Temperature, default=refrigeration.ADSORPTION_MAXIMUM_DRIVING_TEMPERATURE
+            Temperature, default=_physics.ADSORPTION_MAXIMUM_DRIVING_TEMPERATURE
         )
 
         # Inlets
@@ -124,10 +125,10 @@ class AdsorptionChiller(Module):
         requested = heat_transfer.setpoint_duty(
             rates["chilled_in"], chilled_in.T - self.temperature_setpoint
         )
-        evaporator, is_capped = refrigeration.sorption_delivered_duty(
+        evaporator, is_capped = _physics.sorption_delivered_duty(
             requested, self._available_duty(inlets, rates), self.capacity, 1
         )
-        generator, electricity, rejection = refrigeration.sorption_duties(
+        generator, electricity, rejection = _physics.sorption_duties(
             evaporator, self.thermal_cop, self.auxiliary_power_ratio
         )
         return {

@@ -11,7 +11,7 @@ from collections import deque
 from dataclasses import dataclass
 
 from gemini.errors import NotImplementedYet, ValidationError
-from gemini.modules.container import ModuleDict, ModuleList
+from gemini.modules._utils.container import ModuleDict, ModuleList
 from gemini.utils.strings import join_path
 
 STATE = "state"

@@ -6,7 +6,7 @@ from copy import deepcopy
 import pandas as pd
 
 from gemini.errors import GeminiWarning, ValidationError
-from gemini.modules.wiring import trace_wiring
+from gemini.modules._utils.wiring import trace_wiring
 from gemini.physics import units
 from gemini.types import Binding, ModuleBindings
 from gemini.utils.data.dataset import Dataset

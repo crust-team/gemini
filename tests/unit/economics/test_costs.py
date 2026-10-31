@@ -4,7 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.economics import costs
-from gemini.physics import pumps
+from gemini.modules.pumps import _physics
 from gemini.physics.units import SECONDS_PER_YEAR
 from tests.fixtures.costed_plants import HOURS, cooling_plant, day, heating_plant
 from tests.fixtures.errors import raises
@@ -131,7 +131,7 @@ def test_a_doublet_pays_for_its_wells_and_its_pump():
     }
     plant = gm.Plant("One")
     doublet = plant.add("Doublet", name="unit", params=design | pump)
-    power = 300 / 3600 * pumps.head(0.0, 60.0, 1, doublet.esp.head_coefficients) / 0.7
+    power = 300 / 3600 * _physics.head(0.0, 60.0, 1, doublet.esp.head_coefficients) / 0.7
     result = gm.economics.capex(plant, COSTS)
     assert result["value"] == pytest.approx(wells + 0.5 * power)
     assert "SDE+" in result["source"] and "assumptions.pump_cost" in result["source"]

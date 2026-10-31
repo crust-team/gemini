@@ -3,6 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
+from gemini.modules.pumps import _physics
 from gemini.physics import constants, energy, pumps
 from gemini.types import (
     Control,
@@ -109,7 +110,7 @@ class LineShaftPump(Module):
             flow=flow,
         )
         speed = pumps.speed_ratio(self.frequency, constants.ESP_REFERENCE_FREQUENCY)
-        friction = pumps.line_shaft_friction_power(
+        friction = _physics.line_shaft_friction_power(
             self.shaft_friction_loss, self.setting_depth, speed
         )
         self.flow = flow
@@ -117,7 +118,7 @@ class LineShaftPump(Module):
         self.pump_power = pump_power
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction
-        self.efficiency = pumps.pump_efficiency(flow, self.head, pump_power)
+        self.efficiency = _physics.pump_efficiency(flow, self.head, pump_power)
         self.electricity = energy.input_power(self.shaft_power, self.motor_efficiency)
 
     def _head(self, flow):
@@ -129,7 +130,7 @@ class LineShaftPump(Module):
             path=self.path,
             flow=flow,
         )
-        head = pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
+        head = _physics.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         ops.check(
             head >= 0,
             PhysicsError,

@@ -284,7 +284,7 @@ intercooled stages.
 - **Controls**: `pressure_setpoint` (`Pressure`, the discharge pressure).
 - **Outputs**: `pressure_ratio`, `shaft_power` (soft sensor), `electricity`, `discharge_T`
   (soft sensor), `heat_loss`.
-- **Model** (`physics.compression`; GPSA Engineering Data Book, 14th ed., Section 13, Z = 1):
+- **Model** (`modules/pumps/_physics.py`; GPSA Engineering Data Book, 14th ed., Section 13, Z = 1):
   `r = pressure_setpoint / p_s`, stage ratio `r^(1/N)`,
   `T_2 = T_1 + T_1 (r^((k-1)/(k N)) - 1) / eta_s`, `P_shaft = m_dot N cp (T_2 - T_1)`,
   `electricity = P_shaft / eta_motor`, `heat_loss = electricity - P_shaft / N` (intercooler

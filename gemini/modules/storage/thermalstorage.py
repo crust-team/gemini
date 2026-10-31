@@ -5,7 +5,8 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer, storage
+from gemini.modules.storage import _physics
+from gemini.physics import heat_transfer
 from gemini.types import (
     Boundary,
     Energy,
@@ -88,7 +89,7 @@ class ThermalStorage(Module):
         self.ambient_temperature = Boundary(Temperature)
 
         # States
-        self.temperature = State(Temperature, default=storage.DEFAULT_TANK_TEMPERATURE)
+        self.temperature = State(Temperature, default=_physics.DEFAULT_TANK_TEMPERATURE)
 
         # Outputs
         self.tank_temperature = Output(Temperature)
@@ -122,7 +123,7 @@ class ThermalStorage(Module):
         ambient = heat_transfer.heat_rate(
             self.heat_loss_conductance, self.temperature - self.ambient_temperature
         )
-        reports = storage.tank_service_report(
+        reports = _physics.tank_service_report(
             self.service == "hot",
             self._capacity(inlets.charge_in),
             self.temperature,
@@ -137,7 +138,7 @@ class ThermalStorage(Module):
 
     def _advance_states(self, inlets, outlets, dt):
         charge_in, discharge_in = inlets.charge_in, inlets.discharge_in
-        relaxed = storage.tank_relaxation(
+        relaxed = _physics.tank_relaxation(
             self.temperature,
             self._capacity(charge_in),
             dt,
@@ -153,7 +154,7 @@ class ThermalStorage(Module):
     def _capacity(self, charge_in):
         """Return the tank heat capacity rho * cp * V [J/K] of ``module.fluid``."""
         properties = self.fluid.properties(charge_in.p, self.temperature)
-        return storage.tank_capacity(properties.liquid_volumetric_heat_capacity, self.volume)
+        return _physics.tank_capacity(properties.liquid_volumetric_heat_capacity, self.volume)
 
     def _conductance(self, stream, effectiveness):
         """Return the circuit conductance e * m_dot * cp [W/K]; reject reverse flow."""
@@ -164,7 +165,7 @@ class ThermalStorage(Module):
             path=self.path,
             m_dot=stream.m_dot,
         )
-        return storage.circuit_conductance(effectiveness, stream.heat_capacity_rate())
+        return _physics.circuit_conductance(effectiveness, stream.heat_capacity_rate())
 
     def _circuit_heat(self, stream, effectiveness):
         """Return the heat flow [W] from a circuit into the start-of-step tank."""

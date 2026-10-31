@@ -2,6 +2,7 @@
 
 from gemini import ops
 from gemini.modules.module import Module
+from gemini.modules.treatment import _physics
 from gemini.physics import diagnostics, hydraulics, separation, units
 from gemini.types import (
     Health,
@@ -27,10 +28,10 @@ class Filter(Module):
 
         # Parameters
         self.nominal_pressure_drop = Parameter(
-            PressureDifference, default=separation.FILTER_NOMINAL_DROP, ge=0
+            PressureDifference, default=_physics.FILTER_NOMINAL_DROP, ge=0
         )
         self.nominal_mass_flow = Parameter(
-            MassFlow, default=separation.FILTER_NOMINAL_MASS_FLOW, gt=0
+            MassFlow, default=_physics.FILTER_NOMINAL_MASS_FLOW, gt=0
         )
         self.clogging_pressure_drop = Parameter(
             PressureDifference, default=units.bar_to_pa(separation.FILTER_CLOGGING_BAR), gt=0

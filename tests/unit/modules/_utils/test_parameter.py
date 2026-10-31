@@ -1,6 +1,6 @@
 """The graph-input roles are the existing declarations plus ``Constant``."""
 
-from gemini.modules import parameter
+from gemini.modules._utils import parameter
 from gemini.ops import Constant
 from gemini.physics import constants
 from gemini.types import declarations

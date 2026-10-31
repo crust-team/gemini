@@ -56,10 +56,21 @@ to `SNAPSHOTS` for the new version; never edit the hash of a released version.
 
 ## Module rules
 
-**Physics lives only in `gemini/physics/`.** Modules declare and wire; they never define physics.
-Reuse existing physics functions wherever possible and combine them; add a new physics function
-only when nothing existing can do the job, and generalise an existing one rather than writing a
-second copy. Never write a formula inside a module, and never write the same formula twice.
+**Physics lives in `gemini/physics/` or a `_physics.py`.** Modules declare and wire; they never
+define physics. `gemini/physics/` keeps the textbook formulas and anything more than one category,
+or `analysis`, `optim`, `economics` or `checks`, reads. Physics of one category lives in
+`gemini/modules/<category>/_physics.py`, which imports only `gemini.physics`, `gemini.ops`,
+`gemini.types` and `gemini.errors`, never another category's `_physics.py`; when a second category
+needs a function it moves up into `gemini/physics/`. Its functions keep `@ops.physics` and stay
+traceable on every backend. Reuse existing physics functions wherever possible and combine them; add
+a new physics function only when nothing existing can do the job, and generalise an existing one
+rather than writing a second copy. Never write a formula inside a module, and never write the same
+formula twice.
+
+**Helpers live in `gemini/modules/_utils/`.** A file under `gemini/modules/` that is neither a module
+nor a category (`balance`, `burner`, `container`, `description`, `design`, `parameter`, `registry`,
+`serialization`, `sorption`, `wiring`) goes there; `module.py` and the category folders stay. A class
+in `_utils` belongs to no category, and the public names stay in `gm.modules`.
 Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
 
 1. Assign declarations and children only in `__init__`, after `super().__init__()`.

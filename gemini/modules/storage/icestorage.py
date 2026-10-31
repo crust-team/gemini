@@ -3,7 +3,8 @@
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer, storage, units
+from gemini.modules.storage import _physics
+from gemini.physics import heat_transfer, units
 from gemini.types import (
     Duty,
     Energy,
@@ -68,9 +69,9 @@ class IceStorage(Module):
 
     NOTE(refactor): the ice fraction and the temperature are states, so the module is a graph
     break until ``scan`` exists; its arithmetic is written with ops all the same, and the segment
-    loop of ``storage.ice_advance`` runs its fixed ``storage.MAX_SEGMENTS`` passes, a finished
+    loop of ``_physics.ice_advance`` runs its fixed ``_physics.MAX_SEGMENTS`` passes, a finished
     pass keeping its state. The coil follows ``heat_transfer.ambient_effectiveness`` and
-    ``storage.circuit_conductance``; the segments are ``storage.ice_step``.
+    ``_physics.circuit_conductance``; the segments are ``_physics.ice_step``.
     """
 
     def __init__(self):
@@ -80,14 +81,14 @@ class IceStorage(Module):
         # Parameters
         self.water_mass = Parameter(Mass, gt=0)
         self.thermal_conductance = Parameter(ThermalConductance, gt=0)
-        self.latent_heat = Parameter(SpecificEnthalpy, default=storage.DEFAULT_LATENT_HEAT, gt=0)
+        self.latent_heat = Parameter(SpecificEnthalpy, default=_physics.DEFAULT_LATENT_HEAT, gt=0)
         self.freezing_temperature = Parameter(
-            Temperature, default=storage.DEFAULT_FREEZING_TEMPERATURE
+            Temperature, default=_physics.DEFAULT_FREEZING_TEMPERATURE
         )
         self.water_specific_heat = Parameter(
-            SpecificHeat, default=storage.DEFAULT_WATER_HEAT_CAPACITY
+            SpecificHeat, default=_physics.DEFAULT_WATER_HEAT_CAPACITY
         )
-        self.ice_specific_heat = Parameter(SpecificHeat, default=storage.DEFAULT_ICE_HEAT_CAPACITY)
+        self.ice_specific_heat = Parameter(SpecificHeat, default=_physics.DEFAULT_ICE_HEAT_CAPACITY)
 
         # Inlets
         self.inlet = Inlet(Stream, stream="chilled_water")
@@ -124,7 +125,7 @@ class IceStorage(Module):
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
-        self.stored_cold = storage.ice_stored_cold(
+        self.stored_cold = _physics.ice_stored_cold(
             self.water_mass, self.latent_heat, self.ice_fraction
         )
         self.duty = heat_transfer.heat_rate(self._conductance(inlet), inlet.T - self.temperature)
@@ -135,7 +136,7 @@ class IceStorage(Module):
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.inlet
-        fraction, temperature = storage.ice_advance(
+        fraction, temperature = _physics.ice_advance(
             self.ice_fraction,
             self.temperature,
             dt,
@@ -168,7 +169,7 @@ class IceStorage(Module):
 
     def _conductance(self, inlet):
         """Return the coil conductance e * m_dot * cp [W/K]."""
-        return storage.circuit_conductance(self._effectiveness(inlet), self._rate(inlet))
+        return _physics.circuit_conductance(self._effectiveness(inlet), self._rate(inlet))
 
     def _check_state(self):
         """Require the store temperature to match its phase (see the class docstring)."""

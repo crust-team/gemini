@@ -4,7 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import ValidationError
-from gemini.modules import design
+from gemini.modules._utils import design
 from tests.fixtures.errors import raises
 
 BINDING = {"column": "x", "unit": "kW/K"}

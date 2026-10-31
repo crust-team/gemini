@@ -3,7 +3,7 @@
 import pytest
 
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules.balance import energy_balance, mass_balance
+from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.exchangers import Cooler
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches

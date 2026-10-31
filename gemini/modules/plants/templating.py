@@ -24,9 +24,9 @@ from pathlib import Path
 
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
+from gemini.modules._utils.serialization import located
 from gemini.modules.plants import generators
 from gemini.modules.plants.spec import from_spec, validate
-from gemini.modules.serialization import located
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 

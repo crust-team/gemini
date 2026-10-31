@@ -3,7 +3,8 @@
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import compression, energy
+from gemini.modules.pumps import _physics
+from gemini.physics import energy
 from gemini.types import (
     Control,
     Count,
@@ -33,7 +34,7 @@ class GasCompressor(Module):
     is passed through unchanged and its liquid property model is not used. The overall pressure
     ratio ``r = pressure_setpoint / p_suction`` is split equally over ``stage_count`` adiabatic
     stages with intercoolers that return the gas to the suction temperature
-    (``gemini.physics.compression``, GPSA Engineering Data Book, 14th ed., Section 13):
+    (``_physics``, GPSA Engineering Data Book, 14th ed., Section 13):
 
     ``T_2 = T_1 + T_1 (r**((k - 1) / (k N)) - 1) / eta_s``,
     ``P_shaft = m_dot N cp (T_2 - T_1)``, ``electricity = P_shaft / motor_efficiency``.
@@ -86,10 +87,8 @@ class GasCompressor(Module):
 
         # Outlets
         suction = inlets.suction
-        stage_ratio = compression.stage_pressure_ratio(
-            self._pressure_ratio(suction), self.stage_count
-        )
-        discharge_T = compression.stage_outlet_temperature(
+        stage_ratio = _physics.stage_pressure_ratio(self._pressure_ratio(suction), self.stage_count)
+        discharge_T = _physics.stage_outlet_temperature(
             suction.T, stage_ratio, self.heat_capacity_ratio, self.isentropic_efficiency
         )
 
@@ -102,7 +101,7 @@ class GasCompressor(Module):
         suction = inlets.suction
         discharge = outlets.discharge
         self.pressure_ratio = self._pressure_ratio(suction)
-        work = compression.specific_compression_work(
+        work = _physics.specific_compression_work(
             suction.T,
             self.pressure_ratio,
             self.heat_capacity_ratio,
@@ -110,10 +109,10 @@ class GasCompressor(Module):
             self.isentropic_efficiency,
             self.stage_count,
         )
-        self.shaft_power = compression.shaft_power(suction.m_dot, work)
+        self.shaft_power = _physics.shaft_power(suction.m_dot, work)
         self.electricity = energy.input_power(self.shaft_power, self.motor_efficiency)
         self.discharge_T = discharge.T
-        self.heat_loss = compression.heat_rejected(
+        self.heat_loss = _physics.heat_rejected(
             self.electricity, self.shaft_power, self.stage_count
         )
 
@@ -135,4 +134,4 @@ class GasCompressor(Module):
             setpoint=self.pressure_setpoint,
             p=suction.p,
         )
-        return compression.overall_pressure_ratio(self.pressure_setpoint, suction.p)
+        return _physics.overall_pressure_ratio(self.pressure_setpoint, suction.p)

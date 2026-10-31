@@ -179,7 +179,7 @@ fractions are rejected until a suitable model exists. Default water/brine number
 `Fluid(kind="steam")`, exported as `STEAM`, labels water vapour such as the `gas` outlet of a
 flash `Separator`; `FlashTurbine` requires it. Its constant property snapshot is the unchanged
 liquid-water default and does not describe vapour: steam equipment takes enthalpies and
-entropies from `gemini.physics.steam`, so do not convert a steam stream's volume flow or audit its
+entropies from `gemini.modules.power._physics`, so do not convert a steam stream's volume flow or audit its
 latent heat with `cp_l * T`.
 
 Well corrosion helpers accept omitted chemistry: Fluid salt fraction becomes salt concentration
@@ -197,7 +197,7 @@ each declared with its own additive quantity in W (`Electricity`, `Fuel`, `HeatA
 ports. Six are nonnegative: the inflows `electricity` and `fuel` consumed
 and `heat_absorbed` from outside the plant (ambient air, the ground, a cooled building), and the
 outflows `heat_loss` to the environment, `heat_supplied` to a consumer and `electricity_generated`.
-`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `modules/balance.py` list them. The seventh,
+`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `modules/_utils/balance.py` list them. The seventh,
 `heat_accumulation`, is signed: the rate of increase of the heat a storage leaf holds
 (`ThermalStorage`, `IceStorage`, `AquiferStorage`), counted with the outflows, so a charging store
 (positive) and a discharging one (negative) both close. Declare only the outputs a module has. Fluid

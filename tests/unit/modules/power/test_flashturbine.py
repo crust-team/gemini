@@ -5,8 +5,7 @@ import pytest
 import gemini as gm
 from gemini.errors import PhysicsError
 from gemini.modules import Module, mass_balance
-from gemini.modules.power import FlashTurbine, Separator
-from gemini.physics import steam
+from gemini.modules.power import FlashTurbine, Separator, _physics
 from gemini.types import STEAM, WATER, Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_module_matches
 
@@ -34,8 +33,8 @@ def test_closed_in_steam_enthalpies_and_condensate():
     module = turbine()
     result = module(inlet=STEAM_FEED)
     out, outlet = result.outputs, result.outlets.outlet
-    condenser = steam.saturation_properties(1e4)
-    incoming = 20 * steam.saturation_properties(6e5).vapour_enthalpy
+    condenser = _physics.saturation_properties(1e4)
+    incoming = 20 * _physics.saturation_properties(6e5).vapour_enthalpy
     outgoing = out.electricity_generated + out.heat_loss + 20 * condenser.liquid_enthalpy
     assert outgoing == pytest.approx(incoming, rel=1e-12)
     assert out.heat_loss == pytest.approx(out.condenser_duty + 0.02 * out.gross_power)
@@ -100,12 +99,12 @@ def test_single_flash_plant_closure():
     brine, condensate = result.outlets.brine_out, result.outlets.condensate_out
     assert result.outputs.net_power == pytest.approx(9.53e6, rel=2e-3)
     assert brine.m_dot + condensate.m_dot == pytest.approx(100, rel=1e-15)
-    incoming = 100 * steam.liquid_enthalpy(feed.p, feed.T)
+    incoming = 100 * _physics.liquid_enthalpy(feed.p, feed.T)
     outgoing = (
         result.outputs.net_power
         + result.children["turbine"].outputs.heat_loss
-        + brine.m_dot * steam.saturation_properties(6e5).liquid_enthalpy
-        + condensate.m_dot * steam.saturation_properties(1e4).liquid_enthalpy
+        + brine.m_dot * _physics.saturation_properties(6e5).liquid_enthalpy
+        + condensate.m_dot * _physics.saturation_properties(1e4).liquid_enthalpy
     )
     assert outgoing == pytest.approx(incoming, rel=1e-12)
 

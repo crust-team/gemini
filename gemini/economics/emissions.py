@@ -8,7 +8,7 @@ from gemini import backends
 from gemini.analysis.series import results_total, window_seconds
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.outcome import reported
-from gemini.modules.balance import emissions
+from gemini.modules._utils.balance import emissions
 from gemini.types.shapes import value
 
 _LEDGER = ("electricity", "fuel", "electricity_generated")
@@ -38,7 +38,7 @@ def source_energies(results):
     """Return the fuel energy and the grid electricity energy [J] drawn over the run.
 
     Grid electricity is the consumption not covered by on-site generation, tick by tick, as
-    ``gemini.modules.balance.emissions`` counts it.
+    ``gemini.modules._utils.balance.emissions`` counts it.
     """
     return _weighted_energy(results, 1.0, 0.0), _weighted_energy(results, 0.0, 1.0)
 

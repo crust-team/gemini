@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.modules.balance import energy_balance, mass_balance
+from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.treatment import Degasser
 from gemini.types import Fluid
 from gemini.types.flows import Stream

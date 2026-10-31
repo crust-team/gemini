@@ -4,7 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules import Module
-from gemini.modules.balance import energy_balance, mass_balance
+from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.treatment import Degasser, Vent
 from gemini.physics import constants
 from gemini.types import Fluid, Inlet, Outlet, Stream

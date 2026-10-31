@@ -14,7 +14,7 @@ from pydantic_core import to_jsonable_python
 
 from gemini.backends import runtime
 from gemini.errors import GeminiError, ValidationError
-from gemini.modules import design
+from gemini.modules._utils import design
 from gemini.types.bindings import DatedParams
 from gemini.types.fluid import Fluid
 from gemini.types.shapes import problem

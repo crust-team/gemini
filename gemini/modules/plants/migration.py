@@ -4,10 +4,10 @@ from copy import deepcopy
 
 from gemini.backends import runtime
 from gemini.errors import GeminiError, ValidationError
-from gemini.modules import design
+from gemini.modules._utils import design
+from gemini.modules._utils.serialization import FORMAT, SECTIONS, plain_value
 from gemini.modules.plants import library, reader
 from gemini.modules.plants.builder import Plant
-from gemini.modules.serialization import FORMAT, SECTIONS, plain_value
 from gemini.types.bindings import ModuleBindings
 from gemini.types.fluid import Fluid
 from gemini.utils.strings import join_path

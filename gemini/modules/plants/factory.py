@@ -1,8 +1,8 @@
 """Make the module a spec or a call to ``Plant.add`` names: a registry type or a group."""
 
 from gemini.errors import ValidationError
-from gemini.modules import registry
-from gemini.modules.container import ModuleDict, ModuleList
+from gemini.modules._utils import registry
+from gemini.modules._utils.container import ModuleDict, ModuleList
 
 GROUPS = {"ModuleDict": ModuleDict, "ModuleList": ModuleList}
 

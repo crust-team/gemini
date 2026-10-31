@@ -3,7 +3,8 @@
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import heat_transfer, power_cycles
+from gemini.modules.power import _physics
+from gemini.physics import heat_transfer
 from gemini.types import (
     Boundary,
     Efficiency,
@@ -108,7 +109,7 @@ class ORC(Module):
         self.heat_input = heat_transfer.heat_rate(
             brine_in.heat_capacity_rate(), brine_in.T - brine_out.T
         )
-        balance = power_cycles.plant_balance(
+        balance = _physics.plant_balance(
             self.heat_input, design.cycle_efficiency, self.parasitic_fraction
         )
         self.gross_power = balance.gross_power
@@ -122,7 +123,7 @@ class ORC(Module):
         self.is_capped = design.is_capped
 
     def _design(self, brine_in):
-        """Return the ``power_cycles.cycle_design`` of the brine inlet."""
+        """Return the ``_physics.cycle_design`` of the brine inlet."""
         ops.check(
             brine_in.m_dot >= 0,
             PhysicsError,
@@ -131,7 +132,7 @@ class ORC(Module):
             m_dot=brine_in.m_dot,
         )
         cp = brine_in.fluid.properties(brine_in.p, brine_in.T).cp_l
-        return power_cycles.cycle_design(
+        return _physics.cycle_design(
             brine_in.T,
             brine_in.m_dot,
             cp,

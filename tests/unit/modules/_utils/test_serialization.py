@@ -6,7 +6,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import ValidationError
-from gemini.modules import serialization
+from gemini.modules._utils import serialization
 from tests.fixtures.errors import raises
 
 

@@ -58,8 +58,8 @@ class Fluid(BaseModel):
 
     ``steam`` marks water vapour, such as the gas outlet of a flash ``Separator``. Its
     constant property snapshot is the liquid-water default and does not describe vapour:
-    steam equipment takes enthalpy and entropy from ``gemini.physics.steam`` instead, so
-    do not convert a steam stream's volume flow or audit its latent heat with ``cp_l * T``.
+    steam equipment takes enthalpy and entropy from the steam tables of ``modules/power``, so do
+    not convert a steam stream's volume flow or audit its latent heat with ``cp_l * T``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)

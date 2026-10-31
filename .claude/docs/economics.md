@@ -120,12 +120,12 @@ E(x) the sum over ticks of x times the tick duration:
 Each check returns the check `{name, passed, value, limit}`, `value` and `limit` being values; a
 violated limit is `passed: false`, never an error (`passed` is `None`, with a `reason` in `value`,
 when the results hold nothing the check can judge). Because `Results` has no streams, the enthalpy and mass
-closure of `modules/balance.py` (sum in minus sum out per call) cannot be recomputed from
+closure of `modules/_utils/balance.py` (sum in minus sum out per call) cannot be recomputed from
 it, and the checks audit what the columns hold:
 
 | Check | Covers | `value`, `limit` |
 |---|---|---|
-| `energy_balance(results)` | the leaf columns named in `ENERGY_INPUTS` and `ENERGY_OUTPUTS` of `balance.py`, except the signed `heat_accumulation`: finite or missing, not negative | smallest power [W], 1e-9 W |
+| `energy_balance(results)` | the leaf columns named in `ENERGY_INPUTS` and `ENERGY_OUTPUTS` of `_utils/balance.py`, except the signed `heat_accumulation`: finite or missing, not negative | smallest power [W], 1e-9 W |
 | `mass_balance(results)` | the leaf outputs whose unit in `results.units` is kg/s: finite or missing, not negative | smallest flow [kg/s], 1e-12 kg/s |
 | `bounds(plant, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
 | `run_all(plant, results)` | the three above | `{passed, checks}` |

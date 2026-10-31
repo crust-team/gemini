@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from gemini.modules import registry
+from gemini.modules._utils import registry
 from gemini.modules.plants import catalogue
 from gemini.utils.files import read_json
 from tests.fixtures import SHARED

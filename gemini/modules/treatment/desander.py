@@ -3,7 +3,8 @@
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import fluid, hydraulics, separation
+from gemini.modules.treatment import _physics
+from gemini.physics import fluid, hydraulics
 from gemini.types import (
     Boundary,
     Fraction,
@@ -78,7 +79,7 @@ class Desander(Module):
         inlet = inlets.inlet
         properties = inlet.fluid.properties(inlet.p, inlet.T)
         liquid_flow = fluid.liquid_volume_flow(inlet.m_dot, properties.gmf, properties.rho_l)
-        sand = separation.cyclone_sand(
+        sand = _physics.cyclone_sand(
             self.separation_efficiency, self.sand_concentration, liquid_flow
         )
         self.pressure_drop = self._pressure_drop(inlet)

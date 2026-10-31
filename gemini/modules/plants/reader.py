@@ -4,12 +4,8 @@ from copy import deepcopy
 
 from gemini.errors import GeminiError, ValidationError
 from gemini.errors.base import reported
-from gemini.modules import registry
-from gemini.modules.plants import outputs
-from gemini.modules.plants.factory import make_module
-from gemini.modules.plants.plan import is_group, unconnected_port
-from gemini.modules.plants.writer import baseline_of
-from gemini.modules.serialization import (
+from gemini.modules._utils import registry
+from gemini.modules._utils.serialization import (
     SECTIONS,
     Report,
     format_error,
@@ -17,6 +13,10 @@ from gemini.modules.serialization import (
     read_params,
     read_sections,
 )
+from gemini.modules.plants import outputs
+from gemini.modules.plants.factory import make_module
+from gemini.modules.plants.plan import is_group, unconnected_port
+from gemini.modules.plants.writer import baseline_of
 from gemini.utils.strings import close_matches, did_you_mean, join_path
 
 TYPES = {

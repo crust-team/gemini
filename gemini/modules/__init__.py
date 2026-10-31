@@ -1,8 +1,10 @@
 """Public composable equipment and plant API."""
 
-from . import registry
-from .balance import collect_flows, emissions, energy_balance, mass_balance
-from .container import ModuleDict, ModuleList
+from ._utils import registry
+from ._utils.balance import collect_flows, emissions, energy_balance, mass_balance
+from ._utils.container import ModuleDict, ModuleList
+from ._utils.registry import categories, get, load_file, names, register
+from ._utils.wiring import trace_wiring
 from .control import PIDController
 from .cooling import AbsorptionUnit, AdsorptionChiller
 from .demand import CoolingConsumer, HeatConsumer
@@ -13,7 +15,6 @@ from .piping import GasGrid, GasMakeup, Mixer, Pipe, PressurizationTank, Splitte
 from .plants import ATESPlant, CoolingSubstation, HeatingSubstation
 from .power import ORC, FlashTurbine, GridConnection, Separator
 from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
-from .registry import categories, get, load_file, names, register
 from .storage import AquiferStorage, IceStorage, ThermalStorage
 from .subsurface import (
     BoreholeField,
@@ -24,7 +25,6 @@ from .subsurface import (
 )
 from .treatment import Blowdown, Degasser, Desander, Filter, Flare, InhibitorDosing, Vent
 from .wells import InjectionWell, ProductionWell
-from .wiring import trace_wiring
 
 __all__ = [
     "Module",

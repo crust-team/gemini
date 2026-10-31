@@ -2,7 +2,7 @@
 
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
-from gemini.modules.container import ModuleList
+from gemini.modules._utils.container import ModuleList
 from gemini.modules.module import Module
 from gemini.modules.plants import listing, outputs, reader, writer
 from gemini.modules.plants.factory import make_module

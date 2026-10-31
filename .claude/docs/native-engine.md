@@ -74,7 +74,7 @@ engine treats it):
   shared; the tracer creates one graph input per constant.
 - Declared in modules by attribute assignment (`self.stages = gm.Parameter("50")`); `Module`
   registers them; `named_parameters`, `named_constants`, `named_states` list them.
-- Defined in `gemini/modules/parameter.py`, next to `Module`. Reuse and extend whatever
+- Defined in `gemini/modules/_utils/parameter.py`, next to `Module`. Reuse and extend whatever
   parameter mechanism already exists.
 
 ## 5. Units and types
@@ -206,7 +206,7 @@ Implemented for one leaf module, the ESP, and everything its call needs:
   `describe()`), `Proxy`, `Tracer` (one leaf module), `Interpreter` (value pass, then error
   pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
   row on a graph break).
-- `modules/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
+- `modules/_utils/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
   ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `Stream` is one
   slots dataclass used on every path.
 - The traced ESP on NumPy equals the untraced ESP exactly on the July data (tolerance 1e-12,
@@ -389,8 +389,8 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   the steps), `outputs.py` (sum, copy and ratio outputs), `reader.py` and `writer.py` (spec in and
   out), `spec.py`, `schema.py`, `migration.py`, `library.py` (shipped spec files in `specs/`,
   registered with `registry.register_plant`), `factory.py` (a registry type or a group to a module).
-  The dated parameters and bindings of `Module` are `modules/design.py`; the sections every
-  tree shares are `modules/serialization.py`.
+  The dated parameters and bindings of `Module` are `modules/_utils/design.py`; the sections every
+  tree shares are `modules/_utils/serialization.py`.
 - **Rules.** Only `connect` wires. An inlet has one source and an outlet one target
   (`port_in_use`); a bare module takes its only fitting free port, several raise `ambiguous_port`
   with the candidates; different stream types raise `stream_mismatch`; a loop of leaves without a

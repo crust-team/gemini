@@ -1,7 +1,7 @@
 """The outputs of a built plant: sums, copies of one module's value and ratios, from the spec."""
 
 from gemini.errors import ValidationError
-from gemini.modules.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
+from gemini.modules._utils.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
 from gemini.types.declarations import Output
 from gemini.types.quantities import TemperatureDifference
 from gemini.utils.strings import close_matches, did_you_mean, join_names

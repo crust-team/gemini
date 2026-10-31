@@ -3,7 +3,7 @@
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import steam
+from gemini.modules.power import _physics
 from gemini.types import (
     WATER,
     Efficiency,
@@ -28,7 +28,7 @@ class FlashTurbine(Module):
     the inlet pressure; the inlet temperature is not used because the pressure fixes the
     saturated state. The steam expands to ``condenser_pressure`` with the Baumann rule:
     eta = eta_dry (1 - a (1 - x_out) / 2) for the mean exhaust moisture (see
-    ``physics.steam.baumann_expansion``). The generator converts ``gross_power`` (shaft power)
+    ``_physics.baumann_expansion``). The generator converts ``gross_power`` (shaft power)
     with ``generator_efficiency``. The condenser condenses the exhaust to saturated liquid at
     the condenser pressure, which leaves through ``outlet`` as water.
 
@@ -39,7 +39,7 @@ class FlashTurbine(Module):
     cannot represent the latent heat of the steam, so its residual is not valid for this phase
     change; the unit tests check closure with the steam enthalpies instead.
 
-    Defaults: ``isentropic_efficiency`` (``steam.DEFAULT_TURBINE_EFFICIENCY``, 0.85) is the dry
+    Defaults: ``isentropic_efficiency`` (``_physics.DEFAULT_TURBINE_EFFICIENCY``, 0.85) is the dry
     turbine efficiency DiPippo assumes for geothermal steam turbines and ``baumann_factor`` 1 is
     the classical Baumann rule (DiPippo, R. (2016), Geothermal Power Plants, 4th ed., section
     5.5). Assumptions: no non-condensable gases, steam ejector or gland losses; condenser at a
@@ -52,7 +52,9 @@ class FlashTurbine(Module):
         super().__init__()
 
         # Parameters
-        self.isentropic_efficiency = Parameter(Efficiency, default=steam.DEFAULT_TURBINE_EFFICIENCY)
+        self.isentropic_efficiency = Parameter(
+            Efficiency, default=_physics.DEFAULT_TURBINE_EFFICIENCY
+        )
         self.baumann_factor = Parameter(Ratio, default=1)
         self.condenser_pressure = Parameter(Pressure, gt=0)
         self.generator_efficiency = Parameter(Efficiency)
@@ -76,7 +78,7 @@ class FlashTurbine(Module):
         # Outlets
         inlet = inlets.inlet
         ops.require(self._expansion(inlet))
-        condenser = steam.saturation_properties(self.condenser_pressure)
+        condenser = _physics.saturation_properties(self.condenser_pressure)
 
         outlet = inlet.with_(T=condenser.temperature, p=self.condenser_pressure, fluid=WATER)
 
@@ -86,8 +88,8 @@ class FlashTurbine(Module):
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.inlet
         expansion = self._expansion(inlet)
-        condensate = steam.saturation_properties(self.condenser_pressure).liquid_enthalpy
-        balance = steam.turbine_balance(
+        condensate = _physics.saturation_properties(self.condenser_pressure).liquid_enthalpy
+        balance = _physics.turbine_balance(
             inlet.m_dot,
             expansion.inlet_enthalpy,
             expansion.outlet_enthalpy,
@@ -126,6 +128,6 @@ class FlashTurbine(Module):
             p=inlet.p,
             condenser_pressure=self.condenser_pressure,
         )
-        return steam.baumann_expansion(
+        return _physics.baumann_expansion(
             inlet.p, self.condenser_pressure, self.isentropic_efficiency, self.baumann_factor
         )

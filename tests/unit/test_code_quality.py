@@ -83,21 +83,24 @@ FORMULA_EXCEPTIONS = {
     "gemini/modules/module.py: np.ndarray": "a type test of the array path, not maths",
     "gemini/modules/pumps/esp.py: np.asarray": "the float32 cast of the retained precision",
     "gemini/modules/pumps/esp.py: np.float32": "the float32 cast of the retained precision",
-    "gemini/modules/serialization.py: literal 2": "the plant file format number",
+    "gemini/modules/_utils/serialization.py: literal 2": "the plant file format number",
 }
 """``file: marker`` of what a module may keep, each with its reason; see ``formula_markers``."""
 SAME_FORM = {
     (
         "chemistry.py::co2_solubility_gas",
-        "control.py::pid_derivative",
+        "control/_physics.py::pid_derivative",
         "hydraulics.py::reynolds_number",
     ): "a product over a divisor: dissolved CO2, a PID term and the Reynolds number",
-    ("compression.py::heat_rejected", "hydraulics.py::productivity_pressure"): "a less b over c: "
+    (
+        "hydraulics.py::productivity_pressure",
+        "pumps/_physics.py::heat_rejected",
+    ): "a less b over c: "
     "compressor heat and a linear inflow relation",
     (
         "ground.py::stored_heat",
-        "pumps.py::line_shaft_friction_power",
-        "storage.py::ice_stored_cold",
+        "pumps/_physics.py::line_shaft_friction_power",
+        "storage/_physics.py::ice_stored_cold",
     ): "a product of three: stored heat, shaft friction and latent cold",
     (
         "dispatch.py::circuit_flow",
@@ -304,13 +307,22 @@ def formula_markers(source):
 MODULE_FILES = [
     path
     for path in PACKAGE_FILES
-    if path.startswith("gemini/modules/") and not path.startswith("gemini/modules/plants/")
+    if path.startswith("gemini/modules/")
+    and not path.startswith("gemini/modules/plants/")
+    and not path.endswith("/_physics.py")
 ]
+PHYSICS_FILES = [
+    path
+    for path in PACKAGE_FILES
+    if path.startswith("gemini/physics/") or path.endswith("/_physics.py")
+]
+CATEGORY_PHYSICS = [path for path in PHYSICS_FILES if path.startswith("gemini/modules/")]
+PHYSICS_IMPORTS = ("gemini.errors", "gemini.ops", "gemini.physics", "gemini.types")
 
 
 @pytest.mark.parametrize("path", MODULE_FILES)
 def test_modules_hold_no_formulas(path):
-    """Physics lives only in ``gemini/physics/``: a module declares and wires."""
+    """Physics lives in ``gemini/physics/`` or a ``_physics.py``: a module declares and wires."""
     markers = formula_markers((ROOT / path).read_text())
     found = {f"{path}: {marker}": line for marker, line in markers.items()}
     assert {name: line for name, line in found.items() if name not in FORMULA_EXCEPTIONS} == {}
@@ -356,14 +368,49 @@ def is_one_operation(function):
 def physics_copies():
     """Return groups of public and private physics functions with one normalised body."""
     bodies = {}
-    for path in PACKAGE_FILES:
-        if not path.startswith("gemini/physics/"):
-            continue
+    for path in PHYSICS_FILES:
         for function in ast.parse((ROOT / path).read_text()).body:
             if isinstance(function, ast.FunctionDef) and not is_one_operation(function):
-                name = f"{path.removeprefix('gemini/physics/')}::{function.name}"
+                short = path.removeprefix("gemini/physics/").removeprefix("gemini/modules/")
+                name = f"{short}::{function.name}"
                 bodies.setdefault(normalised_body(function), []).append(name)
     return [tuple(sorted(names)) for names in bodies.values() if len(names) > 1]
+
+
+def gemini_imports(path):
+    """Return the absolute ``gemini`` packages one file imports, ``gemini.ops`` for ``ops``."""
+    found = set()
+    for node in ast.walk(ast.parse((ROOT / path).read_text())):
+        if isinstance(node, ast.ImportFrom) and node.module == "gemini":
+            found |= {f"gemini.{alias.name}" for alias in node.names}
+        elif isinstance(node, ast.ImportFrom) and (node.module or "").startswith("gemini."):
+            found.add(node.module)
+    return found
+
+
+@pytest.mark.parametrize("path", CATEGORY_PHYSICS)
+def test_category_physics_imports_only_the_shared_layers(path):
+    """A ``_physics.py`` reads the shared physics, never another category's ``_physics.py``."""
+    outside = [
+        name
+        for name in gemini_imports(path)
+        if not any(name == allowed or name.startswith(f"{allowed}.") for allowed in PHYSICS_IMPORTS)
+    ]
+    assert outside == []
+
+
+@pytest.mark.parametrize("path", CATEGORY_PHYSICS)
+def test_category_physics_serves_its_own_category(path):
+    """A function a second category needs moves up into ``gemini/physics/``."""
+    category = path.split("/")[2]
+    users = [
+        other
+        for other in PACKAGE_FILES
+        if f"gemini.modules.{category}" in (ROOT / other).read_text()
+        and "_physics" in (ROOT / other).read_text()
+        and not other.startswith((f"gemini/modules/{category}/", "gemini/modules/_utils/"))
+    ]
+    assert users == []
 
 
 def test_no_two_physics_functions_share_a_body():

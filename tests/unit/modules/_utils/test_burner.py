@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini.modules.heating import burner
+from gemini.modules._utils import burner
 from gemini.physics import gas
 from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid

@@ -1,7 +1,9 @@
 # Physics rules
 
-`gemini/physics` holds every formula of the package. Modules declare parameters and wire streams;
-they call physics and write no correlation of their own. The files cover unit conversions,
+`gemini/physics` holds the textbook formulas and everything more than one category reads; physics of
+one category lives in `gemini/modules/<category>/_physics.py` (rule in
+[conventions.md](conventions.md#module-rules)). Modules declare parameters and wire streams; they
+call physics and write no correlation of their own. The files cover unit conversions,
 constants, fluid properties, geometry, hydraulics, heat transfer, pumps, chemistry, corrosion and
 erosion, gas compression, refrigeration cycles, IAPWS-IF97 steam, ground heat transport,
 psychrometrics, separation, combustion, thermal storage, PID control, power cycles, grid
@@ -11,7 +13,7 @@ list state the rules, then each subject (the original GEMINI correlations first)
 
 ## What each file holds
 
-One heading per file of `gemini/physics/`, one line per public function with its arguments and
+One heading per file of `gemini/physics/` and per moved `_physics.py` part, one line per public function with its arguments and
 what it computes. Public default constants (`DEFAULT_*` and similar) are not listed. Every
 function carries `@ops.physics` except those named under "Functions without `@ops.physics`".
 
@@ -260,7 +262,10 @@ Ground and aquifer heat transport: doublet breakthrough, conduction shapes, Rame
 
 ### `pumps.py`
 
-Pump relations: TNO R11363 polynomials on the US basis, affinity-law curves, efficiencies.
+Pump relations: the TNO R11363 power polynomial, affinity-law curves, efficiencies. `head`,
+`esp_efficiency`, `pump_efficiency` and `line_shaft_friction_power` live in
+`modules/pumps/_physics.py`; `power` and `constant_head_curves` stay here because the doublet design
+reads them too.
 
 - `head(volume_flow, frequency, stages, coefficients)`: pressure rise [Pa] from flow [m3/s],
   frequency [Hz], stages and ft coefficients.
@@ -282,7 +287,7 @@ Pump relations: TNO R11363 polynomials on the US basis, affinity-law curves, eff
 - `line_shaft_friction_power(friction_loss, depth, speed)`: mechanical friction power of a line
   shaft.
 
-### `compression.py`
+### `modules/pumps/_physics.py`: compression
 
 Ideal-gas adiabatic compression with an isentropic efficiency and intercooled stages.
 
@@ -303,7 +308,8 @@ Ideal-gas adiabatic compression with an isentropic efficiency and intercooled st
 
 ### `refrigeration.py`
 
-Heat pump and chiller relations: Carnot and Lorenz COPs, sorption equations, part load.
+Heat pump and chiller relations: Carnot and Lorenz COPs, part load. The sorption functions listed
+here (`characteristic_*`, `sorption_*`) live in `modules/cooling/_physics.py`.
 
 - `carnot_cop_heating(sink_temperature, source_temperature, minimum_lift)`: Carnot heating COP of a
   heat pump.
@@ -359,7 +365,7 @@ Heat pump and chiller relations: Carnot and Lorenz COPs, sorption equations, par
   source_limit, available, efficiency, minimum_lift)`: evaporator demand minus the available source
   heat [W] at a heating duty.
 
-### `steam.py`
+### `modules/power/_physics.py`: steam
 
 Saturated water and steam properties from IAPWS-IF97 and wet steam expansion.
 
@@ -436,7 +442,9 @@ Erosion correlations: DNV RP O501, OKA, E/CRC Tulsa and API RP 14E.
 
 ### `separation.py`
 
-Flow splitting, gas separation, cyclone sand removal, chemical dosing and filter defaults.
+Flow splitting, shared by piping and treatment, and `FILTER_CLOGGING_BAR`, which the legacy bridge
+reads. `degasser_split`, `cyclone_sand`, `dosing_flows` and the other filter and degasser defaults
+live in `modules/treatment/_physics.py`.
 
 - `split_flow(mass_flow, fraction)`: remainder and the branch of a mass flow split, `(m - f m, f
   m)`.
@@ -458,7 +466,7 @@ Fuel-fired heat and power: fuel input of a boiler or engine, flare emissions.
 - `flare_emissions(gas_flow, co2_fraction, methane_fraction, combustion_efficiency, heating_value)`:
   CO2 and methane emissions and the fuel power of a flared gas.
 
-### `storage.py`
+### `modules/storage/_physics.py`
 
 Thermal storage: mixed water tanks, coil conductance and the phase segments of an ice store.
 
@@ -478,7 +486,7 @@ Thermal storage: mixed water tanks, coil conductance and the phase segments of a
   latent_heat, freezing_temperature, water_specific_heat, ice_specific_heat)`: advances an ice store
   through one phase segment.
 
-### `control.py`
+### `modules/control/_physics.py`
 
 Discrete PID control: the error, the ideal-form command and the clamped integral.
 
@@ -492,7 +500,7 @@ Discrete PID control: the error, the ideal-form command and the clamped integral
 - `anti_windup_increment(increment, unclamped, minimum_output, maximum_output)`: integral increment,
   zero while the output is clamped and driven further out.
 
-### `power_cycles.py`
+### `modules/power/_physics.py`: power cycles
 
 Binary organic Rankine cycle plant relations: Lorenz efficiency, capacity cap, energy balance.
 
@@ -602,7 +610,7 @@ returns one cached snapshot per complete `Fluid` value.
 
 Salinity, CO2 and free gas are mass fractions; glycol is a volume fraction. Brine density and
 viscosity are not inferred from salinity: supply the overrides. A `steam` fluid carries the
-liquid-water snapshot, not vapour properties (use `steam.py`). Mass fractions summing above one,
+liquid-water snapshot, not vapour properties (use `modules/power/_physics.py`). Mass fractions summing above one,
 a glycol fraction on another kind, or a glycol fraction other than 0.3 raise a pydantic
 `ValueError`, not `PhysicsError`. `FluidProperties` and `Stream` are frozen slots dataclasses:
 invalid physical values (a non-positive property, a gas mass fraction outside [0, 1), a
@@ -857,7 +865,7 @@ rate) and a nonpositive density or API limit raise `PhysicsError`.
 
 ## Compression
 
-`compression.py` holds ideal-gas adiabatic compression (GPSA Engineering Data Book, 14th ed.
+`modules/pumps/_physics.py` holds ideal-gas adiabatic compression (GPSA Engineering Data Book, 14th ed.
 2017, Section 13; compressibility factor Z = 1, constant `k = cp/cv`), used by `GasCompressor`:
 
 - `isentropic_outlet_temperature(T_1, r, k)` = `T_1 r^((k-1)/k)` [K];
@@ -872,7 +880,7 @@ raise `PhysicsError`. Valid for near-ideal gases and stage ratios up to about 4.
 
 ## Refrigeration
 
-`refrigeration.py` holds the heat pump, chiller and sorption-machine relations of `HeatPump`,
+`refrigeration.py` and `modules/cooling/_physics.py` hold the heat pump, chiller and sorption-machine relations of `HeatPump`,
 `AbsorptionUnit` and `AdsorptionChiller`. Inputs and outputs are SI (K, W, W/K); NaN and
 out-of-domain inputs raise `PhysicsError`.
 
@@ -901,7 +909,7 @@ out-of-domain inputs raise `PhysicsError`.
 
 ## Steam
 
-`steam.py` holds the exact IAPWS-IF97 equations for water and steam in SI units (Pa, K, J/kg,
+`modules/power/_physics.py` holds the exact IAPWS-IF97 equations for water and steam in SI units (Pa, K, J/kg,
 J/kg/K), not fits, used by `Separator` and `FlashTurbine`:
 
 - `saturation_pressure(T)` (eq. 30, 273.15 K to 647.096 K) and `saturation_temperature(p)`
@@ -1001,7 +1009,7 @@ assert round(psychrometrics.humidity_ratio(293.15, 0.5, 101325), 6) == 0.007262
 
 ## Separation
 
-`separation.py` holds the lumped splits of the treatment and piping modules (`Splitter`,
+`separation.py` and `modules/treatment/_physics.py` hold the lumped splits of the treatment and piping modules (`Splitter`,
 `Blowdown`, `Degasser`, `Desander`, `InhibitorDosing`). No relation has a residence time, a level
 or a size distribution.
 
@@ -1036,7 +1044,7 @@ or a size distribution.
 
 ## Storage
 
-`storage.py` holds lumped stores at one uniform temperature, used by `ThermalStorage` and
+`modules/storage/_physics.py` holds lumped stores at one uniform temperature, used by `ThermalStorage` and
 `IceStorage`.
 
 - `circuit_conductance(e, C)` = `G = e C` [W/K]: a circuit exchanging heat with a store at uniform
@@ -1059,7 +1067,7 @@ or a size distribution.
 
 ## Control
 
-`control.py` holds the ideal (ISA) PID form of `PIDController`, discretised as in Astrom and
+`modules/control/_physics.py` holds the ideal (ISA) PID form of `PIDController`, discretised as in Astrom and
 Hagglund (2006, chapter 3): explicit rectangular integral, backward-difference derivative on the
 error, and anti-windup by clamping (conditional integration).
 
@@ -1073,7 +1081,7 @@ error, and anti-windup by clamping (conditional integration).
 
 ## Power cycles
 
-`power_cycles.py` holds the binary organic Rankine cycle of `ORC`. The reversible work of a heat
+`modules/power/_physics.py` also holds the binary organic Rankine cycle of `ORC`. The reversible work of a heat
 source cooled from `T_in` to `T_out` and rejected at the condensing temperature is the Lorenz
 (triangular-cycle) work, and the plant delivers a fraction of it (DiPippo 2007, 2016, chapter 8).
 

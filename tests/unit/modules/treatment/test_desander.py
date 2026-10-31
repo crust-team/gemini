@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from gemini.modules.balance import energy_balance, mass_balance
+from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.treatment import Desander
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches

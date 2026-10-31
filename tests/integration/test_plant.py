@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 import gemini as gm
-from gemini.modules.balance import collect_flows, energy_balance, mass_balance
-from gemini.modules.wiring import trace_wiring
+from gemini.modules._utils.balance import collect_flows, energy_balance, mass_balance
+from gemini.modules._utils.wiring import trace_wiring
 from gemini.utils import legacy
 
 ROOT = Path(__file__).parents[2]
