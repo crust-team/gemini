@@ -58,6 +58,14 @@ RAISED_CLASSES = {
 }
 """What the package raises; the built-ins are for the exempt topics of ``gemini.utils``."""
 VALIDATORS = {"model_validator", "field_validator"}
+DATA_FOLDER = re.compile(r"""/ *["'](inputs|assets)\b|["'][^"'`\n]*\b(inputs|assets)/""")
+BUILDS_NO_DATA_PATH = {
+    "gemini/utils/paths.py",
+    "scripts/test_changed.py",
+    "tests/unit/scripts/test_test_changed.py",
+    "tests/unit/test_code_quality.py",
+}
+"""Files allowed to name the data folders; the first is the one that knows where they are."""
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
 FRAMEWORK_STEM = "tor" + "ch"
 """Lowercase text that every ``FRAMEWORK`` match contains, checked before the slower regex."""
@@ -530,6 +538,20 @@ def test_nothing_imports_an_example():
     """No code imports from ``examples``: one test runs them, as subprocesses."""
     assert [
         path for path in PYTHON_FILES if IMPORTS_EXAMPLES.search((ROOT / path).read_text())
+    ] == []
+
+
+def test_only_the_paths_module_builds_a_path_to_the_data_folders():
+    """Code reaches ``gemini/assets/`` and ``inputs/`` through ``gemini/utils/paths.py``.
+
+    An example is a standalone script on the public API, so it finds ``inputs/`` from ``__file__``.
+    ``scripts/test_changed.py`` and its test match repository paths and build none.
+    """
+    code = [path for path in PYTHON_FILES if not path.startswith("examples/")]
+    assert [
+        path
+        for path in code
+        if path not in BUILDS_NO_DATA_PATH and DATA_FOLDER.search((ROOT / path).read_text())
     ] == []
 
 

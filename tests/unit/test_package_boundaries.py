@@ -1,7 +1,9 @@
 """``gemini.utils`` and ``gemini.errors`` are leaf packages that import nothing else from GEMINI.
 
 ``gemini/utils/data`` and ``gemini/utils/legacy`` are the exception: they live in ``utils`` but sit
-higher in the dependency order, so they have their own rule here.
+higher in the dependency order, so they have their own rule here. ``gemini/utils/paths.py`` may
+import ``gemini.errors``, itself a leaf, because a missing ``inputs/`` folder raises
+``inputs_missing``.
 """
 
 import ast
@@ -12,6 +14,8 @@ import pytest
 ROOT = Path(__file__).parents[2]
 LAYERED = {"data": ("gemini.modules", "gemini.engine"), "legacy": ("gemini.engine",)}
 """Folders of ``gemini.utils`` above the leaf, with the packages each must never import."""
+RAISES_ERRORS = "paths.py"
+"""The topic file that raises a ``gm.errors`` class: it may import ``gemini.errors``."""
 
 
 def imported_modules(path):
@@ -47,7 +51,9 @@ def test_leaf_package_imports_only_itself(package):
     """Every import is the standard library, a dependency, or the package itself."""
     offending = {}
     for path in leaf_files(package):
-        names = imported_modules(path)
+        names = imported_modules(path) - (
+            {"gemini.errors"} if path.name == RAISES_ERRORS else set()
+        )
         bad = {
             name
             for name in names

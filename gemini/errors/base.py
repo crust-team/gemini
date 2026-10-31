@@ -24,6 +24,7 @@ CODES = (
     "invalid_binding",
     "missing_column",
     "invalid_data",
+    "inputs_missing",
     "invalid_design",
     "invalid_definition",
     "out_of_range",
