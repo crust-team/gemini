@@ -10,7 +10,16 @@ from gemini.modules._utils import registry
 from gemini.modules.plants._utils import catalogue
 from gemini.utils import paths
 from tests.fixtures.errors import raises
+from tests.fixtures.sample_problems import treatment_plant
 
+TEMPLATE_PLANTS = (
+    "HeatingPlant",
+    "HeatingCoolingPlant",
+    "HeatingFullCoolingPlant",
+    "HeatingAbsorptionCoolingPlant",
+    "HeatingHeatPumpCoolingPlant",
+)
+"""The plants whose values are the sample problem's, in ``inputs/examples/``, not an example."""
 FORMER_EXAMPLES = {
     "ATESPlant": "7ae7cf36bd0d34f7039c2881cffb107b769d0ad4f12f53b66359fe1053842210",
     "BoilerChpPlant": "a9213b64867d13df1d31e86a2e60eda6332b434d532ca822e7a2c3b086dcd7a3",
@@ -19,27 +28,15 @@ FORMER_EXAMPLES = {
     "DistrictNetwork": "3475084a865a4a441eb0743ab9ae81356d0412ab69144c6a0b0a02e31cd2a9e6",
     "Doublet": "7e38703b880e458aef5d3957bc7cc7d51ffc8c9b067d8da0b6c3568dd88249e2",
     "DoubletHeatPlant": "8ef986a72459b8b04d5cd1f6534644c3c8584428ab1e1b2368d2c7c21bad22ee",
-    "HackathonPlant": "18ecaf9a7853e3f5d4c3f63ed2944711eb601f0992c0d6965d5474fc39a6dfb2",
     "HeatingSubstation": "f1306278048f262a2b088d3d895882f802aff702f69358c6615de849fc4bddf5",
     "MultiWellPlant": "30c96f8dec0a190ffb5333e40465dd2437c43fae1952736ee8356344252d4251",
     "NodalDoublet": "012940e8e779020cd6212111cf8b0fafeae60bd517979cfe1632358b66a918f7",
     "ParallelExchangerPlant": "d8b21e47275c3b8d0c0d88241c05a1fcd95951dc5cec38e3775ad31ef43eea8b",
-    "HeatingPlant": "7cfac5547e2715c08863736a4c31d016669b04f88fbd4b3f6d49967781e4b44e",
-    "HeatingCoolingPlant": ("e9b9e6a0611b43d29b8eaa40d9c155d0d3bc83ba128ae579769e16e58a5b60f1"),
-    "HeatingFullCoolingPlant": ("c259287c9f46d964292ac2205f29c70bccad7810be6379c83fcbcf0bc2f53934"),
-    "HeatingAbsorptionCoolingPlant": (
-        "82429bb666d470a1ebf6c85cbea2fbedccff84e2310388c243c6f3e657962707"
-    ),
-    "HeatingHeatPumpCoolingPlant": (
-        "ca2846828473e49abb5bfe1369a99a3e3f409683170d57f5f02f9e87f5021f86"
-    ),
 }
 """Hash of ``to_dict()`` of the plant built from each whole example file these values replaced.
 
-NOTE(refactor): ``HackathonPlant`` is hashed with its 24 stated values in SI, because ``set_params``
-stores SI where the former file kept text such as ``"2500 m"``; its ``state_dict`` was equal, the
-derived child values included. ``Doublet`` is hashed without ``outputs``, which its structure file
-has and its former example file lacked.
+The template plants have no example: their values are in the sample problem. ``Doublet`` is hashed
+without ``outputs``, which its structure file has and its former example file lacked.
 """
 
 
@@ -51,7 +48,7 @@ def test_names_are_the_registered_plants():
     )
     assert {"HeatingSubstation", "CoolingSubstation", "ATESPlant"} <= set(catalogue.names())
     assert {"NodalDoublet", "ParallelExchangerPlant", "BoilerChpPlant"} <= set(catalogue.names())
-    assert {"DistrictEnergyPlant", "HackathonPlant"} <= set(catalogue.names())
+    assert {"DistrictEnergyPlant", "HeatingCoolingPlant"} <= set(catalogue.names())
     assert "ESP" not in catalogue.names()
 
 
@@ -72,7 +69,10 @@ def test_get_refuses_unknown_names_and_modules_that_are_not_plants():
         catalogue.get("ESP")
 
 
-@pytest.mark.parametrize("name", catalogue.names())
+EXAMPLES = [name for name in catalogue.names() if name not in TEMPLATE_PLANTS]
+
+
+@pytest.mark.parametrize("name", EXAMPLES)
 def test_every_spec_plant_and_special_case_has_an_example_that_round_trips(name):
     """An example builds, has no problems and writes the spec it was read from."""
     spec = catalogue.example(name).to_dict()
@@ -80,7 +80,7 @@ def test_every_spec_plant_and_special_case_has_an_example_that_round_trips(name)
     assert gm.plants.from_dict(spec).to_dict() == spec
 
 
-@pytest.mark.parametrize("name", catalogue.names())
+@pytest.mark.parametrize("name", EXAMPLES)
 def test_every_example_equals_the_plant_of_its_former_file(name):
     """``get`` and the values of ``inputs/plants/`` give the structure and the values pinned."""
     spec = catalogue.example(name).to_dict(structure=True)
@@ -122,13 +122,21 @@ def test_a_state_dictionary_fills_a_plant_without_values():
     assert fresh.is_initialized
 
 
-def test_the_hackathon_plant_has_its_values_only_in_the_example():
-    """The registered spec is the wiring, and the example fills every module of it."""
-    empty, filled = catalogue.get("HackathonPlant"), catalogue.example("HackathonPlant")
-    assert not empty.is_initialized and filled.is_initialized
-    assert empty._connections == filled._connections
-    assert filled.d0.reservoir.temperature == filled.d1.reservoir.temperature
-    assert filled.heat_users.fluid == gm.WATER
+@pytest.mark.parametrize("name", TEMPLATE_PLANTS)
+def test_a_template_plant_has_no_example(name):
+    """Its values belong to a problem, so ``example`` says so and ``get`` still gives the plant."""
+    with pytest.raises(gm.errors.NotImplementedYet, match=name):
+        catalogue.example(name)
+    assert not catalogue.get(name).is_initialized
+
+
+def test_the_treatment_design_is_complete_and_valid():
+    """Every port is connected and every parameter has a value."""
+    plant = treatment_plant()
+    assert plant.is_initialized
+    assert plant.validate(on_error="record") == []
+    assert plant.d0.reservoir.temperature == plant.d1.reservoir.temperature
+    assert plant.heat_users.fluid == gm.WATER
 
 
 def test_a_registered_plant_without_values_names_itself(monkeypatch):

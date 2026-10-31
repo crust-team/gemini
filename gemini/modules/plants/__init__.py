@@ -10,7 +10,6 @@ from .coolingsubstation import CoolingSubstation
 from .districtnetwork import DistrictNetwork
 from .doublet import Doublet
 from .doubletheatplant import DoubletHeatPlant
-from .hackathonplant import HackathonPlant
 from .heatingabsorptioncoolingplant import HeatingAbsorptionCoolingPlant
 from .heatingcoolingplant import HeatingCoolingPlant
 from .heatingfullcoolingplant import HeatingFullCoolingPlant
@@ -35,7 +34,6 @@ __all__ = [
     "DoubletHeatPlant",
     "DistrictNetwork",
     "MultiWellPlant",
-    "HackathonPlant",
     "HeatingPlant",
     "HeatingCoolingPlant",
     "HeatingFullCoolingPlant",

@@ -1,51 +1,38 @@
-"""The challenge year on the example plant: every requirement, checked on the run.
+"""The demand year on a sample plant: every requirement, checked on the run.
 
-Plans 2027 for ``gm.plants.example("HeatingCoolingPlant")``, two doublets with a heat pump, a boiler
-and three chillers, and simulates it. The reservoir, the brine, the limits and the supply
-temperatures are the challenge's; what this case assumes it prints as assumptions.
+Plans 2027 for the plant dict ``plant.json`` of the sample problem, two doublets with a heat pump,
+a boiler and three chillers, and simulates it. The reservoir, the brine, the limits and the supply
+temperatures are the sample problem's; what this case assumes it prints as assumptions.
 
-Shows ``gm.plants.example``, ``gm.profiles.demand``, ``gm.challenge_rules``, ``gm.schedule``,
-``gm.simulate``, ``gm.checks.limits``, ``gm.checks.operating_days``, ``gm.kpi.totals`` and
-``gm.economics.lcts``.
+Shows ``gm.plants.from_dict``, ``gm.profiles.demand``, ``gm.schedule``, ``gm.simulate``,
+``gm.checks.Limits.from_dict``, ``gm.checks.limits``, ``gm.checks.operating_days``,
+``gm.kpi.totals`` and ``gm.economics.lcts``.
 
 Run with ``python examples/cases/challenge_year.py``.
 """
+
+import json
+from pathlib import Path
 
 import gemini as gm
 
 MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
-PRICES = dict(
-    discount_rate=0.05,
-    lifetime_years=25,
-    electricity_price=100.0 / MWH,
-    gas_price=40.0,
-    pump_cost=0.5,
-    chiller_cost=0.3,
-    exchanger_cost=0.5,
-    flare_cost=1e5,
-    makeup_cost=5e4,
-)
-"""Placeholders, not data: the prices and the factors without a source are this case's."""
+SAMPLE = Path(__file__).resolve().parents[2] / "inputs/examples/hackathon_2027"
+"""The sample problem, read by this example only."""
 
-ASSUMPTIONS = """Assumptions of this case, not of the challenge:
+
+def sample(name):
+    """Return the JSON file ``name`` of the sample problem as data."""
+    return json.loads((SAMPLE / name).read_text())
+
+
+ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
   heating return 60 °C, cooling return 25 °C, air 10 °C all year
   well diameter 244 mm, 1000 m drainage radius, 30 bar at the injection pump
   heat exchanger, heat pump (15 MW), boiler (30 MW), absorption (7 MW), adsorption (1 MW) and
-  compression (5 MW) sizes, in inputs/plants/HeatingCoolingPlant.json
+  compression (5 MW) sizes, in plant.json of the sample problem
   discount rate, lifetime, every price and the cost factors without a source"""
-
-
-def requirements():
-    """Return the limits of the challenge."""
-    limits = gm.checks.Limits()
-    limits.add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
-    limits.add("d*.brine_cooling", max="40 K")
-    limits.add("d*.pump_efficiency", min=0.7, max=0.7)
-    limits.add("d*.volume_imbalance", min="-1e-6 m3/s", max="1e-6 m3/s")
-    limits.add("heating_consumer.supply_in.temperature", min="100 degC")
-    limits.add("cooling_consumer.supply_in.temperature", max="20 degC")
-    return limits
 
 
 def print_year(plant, results):
@@ -99,16 +86,19 @@ def print_checks(checks):
 
 def main():
     """Plan and simulate the year, then print what it delivered and each requirement."""
-    plant = gm.plants.example("HeatingCoolingPlant")
+    plant = gm.plants.from_dict(sample("plant.json"))
     print(ASSUMPTIONS)
-    rules = gm.challenge_rules()
+    rules = sample("rules.json")
     plan = gm.schedule(plant, gm.profiles.demand(), rules)
     results = gm.simulate(plant, plan, on_error="record")
     print(f"\nFailed days: {len(results.errors())}")
     print_year(plant, results)
+    requirements = gm.checks.Limits.from_dict(sample("limits.json"))
     days = gm.checks.operating_days(plant, results, rules["operating_days"])
-    print_checks(gm.checks.limits(plant, results, requirements()) + days)
-    lcts = gm.economics.lcts(plant, results, assumptions=gm.economics.Assumptions(**PRICES))
+    print_checks(gm.checks.limits(plant, results, requirements) + days)
+    lcts = gm.economics.lcts(
+        plant, results, assumptions=gm.economics.Assumptions(**sample("assumptions.json"))
+    )
     print(f"\nLCTS, on the placeholder prices above: {lcts['value'] * MWH:.2f} EUR/MWh")
 
 

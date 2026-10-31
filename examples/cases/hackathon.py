@@ -1,12 +1,17 @@
 """The hackathon case: two doublets, heat exchanger, heat pump, gas boiler and absorption chiller.
 
-Schedules 2027 from the daily demand on ``gm.plants.example("HackathonPlant")`` and simulates it.
-The reservoir, brine, limits and supply temperatures are the challenge's; what this case assumes
-it prints as assumptions. Shows ``gm.schedule``, ``gm.simulate``, ``gm.checks.limits``,
-``gm.checks.plant_balance``, ``gm.kpi.totals``, ``gm.kpi.compute`` and ``gm.economics``.
+Schedules 2027 from the daily demand on the plant dict ``plant_with_treatment.json`` of the sample
+problem and simulates it. The reservoir, brine, limits and supply temperatures are the sample
+problem's; what this case assumes it prints as assumptions. Shows ``gm.plants.from_dict``,
+``gm.checks.Limits.from_dict``, ``gm.economics.Assumptions``, ``gm.schedule``, ``gm.simulate``,
+``gm.checks.limits``, ``gm.checks.plant_balance``, ``gm.kpi.totals``, ``gm.kpi.compute`` and
+``gm.economics``.
 
 Run with ``python examples/cases/hackathon.py``.
 """
+
+import json
+from pathlib import Path
 
 import pandas as pd
 
@@ -14,45 +19,21 @@ import gemini as gm
 
 MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
-RULES = {
-    "order": ["geothermal", "heat_pump", "boiler"],
-    "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
-    "max_brine_cooling": "40 K",
-    "operating_days": None,
-}
-PRICES = dict(
-    discount_rate=0.05,
-    lifetime_years=25,
-    electricity_price=100.0 / MWH,
-    gas_price=40.0,
-    heat_price=60.0 / MWH,
-    cold_price=60.0 / MWH,
-    electricity_emission_factor=0.3 / gm.units.convert(1, "kWh", "J"),
-    pump_cost=0.5,
-    chiller_cost=0.3,
-    exchanger_cost=0.5,
-    flare_cost=1e5,
-    makeup_cost=5e4,
-    waste_disposal_price=0.2,
-    chemical_price=3.0,
-)
-"""Placeholders, not data: the prices and the factors without a source are this case's."""
+SAMPLE = Path(__file__).resolve().parents[2] / "inputs/examples/hackathon_2027"
+"""The sample problem, read by this example only."""
 
-ASSUMPTIONS = """Assumptions of this case, not of the challenge:
+
+def sample(name):
+    """Return the JSON file ``name`` of the sample problem as data."""
+    return json.loads((SAMPLE / name).read_text())
+
+
+ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
   heating return 60 °C, cooling return 25 °C, chiller cooling water 15 °C
   air 10 °C; the chiller's dry cooler: 5 K approach, 2 % fan power
   20 mg/l sand, 90 % desander, 10 ppm inhibitor
   heat exchanger, heat pump, boiler and chiller sizes; 1000 m drainage radius
   discount rate, lifetime, every price and the cost factors without a source"""
-
-
-def hackathon_limits():
-    """Return the hard limits of the challenge."""
-    limits = gm.checks.Limits()
-    limits.add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
-    limits.add("d*.brine_cooling", max="40 K")
-    limits.add("heat_users.supply_in.temperature", min="100 degC")
-    return limits
 
 
 def print_run(plant, results):
@@ -80,7 +61,7 @@ def print_run(plant, results):
 
 
 def print_limits(checks):
-    """Print each limit of the challenge, in the units of the challenge."""
+    """Print each limit of the sample problem, in its units."""
     print("\nLimits:")
     for item in checks:
         value, unit = item["value"]["value"], item["value"]["unit"]
@@ -118,7 +99,9 @@ def print_economics(plant, results):
     """Print the economics in the units people read; every price is a placeholder."""
     totals = gm.kpi.totals(plant, results)
     heat, cold = totals["heat_delivered"]["value"], totals["cold_delivered"]["value"]
-    values = gm.economics.Assumptions(heat_cost_share=heat / (heat + cold), **PRICES)
+    values = gm.economics.Assumptions(
+        heat_cost_share=heat / (heat + cold), **sample("assumptions.json")
+    )
     capex = gm.economics.capex(plant, values)
     rows = (
         ("capex", capex["value"] / 1e6, f"MEUR ({capex['price_year']['value']})"),
@@ -136,12 +119,14 @@ def print_economics(plant, results):
 
 def main():
     """Plan and simulate the year, then print what it delivered and what it costs."""
-    plant = gm.plants.example("HackathonPlant")
+    plant = gm.plants.from_dict(sample("plant_with_treatment.json"))
+    rules = sample("rules.json") | {"operating_days": None}
+    limits = gm.checks.Limits.from_dict(sample("limits_with_treatment.json"))
     profiles = [gm.profiles.get("heating_demand"), gm.profiles.get("cooling_demand")]
     print(ASSUMPTIONS)
-    results = gm.simulate(plant, gm.schedule(plant, pd.concat(profiles, axis=1), RULES))
+    results = gm.simulate(plant, gm.schedule(plant, pd.concat(profiles, axis=1), rules))
     print_run(plant, results)
-    print_limits(gm.checks.limits(plant, results, hackathon_limits()))
+    print_limits(gm.checks.limits(plant, results, limits))
     print_balance(gm.checks.plant_balance(plant, results))
     print_totals(plant, results)
     print_economics(plant, results)

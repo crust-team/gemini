@@ -1,8 +1,8 @@
-Assumptions of this case, not of the challenge:
+Assumptions of this case, not of the sample problem:
   heating return 60 °C, cooling return 25 °C, air 10 °C all year
   well diameter 244 mm, 1000 m drainage radius, 30 bar at the injection pump
   heat exchanger, heat pump (15 MW), boiler (30 MW), absorption (7 MW), adsorption (1 MW) and
-  compression (5 MW) sizes, in inputs/plants/HeatingCoolingPlant.json
+  compression (5 MW) sizes, in plant.json of the sample problem
   discount rate, lifetime, every price and the cost factors without a source
 
 Failed days: 0

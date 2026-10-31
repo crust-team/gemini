@@ -248,30 +248,49 @@ def planned(monkeypatch):
     return calls
 
 
-def test_a_demand_frame_is_planned_for_each_trial(monkeypatch):
+RULES = {"doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"}, "max_brine_cooling": "40 K"}
+
+
+def test_a_demand_frame_is_planned_for_each_trial_with_the_rules_of_the_caller(monkeypatch):
     """A variable that changes the design changes the plan: one schedule per simulation."""
     calls = planned(monkeypatch)
-    found = gm.optim.minimize(scheduled_plant(), two_days(), [FLOW], "peak_heat", evaluations=5)
+    found = gm.optim.minimize(
+        scheduled_plant(), two_days(), [FLOW], "peak_heat", evaluations=5, rules=RULES
+    )
     assert len(calls) == found["evaluations"] == 5
-    assert calls[0] == gm.challenge_rules()
+    assert calls[0] == RULES
 
 
-def test_a_plan_is_not_planned_again(monkeypatch):
+def test_a_plan_is_not_planned_again_and_needs_no_rules(monkeypatch):
     """A plan stays what it is over the trials, as a run input does."""
     calls = planned(monkeypatch)
-    rules = {"doublet_flow": gm.challenge_rules()["doublet_flow"], "max_brine_cooling": "40 K"}
-    plan = gm.schedule(scheduled_plant(), two_days(), rules)
+    plan = gm.schedule(scheduled_plant(), two_days(), RULES)
     calls.clear()
     uncertain = {"d0.well_diameter": {"kind": "uniform", "lower": 0.2, "upper": 0.3}}
     gm.optim.sample(scheduled_plant(), plan, uncertain, ["peak_heat"], count=2)
     assert calls == []
 
 
-def test_no_profile_is_the_demand_year_under_the_challenge_rules(monkeypatch):
-    """``None`` reads the demand of the challenge, and ``sample`` takes it too."""
+def test_sample_plans_a_demand_with_the_rules_of_the_caller(monkeypatch):
+    """The rules reach every draw."""
     calls = planned(monkeypatch)
-    monkeypatch.setattr(search.profiles, "demand", two_days)
     uncertain = {"d0.well_diameter": {"kind": "uniform", "lower": 0.2, "upper": 0.3}}
-    found = gm.optim.sample(scheduled_plant(), None, uncertain, ["peak_heat"], count=2)
+    found = gm.optim.sample(
+        scheduled_plant(), two_days(), uncertain, ["peak_heat"], count=2, rules=RULES
+    )
     assert len(found["samples"]) == 2
-    assert calls == [gm.challenge_rules()] * 2
+    assert calls == [RULES] * 2
+
+
+@pytest.mark.parametrize(
+    ("profile", "path"), [(None, "profile"), (two_days(), "rules")], ids=["none", "no_rules"]
+)
+def test_no_profile_and_a_demand_without_rules_are_refused(profile, path):
+    """Nothing is assumed: not a demand year, not a limit."""
+    uncertain = {"d0.well_diameter": {"kind": "uniform", "lower": 0.2, "upper": 0.3}}
+    with raises(gm.errors.ValidationError, "missing_value") as refused:
+        gm.optim.minimize(scheduled_plant(), profile, [FLOW], "peak_heat", evaluations=5)
+    assert refused.value.path == path
+    with raises(gm.errors.ValidationError, "missing_value") as refused:
+        gm.optim.sample(scheduled_plant(), profile, uncertain, ["peak_heat"], count=2)
+    assert refused.value.path == path

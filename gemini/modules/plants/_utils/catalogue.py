@@ -62,10 +62,11 @@ def example(name):
     The plant comes from its class; ``inputs/plants/<name>.json`` of a source checkout gives its
     ``size``, ``params`` and any ``fluids``, ``boundary``, ``bindings``, ``param_history`` and
     ``inputs``, under the keys of a plant dict. ``Doublet`` and ``DoubletHeatPlant`` carry the
-    values of the measured doublet, the five template plants those of the challenge, and the other
-    plants the values their unit tests use, the design parameters only: controls and boundaries
-    are inputs of a run. A registered plant without a file raises ``NotImplementedYet`` naming
-    it, and without ``inputs/`` this raises ``inputs_missing``.
+    values of the measured doublet, and the other plants the values their unit tests use, the
+    design parameters only: controls and boundaries are inputs of a run. A template plant has no
+    values of its own, a design is its plant dict (``gm.plants.from_dict``). A registered plant
+    without a file raises ``NotImplementedYet`` naming it, and without ``inputs/`` this raises
+    ``inputs_missing``.
     """
     _check("example", name)
     path = paths.plant_values(name)

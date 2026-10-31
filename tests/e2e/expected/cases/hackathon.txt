@@ -1,4 +1,4 @@
-Assumptions of this case, not of the challenge:
+Assumptions of this case, not of the sample problem:
   heating return 60 °C, cooling return 25 °C, chiller cooling water 15 °C
   air 10 °C; the chiller's dry cooler: 5 K approach, 2 % fan power
   20 mg/l sand, 90 % desander, 10 ppm inhibitor

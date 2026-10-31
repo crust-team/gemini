@@ -475,3 +475,19 @@ def test_the_doublet_heat_plant_runs_a_plan_within_its_pump_curve():
     assert results.errors() == []
     flows = results.get("doublet.reservoir", "liquid_flow")["value"]
     assert 50 / 3600 <= min(flows) and max(flows) == pytest.approx(165 / 3600)
+
+
+@pytest.mark.parametrize(
+    ("rules", "path"),
+    [
+        (RULES | {"doublet_flow": None}, "doublet_flow"),
+        (RULES | {"doublet_flow": {"max": "300 m3/h"}}, "doublet_flow.min"),
+        (RULES | {"doublet_flow": {"min": "50 m3/h"}}, "doublet_flow.max"),
+        ({"doublet_flow": RULES["doublet_flow"]}, "max_brine_cooling"),
+    ],
+)
+def test_a_limit_the_schedule_needs_has_no_default(rules, path):
+    """No rule is assumed: the missing one is named."""
+    with raises(gm.errors.ValidationError, "missing_value") as refused:
+        gm.schedule(plant_of_two(), demand(FULL), rules)
+    assert refused.value.path == f"rules.{path}"

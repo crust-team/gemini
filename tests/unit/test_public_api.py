@@ -50,7 +50,6 @@ def test_public_names_and_docs():
         "optim",
         "errors",
         "no_outputs",
-        "challenge_rules",
         "__version__",
     }
     assert set(dir(gm)) == expected == set(gm.__all__)
