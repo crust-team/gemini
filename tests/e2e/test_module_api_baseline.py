@@ -159,7 +159,9 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
             51.5, unit="bar", clock=clock
         ),
     }
-    simulation = path_frame(gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock))
+    simulation = path_frame(
+        gm.simulate(plant, plan=gm.Dataset.from_profiles(profiles), clock=clock)
+    )
     _assert_values_identical(
         simulation, _baseline_frame(BASELINE, "simulate.csv.gz"), SIMULATE_RTOL
     )

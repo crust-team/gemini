@@ -24,7 +24,7 @@ def example(fresh_plant, fast_dataset):
         captured.update(inlets)
 
     handle = fresh_plant.register_forward_pre_hook(capture)
-    gm.simulate(fresh_plant, data, gm.engine.Clock.from_data(data), on_error="raise")
+    gm.simulate(fresh_plant, plan=data, clock=gm.engine.Clock.from_data(data), on_error="raise")
     handle.remove()
     return fresh_plant, captured
 

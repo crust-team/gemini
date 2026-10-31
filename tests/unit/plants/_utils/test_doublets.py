@@ -54,7 +54,11 @@ GEOTHERM = {
     for index in range(2)
     for name, value in (("gradient", "30 K/km"), ("surface_temperature", "12 degC"))
 }
-RULES = {"doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"}, "max_brine_cooling": "40 K"}
+LIMITS = [
+    gm.Constraint("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h", when="running"),
+    gm.Constraint("d*.brine_cooling", max="40 K"),
+]
+ASSUMPTIONS = gm.Assumptions(prices={"electricity": "100 EUR/MWh", "gas": "40 EUR/MWh"})
 
 
 def brine_side(plant):
@@ -123,7 +127,9 @@ def test_a_plant_runs_one_day(stored):
     index = pd.date_range("2027-01-28", periods=1, freq="D", tz="UTC", name="time")
     demand = pd.DataFrame({"heating_demand": 8e6 * count}, index=index)
     clock = gm.engine.Clock.days(2027, 1, 28, step="24h")
-    results = gm.simulate(built, gm.schedule(built, demand, RULES), clock=clock)
+    results = gm.simulate(
+        built, gm.Problem(demand, constraints=LIMITS, assumptions=ASSUMPTIONS), clock=clock
+    )
     delivered = gm.evaluate.totals(built, results)["heat_delivered"]["value"]
     assert delivered == pytest.approx(8e6 * count * 86400, rel=2e-3)
 

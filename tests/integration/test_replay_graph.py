@@ -49,7 +49,7 @@ def test_a_failing_row_of_a_plant_without_ports_is_an_error(backend):
     index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC", name="time")
     columns = {"users.flow": 10.0, "users.heat_demand": 0.0, "valve.opening": [1.0, 0.0]}
     frame = pd.DataFrame(columns, index=index)
-    results = gm.simulate(port_free_plant(), frame, on_error="record", backend=backend)
+    results = gm.simulate(port_free_plant(), plan=frame, on_error="record", backend=backend)
     assert [item["time"][:10] for item in results.errors()] == ["2027-01-02"]
     with pytest.raises(PhysicsError):
-        gm.simulate(port_free_plant(), frame, backend=backend)
+        gm.simulate(port_free_plant(), plan=frame, backend=backend)

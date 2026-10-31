@@ -63,8 +63,8 @@ def test_profiles_drive_scenario():
     boiler.boundary = {"stream_defaults": {"": {"fluid_in": inlet}}}
     result = gm.simulate(
         boiler,
-        gm.Dataset.from_profiles({"temperature_setpoint": target}),
-        gm.engine.Clock.from_data(gm.Dataset.from_profiles({"temperature_setpoint": target})),
+        plan=gm.Dataset.from_profiles({"temperature_setpoint": target}),
+        clock=gm.engine.Clock.from_data(gm.Dataset.from_profiles({"temperature_setpoint": target})),
         on_error="raise",
     )
     assert len(result) == 3

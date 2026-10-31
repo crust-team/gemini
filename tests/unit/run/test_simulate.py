@@ -55,7 +55,7 @@ def test_a_function_returns_what_its_engine_method_returns(backend):
     data = _pairs({("level", 4): -1.0})
     clock = gm.engine.Clock.from_data(data)
     _same(
-        gm.simulate(tank(), _rows(), backend=backend),
+        gm.simulate(tank(), plan=_rows(), backend=backend),
         gm.Engine(tank(), backend).simulate(_rows()),
     )
     window = dict(end=TICKS[8], clock=clock, only=["first"])
@@ -105,7 +105,7 @@ def test_a_replay_goes_in_pieces_with_the_end_state():
 def test_nothing_is_written_without_a_checkpoint(tmp_path, monkeypatch):
     """Without ``checkpoint`` a run leaves no file."""
     monkeypatch.chdir(tmp_path)
-    gm.simulate(tank(), _rows())
+    gm.simulate(tank(), plan=_rows())
     gm.replay(pair_plant(), _pairs())
     assert list(tmp_path.iterdir()) == []
 
@@ -113,7 +113,7 @@ def test_nothing_is_written_without_a_checkpoint(tmp_path, monkeypatch):
 def test_checkpoint_every_needs_a_checkpoint():
     """``checkpoint_every`` without a path raises before the run."""
     with pytest.raises(ValidationError, match="checkpoint_every = 100") as caught:
-        gm.simulate(tank(), _rows(), checkpoint_every=100)
+        gm.simulate(tank(), plan=_rows(), checkpoint_every=100)
     assert caught.value.path == "checkpoint_every"
     with pytest.raises(ValidationError, match="checkpoint_every = '1h'"):
         gm.replay(pair_plant(), _pairs(), checkpoint_every="1h")
@@ -128,7 +128,7 @@ def test_a_run_that_never_started_writes_nothing(tmp_path):
 
 
 def _run_simulate(**kwargs):
-    return gm.simulate(tank(), _rows(), **kwargs)
+    return gm.simulate(tank(), plan=_rows(), **kwargs)
 
 
 def _run_replay(**kwargs):
@@ -253,13 +253,13 @@ def test_two_calls_on_one_plant_trace_once_and_match_two_fresh_plants(shared_pla
     """A new numeric value needs no new trace; the numbers are those of two fresh plants."""
     data = fast_dataset.window(end=fast_dataset.start + pd.Timedelta(hours=2))
     plant, other = copy.deepcopy(shared_plant), copy.deepcopy(shared_plant)
-    first = gm.simulate(plant, data)
+    first = gm.simulate(plant, plan=data)
     plant.heat_exchanger.thermal_conductance = 5e6
-    second = gm.simulate(plant, data)
+    second = gm.simulate(plant, plan=data)
     assert graph_cache(plant).traces == 1
-    _same(first, gm.simulate(other, data))
+    _same(first, gm.simulate(other, plan=data))
     other.heat_exchanger.thermal_conductance = 5e6
-    _same(second, gm.simulate(copy.deepcopy(other), data))
+    _same(second, gm.simulate(copy.deepcopy(other), plan=data))
     assert (
         first.to_frame()["heat_exchanger.duty"].ne(second.to_frame()["heat_exchanger.duty"]).any()
     )
@@ -275,3 +275,21 @@ def test_a_structural_change_retraces():
     module.first.register_forward_hook(lambda module, inlets, outlets: None)
     gm.replay(module, _pairs())
     assert graph_cache(module).traces > traces
+
+
+def test_a_call_without_a_problem_or_a_plan_is_refused():
+    """A building block has no demand: it needs a plan."""
+    with raises(ValidationError, "missing_value") as refused:
+        gm.simulate(tank())
+    assert refused.value.path == "problem"
+
+
+def test_a_problem_schedules_when_there_is_no_plan():
+    """The run input is the plan of the problem, and a plan given runs the same."""
+    from tests.unit.run.test_schedule import FULL, demand, plant_of_two, problem_of
+
+    plant = plant_of_two()
+    problem = problem_of(demand(FULL, 0.5 * FULL))
+    scheduled = gm.simulate(plant, problem)
+    given = gm.simulate(plant, problem, gm.schedule(plant, problem))
+    pd.testing.assert_frame_equal(scheduled.to_frame(), given.to_frame())

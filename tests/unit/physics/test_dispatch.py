@@ -1,5 +1,6 @@
 """The daily energy balance of a schedule."""
 
+import numpy as np
 import pytest
 
 from gemini.physics import dispatch
@@ -39,11 +40,47 @@ def test_on_arrays():
     assert_function_matches(dispatch.flow_share, [(1.0, 3.0), (0.0, 0.0)])
 
 
-def test_units_take_a_demand_in_order():
-    """Each up to its capacity; what no unit takes is left."""
-    assert dispatch.units_taken(7.0, [5.0, 1.0, 9.0]) == [5, 1, 1]
-    assert dispatch.units_taken(3.0, [5.0, 1.0]) == [3, 0]
-    assert dispatch.units_taken(9.0, [5.0, 1.0]) == [5, 1]
+def test_the_cheapest_source_loads_first():
+    """Each up to its capacity in the order of the costs; what no source takes is left."""
+    assert dispatch.loaded_by_cost(7.0, [5.0, 1.0, 9.0], [3.0, 2.0, 1.0]) == [0, 0, 7]
+    assert dispatch.loaded_by_cost(7.0, [5.0, 1.0, 9.0], [1.0, 2.0, 3.0]) == [5, 1, 1]
+    assert dispatch.loaded_by_cost(9.0, [5.0, 1.0], [1.0, 2.0]) == [5, 1]
+    assert dispatch.loaded_by_cost(3.0, [5.0, 1.0], [2.0, 1.0]) == [2, 1]
+
+
+def test_sources_of_equal_cost_load_in_plant_order():
+    """A tie keeps the order of the list."""
+    assert dispatch.loaded_by_cost(6.0, [4.0, 4.0, 4.0], [1.0, 1.0, 1.0]) == [4, 2, 0]
+
+
+def test_the_order_can_change_from_step_to_step():
+    """Costs along the steps give an order per step."""
+    taken = dispatch.loaded_by_cost(
+        np.array([3.0, 3.0]),
+        [np.array([2.0, 2.0]), np.array([5.0, 5.0])],
+        [np.array([1.0, 2.0]), np.array([2.0, 1.0])],
+    )
+    assert taken[0].tolist() == [2, 0] and taken[1].tolist() == [1, 3]
+
+
+def test_the_marginal_cost_is_price_over_efficiency_plus_carbon():
+    """Energy price and CO2 cost, per joule delivered."""
+    assert dispatch.marginal_cost(3.0, 2.0, 10.0, 0.1) == pytest.approx(2.0)
+
+
+def test_methane_emits_its_stoichiometric_carbon_dioxide():
+    """2.74 kg of CO2 per kg of methane at 50 MJ/kg."""
+    assert dispatch.methane_emission_factor() == pytest.approx(2.743 / 50e6, rel=1e-3)
+
+
+def test_a_heat_pump_cop_follows_the_lift():
+    """Heating at a 50 K lift with half the Carnot COP; cooling at 15 K."""
+    assert dispatch.heat_pump_cop(True, 0.5, 5.0, 373.15, 323.15) == pytest.approx(
+        0.5 * 373.15 / 50
+    )
+    assert dispatch.heat_pump_cop(False, 0.5, 5.0, 308.15, 293.15) == pytest.approx(
+        0.5 * 293.15 / 15
+    )
 
 
 def test_the_temperature_moves_with_the_duty():

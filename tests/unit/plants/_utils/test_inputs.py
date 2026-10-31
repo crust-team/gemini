@@ -85,10 +85,15 @@ def test_from_dict_then_schedule_needs_no_extra_call():
     built = gm.plants.from_dict(plant.to_dict())
     index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC", name="time")
     demand = pd.DataFrame({"heating_demand": [1e5, 2e5]}, index=index)
-    rules = {"doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"}, "max_brine_cooling": "40 K"}
-    plan = gm.schedule(built, demand, rules)
+    limits = [
+        gm.Constraint("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h", when="running"),
+        gm.Constraint("d*.brine_cooling", max="40 K"),
+    ]
+    prices = gm.Assumptions(prices={"electricity": "100 EUR/MWh", "gas": "40 EUR/MWh"})
+    problem = gm.Problem(demand, constraints=limits, assumptions=prices)
+    plan = gm.schedule(built, problem)
     assert plan["pump_heater.temperature_setpoint"].iloc[0] == pytest.approx(373.15)
-    results = gm.simulate(built, plan)
+    results = gm.simulate(built, plan=plan)
     assert results.get("pump_heater", "fluid_out.temperature")["value"][0] == pytest.approx(373.15)
 
 

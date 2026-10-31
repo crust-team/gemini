@@ -14,7 +14,7 @@ from gemini.modules.heating import HeatPump
 from gemini.plants._utils.plan import members
 
 COOLING_KINDS = ("absorption", "adsorption", "compression")
-"""The kinds of cooling unit, heat-driven first: the default ``rules["cooling_order"]``."""
+"""The kinds of cooling unit, heat-driven first."""
 HEAT_DRIVEN = ("absorption", "adsorption")
 """The kinds of cooling unit whose drive heat adds to the heat need."""
 CHILLERS = {"absorption": AbsorptionUnit, "adsorption": AdsorptionChiller}
@@ -64,3 +64,17 @@ def cooling_units(plant):
         ]
         units[kind] = _one(found, f"{kind} chiller")
     return {kind: units[kind] for kind in COOLING_KINDS if units[kind] is not None}
+
+
+def setpoint(plant, path):
+    """Return the ``temperature_setpoint`` of the design module at ``path``, or raise saying so."""
+    name = join_path(path, "temperature_setpoint")
+    value = plant.input_value(name)
+    if value is None:
+        raise ValidationError(
+            f"schedule: {name} has no value; expected the supply setpoint of the design, set "
+            "with plant.set_inputs",
+            path=name,
+            code="invalid_design",
+        )
+    return value

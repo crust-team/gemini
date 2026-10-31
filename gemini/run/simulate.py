@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from gemini.engine.callbacks import AutoCheckpoint
 from gemini.engine.engine import Engine
 from gemini.errors import RunError, ValidationError
+from gemini.run.schedule import scheduled
 
 
 def _with_autosave(callbacks, checkpoint, checkpoint_every):
@@ -41,7 +42,8 @@ def _saved_after(engine, checkpoint):
 
 def simulate(
     plant,
-    profile,
+    problem=None,
+    plan=None,
     clock=None,
     checkpoint=None,
     checkpoint_every=None,
@@ -51,16 +53,37 @@ def simulate(
 ):
     """Run ``Engine.simulate`` once and return its ``Results``.
 
+    ``problem`` is a ``gm.Problem``: its site is applied to a copy of ``plant`` for the run, which
+    never changes ``plant``, and without ``plan`` the run input is ``gm.schedule``'s plan. ``plan``
+    is the run input, a DataFrame or a ``gm.Dataset``, run on the same copy. A building block has
+    no demand, so ``problem`` may be ``None`` only with a ``plan``; with neither the call raises
+    ``ValidationError`` (code ``missing_value``).
+
     ``checkpoint`` is a path written at the end of the run, also when it stops early (a
     ``gm.errors.Cancelled`` or a failure under ``on_error="raise"``), so ``gm.resume`` can always
     continue it; an existing file is replaced. ``checkpoint_every``, a step count or a duration
     such as ``"1h"``, also writes it during the run and needs ``checkpoint``. The other arguments
     are those of ``Engine`` and ``Engine.simulate``.
     """
+    if problem is None and plan is None:
+        raise ValidationError(
+            "gemini.simulate: problem = None and plan = None; expected a problem, a plan or both",
+            path="problem",
+            code="missing_value",
+        )
+    run_plant, run_input = _planned(plant, problem, plan)
     callbacks = _with_autosave(callbacks, checkpoint, checkpoint_every)
-    engine = Engine(plant, backend, callbacks, on_error)
+    engine = Engine(run_plant, backend, callbacks, on_error)
     with _saved_after(engine, checkpoint):
-        return engine.simulate(profile, clock)
+        return engine.simulate(run_input, clock)
+
+
+def _planned(plant, problem, plan):
+    """Return the plant of the run, with the site of ``problem``, and its run input."""
+    if problem is None:
+        return plant, plan
+    sited = problem.apply_site(plant)
+    return sited, scheduled(sited, problem) if plan is None else plan
 
 
 def replay(

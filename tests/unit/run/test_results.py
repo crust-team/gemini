@@ -365,4 +365,4 @@ def fast_run_results():
         "in_port.p": 5e5,
         "users.heat_demand": 1e5,
     }
-    return gm.simulate(plant, pd.DataFrame(columns, index=index))
+    return gm.simulate(plant, plan=pd.DataFrame(columns, index=index))
