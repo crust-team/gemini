@@ -440,6 +440,10 @@
         "target": "atmosphere.gas_in"
       },
       {
+        "source": "flare.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
         "source": "compression_chiller.sink_out",
         "target": "compression_cooler.fluid_in"
       },

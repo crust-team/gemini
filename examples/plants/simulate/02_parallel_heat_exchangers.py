@@ -26,6 +26,7 @@ PYTHONPATH=. python examples/plants/simulate/02_parallel_heat_exchangers.py
 import gemini as gm
 from examples.shared.nodal_doublet import NodalDoublet
 from gemini.modules import (
+    ElectricityGrid,
     HeatExchanger,
     Mixer,
     ModuleList,
@@ -96,6 +97,7 @@ class ParallelExchangerPlant(gm.modules.Module):
         self.primary_mixers = ModuleList(Mixer() for _ in SHARES[1:])
         self.secondary_mixers = ModuleList(Mixer() for _ in SHARES[1:])
         self.outlet_filter = Filter()
+        self.electricity_grid = ElectricityGrid()
 
         # Inlets
         self.return_in = Inlet(Stream)
@@ -115,7 +117,7 @@ class ParallelExchangerPlant(gm.modules.Module):
         """Produce and treat the brine, exchange in parallel, remix and inject it."""
 
         # Modules
-        supply, _ = self.doublet.produce()
+        supply, lift_power, well_losses = self.doublet.produce()
         degassed = self.degasser(fluid_in=supply)
         filtered = self.inlet_filter(fluid_in=degassed.outlets.liquid_out)
         primaries = divide(self.primary_splitters, filtered.outlets.fluid_out)
@@ -126,7 +128,9 @@ class ParallelExchangerPlant(gm.modules.Module):
         ]
         cooled = combine(self.primary_mixers, [each.outlets.hot_out for each in exchanged])
         returned = self.outlet_filter(fluid_in=cooled)
-        self.doublet.inject(returned.outlets.fluid_out)
+        injection_power, injection_loss = self.doublet.inject(returned.outlets.fluid_out)
+        self.doublet.formation(heat_in=well_losses + injection_loss)
+        self.electricity_grid(power_in=[], power_out=[lift_power, injection_power])
 
         # Outlets
         supply_out = combine(self.secondary_mixers, [each.outlets.cold_out for each in exchanged])
@@ -259,5 +263,6 @@ print(f"Total duty:                  {sum(duties) / 1e3:.1f} kW")
 print(f"Secondary outlet:            {out.get('secondary_out_T', unit='degC'):.2f} degC")
 print(f"Electricity (ESP and pump):  {collect_flows(result)['electricity'] / 1e6:.4f} MW")
 print(f"Mass residual:               {gm.modules.mass_balance(plant, result)['residual']} kg/s")
+assert all(check["passed"] for check in gm.checks.plant_balance(plant, result))
 assert energy_balance(plant, result)["relative_thermal_residual"] < 1e-9
 assert abs(out.get("injection_pressure", unit="bar") - 44.47) < 0.05

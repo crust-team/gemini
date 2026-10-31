@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import CoolingSubstation
 from gemini.types import Stream
+from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.reading import reading
 
 CP = 4217.4
@@ -38,6 +39,7 @@ def test_met_loads_close_the_building_loop(plants):
     )
     assert out.building_supply_temperature < out.dew_point - 1.0
     assert energy_balance(substation, result)["relative_residual"] < 1e-12
+    assert_plant_closes(substation, result)
     assert mass_balance(substation, result)["residual"] == 0
 
 

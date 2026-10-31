@@ -13,7 +13,14 @@ import pandas as pd
 from gemini.errors import ValidationError
 from gemini.types.flows import Stream
 
-ADDED_QUANTITIES = ("mass_flow", "volume_flow", "enthalpy_flow", "gas_flow", "co2_flow")
+ADDED_QUANTITIES = (
+    "mass_flow",
+    "volume_flow",
+    "enthalpy_flow",
+    "gas_flow",
+    "co2_flow",
+    "chemical_flow",
+)
 """The quantities of a fluid port that add up over the streams of a ``many`` port."""
 
 MISSING = float("nan")

@@ -8,6 +8,7 @@ import pytest
 import gemini as gm
 from gemini.physics import constants, units
 from gemini.types import Stream
+from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.reading import reading
 
 
@@ -32,6 +33,7 @@ def test_supply_is_the_riser_wellhead_and_return_reaches_the_sink(doublet):
     lossy = [leaf for leaf in leaves.values() if "loss_out" in leaf.outlets]
     heat_loss = sum(leaf.outlets.loss_out for leaf in lossy)
     assert sum(leaves["formation"].inlets.heat_in) == pytest.approx(heat_loss)
+    assert_plant_closes(doublet, result)
 
 
 DESIGN = {

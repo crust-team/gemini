@@ -133,6 +133,14 @@ def flare_emissions(
 
 
 @ops.physics
+def released_heat(gas_flow: float, heating_value: float, combustion_efficiency: float) -> float:
+    """Return the heat [W] that burning ``gas_flow`` [kg/s] of a gas of ``heating_value`` releases.
+
+    Source: definition of the lower heating value; ``combustion_efficiency`` is the share burnt.
+    """
+    return gas_flow * heating_value * combustion_efficiency
+
+
 def burnt_gas_emissions(
     gas_flow: float,
     carried_co2: float,

@@ -22,7 +22,9 @@ import gemini as gm
 from examples.shared.nodal_doublet import NodalDoublet
 from gemini.modules import (
     CHP,
+    Atmosphere,
     Boiler,
+    ElectricityGrid,
     GasGrid,
     HeatExchanger,
     Mixer,
@@ -65,10 +67,13 @@ class BoilerChpPlant(gm.modules.Module):
         self.heat_exchanger = HeatExchanger()
         self.cold_filter = Filter()
         self.splitter = Splitter()
-        self.grid = GasGrid()
+        self.boiler_gas = GasGrid()
+        self.chp_gas = GasGrid()
         self.boiler = Boiler()
         self.chp = CHP()
         self.mixer = Mixer()
+        self.electricity_grid = ElectricityGrid()
+        self.air = Atmosphere()
 
         # Inlets
         self.return_in = Inlet(Stream)
@@ -86,7 +91,7 @@ class BoilerChpPlant(gm.modules.Module):
         """Produce, treat, exchange and inject the brine; heat and remix the secondary water."""
 
         # Modules
-        supply, _ = self.doublet.produce()
+        supply, lift_power, well_losses = self.doublet.produce()
         degassed = self.degasser(fluid_in=supply)
         filtered = self.hot_filter(fluid_in=degassed.outlets.liquid_out)
         split = self.splitter(fluid_in=inlets.return_in)
@@ -94,12 +99,30 @@ class BoilerChpPlant(gm.modules.Module):
             hot_in=filtered.outlets.fluid_out, cold_in=split.outlets.branch1_out
         )
         returned = self.cold_filter(fluid_in=exchanged.outlets.hot_out)
-        self.doublet.inject(returned.outlets.fluid_out)
-        gas = self.grid.offer()["gas_out"]
-        boiled = self.boiler(fluid_in=exchanged.outlets.cold_out, fuel_in=gas)
-        cogenerated = self.chp(fluid_in=split.outlets.branch2_out, fuel_in=gas)
+        injection_power, injection_loss = self.doublet.inject(returned.outlets.fluid_out)
+        self.doublet.formation(heat_in=well_losses + injection_loss)
+        boiled = self.boiler(
+            fluid_in=exchanged.outlets.cold_out, fuel_in=self.boiler_gas.offer()["gas_out"]
+        )
+        cogenerated = self.chp(
+            fluid_in=split.outlets.branch2_out, fuel_in=self.chp_gas.offer()["gas_out"]
+        )
         mixed = self.mixer(
             branch1_in=boiled.outlets.fluid_out, branch2_in=cogenerated.outlets.fluid_out
+        )
+        self.boiler_gas(gas_out=boiled.inlets.fuel_in)
+        self.chp_gas(gas_out=cogenerated.inlets.fuel_in)
+        self.electricity_grid(
+            power_in=[cogenerated.outlets.power_out], power_out=[lift_power, injection_power]
+        )
+        self.air(
+            air_in=[],
+            gas_in=[
+                degassed.outlets.gas_out,
+                boiled.outlets.flue_out,
+                cogenerated.outlets.flue_out,
+            ],
+            heat_in=[boiled.outlets.loss_out, cogenerated.outlets.loss_out],
         )
 
         # Outlets
@@ -162,6 +185,7 @@ def configure_surface(plant):
         maximum_outlet_temperature="90 degC",
     )
     plant.chp.load_fraction = 1.0
+    plant.air.temperature = "10 degC"
 
 
 plant = BoilerChpPlant()
@@ -182,3 +206,4 @@ print(
     f"CO2 emissions:               {emissions(result, GAS_FACTOR, GRID_FACTOR) * 86400:.0f} kg/day"
 )
 assert pump_power == 0
+assert all(check["passed"] for check in gm.checks.plant_balance(plant, result))

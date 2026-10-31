@@ -28,6 +28,7 @@ def chain():
     plant.connect("boiler.flue_out", "air.gas_in")
     plant.connect("boiler.loss_out", "air.heat_in")
     plant.connect("flare.flue_out", "air.gas_in")
+    plant.connect("flare.loss_out", "air.heat_in")
     plant.connect("produced", "degasser.fluid_in")
     plant.connect("degasser.liquid_out", "fluid_out")
     plant.connect("degasser.gas_out", "makeup.gas_in")

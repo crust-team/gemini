@@ -320,6 +320,10 @@
    "mass_balance": [
     "results"
    ],
+   "plant_balance": [
+    "plant",
+    "run"
+   ],
    "run_all": [
     "plant",
     "results"

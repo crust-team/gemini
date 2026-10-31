@@ -182,6 +182,7 @@ def connect_air(plant):
     """Wire what the plant releases and the chiller's cooler to the air."""
     plant.connect("boiler.flue_out", "air.gas_in")
     plant.connect("flare.flue_out", "air.gas_in")
+    plant.connect("flare.loss_out", "air.heat_in")
     plant.connect("boiler.loss_out", "air.heat_in")
     plant.connect("air.air_out", "chiller_cooler.air_in")
     plant.connect("chiller_cooler.air_out", "air.air_in")

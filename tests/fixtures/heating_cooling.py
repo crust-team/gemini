@@ -82,6 +82,11 @@ COOLERS = {
     "compression_cooler": (30.0, 303.15),
 }
 """Flow [kg/s] and temperature [K] of the cooling water of each cooler."""
+COOLER_INPUTS = {
+    f"{cooler}.{name}": value
+    for cooler, (flow, temperature) in COOLERS.items()
+    for name, value in (("flow", flow), ("temperature_setpoint", temperature))
+}
 ROOT_STREAMS = {}
 BRINE_MODULES = ("doublet", "degasser", "heat_exchanger", "injection_pump")
 
@@ -122,7 +127,8 @@ def configure(plant):
         if path in modules:
             modules[path].update_params(**fit)
     declared = plant.inputs()
-    plant.set_inputs({path: value for path, value in INPUTS.items() if path in declared})
+    inputs = INPUTS | COOLER_INPUTS
+    plant.set_inputs({path: value for path, value in inputs.items() if path in declared})
     plant.boundary = {"root_inputs": _root_streams(plant)}
     return plant
 

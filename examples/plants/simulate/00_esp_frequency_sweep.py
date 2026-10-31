@@ -19,4 +19,5 @@ for frequency in (55, 60, 65):
     }
     results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     assert not results.errors(), results.errors()[0]
+    assert all(check["passed"] for check in gm.checks.plant_balance(plant, results))
     print(frequency, results.to_frame(table="energy"))

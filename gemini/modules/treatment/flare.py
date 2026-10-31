@@ -4,7 +4,17 @@ from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import combustion, gas
-from gemini.types import Efficiency, Inlet, MassFlow, Outlet, Output, Parameter, Stream
+from gemini.types import (
+    Efficiency,
+    Fuel,
+    Inlet,
+    MassFlow,
+    Outlet,
+    Output,
+    Parameter,
+    Power,
+    Stream,
+)
 from gemini.types.cost import scaled_cost
 from gemini.types.fluid import FLUE_CO2, Fluid
 
@@ -15,6 +25,7 @@ class Flare(Module):
     ``flue_out`` carries the CO2 the gas carries plus what burning forms and the methane that passes
     unburnt, to ``Atmosphere.gas_in``; ``combustion_efficiency`` defaults to 98 % (US EPA, AP-42,
     5th ed., section 13.5 "Industrial Flares", 2018). ``burned_mass_flow`` closes ``mass_balance``.
+    The chemical power burned is ``fuel``; it leaves as heat through ``loss_out``.
     """
 
     def __init__(self):
@@ -31,9 +42,11 @@ class Flare(Module):
 
         # Outputs
         self.burned_mass_flow = Output(MassFlow)
+        self.fuel = Output(Fuel)
 
         # Outlets
         self.flue_out = Outlet(Stream, kind="gas")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Refuse reverse flow and release what burning leaves."""
@@ -50,11 +63,16 @@ class Flare(Module):
         co2, methane = self._released(inlet, inlet.m_dot)
         flue_out = inlet.with_(m_dot=co2 + methane, fluid=self._flue_fluid(inlet))
 
-        outlets = dict(flue_out=flue_out)
+        loss_out = combustion.released_heat(
+            inlet.m_dot, inlet.fluid.heating_value(), self.combustion_efficiency
+        )
+
+        outlets = dict(flue_out=flue_out, loss_out=loss_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         self.burned_mass_flow = inlets.gas_in.m_dot
+        self.fuel = outlets.loss_out
 
     def _released(self, inlet, mass_flow):
         """Return the CO2 and the methane [kg/s] that burning ``mass_flow`` of ``inlet`` leaves."""

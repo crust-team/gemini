@@ -119,6 +119,7 @@ def _ledger_entries(plant, results):
         "energy_balance": lambda: gm.checks.energy_balance(results),
         "mass_balance": lambda: gm.checks.mass_balance(results),
         "bounds": lambda: gm.checks.bounds(plant, results),
+        "plant_balance": lambda: gm.checks.plant_balance(plant, results),
         "limits": lambda: gm.checks.limits(plant, results, _limits()),
         "run_all": lambda: gm.checks.run_all(plant, results),
         "Limits": lambda: _limits().to_dict(),

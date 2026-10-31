@@ -4,7 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.errors import PhysicsError
-from gemini.modules import Flare
+from gemini.modules import Flare, energy_balance
 from gemini.physics import combustion, gas
 from tests.fixtures.equivalence import assert_module_matches
 
@@ -46,3 +46,14 @@ def test_reverse_flow_is_refused():
 def test_traced_call_matches_one_call_per_row():
     """No gas and some gas equal one call per row."""
     assert_module_matches(Flare(), [dict(gas_in=stream(flow)) for flow in (0.0, 0.1, 1.0)])
+
+
+def test_the_heat_of_burning_leaves_through_a_loss_port():
+    """The chemical power burned is ``fuel``; it leaves through ``loss_out``; the audit closes."""
+    fluid = gm.Fluid(kind="gas", gas_composition={"CH4": 1.0})
+    flare = Flare()
+    result = flare(gas_in=gm.Stream(m_dot=0.1, T=300, p=2e5, fluid=fluid))
+    burned = 0.1 * fluid.heating_value() * flare.combustion_efficiency
+    assert result.outlets.loss_out == pytest.approx(burned)
+    assert result.outputs.fuel == pytest.approx(burned)
+    assert energy_balance(flare, result)["relative_residual"] < 1e-12

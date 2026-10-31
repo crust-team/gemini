@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import HeatingSubstation
 from gemini.types import Stream
+from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.errors import raises
 from tests.fixtures.reading import reading
 
@@ -41,6 +42,7 @@ def test_met_demand_closes_the_building_loop(plants):
     assert out.valve_pressure_drop == valve.outputs.pressure_drop > 0
     assert result.outlets.return_out.p == pytest.approx(6e5 - out.valve_pressure_drop - 2e4)
     assert energy_balance(substation, result)["relative_residual"] < 1e-12
+    assert_plant_closes(substation, result)
     assert mass_balance(substation, result)["residual"] == 0
     assert list(result.leaves()) == ["valve", "heat_exchanger", "consumer"]
 

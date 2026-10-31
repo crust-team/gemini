@@ -242,6 +242,10 @@
         "target": "atmosphere.gas_in"
       },
       {
+        "source": "flare.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
         "source": "heating_return_pipe.loss_out",
         "target": "atmosphere.heat_in"
       },

@@ -12,7 +12,15 @@ PYTHONPATH=. python examples/plants/simulate/01_district_heating_and_cooling.py
 """
 
 import gemini as gm
-from gemini.modules import ATESPlant, CoolingGrid, HeatingGrid, collect_flows, energy_balance
+from gemini.modules import (
+    ATESPlant,
+    Atmosphere,
+    CoolingGrid,
+    ElectricityGrid,
+    HeatingGrid,
+    collect_flows,
+    energy_balance,
+)
 from gemini.types import (
     Inlet,
     Outlet,
@@ -39,6 +47,9 @@ class DistrictEnergyPlant(gm.modules.Module):
             "DistrictNetwork", {"consumers": 1, "service": "cooling"}
         )
 
+        self.electricity_grid = ElectricityGrid()
+        self.air = Atmosphere()
+
         # Inlets
         self.heat_supply_in = Inlet(Stream)
         self.cooling_return_in = Inlet(Stream)
@@ -58,6 +69,23 @@ class DistrictEnergyPlant(gm.modules.Module):
         heated = self.heating(supply_in=inlets.heat_supply_in, air_in=inlets.air_in)
         chilled = self.ates(return_in=inlets.cooling_return_in)
         cooled = self.cooling(supply_in=chilled.outlets.supply_out, air_in=inlets.air_in)
+        self.electricity_grid(
+            power_in=[],
+            power_out=[
+                heated.inlets.power_in,
+                chilled.inlets.power_in,
+                cooled.inlets.power_in,
+            ],
+        )
+        self.air(
+            air_in=[],
+            gas_in=[],
+            heat_in=[
+                heated.outlets.loss_out,
+                chilled.outlets.loss_out,
+                cooled.outlets.loss_out,
+            ],
+        )
 
         # Outlets
         heat_return_out = heated.outlets.return_out
@@ -160,6 +188,7 @@ def build_plant():
     configure_heating(plant.heating)
     configure_cooling(plant.cooling)
     configure_ates(plant.ates)
+    plant.air.temperature = "10 degC"
     return plant
 
 
@@ -204,6 +233,7 @@ def main():
         }
         state, result = plant.step(state, HOUR, inlets)
         check_closure(plant, result)
+        assert all(check["passed"] for check in gm.checks.plant_balance(plant, result))
         out, flows = result.outputs, collect_flows(result)
         heat = consumer_heat(plant, result, HeatingGrid)
         cold = flows["heat_absorbed"] - consumer_heat(plant, result, CoolingGrid)

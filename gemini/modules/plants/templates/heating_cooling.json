@@ -604,6 +604,10 @@
         "target": "atmosphere.gas_in"
       },
       {
+        "source": "flare.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
         "source": "absorption_chiller.cooling_out",
         "target": "absorption_cooler.fluid_in"
       },

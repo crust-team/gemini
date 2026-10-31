@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import generators
 from gemini.types import Stream
+from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.errors import raises
 from tests.fixtures.reading import reading
 
@@ -33,6 +34,7 @@ def test_two_producers_mix_into_the_supply(fresh_plant):
     field = _field(fresh_plant.doublet)
     returned = Stream(m_dot=70, T=330, p=5e6, fluid=field.producers[0].riser.fluid)
     result = field(return_in=returned)
+    assert_plant_closes(field, result)
     first = result.children["producers.0.riser"].outlets.wellhead_out
     second = result.children["producers.1.riser"].outlets.wellhead_out
     supply = result.outlets.supply_out

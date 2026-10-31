@@ -9,6 +9,7 @@ from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import CoolingSubstation, HeatingSubstation, generators
 from gemini.types import Stream
 from tests.fixtures.air import air
+from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.errors import raises
 from tests.fixtures.reading import reading
 
@@ -32,6 +33,7 @@ def test_heating_network_serves_both_substations(plants):
     network = plants["network"](_network(), plants["heating_substation"])
     result = network(supply_in=HOT, air_in=air(283.15))
     out = reading(result)
+    assert_plant_closes(network, result)
     children = result.children
     feeds = [children[f"substations.{index}"].inlets.supply_in.m_dot for index in range(2)]
     assert feeds == [2.0, 2.0]
@@ -81,6 +83,7 @@ def test_cooling_network_absorbs_building_and_ground_heat(plants):
     assert "heat_supplied" not in network.outputs(recurse=False)
     result = network(supply_in=CHILLED, air_in=air(283.15))
     assert _leaf_sum(result, "heat_absorbed") > 1.4e5
+    assert_plant_closes(network, result)
     audit = energy_balance(network, result)
     hydraulic = result.children["pump"].outputs.hydraulic_power
     assert abs(audit["residual"] - hydraulic) / audit["in"] < 1e-12

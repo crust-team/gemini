@@ -99,10 +99,11 @@ SAME_FORM = {
     ): "a less b over c: "
     "compressor heat and a linear inflow relation",
     (
+        "combustion.py::released_heat",
         "ground.py::stored_heat",
         "pumps/_physics.py::line_shaft_friction_power",
         "storage/_physics.py::ice_stored_cold",
-    ): "a product of three: stored heat, shaft friction and latent cold",
+    ): "a product of three: stored heat, shaft friction, latent cold and burned heat",
     (
         "dispatch.py::circuit_flow",
         "pumps.py::best_efficiency_ratio",

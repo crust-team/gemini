@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.modules import Module, energy_balance, mass_balance
 from gemini.modules.plants import ATESPlant
 from gemini.types import Inlet, Outlet, Output, Stream
+from tests.fixtures.balance import assert_plant_closes
 from tests.fixtures.reading import reading
 
 CP = 4217.4
@@ -52,6 +53,7 @@ def _check_balances(plant, result):
     hydraulic = result.children["pump"].outputs.hydraulic_power
     assert abs(audit["residual"] - hydraulic) / audit["in"] < 1e-12
     assert mass_balance(plant, result)["residual"] == 0
+    assert_plant_closes(plant, result)
 
 
 def test_charge_cools_the_building_with_native_groundwater():
