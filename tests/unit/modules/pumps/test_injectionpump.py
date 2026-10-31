@@ -48,3 +48,10 @@ def test_setpoint_below_suction_raises():
     """A setpoint below the suction pressure is a physics range error."""
     with pytest.raises(PhysicsError, match="below suction pressure"):
         InjectionPump()(fluid_in=Stream(m_dot=1, T=300, p=2e6), pressure_setpoint=1e6)
+
+
+def test_a_stopped_pump_lets_the_pressure_through():
+    """Without flow a setpoint below the suction is no error: the pump adds no pressure."""
+    result = InjectionPump()(fluid_in=Stream(m_dot=0.0, T=320.0, p=100e5), pressure_setpoint=30e5)
+    assert result.outlets["fluid_out"].p == 100e5
+    assert result.outputs["head"] == 0.0

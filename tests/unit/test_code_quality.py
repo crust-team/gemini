@@ -72,6 +72,8 @@ BUILDS_NO_DATA_PATH = {
     "tests/unit/test_code_quality.py",
 }
 """Files allowed to name the data folders; the first is the one that knows where they are."""
+SAMPLE_PROBLEM = re.compile(r"hackathon|challenge|inputs/examples", re.IGNORECASE)
+"""What no file of ``gemini/`` may name: it is a general package, and a problem is only an input."""
 VALUE_KEYS = {"plant", "size", "params", "inputs", *SECTIONS}
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
 FRAMEWORK_STEM = "tor" + "ch"
@@ -636,6 +638,16 @@ def test_a_file_of_example_values_has_only_the_allowed_keys_and_names_a_register
         assert set(values) <= VALUE_KEYS, path.name
         assert values["plant"] == path.stem and path.stem in gm.plants.names(), path.name
         assert isinstance(values["params"], dict), path.name
+
+
+def test_the_package_knows_no_sample_problem():
+    """Nothing under ``gemini/`` names the sample problems or the folder that holds them."""
+    found = []
+    for path in tracked_files():
+        if path.startswith("gemini/"):
+            text = (ROOT / path).read_text(encoding="utf-8")
+            found += [path] if SAMPLE_PROBLEM.search(text) else []
+    assert found == []
 
 
 def test_the_repository_has_no_datasets_folder():

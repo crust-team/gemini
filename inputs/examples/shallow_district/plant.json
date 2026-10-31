@@ -1,0 +1,94 @@
+{
+  "format": 2,
+  "type": "HeatingHeatPumpCoolingPlant",
+  "size": {
+    "doublets": 1
+  },
+  "params": {
+    "depth": "1300 m",
+    "d0.gradient": "36 K/km",
+    "d0.surface_temperature": "9 degC",
+    "d0.thickness": "60 m",
+    "d0.permeability": "450 mD",
+    "d0.well_diameter": "0.216 m",
+    "d0.nominal_flow": "130 m3/h",
+    "d0.pump_efficiency": 0.65,
+    "d0.nominal_wellhead_pressure": "8 bar",
+    "d0.reservoir.pressure": "120 barg",
+    "d0.sink.pressure": "120 barg",
+    "degasser.separation_efficiency": 0.95,
+    "heat_exchanger.thermal_conductance": "250000 W/K",
+    "heat_exchanger.hot_nominal_pressure_drop": "0 bar",
+    "heat_exchanger.cold_nominal_pressure_drop": "0 bar",
+    "heat_exchanger.hot_nominal_mass_flow": "36 kg/s",
+    "heat_exchanger.cold_nominal_mass_flow": "30 kg/s",
+    "injection_pump.efficiency": 0.65,
+    "peak_boiler.capacity": "3.5 MW",
+    "peak_boiler.efficiency": 0.92,
+    "heating_consumer.return_temperature": "38 degC",
+    "heating_consumer.return_pressure": "5 bar",
+    "heating_return_pipe.length": "400 m",
+    "heating_return_pipe.inner_diameter": "0.2 m",
+    "heating_return_pipe.elevation_change": "0 m",
+    "heating_return_pipe.heat_transfer_coefficient": 0.0,
+    "heating_supply_pipe.length": "400 m",
+    "heating_supply_pipe.inner_diameter": "0.2 m",
+    "heating_supply_pipe.elevation_change": "0 m",
+    "heating_supply_pipe.heat_transfer_coefficient": 0.0,
+    "heat_pump.mode": "heating",
+    "heat_pump.capacity": "1.6 MW",
+    "heat_pump.minimum_source_outlet_temperature": "27 degC",
+    "cooling_consumer.dew_point_margin": "1 K",
+    "cooling_consumer.return_temperature": "22 degC",
+    "cooling_consumer.return_pressure": "3 bar",
+    "cooling_return_pipe.length": "400 m",
+    "cooling_return_pipe.inner_diameter": "0.2 m",
+    "cooling_return_pipe.elevation_change": "0 m",
+    "cooling_return_pipe.heat_transfer_coefficient": 0.0,
+    "cooling_supply_pipe.length": "400 m",
+    "cooling_supply_pipe.inner_diameter": "0.2 m",
+    "cooling_supply_pipe.elevation_change": "0 m",
+    "cooling_supply_pipe.heat_transfer_coefficient": 0.0,
+    "compression_chiller.mode": "cooling",
+    "compression_chiller.capacity": "0.4 MW",
+    "compression_cooler.cooler_type": "dry",
+    "compression_cooler.approach": "6 K",
+    "compression_cooler.specific_fan_power": 0.02,
+    "compression_cooler.loop_pressure": "3 bar",
+    "compression_cooler.capacity": "1 MW"
+  },
+  "fluids": {
+    "d0": {
+      "kind": "brine",
+      "density": 1012.0,
+      "viscosity": 0.00055,
+      "gas_liquid_ratio": 0.15,
+      "gas_composition": {
+        "CH4": 0.92,
+        "CO2": 0.08
+      }
+    },
+    "heating_consumer": {
+      "kind": "water"
+    },
+    "cooling_consumer": {
+      "kind": "water"
+    },
+    "compression_cooler": {
+      "kind": "water"
+    }
+  },
+  "inputs": {
+    "peak_boiler.temperature_setpoint": "65 degC",
+    "injection_pump.pressure_setpoint": "36 bar",
+    "atmosphere.temperature": "6 degC",
+    "heat_pump.temperature_setpoint": "65 degC",
+    "cooling_consumer.indoor_temperature": "24 degC",
+    "cooling_consumer.indoor_relative_humidity": 0.45,
+    "compression_cooler.temperature_setpoint": "18 degC",
+    "compression_cooler.flow": "60 kg/s",
+    "compression_chiller.temperature_setpoint": "16 degC"
+  },
+  "bindings": {},
+  "param_history": {}
+}

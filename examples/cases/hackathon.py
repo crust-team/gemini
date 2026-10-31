@@ -3,7 +3,8 @@
 Schedules 2027 from the daily demand on the plant dict ``plant_with_treatment.json`` of the sample
 problem and simulates it. The reservoir, brine, limits and supply temperatures are the sample
 problem's; what this case assumes it prints as assumptions. Shows ``gm.plants.from_dict``,
-``gm.profiles.from_csv``, ``gm.checks.Limits.from_dict``, ``gm.economics.Assumptions``, ``gm.schedule``, ``gm.simulate``,
+``gm.profiles.from_csv``, ``gm.checks.Limits.from_dict``, ``gm.economics.Assumptions``,
+``gm.schedule``, ``gm.simulate``,
 ``gm.checks.limits``, ``gm.checks.plant_balance``, ``gm.kpi.totals``, ``gm.kpi.compute`` and
 ``gm.economics``.
 

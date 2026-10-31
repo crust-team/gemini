@@ -34,7 +34,7 @@ Requirements:
   d1.volume_imbalance                     ok        worst -2.776e-17 m3/s
   heating_consumer.supply_in.temperature  ok        worst 100 °C
   cooling_consumer.supply_in.temperature  ok        worst 20 °C
-  d0.operating_days                       ok        worst 330 day
-  d1.operating_days                       ok        worst 330 day
+  d0.operating_time                       ok        worst 330 day
+  d1.operating_time                       ok        worst 330 day
 
 LCTS, on the placeholder prices above: 38.28 EUR/MWh

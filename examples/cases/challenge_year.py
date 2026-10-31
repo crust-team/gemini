@@ -98,6 +98,8 @@ def print_checks(checks):
             worst, unit = gm.units.convert(worst, unit, "m3/h"), "m³/h"
         if unit == "K" and item["name"].endswith("temperature"):
             worst, unit = gm.units.convert(worst, unit, "degC"), "°C"
+        if unit == "s":
+            worst, unit = worst / 86400, "day"
         print(f"  {item['name']:<39} {result:<9} worst {worst:.4g} {unit}")
 
 

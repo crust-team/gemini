@@ -95,7 +95,8 @@ class InjectionPump(Module):
         """Return the pressure rise [Pa] from the head curve, else from the pressure setpoint.
 
         A ``power_coefficients`` curve is used for power only together with a ``head_coefficients``
-        curve.
+        curve. A pump without flow cannot lower the pressure: a setpoint below its suction is then
+        no rise, not an error.
         """
         flow = suction.volumetric_flow()
         ops.check(
@@ -113,7 +114,8 @@ class InjectionPump(Module):
                 )
             return _physics.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         if self.pressure_setpoint is not None:
-            return self.pressure_setpoint - suction.p
+            rise = self.pressure_setpoint - suction.p
+            return ops.where(flow > 0, rise, ops.maximum(rise, 0.0))
         raise ValidationError(
             f"{self.path}: supply the pressure_setpoint control or head_coefficients and "
             "stage_count",
