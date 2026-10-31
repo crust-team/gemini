@@ -12,14 +12,19 @@ from gemini.errors import GeminiError, NotImplementedYet, PhysicsError, Validati
 from gemini.errors.base import check_on_error
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
-from gemini.modules.wells import ProductionWell
+from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.physics import constants
 from gemini.physics import units as physics_units
+from gemini.types.flows import Stream
 from gemini.types.shapes import OutputUnits, value
 from gemini.utils.jsonable import to_plain
+from gemini.utils.strings import split_path
 
 CURVE_POINTS = 21
 """Number of rates on the IPR and VLP curves of ``nodal``, from the low to the high bracket end."""
+WELLHEAD_PRESSURES = (101325.0, 1e8)
+"""The bracket [Pa] of an injection wellhead: the lowest is one atmosphere, the highest 1000 bar."""
+NO_PUMP = "the column of brine delivers what the aquifer needs: no pump, a choke holds the well"
 
 
 @dataclass(frozen=True)
@@ -32,16 +37,49 @@ class _Chain:
     upper: Any
 
 
+@dataclass(frozen=True)
+class _Injection:
+    """The injection chain of a well: the well and the aquifer it feeds."""
+
+    well: Any
+    sink: Any
+
+
+def _injection_chain(plant, well, module, inside):
+    """Return the injection chain at ``well``, or ``None`` when it has no part of one.
+
+    A path of the well or of the aquifer finds the other in the same parent, which is how to reach
+    the injection side of a doublet, whose own path is its production chain.
+    """
+    alone = isinstance(module, (InjectionWell, InjectionReservoir))
+    scope = list(plant.get_submodule(split_path(well)[0]).modules()) if alone else inside
+    wells = [item for item in scope if isinstance(item, InjectionWell)]
+    sinks = [item for item in scope if isinstance(item, InjectionReservoir)]
+    if not wells and not sinks:
+        return None
+    if len(wells) != 1 or len(sinks) != 1:
+        raise ValidationError(
+            f"nodal: well = {well!r}; {len(wells)} injection wells, {len(sinks)} aquifers; "
+            "expected one of each",
+            path=well,
+            code="invalid_design",
+        )
+    return _Injection(wells[0], sinks[0])
+
+
 def _chain(plant, well):
-    """Return the production chain below the plant path ``well``."""
+    """Return the production or injection chain at the plant path ``well``."""
     module = plant.get_submodule(well)
     inside = list(module.modules())
     reservoirs = [item for item in inside if isinstance(item, ProductionReservoir)]
     if not reservoirs:
-        if any(isinstance(item, InjectionReservoir) for item in inside):
-            raise NotImplementedYet(f"nodal: well = {well!r}; injection wells are not solved yet")
+        injection = _injection_chain(plant, well, module, inside)
+        if injection is not None:
+            return injection
         raise ValidationError(
-            f"nodal: well = {well!r}; expected a path that holds a ProductionReservoir", path=well
+            f"nodal: well = {well!r}; expected a path that holds a ProductionReservoir, or an "
+            "injection well and its aquifer",
+            path=well,
         )
     wells = {item.segment: item for item in inside if isinstance(item, ProductionWell)}
     esps = [item for item in inside if isinstance(item, ESP)]
@@ -118,6 +156,87 @@ def _curves(chain, pressure, rates, output):
     return _curve(sampled, inflow, output), _curve(sampled, lift, output), point
 
 
+def _in_si(conditions, name, unit, quantity):
+    """Return the condition ``name`` as a float in SI."""
+    return float(physics_units.value_in_si(conditions[name], unit, f"conditions.{name}", quantity))
+
+
+def _injection_inputs(conditions):
+    """Return the SI temperature [K], rate bracket [kg/s] and what the case gives of a point."""
+    _required(conditions, "temperature")
+    temperature = _in_si(conditions, "temperature", "K", "temperature")
+    low, high = (
+        physics_units.value_in_si(value, "kg/s", "conditions.rates", "mass_flow")
+        for value in _required(conditions, "rates")
+    )
+    if "rate" not in conditions and "wellhead_pressure" not in conditions:
+        raise ValidationError(
+            "nodal: conditions has no rate and no wellhead_pressure; expected one of them",
+            path="wellhead_pressure",
+            code="missing_value",
+        )
+    return temperature, (float(low), float(high))
+
+
+def _needed_pressure(chain, temperature, rate):
+    """Return the wellhead pressure [Pa] that injects ``rate``, or ``None`` with no pump."""
+    stream = Stream(m_dot=rate, T=temperature, p=WELLHEAD_PRESSURES[0], fluid=chain.well.fluid)
+    return solves.solve_injection_pressure(chain.well, chain.sink, stream, WELLHEAD_PRESSURES)
+
+
+def _injected_rate(chain, temperature, pressure, rates):
+    """Return the rate [kg/s] the wellhead pressure [Pa] pushes into the aquifer."""
+    stream = Stream(m_dot=rates[0], T=temperature, p=pressure, fluid=chain.well.fluid)
+    return solves.solve_injection_rate(chain.well, chain.sink, stream, rates)
+
+
+def _aquifer_pressure(chain, temperature, rate):
+    """Return the sandface pressure [Pa] the aquifer needs to take ``rate``."""
+    stream = Stream(m_dot=rate, T=temperature, p=WELLHEAD_PRESSURES[0], fluid=chain.sink.fluid)
+    return chain.sink.required_pressure(stream)
+
+
+def _wellhead_value(pressure, output):
+    """Return the wellhead pressure of a point; ``None`` says that no pump is needed."""
+    return output.value(pressure, "Pa", "pressure", None if pressure is not None else NO_PUMP)
+
+
+def _injection_point(chain, conditions, temperature, rates, output):
+    """Return the operating point: the rate and pressure of the case, the other one solved."""
+    if "rate" in conditions:
+        rate = _in_si(conditions, "rate", "kg/s", "mass_flow")
+        pressure = _needed_pressure(chain, temperature, rate)
+    else:
+        pressure = _in_si(conditions, "wellhead_pressure", "Pa", "pressure")
+        rate = _injected_rate(chain, temperature, pressure, rates)
+    return {
+        "rate": output.value(rate, "kg/s", "mass_flow"),
+        "wellhead_pressure": _wellhead_value(pressure, output),
+        "sandface_pressure": output.value(
+            _aquifer_pressure(chain, temperature, rate), "Pa", "pressure"
+        ),
+    }
+
+
+def _injection_curves(chain, conditions, output):
+    """Return the aquifer's curve, the well's curve and the operating point of a case."""
+    temperature, rates = _injection_inputs(conditions)
+    sampled = np.linspace(*rates, CURVE_POINTS)
+    aquifer = [_aquifer_pressure(chain, temperature, rate) for rate in sampled]
+    needed = [_needed_pressure(chain, temperature, rate) for rate in sampled]
+    well = [np.nan if pressure is None else pressure for pressure in needed]
+    point = _injection_point(chain, conditions, temperature, rates, output)
+    return _curve(sampled, aquifer, output), _curve(sampled, well, output), point
+
+
+def _production_curves(chain, conditions, output):
+    """Return the IPR, the VLP and the operating point of a case of a production well."""
+    pressure, rates, frequency = _case_inputs(chain, conditions)
+    if chain.esp is not None:
+        chain.esp.frequency = frequency
+    return _curves(chain, pressure, rates, output)
+
+
 def _case(chain, conditions, on_error, output):
     """Return the curves and the operating point of one set of conditions."""
     case = {
@@ -128,10 +247,8 @@ def _case(chain, conditions, on_error, output):
         "error": None,
     }
     try:
-        pressure, rates, frequency = _case_inputs(chain, conditions)
-        if chain.esp is not None:
-            chain.esp.frequency = frequency
-        case["ipr"], case["vlp"], case["operating_point"] = _curves(chain, pressure, rates, output)
+        curves = _injection_curves if isinstance(chain, _Injection) else _production_curves
+        case["ipr"], case["vlp"], case["operating_point"] = curves(chain, conditions, output)
     except GeminiError as error:
         if on_error == "raise":
             raise
@@ -140,7 +257,7 @@ def _case(chain, conditions, on_error, output):
 
 
 def nodal(plant, well, conditions, on_error="raise", units=None):
-    """Return the IPR and VLP curves and the operating point of a production well.
+    """Return the IPR and VLP curves and the operating point of a production or injection well.
 
     The IPR (inflow performance) is the sandface pressure the reservoir delivers at each rate.
     The VLP (vertical lift performance) is the wellhead pressure the well, the ESP and the riser
@@ -149,6 +266,12 @@ def nodal(plant, well, conditions, on_error="raise", units=None):
     of ``solves.solve_production_rate``. The plant is not changed: the ESP frequency
     of a case is set on a copy.
 
+    An injection well has the same shape. ``ipr`` is the sandface pressure the aquifer needs at
+    each rate and ``vlp`` the wellhead pressure that delivers it down the well, ``solves.
+    solve_injection_pressure``; the operating point is the pressure a case's rate needs, or the
+    rate a case's pressure pushes in. A rate the column of brine injects alone needs no pump: its
+    point on ``vlp`` is ``None``, and in ``operating_point`` a value ``None`` with a ``reason``.
+
     Parameters
     ----------
     plant : Module
@@ -156,13 +279,16 @@ def nodal(plant, well, conditions, on_error="raise", units=None):
     well : str
         Dotted path of the module that holds the whole chain, for example ``"doublet"``: one
         ``ProductionReservoir`` and either one full ``ProductionWell`` or an ``ESP`` with the
-        ``below_esp`` and ``above_esp`` segments. An injection chain raises
-        ``NotImplementedYet``.
+        ``below_esp`` and ``above_esp`` segments. For injection, the path of an
+        ``InjectionWell`` or of its ``InjectionReservoir``, ``"doublet.injector"``, or of what
+        holds one of each and no production chain.
     conditions : dict or list of dict
         One case, or several for a what-if. Each has ``wellhead_pressure`` [Pa], ``rates``, the
         ``[low, high]`` bracket [kg/s] of the curves and of the solve (a trial outside the well
         model's domain fails the case), and ``frequency`` [Hz] when the chain has an ESP. Numbers
-        are SI; unit strings such as ``"3 bar"`` are accepted.
+        are SI; unit strings such as ``"3 bar"`` are accepted. An injection case has ``rates``,
+        ``temperature`` [K], the temperature at the wellhead, and ``rate`` or
+        ``wellhead_pressure``, which says what to solve for.
     on_error : {"raise", "record"}, optional
         A case that fails raises; ``"record"`` puts its problem in ``error`` and runs the others.
     units : dict, optional

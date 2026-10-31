@@ -175,7 +175,7 @@ as a result column; that is a change to the engine, not to this package.
 
 | Name | Status | Notes |
 |---|---|---|
-| `nodal(plant, well, conditions)` | real, production wells | IPR, VLP and operating point from `gemini/analysis/solves.py`; the plant is not changed |
+| `nodal(plant, well, conditions)` | real | IPR, VLP and operating point from `gemini/analysis/solves.py`, for production and injection wells; the plant is not changed |
 | `pump_curve(plant, pump, measured=None)` | real | the polynomial head curve of the pump at 60 Hz (the private `_head_curve` of `gemini/analysis/wells.py`), theoretical head of measured points, `gm.analysis.fit_head_correction` |
 | `corrosion_forecast(model, until)` | real | `co2_corrosion_rate`, `wall_loss`, `time_to_minimum_wall` |
 | `injectivity(data, well)` | `NotImplementedYet` | Hall analysis not built |
@@ -188,6 +188,13 @@ as a result column; that is a change to the engine, not to this package.
 are accepted. A case whose bracket leaves the well model's domain raises `PhysicsError`; with `on_error="record"`
 the case carries the problem in `error` and the other cases still run. The VLP is the wellhead pressure the well, ESP and riser
 deliver at each rate; the operating point is where it falls to the wellhead pressure asked for.
+
+`well` naming an injection well, or its aquifer, solves the injection side (`doublet.injector`: the
+path of a doublet itself is its production chain). A case has `rates`, `temperature` at the wellhead
+and either `rate` or `wellhead_pressure`. `ipr` is the sandface pressure the aquifer needs, `vlp` the
+wellhead pressure that delivers it, and the operating point the pressure of the rate or the rate of
+the pressure. A rate the column of brine injects alone has no pressure to give: `null` on `vlp`, and a
+`null` value with a reason in `operating_point`.
 
 `pump_curve` head is a pressure difference in Pa; the head of a fluid column in metres is
 `head / (density g)`. The correction is `theoretical = slope * measured + offset` (offset in Pa).

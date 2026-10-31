@@ -8,6 +8,7 @@ import pytest
 import gemini as gm
 from gemini.analysis import wells
 from gemini.physics import units
+from gemini.physics.geometry import vertical_path
 from gemini.types.flows import Stream
 from tests.fixtures.errors import raises
 
@@ -92,10 +93,110 @@ def test_inputs_are_checked(shared_plant):
         wells.nodal(shared_plant, "doublet.esp", CASE)
 
 
-def test_an_injection_chain_is_not_solved_yet(shared_plant):
-    """The injection side names itself as not implemented."""
-    with pytest.raises(gm.errors.NotImplementedYet, match="injection"):
-        wells.nodal(shared_plant, "doublet.sink", CASE)
+DEPTH = 2500.0
+WIDE = 2.0
+"""A well this wide has no friction to speak of: the answer is the column of brine."""
+INJECTIVITY = 2e-6
+RATE = 50.0
+BRINE = gm.Fluid(density=1030.0, viscosity=4e-4)
+
+
+def injector():
+    """Return a vertical injector into an aquifer at 280 bar, the path ``"limb"`` of a plant."""
+    plant = gm.Plant("Injector")
+    limb = gm.modules.ModuleDict(
+        {"well": gm.modules.InjectionWell(), "sink": gm.modules.InjectionReservoir()}
+    )
+    plant._add_module("limb", limb)
+    path = vertical_path(DEPTH, WIDE, 2e-5).model_dump()
+    limb["well"].set_params(
+        "", {"pipe_path": path, "soil_temperature": "50 degC", "heat_transfer_coefficient": 0.0}
+    )
+    limb["sink"].set_params(
+        "",
+        {
+            "pressure": "280 bar",
+            "temperature": "87 degC",
+            "permeability": 2e-13,
+            "aquifer_thickness": 100.0,
+            "drainage_radius": 1000.0,
+            "top_depth": 2450.0,
+            "injectivity_index": INJECTIVITY,
+            "wellbore_radius": 0.1,
+        },
+    )
+    limb["well"].fluid = limb["sink"].fluid = BRINE
+    return plant
+
+
+def needed(rate):
+    """Return the wellhead pressure [Pa] at ``rate``: the aquifer's need less the column."""
+    required = 280e5 + rate / 1030.0 / INJECTIVITY
+    return required - 1030.0 * 9.81 * DEPTH
+
+
+def test_an_injection_well_gives_the_wellhead_pressure_a_rate_needs():
+    """The operating point of a rate is the column of brine below the aquifer's pressure."""
+    case = {"rate": RATE, "rates": [10.0, 100.0], "temperature": "40 degC"}
+    found = wells.nodal(injector(), "limb.well", case)
+    point = found["cases"][0]["operating_point"]
+    assert point["rate"]["value"] == RATE
+    assert point["wellhead_pressure"]["value"] == pytest.approx(needed(RATE), rel=1e-3)
+    assert point["sandface_pressure"]["value"] == pytest.approx(280e5 + RATE / 1030.0 / INJECTIVITY)
+
+
+def test_an_injection_well_gives_the_rate_of_a_wellhead_pressure():
+    """The other way round: the same balance, solved for the rate."""
+    case = {"wellhead_pressure": needed(RATE), "rates": [10.0, 100.0], "temperature": "40 degC"}
+    found = wells.nodal(injector(), "limb.sink", case)
+    assert found["cases"][0]["operating_point"]["rate"]["value"] == pytest.approx(RATE, rel=1e-3)
+
+
+def test_injection_curves_have_the_shape_of_production():
+    """21 points of the pressure the aquifer needs and the wellhead pressure that gives it."""
+    case = {"rate": RATE, "rates": ["36 t/h", 100.0], "temperature": "40 degC"}
+    found = wells.nodal(injector(), "limb.well", case, units={"pressure": "bar"})["cases"][0]
+    assert set(found) == {"conditions", "ipr", "vlp", "operating_point", "error"}
+    assert len(found["ipr"]["pressure"]["value"]) == wells.CURVE_POINTS
+    assert found["vlp"]["pressure"]["unit"] == "bar"
+    assert found["vlp"]["rate"]["value"][0] == pytest.approx(10.0)
+    assert found["vlp"]["pressure"]["value"][0] == pytest.approx(needed(10.0) / 1e5, rel=1e-3)
+    assert found["ipr"]["pressure"]["value"][-1] == pytest.approx(
+        (280e5 + 100.0 / 1030.0 / INJECTIVITY) / 1e5
+    )
+
+
+def test_a_column_that_is_enough_needs_no_wellhead_pressure():
+    """Below the lowest pressure a well can hold, no pump is needed: the value says so."""
+    plant = injector()
+    plant.get_submodule("limb.sink").pressure = "200 bar"
+    case = {"rate": RATE, "rates": [10.0, 100.0], "temperature": "40 degC"}
+    point = wells.nodal(plant, "limb.well", case)["cases"][0]["operating_point"]
+    assert point["wellhead_pressure"]["value"] is None
+    assert "no pump" in point["wellhead_pressure"]["reason"]
+
+
+def test_an_injection_case_needs_a_rate_or_a_pressure():
+    """One of them says which way to solve."""
+    case = {"rates": [10.0, 100.0], "temperature": "40 degC"}
+    with raises(gm.errors.ValidationError, "missing_value", match="wellhead_pressure"):
+        wells.nodal(injector(), "limb.well", case)
+
+
+def test_a_failed_injection_case_is_recorded():
+    """As in production, the other cases still run."""
+    cases = [
+        {"rate": RATE, "rates": [10.0, 100.0]},
+        {"rate": RATE, "rates": [10.0, 100.0], "temperature": "40 degC"},
+    ]
+    found = wells.nodal(injector(), "limb.well", cases, on_error="record")["cases"]
+    assert found[0]["error"]["code"] == "missing_value" and found[1]["error"] is None
+
+
+def test_the_injection_side_of_a_doublet_is_reached_through_its_injector(shared_plant):
+    """The doublet itself is its production chain; the injector names the other side."""
+    assert wells._chain(shared_plant, "doublet.injector").well is shared_plant.doublet.injector
+    assert wells._chain(shared_plant, "doublet.sink").sink is shared_plant.doublet.sink
 
 
 def test_pump_curve_starts_at_the_shut_in_head_of_the_polynomial(shared_plant):
