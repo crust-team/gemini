@@ -384,7 +384,11 @@
     "plant",
     "results"
    ],
-   "names": []
+   "names": [],
+   "totals": [
+    "plant",
+    "results"
+   ]
   },
   "optim": {
    "CalibrationResult": "class",

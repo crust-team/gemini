@@ -250,6 +250,7 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.economics.co2(plant, results, assumptions=None, on_error="raise")` | real |
 | `gm.economics.npv(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
 | `gm.economics.payback(plant, results, assumptions=None, on_error="raise")` | real |
+| `gm.kpi.totals(plant, results)` | real: `{name: value}` of what crossed the plant's edge over the run, each read from the ports of the edge modules; `None` with a reason when no edge module shows it |
 | `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `{name: value}` of `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
 | `gm.checks.plant_balance(plant, run)` | real, a list of checks: mass and energy of every module within 1e-9 and of the root within 1e-6; `run` is `Results` or a `ModuleResult`. The root's in and out are the ports of the grids and environment modules, the aquifers and the plant ports of a building block run alone; a replay does not close at the root. |
 | `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)` | real, each a check; they are ledger checks, see [economics.md](economics.md) |
@@ -283,6 +284,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `gm.kpi.totals(plant, results)`: heat and cold delivered, electricity bought and sold, gas bought, emissions, waste, chemicals and losses, read from the ports of the edge modules. The hackathon example has all seven edge modules, a desander and inhibitor dosing. |
 | 0.2.0, unreleased changes | | `gm.checks.plant_balance(plant, run)`: a `Check` of mass and of energy per module and for the plant, whose in and out are the ports of the grids and environment modules. `Flare` has `fuel` and `loss_out`. |
 | 0.2.0, unreleased changes | | Port quantities are in `Results`: `<port>.mass_flow`, `.volume_flow`, `.temperature`, `.pressure`, `.enthalpy_flow`, `.gas_flow`, `.co2_flow`, `.chemical_flow`, and a `Power` port under its name. Outputs a port shows are gone (`useful_duty`, `condenser_duty`, `electricity`, `electricity_generated`, `heat_loss`, `heat_supplied`, ...), and so are automatic sums, the `sum` key of a plant's `outputs` and the quantities `ElectricityGenerated`, `HeatLoss`, `HeatSupplied` and `HeatAbsorbed`. `gm.kpi` and `gm.economics` read the edge modules; `waste_disposal_price`, `chemical_price`. |
 | 0.2.0, unreleased changes | | Port names follow `<role>_in` and `<role>_out` (`gm.plants.migrate` converts stored specs). `Inlet(Stream, kind=...)` replaces `stream=`, the first argument of a declaration is `type`, `p.add(type, ...)`, `p.connect(source, target, type=None)`, a connection's `type: "state"`; `describe()` gives ports `{kind, fields}`, outputs `{unit, quantity, soft_sensor}`, connections `{source, target, kind, type}`. |

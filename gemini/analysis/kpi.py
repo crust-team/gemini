@@ -1,4 +1,4 @@
-"""The plant KPIs under fixed names: ``gm.kpi.compute`` and ``gm.kpi.names``.
+"""The plant KPIs under fixed names and the totals at the edge: ``gm.kpi``.
 
 Every KPI is read from the columns of a finished run (``results.to_frame()``): the totals come from
 the ports of the edge modules, so nothing is summed over the plant. A tick where a needed
@@ -18,7 +18,15 @@ from gemini.analysis.series import (
     leaf_total,
     window_seconds,
 )
-from gemini.modules.grids import CoolingGrid, ElectricityGrid, HeatingGrid
+from gemini.modules.environment import Atmosphere, Formation
+from gemini.modules.grids import (
+    ChemicalGrid,
+    CoolingGrid,
+    ElectricityGrid,
+    GasGrid,
+    HeatingGrid,
+    WasteGrid,
+)
 from gemini.types.shapes import value
 
 
@@ -96,7 +104,7 @@ def _cop(series):
     return energy(series.heat.where(series.electricity.notna()), series.seconds) / consumed, None
 
 
-__all__ = ["compute", "names"]
+__all__ = ["compute", "names", "totals"]
 
 _KPIS = {
     "heating_coverage": ("-", _heating_coverage),
@@ -150,3 +158,56 @@ def compute(plant, results):
         number, reason = compute(series)
         values[name] = value(number, unit, reason)
     return values
+
+
+_EDGE_TOTALS = {
+    "electricity_bought": ("J", ElectricityGrid, "net_import"),
+    "electricity_sold": ("J", ElectricityGrid, "net_export"),
+    "gas_bought": ("J", GasGrid, "gas_out.chemical_flow"),
+    "co2_emitted": ("kg", Atmosphere, "co2_emission"),
+    "methane_emitted": ("kg", Atmosphere, "methane_emission"),
+    "waste": ("kg", WasteGrid, "waste_in.mass_flow"),
+    "chemicals": ("kg", ChemicalGrid, "chemical_out.mass_flow"),
+}
+"""Each total read from one column of the edge modules: unit, module class and column."""
+
+
+def _integral(series, seconds, unit):
+    """Return the integral of ``series`` over a run, or ``None`` with what it needs."""
+    if series is None:
+        return value(None, unit, "the plant has no module at its edge that shows it")
+    return value(energy(series, seconds), unit)
+
+
+def totals(plant, results):
+    """Return what crossed the plant's edge over a run, read from the edge modules' ports.
+
+    Parameters
+    ----------
+    plant : Module
+        The plant that produced ``results``.
+    results : Results
+        A finished ``simulate`` or ``replay``.
+
+    Returns
+    -------
+    dict
+        ``{name: value}``, plain JSON: ``heat_delivered``, ``cold_delivered``,
+        ``electricity_bought``, ``electricity_sold``, ``gas_bought`` (lower heating value) and
+        ``losses`` in J, ``co2_emitted``, ``methane_emitted``, ``waste`` and ``chemicals`` in kg.
+        ``losses`` is the net heat into the ``Atmosphere`` and the ``Formation``. A value is
+        ``None``, with a ``reason``, when no module at the edge shows it.
+    """
+    frame = results.to_frame()
+    seconds = window_seconds(results)
+    report = {
+        "heat_delivered": _integral(delivered_heat(plant, frame), seconds, "J"),
+        "cold_delivered": _integral(delivered_cold(plant, frame), seconds, "J"),
+    }
+    for name, (unit, module_class, field) in _EDGE_TOTALS.items():
+        report[name] = _integral(edge_total(plant, frame, field, module_class), seconds, unit)
+    air = edge_total(plant, frame, "heat_in", Atmosphere)
+    ground = edge_total(plant, frame, "heat_in", Formation)
+    known = [series for series in (air, ground) if series is not None]
+    report["losses"] = _integral(sum(known) if known else None, seconds, "J")
+    return report

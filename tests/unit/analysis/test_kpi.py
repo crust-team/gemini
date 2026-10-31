@@ -45,7 +45,7 @@ def test_names_are_fixed():
 
 def test_kpi_is_a_namespace():
     """``compute`` and ``names`` are its functions; it is no function with an attribute."""
-    assert not callable(gm.kpi) and gm.kpi.__all__ == ["compute", "names"]
+    assert not callable(gm.kpi) and gm.kpi.__all__ == ["compute", "names", "totals"]
 
 
 def test_values_equal_the_hand_computed_ratios(plant, results):
@@ -91,3 +91,47 @@ def test_skipped_ticks_leave_the_ratios_alone(plant):
         }
     )
     assert gm.kpi.compute(plant, gap)["heating_coverage"]["value"] == 0.5
+
+
+def test_totals_integrate_the_ports_of_the_edge_modules(plant, results):
+    """Each total is the hand sum of one edge column; a module the plant lacks says so."""
+    totals = gm.kpi.totals(plant, results)
+    assert totals["heat_delivered"] == {"value": 300 * 3600.0, "unit": "J"}
+    assert totals["cold_delivered"]["value"] == 60 * 3600.0
+    assert totals["gas_bought"]["value"] is None and totals["gas_bought"]["reason"]
+    json.dumps(totals, allow_nan=False)
+
+
+def test_totals_of_a_run_with_every_edge_module():
+    """Bought, sold, released, wasted and lost come from their own module."""
+    plant = gm.Plant("Edges")
+    for module, name in (
+        ("ElectricityGrid", "grid"),
+        ("GasGrid", "gas"),
+        ("Atmosphere", "air"),
+        ("WasteGrid", "waste"),
+        ("ChemicalGrid", "chemicals"),
+    ):
+        plant.add(module, name)
+    run = make_results(
+        {
+            "grid": {"net_import": [10.0], "net_export": [1.0]},
+            "gas": {"gas_out.chemical_flow": [20.0]},
+            "air": {"co2_emission": [2.0], "methane_emission": [0.5], "heat_in": [7.0]},
+            "waste": {"waste_in.mass_flow": [3.0]},
+            "chemicals": {"chemical_out.mass_flow": [4.0]},
+        }
+    )
+    totals = {name: item["value"] for name, item in gm.kpi.totals(plant, run).items()}
+    assert totals == {
+        "heat_delivered": None,
+        "cold_delivered": None,
+        "electricity_bought": 36000.0,
+        "electricity_sold": 3600.0,
+        "gas_bought": 72000.0,
+        "co2_emitted": 7200.0,
+        "methane_emitted": 1800.0,
+        "waste": 10800.0,
+        "chemicals": 14400.0,
+        "losses": 25200.0,
+    }

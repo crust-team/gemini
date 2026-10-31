@@ -116,6 +116,7 @@ def _economics_entries():
 def _ledger_entries(plant, results):
     return {
         "compute": lambda: gm.kpi.compute(plant, results),
+        "totals": lambda: gm.kpi.totals(plant, results),
         "energy_balance": lambda: gm.checks.energy_balance(results),
         "mass_balance": lambda: gm.checks.mass_balance(results),
         "bounds": lambda: gm.checks.bounds(plant, results),

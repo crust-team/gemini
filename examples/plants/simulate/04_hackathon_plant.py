@@ -48,6 +48,19 @@ CHILLER_COOLER = {
 HEATING_SUPPLY = "100 degC"
 COOLING_SUPPLY = "20 degC"
 
+SAND = "20 mg/l"
+"""Assumed sand in the brine."""
+
+DOSE = 1e-5
+"""Assumed scale inhibitor dose [kg active/kg brine], 10 ppm."""
+
+DESANDER = {
+    "separation_efficiency": 0.9,
+    "nominal_pressure_drop": "0.2 bar",
+    "nominal_mass_flow": 170.0,
+}
+DOSING = {"product_concentration": 0.3}
+
 BRINE = gm.Fluid(
     density="1030 kg/m3",
     viscosity="0.4 mPa*s",
@@ -105,6 +118,8 @@ ASSUMPTIONS = dict(
     exchanger_cost=0.5,
     flare_cost=1e5,
     makeup_cost=5e4,
+    waste_disposal_price=0.2,
+    chemical_price=3.0,
 )
 """Placeholders, not data: the prices and the factors without a source are this example's."""
 
@@ -116,6 +131,10 @@ def add_modules(plant):
         plant.get_module(name).fluid = BRINE
     plant.add("Mixer", name="production")
     plant.add("Degasser", name="degasser", params={"separation_efficiency": 1.0})
+    plant.add("Desander", name="desander", params=DESANDER)
+    plant.add("InhibitorDosing", name="dosing", params=DOSING)
+    plant.add("WasteGrid", name="waste")
+    plant.add("ChemicalGrid", name="chemicals")
     plant.add("HeatExchanger", name="hx", params=EXCHANGER)
     plant.add("Splitter", name="injection")
     plant.add("GasGrid", name="gas_grid")
@@ -141,7 +160,11 @@ def connect_brine(plant):
     plant.connect("d0.supply_out", "production.branch1_in")
     plant.connect("d1.supply_out", "production.branch2_in")
     plant.connect("production.fluid_out", "degasser.fluid_in")
-    plant.connect("degasser.liquid_out", "hx.hot_in")
+    plant.connect("degasser.liquid_out", "desander.fluid_in")
+    plant.connect("desander.fluid_out", "dosing.fluid_in")
+    plant.connect("desander.waste_out", "waste.waste_in")
+    plant.connect("chemicals.chemical_out", "dosing.chemical_in")
+    plant.connect("dosing.fluid_out", "hx.hot_in")
     plant.connect("hx.hot_out", "heat_pump.source_in")
     plant.connect("heat_pump.source_out", "injection.fluid_in")
     plant.connect("injection.branch1_out", "d0.return_in")
@@ -198,6 +221,8 @@ def set_boundaries(plant):
     plant.chiller_cooler.temperature_setpoint = COOLING_WATER
     plant.chiller_cooler.flow = COOLING_WATER_FLOW
     plant.air.temperature = AMBIENT
+    plant.desander.sand_concentration = SAND
+    plant.dosing.dose = DOSE
 
 
 def build():
@@ -228,6 +253,7 @@ def print_assumptions():
     print("Assumptions of this example, not of the challenge:")
     print("  heating return 60 degC, cooling return 25 degC, chiller cooling water 15 degC")
     print("  air 10 degC; the chiller's dry cooler: 5 K approach, 2 % fan power")
+    print("  20 mg/l sand, 90 % desander, 10 ppm inhibitor")
     print("  heat exchanger, heat pump, boiler and chiller sizes; 1000 m drainage radius")
     print("  discount rate, lifetime, every price and the cost factors without a source")
 
@@ -271,6 +297,26 @@ def print_limits(checks):
         )
 
 
+def print_balance(checks):
+    """Print the plant balance: the root, and how many modules close."""
+    modules = [item for item in checks if not item["name"].startswith("plant ")]
+    closed = sum(item["passed"] is True for item in modules)
+    print("\nBalance:")
+    print(f"  modules that close {closed} of {len(modules)}")
+    for item in checks[-2:]:
+        result = "ok" if item["passed"] else "OPEN"
+        print(f"  {item['name']:<18} {result:<5} worst {item['value']['value']:.3g}")
+    assert all(item["passed"] for item in checks)
+
+
+def print_totals(totals):
+    """Print what crossed the plant's edge, read from the edge modules."""
+    print("\nAt the plant's edge:")
+    for name, item in totals.items():
+        scale, unit = (3.6e12, "GWh") if item["unit"] == "J" else (1e6, "kt")
+        print(f"  {name:<20} {item['value'] / scale:10.3f} {unit}")
+
+
 def print_kpis(kpis):
     """Print the KPIs of the run."""
     print("\nKPIs:")
@@ -310,6 +356,8 @@ except gm.errors.NotImplementedYet as error:
 results = gm.simulate(plant, plan)
 print_run(results)
 print_limits(gm.checks.limits(plant, results, hackathon_limits()))
+print_balance(gm.checks.plant_balance(plant, results))
+print_totals(gm.kpi.totals(plant, results))
 print_kpis(gm.kpi.compute(plant, results))
 frame = results.to_frame()
 heat = -gain(frame, "heat_users", "supply_in", "return_out").sum()
