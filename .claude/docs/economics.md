@@ -30,7 +30,8 @@ its heat and cold KPIs and levelised costs are `null` with that reason.
 ## `gm.economics`
 
 Every function returns a value with the parts of its result as more keys, each a value or a text;
-`unit` is the currency (`EUR`), `EUR/year`, `EUR/J`, `year` or `kg`. Every function takes
+`unit` is the currency (`EUR`), `EUR/year`, `EUR/J`, `year` or `kg`. `A` is the annuity factor, the
+sum over the lifetime years of `1 / (1 + discount_rate) ** t`, in years. Every function takes
 `on_error="raise"`: a value the inputs cannot give raises `ValidationError`, code `no_value`, or
 `missing_assumption`, naming it, for an assumption nobody gave. With `on_error="record"` nothing is raised and it is
 `{value: null, unit, reason}`.
@@ -42,6 +43,8 @@ Every function returns a value with the parts of its result as more keys, each a
 | `opex(plant, results, assumptions=None)` | fixed + variable cost per year + yearly bill of grid electricity and purchased gas (`fuel_purchased` at `gas_price`; co-produced gas costs nothing); `components` lists the parts |
 | `lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `(capex + opex A) / (heat A)` in currency/J, `A` the annuity factor |
 | `lcoc(...)` | the same with the cold delivered |
+| `annualised_cost(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `capex / A + opex` in currency/year, with `capex`, `opex`, `annuity_factor`, `discount_rate`, `lifetime_years` |
+| `lcts(...)` | levelised cost of thermal supply, the team's design metric: `annualised_cost / (heat + cold)` in currency/J, heat and cold delivered per year, with `annualised_cost`, `heat`, `cold`; it needs no `heat_cost_share` |
 | `co2(plant, results, assumptions=None)` | kg of CO2-equivalent over the window: the leaf `co2_emission`, `methane_emission` times `methane_gwp`, grid electricity times `electricity_emission_factor` |
 | `npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `-capex + (revenue - opex) A` |
 | `payback(plant, results, assumptions=None)` | `capex / (revenue - opex)` in years, undiscounted |
@@ -64,7 +67,11 @@ assumptions in another currency than the costs raise `ValidationError`.
 
 `lcoh` charges the whole plant cost to the heat. A plant that also delivers cold has no value ("the
 split of its cost is not defined") unless `heat_cost_share` gives the part charged to heat; `lcoc`
-gets the rest. Levelised cost, `npv` and `payback` assume constant yearly energy and cost over the
+gets the rest. `lcts` needs no share: with a `heat_cost_share` of 1, `lcts` is `lcoh` times its
+energy over `heat + cold`. It has no value when the run delivers neither. `lcoh` and `lcoc` keep the
+one expression `(capex + opex A) / (energy A)`: `annualised_cost` and they share `lifetime_cost`
+(`capex + opex A`) and not the division, which would move the last bits of their numbers. Levelised
+cost, `npv` and `payback` assume constant yearly energy and cost over the
 lifetime, with no degradation, tax, replacement or residual value.
 
 Missing user inputs raise `ValidationError` with code `missing_assumption` and the path

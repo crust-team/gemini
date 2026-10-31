@@ -338,6 +338,14 @@
   },
   "economics": {
    "Assumptions": "class",
+   "annualised_cost": [
+    "plant",
+    "results",
+    "discount_rate",
+    "lifetime",
+    "assumptions",
+    "on_error"
+   ],
    "capex": [
     "plant",
     "assumptions",
@@ -358,6 +366,14 @@
     "on_error"
    ],
    "lcoh": [
+    "plant",
+    "results",
+    "discount_rate",
+    "lifetime",
+    "assumptions",
+    "on_error"
+   ],
+   "lcts": [
     "plant",
     "results",
     "discount_rate",

@@ -10,7 +10,7 @@ from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
 SNAPSHOTS = {
     "0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b48178a8b",
-    "0.2.0": "6052bab3b6a3f36c774ea37fb46e6076f1a5b179835dd3ebd05a4e80fb7049e5",
+    "0.2.0": "f6f80fb087eaedb3484507dd51eae722d6cdc667a818d807a442c8cfe1a88bdd",
 }
 """Hash of the snapshot per ``gm.__version__``: a released entry never changes."""
 
@@ -99,7 +99,7 @@ def test_the_package_has_one_version():
 
 def test_every_economics_function_takes_the_plant_and_the_results():
     """``capex`` alone has no results; ``co2`` takes the plant too."""
-    for name in ("opex", "lcoh", "lcoc", "co2", "npv", "payback"):
+    for name in ("opex", "lcoh", "lcoc", "lcts", "annualised_cost", "co2", "npv", "payback"):
         arguments = list(inspect.signature(getattr(gm.economics, name)).parameters)
         assert arguments[:2] == ["plant", "results"], name
     assert list(inspect.signature(gm.economics.capex).parameters)[0] == "plant"

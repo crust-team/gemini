@@ -247,6 +247,8 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.economics.opex(plant, results, assumptions=None, on_error="raise")` | real |
 | `gm.economics.lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
 | `gm.economics.lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
+| `gm.economics.lcts(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
+| `gm.economics.annualised_cost(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
 | `gm.economics.co2(plant, results, assumptions=None, on_error="raise")` | real |
 | `gm.economics.npv(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
 | `gm.economics.payback(plant, results, assumptions=None, on_error="raise")` | real |
@@ -285,6 +287,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `gm.economics.annualised_cost` and `gm.economics.lcts`, the levelised cost of heat and cold together. |
 | 0.2.0, unreleased changes | | `rules["operating_days"]` of `gm.schedule` is built: a count or a list of outage dates, `attrs["outage_days"]`, the column `<heat pump>.is_running`. New `gm.checks.operating_days(plant, results, days)`; `gm.checks.run_all` takes `days`. |
 | 0.2.0, unreleased changes | | File layout of `gemini/modules/`: `plant.py` and `container.py` beside `module.py`, the plant tools in `plants/_utils/`, `heating/_burner.py`, `cooling/_sorption.py`. Private paths only: no change to a name of this page. |
 | 0.2.0, unreleased changes | | Data layout: `gemini/assets/` (installed: plant structures, templates) and `inputs/` (repository only: hackathon inputs, example values, measured data, legacy project); `datasets/` is gone. New code `inputs_missing`: `gm.profiles.get` and `gm.plants.example` raise it outside a source checkout. Templates `DistrictNetwork` and `MultiWellPlant` are now `district_network` and `multi_well`. `gm.plants.example("Doublet")` is the registered class, with the outputs of its structure file. No change to a name of this page. |
