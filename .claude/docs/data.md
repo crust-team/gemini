@@ -67,7 +67,7 @@ convert in-memory raw values to SI. Profiles combined into a dataset must share 
 ## Demand profiles
 
 `gm.profiles` holds the two demand profiles of the challenge. `names()` lists them
-(`heating_demand`, `cooling_demand`). `get(name)` returns a DataFrame in the run-input format: 365
+(`heating_demand`, `cooling_demand`). `demand()` both in one frame, `get(name)` returns a DataFrame in the run-input format: 365
 UTC days of 2027, a `DatetimeIndex` called `time`, one column named after the profile in W, and
 `frame.attrs` with `units`, `quantities`, `description` and `source`, which names the organiser
 file. The two files in `inputs/hackathon/` are the organisers' CSV files, unchanged; their

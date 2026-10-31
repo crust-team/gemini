@@ -6,6 +6,7 @@ drive, the dotted path of a control or boundary or ``port.field`` of a plant inl
 caller writes a binding.
 """
 
+from copy import deepcopy
 from dataclasses import dataclass
 
 import numpy as np
@@ -28,6 +29,24 @@ SOURCES = ("geothermal", "heat_pump", "boiler")
 RULES = ("order", "cooling_order", "doublet_flow", "max_brine_cooling", "operating_days")
 ARRAY_BACKEND = "numpy"
 """A plan is a balance over the days, on arrays whatever backend the run takes after it."""
+
+
+CHALLENGE_RULES = {
+    "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
+    "max_brine_cooling": "40 K",
+    "operating_days": 330,
+}
+"""The rules of the challenge, section 3 of its requirements (``inputs/hackathon/``, a PDF)."""
+
+
+def challenge_rules():
+    """Return a new copy of the rules of the challenge, for ``gm.schedule``.
+
+    ``doublet_flow`` is 50 to 300 m3/h per doublet, ``max_brine_cooling`` 40 K and
+    ``operating_days`` 330. The source is ``inputs/hackathon/``, where they stand in the PDF of the
+    organisers and its README, in no form code reads.
+    """
+    return deepcopy(CHALLENGE_RULES)
 
 
 @dataclass(frozen=True)

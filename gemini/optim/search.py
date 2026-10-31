@@ -3,9 +3,12 @@
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
 from scipy.optimize import differential_evolution
 
+from gemini import profiles
 from gemini.analysis import kpi
+from gemini.analysis.schedule import challenge_rules, schedule
 from gemini.economics import annualised_cost, co2, lcoc, lcoh, lcts
 from gemini.engine.run import simulate
 from gemini.errors import GeminiError, ValidationError
@@ -56,6 +59,25 @@ def _metric(plant, results, name, assumptions):
     return kpi.compute(plant, results)[name]
 
 
+def _input_of(profile):
+    """Return what a search runs on: the challenge's demand for ``None``, else ``profile``."""
+    return profiles.demand() if profile is None else profile
+
+
+def _is_demand(profile):
+    """Return whether ``profile`` is a demand to plan, not a plan: it has no plan's ``attrs``."""
+    return (
+        isinstance(profile, pd.DataFrame)
+        and "heating_demand" in profile
+        and "outage_days" not in profile.attrs
+    )
+
+
+def _planned(trial, profile):
+    """Return the run input of one trial: a demand is planned on the design of the trial."""
+    return schedule(trial, profile, challenge_rules()) if _is_demand(profile) else profile
+
+
 def _trial(plant, profile, parameters, names, assumptions):
     """Return ``(metrics, reason)`` of one run of a copy; a run that fails has its reason."""
     trial = deepcopy(plant)
@@ -63,7 +85,7 @@ def _trial(plant, profile, parameters, names, assumptions):
         for name, number in parameters.items():
             path, _, parameter = name.rpartition(".")
             trial.set_params(path, {parameter: number})
-        results = simulate(trial, profile)
+        results = simulate(trial, _planned(trial, profile))
         return {item: _metric(trial, results, item, assumptions) for item in names}, None
     except GeminiError as error:
         return {}, str(error)
@@ -132,8 +154,8 @@ def minimize(
 ):
     """Return the parameter values that minimise a metric of a simulated plant.
 
-    Each trial copies the plant, sets the variables with ``set_params``, simulates the profile and
-    reads the objective from ``gm.kpi`` or ``gm.economics``. The search is
+    Each trial copies the plant, sets the variables with ``set_params``, plans a demand on that
+    design, simulates and reads the objective from ``gm.kpi`` or ``gm.economics``. The search is
     ``scipy.optimize.differential_evolution`` from a Latin hypercube, with a fixed seed: it needs no
     gradient, takes a failed trial as infinitely bad, and its population gives the exact number of
     simulations. The plant itself is not changed.
@@ -142,9 +164,12 @@ def minimize(
     ----------
     plant : Module
         A plant with parameter values.
-    profile : Dataset or DataFrame
-        The simulation input: a UTC time index and one column per binding, or what ``gm.schedule``
-        returns. It stays fixed over the trials.
+    profile : Dataset, DataFrame or None
+        ``None`` is the demand year of the challenge, ``gm.profiles.demand()``. A demand frame, with
+        a column ``heating_demand``, is planned for each trial with ``gm.schedule`` and
+        ``gm.challenge_rules()``, so a variable that changes the design changes the plan. A plan or
+        any other simulation input (a UTC time index and one column per binding) stays fixed over
+        the trials.
     variables : list of dict
         The decision variables, each ``{path, parameter, lower, upper}``: the module path, the
         parameter name and its closed bounds in the parameter's SI unit.
@@ -157,7 +182,8 @@ def minimize(
     evaluations : int
         The largest number of simulations; at least five per variable, and at least five.
     assumptions : Assumptions, optional
-        The prices and the discounting the economic metrics need.
+        The prices and the discounting the economic metrics need; ``None`` gives the defaults of
+        ``Assumptions``, so an economic metric without one of them has a reason, not a value.
 
     Returns
     -------
@@ -175,10 +201,11 @@ def minimize(
     keys, bounds = _checked_variables(plant, variables)
     population, generations = _generations(evaluations, len(keys))
     history = []
+    run_input = _input_of(profile)
 
     def evaluated(point):
         parameters = dict(zip(keys, map(float, point)))
-        metrics, reason = _trial(plant, profile, parameters, names, assumptions)
+        metrics, reason = _trial(plant, run_input, parameters, names, assumptions)
         reason = reason or metrics[name].get("reason") or _broken_constraint(metrics, constraints)
         history.append(_entry(parameters, metrics, name, reason))
         return np.inf if reason else sign * metrics[name]["value"]
@@ -240,15 +267,15 @@ def _spread(samples, name):
 def sample(plant, profile, distributions, metrics, count, seed=0, *, assumptions=None):
     """Return the spread of metrics when uncertain parameters are drawn at random.
 
-    Each draw copies the plant, sets the drawn values with ``set_params``, simulates the profile
-    and reads the metrics. The plant itself is not changed.
+    Each draw copies the plant, sets the drawn values with ``set_params``, plans a demand on that
+    design, simulates and reads the metrics. The plant itself is not changed.
 
     Parameters
     ----------
     plant : Module
         A plant with parameter values.
-    profile : Dataset or DataFrame
-        The simulation input, as for ``minimize``.
+    profile : Dataset, DataFrame or None
+        The simulation input, as for ``minimize``: ``None`` is the demand year of the challenge.
     distributions : dict
         For each uncertain parameter ``"path.parameter"``, its distribution:
         ``{"kind": "normal", "mean", "std"}``, ``{"kind": "uniform", "lower", "upper"}`` or
@@ -260,7 +287,7 @@ def sample(plant, profile, distributions, metrics, count, seed=0, *, assumptions
     seed : int
         Seed of ``numpy.random.default_rng``; the same seed gives the same draws.
     assumptions : Assumptions, optional
-        The prices and the discounting the economic metrics need.
+        The prices and the discounting the economic metrics need, as for ``minimize``.
 
     Returns
     -------
@@ -277,9 +304,10 @@ def sample(plant, profile, distributions, metrics, count, seed=0, *, assumptions
         _checked_distribution(plant, name, distribution)
     generator = np.random.default_rng(seed)
     samples = []
+    run_input = _input_of(profile)
     for _ in range(count):
         drawn = {key: _draw(generator, key, item) for key, item in distributions.items()}
-        found, reason = _trial(plant, profile, drawn, names, assumptions)
+        found, reason = _trial(plant, run_input, drawn, names, assumptions)
         failed = {"reason": reason} if reason else {}
         samples.append({"parameters": drawn, "metrics": found, **failed})
     summary = {name: _spread(samples, name) for name in names}

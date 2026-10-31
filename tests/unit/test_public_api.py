@@ -10,7 +10,7 @@ from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
 SNAPSHOTS = {
     "0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b48178a8b",
-    "0.2.0": "cad3f62a3dc8711d690f1df7e03e4086cbb21efef21f5174ef1fdd8670f0b18c",
+    "0.2.0": "25cece2c8f13b81bf11811d68ebe73747044d912e9ad28343cad7d51e1d1d203",
 }
 """Hash of the snapshot per ``gm.__version__``: a released entry never changes."""
 
@@ -50,6 +50,7 @@ def test_public_names_and_docs():
         "optim",
         "errors",
         "no_outputs",
+        "challenge_rules",
         "__version__",
     }
     assert set(dir(gm)) == expected == set(gm.__all__)

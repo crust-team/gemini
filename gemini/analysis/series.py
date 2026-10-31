@@ -9,7 +9,7 @@ from gemini.utils.strings import join_path
 
 def window_seconds(results):
     """Return the duration [s] of every completed tick of ``results``, as an array."""
-    return np.asarray(results.to_dict()["duration"]["value"], dtype=float)
+    return results.durations
 
 
 def leaf_total(plant, frame, field, module_class=Module):

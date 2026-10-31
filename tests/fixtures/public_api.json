@@ -504,6 +504,7 @@
    ]
   },
   "profiles": {
+   "demand": [],
    "get": [
     "name"
    ],
@@ -644,6 +645,7 @@
   "WATER",
   "__version__",
   "analysis",
+  "challenge_rules",
   "checks",
   "economics",
   "errors",

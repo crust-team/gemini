@@ -135,6 +135,7 @@ class Results:
         self._energy = set()
         self._skips = []
         self._frame = None
+        self._series = None
         self.units = dict(units or {})
         self.quantities = {}
         self.end_state = None
@@ -159,6 +160,7 @@ class Results:
         for row, error in errors:
             self._failures.append(dict(error, time=times[row].isoformat()))
         self._frame = None
+        self._series = None
 
     def _register(self, chunk):
         """Store a chunk: its new columns, in the order a row-by-row build meets them."""
@@ -192,6 +194,11 @@ class Results:
             return frame[module][column].copy()
         raise _unknown_path(path, paths)
 
+    @property
+    def durations(self):
+        """Return the duration [s] of every committed tick, as a float array."""
+        return np.asarray(self._dt, dtype=float)
+
     def _cached_frame(self):
         """Return the shared table, built once after each append; callers must not change it."""
         if self._frame is None:
@@ -217,7 +224,20 @@ class Results:
         return self._energy_table() if table == "energy" else self._series_table(units)
 
     def _series_table(self, units):
-        """Return the table of the series, with the unit of each column in ``attrs``."""
+        """Return the table of the series, with the unit of each column in ``attrs``.
+
+        Without ``units`` it is built once and each caller gets a copy: every reader of a finished
+        run starts here, several times for one metric.
+        """
+        if units or self._series is None:
+            table = self._built_series(units)
+            if units:
+                return table
+            self._series = table
+        return self._series.copy()
+
+    def _built_series(self, units):
+        """Return a new table of the series in ``units``."""
         output = OutputUnits(units)
         frame = self._cached_frame().copy()
         stated = {}

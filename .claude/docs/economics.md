@@ -198,9 +198,12 @@ deliver at each rate; the operating point is where it falls to the wellhead pres
 [modules.md](modules.md#registry-categories-and-streams).
 
 `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *,
-assumptions=None)` searches design values on a fixed run input. Each trial copies the plant, sets
-the variables with `set_params`, simulates `profile` and reads the metric, so the plant is not
-changed. The search is `scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
+assumptions=None)` searches design values. Each trial copies the plant, sets the variables with
+`set_params`, plans a demand on that design, simulates and reads the metric, so the plant is not
+changed. `profile=None` is the demand year of the challenge; it and a demand frame are planned with
+`gm.schedule` and `gm.challenge_rules()` for each trial, and a plan stays fixed. A trial reads a
+finished run in about 0.1 s; simulating the year takes 0.3 s on a plant without a loop and about 6 s
+on one with the drive-water loop of a heat-driven chiller, which runs row by row. The search is `scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
 with five candidates per variable: the population times the generations is the number of
 simulations, so `evaluations` is a hard limit and a smaller budget than one population raises
 `ValidationError`. A trial that fails, has no value or breaks a constraint is in `history` with its

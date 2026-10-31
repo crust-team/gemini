@@ -4,24 +4,17 @@ Plans 2027 for ``gm.plants.example("HeatingCoolingPlant")``, two doublets with a
 and three chillers, and simulates it. The reservoir, the brine, the limits and the supply
 temperatures are the challenge's; what this case assumes it prints as assumptions.
 
-Shows ``gm.plants.example``, ``gm.schedule``, ``gm.simulate``, ``gm.checks.limits``,
-``gm.checks.operating_days``, ``gm.kpi.totals`` and ``gm.economics.lcts``.
+Shows ``gm.plants.example``, ``gm.profiles.demand``, ``gm.challenge_rules``, ``gm.schedule``,
+``gm.simulate``, ``gm.checks.limits``, ``gm.checks.operating_days``, ``gm.kpi.totals`` and
+``gm.economics.lcts``.
 
 Run with ``python examples/cases/challenge_year.py``.
 """
-
-import pandas as pd
 
 import gemini as gm
 
 MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
-OPERATING_DAYS = 330
-RULES = {
-    "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
-    "max_brine_cooling": "40 K",
-    "operating_days": OPERATING_DAYS,
-}
 PRICES = dict(
     discount_rate=0.05,
     lifetime_years=25,
@@ -41,11 +34,6 @@ ASSUMPTIONS = """Assumptions of this case, not of the challenge:
   heat exchanger, heat pump (15 MW), boiler (30 MW), absorption (7 MW), adsorption (1 MW) and
   compression (5 MW) sizes, in inputs/plants/HeatingCoolingPlant.json
   discount rate, lifetime, every price and the cost factors without a source"""
-
-
-def demand():
-    """Return the heating and cooling demand of 2027."""
-    return pd.concat([gm.profiles.get(name) for name in gm.profiles.names()], axis=1)
 
 
 def requirements():
@@ -113,10 +101,12 @@ def main():
     """Plan and simulate the year, then print what it delivered and each requirement."""
     plant = gm.plants.example("HeatingCoolingPlant")
     print(ASSUMPTIONS)
-    results = gm.simulate(plant, gm.schedule(plant, demand(), RULES), on_error="record")
+    rules = gm.challenge_rules()
+    plan = gm.schedule(plant, gm.profiles.demand(), rules)
+    results = gm.simulate(plant, plan, on_error="record")
     print(f"\nFailed days: {len(results.errors())}")
     print_year(plant, results)
-    days = gm.checks.operating_days(plant, results, OPERATING_DAYS)
+    days = gm.checks.operating_days(plant, results, rules["operating_days"])
     print_checks(gm.checks.limits(plant, results, requirements()) + days)
     lcts = gm.economics.lcts(plant, results, assumptions=gm.economics.Assumptions(**PRICES))
     print(f"\nLCTS, on the placeholder prices above: {lcts['value'] * MWH:.2f} EUR/MWh")

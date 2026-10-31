@@ -34,6 +34,19 @@ def names():
     return list(PROFILES)
 
 
+def demand():
+    """Return every profile in one DataFrame: the demand of the challenge year.
+
+    One column per name, heating then cooling, the input of ``gm.schedule``. ``attrs`` has the
+    ``units`` and ``quantities`` of the columns.
+    """
+    frames = [get(name) for name in names()]
+    joined = pd.concat(frames, axis=1)
+    for key in ("units", "quantities"):
+        joined.attrs[key] = {name: frame.attrs[key][name] for name, frame in zip(names(), frames)}
+    return joined
+
+
 def get(name):
     """Return profile ``name`` as a DataFrame in the run-input format.
 

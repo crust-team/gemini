@@ -7,7 +7,9 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.optim import search
 from tests.fixtures.errors import raises
+from tests.unit.analysis.test_schedule import plant_of_two
 
 DEMAND = 1e6
 """Constant heat demand [W]."""
@@ -217,3 +219,58 @@ def test_a_sample_that_does_not_fit_is_refused(arguments, code):
     call = dict(distributions=UNCERTAIN, metrics=["peak_heat"], count=2) | arguments
     with raises(gm.errors.ValidationError, code):
         gm.optim.sample(boiler_plant(), profile(), **call)
+
+
+def scheduled_plant():
+    """Return the plant of ``test_schedule``: two doublets, a boiler and a heat user."""
+    return plant_of_two()
+
+
+def two_days():
+    """Return two days of demand: a frame ``gm.schedule`` plans, not a plan."""
+    index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC", name="time")
+    return pd.DataFrame({"heating_demand": [5e6, 8e6]}, index=index)
+
+
+FLOW = {"path": "d0", "parameter": "well_diameter", "lower": 0.2, "upper": 0.3}
+
+
+def planned(monkeypatch):
+    """Return the list of the rules of each ``gm.schedule`` of the search, and record them."""
+    calls = []
+    real = search.schedule
+
+    def counted(plant, demand, rules):
+        calls.append(rules)
+        return real(plant, demand, rules)
+
+    monkeypatch.setattr(search, "schedule", counted)
+    return calls
+
+
+def test_a_demand_frame_is_planned_for_each_trial(monkeypatch):
+    """A variable that changes the design changes the plan: one schedule per simulation."""
+    calls = planned(monkeypatch)
+    found = gm.optim.minimize(scheduled_plant(), two_days(), [FLOW], "peak_heat", evaluations=5)
+    assert len(calls) == found["evaluations"] == 5
+    assert calls[0] == gm.challenge_rules()
+
+
+def test_a_plan_is_not_planned_again(monkeypatch):
+    """A plan stays what it is over the trials, as a run input does."""
+    calls = planned(monkeypatch)
+    rules = {"doublet_flow": gm.challenge_rules()["doublet_flow"], "max_brine_cooling": "40 K"}
+    plan = gm.schedule(scheduled_plant(), two_days(), rules)
+    calls.clear()
+    gm.optim.minimize(scheduled_plant(), plan, [FLOW], "peak_heat", evaluations=5)
+    assert calls == []
+
+
+def test_no_profile_is_the_demand_year_under_the_challenge_rules(monkeypatch):
+    """``None`` reads the demand of the challenge, and ``sample`` takes it too."""
+    calls = planned(monkeypatch)
+    monkeypatch.setattr(search.profiles, "demand", two_days)
+    uncertain = {"d0.well_diameter": {"kind": "uniform", "lower": 0.2, "upper": 0.3}}
+    found = gm.optim.sample(scheduled_plant(), None, uncertain, ["peak_heat"], count=2)
+    assert len(found["samples"]) == 2
+    assert calls == [gm.challenge_rules()] * 2

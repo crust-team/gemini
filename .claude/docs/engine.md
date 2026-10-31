@@ -54,6 +54,9 @@ plan = gm.schedule(plant, demand, rules={
 results = gm.simulate(plant, plan)
 ```
 
+`gm.challenge_rules()` returns the rules of the challenge in this form, and `gm.profiles.demand()` its
+demand.
+
 `gm.schedule` (`gemini/analysis/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
 of each day of `demand` from a daily energy balance on the plant's design values, with no simulation
 inside. It reads the `Doublet` children, the grids and the units by **role, from the wiring**

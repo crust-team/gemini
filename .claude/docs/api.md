@@ -184,6 +184,7 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 | Name | Returns | Status |
 | --- | --- | --- |
 | `gm.schedule(plant, demand, rules)` | run input, a UTC DataFrame: the demand and one column per scheduled control, named after its dotted path; `attrs["outage_days"]` is `{doublet path: [ISO date]}`; see [engine.md](engine.md#schedule) | real |
+| `gm.challenge_rules()` | a new dict of the rules of the challenge for `gm.schedule`: `doublet_flow` 50 to 300 m3/h, `max_brine_cooling` 40 K, `operating_days` 330; the source is `inputs/hackathon/` | real |
 | `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` | real |
 | `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results`; `results.end_state` is the `state=` of the next call | real |
 | `gm.live(plant, source, checkpoint, step=None, now=None, sink=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` of the new rows; `checkpoint` is a required path | real |
@@ -216,7 +217,8 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 | Name | Returns | Status |
 | --- | --- | --- |
 | `gm.profiles.names()` | `heating_demand`, `cooling_demand` | real |
-| `gm.profiles.get(name)` | run input, a UTC daily DataFrame of 365 rows in W, with `units` and the source file in `attrs`, the one DataFrame outside `to_frame` | real |
+| `gm.profiles.get(name)` | run input, a UTC daily DataFrame of 365 rows in W, with `units`, `quantities`, `description` and the `source` file in `attrs`, the one DataFrame outside `to_frame` | real |
+| `gm.profiles.demand()` | both profiles in one frame, the `demand` of `gm.schedule`, with `units` and `quantities` in `attrs` | real |
 | `gm.profiles.profile_schema()` | JSON Schema of what `get` returns, as a document | real |
 
 ## Analysis
@@ -271,6 +273,12 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *, assumptions=None)` | real: `{best: {parameters, value, unit}, history, evaluations}`, `parameters` in SI as `{"path.parameter": value}` for `set_params`; a failed trial has a `reason` and is never `best` |
 | `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0, *, assumptions=None)` | real: `{samples, summary}`, `summary` per metric `{mean, p5, p50, p95, unit}` |
 
+`profile` of `gm.optim.minimize` and `sample` is required and may be `None`, the demand year of the
+challenge. `None`, or a demand frame with a column `heating_demand`, is planned for each trial with
+`gm.schedule` and `gm.challenge_rules()` on the design of that trial, so a variable that changes the
+design changes the plan; a plan or another run input stays fixed. `assumptions=None` takes the
+defaults of `Assumptions`, so an economic metric that needs a price gives a reason, not a value.
+
 `gm.optim.calibrate` fits only through replay and returns a `CalibrationResult`. With `apply=True` a
 successful fit replaces the current parameter as an explicit override and adds no dated snapshot.
 Pass parameter objects declared `calibratable=True`, such as
@@ -293,6 +301,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `gm.challenge_rules()` and `gm.profiles.demand()`. `profile=None` in `gm.optim.minimize` and `sample` is the demand year under the challenge rules, and a demand frame is planned for each trial. Reading a finished run no longer builds the JSON of every column. |
 | 0.2.0, unreleased changes | | `gm.plants.example` of the five template plants holds the challenge values on two doublets, with `inputs`, and runs the demand year (`examples/cases/challenge_year.py`); a value file may state `size`. A plan states the unit of its columns in `attrs["units"]`, and a run reads them: a binding in another unit no longer misreads a plan. On a root plant, which has no ports, a failing row is now an error: it passed unnoticed on a traced plant. A stopped drive circuit of `AdsorptionChiller` has no driving-temperature limit. |
 | 0.2.0, unreleased changes | | `Doublet.volume_imbalance` and `InjectionReservoir.liquid_flow`. `gm.checks.Limits` takes a parameter. `gm.checks.limits` on a run whose every row failed gives `passed: null` with a reason `no_value` instead of a `KeyError`. |
 | 0.2.0, unreleased changes | | `HeatingGrid.surplus` and `CoolingGrid.surplus`, what the water gives above the demand. `gm.kpi.totals` adds `heat_useful`, `heat_surplus`, `cold_useful`, `cold_surplus`; `gm.kpi.compute`, `gm.economics.lcoh`, `lcoc` and `lcts` read the useful energy. `HackathonPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant` and `HeatingAbsorptionCoolingPlant` return the drive water of their chillers through a bypass past the users (`loads` and `heat_return`, `drive_splitter` and `drive_mixer`), a loop the engine closes, and `gm.schedule` sets its split: the heating supply stays at its setpoint. |

@@ -2,7 +2,7 @@
 
 from gemini import analysis, checks, economics, errors, modules, optim, profiles, testing
 from gemini.analysis import kpi
-from gemini.analysis.schedule import schedule
+from gemini.analysis.schedule import challenge_rules, schedule
 from gemini.backends import runtime
 from gemini.engine.clock import Clock
 from gemini.engine.engine import Engine
@@ -20,6 +20,7 @@ from gemini.utils.version import package_version
 __version__ = package_version()
 __all__ = [
     "schedule",
+    "challenge_rules",
     "simulate",
     "replay",
     "live",

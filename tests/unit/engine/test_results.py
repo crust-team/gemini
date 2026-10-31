@@ -334,3 +334,35 @@ def test_quantities_survive_files_and_slices(tmp_path):
     assert loaded.quantities == rows.quantities
     assert loaded.get("pump", "head", units=UNITS)["unit"] == "bar"
     assert rows.slice(1).get("pump", "head", units=UNITS)["unit"] == "bar"
+
+
+def test_the_series_table_is_built_once_and_stays_the_callers(fast_run_results):
+    """A second call reads the same table; what a caller writes to its copy stays there."""
+    first = fast_run_results.to_frame()
+    column = first.columns[0]
+    first[column] = -1.0
+    assert not (fast_run_results.to_frame()[column] == -1.0).all()
+    assert fast_run_results._series is not None
+
+
+def test_durations_are_the_ones_of_the_dictionary(fast_run_results):
+    """The tick durations, without building the JSON of every column."""
+    expected = fast_run_results.to_dict()["duration"]["value"]
+    assert list(fast_run_results.durations) == expected
+
+
+@pytest.fixture
+def fast_run_results():
+    """Return the results of a small run of two ticks."""
+    plant = gm.Plant("Hot")
+    plant.add("HeatingGrid", name="users", params={"minimum_return_temperature": 313.15})
+    plant.connect("in_port", "users.supply_in")
+    plant.connect("users.return_out", "out_port")
+    index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC", name="time")
+    columns = {
+        "in_port.m_dot": 10.0,
+        "in_port.T": 350.0,
+        "in_port.p": 5e5,
+        "users.heat_demand": 1e5,
+    }
+    return gm.simulate(plant, pd.DataFrame(columns, index=index))
