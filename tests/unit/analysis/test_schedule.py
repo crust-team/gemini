@@ -333,3 +333,93 @@ def test_a_finished_run_ran_the_days_of_the_rule():
     checks = gm.checks.operating_days(plant, results, 3)
     assert [item["passed"] for item in checks] == [True, True]
     assert [item["value"]["value"] for item in checks] == [3, 3]
+
+
+COOLING_SIZES = {
+    "heat_pump.capacity": "2 MW",
+    "peak_boiler.capacity": "30 MW",
+    "absorption_chiller.capacity": "3 MW",
+    "adsorption_chiller.capacity": "1 MW",
+    "compression_chiller.capacity": "10 MW",
+    "absorption_chiller.thermal_cop": 0.5,
+    "adsorption_chiller.thermal_cop": 0.25,
+    "heating_consumer.return_temperature": "60 degC",
+    "cooling_consumer.return_temperature": "28 degC",
+}
+COOLING_INPUTS = {
+    "heat_pump.temperature_setpoint": "100 degC",
+    "peak_boiler.temperature_setpoint": "100 degC",
+    "compression_chiller.temperature_setpoint": "20 degC",
+}
+
+
+def cooling_plant():
+    """Return the plant with every cooling unit: only what a schedule reads is set."""
+    plant = gm.plants.get("HeatingCoolingPlant")
+    plant.set_params("", COOLING_SIZES)
+    plant.heating_consumer.fluid = plant.cooling_consumer.fluid = gm.WATER
+    return plant.set_inputs(COOLING_INPUTS)
+
+
+def cold_demand(cold, heat=1e6):
+    """Return one day of heat and cold [W]."""
+    frame = demand(heat)
+    frame["cooling_demand"] = cold
+    return frame
+
+
+def test_a_heat_pump_and_a_compression_chiller_are_scheduled_together():
+    """The plant that "expected at most one": each has its own setpoint."""
+    plan = gm.schedule(cooling_plant(), cold_demand(8e6), RULES)
+    assert plan["heat_pump.temperature_setpoint"].iloc[0] == pytest.approx(373.15)
+    assert plan["compression_chiller.temperature_setpoint"].iloc[0] == pytest.approx(293.15)
+
+
+def test_heat_driven_units_go_first_and_add_their_drive_heat():
+    """Absorption 3 MW, adsorption 1 MW, compression the rest: 3 / 0.5 + 1 / 0.25 of heat."""
+    plan = gm.schedule(cooling_plant(), cold_demand(8e6), RULES)
+    assert plan["d0.flow"].iloc[0] == pytest.approx(11e6 / (1000 * 4217.4 * 40))
+    assert plan["cooling_consumer.flow"].iloc[0] == pytest.approx(8e6 / (4217.4 * 8))
+
+
+def test_the_units_before_the_last_stop_where_their_share_ends():
+    """28 to 20 degC over 8 MW: absorption takes 3 K, adsorption 1 K more, compression the rest."""
+    plan = gm.schedule(cooling_plant(), cold_demand(8e6), RULES)
+    assert plan["absorption_chiller.temperature_setpoint"].iloc[0] == pytest.approx(298.15)
+    assert plan["adsorption_chiller.temperature_setpoint"].iloc[0] == pytest.approx(297.15)
+    assert plan["compression_chiller.temperature_setpoint"].iloc[0] == pytest.approx(293.15)
+
+
+def test_the_cooling_order_rule_changes_who_takes_the_cold():
+    """Compression first takes all of it: the heat-driven units stand and draw no heat."""
+    rules = RULES | {"cooling_order": ["compression", "absorption", "adsorption"]}
+    plan = gm.schedule(cooling_plant(), cold_demand(8e6), rules)
+    assert plan["absorption_chiller.temperature_setpoint"].iloc[0] == pytest.approx(301.15)
+    assert plan["adsorption_chiller.temperature_setpoint"].iloc[0] == pytest.approx(301.15)
+
+
+def test_a_unit_left_out_of_the_order_takes_nothing():
+    """Absorption alone: the cold beyond its capacity stays with the chain's last unit."""
+    rules = RULES | {"cooling_order": ["absorption"]}
+    plan = gm.schedule(cooling_plant(), cold_demand(8e6), rules)
+    assert plan["adsorption_chiller.temperature_setpoint"].iloc[0] == pytest.approx(298.15)
+
+
+def test_a_day_without_cold_takes_nothing():
+    """No demand, no drive heat and no error."""
+    plan = gm.schedule(cooling_plant(), cold_demand(0.0), RULES)
+    assert plan["cooling_consumer.flow"].iloc[0] == 0
+
+
+def test_an_unknown_cooling_kind_is_refused():
+    """The rule names what it takes."""
+    rules = RULES | {"cooling_order": ["absorptoin"]}
+    with raises(gm.errors.ValidationError, "invalid_value", match="cooling_order"):
+        gm.schedule(cooling_plant(), cold_demand(1e6), rules)
+
+
+def test_an_adsorption_chiller_is_dispatched_with_its_own_cop():
+    """Alone, its 1 MW of cold draws 4 MW of heat at its COP of 0.25."""
+    rules = RULES | {"cooling_order": ["adsorption"]}
+    plan = gm.schedule(cooling_plant(), cold_demand(8e6), rules)
+    assert plan["d0.flow"].iloc[0] == pytest.approx(5e6 / (1000 * 4217.4 * 40))

@@ -5,7 +5,15 @@ from gemini.errors.base import reported
 from gemini.modules._utils import design
 from gemini.modules.container import ModuleList
 from gemini.modules.module import Module
-from gemini.modules.plants._utils import inputs, listing, loops, outputs, reader, writer
+from gemini.modules.plants._utils import (
+    circuits,
+    inputs,
+    listing,
+    loops,
+    outputs,
+    reader,
+    writer,
+)
 from gemini.modules.plants._utils.factory import make_module
 from gemini.modules.plants._utils.plan import STATE, Constraint, compile_plan, is_group, port_ends
 from gemini.modules.plants._utils.ports import PortResolver
@@ -306,6 +314,15 @@ class Plant(PortResolver, Module):
         """
         found = [item["source"] for item in self._connections if item["target"] == target]
         return found[0] if found else None
+
+    def feeds(self, source):
+        """Return the paths of the modules the outlet ``source`` reaches, nearest first.
+
+        The walk follows the circuit through each module, a mixer and a splitter included, and ends
+        at a plant port or at a module the circuit does not pass, such as a grid. It is how to ask
+        what a unit serves: ``gm.schedule`` reads a unit's role from it.
+        """
+        return circuits.feeds(self, source)
 
     def _connection_list(self):
         """Return the plant's connections as ``[{source, target, kind, type}]``.

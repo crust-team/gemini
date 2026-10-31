@@ -12,10 +12,10 @@ import numpy as np
 import pandas as pd
 
 from gemini import backends
+from gemini.analysis import roles
 from gemini.errors import ValidationError
-from gemini.modules.cooling import AbsorptionUnit
 from gemini.modules.grids import CoolingGrid, HeatingGrid
-from gemini.modules.heating import Boiler, HeatPump
+from gemini.modules.heating import Boiler
 from gemini.modules.piping import Mixer, Splitter
 from gemini.modules.plants._utils.plan import members, split_end
 from gemini.modules.plants.doublet import Doublet
@@ -25,7 +25,7 @@ from gemini.utils.strings import join_names, join_path
 from gemini.utils.time import to_utc_index
 
 SOURCES = ("geothermal", "heat_pump", "boiler")
-RULES = ("order", "doublet_flow", "max_brine_cooling", "operating_days")
+RULES = ("order", "cooling_order", "doublet_flow", "max_brine_cooling", "operating_days")
 ARRAY_BACKEND = "numpy"
 """A plan is a balance over the days, on arrays whatever backend the run takes after it."""
 
@@ -35,6 +35,7 @@ class Rules:
     """The rules of a schedule in SI."""
 
     order: tuple
+    cooling_order: tuple
     minimum_flow: float
     maximum_flow: float
     brine_cooling: float
@@ -47,6 +48,18 @@ def _quantity(text, unit):
     return units.convert(number, given, unit, "temperature_difference" if unit == "K" else None)
 
 
+def _checked_order(rules, name, names):
+    """Return the rule ``name``, a tuple of ``names``, all of them by default."""
+    order = tuple(rules.get(name, names))
+    if set(order) - set(names):
+        raise ValidationError(
+            f"schedule: {name} = {order!r}; expected names of {join_names(names)}",
+            path=f"rules.{name}",
+            suggestions=list(names),
+        )
+    return order
+
+
 def _checked_rules(rules):
     """Return the ``Rules`` of the mapping ``rules``, or raise naming what does not fit."""
     unknown = sorted(set(rules) - set(RULES))
@@ -57,16 +70,10 @@ def _checked_rules(rules):
             code="unknown_name",
             suggestions=list(RULES),
         )
-    order = tuple(rules.get("order", SOURCES))
-    if set(order) - set(SOURCES):
-        raise ValidationError(
-            f"schedule: order = {order!r}; expected names of {join_names(SOURCES)}",
-            path="rules.order",
-            suggestions=list(SOURCES),
-        )
     flow = rules["doublet_flow"]
     return Rules(
-        order,
+        _checked_order(rules, "order", SOURCES),
+        _checked_order(rules, "cooling_order", roles.COOLING_KINDS),
         _quantity(flow["min"], "m3/s"),
         _quantity(flow["max"], "m3/s"),
         _quantity(rules["max_brine_cooling"], "K"),
@@ -229,7 +236,7 @@ def _heat_pump_stopped(plant, off, rows):
     Its source then carries no flow, which stops it in the run too; a source that no doublet feeds
     never stops it.
     """
-    path, _ = _single(plant, HeatPump)
+    path, _ = roles.heat_pumps(plant)
     if path is None or not any(item.any() for item in off.values()):
         return np.zeros(rows, dtype=bool)
     feeding = _doublets_above(plant, path, "source_in", off, set())
@@ -272,7 +279,11 @@ def _load_splits(plant, consumer, chiller, heat, generator):
 
 def _covered_before_geothermal(plant, rules, need, heat_pump_stopped):
     """Return the need left for geothermal heat after the sources ordered before it."""
-    modules = {"heat_pump": _single(plant, HeatPump)[1], "boiler": _single(plant, Boiler)[1]}
+    heat_pump = roles.heat_pumps(plant)[0]
+    modules = {
+        "heat_pump": None if heat_pump is None else plant.get_submodule(heat_pump),
+        "boiler": _single(plant, Boiler)[1],
+    }
     running = {"heat_pump": ~heat_pump_stopped, "boiler": True}
     for source in rules.order[: rules.order.index("geothermal")]:
         module = modules[source]
@@ -336,8 +347,7 @@ def _heating_columns(plant, heat, generator):
     path, grid = _single(plant, HeatingGrid)
     if path is not None:
         columns[f"{path}.heat_demand"] = heat
-    for kind in (HeatPump, Boiler):
-        unit_path, _ = _single(plant, kind)
+    for unit_path in (roles.heat_pumps(plant)[0], _single(plant, Boiler)[0]):
         if unit_path is not None:
             supply = _setpoint(plant, unit_path)
             columns[f"{unit_path}.temperature_setpoint"] = np.full_like(heat, supply)
@@ -346,26 +356,68 @@ def _heating_columns(plant, heat, generator):
     return columns
 
 
-def _cooling_columns(plant, cool):
-    """Return the columns of the cooling users, the chiller and the return flow."""
+def _cold_taken(plant, rules, cool):
+    """Return ``{kind: cold}`` [W] of each cooling unit: in ``cooling_order``, up to its capacity.
+
+    What no unit takes stays unmet, which the run reports.
+    """
+    units = roles.cooling_units(plant)
+    kinds = [kind for kind in rules.cooling_order if kind in units]
+    capacities = [plant.get_submodule(units[kind]).capacity for kind in kinds]
+    return dict(zip(kinds, dispatch.units_taken(cool, capacities)))
+
+
+def _in_series(plant, grid_path, units):
+    """Return the paths of the cooling units in the order the chilled water meets them."""
+    met = [] if grid_path is None else plant.feeds(join_path(grid_path, "return_out"))
+    return sorted(units, key=lambda path: met.index(path) if path in met else len(met))
+
+
+def _unit_setpoints(path, grid, chain, taken, cool, supply):
+    """Return the setpoint of each cooling unit of a chain on one chilled water circuit.
+
+    The last unit brings the water to ``supply``. A unit before it stops at the temperature that
+    leaves the rest of the cold to the units after it.
+    """
+    setpoints = {chain[-1]: np.full_like(cool, supply)}
+    if len(chain) == 1 or grid.return_temperature is None:
+        return setpoints | {unit: setpoints[chain[-1]] for unit in chain}
+    done = np.zeros_like(cool)
+    for unit in chain[:-1]:
+        done = done + taken[unit]
+        setpoints[unit] = dispatch.temperature_after(
+            grid.return_temperature, supply, dispatch.flow_share(done, cool - done)
+        )
+    return setpoints
+
+
+def _cooling_columns(plant, cool, taken):
+    """Return the columns of the cooling users, the cooling units and the return flow."""
     columns = {}
     path, grid = _single(plant, CoolingGrid)
     if path is not None:
         columns[f"{path}.sensible_cooling_demand"] = cool
         columns[f"{path}.latent_cooling_demand"] = np.zeros_like(cool)
-    chiller_path, _ = _single(plant, AbsorptionUnit)
-    if chiller_path is not None:
-        supply = _setpoint(plant, chiller_path)
-        columns[f"{chiller_path}.temperature_setpoint"] = np.full_like(cool, supply)
-        columns |= _return_flow(path, grid, cool, supply)
-    return columns
+    units = roles.cooling_units(plant)
+    if not units:
+        return columns
+    chain = _in_series(plant, path, list(units.values()))
+    supply = _setpoint(plant, chain[-1])
+    by_path = {units[kind]: taken.get(kind, np.zeros_like(cool)) for kind in units}
+    for unit, setpoint in _unit_setpoints(path, grid, chain, by_path, cool, supply).items():
+        columns[f"{unit}.temperature_setpoint"] = setpoint
+    return columns | _return_flow(path, grid, cool, supply)
 
 
 def schedule(plant, demand, rules):
     """Return the run input of ``plant`` for each day of ``demand``.
 
-    A daily energy balance on the design values, with no simulation inside. An absorption chiller
-    needs the cooling demand over its ``thermal_cop`` of heat. Heat comes from the sources in
+    A daily energy balance on the design values, with no simulation inside. Roles come from the
+    wiring (``gemini/analysis/roles.py``): a unit that feeds the ``CoolingGrid`` is a cooling unit,
+    a ``HeatPump`` included, which is then the compression chiller. Cooling units take the cold in
+    ``rules["cooling_order"]``, each up to its capacity; what they leave is unmet, no error. A
+    heat-driven unit needs its cold over its ``thermal_cop`` of heat, and the compression chiller
+    adds electricity, its condenser heat going to its cooler. Heat comes from the sources in
     ``rules["order"]``: geothermal heat first by default, doublets in plant order, each at the flow
     that gives the heat at no more than ``max_brine_cooling``, clipped to ``doublet_flow``, and
     below the minimum at the minimum with less cooling. The heat pump lifts to its setpoint and the
@@ -382,15 +434,18 @@ def schedule(plant, demand, rules):
     Parameters
     ----------
     plant : Plant
-        The design: its ``Doublet`` children, at most one ``HeatPump``, ``Boiler``,
-        ``AbsorptionUnit``, ``HeatingGrid`` and ``CoolingGrid``, with the
-        ``temperature_setpoint`` of the heat pump, boiler and chiller set with ``set_inputs``.
+        The design: its ``Doublet`` children, at most one unit per role and kind (a heating
+        ``HeatPump``, a ``Boiler``, an absorption, an adsorption and a compression chiller) and at
+        most one ``HeatingGrid`` and ``CoolingGrid``, with the ``temperature_setpoint`` of the heat
+        pump, the boiler and the last cooling unit set with ``set_inputs``. ``ATESPlant`` is not
+        scheduled: its three seasonal commands are inputs of a run.
         Plant ports named ``heating_return`` and ``cooling_return`` take their temperature from
         the inputs (``heating_return.T``) and get their flow from the plan.
     demand : DataFrame
         UTC index, columns ``heating_demand`` and, optionally, ``cooling_demand`` in W.
     rules : dict
-        ``order`` (names of ``SOURCES``), ``doublet_flow`` (``{min, max}``), ``max_brine_cooling``
+        ``order`` (names of ``SOURCES``), ``cooling_order`` (names of ``roles.COOLING_KINDS``,
+        heat-driven first by default), ``doublet_flow`` (``{min, max}``), ``max_brine_cooling``
         and ``operating_days``: ``None`` (every doublet on every day that has a need), an integer
         or a list of outage dates.
 
@@ -422,20 +477,36 @@ def _plan_columns(plant, demand, checked, outages):
     days = _days(demand)
     off = {path: days.isin(dates) for path, dates in outages.items()}
     stopped = _heat_pump_stopped(plant, off, len(demand))
-    chiller_path, chiller = _single(plant, AbsorptionUnit)
-    generator = np.zeros_like(heat) if chiller is None else cool / chiller.thermal_cop
+    taken = _cold_taken(plant, checked, cool)
+    generator = _drive_heat(plant, taken, heat)
     need = _covered_before_geothermal(plant, checked, heat + generator, stopped)
     flows, columns = _doublet_columns(plant, checked, need, off)
     columns |= _brine_splits(plant, flows)
     consumer, _ = _single(plant, HeatingGrid)
-    columns |= _load_splits(plant, consumer, chiller_path, heat, generator)
+    columns |= _load_splits(plant, consumer, _first_driven(plant), heat, generator)
     columns |= _heating_columns(plant, heat, generator)
-    heat_pump, _ = _single(plant, HeatPump)
+    heat_pump = roles.heat_pumps(plant)[0]
     if heat_pump is not None:
         columns[f"{heat_pump}.is_running"] = ~stopped
-    columns |= _cooling_columns(plant, cool)
+    columns |= _cooling_columns(plant, cool, taken)
     columns["boiler_duty"] = _boiler_duty(plant, checked, heat + generator, flows)
     return columns
+
+
+def _first_driven(plant):
+    """Return the path of the first heat-driven cooling unit, or ``None``."""
+    units = roles.cooling_units(plant)
+    return next((units[kind] for kind in roles.HEAT_DRIVEN if kind in units), None)
+
+
+def _drive_heat(plant, taken, heat):
+    """Return the heat [W] the heat-driven cooling units draw for the cold they take."""
+    units = roles.cooling_units(plant)
+    drive = np.zeros_like(heat)
+    for kind in roles.HEAT_DRIVEN:
+        if kind in taken:
+            drive = drive + taken[kind] / plant.get_submodule(units[kind]).thermal_cop
+    return drive
 
 
 def _boiler_duty(plant, rules, need, flows):

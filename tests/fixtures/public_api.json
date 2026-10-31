@@ -93,6 +93,9 @@
     "equals",
     "at_least"
    ],
+   "feeds": [
+    "source"
+   ],
    "from_dict": [
     "data"
    ],

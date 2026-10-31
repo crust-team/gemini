@@ -129,6 +129,7 @@ plant dict is the JSON form agents use, and `gm.plants.schema()` is its schema.
 | `p.set_inputs(values)` | the plant; sets inputs by path, the one public way: `{"heat_pump.temperature_setpoint": "100 degC", "heating_return.T": "60 degC"}`, stored by `to_dict` under `inputs`, see [plants.md](plants.md#the-plant-dict) | real |
 | `p.input_value(path)` | the input in SI, or `None` when it has no value | real |
 | `p.target_of(source)`, `p.source_of(target)` | the `"path.port"` an outlet feeds, or that feeds an inlet; `None` for a plant port | real |
+| `p.feeds(source)` | the paths of the modules an outlet reaches through its circuit, nearest first; it ends at a grid or a plant port | real |
 | `p.to_dict(structure=False)` | the plant dict; `structure=True` gives the modules and connections of a plant of a class | real |
 | `p.save(path)`, `gm.Plant.load(path)` | writes or reads the plant dict as JSON | real |
 | `Output.difference(a, b)`, `Output.ratio(a, b)`, `Output.sum(a, b, ...)` | the outputs of a plant, combinations of paths, see [plants.md](plants.md#outputs) | real |
@@ -292,6 +293,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `gm.schedule` finds roles from the wiring: a unit that feeds the `CoolingGrid` is a cooling unit, a `HeatPump` included. `rules["cooling_order"]`, heat-driven first by default, dispatches absorption, adsorption and compression chillers, each up to its capacity. `Plant.feeds`. |
 | 0.2.0, unreleased changes | | Template plants take `size={"doublets": n}`, 1 to 3: `doublet` is now `d0`, with `d1`, `d2`, `production_mixers` and `injection_splitters`, and a plant-level `depth`. `Doublet.gradient` and `surface_temperature` default to the challenge values. |
 | 0.2.0, unreleased changes | | `Plant.set_inputs`, `Plant.input_value`, `Plant.target_of`, `Plant.source_of`. The plant dict has one key `inputs`, `{path: value}`, in both forms; `gm.plants.from_dict`, `gm.schedule` and a run use it. `boundary[""]["inputs"]` and `boundary[""]["root_inputs"]` are gone: a plant inlet field is the path `port.field`. |
 | 0.2.0, unreleased changes | | Leaves compute, plants connect. `_compute_outputs` is gone: a leaf computes once in `forward`. Every composite is a `Plant`, which never writes `forward`, with `HeatingSubstation`, `CoolingSubstation`, `NodalDoublet`, `DistrictEnergyPlant`, `BoilerChpPlant`, `ParallelExchangerPlant` and `ATESPlant` among them. The engine closes loops (`loop_not_converged`) and solves `Plant.constrain`. `CirculationPump` carries the flow of a building circuit, and its electricity is counted. Plant outputs are `Output.difference`, `Output.ratio` and `Output.sum` of paths; `Results` reads a path. |

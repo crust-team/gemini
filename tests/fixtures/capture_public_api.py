@@ -51,6 +51,7 @@ METHODS = {
         "input_value",
         "target_of",
         "source_of",
+        "feeds",
         "summary",
         "validate",
         "to_dict",

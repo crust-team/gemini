@@ -49,38 +49,31 @@ plan = gm.schedule(plant, demand, rules={
     "order": ["geothermal", "heat_pump", "boiler"],
     "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
     "max_brine_cooling": "40 K",
-    "operating_days": None})
+    "operating_days": None,
+    "cooling_order": ["absorption", "adsorption", "compression"]})
 results = gm.simulate(plant, plan)
 ```
 
 `gm.schedule` (`gemini/analysis/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
 of each day of `demand` from a daily energy balance on the plant's design values, with no simulation
-inside. It reads the `Doublet` children and at most one `HeatPump`, `Boiler`, `AbsorptionUnit`,
-`HeatingGrid` and `CoolingGrid`. The chiller's heat is the cooling demand over its
-`thermal_cop`. Sources follow `order`: each doublet, in plant order, runs at the flow that gives the
+inside. It reads the `Doublet` children, the grids and the units by **role, from the wiring**
+(`gemini/analysis/roles.py`, on `plant.feeds`): a unit whose useful outlet feeds the `HeatingGrid` is
+a heating unit and one that feeds the `CoolingGrid` a cooling unit, directly or through mixers,
+splitters and other units. A `HeatPump` is either: on the cooling grid it is the compression chiller,
+with its condenser heat going to its cooler. At most one unit per role and kind, or `invalid_design`.
+
+Cooling units take the cold in `rules["cooling_order"]`, by default heat-driven first (`absorption`,
+`adsorption`, `compression`), each up to its capacity. Unmet cold is no error. The drive heat of a
+heat-driven unit, its cold over its `thermal_cop`, adds to the heat need. On one chilled-water
+circuit the last unit brings the water to its setpoint and each unit before it gets the setpoint
+that leaves the rest to the units after it. `ATESPlant` is not scheduled: its three seasonal commands
+(`storage.mode`, `source_valve.split_fraction`, `load_valve.split_fraction`) stay inputs of a run.
+
+Sources follow `order`: each doublet, in plant order, runs at the flow that gives the
 heat at `max_brine_cooling`, clipped to `doublet_flow`, below the minimum at the minimum with less
 cooling. The heat pump and boiler take the `temperature_setpoint` set on them, the design's supply
 temperatures, and cover what is left in the run. Unmet demand is no error: the run reports
 `unmet_demand`.
-
-`operating_days` takes doublets out of service:
-
-- `None`: every doublet on every day that leaves it a need, as above.
-- An integer `n`: each doublet runs exactly `n` days of the demand. Its outage days are the days of
-  lowest total demand, heating plus cooling in W: the first doublet takes the lowest, the next the
-  lowest left, so at most one doublet is off on a day. A count that needs more outage days than the
-  demand has raises `ValidationError` (`invalid_value`).
-- A list of dates: every doublet is off on those UTC days; a date outside the demand raises
-  `ValidationError` (`invalid_value`).
-
-On an outage day a doublet has no flow, `<doublet>.is_running` is false and its heat goes to the
-next sources of `order`: first the next doublet, then the heat pump and the boiler. A heat pump
-whose source only doublets that are off feed stops that day: `<heat pump>.is_running` is false, its
-capacity does not count when it is ordered before `geothermal`, and its source carries no flow in
-the run. The feed is read from the wiring, along the circuit of each module. Under an `operating_days` rule
-a doublet runs every day it is not off, at the minimum flow when no need is left for it, or it would
-not run its days. `plan.attrs["outage_days"]` is `{doublet path: [ISO date]}`, empty lists without
-outages, and `gm.checks.operating_days(plant, results, days)` counts the days of a finished run.
 
 The plan needs no bindings and changes nothing on the plant: **its columns are named after what they
 drive**, so `gm.simulate(plant, plan)` binds them by the rule of a run, below. Leaf controls and

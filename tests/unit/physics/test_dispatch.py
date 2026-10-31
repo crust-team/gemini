@@ -37,3 +37,20 @@ def test_on_arrays():
     assert_function_matches(dispatch.doublet_flow, rows)
     assert_function_matches(dispatch.circuit_flow, [(4e6, 4000.0, 40.0), (0.0, 4000.0, 40.0)])
     assert_function_matches(dispatch.flow_share, [(1.0, 3.0), (0.0, 0.0)])
+
+
+def test_units_take_a_demand_in_order():
+    """Each up to its capacity; what no unit takes is left."""
+    assert dispatch.units_taken(7.0, [5.0, 1.0, 9.0]) == [5, 1, 1]
+    assert dispatch.units_taken(3.0, [5.0, 1.0]) == [3, 0]
+    assert dispatch.units_taken(9.0, [5.0, 1.0]) == [5, 1]
+
+
+def test_the_temperature_moves_with_the_duty():
+    """At a constant flow, a quarter of the duty is a quarter of the way."""
+    assert dispatch.temperature_after(298.0, 290.0, 0.25) == 296
+
+
+def test_the_two_paths_agree():
+    """Floats and arrays give the same numbers."""
+    assert_function_matches(dispatch.temperature_after, [(298.0, 290.0, 0.25), (280.0, 280.0, 1.0)])
