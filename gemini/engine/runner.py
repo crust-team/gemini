@@ -1,13 +1,13 @@
-"""The one runner: chunks of ticks through the graphs of the twins, then results and callbacks.
+"""The one runner: chunks of ticks through the executor, then results and callbacks.
 
 ``Runner.run`` is what ``Engine.replay``, ``live``, ``simulate`` and ``resume`` all execute. A
 run is a list of twins (the equipment twins of a replay, the plant of a simulation) evaluated
 over **chunks** of ticks, each inside a stretch of ticks that share one dated parameter
 snapshot. A chunk is the whole stretch, except that it is one tick when a stateful module is
 stepped, a twin sits below another twin or a callback declares ``changes_run``. For each chunk
-and twin: the bound columns become SI arrays (``columns``), the graph is evaluated on the
-selected backend (``outcome``), the health is assessed and the columns of the twin join one
-``ResultChunk``.
+and twin: the bound columns become SI arrays (``columns``), the twin is evaluated by the
+engine's executor on the selected backend (``outcome``), the health is assessed and the columns
+of the twin join one ``ResultChunk``.
 
 Callbacks are replayed from the results of a chunk, tick by tick, seeing the engine as a tick
 loop would have left it: ``on_step_start``, the inputs of the tick, the results, the position and
@@ -97,7 +97,7 @@ class Runner:
         block = read(twin, self.aligned, first, stop)
         state = engine.module_states.get(twin.path)
         durations = self.aligned.durations[first:stop]
-        outcome = evaluate_twin(twin, block, engine._graph_cache, durations, state)
+        outcome = evaluate_twin(twin, block, engine._executor, durations, state)
         self._note_breaks(outcome)
         if stop - first == 1:
             self._set(outcome, 0)
@@ -109,7 +109,7 @@ class Runner:
 
     def _note_breaks(self, outcome):
         if outcome.evaluation is not None:
-            breaks = outcome.evaluation.graph.breaks
+            breaks = outcome.evaluation.breaks
             self.engine.graph_breaks[outcome.twin.path] = [reason for _, reason in breaks]
 
     def _failure(self, outcomes):

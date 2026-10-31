@@ -1,7 +1,7 @@
 """One twin evaluated over a block of ticks: its result columns, errors and new state.
 
 ``evaluate_twin`` builds the inlet streams and inputs of the ticks a ``Block`` lets through,
-evaluates the twin's graph over them (``gemini.compiler.graph.evaluate``, on whichever backend is
+evaluates the twin over them with an executor (``gemini.engine.executor``, on whichever backend is
 selected), assesses the health of the rows that worked and spreads the columns over the ticks
 of the chunk. A tick that cannot be evaluated has an error: an invalid inlet stream, the
 exception of the failing row, or the exception of its health.
@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from gemini.compiler.graph import evaluate, graph_feeds
 from gemini.engine.chunks import PathColumns
 from gemini.engine.health import assess
 from gemini.types import Stream
@@ -47,11 +46,11 @@ class Outcome:
         return self.evaluation.result.row(position)
 
 
-def evaluate_twin(twin, block, cache, durations, state):
+def evaluate_twin(twin, block, executor, durations, state):
     """Return the ``Outcome`` of ``twin`` over ``block``.
 
     ``durations`` are the seconds of every tick of the chunk and ``state`` the state tree the
-    twin starts from (``None`` for its initial states). ``cache`` is the ``GraphCache``.
+    twin starts from (``None`` for its initial states). ``executor`` is the engine's ``Executor``.
     """
     selected = block.selected
     outcome = Outcome(twin, block, selected)
@@ -60,12 +59,12 @@ def evaluate_twin(twin, block, cache, durations, state):
     if not selected.size:
         return outcome
     try:
-        graph, feeds = _prepare(twin, block, selected, cache)
+        prepared = _prepare(twin, block, selected, executor)
     except Exception as error:
         outcome.errors.update(dict.fromkeys(map(int, selected), error))
         return outcome
     context = {"dt": durations[selected], "states": _start_state(twin, block, selected, state)}
-    evaluation = evaluate(graph, feeds, len(selected), context)
+    evaluation = executor.evaluate(prepared, len(selected), context)
     outcome.evaluation = evaluation
     for position in np.flatnonzero(evaluation.failed):
         outcome.errors[int(selected[position])] = evaluation.error(int(position))
@@ -76,14 +75,11 @@ def evaluate_twin(twin, block, cache, durations, state):
     return outcome
 
 
-def _prepare(twin, block, selected, cache):
-    """Return the graph of the twin and its feeds for the selected ticks."""
-    module = twin.module
+def _prepare(twin, block, selected, executor):
+    """Return what the executor prepared for the twin on the selected ticks."""
     streams = _streams(twin, block, selected)
-    fluids = {port: stream.fluid for port, stream in streams.items()}
-    graph = cache.graph(module, fluids, twin.stepped)
     inputs = {name: values[selected] for name, values in block.inputs.items()}
-    return graph, graph_feeds(graph, module, streams, inputs)
+    return executor.prepare(twin.module, streams, inputs, twin.stepped)
 
 
 def _streams(twin, block, selected):
@@ -132,7 +128,7 @@ def _advance(outcome, tick):
     measured = twin.kinds("state")
     if measured:
         outcome.state = {s.key: float(outcome.block.states[s.key][tick]) for s in measured}
-    elif outcome.evaluation.graph.stepped:
+    elif outcome.evaluation.stepped:
         outcome.state = outcome.evaluation.states
 
 

@@ -11,9 +11,10 @@ from gemini import runtime
 from gemini._utils.jsonable import to_plain
 from gemini._utils.strings import close_matches, did_you_mean
 from gemini._utils.time import parse_duration, to_utc
-from gemini.compiler.graph import graph_cache
 from gemini.engine import checkpoint as storage
+from gemini.engine import eager  # noqa: F401
 from gemini.engine.clock import Clock
+from gemini.engine.executor import executor_for
 from gemini.engine.loader import Loader
 from gemini.engine.runner import Runner
 from gemini.engine.step import BindingPlan
@@ -61,11 +62,13 @@ class Engine:
     backend gives the same numbers.
     """
 
-    def __init__(self, plant, backend="numpy", callbacks=None, on_error="raise"):
+    def __init__(self, plant, backend="numpy", callbacks=None, on_error="raise", compile=True):
         """Configure the plant to run, its backend, lifecycle callbacks and the error policy.
 
         With the default ``on_error="raise"`` an ordinary error ends the run; with ``"record"``
-        it becomes a row of ``results.errors()`` and the run continues.
+        it becomes a row of ``results.errors()`` and the run continues. With ``compile=True`` the
+        plant runs through the compiler when ``gemini.compiler`` is imported; ``compile=False``
+        runs it eagerly, as a direct call does.
         """
         if not isinstance(plant, Module):
             raise ValidationError(
@@ -88,7 +91,7 @@ class Engine:
         self._dataset_fingerprint = None
         self._max_gap = None
         self._in_step = False
-        self._graph_cache = graph_cache(plant)
+        self._executor = executor_for(plant, compile)
         self.graph_breaks = {}
         self.step_results = {}
 

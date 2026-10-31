@@ -18,7 +18,8 @@ import numpy as np
 
 from gemini import runtime, units
 from gemini.compiler.graph.errors import TraceError
-from gemini.compiler.graph.node import STREAM_FIELDS, row_item, row_streams, stack_column
+from gemini.compiler.graph.node import STREAM_FIELDS
+from gemini.engine.rows import row_item, row_streams, stack_column
 from gemini.errors import ValidationError
 from gemini.modules.module import _Call, _current_call
 from gemini.ops import Symbolic, registry

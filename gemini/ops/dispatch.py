@@ -1,7 +1,7 @@
 """Op dispatch: record an op on traced values, otherwise evaluate it on a backend.
 
 ``dispatch(name, *operands)`` is the single entry of every op. When an operand is
-``Symbolic`` (a traced value of ``gemini.compiler.graph``), the op is recorded in its graph.
+``Symbolic`` (a traced value of the compiler), the op is recorded in its graph.
 Otherwise every ``Constant`` operand is replaced by its plain Python value and the op runs on
 the backend that ``gemini.ops.kernels.select`` chooses. ``Operators`` gives a class the Python
 operators through the same entry.

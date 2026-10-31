@@ -1,4 +1,4 @@
-"""The run engine: ``Engine``, ``Clock``, runner, chunks, checkpoints.
+"""The run engine: ``Engine``, ``Clock``, executors, runner, chunks, checkpoints.
 
 ``Results`` and ``Dataset`` live in ``gemini.run``, whose functions import ``gemini.engine.engine``:
 importing ``gemini.run`` first gives one import order from either side of that cycle.
@@ -7,5 +7,6 @@ importing ``gemini.run`` first gives one import order from either side of that c
 from gemini import run  # noqa: F401
 
 from .clock import Clock
+from .executor import Executor, register_executor
 
-__all__ = ["Clock"]
+__all__ = ["Clock", "Executor", "register_executor"]

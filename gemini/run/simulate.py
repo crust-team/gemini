@@ -3,8 +3,7 @@
 Each function builds an ``Engine``, calls the matching method and returns its ``Results``; the
 run logic is the engine's, and the engine stays public for what one call cannot do: a run held in
 memory, a callback that reads it, a manual checkpoint. No object is kept between calls. The plant
-holds its traced graphs (``gemini.compiler.graph.graph_cache``), so a second call on one plant
-does not trace it again.
+holds what the compiler traced, so a second call on one plant does not trace it again.
 """
 
 from contextlib import contextmanager
@@ -50,6 +49,7 @@ def simulate(
     backend="numpy",
     callbacks=None,
     on_error="raise",
+    compile=True,
 ):
     """Run ``Engine.simulate`` once and return its ``Results``.
 
@@ -62,8 +62,8 @@ def simulate(
     ``checkpoint`` is a path written at the end of the run, also when it stops early (a
     ``gm.errors.Cancelled`` or a failure under ``on_error="raise"``), so ``gm.resume`` can always
     continue it; an existing file is replaced. ``checkpoint_every``, a step count or a duration
-    such as ``"1h"``, also writes it during the run and needs ``checkpoint``. The other arguments
-    are those of ``Engine`` and ``Engine.simulate``.
+    such as ``"1h"``, also writes it during the run and needs ``checkpoint``. ``compile=False``
+    forces the eager run. The other arguments are those of ``Engine`` and ``Engine.simulate``.
     """
     if problem is None and plan is None:
         raise ValidationError(
@@ -73,7 +73,7 @@ def simulate(
         )
     run_plant, run_input = _planned(plant, problem, plan)
     callbacks = _with_autosave(callbacks, checkpoint, checkpoint_every)
-    engine = Engine(run_plant, backend, callbacks, on_error)
+    engine = Engine(run_plant, backend, callbacks, on_error, compile)
     with _saved_after(engine, checkpoint):
         return engine.simulate(run_input, clock)
 

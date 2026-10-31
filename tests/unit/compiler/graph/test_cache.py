@@ -96,7 +96,7 @@ def test_stepped_is_a_guard(tank):
 def test_a_module_holds_one_cache_that_an_engine_uses(gain):
     """The graphs outlive an engine: a new engine on the module finds them."""
     assert graph_cache(gain) is graph_cache(gain)
-    assert gm.Engine(gain)._graph_cache is graph_cache(gain)
+    assert gm.Engine(gain)._executor.cache is graph_cache(gain)
     assert graph_cache(gm.modules.ESP()) is not graph_cache(gain)
 
 
@@ -105,9 +105,9 @@ def test_a_copied_module_starts_with_an_empty_cache(gain):
     cache = graph_cache(gain)
     cache.graph(gain, {"fluid_in": gain.fluid})
     for copied in (copy.deepcopy(gain), pickle.loads(pickle.dumps(gain))):
-        assert copied._graph_cache is not cache
-        assert copied._graph_cache.traces == 0
-        assert copied._graph_cache.graph(copied, {"fluid_in": copied.fluid}).root is not gain
+        assert copied._executor_cache is not cache
+        assert copied._executor_cache.traces == 0
+        assert copied._executor_cache.graph(copied, {"fluid_in": copied.fluid}).root is not gain
 
 
 def test_a_cache_does_not_keep_a_finished_module_alive(gain):

@@ -56,9 +56,9 @@ class GraphCache:
 
 def graph_cache(module):
     """Return the one ``GraphCache`` of ``module``, so its graphs outlive any one engine."""
-    if module._graph_cache is None:
-        module._graph_cache = GraphCache()
-    return module._graph_cache
+    if module._executor_cache is None:
+        module._executor_cache = GraphCache()
+    return module._executor_cache
 
 
 def _guards(module, fluids, stepped):

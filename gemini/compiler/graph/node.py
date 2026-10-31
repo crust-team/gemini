@@ -4,10 +4,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
-
 from gemini.types import flows
-from gemini.types.flows import Stream
 
 _TRACING_PACKAGES = tuple(
     str(Path(__file__).parents[2] / package) for package in ("compiler/graph", "ops")
@@ -16,25 +13,6 @@ _TRACING_PACKAGES = tuple(
 
 STREAM_FIELDS = tuple(zip(flows.STREAM_FIELDS, ("kg/s", "K", "Pa")))
 """Stream fields of every inlet and outlet in the graph, with their units."""
-
-
-def row_item(value, row):
-    """Return row ``row`` of a column as a plain Python value; a scalar holds for every row."""
-    array = np.asarray(value)
-    return array[row].item() if array.ndim else array.item()
-
-
-def stack_column(values):
-    """Return the values of one position over the rows as an array; ``None`` is NaN."""
-    return np.array([np.nan if value is None else value for value in values])
-
-
-def row_streams(fluids, value):
-    """Return the inlet streams of one row: ``value(port, field)`` for each field of each port."""
-    return {
-        port: Stream(**{field: value(port, field) for field, _ in STREAM_FIELDS}, fluid=fluid)
-        for port, fluid in fluids.items()
-    }
 
 
 @dataclass(eq=False, slots=True)

@@ -9,51 +9,28 @@ break graph calls the real module row by row (see ``rootbreak``). ``feeds`` maps
 to arrays over the rows or scalars, which broadcast; ``context`` may hold ``dt`` and ``states``
 for a stepped root break.
 
-An ``Evaluation`` holds ``result``, the ``ModuleResult`` tree of the trace mapped to arrays of
-``rows`` (children included; a root break stacks its real rows): a literal broadcasts, a list
-of traced values is an array of shape ``(rows, n)``, ``None`` is NaN (``ModuleResult.row`` reads
-it back as ``None`` for a declared ``X | None``) and an output has the dtype its declaration
-gives on the plain path. ``failed`` marks the rows with an error reaching an output and
-``error(row)`` is the exception of that row. ``states`` are the states after a stepped break.
+An ``Evaluation`` is a ``gemini.engine.evaluation.Evaluation`` that also keeps its ``graph``.
 """
-
-import dataclasses
 
 import numpy as np
 
 from gemini.compiler.graph.failures import RowView, row_error
 from gemini.compiler.graph.interpreter import Interpreter
-from gemini.compiler.graph.node import Node, stack_column
+from gemini.compiler.graph.node import Node
 from gemini.compiler.graph.proxy import Proxy
-from gemini.compiler.graph.rootbreak import run_rows, stacked
-from gemini.ops import Constant, kernels
-from gemini.types.results import Values
-
-DTYPES = {"number": float, "boolean": bool, "integer": np.int64}
-"""The NumPy type of an output by the JSON type of its declaration."""
+from gemini.engine import evaluation
+from gemini.engine.rows import run_rows, stack_column, stacked
+from gemini.ops import kernels
 
 
-class Evaluation:
+class Evaluation(evaluation.Evaluation):
     """The result of evaluating a graph over ``rows`` rows."""
 
     def __init__(self, graph, rows, failed, result, errors, states=None, convert=None):
         """Keep the mapped ``result``, the ``failed`` mask and ``errors``, a function of a row."""
+        super().__init__(rows, failed, result, errors, states, graph.stepped, graph.breaks)
         self.graph = graph
-        self.rows = rows
-        self.failed = failed
-        self.result = result
-        self.states = states
-        self._errors = errors
         self._convert = convert
-
-    def error(self, row):
-        """Return the exception of a failed ``row``: the check's class with its exact message."""
-        return self._errors(row)
-
-    def raise_first(self):
-        """Raise the exception of the first failed row, if any."""
-        if self.failed.any():
-            raise self._errors(int(np.flatnonzero(self.failed)[0]))
 
     def output(self, name):
         """Return the array of the graph output ``outputs.<name>`` or ``outlets.<port>.<field>``."""
@@ -117,35 +94,15 @@ def _row_feeds(graph, feeds, rows, row):
 def _assembled(graph, rows, codes, column, error):
     """Return the ``Evaluation`` of per-node ``column`` values and reached ``codes``."""
     failed = np.zeros(rows, dtype=bool) if codes is None else codes != 0
-    convert = _converter(column, rows)
-    result = None if graph.result is None else _typed(graph.result.mapped(convert))
+    convert = evaluation.converter(rows, (Node, Proxy), lambda value: column(_node(value)))
+    result = None if graph.result is None else evaluation.typed(graph.result.mapped(convert))
     return Evaluation(graph, rows, failed, result, error, convert=convert)
 
 
-def _converter(column, rows):
-    """Return the function that maps a traced value, a literal or a list of them to an array."""
-
-    def convert(value):
-        if isinstance(value, Node):
-            return column(value)
-        if isinstance(value, Proxy):
-            return column(value.node)
-        if isinstance(value, (list, tuple)):
-            items = [convert(item) for item in value]
-            return np.stack(items, axis=1) if items else np.empty((rows, 0))
-        if isinstance(value, Constant):
-            value = value.value
-        if value is None:
-            return np.full(rows, np.nan)
-        if isinstance(value, (bool, int, float, np.number, np.bool_)):
-            return np.full(rows, value)
-        return value
-
-    return convert
-
-
 def _root_evaluation(graph, feeds, rows, context):
-    results, errors, states = run_rows(graph, feeds, rows, context)
+    results, errors, states = run_rows(
+        graph.root, graph.inlet_fluids, feeds, rows, context, graph.stepped
+    )
     failed = np.ones(rows, dtype=bool)
     failed[list(results)] = False
     result = stacked(results, rows)
@@ -153,33 +110,11 @@ def _root_evaluation(graph, feeds, rows, context):
         graph,
         rows,
         failed,
-        None if result is None else _typed(result),
+        None if result is None else evaluation.typed(result),
         errors.__getitem__,
         states,
     )
 
 
-def _typed(result, done=None):
-    """Return ``result`` with the outputs in the dtype their declarations have on the plain path."""
-    done = {} if done is None else done
-    if id(result) in done:
-        return done[id(result)]
-    declarations = result.outputs._declarations
-    values = {name: _cast(value, declarations.get(name)) for name, value in result.outputs.items()}
-    typed = dataclasses.replace(
-        result,
-        outputs=Values._trusted(values, declarations),
-        children={name: _typed(child, done) for name, child in result.children.items()},
-        call_records=tuple((name, _typed(child, done)) for name, child in result.call_records),
-    )
-    done[id(result)] = typed
-    return typed
-
-
-def _cast(value, declaration):
-    if declaration is None or not isinstance(value, np.ndarray):
-        return value
-    kind = DTYPES.get(declaration.value_type())
-    if kind is None or value.dtype.kind not in "biuf":
-        return value
-    return value.astype(kind)
+def _node(value):
+    return value.node if isinstance(value, Proxy) else value

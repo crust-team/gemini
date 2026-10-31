@@ -6,7 +6,7 @@ import pytest
 import gemini as gm
 from gemini import runtime
 from gemini.compiler.graph import GraphCache, evaluate, graph_feeds
-from gemini.compiler.graph.rootbreak import stacked
+from gemini.engine.rows import stacked
 from gemini.errors import PhysicsError
 from gemini.modules.declarations import Inlet, Outlet, Output
 from gemini.types import Stream

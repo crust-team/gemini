@@ -234,10 +234,10 @@ class _Call:
     ``call_records`` collects the results of every child call made during this call, in call
     order. ``parent`` is the enclosing call.
     ``states`` holds the module's own state values and ``step`` the running ``_Step``, if any.
-    A traced call (``gemini.compiler.graph``) sets ``parameters`` to the traced parameter values
+    A traced call (a call of the compiler) sets ``parameters`` to the traced parameter values
     that replace the stored ones, and records outputs without validating them. ``trace`` is the
-    running trace of ``gemini.compiler.graph``: a call made while it is set is recorded in the graph
-    through ``trace.child`` instead of being evaluated. ``wrapping`` marks an eager call whose
+    running trace of the compiler: a call made while it is set is recorded through
+    ``trace.child`` instead of being evaluated. ``wrapping`` marks an eager call whose
     physics gets NumPy scalars (``gemini.ops.scope``).
     """
 
@@ -326,7 +326,7 @@ class Module:
         object.__setattr__(self, "boundary", {})
         object.__setattr__(self, "_param_history", [DatedParams(params={})])
         object.__setattr__(self, "_param_overrides", {})
-        object.__setattr__(self, "_graph_cache", None)
+        object.__setattr__(self, "_executor_cache", None)
 
     @property
     def name(self):
@@ -430,9 +430,13 @@ class Module:
         if call.trace is not None or not call.recording:
             call.outputs[name] = value
             return
-        call.outputs[name] = self._outputs[name].validate(
-            _scalar_output(self._outputs[name], value)
-        )
+        declaration = self._outputs[name]
+        if isinstance(value, np.ndarray) and value.ndim:
+            for item in value.tolist():
+                declaration.validate(_scalar_output(declaration, item))
+            call.outputs[name] = value
+            return
+        call.outputs[name] = declaration.validate(_scalar_output(declaration, value))
 
     def _add_module(self, name, module):
         """Register an immediate child and reject ambiguous names or ownership cycles."""
