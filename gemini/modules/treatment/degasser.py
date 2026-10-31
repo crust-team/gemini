@@ -13,6 +13,7 @@ from gemini.types import (
     PressureDifference,
     Stream,
 )
+from gemini.types.cost import scaled_cost
 
 
 class Degasser(Module):
@@ -100,3 +101,7 @@ class Degasser(Module):
         gas = outlets.gas
         self.gas_mass_flow = gas.m_dot
         self.pressure_drop = inlet.p - liquid.p
+
+    def capex(self, assumptions):
+        """Return the cost of the degasser, a fixed item."""
+        return scaled_cost(assumptions, "degasser_cost")

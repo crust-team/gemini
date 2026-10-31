@@ -4,7 +4,7 @@ from gemini.modules.module import Module
 from gemini.modules.plants import library, writer
 from gemini.modules.plants.builder import Plant
 from gemini.modules.serialization import module_spec
-from gemini.physics import geometry, ground, hydraulics, pumps
+from gemini.physics import constants, geometry, ground, hydraulics, pumps
 from gemini.types import (
     Efficiency,
     Length,
@@ -15,12 +15,15 @@ from gemini.types import (
     TemperatureGradient,
     VolumeFlow,
 )
+from gemini.types.cost import scaled_cost
 
 REQUIRED = ("depth", "gradient", "surface_temperature")
 RESERVOIR = ("permeability", "thickness", "well_diameter")
 PUMP = ("nominal_flow", "pump_efficiency", "nominal_wellhead_pressure")
 RESERVOIRS = ("reservoir", "sink")
 WELLS = ("well", "riser", "injector")
+WELL_COUNT = 2
+"""The producer and the injector of a doublet."""
 
 
 class Doublet(Plant):
@@ -94,6 +97,26 @@ class Doublet(Plant):
         if not set(params) & set(self._parameters):
             return super().to_spec()
         return module_spec(self) | {"params": params}
+
+    def capex(self, assumptions):
+        """Return the cost of the design: both wells by the metre and the pump by its power.
+
+        A doublet without a design declares no cost; its children's own costs stand.
+        """
+        if self.depth is None:
+            return None
+        wells = scaled_cost(assumptions, "drilling_cost", WELL_COUNT * self.depth)
+        if self.nominal_flow is None:
+            return wells
+        power = pumps.power(
+            self.nominal_flow,
+            float(constants.ESP_REFERENCE_FREQUENCY),
+            self.esp.stage_count,
+            self.esp.power_coefficients,
+        )
+        pump = scaled_cost(assumptions, "pump_cost", power)
+        source = f"{wells.source}; {pump.source}"
+        return wells.model_copy(update={"capex": wells.capex + pump.capex, "source": source})
 
     def _derived(self, values, params):
         """Return the child values the design ``values`` give, with ``params`` read for the pump."""

@@ -24,6 +24,7 @@ from gemini.types import (
     TemperatureDifference,
     ThermalConductance,
 )
+from gemini.types.cost import scaled_cost
 from gemini.types.results import NOT_ASSESSED
 
 
@@ -91,6 +92,10 @@ class HeatExchanger(Module):
         values = self._performance(hot_in, cold_in)
         for name, value in values.items():
             setattr(self, name, value)
+
+    def capex(self, assumptions):
+        """Return the cost of the exchanger from its thermal conductance."""
+        return scaled_cost(assumptions, "exchanger_cost", self.thermal_conductance)
 
     def _performance(self, hot_in, cold_in):
         self._check_inlets(hot_in, cold_in)

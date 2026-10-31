@@ -14,8 +14,8 @@ from gemini.types.cost import total_cost
 from gemini.types.shapes import value
 
 NO_COST = (
-    "no module declares a cost: a module declares it by defining capex() that returns a Cost, "
-    "and no built-in module does"
+    "no module declares a cost: a module declares it by defining capex(assumptions) that returns "
+    "a Cost"
 )
 """The reason when a plant has no declared cost."""
 
@@ -56,16 +56,17 @@ def annual_energies(plant, results):
 def capex(plant, assumptions=None, on_error="raise"):
     """Return the investment of a plant: the sum of the costs its modules declare.
 
-    One implementation: ``gemini.types.cost.total_cost``. A module declares its cost by
-    defining ``capex()`` that returns a ``Cost``; no built-in module does, so a plant of built-in
-    modules has none, and nothing is estimated or defaulted.
+    One implementation: ``gemini.types.cost.total_cost``. A module declares its cost by defining
+    ``capex(assumptions)`` that returns a ``Cost`` from its own design values and the cost factors
+    of ``assumptions``. A factor without a value raises ``ValidationError`` (code
+    ``missing_assumption``), and nothing is estimated.
 
     Parameters
     ----------
     plant : Module
         The plant whose modules and descendants declare costs.
     assumptions : Assumptions, optional
-        Only its ``currency`` is used, to state the unit when the plant has no declared cost.
+        The cost factors, the ``currency`` and the ``cost_price_year``.
     on_error : {"raise", "record"}, optional
         A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
 
@@ -78,9 +79,10 @@ def capex(plant, assumptions=None, on_error="raise"):
     """
 
     def compute():
-        cost = total_cost(plant)
+        given = resolve(assumptions)
+        cost = total_cost(plant, given)
         if cost is None:
-            return unavailable(resolve(assumptions).currency, NO_COST, on_error)
+            return unavailable(given.currency, NO_COST, on_error)
         year = value(cost.price_year, "year")
         return value(cost.capex, cost.currency, price_year=year, source=cost.source)
 
@@ -140,7 +142,7 @@ def opex(plant, results, assumptions=None, on_error="raise"):
 def _opex(plant, results, assumptions, on_error):
     """Return the annual operating cost; ``on_error`` applies to a plant without a cost."""
     assumptions = resolve(assumptions)
-    cost = total_cost(plant)
+    cost = total_cost(plant, assumptions)
     annual = annual_energies(plant, results)
     bill = _bill(assumptions, annual)
     if cost is None:

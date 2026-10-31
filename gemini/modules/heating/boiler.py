@@ -21,6 +21,7 @@ from gemini.types import (
     Stream,
     Temperature,
 )
+from gemini.types.cost import scaled_cost
 
 
 class _BoilerBody(Module):
@@ -128,6 +129,10 @@ class Boiler(_BoilerBody):
         self.fuel = self.fuel_or_power
         for name, value in burner.fuel_outputs(self.fuel_or_power, fuel).items():
             setattr(self, name, value)
+
+    def capex(self, assumptions):
+        """Return the cost of the boiler from its capacity."""
+        return scaled_cost(assumptions, "boiler_cost", self.capacity)
 
     def _duty_limit(self, fuel):
         """Return the capacity, or less when the stream alone must cover the fuel [W]."""

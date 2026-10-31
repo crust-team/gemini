@@ -561,7 +561,7 @@ assert result.outlets.outlet.T == 300 and state["temperature"] > 300
 A module with a diagnostic model overrides `health(self, result, measured)`. It receives the
 call's `ModuleResult` and the measured outputs of that tick and returns a `Health` (`assessed`,
 `score`, `alarm`, `message`, `metrics`); the base method returns `None`, which the engine records
-as `assessed=False`. A module that declares its own cost defines `capex()` returning a `Cost`;
+as `assessed=False`. A module that declares its own cost defines `capex(assumptions)` returning a `Cost`;
 see [types.md](types.md#profiles-and-costs).
 
 ## Structure

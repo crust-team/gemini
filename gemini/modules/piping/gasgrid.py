@@ -3,6 +3,7 @@
 from gemini.modules.module import Module
 from gemini.physics import gas
 from gemini.types import Fraction, Inlet, Outlet, Parameter, Stream
+from gemini.types.cost import scaled_cost
 from gemini.types.fluid import grid_gas
 
 
@@ -74,3 +75,7 @@ class GasMakeup(Module):
 
         outlets = dict(outlet=outlet)
         return outlets
+
+    def capex(self, assumptions):
+        """Return the cost of the grid connection, a fixed item."""
+        return scaled_cost(assumptions, "makeup_cost")

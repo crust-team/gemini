@@ -21,6 +21,7 @@ from gemini.types import (
     Stream,
     Temperature,
 )
+from gemini.types.cost import scaled_cost
 
 
 class CHP(Module):
@@ -105,6 +106,10 @@ class CHP(Module):
         values |= burner.fuel_outputs(values["fuel"], inlets.fuel_in)
         for name, value in values.items():
             setattr(self, name, value)
+
+    def capex(self, assumptions):
+        """Return the cost of the engine from its electric capacity."""
+        return scaled_cost(assumptions, "chp_cost", self.electric_capacity)
 
     def _load(self, fuel):
         """Return the load: the commanded one, or less when the stream alone must cover it."""

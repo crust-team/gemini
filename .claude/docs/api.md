@@ -234,8 +234,8 @@ returns is a value; every entry here takes *units*, except where a coefficient h
 Every economics function takes `(plant, results, ...)`, only `capex` has no results, and returns a
 value with the parts of the result as more keys. A value the inputs cannot give raises
 `ValidationError` (code `no_value`, or `missing_assumption` for an assumption nobody gave); with
-`on_error="record"` it is `{value: null, unit, reason}`. No shipped module declares a cost yet, so a
-shipped plant has no value until modules declare `capex()`.
+`on_error="record"` it is `{value: null, unit, reason}`. Equipment declares `capex(assumptions)` from
+its design values and the cost factors of `Assumptions`, see [economics.md](economics.md).
 
 | Name | Status |
 | --- | --- |

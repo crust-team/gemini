@@ -45,21 +45,31 @@ Every function returns a value with the parts of its result as more keys, each a
 | `npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `-capex + (revenue - opex) A` |
 | `payback(plant, results, assumptions=None)` | `capex / (revenue - opex)` in years, undiscounted |
 
-`Cost` and `total_cost` (`types/cost.py`) are the one cost implementation. **No built-in module
-declares a cost**, so for a plant of built-in modules `capex` and `opex` have no value, with the reason "no module
-declares a cost" (under `"record"`, `opex` still lists the energy bill in `components`), and
-`lcoh`, `lcoc`, `npv` and `payback` follow. A module declares its cost by defining `capex()` that
-returns a `Cost`. Costs in different currencies or price years raise `ValidationError`; assumptions
-in another currency than the costs raise `ValidationError`.
+`Cost` and `total_cost` (`types/cost.py`) are the one cost implementation. Every equipment module
+that has a cost declares `capex(assumptions)`, which returns a `Cost` from its own design values and
+a cost factor of `Assumptions` through `scaled_cost(assumptions, factor, size)`; a composite adds only
+its own part. A factor without a value raises `ValidationError`, code `missing_assumption`, under
+`"record"` `{value: null, reason}`. A plant with no declaring module has no value, with the reason "no
+module declares a cost". Costs in different currencies or price years raise `ValidationError`;
+assumptions in another currency than the costs raise `ValidationError`.
+
+| Module | `capex` |
+| --- | --- |
+| `Doublet` with a design | `drilling_cost` times twice the depth, plus `pump_cost` times the shaft power at `nominal_flow`; without a design, none |
+| `HeatPump`, `Boiler`, `AbsorptionUnit` | `heat_pump_cost`, `boiler_cost`, `chiller_cost` times `capacity` |
+| `CHP` | `chp_cost` times `electric_capacity` |
+| `HeatExchanger` | `exchanger_cost` times `thermal_conductance` |
+| `Degasser`, `Flare`, `GasMakeup` | `degasser_cost`, `flare_cost`, `makeup_cost`, fixed items |
+
+`lcoh` charges the whole plant cost to the heat. A plant that also delivers cold has no value ("the
+split of its cost is not defined") unless `heat_cost_share` gives the part charged to heat; `lcoc`
+gets the rest. Levelised cost, `npv` and `payback` assume constant yearly energy and cost over the
+lifetime, with no degradation, tax, replacement or residual value.
 
 Missing user inputs raise `ValidationError` with code `missing_assumption` and the path
 `assumptions.<name>`: a discount rate or lifetime given nowhere, an electricity or gas price for an
 energy the run buys, a heat or cold price for a product it delivers, an electricity emission factor
 for grid electricity drawn. A price is asked for only when its energy is non-zero.
-
-`lcoh` charges the whole plant cost to the heat, so a plant that also delivers cold has no value ("the split of its cost is not defined"); `lcoc` likewise. Levelised cost, `npv` and `payback`
-assume constant yearly energy and cost over the lifetime, with no degradation, tax, replacement or
-residual value.
 
 ### Sources of the `Assumptions` defaults
 
@@ -72,7 +82,22 @@ residual value.
 | `electricity_price` | currency/J | None | depends on country, year and contract |
 | `gas_price` | currency/MWh | None | per MWh of fuel energy; depends on country, year and contract |
 | `heat_price`, `cold_price` | currency/J | None | depends on the contract |
+| `heat_cost_share` | - | None | a choice of the assessment |
 | `electricity_emission_factor` | kg/J | None | depends on the grid and the year |
+
+### Sources of the cost factors
+
+All are in `cost_price_year` = 2015, the prices of the Danish catalogue; `Assumptions` has the
+citation of each in `COST_SOURCES`, and `capex` returns it in `source`.
+
+| Field | Unit | Default | Source |
+|---|---|---|---|
+| `drilling_cost` | currency/m of well | 1239.13 | SDE+ 2013 reference case, 5.7 MEUR net drilling for a doublet at 2300 m, over 2 x 2300 m (Mijnlieff et al. 2013, EGC, slide 26). Per doublet by the table's own sum: 6.2 MWth at 1527 EUR/kWth is 9.5 MEUR. A 2013 figure, not escalated. The 3000 m case gives 1833 EUR/m: use it for deep designs |
+| `degasser_cost` | currency | 1 000 000 | SDE+ 2013 reference case, reserve for separation of hydrocarbons per doublet (same slide), a 2013 figure, not escalated |
+| `heat_pump_cost` | currency/W | 0.67 | Danish Energy Agency, Technology Data for Energy Plants, April 2020, ch. 40, compression heat pump, excess heat, 10 MW, 2020 |
+| `boiler_cost` | currency/W | 0.06 | same catalogue, ch. 44, district heating boiler, natural gas, 2020 |
+| `chp_cost` | currency/W electric | 0.95 | same catalogue, ch. 06, spark ignition engine, natural gas, 1-10 MWe, 2020 |
+| `pump_cost`, `chiller_cost`, `exchanger_cost`, `flare_cost`, `makeup_cost` | | None | no source found; using one raises `missing_assumption` |
 
 Convert at the boundary: EUR/MWh divided by 3.6e9 is EUR/J, kg/GJ divided by 1e9 is kg/J.
 

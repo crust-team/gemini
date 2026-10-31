@@ -26,7 +26,7 @@ def _cost_of(plant, results, product, rate, years, assumptions, on_error):
     """Compute the levelised cost; ``on_error`` applies to a value the plant cannot give."""
     assumptions = resolve(assumptions)
     rate, years = discounting(assumptions, rate, years)
-    investment = capex(plant, assumptions, "record")
+    investment = capex(plant, assumptions, on_error)
     unit = f"{investment['unit']}/J"
     if investment["value"] is None:
         return unavailable(unit, investment["reason"], on_error)
@@ -36,14 +36,18 @@ def _cost_of(plant, results, product, rate, years, assumptions, on_error):
     )
     if delivered <= 0:
         return unavailable(unit, f"the run delivers no {product}", on_error)
+    share = 1.0
     if other > 0:
-        reason = "the plant delivers heat and cold; the split of its cost is not defined"
-        return unavailable(unit, reason, on_error)
+        if assumptions.heat_cost_share is None:
+            reason = "the plant delivers heat and cold; the split of its cost is not defined"
+            return unavailable(unit, reason, on_error)
+        heat_share = assumptions.heat_cost_share
+        share = heat_share if product == "heat" else 1 - heat_share
     yearly = opex(plant, results, assumptions, "raise")["value"]
     factor = annuity(rate, years)
     cost = investment["value"] + yearly * factor
     return value(
-        cost / (delivered * factor),
+        share * cost / (delivered * factor),
         unit,
         capex=value(investment["value"], investment["unit"]),
         opex=value(yearly, f"{investment['unit']}/year"),
@@ -60,8 +64,8 @@ def lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None, on
     years of ``1 / (1 + discount_rate) ** t``. ``capex`` and ``opex`` are the ``capex`` and
     ``opex`` of this package, ``opex`` and ``heat`` are per year as scaled from the run
     (``annual_energies``), constant over the lifetime, with no degradation, replacement or
-    residual value. The whole plant cost is charged to the heat, so a plant that also delivers
-    cold gives no value.
+    residual value. The whole plant cost is charged to the heat; for a plant that also delivers
+    cold, ``assumptions.heat_cost_share`` of it, and without that share it gives no value.
 
     Parameters
     ----------
@@ -82,7 +86,8 @@ def lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None, on
     dict
         ``{value, unit, capex, opex, energy, discount_rate, lifetime_years}``, the last five each
         a value; ``value`` in currency/J (multiply by 3.6e9 for currency/MWh). A plant that
-        declares no cost, delivers no heat or also delivers cold has no value.
+        declares no cost, delivers no heat, or also delivers cold without a ``heat_cost_share`` has
+        no value.
     """
     return _levelised(plant, results, "heat", discount_rate, lifetime, assumptions, on_error)
 
@@ -91,7 +96,7 @@ def lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None, on
     """Return the levelised cost of cold [currency/J]; the cooling twin of ``lcoh``.
 
     The same formula with the cold delivered (``heat_absorbed`` of the ``CoolingConsumer``
-    leaves) in place of the heat, and a plant that also delivers heat gives no value. The
-    parameters and the return shape are those of ``lcoh``.
+    leaves) in place of the heat, and for a plant that also delivers heat the share of the cost
+    ``heat_cost_share`` leaves. The parameters and the return shape are those of ``lcoh``.
     """
     return _levelised(plant, results, "cold", discount_rate, lifetime, assumptions, on_error)

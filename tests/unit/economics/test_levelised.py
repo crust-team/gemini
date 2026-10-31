@@ -67,6 +67,19 @@ def test_null_with_a_reason_when_the_cost_or_the_heat_is_missing():
         gm.economics.lcoh(plant, day(cold=100.0), 0.05, 20, PRICES)
 
 
+def test_a_share_splits_the_cost_of_a_plant_with_two_products():
+    """``heat_cost_share`` charges that part of the cost to heat and the rest to cold."""
+    plant = heating_plant()
+    plant.add_module("cool", CoolingConsumer())
+    run = day(cold=100.0)
+    values = PRICES.model_copy(update={"heat_cost_share": 0.8})
+    heat = gm.economics.lcoh(plant, run, 0.05, 20, values)
+    cold = gm.economics.lcoc(plant, run, 0.05, 20, values)
+    assert heat["value"] * heat["energy"]["value"] / 0.8 == pytest.approx(
+        cold["value"] * cold["energy"]["value"] / 0.2
+    )
+
+
 def test_lcoc_divides_by_the_cold_delivered():
     """The cooling plant (2000 EUR, no running cost, 300 W of cold) over 10 years at 0 %."""
     values = gm.economics.Assumptions(electricity_price=2e-8)

@@ -18,15 +18,31 @@ class Cost(BaseModel):
     source: str = Field(min_length=1)
 
 
-def total_cost(module):
-    """Sum the costs that a module and its descendants declare through a ``capex()`` method.
+def scaled_cost(assumptions, factor, size=1):
+    """Return the ``Cost`` of a design size at the cost factor named ``factor``.
 
-    A module declares its own capital and operating cost by defining ``capex()`` returning a
-    ``Cost``; a composite's ``capex`` describes only its own addition, never its children's.
-    Returns ``None`` when no module declares a cost, and refuses to add costs valued in different
-    currencies or price years.
+    ``assumptions`` is a ``gm.economics.Assumptions``; a factor without a value raises
+    ``ValidationError`` (code ``missing_assumption``). A size of one is a fixed item.
     """
-    costs = [cost for item in module.modules() if (cost := _own_cost(item)) is not None]
+    return Cost(
+        capex=assumptions.factor(factor) * size,
+        currency=assumptions.currency,
+        price_year=assumptions.cost_price_year,
+        source=assumptions.source_of(factor),
+    )
+
+
+def total_cost(module, assumptions):
+    """Sum the costs that a module and its descendants declare through a ``capex`` method.
+
+    A module declares its own capital and operating cost by defining ``capex(assumptions)``
+    returning a ``Cost``, or ``None`` while its design gives none; a composite's ``capex``
+    describes only its own addition, never its children's. Returns ``None`` when no module
+    declares a cost, and refuses to add costs valued in different currencies or price years.
+    """
+    costs = [
+        cost for item in module.modules() if (cost := _own_cost(item, assumptions)) is not None
+    ]
     if not costs:
         return None
     first = costs[0]
@@ -46,7 +62,7 @@ def total_cost(module):
     )
 
 
-def _own_cost(module):
+def _own_cost(module, assumptions):
     """Return the cost a module declares itself, or ``None``."""
     capex = getattr(module, "capex", None)
-    return capex() if capex is not None else None
+    return capex(assumptions) if capex is not None else None

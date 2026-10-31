@@ -10,7 +10,7 @@ from gemini.types.cost import Cost, total_cost
 class CostedFilter(Filter):
     """Fictional cost for testing aggregation, not an equipment estimate."""
 
-    def capex(self):
+    def capex(self, assumptions):
         """Return a sourced fixture estimate."""
         return self.estimate
 
@@ -23,12 +23,12 @@ def test_cost_aggregation():
     )
     second.estimate = first.estimate
     plant = ModuleList([first, second])
-    assert total_cost(plant).capex == 200
-    assert total_cost(plant).opex_fixed == 20
-    assert total_cost(plant).opex_variable == 0.002
-    assert total_cost(plant).source == "test fixture"
+    assert total_cost(plant, None).capex == 200
+    assert total_cost(plant, None).opex_fixed == 20
+    assert total_cost(plant, None).opex_variable == 0.002
+    assert total_cost(plant, None).source == "test fixture"
     for change in ({"currency": "USD"}, {"price_year": 2025}):
         second.estimate = first.estimate.model_copy(update=change)
         with pytest.raises(ValueError, match="currency and price year"):
-            total_cost(plant)
-    assert total_cost(Filter()) is None
+            total_cost(plant, None)
+    assert total_cost(Filter(), None) is None

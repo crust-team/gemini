@@ -15,7 +15,7 @@ HOURS = 24
 class CostedHeatConsumer(HeatConsumer):
     """A heat consumer that declares 1000 EUR, 10 EUR/year fixed and 1e-9 EUR/J variable cost."""
 
-    def capex(self):
+    def capex(self, assumptions):
         """Return the declared cost."""
         return Cost(
             capex=1000.0,
@@ -30,7 +30,7 @@ class CostedHeatConsumer(HeatConsumer):
 class CostedCoolingConsumer(CoolingConsumer):
     """A cooling consumer that declares 2000 EUR and no running cost."""
 
-    def capex(self):
+    def capex(self, assumptions):
         """Return the declared cost."""
         return Cost(capex=2000.0, currency="EUR", price_year=2024, source="test fixture")
 

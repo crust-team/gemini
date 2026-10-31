@@ -5,6 +5,7 @@ from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import combustion, gas
 from gemini.types import Efficiency, Inlet, MassFlow, Output, Parameter, Stream
+from gemini.types.cost import scaled_cost
 
 
 class Flare(Module):
@@ -57,3 +58,7 @@ class Flare(Module):
         self.co2_emission, self.methane_emission = combustion.burnt_gas_emissions(
             inlet.m_dot, carried, formed, methane, self.combustion_efficiency
         )
+
+    def capex(self, assumptions):
+        """Return the cost of the flare, a fixed item."""
+        return scaled_cost(assumptions, "flare_cost")

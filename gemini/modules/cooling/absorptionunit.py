@@ -21,6 +21,7 @@ from gemini.types import (
     TemperatureDifference,
     ThermalConductance,
 )
+from gemini.types.cost import scaled_cost
 
 
 class AbsorptionUnit(Module):
@@ -114,6 +115,10 @@ class AbsorptionUnit(Module):
 
     def _compute_outputs(self, inlets, outlets):
         sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
+
+    def capex(self, assumptions):
+        """Return the cost of the absorption unit from its capacity."""
+        return scaled_cost(assumptions, "chiller_cost", self.capacity)
 
     def _performance(self, inlets):
         """Return the duties [W], COP and outlet temperatures [K] of one operating point."""

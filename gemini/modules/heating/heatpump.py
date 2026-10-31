@@ -22,6 +22,7 @@ from gemini.types import (
     Temperature,
     TemperatureDifference,
 )
+from gemini.types.cost import scaled_cost
 
 
 class HeatPump(Module):
@@ -120,6 +121,10 @@ class HeatPump(Module):
         values = self._performance(inlets.source_in, inlets.sink_in)
         for name, value in values.items():
             setattr(self, name, value)
+
+    def capex(self, assumptions):
+        """Return the cost of the heat pump from its capacity."""
+        return scaled_cost(assumptions, "heat_pump_cost", self.capacity)
 
     def _performance(self, source_in, sink_in):
         """Return every output; the outlet temperatures [K] also define the outlets."""

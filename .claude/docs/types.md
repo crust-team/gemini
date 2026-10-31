@@ -241,7 +241,7 @@ dataset must share one index; resample explicitly.
 
 `Cost` stores investment, annual fixed cost and variable currency/J of useful output, together
 with currency, price year and a source citation. A module declares its own cost by defining
-`capex()` returning a `Cost`; `gemini.types.cost.total_cost(plant)` sums each module's own
-contribution once, returns `None` when no module declares a cost and rejects mixed currencies or
-years. Composite `capex` must therefore describe only its own additional cost, not repeat child
-costs. No built-in module declares a cost.
+`capex(assumptions)` returning a `Cost`; `gemini.types.cost.total_cost(plant, assumptions)` sums each
+module's own contribution once, returns `None` when no module declares a cost and rejects mixed
+currencies or years. Composite `capex` must therefore describe only its own additional cost, not
+repeat child costs. `scaled_cost(assumptions, factor, size)` is a factor times a design size.

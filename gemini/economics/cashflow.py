@@ -17,9 +17,9 @@ def _revenue(assumptions, annual):
     return revenue
 
 
-def _net_cash_flow(plant, results, assumptions):
+def _net_cash_flow(plant, results, assumptions, on_error):
     """Return ``(capex, yearly net cash flow, unit, reason)``; no cost gives ``None`` numbers."""
-    investment = capex(plant, assumptions, "record")
+    investment = capex(plant, assumptions, on_error)
     if investment["value"] is None:
         return None, None, investment["unit"], investment["reason"]
     yearly = opex(plant, results, assumptions, "raise")
@@ -67,7 +67,7 @@ def _npv(plant, results, discount_rate, lifetime, assumptions, on_error):
     """Return the net present value; ``on_error`` applies to a plant without a cost."""
     assumptions = resolve(assumptions)
     rate, years = discounting(assumptions, discount_rate, lifetime)
-    investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions)
+    investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions, on_error)
     if investment is None:
         return unavailable(unit, reason, on_error)
     return value(
@@ -106,7 +106,7 @@ def payback(plant, results, assumptions=None, on_error="raise"):
 def _payback(plant, results, assumptions, on_error):
     """Return the payback time; ``on_error`` applies to a value the plant cannot give."""
     assumptions = resolve(assumptions)
-    investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions)
+    investment, flow, unit, reason = _net_cash_flow(plant, results, assumptions, on_error)
     if investment is None:
         return unavailable("year", reason, on_error)
     details = dict(capex=value(investment, unit), net_cash_flow=value(flow, f"{unit}/year"))

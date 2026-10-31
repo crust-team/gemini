@@ -228,8 +228,8 @@ reason it is needed:
   `gemini.utils.mappings.AttributeMapping`, so `result.outlets.discharge` equals
   `result.outlets["discharge"]`, and `Results[path].field` returns a pandas Series through
   `ModuleSeries.__getattr__`.
-- Two optional method protocols: a module that defines `capex()` returning a `Cost` declares its
-  own cost for `gemini.types.cost.total_cost(plant)`, which looks the method up by name; a
+- Two optional method protocols: a module that defines `capex(assumptions)` returning a `Cost`
+  declares its own cost for `gemini.types.cost.total_cost(plant, assumptions)`, which looks the method up by name; a
   module that overrides `health(result, measured)` gets a diagnostic, which the engine calls
   after each replayed twin (the base method returns `None`, meaning not assessed).
 
