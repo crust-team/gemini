@@ -1,19 +1,38 @@
-"""Replay measured twins and summarize soft sensors.
+"""Replay measured data through the equipment twins and read the soft sensors.
 
-Run from the repository root: PYTHONPATH=. python examples/plants/replay/00_doublet_soft_sensors.py
+Shows ``gm.replay``, ``results[path].get`` and the energy table of ``Results.to_frame``.
+
+Run with ``python examples/recipes/replay_measurements.py``.
 """
 
 import os
+from pathlib import Path
 
 import pandas as pd
 
 import gemini as gm
 
-shared = "datasets/doublet_heat"
-plant = gm.Plant.load(f"{shared}/plant.json")
-dataset_path = os.environ.get("GEMINI_EXAMPLE_DATASET", f"{shared}/doublet_2024_15min.csv")
-frame = pd.read_csv(dataset_path, parse_dates=["time"])
-data = gm.Dataset.from_frame(frame, time_column="time")
-results = gm.replay(plant, data)
-print(results["doublet.esp"].head.head())
-print(results.to_frame(table="energy"))
+DATASETS = Path(__file__).resolve().parents[2] / "datasets"
+MONTH = DATASETS / "doublet_heat/doublet_2024_15min_month.csv"
+DATA = Path(os.environ.get("GEMINI_EXAMPLE_DATASET", MONTH))
+
+
+def main():
+    """Replay the data, then print the pump head and the energy of each module."""
+    plant = gm.Plant.load(DATASETS / "doublet_heat/plant.json")
+    frame = pd.read_csv(DATA, parse_dates=["time"])
+    results = gm.replay(plant, gm.Dataset.from_frame(frame, time_column="time"))
+    head = results["doublet.esp"].get("head", unit="bar")
+    print(f"ESP head, first step:  {head.iloc[0]:.4f} bar")
+    print(f"ESP head, mean:        {head.mean():.4f} bar")
+    print("module, port: energy, peak, operating hours, alarms")
+    table = results.to_frame(table="energy")
+    for (module, port), row in table[(table["peak_W"] > 0) | (table["alarms"] > 0)].iterrows():
+        print(
+            f"{module + ' ' + port:<26} {row['energy_MWh']:8.2f} MWh {row['peak_W'] / 1e3:9.1f} kW "
+            f"{row['operating_hours']:6.0f} h {row['alarms']:6.0f} alarms"
+        )
+
+
+if __name__ == "__main__":
+    main()

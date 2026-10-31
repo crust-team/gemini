@@ -1,30 +1,34 @@
-"""Convert old files in both directions.
+"""Convert an old GEMINI project folder into a plant.
 
-Run from the repository root: PYTHONPATH=. python examples/legacy/00_gemini_project_bridge.py
+Shows ``gm.plants.convert_legacy``, the one public entry to the old format, and
+``gm.plants.from_dict``. The conversion gives the stored plant file of ``datasets/doublet_heat``.
+The data file of the project is read here only to count its rows: its converted copy is the CSV
+beside that plant file.
+
+Run with ``python examples/recipes/legacy_project.py``.
 """
 
-import argparse
+import json
 from pathlib import Path
 
+import pandas as pd
+
 import gemini as gm
-from gemini.utils import legacy
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--out", default="runs/bridge")
-arguments = parser.parse_args()
-source = Path("datasets/legacy_project")
-target = Path(arguments.out)
-target.mkdir(parents=True, exist_ok=True)
+DATASETS = Path(__file__).resolve().parents[2] / "datasets"
+PROJECT = DATASETS / "legacy_project"
 
-project = legacy.read_project(source)
-plant = legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
-old_frame = legacy.read_csv(source / "doublet_2024_old.csv")
-data = legacy.to_dataset(project, old_frame)
-plant.save(target / "plant.json")
-frame = data.to_frame()
-frame.index.name = "time"
-frame.reset_index().to_csv(target / "doublet_2024_15min.csv", index=False, float_format="%.17g")
-results = gm.replay(plant, data.window(end="2024-06-07T01:00:00Z"))
-legacy.write_csv(legacy.results_to_frame(results, project), target / "results_old.csv")
-legacy.write_project(legacy.from_plant(plant, project), target / "old_project")
-print("Converted", len(data), "rows; wiring:", legacy.check_wiring(plant, project))
+
+def main():
+    """Convert the folder and compare the result with the stored plant file."""
+    spec = gm.plants.convert_legacy(PROJECT)
+    plant = gm.plants.from_dict(spec)
+    rows = pd.read_csv(PROJECT / "doublet_2024_old.csv", sep=";")
+    stored = json.loads((DATASETS / "doublet_heat/plant.json").read_text())
+    print(f"Old project rows:     {len(rows)}")
+    print(f"Modules converted:    {len(plant.to_spec()['modules'])}")
+    print(f"Same as the stored plant file: {spec == stored}")
+
+
+if __name__ == "__main__":
+    main()
