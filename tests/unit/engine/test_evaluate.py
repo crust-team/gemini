@@ -105,3 +105,39 @@ def test_a_wrong_map_of_units_follows_on_error():
     with raises(gm.errors.ValidationError, "unknown_name"):
         call(units={"powr": "kW"})
     assert call(units={"powr": "kW"}, on_error="record")["errors"][0]["code"] == "unknown_name"
+
+
+def test_a_volume_flow_goes_in_as_flow_with_the_fluid_of_the_inlet():
+    """``flow`` converts with the density of the fluid given for the inlet, at any unit."""
+    brine = {"density": 1030.0}
+    for flow in ("150 m3/h", "41.666666666666664 l/s"):
+        inlets = {"fluid_in": {"flow": flow, "T": "80 degC", "p": "20 bar", "fluid": brine}}
+        discharge = call(inlets=inlets)["outlets"]["fluid_out"]
+        assert discharge["m_dot"]["value"] == pytest.approx(150 / 3600 * 1030)
+
+
+@pytest.mark.parametrize("flow", ["150 m3/h", "150  m3/s", "40 l/s"])
+def test_a_volume_flow_given_as_m_dot_points_to_flow(flow):
+    """The code stays that of a wrong inlet; the path, message and suggestion name ``flow``."""
+    inlets = {"fluid_in": {"m_dot": flow, "T": "80 degC", "p": "20 bar"}}
+    with raises(gm.errors.ValidationError, "invalid_call", match="give it as 'flow'") as caught:
+        call(inlets=inlets)
+    assert caught.value.path == "fluid_in.m_dot"
+    assert caught.value.suggestions == ("flow",)
+    recorded = call(inlets=inlets, on_error="record")["errors"][0]
+    assert recorded["code"] == "invalid_call" and recorded["suggestions"] == ["flow"]
+
+
+@pytest.mark.parametrize("flow", ["40 kg/s", "144 t/h", 40.0])
+def test_a_mass_flow_stays_a_mass_flow(flow):
+    """A number or a mass unit goes through ``m_dot`` unchanged."""
+    inlets = {"fluid_in": {"m_dot": flow, "T": "80 degC", "p": "20 bar"}}
+    assert call(inlets=inlets)["outlets"]["fluid_out"]["m_dot"]["value"] == pytest.approx(40.0)
+
+
+def test_another_wrong_unit_of_m_dot_keeps_its_error():
+    """Only a volume flow has the suggestion."""
+    inlets = {"fluid_in": {"m_dot": "40 bar", "T": "80 degC", "p": "20 bar"}}
+    with raises(gm.errors.ValidationError, "invalid_call") as caught:
+        call(inlets=inlets)
+    assert caught.value.suggestions == ()

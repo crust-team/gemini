@@ -189,7 +189,7 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 | `engine.save_checkpoint(path)`, `gm.Engine.load_checkpoint(path, callbacks=None)`, `engine.resume()` | see [engine.md](engine.md) | real |
 | `AutoCheckpoint(path, every=100)` | a callback that saves every N steps or every duration | real |
 | Callback `on_progress(engine, done, total)` | a callback may raise `gm.errors.Cancelled`; committed ticks stay in `engine.results` | real |
-| `gm.evaluate(module, parameters, inlets, controls, on_error="raise", units=None)` | `{outlets: {port: {field: value}}, outputs: {name: value}, errors: [problem]}`; *units*; a run at one point | real |
+| `gm.evaluate(module, parameters, inlets, controls, on_error="raise", units=None)` | `{outlets: {port: {field: value}}, outputs: {name: value}, errors: [problem]}`; *units*; a run at one point. An inlet takes `m_dot` for a mass flow or `flow` for a volume flow (`"150 m3/h"`, by the density of the inlet's `fluid`), with `T`, `p` and an optional `fluid`; a volume unit on `m_dot` raises code `invalid_call` with the suggestion `flow` | real |
 
 | `Results` | Returns | Status |
 | --- | --- | --- |
@@ -287,6 +287,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `gm.evaluate`: a volume unit on `m_dot` names `flow` in its message, `path` and `suggestions`; the code stays `invalid_call`. |
 | 0.2.0, unreleased changes | | `gm.economics.annualised_cost` and `gm.economics.lcts`, the levelised cost of heat and cold together. |
 | 0.2.0, unreleased changes | | `rules["operating_days"]` of `gm.schedule` is built: a count or a list of outage dates, `attrs["outage_days"]`, the column `<heat pump>.is_running`. New `gm.checks.operating_days(plant, results, days)`; `gm.checks.run_all` takes `days`. |
 | 0.2.0, unreleased changes | | File layout of `gemini/modules/`: `plant.py` and `container.py` beside `module.py`, the plant tools in `plants/_utils/`, `heating/_burner.py`, `cooling/_sorption.py`. Private paths only: no change to a name of this page. |

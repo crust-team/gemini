@@ -1,9 +1,12 @@
 """One call of one module from plain JSON."""
 
+from collections.abc import Mapping
+
 from gemini.errors import GeminiError, ValidationError
 from gemini.errors.base import check_on_error
 from gemini.modules._utils import registry
 from gemini.modules.module import Module
+from gemini.physics import units as unit_table
 from gemini.types.flows import STREAM_FIELDS, Stream
 from gemini.types.shapes import OutputUnits
 
@@ -20,9 +23,10 @@ def evaluate(module, parameters, inlets, controls, on_error="raise", units=None)
 
     ``module`` is a registry name or a ``Module`` class. ``parameters`` maps parameter names to
     numbers or unit strings (``"150 m3/h"``). ``inlets`` maps each inlet port to its stream
-    fields, ``{"m_dot": "10 kg/s", "T": "80 degC", "p": "5 bar"}`` (or ``flow`` for a volume
-    flow, and an optional ``fluid``). ``controls`` maps control and boundary names to values for
-    this call only.
+    fields, ``{"m_dot": "10 kg/s", "T": "80 degC", "p": "5 bar"}``, or ``flow`` in place of
+    ``m_dot`` for a volume flow (``"150 m3/h"``), which converts with the density of the inlet's
+    fluid, and an optional ``fluid``. ``m_dot`` refuses a volume unit and suggests ``flow``.
+    ``controls`` maps control and boundary names to values for this call only.
 
     The result is plain JSON with units: ``outlets`` is ``{port: {field: {value, unit}}}`` and
     ``outputs`` is ``{name: {value, unit}}``, in SI or in ``units``, a map from quantity to unit,
@@ -32,6 +36,7 @@ def evaluate(module, parameters, inlets, controls, on_error="raise", units=None)
     check_on_error(on_error)
     try:
         output = OutputUnits(units)
+        _check_mass_flows(inlets or {})
         instance = _instance(module)
         instance.update_params(**(parameters or {}))
         result = instance(dict(inlets or {}), **(controls or {}))
@@ -44,6 +49,19 @@ def evaluate(module, parameters, inlets, controls, on_error="raise", units=None)
         "outputs": _outputs(instance, result.outputs, output),
         "errors": [],
     }
+
+
+def _check_mass_flows(inlets):
+    """Refuse a volume flow given as ``m_dot``, pointing to ``flow``."""
+    for port, fields in inlets.items():
+        flow = fields.get("m_dot") if isinstance(fields, Mapping) else None
+        if unit_table.fits(str(flow).rpartition(" ")[2], "volume_flow"):
+            raise ValidationError(
+                f"evaluate: {port}.m_dot = {flow!r}; expected a mass flow; give it as 'flow'",
+                path=f"{port}.m_dot",
+                code="invalid_call",
+                suggestions=["flow"],
+            )
 
 
 def _instance(module):
