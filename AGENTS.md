@@ -102,6 +102,7 @@ docs/schemas/         # generated JSON Schemas and samples of the exchanged docu
 inputs/               # not installed: hackathon/, plants/ (example values), doublet_heat/, legacy_project/
 examples/             # quickstart.py, basics/, recipes/, cases/, scripts only
 scripts/              # test_changed.py, write_schemas.py
+docker/               # sandbox.Dockerfile, the image of a module sandbox (make sandbox-image)
 tests/                # unit mirror, integration, e2e (expected/ holds example outputs), fixtures
 ```
 

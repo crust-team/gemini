@@ -301,6 +301,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `make sandbox-image` builds `gemini-sandbox:<version>`, the image of geomind's module sandbox, from `docker/sandbox.Dockerfile`. |
 | 0.2.0, unreleased changes | | `gm.analysis.nodal` solves injection wells: the wellhead pressure of a rate, or the rate of a wellhead pressure. |
 | 0.2.0, unreleased changes | | `gm.challenge_rules()` and `gm.profiles.demand()`. `profile=None` in `gm.optim.minimize` and `sample` is the demand year under the challenge rules, and a demand frame is planned for each trial. Reading a finished run no longer builds the JSON of every column. |
 | 0.2.0, unreleased changes | | `gm.plants.example` of the five template plants holds the challenge values on two doublets, with `inputs`, and runs the demand year (`examples/cases/challenge_year.py`); a value file may state `size`. A plan states the unit of its columns in `attrs["units"]`, and a run reads them: a binding in another unit no longer misreads a plan. On a root plant, which has no ports, a failing row is now an error: it passed unnoticed on a traced plant. A stopped drive circuit of `AdsorptionChiller` has no driving-temperature limit. |

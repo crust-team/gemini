@@ -228,6 +228,21 @@ shapes, and `tests/unit/scripts/test_write_schemas.py` that the
 files of `docs/schemas/` are up to date and each sample fits its schema, with the small checker
 in `tests/fixtures/json_schema.py`.
 
+## Sandbox image
+
+`make sandbox-image` builds `docker/sandbox.Dockerfile` as `gemini-sandbox:<version>`, the version of
+`pyproject.toml`, so `gemini-sandbox:0.2.0` today. geomind's `DockerSandbox(image="gemini-sandbox:0.2.0")`
+runs agent-written modules in it. It is a slim Python 3.11, the oldest supported version, with gemini
+and its runtime dependencies installed from the repository, about 640 MB, and a non-root user
+`sandbox`. `docker/sandbox.Dockerfile.dockerignore` lets only `pyproject.toml`, `README.md`, `LICENSE`
+and `gemini/` into the build. Nothing in the image needs a network at run time: it runs under
+`--read-only --network none`, the flags of `DockerSandbox`. `inputs/` is not in the image, so
+`gm.plants.example` and `gm.profiles.get` raise `inputs_missing` there, as in any installed package.
+
+The image lives on the machine that built it. Publishing it needs a registry name, such as
+`ghcr.io/<organisation>/gemini-sandbox:<version>`, a `docker login` with a token that may write
+packages, and `docker buildx build --platform linux/amd64,linux/arm64` for both architectures.
+
 ## Old formats, examples and e2e coverage
 
 Old-format files are read only by `tests/unit/utils/legacy/`, `tests/e2e/test_legacy_bridge.py`,
