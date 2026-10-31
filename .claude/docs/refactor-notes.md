@@ -50,7 +50,7 @@ implementation or test.
   numbers are unchanged.
 - No injection-pump curves exist in the project. Use the measured discharge setpoint in twins;
   Q*deltaP/PowerDraw implies efficiency 0.80000 within CSV rounding. The example explicitly
-  selects 0.8 while standalone equipment defaults to 0.7. Scenarios default to 51.5 bar.
+  selects 0.8; the equipment has no default. Scenarios default to 51.5 bar.
 - The buried ESP is represented by below-pump and riser well segments, `doublet.well` and
   `doublet.riser`; the riser is connected after ESP discharge. Both segments use the same
   trajectory slicing as `intake_conditions` and `wellhead_from_discharge`. Segment outputs

@@ -11,7 +11,7 @@ from gemini.errors import ValidationError
 from gemini.types.bindings import Binding, ConfigModel, DatedParams, ModuleBindings
 from gemini.types.fluid import BRINE, Fluid
 from gemini.utils.mappings import set_nested
-from gemini.utils.strings import join_path
+from gemini.utils.strings import join_names, join_path
 from gemini.utils.time import EARLIEST, to_utc
 
 from . import tables
@@ -153,6 +153,21 @@ def _json_params(kind, params):
     return module.state_dict()[""]["params"]
 
 
+def _supplement(project, node_id, kind, columns):
+    """Return the parameters the data column of ``kind`` implies, or raise without that column."""
+    if kind not in tables.PARAMETER_SUPPLEMENTS:
+        return {}
+    column, supplement = tables.PARAMETER_SUPPLEMENTS[kind]
+    if column not in columns:
+        names = join_names(supplement)
+        raise ValidationError(
+            f"{project.nodes[node_id].name}: {names} = missing; expected the data column {column}",
+            path=f"{tables.NODE_PATHS[project.nodes[node_id].name]}.{names}",
+            code="missing_value",
+        )
+    return supplement
+
+
 def _snapshots(project, node_id, kinds, columns):
     """Return one node's dated parameter snapshots, oldest first."""
     kind = kinds[node_id]
@@ -163,13 +178,11 @@ def _snapshots(project, node_id, kinds, columns):
             "effective dates",
             code="invalid_format",
         )
-    column, supplement = tables.PARAMETER_SUPPLEMENTS.get(kind, (None, {}))
+    supplement = _supplement(project, node_id, kind, columns)
     snapshots = []
     for index, at in enumerate(times):
         params = _converted(project, node_id, kinds, _snapshot(project, node_id, index), at)
-        if column in columns:
-            params |= supplement
-        snapshots.append(DatedParams(valid_from=at, params=_json_params(kind, params)))
+        snapshots.append(DatedParams(valid_from=at, params=_json_params(kind, params | supplement)))
     return sorted(snapshots, key=lambda item: item.valid_from or EARLIEST)
 
 

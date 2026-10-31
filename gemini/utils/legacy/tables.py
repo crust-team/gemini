@@ -233,8 +233,8 @@ PARAMETER_SUPPLEMENTS = {"injection_pump": ("InjectorPump_PowerDraw", {"efficien
 """Parameters a data CSV column implies but the old project lacks: kind -> (column, params).
 
 NOTE(refactor): example Q*deltaP/PowerDraw is 0.80000 (within rounding). No curves exist, so
-use the pressure-setpoint variant with efficiency 0.8; the standalone equipment default stays
-0.7.
+use the pressure-setpoint variant with efficiency 0.8. A project without that column has no
+efficiency, which has no default: ``_loader`` raises ``missing_value``.
 """
 
 STREAM_DEFAULTS = {"heat_exchanger": {"cold_in": {"p": ASSUMED_SECONDARY_PRESSURE}}}

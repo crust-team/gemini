@@ -33,9 +33,7 @@ class InjectionPump(Module):
         # Parameters
         self.stage_count = Parameter(Count | None, default=None)
         self.pump_type = Parameter(str, default="unspecified")
-        self.efficiency = Parameter(
-            Efficiency, default=pumps.DEFAULT_INJECTION_PUMP_EFFICIENCY, calibratable=True
-        )
+        self.efficiency = Parameter(Efficiency | None, default=None, calibratable=True)
         self.head_coefficients = Parameter(
             list[float] | None, default=None, shape=(pumps.POLYNOMIAL_COEFFICIENT_COUNT,)
         )
@@ -85,10 +83,19 @@ class InjectionPump(Module):
         return outlets
 
     def _power(self, suction, head):
-        """Return the pump power [W] from the power curve, else from the efficiency."""
+        """Return the pump power [W] from the power curve, else from the efficiency.
+
+        The efficiency has no default: a design states it, unless it has both curves.
+        """
         flow = suction.volumetric_flow()
         if self.head_coefficients is not None and self.power_coefficients is not None:
             return pumps.power(flow, self.frequency, self.stage_count, self.power_coefficients)
+        if self.efficiency is None:
+            raise ValidationError(
+                f"{self.path}: efficiency = None; expected a value, or head and power curves",
+                path="efficiency",
+                code="missing_value",
+            )
         return energy.input_power(pumps.hydraulic_power(flow, head), self.efficiency)
 
     def _head(self, suction):

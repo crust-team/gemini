@@ -27,13 +27,6 @@ DEFAULT_BEP_FLOW = 0.04
 """Default best-efficiency flow of an ESP [m3/s] (retained GEMINI default)."""
 
 
-DEFAULT_INJECTION_PUMP_EFFICIENCY = 0.7
-"""Default constant overall efficiency [-] of an injection pump without a power curve.
-
-A retained GEMINI default with no published source; a design states its own efficiency.
-"""
-
-
 DEFAULT_CIRCULATION_PUMP_EFFICIENCY = 0.55
 """Efficiency of a building circulation pump [-], from the electricity to the water.
 

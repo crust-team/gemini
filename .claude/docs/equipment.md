@@ -163,9 +163,9 @@ Injection (booster) pump that raises the brine to a discharge pressure.
 
 - **Ports**: `fluid_in`, `power_in` (power) -> `fluid_out`.
 - **Parameters**: `stage_count` (`Count | None`, default `None`), `pump_type` (default
-  `"unspecified"`, read only by the legacy import and export), `efficiency` (`Efficiency`,
-  default 0.7, calibratable; the example plant selects 0.8, see
-  [refactor-notes.md](refactor-notes.md)), `head_coefficients`, `power_coefficients`
+  `"unspecified"`, read only by the legacy import and export), `efficiency` (`Efficiency | None`,
+  no default, calibratable, required unless both curves are given: `missing_value` when the power
+  needs it; the example plant selects 0.8, see [refactor-notes.md](refactor-notes.md)), `head_coefficients`, `power_coefficients`
   (`list[float] | None`, shape 6, default `None`, ESP basis).
 - **Controls**: `pressure_setpoint` (`Pressure | None`, default `None`), `frequency`
   (`Frequency`, default 60 Hz, used with curves).

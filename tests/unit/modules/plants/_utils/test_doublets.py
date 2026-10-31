@@ -32,6 +32,7 @@ WELL_DESIGN = {
 }
 SIZES = {
     "degasser.separation_efficiency": 1.0,
+    "injection_pump.efficiency": 0.7,
     "heat_exchanger.thermal_conductance": "1500000 W/K",
     "heat_exchanger.hot_nominal_pressure_drop": "0 bar",
     "heat_exchanger.cold_nominal_pressure_drop": "0 bar",

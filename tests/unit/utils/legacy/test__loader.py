@@ -9,7 +9,7 @@ import pytest
 import gemini as gm
 from gemini.errors import GeminiWarning, ValidationError
 from gemini.utils import legacy
-from gemini.utils.legacy._loader import load_legacy_design, node_kinds
+from gemini.utils.legacy._loader import _data_columns, load_legacy_design, node_kinds
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.errors import raises
 
@@ -24,6 +24,17 @@ def _copy(tmp_path):
     folder = tmp_path / "old"
     shutil.copytree(OLD_PROJECT, folder)
     return folder
+
+
+def test_a_project_without_the_power_column_of_its_pump_has_no_efficiency(project, monkeypatch):
+    """The efficiency comes from the data column: there is no default to fall back on."""
+    monkeypatch.setattr(
+        "gemini.utils.legacy._loader._data_columns",
+        lambda parsed: _data_columns(parsed) - {"InjectorPump_PowerDraw"},
+    )
+    with raises(ValidationError, "missing_value") as caught:
+        load_legacy_design(project)
+    assert caught.value.path == "injection_pump.efficiency"
 
 
 def _edit_param(folder, name, edit):
