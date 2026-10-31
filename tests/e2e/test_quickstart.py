@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from tests.fixtures import ROOT
+from tests.fixtures import SHARED
 
 pytestmark = pytest.mark.e2e
 
@@ -14,13 +14,9 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
 
     The body is one end-to-end path through the public API, so it stays one function.
     """
-    (tmp_path / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
-    (tmp_path / "datasets").symlink_to(ROOT / "datasets", target_is_directory=True)
     monkeypatch.chdir(tmp_path)
 
-    SHARED = "datasets/doublet_heat"
-
-    plant = gm.Plant.load(f"{SHARED}/plant.json")
+    plant = gm.Plant.load(SHARED / "plant.json")
     print(plant)
 
     df = pd.read_csv(dataset_path, parse_dates=["time"])

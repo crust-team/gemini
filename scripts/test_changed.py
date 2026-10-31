@@ -16,7 +16,7 @@ Selection rules, applied to the changed files:
    and every affected ``gemini/<path>/<name>.py`` runs its mirror
    ``tests/unit/<path>/test_<name>.py``. Imports made by ``conftest.py`` files are not followed,
    otherwise every change would select the whole suite through shared fixtures.
-4. A changed numbered example script selects ``tests/e2e/test_examples.py``.
+4. Any changed file under ``examples/`` selects ``tests/e2e/test_examples.py``.
 5. Any other changed file selects the tests whose source, or whose ``conftest.py``, names its
    repository path. A file below ``datasets/`` also selects those that name its folder or a
    constant of ``tests/fixtures/__init__.py`` that holds the folder.
@@ -30,15 +30,13 @@ to the release profile. The import graph is cached in ``.tmp/test_changed/import
 import argparse
 import ast
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("gemini", "examples", "tests", "scripts")
+PACKAGES = ("gemini", "tests", "scripts")
 SELECT_ALL = {"pyproject.toml", "tests/conftest.py", "tests/xdist_plugin.py"}
-EXAMPLE_SCRIPT = re.compile(r"^examples/.*/\d\d_[^/]+\.py$")
 EXAMPLES_TEST = "tests/e2e/test_examples.py"
 FIXTURE_PATHS = "tests/fixtures/__init__.py"
 QUALITY_TEST = "tests/unit/test_code_quality.py"
@@ -193,7 +191,7 @@ def _select_changed_file(path, tests, root):
         return tests_below(Path(path).parent.as_posix(), tests), f"{path} scope"
     if is_test_file(path):
         return ({path} & tests), "changed test file"
-    if EXAMPLE_SCRIPT.match(path):
+    if path.startswith("examples/"):
         return ({EXAMPLES_TEST} & tests), f"runs example {path}"
     if module_name(path) is None and (root / path).is_file():
         return naming_tests(path, tests, root), f"names {path}"

@@ -28,16 +28,18 @@ python scripts/test_changed.py --base origin/main -- -x
 ```
 
 `scripts/test_changed.py` takes the files changed against `HEAD` (plus uncommitted and untracked
-files, plus commits since `--base <ref>`), builds the `ast` import graph of `gemini/`,
-`examples/`, `tests/` and `scripts/` (cached in `.tmp/test_changed/`), and selects the tests of the
-changed files and of every module that imports a changed module, directly or transitively:
+files, plus commits since `--base <ref>`), builds the `ast` import graph of `gemini/`, `tests/` and
+`scripts/` (cached in `.tmp/test_changed/`), and selects the tests of the changed files and of every
+module that imports a changed module, directly or transitively:
 
 1. a changed test file runs itself; a changed `conftest.py` runs every test below it;
 2. `pyproject.toml`, `tests/conftest.py` and `tests/xdist_plugin.py` select every test;
 3. every affected `gemini/<path>/<name>.py` runs `tests/unit/<path>/test_<name>.py`, and every
    affected test file runs; imports made by `conftest.py` files are not followed;
-4. a changed numbered example selects `tests/e2e/test_examples.py`;
+4. any changed file under `examples/` selects `tests/e2e/test_examples.py`;
 5. any other changed file selects the tests (or `conftest.py` scopes) whose source names its path;
+   a file below `datasets/` also selects those that name its folder or a constant of
+   `tests/fixtures/__init__.py` that holds it;
 6. `tests/unit/test_code_quality.py` always runs, whatever changed and also when nothing else is
    selected, and its reason is printed.
 
@@ -74,7 +76,7 @@ bound only for a known incompatibility.
 An individual fast-tier test call may take at most one second **of CPU time**. In the
 development profile the root `tests/conftest.py` hook fails a unit or integration test whose call
 phase (without fixture setup and teardown) used more, also inside xdist workers, with
-instructions to optimize it or mark it `slow`. E2E tests, including the example smoke tests, are
+instructions to optimize it or mark it `slow`. E2E tests, including the example runs, are
 exempt, and the release profile does not enforce the budget.
 
 The measure is `time.process_time()` around the call (`tests/cpu_budget.py`), not elapsed time:
@@ -175,7 +177,7 @@ backend. **Adding a backend means adding its name to `BACKENDS`** (after registe
   cover replay, faulted rows, `on_error="raise"`, stateful and composite twins, simulate (clean and
   faulted), live, `EventLog`, `AutoCheckpoint` with resume, health columns, output types and
   column dtypes. Floats compare within `RTOL`; structure and types compare exactly.
-- **Examples** (`tests/e2e/test_backend_parity.py`, `slow`). Each numbered example runs under every
+- **Examples** (`tests/e2e/test_backend_parity.py`, `slow`). Each example runs under every
   backend through `tests/fixtures/run_example.py`, which reads `GEMINI_EXAMPLE_BACKEND`, enters
   `gemini.backends.settings` and runs the script with `runpy`; standard output without timing
   lines must be equal.
@@ -226,12 +228,19 @@ build equipment from the original `.param` files: the subsurface, wells and exch
 `tests/fixtures/capture_golden.py`. Shared paths live in `tests/fixtures/__init__.py` (`ROOT`,
 `FIXTURES`, `SHARED`, `OLD_PROJECT`).
 
-The example smoke tests are the e2e cases of `tests/e2e/test_examples.py`, one per numbered
-example. They run in both profiles (the development profile selects them when a numbered
-example changes) and are exempt from the one-second budget; a 900 s hang guard (`TIMEOUT_S`)
-stops a stuck one. Each example runs as a subprocess in `tmp_path` with an `examples` symlink, so
-its output never lands in the repository;
-`GEMINI_EXAMPLE_DATASET` points the examples that read the shared CSV at the selected dataset.
+`tests/e2e/test_examples.py` has one case per `.py` file under `examples/`. The cases run in both
+profiles (the development profile selects them when any file under `examples/` changes) and are
+exempt from the one-second budget; `TIMEOUT_S` is the time budget of one example, 120 s on the fast
+dataset and a 900 s hang guard on the slow one. Each example runs as a subprocess from an empty
+`tmp_path`, without `PYTHONPATH`, which proves it is standalone and keeps its output out of the
+repository; `GEMINI_EXAMPLE_DATASET` points it at the selected dataset. On the fast dataset what it
+prints is compared with `tests/e2e/expected/<folder>/<name>.txt`: the text exactly, the numbers
+within 1e-6 relative, 1e-6 absolute or one unit of the last printed digit. Regenerate those files
+with `python tests/fixtures/capture_example_outputs.py` and review the diff: a changed number is a
+changed result, as a changed golden is.
+`tests/unit/test_code_quality.py` checks the style of an example: a docstring with `Shows` and the
+command, `main()` under the `__main__` guard, imports of `gemini` and `gemini.types` only, no
+`__init__.py` under `examples/`, and no code that imports from `examples`.
 Expensive module-scoped e2e fixtures carry `pytest.mark.xdist_group`; the default
 `--dist loadgroup` runs each group on one worker so the fixture is built once. E2E retains the
 quickstart acceptance path (`tests/e2e/test_quickstart.py`), reconciliation, calibration

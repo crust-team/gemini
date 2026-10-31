@@ -24,7 +24,8 @@ FILES = {
     "tests/unit/engine/test_other.py": "",
     "tests/integration/test_flow.py": "from gemini.engine import user\n",
     "tests/e2e/test_examples.py": "",
-    "examples/area/01_demo.py": "import gemini\n",
+    "examples/recipes/demo.py": "import gemini\n",
+    "examples/README.md": "# Examples\n",
     "datasets/shared/data.csv": "time\n",
     "datasets/project/well.param": "{}\n",
     "tests/fixtures/__init__.py": 'PROJECT = ROOT / "datasets/project"\n',
@@ -100,7 +101,8 @@ def test_test_files_examples_and_data_files(repository):
     assert set(select(repository, "tests/unit/engine/test_base.py")) == {
         "tests/unit/engine/test_base.py"
     }
-    assert "tests/e2e/test_examples.py" in select(repository, "examples/area/01_demo.py")
+    assert "tests/e2e/test_examples.py" in select(repository, "examples/recipes/demo.py")
+    assert "tests/e2e/test_examples.py" in select(repository, "examples/README.md")
     assert set(select(repository, "datasets/shared/data.csv")) == {
         path for path in FILES if test_changed.is_test_file(path) and "tests/unit/" in path
     }

@@ -1,4 +1,4 @@
-"""Every numbered example prints the same output on every backend in ``BACKENDS``.
+"""Every example prints the same output on every backend in ``BACKENDS``.
 
 Each example runs once per backend through ``tests/fixtures/run_example.py``, which reads the
 backend from ``GEMINI_EXAMPLE_BACKEND`` and enters ``gemini.backends.settings`` before running the
@@ -7,14 +7,13 @@ duration and the temporary working directory are removed. Adding a backend means
 ``tests.fixtures.parity.BACKENDS``.
 """
 
-import os
 import re
 import subprocess
 import sys
 
 import pytest
 
-from tests.e2e.test_examples import EXAMPLES, TIMEOUT_S
+from tests.e2e.test_examples import EXAMPLES, TIMEOUT_S, example_environment
 from tests.fixtures import ROOT
 from tests.fixtures.parity import BACKENDS, REFERENCE, others
 
@@ -26,18 +25,14 @@ TIMING = re.compile(r"\b(elapsed|took|duration|wall[- ]?time|runtime)\b|\d\s*(ms
 def _run(path, backend, dataset_path, folder):
     """Run one example under ``backend`` in ``folder`` and return its standard output."""
     folder.mkdir()
-    (folder / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
-    (folder / "datasets").symlink_to(ROOT / "datasets", target_is_directory=True)
-    env = os.environ.copy()
-    env["GEMINI_EXAMPLE_DATASET"] = str(dataset_path)
-    env["GEMINI_EXAMPLE_BACKEND"] = backend
-    env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(ROOT), env.get("PYTHONPATH"))))
+    env = example_environment(dataset_path) | {"GEMINI_EXAMPLE_BACKEND": backend}
     completed = subprocess.run(
         [sys.executable, str(WRAPPER), str(path)],
         cwd=folder,
         capture_output=True,
         text=True,
-        timeout=TIMEOUT_S,
+        encoding="utf-8",
+        timeout=TIMEOUT_S["slow"],
         env=env,
     )
     assert completed.returncode == 0, f"{backend}: {completed.stderr}"

@@ -163,6 +163,8 @@ def nesting(node, depth=0):
 
 
 PYTHON_FILES = python_files()
+EXAMPLE_FILES = [path for path in PYTHON_FILES if path.startswith("examples/")]
+IMPORTS_EXAMPLES = re.compile(r"^\s*(from|import) examples\b", re.MULTILINE)
 LAYERED_UTILS = ("gemini/utils/data/", "gemini/utils/legacy/")
 PACKAGE_FILES = [
     path
@@ -476,6 +478,59 @@ def test_a_copy_with_other_argument_names_has_the_same_body():
 def test_nesting_counts_blocks_but_not_elif_chains(source, expected):
     """The nesting measure ignores ``elif`` chains."""
     assert nesting(ast.parse(source).body[0]) == expected
+
+
+def imported_modules(path):
+    """Return the dotted names one file imports."""
+    found = set()
+    for node in ast.walk(ast.parse((ROOT / path).read_text())):
+        if isinstance(node, ast.Import):
+            found |= {alias.name for alias in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            found.add(node.module or "")
+    return found
+
+
+@pytest.mark.parametrize("path", EXAMPLE_FILES)
+def test_an_example_states_what_it_shows_and_how_to_run_it(path):
+    """The module docstring comes first and has a ``Shows`` part and the command."""
+    docstring = ast.get_docstring(ast.parse((ROOT / path).read_text()))
+    assert docstring and "Shows " in docstring
+    assert f"Run with ``python {path}``." in docstring
+
+
+@pytest.mark.parametrize("path", EXAMPLE_FILES)
+def test_an_example_ends_in_main_and_its_guard(path):
+    """Every example has ``main()``, called from the ``__main__`` guard as its last statement."""
+    last = ast.parse((ROOT / path).read_text()).body[-1]
+    assert "main" in {function.name for function in functions(path)}
+    assert isinstance(last, ast.If) and ast.unparse(last.test) == "__name__ == '__main__'"
+    assert [ast.unparse(statement) for statement in last.body] == ["main()"]
+
+
+@pytest.mark.parametrize("path", EXAMPLE_FILES)
+def test_an_example_uses_the_public_api(path):
+    """An example imports ``gemini`` and the declarations of ``gemini.types``, nothing internal."""
+    internal = {
+        name
+        for name in imported_modules(path)
+        if name.startswith("gemini.") and name != "gemini.types"
+    }
+    assert internal == set()
+
+
+def test_examples_are_scripts_without_packages():
+    """Nothing under ``examples/`` is a package, and it holds only scripts and its README."""
+    files = [path for path in tracked_files() if path.startswith("examples/")]
+    assert [path for path in files if path.endswith("__init__.py")] == []
+    assert {path.rpartition(".")[2] for path in files} == {"py", "md"}
+
+
+def test_nothing_imports_an_example():
+    """No code imports from ``examples``: one test runs them, as subprocesses."""
+    assert [
+        path for path in PYTHON_FILES if IMPORTS_EXAMPLES.search((ROOT / path).read_text())
+    ] == []
 
 
 def test_no_framework_names_in_tracked_text_files():

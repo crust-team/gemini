@@ -1,0 +1,4 @@
+Steps:              2976
+Mean heat duty:     3.21 MW
+Mean pump power:    0.207 MW
+Mean hot outlet:    54.2 °C
