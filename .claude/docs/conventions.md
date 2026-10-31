@@ -107,7 +107,7 @@ audit as full first-law closure or tune against a holdout merely to meet a thres
 
 Examples live under `examples/<area>/<category>/NN_<name>.py`; the legacy bridge example
 `examples/legacy/00_gemini_project_bridge.py` is the one example without a category folder.
-Shared artifacts live in `examples/shared/`, and generated output goes under ignored `runs/`.
+Data lives in `datasets/`, and generated output goes under ignored `runs/`.
 
 ## Naming
 

@@ -9,8 +9,8 @@ from gemini.utils import legacy
 
 pytestmark = pytest.mark.e2e
 ROOT = Path(__file__).parents[2]
-OLD = ROOT / "examples/legacy/gemini_project_bridge/old_project"
-SHARED = ROOT / "examples/shared/doublet_heat"
+OLD = ROOT / "datasets/legacy_project"
+SHARED = ROOT / "datasets/doublet_heat"
 
 
 def test_legacy_bridge(tmp_path):

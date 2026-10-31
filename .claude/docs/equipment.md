@@ -93,6 +93,7 @@ Shared conventions, stated once here and not repeated per module:
 | Plants | `CoolingSubstation` | `supply_in` -> `return_out` | no | valve, HX, cooler |
 | Plants | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
 | Plants | `ATESPlant` | `return_in`, `power_in` -> `supply_out`, `loss_out` | child | ATES, pump, HX, heat pump |
+| Plants | `NodalDoublet` | `return_in`, `power_in` -> `supply_out` | no | doublet solved by nodal analysis |
 
 ## Pumps
 
@@ -1608,7 +1609,7 @@ A plant built from a spec: `plants/specs/Doublet.json`, no handwritten class.
 ```python
 import gemini as gm
 
-doublet = gm.Plant.load("examples/shared/doublet_heat/plant.json").doublet
+doublet = gm.Plant.load("datasets/doublet_heat/plant.json").doublet
 doublet.set_inputs({"reservoir.production_rate": "42.4 kg/s", "esp.frequency": "55.5 Hz"})
 result = doublet(return_in=gm.Stream(m_dot=40, T="45 C", p="20 bar", fluid=doublet.fluid))
 assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
@@ -1677,7 +1678,7 @@ limbs fed from one return. A spec plant of variable size: `gm.plants.from_templa
 ```python
 import gemini as gm
 
-doublet = gm.Plant.load("examples/shared/doublet_heat/plant.json").doublet
+doublet = gm.Plant.load("datasets/doublet_heat/plant.json").doublet
 field = gm.plants.from_template("MultiWellPlant", {"producers": 2, "injectors": 2})
 for limb, rate in zip(field.producers, (40.0, 30.0)):
     for name in ("reservoir", "well", "esp", "riser"):
@@ -1940,8 +1941,8 @@ the trial value or both residuals. On the upstream doublet-A configuration (2400
 135.9258, -0.044 %) and 174406.5 W ESP shaft power at 65 Hz (upstream 174444.7, -0.022 %); the
 3100 m injector needs no pump (`None`, upstream 0.001 bar).
 
-`examples/shared/nodal_doublet/plant.py` (`NodalDoublet`) wraps both solves in a handwritten
-doublet: `produce()` solves the rate for its `wellhead_pressure` boundary, `inject(stream)` sets
+`NodalDoublet` (`plants/nodaldoublet.py`, `gm.plants.get("NodalDoublet")`) wraps both solves in a
+handwritten doublet: `produce()` solves the rate for its `wellhead_pressure` boundary, `inject(stream)` sets
 the injection pump to the solved pressure, or to its suction pressure when the solve returns
 `None`. `examples/plants/simulate/02_parallel_heat_exchangers.py` uses it with three parallel
 exchangers (upstream `parallel_hex_plant`: 125.10 m3/h at 10 bar, the measured 125 m3/h the

@@ -18,15 +18,17 @@ FILES = {
     "gemini/engine/other.py": "",
     "tests/__init__.py": "",
     "tests/conftest.py": "import gemini.engine.other\n",
-    "tests/unit/conftest.py": "DATA = 'examples/shared/data.csv'\n",
+    "tests/unit/conftest.py": "DATA = 'datasets/shared/data.csv'\n",
     "tests/unit/engine/test_base.py": "",
     "tests/unit/engine/test_user.py": "",
     "tests/unit/engine/test_other.py": "",
     "tests/integration/test_flow.py": "from gemini.engine import user\n",
     "tests/e2e/test_examples.py": "",
-    "examples/__init__.py": "",
     "examples/area/01_demo.py": "import gemini\n",
-    "examples/shared/data.csv": "time\n",
+    "datasets/shared/data.csv": "time\n",
+    "datasets/project/well.param": "{}\n",
+    "tests/fixtures/__init__.py": 'PROJECT = ROOT / "datasets/project"\n',
+    "tests/integration/test_project.py": "from tests.fixtures import PROJECT\n",
 }
 
 
@@ -99,8 +101,11 @@ def test_test_files_examples_and_data_files(repository):
         "tests/unit/engine/test_base.py"
     }
     assert "tests/e2e/test_examples.py" in select(repository, "examples/area/01_demo.py")
-    assert set(select(repository, "examples/shared/data.csv")) == {
+    assert set(select(repository, "datasets/shared/data.csv")) == {
         path for path in FILES if test_changed.is_test_file(path) and "tests/unit/" in path
+    }
+    assert set(select(repository, "datasets/project/well.param")) == {
+        "tests/integration/test_project.py"
     }
     assert select(repository, "docs/index.rst") == {}
 

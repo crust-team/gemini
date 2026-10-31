@@ -16,7 +16,7 @@ from gemini.utils.legacy import tables as mapping
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 from tests.fixtures.errors import raises
 
-DATA = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
+DATA = Path(__file__).parents[4] / "datasets/legacy_project"
 BRINE_DENSITY = 1050
 """Brine density [kg/m3] that, with the retained cp = 4217.4 J/kg/K, reproduces the CSV duty.
 

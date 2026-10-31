@@ -27,7 +27,7 @@ from gemini_model.well.correlation.temperaturedrop import TemperatureDrop
 from gemini_model.well.pressure_drop import DPDT
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA = ROOT / "examples/legacy/gemini_project_bridge/old_project"
+DATA = ROOT / "datasets/legacy_project"
 ESP_POWER_COEFFICIENTS = [10.02089977, -0.000160233, 6.52e-8, -2.13e-12, 1.71e-17, 1.38e-23]
 CORROSION_FITS = (
     ("NORSOK", {"A": 1}),

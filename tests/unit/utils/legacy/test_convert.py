@@ -11,7 +11,7 @@ from gemini.utils import legacy
 from gemini.utils.legacy import convert
 from tests.fixtures.errors import raises
 
-OLD = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
+OLD = Path(__file__).parents[4] / "datasets/legacy_project"
 
 
 @pytest.fixture(scope="module")

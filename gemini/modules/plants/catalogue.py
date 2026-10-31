@@ -42,7 +42,7 @@ def get(name):
 def example(name):
     """Return a new plant ``name`` with real parameter values.
 
-    ``Doublet`` and ``DoubletHeatPlant`` carry the values of the shared ``doublet_heat`` example
+    ``Doublet`` and ``DoubletHeatPlant`` carry the values of ``datasets/doublet_heat``
     (``plants/specs/examples/``); the other plants carry the values their unit tests use, the
     design parameters only: controls and boundaries are inputs of a run. A registered plant
     without sourced values raises ``NotImplementedYet`` naming it.

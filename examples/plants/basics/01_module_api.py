@@ -9,7 +9,7 @@ import pandas as pd
 
 import gemini as gm
 
-SHARED = "examples/shared/doublet_heat"
+SHARED = "datasets/doublet_heat"
 
 
 def configured_esp(plant):

@@ -72,7 +72,7 @@ is the JSON Schema of the same frame as a document: `name`, `description`, `sour
 and quantity), `time` and `values`. A profile column becomes a run input when a plant binding names
 it as its `column`.
 
-The committed example CSVs under `examples/shared/doublet_heat/` are immutable source data. Two
+The committed example CSVs under `datasets/doublet_heat/` are immutable source data. Two
 of their naming choices predate the naming rule and stay: columns named `*.m_dot` hold volumetric
 flow in m3/s (their bindings declare `"unit": "m3/s"`), and the unbound status columns
 (`esp_status`, `hex_status`, `filterA_status`, `filterB_status`) and

@@ -23,8 +23,8 @@ ROOT = Path(__file__).parents[1]
 CPU_SECONDS = pytest.StashKey[float]()
 SESSION_BUDGET_S = 300.0
 DATASETS = {
-    "fast": ROOT / "examples/shared/doublet_heat/doublet_2024_15min_month.csv",
-    "slow": ROOT / "examples/shared/doublet_heat/doublet_2024_15min.csv",
+    "fast": ROOT / "datasets/doublet_heat/doublet_2024_15min_month.csv",
+    "slow": ROOT / "datasets/doublet_heat/doublet_2024_15min.csv",
 }
 
 
@@ -76,7 +76,7 @@ def shared_plant():
     """Load and validate one read-only shared plant design."""
     with warnings.catch_warnings(record=True) as warnings_seen:
         warnings.simplefilter("always")
-        plant = gm.Plant.load(ROOT / "examples/shared/doublet_heat/plant.json")
+        plant = gm.Plant.load(ROOT / "datasets/doublet_heat/plant.json")
     assert not warnings_seen
     return plant
 

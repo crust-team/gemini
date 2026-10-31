@@ -11,7 +11,7 @@ from tests.fixtures import ROOT
 from tests.fixtures.errors import raises
 
 OLD = ROOT / "tests/fixtures/plant_format1.json"
-MIGRATED = ROOT / "examples/shared/doublet_heat/plant.json"
+MIGRATED = ROOT / "datasets/doublet_heat/plant.json"
 
 
 @pytest.fixture(scope="module")

@@ -5,7 +5,7 @@ Run from the repository root: PYTHONPATH=. python examples/plants/basics/00_insp
 
 import gemini as gm
 
-plant = gm.Plant.load("examples/shared/doublet_heat/plant.json")
+plant = gm.Plant.load("datasets/doublet_heat/plant.json")
 print(plant)
 print("Parameters:", len(list(plant.named_parameters())))
 print("Root inputs:", list(plant.inputs(recurse=False)))

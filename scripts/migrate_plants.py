@@ -2,7 +2,7 @@
 
 Usage::
 
-    python scripts/migrate_plants.py examples/shared/doublet_heat/plant.json
+    python scripts/migrate_plants.py datasets/doublet_heat/plant.json
 
 A file that is already format 2 is left unchanged.
 """

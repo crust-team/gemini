@@ -17,7 +17,7 @@ from gemini.types import shapes
 
 ROOT = Path(__file__).parents[1]
 SCHEMAS = ROOT / "docs" / "schemas"
-DATA = ROOT / "examples" / "shared" / "doublet_heat" / "doublet_2024_15min_month.csv"
+DATA = ROOT / "datasets" / "doublet_heat" / "doublet_2024_15min_month.csv"
 ROWS = 4
 PROFILE = "heating_demand"
 

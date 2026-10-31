@@ -25,6 +25,7 @@ on 4-vCPU CI runners beside the other release-profile workers, and that profile 
 def test_example(path, dataset_path, tmp_path):
     """Examples load the checked-in dataset, execute cleanly and produce useful output."""
     (tmp_path / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
+    (tmp_path / "datasets").symlink_to(ROOT / "datasets", target_is_directory=True)
     env = os.environ.copy()
     env["GEMINI_EXAMPLE_DATASET"] = str(dataset_path)
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(ROOT), env.get("PYTHONPATH"))))

@@ -24,12 +24,12 @@ PYTHONPATH=. python examples/plants/simulate/02_parallel_heat_exchangers.py
 """
 
 import gemini as gm
-from examples.shared.nodal_doublet import NodalDoublet
 from gemini.modules import (
     ElectricityGrid,
     HeatExchanger,
     Mixer,
     ModuleList,
+    NodalDoublet,
     Splitter,
     collect_flows,
     energy_balance,

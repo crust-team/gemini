@@ -18,7 +18,8 @@ Selection rules, applied to the changed files:
    otherwise every change would select the whole suite through shared fixtures.
 4. A changed numbered example script selects ``tests/e2e/test_examples.py``.
 5. Any other changed file selects the tests whose source, or whose ``conftest.py``, names its
-   repository path.
+   repository path. A file below ``datasets/`` also selects those that name its folder or a
+   constant of ``tests/fixtures/__init__.py`` that holds the folder.
 6. ``tests/unit/test_code_quality.py`` always runs, whatever changed, because the structure and
    style rules apply to every edit.
 
@@ -39,6 +40,7 @@ PACKAGES = ("gemini", "examples", "tests", "scripts")
 SELECT_ALL = {"pyproject.toml", "tests/conftest.py", "tests/xdist_plugin.py"}
 EXAMPLE_SCRIPT = re.compile(r"^examples/.*/\d\d_[^/]+\.py$")
 EXAMPLES_TEST = "tests/e2e/test_examples.py"
+FIXTURE_PATHS = "tests/fixtures/__init__.py"
 QUALITY_TEST = "tests/unit/test_code_quality.py"
 QUALITY_REASON = "always runs: code-quality rules apply to every change"
 CACHE = ROOT / ".tmp/test_changed/imports.json"
@@ -160,13 +162,26 @@ def tests_below(directory, tests):
     return {test for test in tests if test.startswith(prefix)}
 
 
+def data_names(path, root):
+    """Return the texts by which a source reads ``path``: itself and, for data, its folder."""
+    if not path.startswith("datasets/"):
+        return {path}
+    folder = Path(path).parent.as_posix()
+    fixtures = root / FIXTURE_PATHS
+    lines = fixtures.read_text().splitlines() if fixtures.exists() else []
+    return {path, folder} | {line.split()[0] for line in lines if f'"{folder}"' in line}
+
+
 def naming_tests(path, tests, root):
     """Return tests whose own source, or a ``conftest.py`` above them, names ``path``."""
+    names = data_names(path, root)
     selected = set()
     for conftest in sorted(root.glob("tests/**/conftest.py")):
-        if path in conftest.read_text():
+        if any(name in conftest.read_text() for name in names):
             selected |= tests_below(conftest.parent.relative_to(root).as_posix(), tests)
-    selected.update(test for test in tests if path in (root / test).read_text())
+    selected.update(
+        test for test in tests if any(name in (root / test).read_text() for name in names)
+    )
     return selected
 
 

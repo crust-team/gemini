@@ -6,7 +6,7 @@ the implementation differs and why, and section 13 how composites and replay wor
 
 ## 1. Why
 
-Profiling `examples/doublet_heat` (one-month replay, 2976 ticks, 8 twins, 9.7 s) showed physics
+Profiling `datasets/doublet_heat` (one-month replay, 2976 ticks, 8 twins, 9.7 s) showed physics
 is only 6.5 % of the time; about 90 % is framework overhead per tick (`Module` 22 %, `difflib`
 15 %, engine/results 10 %, types 10 %, pydantic 4 %). The win is changing the execution model from
 "one tick at a time" to "the whole time range at once", via a traced computation graph. The graph
@@ -305,7 +305,7 @@ Where the implementation differs from sections 1 to 11, and why:
   `<relative path>.<name>` (the root keeps plain names); a child called twice reuses them; supplied
   keywords win without validation. The `ModuleResult` of traced values joins the parent's
   `call_records`, so `Output.of`, `Output.ratio` (now `where(bottom == 0, None,
-  truediv(top, bottom))`) and helpers such as the `produce()` of the nodal doublet example work unchanged. Guards cover every
+  truediv(top, bottom))`) and helpers such as the `produce()` of `NodalDoublet` work unchanged. Guards cover every
   module of the tree. This replaces section 2's "each Module is traced on its own".
 - **Breaks.** A stateful, pre-hooked or untraceable *leaf* child becomes one `break` node after the
   graph is rolled back (`Graph.mark`, `Graph.rollback`). It runs `module(**row)` on the plain path

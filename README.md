@@ -25,7 +25,7 @@ import pandas as pd
 
 import gemini as gm
 
-SHARED = "examples/shared/doublet_heat"
+SHARED = "datasets/doublet_heat"
 plant = gm.Plant.load(f"{SHARED}/plant.json")
 design = {name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
 esp = gm.modules.ESP().update_params(**design)

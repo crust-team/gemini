@@ -131,8 +131,8 @@ without changing numbers:
   `loops.close_loop`, not a previous-step `state` connection.
 - `ATESPlant`: the storage's `mode` selects which children are called, and the plant reads the
   storage's start-of-step temperature.
-- `NodalDoublet` in `examples/shared/nodal_doublet/`, not registered: each call solves a rate with
-  `brentq`.
+- `NodalDoublet`: each call solves a rate with `brentq`, see
+  [equipment.md](equipment.md#nodal-well-analysis).
 
 They are in the registry (`gm.plants.names()`), so a spec can use them as a `type`.
 

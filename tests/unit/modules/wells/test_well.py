@@ -11,7 +11,7 @@ from gemini.types.flows import Stream
 from gemini.utils.legacy import tables as mapping
 from tests.fixtures.errors import raises
 
-DATA = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
+DATA = Path(__file__).parents[4] / "datasets/legacy_project"
 
 
 def production_well():

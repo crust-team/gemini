@@ -10,7 +10,7 @@ from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
 SNAPSHOTS = {
     "0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b48178a8b",
-    "0.2.0": "a7e00fc7d14711e13f72800865b15ad2a7766661b13e63f9f4ab34e95e46bcf1",
+    "0.2.0": "9874ed5cd73067e56d663569dbcce78d766ac70cc5fbda204c50f764fe241b7a",
 }
 """Hash of the snapshot per ``gm.__version__``: a released entry never changes."""
 
@@ -60,7 +60,7 @@ def test_public_names_and_docs():
 
 def test_readable_tree():
     """Printing a loaded plant displays nested equipment and scalar human-unit parameters."""
-    plant = gm.Plant.load(Path(__file__).parents[2] / "examples/shared/doublet_heat/plant.json")
+    plant = gm.Plant.load(Path(__file__).parents[2] / "datasets/doublet_heat/plant.json")
     with gm.runtime.settings(display_units="field"):
         rendered = repr(plant)
     assert "DoubletHeatPlant(" in rendered and "(doublet): Doublet(" in rendered

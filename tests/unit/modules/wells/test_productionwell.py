@@ -14,7 +14,7 @@ from tests.fixtures.equivalence import assert_function_matches, assert_module_ma
 
 def test_split_esp_traversal():
     """Split at 600 m inside a section; pumping raises the resulting wellhead pressure."""
-    data = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
+    data = Path(__file__).parents[4] / "datasets/legacy_project"
     c = ProductionWell().update_params(
         **mapping.productionwell_params_from_gemini(
             mapping.read_property(data / "production_well_c774.param"),
@@ -34,7 +34,7 @@ def test_split_esp_traversal():
 
 
 def _well(**changes):
-    data = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
+    data = Path(__file__).parents[4] / "datasets/legacy_project"
     return ProductionWell().update_params(
         **mapping.productionwell_params_from_gemini(
             mapping.read_property(data / "production_well_c774.param"),

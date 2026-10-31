@@ -71,7 +71,7 @@ def test_index_at_measured_depth_and_subpath():
 
 def test_project_trajectory_slices():
     """The bridge example trajectory builds and slices without losing length."""
-    data = Path(__file__).parents[3] / "examples/legacy/gemini_project_bridge/old_project"
+    data = Path(__file__).parents[3] / "datasets/legacy_project"
     table = pd.read_csv(data / "well_trajectory.csv", sep=";").to_dict("records")
     path = geometry.build_path(table)
     assert path.total_length == 2800

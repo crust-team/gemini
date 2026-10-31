@@ -12,7 +12,7 @@ from gemini.types.fluid import Fluid
 from gemini.utils.legacy import tables as mapping
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 
-DATA = Path(__file__).parents[4] / "examples/legacy/gemini_project_bridge/old_project"
+DATA = Path(__file__).parents[4] / "datasets/legacy_project"
 
 
 def test_example_production_and_decline():

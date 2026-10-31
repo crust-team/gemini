@@ -103,7 +103,7 @@ budget.
 ## Fast and slow datasets
 
 `--dataset=fast` selects the committed 2,976-row July 2024 calendar month at
-`examples/shared/doublet_heat/doublet_2024_15min_month.csv`. July is the first complete month
+`datasets/doublet_heat/doublet_2024_15min_month.csv`. July is the first complete month
 after the source begins on June 7 and retains 15-minute cadence, daily boundaries, calibration
 and holdout periods, replay, simulation, checkpoints and live paths. Behaviour tests use short
 windows, normally one point to seven days. The shared `fast_dataset` fixture is independent of
@@ -111,7 +111,7 @@ the e2e option. The 96-row `reference_dataset` is the narrow June window require
 pre-refactor engine-frame goldens.
 
 `--dataset=slow` selects the unchanged 17,280-row source at
-`examples/shared/doublet_heat/doublet_2024_15min.csv`. Never delete, replace or shrink either
+`datasets/doublet_heat/doublet_2024_15min.csv`. Never delete, replace or shrink either
 dataset or any golden. Full-year replay/simulate goldens remain under
 `tests/fixtures/module_api_baseline/`; the fast replay golden is under
 `tests/fixtures/module_api_fast/`.

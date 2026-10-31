@@ -7,7 +7,7 @@ import pytest
 import gemini as gm
 from tests.fixtures import ROOT
 
-PLANT_FILE = ROOT / "examples/shared/doublet_heat/plant.json"
+PLANT_FILE = ROOT / "datasets/doublet_heat/plant.json"
 
 
 def test_from_dict_and_from_spec_are_one_function():

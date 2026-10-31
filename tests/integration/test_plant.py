@@ -11,7 +11,7 @@ from gemini.utils import legacy
 from tests.fixtures.reading import reading
 
 ROOT = Path(__file__).parents[2]
-OLD = ROOT / "examples/legacy/gemini_project_bridge/old_project"
+OLD = ROOT / "datasets/legacy_project"
 
 
 @pytest.fixture

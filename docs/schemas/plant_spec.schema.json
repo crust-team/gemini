@@ -83,6 +83,7 @@
             "LineShaftPump",
             "Mixer",
             "MultiWellPlant",
+            "NodalDoublet",
             "ORC",
             "PIDController",
             "Pipe",

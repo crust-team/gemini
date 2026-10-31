@@ -27,6 +27,7 @@ def _run(path, backend, dataset_path, folder):
     """Run one example under ``backend`` in ``folder`` and return its standard output."""
     folder.mkdir()
     (folder / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
+    (folder / "datasets").symlink_to(ROOT / "datasets", target_is_directory=True)
     env = os.environ.copy()
     env["GEMINI_EXAMPLE_DATASET"] = str(dataset_path)
     env["GEMINI_EXAMPLE_BACKEND"] = backend

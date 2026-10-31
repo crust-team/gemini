@@ -19,7 +19,6 @@ PYTHONPATH=. python examples/plants/simulate/03_boiler_chp_secondary.py
 """
 
 import gemini as gm
-from examples.shared.nodal_doublet import NodalDoublet
 from gemini.modules import (
     CHP,
     Atmosphere,
@@ -28,6 +27,7 @@ from gemini.modules import (
     GasGrid,
     HeatExchanger,
     Mixer,
+    NodalDoublet,
     Splitter,
     collect_flows,
     emissions,

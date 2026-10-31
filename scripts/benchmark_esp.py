@@ -23,8 +23,8 @@ from gemini.types.flows import Stream
 
 ROOT = Path(__file__).resolve().parents[1]
 
-DATASET = ROOT / "examples/shared/doublet_heat/doublet_2024_15min_month.csv"
-PLANT = ROOT / "examples/shared/doublet_heat/plant.json"
+DATASET = ROOT / "datasets/doublet_heat/doublet_2024_15min_month.csv"
+PLANT = ROOT / "datasets/doublet_heat/plant.json"
 COLUMNS = ["fluid_in.m_dot", "fluid_in.T", "fluid_in.p", "frequency"]
 RTOL = 1e-12
 

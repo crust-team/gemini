@@ -15,9 +15,10 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     The body is one end-to-end path through the public API, so it stays one function.
     """
     (tmp_path / "examples").symlink_to(ROOT / "examples", target_is_directory=True)
+    (tmp_path / "datasets").symlink_to(ROOT / "datasets", target_is_directory=True)
     monkeypatch.chdir(tmp_path)
 
-    SHARED = "examples/shared/doublet_heat"
+    SHARED = "datasets/doublet_heat"
 
     plant = gm.Plant.load(f"{SHARED}/plant.json")
     print(plant)

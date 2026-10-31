@@ -12,7 +12,7 @@ from gemini.utils import legacy
 parser = argparse.ArgumentParser()
 parser.add_argument("--out", default="runs/bridge")
 arguments = parser.parse_args()
-source = Path("examples/legacy/gemini_project_bridge/old_project")
+source = Path("datasets/legacy_project")
 target = Path(arguments.out)
 target.mkdir(parents=True, exist_ok=True)
 

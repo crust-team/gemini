@@ -84,7 +84,8 @@ gemini/
 ├── testing/          # check_module for a new module class
 └── profiles/         # demand profiles
 docs/schemas/         # JSON Schemas and samples of the exchanged documents
-examples/             # area/category/NN_name.py; shared plant and data in examples/shared/
+datasets/             # committed data: doublet_heat/ (plant file and CSVs), legacy_project/
+examples/             # area/category/NN_name.py
 scripts/              # test_changed.py, write_schemas.py, migrate_plants.py
 tests/                # unit mirror, integration, e2e and immutable fixtures
 ```
