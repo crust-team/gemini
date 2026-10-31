@@ -10,7 +10,7 @@ Shared conventions, stated once here and not repeated per module:
 
 - Values are SI (K, Pa, kg/s, m, W, J, s). Every numeric declaration also accepts a unit string
   such as `"80 C"`, `"6 bar"` or `"40 m3/h"`; see [types.md](types.md#fluid). A parameter
-  without a default is required: set it with `update_params` before the first call.
+  without a default is required: set it with `set_params` before the first call.
 - Properties come from each stream's `Fluid`; unless a module says otherwise it uses the
   constant liquid heat capacity `cp_l` and density `rho_l` of that fluid.
 - Unless stated, a module has no pressure loss and passes mass flow and fluid unchanged.
@@ -49,6 +49,7 @@ Shared conventions, stated once here and not repeated per module:
 | Wells | `InjectionWell` | `wellhead_in` -> `bottom_out`, `loss_out` | no | DPDT path traversal downward |
 | Pumps | `ESP` | `fluid_in`, `power_in` -> `fluid_out` | no | TNO polynomial head and power, isothermal |
 | Pumps | `InjectionPump` | `fluid_in`, `power_in` -> `fluid_out` | no | setpoint or curve head, `Q dp / eta` |
+| Pumps | `CirculationPump` | `fluid_in`, `power_in` -> `fluid_out`, `loss_out` | no | fixed flow of a closed circuit, design pressure rise, efficiency |
 | Pumps | `CentrifugalPump` | `fluid_in`, `power_in` -> `fluid_out`, `loss_out` | no | quadratic head, affinity laws |
 | Pumps | `LineShaftPump` | `fluid_in`, `power_in` -> `fluid_out` | no | ESP curves plus shaft friction |
 | Pumps | `GasCompressor` | `fluid_in`, `power_in` -> `fluid_out`, `loss_out` | no | ideal-gas intercooled stages |
@@ -145,12 +146,12 @@ basis (`gemini.physics.pumps`).
 import gemini as gm
 from gemini.modules import ESP, energy_balance
 
-esp = ESP().update_params(
-    stage_count=12,
-    head_coefficients=[83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
-    power_coefficients=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
-    motor_efficiency=0.9,
-)
+esp = ESP().set_params("", {
+    "stage_count": 12,
+    "head_coefficients": [83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
+    "power_coefficients": [10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+    "motor_efficiency": 0.9,
+})
 result = esp(fluid_in=gm.Stream(flow="200 m3/h", T="70 C", p="10 bar"), frequency="50 Hz")
 assert round(result.outputs.get("head", unit="bar"), 2) == 16.23
 assert round(result.outputs.electricity) == 118246
@@ -182,7 +183,7 @@ Injection (booster) pump that raises the brine to a discharge pressure.
 import gemini as gm
 from gemini.modules import InjectionPump
 
-pump = InjectionPump().update_params(efficiency=0.8)
+pump = InjectionPump().set_params("", {"efficiency": 0.8})
 result = pump(fluid_in=gm.Stream(flow="150 m3/h", T="40 C", p="5 bar"), pressure_setpoint="51.5 bar")
 assert round(result.outputs.get("head", unit="bar"), 6) == 46.5
 assert round(result.outputs.electricity, 1) == 242187.5
@@ -227,15 +228,34 @@ quadratic head curve and affinity-law speed scaling. It replaces the former `Boo
 import gemini as gm
 from gemini.modules import CentrifugalPump
 
-pump = CentrifugalPump().update_params(
-    head_coefficients=[6e5, 0, -4e7], rated_frequency="50 Hz", best_efficiency=0.8,
-    best_efficiency_flow="180 m3/h", motor_efficiency=0.95,
-)
+pump = CentrifugalPump().set_params("", {
+    "head_coefficients": [6e5, 0, -4e7],
+    "rated_frequency": "50 Hz",
+    "best_efficiency": 0.8,
+    "best_efficiency_flow": "180 m3/h",
+    "motor_efficiency": 0.95,
+})
 result = pump(fluid_in=gm.Stream(flow="150 m3/h", T="60 C", p="3 bar"), frequency="45 Hz")
 assert round(result.outputs.get("head", unit="bar"), 3) == 4.166
 assert round(result.outputs.efficiency, 3) == 0.796
 assert round(result.outputs.electricity) == 22963
 ```
+
+### CirculationPump
+
+Purpose: the pump of a closed circuit, such as the building circuit of a substation. It sets the flow
+and the pressure of the circuit, so a [loop](plants.md#loops) through it closes, and draws the
+electricity for it.
+
+- Ports: `fluid_in`, `power_in` -> `fluid_out`, `loss_out`.
+- Parameters: `flow` (`MassFlow`, > 0), `pressure_rise` (`PressureDifference`, >= 0), `loop_pressure`
+  (`Pressure`, > 0), `efficiency` (default 0.55, the low end of the 55 to 70 % peak of larger
+  circulators in the trade press: Siegenthaler, Plumbing & Mechanical, Modern Hydronics).
+- Outputs: `pumping_power`, the hydraulic power `Q dp`.
+- Model: `fluid_out` is `fluid_in` at `flow` and `loop_pressure`; `power_in` is `Q dp / efficiency`.
+  `pressure_rise` is the design head that covers the losses of the circuit, which are not modelled.
+- Energy audit: all the electricity leaves as `loss_out` and the water keeps its temperature, so the
+  module is first-law closed and a building circuit gives the temperatures it gives with no pump.
 
 ### LineShaftPump
 
@@ -265,12 +285,14 @@ Downhole multistage (vertical turbine) pump driven by a surface motor through a 
 import gemini as gm
 from gemini.modules import LineShaftPump
 
-pump = LineShaftPump().update_params(
-    stage_count=12,
-    head_coefficients=[83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
-    power_coefficients=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
-    setting_depth="300 m", shaft_friction_loss=5, motor_efficiency=0.9,
-)
+pump = LineShaftPump().set_params("", {
+    "stage_count": 12,
+    "head_coefficients": [83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
+    "power_coefficients": [10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+    "setting_depth": "300 m",
+    "shaft_friction_loss": 5,
+    "motor_efficiency": 0.9,
+})
 out = pump(fluid_in=gm.Stream(flow="200 m3/h", T="70 C", p="10 bar"), frequency="50 Hz").outputs
 assert round(out.get("head", unit="bar"), 2) == 16.23
 assert out.shaft_friction_power == 1250.0 and round(out.electricity) == 119635
@@ -307,10 +329,13 @@ intercooled stages.
 import gemini as gm
 from gemini.modules import GasCompressor
 
-compressor = GasCompressor().update_params(
-    isentropic_efficiency=0.75, heat_capacity_ratio=1.29, gas_specific_heat=846,
-    stage_count=2, motor_efficiency=0.95,
-)
+compressor = GasCompressor().set_params("", {
+    "isentropic_efficiency": 0.75,
+    "heat_capacity_ratio": 1.29,
+    "gas_specific_heat": 846,
+    "stage_count": 2,
+    "motor_efficiency": 0.95,
+})
 out = compressor(
     fluid_in=gm.Stream(m_dot=0.05, T="40 C", p="1.2 bar"), pressure_setpoint="12 bar"
 ).outputs
@@ -362,9 +387,12 @@ surroundings.
 import gemini as gm
 from gemini.modules import Pipe, energy_balance
 
-pipe = Pipe().update_params(
-    length="1500 m", inner_diameter="0.125 m", elevation_change="12 m", heat_transfer_coefficient="0.8 W/m2/K"
-)
+pipe = Pipe().set_params("", {
+    "length": "1500 m",
+    "inner_diameter": "0.125 m",
+    "elevation_change": "12 m",
+    "heat_transfer_coefficient": "0.8 W/m2/K",
+})
 supply = gm.Stream(flow="40 m3/h", T="80 C", p="6 bar")
 result = pipe(fluid_in=supply, air_in=gm.modules.Atmosphere.ambient_air("10 degC"))
 assert round(result.outputs.get("pressure_drop", unit="bar"), 3) == 2.134
@@ -400,7 +428,7 @@ Control valve; isenthalpic, so the temperature is unchanged.
 import gemini as gm
 from gemini.modules import Valve
 
-valve = Valve().update_params(flow_coefficient="63 m3/h/bar^0.5")
+valve = Valve().set_params("", {"flow_coefficient": "63 m3/h/bar^0.5"})
 result = valve(fluid_in=gm.Stream(flow="40 m3/h", T="80 C", p="6 bar"), opening=0.7)
 assert round(result.outputs.get("pressure_drop", unit="bar"), 3) == 4.215
 kv = gm.units.convert(result.outputs.effective_flow_coefficient, "m3/s/Pa^0.5", "m3/h/bar^0.5")
@@ -414,7 +442,7 @@ Ideal tee that divides a feed into two branches.
 - **Ports**: `fluid_in` -> `branch1_out`, `branch2_out`.
 - **Controls**: `split_fraction` (`Fraction`): share of the mass flow sent to `branch2_out`.
 - **Parameters, boundaries, states, outputs**: none; read the branch flows from the outlets,
-  for example `Output.of(self.splitter.branch2_out.field("m_dot"))` in a composite.
+  for example the path `splitter.branch2_out.m_dot` of a plant.
 - **Model**: `m_second = x m_feed`, `m_first = m_feed - m_second`, both at feed T, p and fluid.
 - **Physics**: `separation.split_flow`
 - **Assumptions**: no tee loss or heat exchange; the commanded split stands for the balancing
@@ -545,7 +573,7 @@ import gemini as gm
 from gemini.modules import Degasser
 
 brine = gm.Fluid(gas_mass_fraction=0.002)
-degassed = Degasser().update_params(separation_efficiency=0.95)(
+degassed = Degasser().set_params("", {"separation_efficiency": 0.95})(
     fluid_in=gm.Stream(flow="40 kg/s", T="80 C", p="5 bar", fluid=brine)
 )
 assert round(degassed.outputs.gas_mass_flow, 12) == 0.076
@@ -603,9 +631,11 @@ Hydrocyclone sand separator ahead of heat exchangers and injection.
 import gemini as gm
 from gemini.modules import Desander
 
-desander = Desander().update_params(
-    separation_efficiency=0.9, nominal_pressure_drop="1 bar", nominal_mass_flow="45 kg/s"
-)
+desander = Desander().set_params("", {
+    "separation_efficiency": 0.9,
+    "nominal_pressure_drop": "1 bar",
+    "nominal_mass_flow": "45 kg/s",
+})
 result = desander(fluid_in=gm.Stream(m_dot=45, T="80 C", p="5 bar"), sand_concentration="20 mg/l")
 assert round(result.outputs.sand_removal_rate, 9) == 0.00081
 assert result.outputs.get("pressure_drop", unit="bar") == 1.0
@@ -634,7 +664,7 @@ Scale or corrosion inhibitor injection proportional to the treated flow.
 import gemini as gm
 from gemini.modules import InhibitorDosing
 
-dosing = InhibitorDosing().update_params(product_concentration=0.3)
+dosing = InhibitorDosing().set_params("", {"product_concentration": 0.3})
 result = dosing(fluid_in=gm.Stream(m_dot=40, T="80 C", p="5 bar"), dose="10 ppm")
 assert round(result.outputs.product_mass_flow, 12) == 4e-4
 assert round(result.outputs.active_mass_flow, 12) == 1.2e-4
@@ -684,10 +714,13 @@ Two-stream effectiveness-NTU heat exchanger with fouling diagnostics.
 import gemini as gm
 from gemini.modules import HeatExchanger
 
-exchanger = HeatExchanger().update_params(
-    thermal_conductance=5e5, hot_nominal_pressure_drop="0.2 bar", cold_nominal_pressure_drop="0.2 bar",
-    hot_nominal_mass_flow=40, cold_nominal_mass_flow=40,
-)
+exchanger = HeatExchanger().set_params("", {
+    "thermal_conductance": 5e5,
+    "hot_nominal_pressure_drop": "0.2 bar",
+    "cold_nominal_pressure_drop": "0.2 bar",
+    "hot_nominal_mass_flow": 40,
+    "cold_nominal_mass_flow": 40,
+})
 result = exchanger(
     hot_in=gm.Stream(m_dot=40, T="80 C", p="5 bar"),
     cold_in=gm.Stream(m_dot=40, T="40 C", p="5 bar"),
@@ -725,9 +758,12 @@ Dry or wet (evaporative) closed-circuit cooler rejecting heat to ambient air.
 import gemini as gm
 from gemini.modules import Cooler
 
-cooler = Cooler().update_params(
-    cooler_type="wet", capacity="2 MW", approach=4, specific_fan_power=0.01
-)
+cooler = Cooler().set_params("", {
+    "cooler_type": "wet",
+    "capacity": "2 MW",
+    "approach": 4,
+    "specific_fan_power": 0.01,
+})
 result = cooler(
     fluid_in=gm.Stream(flow="20 kg/s", T="40 C", p="3 bar"), temperature_setpoint="20 C",
     air_in=gm.modules.Atmosphere.ambient_air("30 degC"), wet_bulb_temperature="22 C",
@@ -793,7 +829,7 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
 import gemini as gm
 from gemini.modules import HeatPump
 
-heat_pump = HeatPump().update_params(mode="heating", capacity="2 MW", carnot_fraction=0.5)
+heat_pump = HeatPump().set_params("", {"mode": "heating", "capacity": "2 MW", "carnot_fraction": 0.5})
 result = heat_pump(
     source_in=gm.Stream(flow="20 kg/s", T="27 C", p="3 bar"),
     sink_in=gm.Stream(flow="10 kg/s", T="47 C", p="3 bar"),
@@ -802,7 +838,7 @@ result = heat_pump(
 assert round(result.outputs.cop, 4) == 3.6015 and round(result.outputs.electricity) == 234202
 
 water = gm.Fluid(kind="water", density=1000, specific_heat=4181)
-lorenz = HeatPump().update_params(mode="heating", capacity="10 MW", cop_model="lorenz")
+lorenz = HeatPump().set_params("", {"mode": "heating", "capacity": "10 MW", "cop_model": "lorenz"})
 result = lorenz(
     source_in=gm.Stream(flow="20 m3/h", T="40 C", p="3 bar", fluid=water),
     sink_in=gm.Stream(flow="10 m3/h", T="30 C", p="3 bar", fluid=water),
@@ -834,7 +870,7 @@ Auxiliary gas boiler heating a stream to a setpoint, burning co-produced gas fir
 import gemini as gm
 from gemini.modules import Boiler, GasGrid
 
-boiler = Boiler().update_params(capacity="1 MW", efficiency=0.9)
+boiler = Boiler().set_params("", {"capacity": "1 MW", "efficiency": 0.9})
 result = boiler(
     fluid_in=gm.Stream(flow="10 kg/s", T="60 C", p="3 bar"),
     fuel_in=GasGrid()().outlets.fluid_out,
@@ -877,10 +913,13 @@ Gas-engine combined heat and power unit heating a water circuit.
 import gemini as gm
 from gemini.modules import CHP
 
-chp = CHP().update_params(
-    electric_capacity="1 MW", electric_efficiency=0.4, thermal_efficiency=0.45,
-    no_load_fuel_fraction=0.1, maximum_outlet_temperature="90 C",
-)
+chp = CHP().set_params("", {
+    "electric_capacity": "1 MW",
+    "electric_efficiency": 0.4,
+    "thermal_efficiency": 0.45,
+    "no_load_fuel_fraction": 0.1,
+    "maximum_outlet_temperature": "90 C",
+})
 result = chp(
     fluid_in=gm.Stream(flow="20 kg/s", T="60 C", p="3 bar"),
     fuel_in=gm.modules.GasGrid()().outlets.fluid_out,
@@ -929,10 +968,15 @@ Single-effect water/LiBr absorption chiller or heat pump driven by hot water.
 import gemini as gm
 from gemini.modules import AbsorptionUnit
 
-chiller = AbsorptionUnit().update_params(
-    mode="chiller", capacity="300 kW", characteristic_slope=20000, minimum_driving_difference=10,
-    rejection_coefficient=2.2, evaporator_coefficient=1.2, auxiliary_power_ratio=0.01,
-)
+chiller = AbsorptionUnit().set_params("", {
+    "mode": "chiller",
+    "capacity": "300 kW",
+    "characteristic_slope": 20000,
+    "minimum_driving_difference": 10,
+    "rejection_coefficient": 2.2,
+    "evaporator_coefficient": 1.2,
+    "auxiliary_power_ratio": 0.01,
+})
 result = chiller(
     generator_in=gm.Stream(flow="10 kg/s", T="88 C", p="3 bar"),
     chilled_in=gm.Stream(flow="10 kg/s", T="12 C", p="3 bar"),
@@ -971,10 +1015,14 @@ Silica-gel/water adsorption chiller driven by hot water of 55 to 90 degC; a chil
 import gemini as gm
 from gemini.modules import AdsorptionChiller
 
-chiller = AdsorptionChiller().update_params(
-    capacity="100 kW", characteristic_slope=2000, minimum_driving_difference=5,
-    rejection_coefficient=2.0, evaporator_coefficient=1.0, auxiliary_power_ratio=0.02,
-)
+chiller = AdsorptionChiller().set_params("", {
+    "capacity": "100 kW",
+    "characteristic_slope": 2000,
+    "minimum_driving_difference": 5,
+    "rejection_coefficient": 2.0,
+    "evaporator_coefficient": 1.0,
+    "auxiliary_power_ratio": 0.02,
+})
 result = chiller(
     generator_in=gm.Stream(flow="5 kg/s", T="70 C", p="3 bar"),
     chilled_in=gm.Stream(flow="5 kg/s", T="18 C", p="3 bar"),
@@ -1022,11 +1070,16 @@ the injected stream as a sink.
 import gemini as gm
 from gemini.modules import ProductionReservoir
 
-reservoir = ProductionReservoir().update_params(
-    pressure="200 bar", temperature="80 C", permeability=1e-12, aquifer_thickness="50 m",
-    drainage_radius="500 m", top_depth="2000 m", productivity_index=20 / 3600 / 1e5,
-    wellbore_radius=0.1,
-)
+reservoir = ProductionReservoir().set_params("", {
+    "pressure": "200 bar",
+    "temperature": "80 C",
+    "permeability": 1e-12,
+    "aquifer_thickness": "50 m",
+    "drainage_radius": "500 m",
+    "top_depth": "2000 m",
+    "productivity_index": 20 / 3600 / 1e5,
+    "wellbore_radius": 0.1,
+})
 source = reservoir(production_rate="40 kg/s")
 assert round(source.outputs.drawdown / 1e5, 6) == 7.2
 ```
@@ -1063,10 +1116,12 @@ injector reaches the producer; placed between a `ProductionReservoir` sandface a
 import gemini as gm
 from gemini.modules import ThermalDecline
 
-decline = ThermalDecline().update_params(
-    well_spacing="1000 m", aquifer_thickness="50 m", porosity=0.2,
-    rock_volumetric_heat_capacity="2.5 MJ/m3/K",
-)
+decline = ThermalDecline().set_params("", {
+    "well_spacing": "1000 m",
+    "aquifer_thickness": "50 m",
+    "porosity": 0.2,
+    "rock_volumetric_heat_capacity": "2.5 MJ/m3/K",
+})
 decline.injection_temperature = "40 degC"
 produced = gm.Stream(flow="180 m3/h", T="80 C", p="200 bar")
 state, result = decline.step({"injected_volume": 1.2e8}, 3600, {"fluid_in": produced})
@@ -1107,11 +1162,16 @@ ground temperature.
 import gemini as gm
 from gemini.modules import BoreholeField
 
-field = BoreholeField().update_params(
-    borehole_count=10, borehole_depth="150 m", borehole_radius=0.075, borehole_spacing="6 m",
-    borehole_resistance=0.1, ground_conductivity=2.0,
-    ground_volumetric_heat_capacity="2.2 MJ/m3/K", undisturbed_ground_temperature="10 C",
-)
+field = BoreholeField().set_params("", {
+    "borehole_count": 10,
+    "borehole_depth": "150 m",
+    "borehole_radius": 0.075,
+    "borehole_spacing": "6 m",
+    "borehole_resistance": 0.1,
+    "ground_conductivity": 2.0,
+    "ground_volumetric_heat_capacity": "2.2 MJ/m3/K",
+    "undisturbed_ground_temperature": "10 C",
+})
 state, result = field.step(None, 30 * 86400, {"fluid_in": gm.Stream(m_dot=3, T="0 C", p="3 bar")})
 assert round(result.outputs.heat_extraction_rate) == 36906
 assert round(state["ground_temperature_change"], 3) == -0.769
@@ -1141,11 +1201,16 @@ Deep coaxial closed-loop heat exchanger in a linear geothermal gradient (steady)
 import gemini as gm
 from gemini.modules import DownholeHeatExchanger
 
-exchanger = DownholeHeatExchanger().update_params(
-    borehole_depth="2500 m", surface_temperature="10 degC", geothermal_gradient="30 K/km",
-    ground_conductivity=2.5, ground_diffusivity=1e-6, borehole_radius=0.1,
-    borehole_resistance=0.05, operating_time=3.15e7,
-)
+exchanger = DownholeHeatExchanger().set_params("", {
+    "borehole_depth": "2500 m",
+    "surface_temperature": "10 degC",
+    "geothermal_gradient": "30 K/km",
+    "ground_conductivity": 2.5,
+    "ground_diffusivity": 1e-6,
+    "borehole_radius": 0.1,
+    "borehole_resistance": 0.05,
+    "operating_time": 3.15e7,
+})
 result = exchanger(fluid_in=gm.Stream(m_dot=5, T="30 C", p="3 bar"))
 assert round(result.outputs.outlet_T - 273.15, 2) == 35.92
 ```
@@ -1184,7 +1249,7 @@ from gemini.physics.geometry import PipePath, PipeSection
 
 vertical = PipeSection(length=1500, inclination=math.pi / 2, inner_diameter=0.2, roughness=2e-5)
 path = PipePath(sections=[vertical])
-well = ProductionWell().update_params(pipe_path=path, soil_temperature="40 C")
+well = ProductionWell().set_params("", {"pipe_path": path, "soil_temperature": "40 C"})
 result = well(bottom_in=gm.Stream(m_dot=40, T="80 C", p="180 bar"))
 assert round(result.outputs.gravity_pressure_drop / 1e5, 2) == 147.15
 assert round(result.outlets.loss_out) == 376991
@@ -1221,9 +1286,12 @@ Fully mixed hot or chilled water tank with a charge and a discharge circuit.
 import gemini as gm
 from gemini.modules import ThermalStorage
 
-tank = ThermalStorage().update_params(
-    service="hot", volume="20 m3", heat_loss_conductance="15 W/K", reference_temperature="40 C"
-)
+tank = ThermalStorage().set_params("", {
+    "service": "hot",
+    "volume": "20 m3",
+    "heat_loss_conductance": "15 W/K",
+    "reference_temperature": "40 C",
+})
 charge = gm.Stream(flow="10 m3/h", T="80 C", p="3 bar")
 discharge = gm.Stream(flow="5 m3/h", T="45 C", p="3 bar")
 state = {"temperature": gm.units.convert(60, "degC", "K")}
@@ -1262,7 +1330,7 @@ import gemini as gm
 from gemini.modules import IceStorage
 from gemini.types import GLYCOL_30
 
-store = IceStorage().update_params(water_mass="50 t", thermal_conductance=20000)
+store = IceStorage().set_params("", {"water_mass": "50 t", "thermal_conductance": 20000})
 glycol = gm.Stream(flow="8 kg/s", T="-5 C", p="3 bar", fluid=GLYCOL_30)
 state = None
 for _ in range(8):
@@ -1304,10 +1372,13 @@ as in [Subsurface](#subsurface).
 import gemini as gm
 from gemini.modules import AquiferStorage
 
-ates = AquiferStorage().update_params(
-    aquifer_temperature="11 degC", aquifer_thickness="30 m", porosity=0.3,
-    rock_volumetric_heat_capacity="2 MJ/m3/K", ground_conductivity=2.5,
-)
+ates = AquiferStorage().set_params("", {
+    "aquifer_temperature": "11 degC",
+    "aquifer_thickness": "30 m",
+    "porosity": 0.3,
+    "rock_volumetric_heat_capacity": "2 MJ/m3/K",
+    "ground_conductivity": 2.5,
+})
 ates.mode = "charge"
 state = None
 for hour in range(24 * 90):
@@ -1344,9 +1415,13 @@ parent cannot run under `gm.no_outputs()`.
 ```python
 from gemini.modules import PIDController
 
-pid = PIDController().update_params(
-    proportional_gain=0.05, integral_time=600, minimum_output=0, maximum_output=1, direction="reverse"
-)
+pid = PIDController().set_params("", {
+    "proportional_gain": 0.05,
+    "integral_time": 600,
+    "minimum_output": 0,
+    "maximum_output": 1,
+    "direction": "reverse",
+})
 pid.setpoint = 70.0
 state = None
 for measured in (60.0, 62.0, 65.0):
@@ -1384,10 +1459,14 @@ Binary organic Rankine cycle plant heated by brine, with an air-cooled condenser
 import gemini as gm
 from gemini.modules import ORC
 
-orc = ORC().update_params(
-    minimum_brine_outlet_temperature="70 degC", pinch=5, carnot_fraction=0.5,
-    condenser_approach=15, parasitic_fraction=0.15, capacity="5 MW",
-)
+orc = ORC().set_params("", {
+    "minimum_brine_outlet_temperature": "70 degC",
+    "pinch": 5,
+    "carnot_fraction": 0.5,
+    "condenser_approach": 15,
+    "parasitic_fraction": 0.15,
+    "capacity": "5 MW",
+})
 result = orc(fluid_in=gm.Stream(m_dot=100, T="150 degC", p="10 bar"), air_in=gm.modules.Atmosphere.ambient_air("15 degC"))
 assert round(result.outlets.power_out / 1e6, 3) == 2.801
 assert result.outlets.fluid_out.T == 343.15
@@ -1449,7 +1528,7 @@ from gemini.modules import FlashTurbine, Separator
 
 geofluid = gm.Stream(m_dot=100, T="250 degC", p="40 bar")
 separated = Separator()(fluid_in=geofluid, pressure_setpoint="6 bar")
-turbine = FlashTurbine().update_params(condenser_pressure="0.1 bar", generator_efficiency=0.98)
+turbine = FlashTurbine().set_params("", {"condenser_pressure": "0.1 bar", "generator_efficiency": 0.98})
 expanded = turbine(fluid_in=separated.outlets.gas_out)
 assert round(expanded.outlets.power_out / 1e6, 3) == 9.532
 assert round(expanded.outputs.exhaust_quality, 4) == 0.8678
@@ -1522,7 +1601,7 @@ delivered heat at the imposed flow.
 import gemini as gm
 from gemini.modules import HeatingGrid
 
-consumer = HeatingGrid().update_params(minimum_return_temperature="40 degC")
+consumer = HeatingGrid().set_params("", {"minimum_return_temperature": "40 degC"})
 supply = gm.Stream(flow="7.2 m3/h", T="70 degC", p="3 bar")
 result = consumer(supply_in=supply, heat_demand="100 kW")
 assert round(result.outlets.return_out.T - 273.15, 2) == 58.14
@@ -1552,9 +1631,7 @@ and a dew-point test.
 import gemini as gm
 from gemini.modules import CoolingGrid
 
-building = CoolingGrid().update_params(
-    maximum_return_temperature="16 degC", dew_point_margin="3 K"
-)
+building = CoolingGrid().set_params("", {"maximum_return_temperature": "16 degC", "dew_point_margin": "3 K"})
 result = building(
     supply_in=gm.Stream(flow="7.2 m3/h", T="7 degC", p="3 bar"),
     sensible_cooling_demand="50 kW", latent_cooling_demand="10 kW",
@@ -1587,15 +1664,12 @@ The rock around a doublet's wells; `Doublet` creates it.
 
 ## Plants
 
-`Doublet`, `DoubletHeatPlant`, `MultiWellPlant` and `DistrictNetwork` are plants built from a spec
-(`gm.plants.names()` lists them with the others); `HeatingSubstation`, `CoolingSubstation` and
-`ATESPlant` stay `Module` subclasses because a loop closed inside one call, or a `mode` that selects
-which children run, is not wiring alone.
+Every composite is a class of `gemini/modules/plants/`, with no `forward` of its own
+([plants.md](plants.md#a-plant-class)); `gm.plants.names()` lists them.
 
 ### Doublet
 
 Reusable production and reinjection limbs of a geothermal doublet (`gm.plants.get("Doublet")`).
-A plant built from a spec: `gemini/assets/plants/Doublet.json`, no handwritten class.
 
 - **Children**: `reservoir` (`ProductionReservoir`), `well` (`ProductionWell` below the ESP),
   `esp` (`ESP`), `riser` (`ProductionWell` above the ESP), `injector` (`InjectionWell`),
@@ -1614,18 +1688,19 @@ A plant built from a spec: `gemini/assets/plants/Doublet.json`, no handwritten c
 import gemini as gm
 
 doublet = gm.plants.example("DoubletHeatPlant").doublet
-doublet.set_inputs({"reservoir.production_rate": "42.4 kg/s", "esp.frequency": "55.5 Hz"})
+doublet.reservoir.production_rate = "42.4 kg/s"
+doublet.esp.frequency = "55.5 Hz"
 result = doublet(return_in=gm.Stream(m_dot=40, T="45 C", p="20 bar", fluid=doublet.fluid))
 assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
 assert gm.modules.mass_balance(doublet, result)["residual"] == 0
 ```
 
-`flow` is the liquid volume flow of the production reservoir and `brine_cooling` the production
-minus the injection temperature, the outputs the limits of a doublet read.
+`brine_cooling` is the production minus the injection temperature, and `reservoir.liquid_flow` the
+liquid volume flow: the two a limit of a doublet reads.
 
 #### A doublet from its depth
 
-`gm.modules.get("Doublet")` is the class `gm.plants.Doublet`, the same spec with design parameters.
+`gm.plants.Doublet` takes design parameters; the formulas are in `gemini/physics/doublet.py`.
 
 ```python
 plant.add("Doublet", name="d0", params={
@@ -1651,22 +1726,20 @@ stays explicit. `esp.frequency` remains a control; the pump head is the design h
 ### MultiWellPlant
 
 Purpose: geothermal well field with N production limbs mixed into one supply and M injection
-limbs fed from one return. A spec plant of variable size: `gm.plants.from_template("multi_well",
-{"producers": 3, "injectors": 2})` returns the plant of that size; the file
-`gemini/assets/plants/MultiWellPlant.json` is the default size (2 and 1) and equals the output of
-`multi_well_spec` in `plants/_utils/generators.py`.
+limbs fed from one return. Its size is structural: `gm.plants.MultiWellPlant(producers=3,
+injectors=2)`, and `{"type": "MultiWellPlant", "size": {"producers": 3, "injectors": 2}}` in a plant
+dict.
 
 - Structure: `producers` (default 2) `ModuleList` of `ModuleDict(reservoir=ProductionReservoir,
   well=ProductionWell, esp=ESP, riser=ProductionWell)`; `mixers` (`producers - 1` `Mixer`s);
   `splitters` (`injectors - 1` `Splitter`s); `injectors` (default 1) `ModuleList` of
   `ModuleDict(well=InjectionWell, sink=InjectionReservoir)`. Paths like
   `producers.0.esp.frequency`, `injectors.1.sink...`. Fewer than one producer or injector
-  raises `ValidationError` from the generator and `ValidationError` from `from_template`.
+  raises `ValidationError`.
 - Ports: `return_in` -> `supply_out`.
 - Parameters, controls, boundaries, states: none of its own (children's: `production_rate` per
   reservoir, `frequency` per ESP, `split_fraction` per splitter).
-- Outputs: `supply_out_T` (`Output.of` the last mixer's `fluid_out.T`, or the single riser's
-  `wellhead_out.T`).
+- Outputs: none; the supply temperature is `result.outlets.supply_out.T`.
 - Model: each limb is traversed like the production limb of `Doublet`. N-way mixing is a cascade
   of two-way mixers, the running mix entering `branch1_in`; capacity-rate weighting is associative,
   so the cascade gives `sum(m_i cp_i T_i) / sum(m_i cp_i)` at the lowest wellhead pressure. The
@@ -1683,11 +1756,12 @@ limbs fed from one return. A spec plant of variable size: `gm.plants.from_templa
 import gemini as gm
 
 doublet = gm.plants.example("DoubletHeatPlant").doublet
-field = gm.plants.from_template("multi_well", {"producers": 2, "injectors": 2})
+field = gm.plants.MultiWellPlant(producers=2, injectors=2)
 for limb, rate in zip(field.producers, (40.0, 30.0)):
     for name in ("reservoir", "well", "esp", "riser"):
         getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
-    limb.set_inputs({"reservoir.production_rate": rate, "esp.frequency": "50 Hz"})
+    limb.reservoir.production_rate = rate
+    limb.esp.frequency = "50 Hz"
 for limb in field.injectors:
     limb.well.load_state_dict(doublet.injector.state_dict())
     limb.sink.load_state_dict(doublet.sink.state_dict())
@@ -1703,24 +1777,23 @@ Purpose: indirect district-heating substation (Frederiksen and Werner 2013, *Dis
 and Cooling*).
 
 - Children: `valve` (`Valve`, network side), `heat_exchanger` (network on `hot_in`, building on
-  `cold_in`), `consumer` (`HeatingGrid`).
-- Ports: `supply_in` -> `return_out`.
-- Parameters: `building_flow` (`MassFlow`, > 0, required), `building_pressure` (`Pressure`,
-  > 0, required); the building fluid is the substation's `fluid`. No defaults: both are design
-  data of the building circuit.
+  `cold_in`), `consumer` (`HeatingGrid`), `pump` (`CirculationPump`, building circuit).
+- Ports: `supply_in`, `power_in` -> `return_out`, `loss_out`.
+- Parameters: none of its own. The building circuit is `pump.flow`, `pump.loop_pressure` and
+  `pump.pressure_rise`, and its fluid is the substation's `fluid`.
 - Controls / boundaries: the children's (`valve.opening`, `consumer.heat_demand`).
 - States: none.
-- Outputs: `duty` (exchanger), `unmet_demand`, `is_unmet`,
-  `building_supply_temperature`, `building_return_temperature`, `valve_pressure_drop`.
-- Model: the building loop (exchanger cold side -> consumer -> back) closes within one call:
-  `close_loop` finds the building return temperature that one pass reproduces, starting at
+- Outputs: none; read `consumer.unmet_demand`, `heat_exchanger.duty`, `valve.pressure_drop` and the
+  ports by path.
+- Model: the building loop (exchanger cold side -> consumer -> pump -> back) closes within one call
+  by the plant's tear stream at `consumer.return_out` ([loops](plants.md#loops)), starting at
   `min(consumer.minimum_return_temperature, T_network)`, clamped to at most the network
-  temperature after the valve; then valve, exchanger and consumer are called once. With the
+  temperature after the valve; then every child is called once. With the
   demand met, `eps C_min (T_network - T_return) = Q`; beyond the exchanger's reach the return
   sits at the consumer's floor and the rest is `unmet_demand`. The valve only throttles: the
   network flow is imposed by `supply_in`, the valve reports the drop at its opening.
-- Assumptions: building pump and hydraulics not modelled (no building-pump electricity); the
-  converged consumer return and the stream fed back to the exchanger differ by at most 1e-9 K
+- Assumptions: the hydraulics of the building circuit are the design `pump.pressure_rise`; the
+  converged consumer return and the stream fed back differ by at most 1e-9 K
   and appear as a boundary pair in the audit's `in`/`out` (the residual is unaffected).
 - Validity: the children's; forward flow; a stopped network or building circuit transfers no
   heat. First-law closed (`relative_residual < 1e-12`), mass residual 0.
@@ -1729,14 +1802,19 @@ and Cooling*).
 import gemini as gm
 from gemini.modules import HeatingSubstation, energy_balance
 
-substation = HeatingSubstation().update_params(building_flow=3.0, building_pressure="3 bar")
-substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
-substation.heat_exchanger.update_params(
-    thermal_conductance=2e4, hot_nominal_pressure_drop="0.2 bar", cold_nominal_pressure_drop="0.2 bar",
-    hot_nominal_mass_flow=2, cold_nominal_mass_flow=3,
-)
-substation.consumer.update_params(minimum_return_temperature="30 degC")
-substation.set_inputs({"valve.opening": 0.8, "consumer.heat_demand": "150 kW"})
+substation = HeatingSubstation()
+substation.pump.set_params("", {"flow": 3.0, "loop_pressure": "3 bar", "pressure_rise": "0.5 bar"})
+substation.valve.set_params("", {"flow_coefficient": "20 m3/h/bar^0.5"})
+substation.heat_exchanger.set_params("", {
+    "thermal_conductance": 2e4,
+    "hot_nominal_pressure_drop": "0.2 bar",
+    "cold_nominal_pressure_drop": "0.2 bar",
+    "hot_nominal_mass_flow": 2,
+    "cold_nominal_mass_flow": 3,
+})
+substation.consumer.set_params("", {"minimum_return_temperature": "30 degC"})
+substation.valve.opening = 0.8
+substation.consumer.heat_demand = "150 kW"
 result = substation(supply_in=gm.Stream(flow=2.0, T="75 degC", p="6 bar"))
 print(result.outputs.building_return_temperature)  # 325.44 K
 assert energy_balance(substation, result)["relative_residual"] < 1e-12
@@ -1748,21 +1826,19 @@ Purpose: indirect district-cooling energy transfer station (ASHRAE 2013, *Distri
 Guide*).
 
 - Children: `valve` (network side), `heat_exchanger` (building on `hot_in`, network on
-  `cold_in`), `consumer` (`CoolingGrid`).
-- Ports: `supply_in` -> `return_out`.
-- Parameters: `building_flow`, `building_pressure` (required, as above).
+  `cold_in`), `consumer` (`CoolingGrid`), `pump` (`CirculationPump`).
+- Ports: `supply_in`, `power_in` -> `return_out`, `loss_out`.
+- Parameters: none of its own, as above.
 - Controls / boundaries: the children's (`valve.opening`, the consumer's sensible and latent
   demand, indoor temperature and relative humidity).
-- Outputs: `duty`, `unmet_sensible`, `unmet_latent`, `is_unmet`,
-  `dew_point`, `building_supply_temperature`, `building_return_temperature`, `network_out_T`,
-  `valve_pressure_drop`.
+- Outputs: none; read `consumer.unmet_sensible`, `consumer.dew_point` and the rest by path.
 - Model: as the heating substation with the roles of the exchanger sides swapped. The iteration
   starts at the consumer's return limit `min(maximum_return_temperature, indoor_temperature)`
   (or the network temperature, if warmer) and is clamped to at least the network temperature.
   The building supply temperature that reaches the consumer decides its dew-point test.
 - Limitation: the consumer's dew-point test is on/off, so near the threshold the loop can lack
   a steady state (meeting the latent load warms the supply above the threshold, dropping it
-  cools it below). The iteration then raises `PhysicsError`; with the test configuration
+  cools it below). The iteration then raises `PhysicsError` (`loop_not_converged`); with the test configuration
   (latent 50 kW) a band of about 2 K of network temperature (280.6 to 282.4 K) fails. A partial
   dehumidification model in `CoolingGrid` would remove the band (open question).
 - First-law closed, mass residual 0.
@@ -1771,42 +1847,39 @@ Guide*).
 import gemini as gm
 from gemini.modules import CoolingSubstation
 
-substation = CoolingSubstation().update_params(building_flow=4.0, building_pressure="3 bar")
-substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
-substation.heat_exchanger.update_params(
-    thermal_conductance=3e4, hot_nominal_pressure_drop="0.2 bar", cold_nominal_pressure_drop="0.2 bar",
-    hot_nominal_mass_flow=4, cold_nominal_mass_flow=3,
-)
-substation.consumer.update_params(maximum_return_temperature="18 degC", dew_point_margin=1.0)
-substation.set_inputs({
-    "valve.opening": 1.0,
-    "consumer.sensible_cooling_demand": "60 kW",
-    "consumer.latent_cooling_demand": "10 kW",
-    "consumer.indoor_temperature": "24 degC",
-    "consumer.indoor_relative_humidity": 0.5,
+substation = CoolingSubstation()
+substation.pump.set_params("", {"flow": 4.0, "loop_pressure": "3 bar", "pressure_rise": "0.5 bar"})
+substation.valve.set_params("", {"flow_coefficient": "20 m3/h/bar^0.5"})
+substation.heat_exchanger.set_params("", {
+    "thermal_conductance": 3e4,
+    "hot_nominal_pressure_drop": "0.2 bar",
+    "cold_nominal_pressure_drop": "0.2 bar",
+    "hot_nominal_mass_flow": 4,
+    "cold_nominal_mass_flow": 3,
 })
-out = substation(supply_in=gm.Stream(flow=3.0, T="6 degC", p="6 bar")).outputs
+substation.consumer.set_params("", {"maximum_return_temperature": "18 degC", "dew_point_margin": 1.0})
+substation.valve.opening = 1.0
+substation.consumer.sensible_cooling_demand = "60 kW"
+substation.consumer.latent_cooling_demand = "10 kW"
+substation.consumer.indoor_temperature = "24 degC"
+substation.consumer.indoor_relative_humidity = 0.5
+out = substation(supply_in=gm.Stream(flow=3.0, T="6 degC", p="6 bar")).children["consumer"].outputs
 print(out.unmet_latent)  # 0.0
 ```
 
 ### DistrictNetwork
 
-Purpose: two-pipe district heating or cooling network with parallel substations. A spec plant of
-variable size: `gm.plants.from_template("district_network", {"consumers": 3, "service": "cooling"})`;
-the file `gemini/assets/plants/DistrictNetwork.json` is the default size (2 heating consumers) and equals
-`district_network_spec()` in `plants/_utils/generators.py`.
+Purpose: two-pipe district heating or cooling network with parallel substations. Its size is
+structural: `gm.plants.DistrictNetwork(consumers=3, service="cooling")`.
 
 - Structure: `pump` (`CentrifugalPump`, network circulation), `supply_pipe` (`Pipe`),
   `splitters` (`consumers - 1`), `substations` (`consumers` `HeatingSubstation`s for
   `service="heating"`, `CoolingSubstation`s for `"cooling"`), `mixers` (`consumers - 1`),
-  `return_pipe` (`Pipe`). An unknown service or `consumers < 1` raises `ValidationError` from the generator and
-  `ValidationError` from `from_template`.
-  `HeatingSubstation` and `CoolingSubstation` stay handwritten composites: each closes its building
-  loop inside one call.
+  `return_pipe` (`Pipe`). An unknown service or `consumers < 1` raises `ValidationError`.
 - Ports: `supply_in` -> `return_out`.
 - Parameters, controls, boundaries, states: none of its own.
-- Outputs: `return_out_T`. `power_in` and `loss_out` are plant ports, one for the pump and both
-  pipes.
+- Outputs: none. `power_in` is one plant port for the pump and the substation pumps, `loss_out`
+  one for them and both pipes.
 - Model: flow order pump -> supply pipe -> splitter cascade -> substations -> mixer cascade ->
   return pipe. Cascades as in `MultiWellPlant` (substation i receives `f_i prod_{j<i}(1-f_j)`,
   equal shares with `f_i = 1 / (N - i)`); splitters stand for balancing valves and branch
@@ -1819,24 +1892,36 @@ the file `gemini/assets/plants/DistrictNetwork.json` is the default size (2 heat
 import gemini as gm
 from gemini.modules import energy_balance
 
-network = gm.plants.from_template("district_network", {"consumers": 2, "service": "heating"})
-network.pump.update_params(
-    head_coefficients=[4e5, 0.0, -1e9], rated_frequency="50 Hz", best_efficiency=0.75,
-    best_efficiency_flow=0.004, motor_efficiency=0.9,
-)
+network = gm.plants.DistrictNetwork(consumers=2)
+network.pump.set_params("", {
+    "head_coefficients": [4e5, 0.0, -1e9],
+    "rated_frequency": "50 Hz",
+    "best_efficiency": 0.75,
+    "best_efficiency_flow": 0.004,
+    "motor_efficiency": 0.9,
+})
 network.pump.frequency = "50 Hz"
 for pipe in (network.supply_pipe, network.return_pipe):
-    pipe.update_params(length=500, inner_diameter=0.1, elevation_change=0, heat_transfer_coefficient=1.0)
+    pipe.set_params("", {
+    "length": 500,
+    "inner_diameter": 0.1,
+    "elevation_change": 0,
+    "heat_transfer_coefficient": 1.0,
+})
 network.splitters[0].split_fraction = 0.5
 for substation in network.substations:
-    substation.update_params(building_flow=3.0, building_pressure="3 bar")
-    substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
-    substation.heat_exchanger.update_params(
-        thermal_conductance=2e4, hot_nominal_pressure_drop="0.2 bar", cold_nominal_pressure_drop="0.2 bar",
-        hot_nominal_mass_flow=2, cold_nominal_mass_flow=3,
-    )
-    substation.consumer.update_params(minimum_return_temperature="30 degC")
-    substation.set_inputs({"valve.opening": 0.8, "consumer.heat_demand": "150 kW"})
+    substation.pump.set_params("", {"flow": 3.0, "loop_pressure": "3 bar", "pressure_rise": "0.5 bar"})
+    substation.valve.set_params("", {"flow_coefficient": "20 m3/h/bar^0.5"})
+    substation.heat_exchanger.set_params("", {
+    "thermal_conductance": 2e4,
+    "hot_nominal_pressure_drop": "0.2 bar",
+    "cold_nominal_pressure_drop": "0.2 bar",
+    "hot_nominal_mass_flow": 2,
+    "cold_nominal_mass_flow": 3,
+})
+    substation.consumer.set_params("", {"minimum_return_temperature": "30 degC"})
+    substation.valve.opening = 0.8
+substation.consumer.heat_demand = "150 kW"
 result = network(supply_in=gm.Stream(flow=4.0, T="75 degC", p="6 bar"))
 print(result.outputs.return_out_T)  # 329.36 K
 audit = energy_balance(network, result)
@@ -1849,28 +1934,29 @@ Purpose: seasonal low-temperature ATES plant with free cooling and a heat pump (
 al. 2018, Renewable and Sustainable Energy Reviews 94, 861-876; Bloemendal and Hartog 2018,
 Geothermics 71, 306-319).
 
-- Children: `storage` (`AquiferStorage`), `pump` (`CentrifugalPump`, well pump),
-  `heat_exchanger`, `heat_pump` (`HeatPump`, configure `mode="heating"`).
-- Ports: `return_in` -> `supply_out`.
-- Parameters: `groundwater_pressure` (`Pressure`, > 0, required).
-- Controls: `groundwater_flow` (`MassFlow`, >= 0, required); season via `storage.mode`.
+- Children: `storage` (`AquiferStorage`), `pump` (`CentrifugalPump`, well pump), `source_valve` and
+  `load_valve` (`Splitter`s), `heat_exchanger`, `heat_pump` (`HeatPump`, configure `mode="heating"`),
+  `source_mixer`, `load_mixer` (`Mixer`s).
+- Ports: `return_in`, `power_in` -> `supply_out`, `loss_out`.
+- Parameters: `storage.groundwater_pressure`.
+- Controls: `storage.groundwater_flow`; the season is three commands that move together:
+  `storage.mode`, `source_valve.split_fraction` and `load_valve.split_fraction`, 0 for the exchanger
+  and 1 for the heat pump.
 - States: through the storage (`Module.step` steps it, also nested in a parent).
-- Outputs: `heat_accumulation`,
-  `stored_energy`, `recovery_efficiency` (from the storage).
-- Topology by `storage.mode`: `"charge"` (summer): cold-well groundwater -> pump -> exchanger
-  cold side (building water on the hot side is cooled) -> warm well; heat pump not called.
-  `"discharge"` (winter): warm-well groundwater -> pump -> heat pump evaporator -> cold well;
-  the condenser heats `return_in` to the heat pump's setpoint; exchanger not called (the
-  winter source-circuit exchanger is lumped into the evaporator). `"idle"`: charge topology at
-  zero groundwater flow.
+- Outputs: none; read `storage.stored_energy`, `storage.heat_accumulation` and
+  `storage.recovery_efficiency` by path.
+- Topology: `"charge"` (summer), fractions 0: cold-well groundwater -> pump -> exchanger
+  cold side (building water on the hot side is cooled) -> warm well; the heat pump stands at zero
+  flow. `"discharge"` (winter), fractions 1: warm-well groundwater -> pump -> heat pump evaporator
+  -> cold well; the condenser heats `return_in` to the heat pump's setpoint; the exchanger stands at
+  zero flow (the winter source-circuit exchanger is lumped into the evaporator). `"idle"`: charge
+  topology at zero groundwater flow.
 - Groundwater loop: `AquiferStorage` produces at the start-of-step temperature of its source
-  store, independent of the injected water. The plant reads the new public
-  `storage.production_temperature()`, builds the produced stream (`groundwater_flow`,
-  `groundwater_pressure`, storage fluid), passes it through pump and exchanger or heat pump and
-  calls the storage once with the result, re-pressurised to `groundwater_pressure` (the storage
+  store, independent of the injected water, so it offers `production_out` before the other modules
+  run (`groundwater_flow`, `groundwater_pressure`, storage fluid). The storage is called once with
+  what comes back and produces again at `groundwater_pressure` (the storage
   passes pressure through and well hydraulics are not modelled, so the pump head minus the
-  exchanger drop is what the unmodelled wells and aquifer consume). The storage's
-  `production_out` then equals the stream fed to the pump.
+  exchanger drop is what the unmodelled wells and aquifer consume).
 - Balance: residual = pump `hydraulic_power` (flow work outside the sensible audit); mass 0.
 - Validity: the children's; in charge and idle the building water must be at least as warm as
   the groundwater (exchanger hot side).
@@ -1879,53 +1965,58 @@ Geothermics 71, 306-319).
 import gemini as gm
 from gemini.modules import ATESPlant
 
-plant = ATESPlant().update_params(groundwater_pressure="3 bar")
-plant.storage.update_params(
-    aquifer_temperature="11 degC", aquifer_thickness=30, porosity=0.3,
-    rock_volumetric_heat_capacity=2.0e6, ground_conductivity=2.5,
-)
-plant.pump.update_params(
-    head_coefficients=[3e5, 0.0, -1e8], rated_frequency="50 Hz", best_efficiency=0.7,
-    best_efficiency_flow=0.03, motor_efficiency=0.9,
-)
-plant.heat_exchanger.update_params(
-    thermal_conductance=1e6, hot_nominal_pressure_drop="0.3 bar", cold_nominal_pressure_drop="0.3 bar",
-    hot_nominal_mass_flow=40, cold_nominal_mass_flow=30,
-)
-plant.heat_pump.update_params(mode="heating", capacity="2 MW")
-plant.set_inputs({
-    "groundwater_flow": 30.0, "storage.mode": "charge",
-    "pump.frequency": "50 Hz", "heat_pump.temperature_setpoint": "40 degC",
+plant = ATESPlant()
+plant.storage.set_params("", {
+    "aquifer_temperature": "11 degC",
+    "aquifer_thickness": 30,
+    "porosity": 0.3,
+    "rock_volumetric_heat_capacity": 2.0e6,
+    "ground_conductivity": 2.5,
 })
+plant.pump.set_params("", {
+    "head_coefficients": [3e5, 0.0, -1e8],
+    "rated_frequency": "50 Hz",
+    "best_efficiency": 0.7,
+    "best_efficiency_flow": 0.03,
+    "motor_efficiency": 0.9,
+})
+plant.heat_exchanger.set_params("", {
+    "thermal_conductance": 1e6,
+    "hot_nominal_pressure_drop": "0.3 bar",
+    "cold_nominal_pressure_drop": "0.3 bar",
+    "hot_nominal_mass_flow": 40,
+    "cold_nominal_mass_flow": 30,
+})
+plant.heat_pump.set_params("", {"mode": "heating", "capacity": "2 MW"})
+plant.storage.groundwater_flow = 30.0
+plant.storage.mode = "charge"
+plant.source_valve.split_fraction = plant.load_valve.split_fraction = 0.0
+plant.pump.frequency = "50 Hz"
+plant.heat_pump.temperature_setpoint = "40 degC"
 summer = gm.Stream(flow=40.0, T="17 degC", p="3 bar")
 state, result = plant.step(None, 3600, {"return_in": summer})
 state, result = plant.step(state, 3600, {"return_in": summer})
-print(result.outlets.supply_out.T, result.outputs.stored_energy)  # 285.84 K 2.62e9 J
+stored = result.children["storage"].outputs.stored_energy
+print(result.outlets.supply_out.T, stored)  # 285.84 K 2.62e9 J
 plant.storage.mode = "discharge"
+plant.source_valve.split_fraction = plant.load_valve.split_fraction = 1.0
 state, result = plant.step(state, 3600, {"return_in": summer.with_(T=303.15)})
 print(result.outlets.supply_out.T)  # 313.15 K
 ```
 
-### Loop closure inside one call
+### Loop closure
 
-A composite with an internal closed circuit (the building loop of a substation) finds the
-circulated temperature first with `close_loop(update, start, path, lower, upper)` from
-`gemini/modules/plants/_utils/loops.py`: Wegstein's accelerated substitution (Wegstein 1958,
-"Accelerating convergence of iterative processes", Communications of the ACM 1(6), 9-13),
-tolerance 1e-9 K, at most 50 passes, then `PhysicsError`. Each trial pass evaluates the
-stateless children with `Module.trial_outlets(inlets)`, which no running call records, and the
-composite then calls every child once with the converged inlets. A loop through a stateful leaf
-whose outlet depends only on its state (the ATES groundwater loop) reads the child's states first
-with `Module.start_states()` (`AquiferStorage.production_temperature()` uses it).
+A plant whose connections form a cycle closes it inside one call: see
+[loops](plants.md#loops). Wegstein's accelerated substitution (Wegstein 1958, "Accelerating
+convergence of iterative processes", Communications of the ACM 1(6), 9-13), tolerance 1e-9, at most
+50 passes, then `PhysicsError` with code `loop_not_converged`.
 
 ### Nodal well analysis
 
-`gemini.modules.plants._utils.nodal` (module import only, not in `gm.plants`) finds the operating
-point at which well and reservoir agree, ported from the upstream GEMINI simulator
-(`nodal_solver`, `well_flow`). Each function evaluates the plant's own modules with
-`ProductionReservoir.sandface_stream`, `InjectionReservoir.required_pressure` and
-`Module.trial_outlets`, so no running call records a trial, and solves with
-`scipy.optimize.brentq`. Call it before the plant call and apply the result as a command.
+`gemini.analysis.solves` (`gm.analysis.nodal` is its public face) finds the operating point at which
+well and reservoir agree, ported from the upstream GEMINI simulator (`nodal_solver`, `well_flow`).
+Each function evaluates the plant's own modules without a running call, and solves with
+`ops.brentq`. A plant states the same balances with `Plant.constrain`.
 
 - `solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, riser=None)`:
   the rate [kg/s] whose sandface stream, lifted through `well` (below the ESP), `esp` and
@@ -1945,10 +2036,9 @@ the trial value or both residuals. On the upstream doublet-A configuration (2400
 135.9258, -0.044 %) and 174406.5 W ESP shaft power at 65 Hz (upstream 174444.7, -0.022 %); the
 3100 m injector needs no pump (`None`, upstream 0.001 bar).
 
-`NodalDoublet` (`plants/nodaldoublet.py`, `gm.plants.get("NodalDoublet")`) wraps both solves in a
-handwritten doublet: `produce()` solves the rate for its `wellhead_pressure` boundary, `inject(stream)` sets
-the injection pump to the solved pressure, or to its suction pressure when the solve returns
-`None`. `ParallelExchangerPlant` (case `examples/cases/parallel_exchangers.py`) uses it with three
+`NodalDoublet` (`plants/nodaldoublet.py`, `gm.plants.get("NodalDoublet")`) states both as
+[constraints](plants.md#constraints): the production rate for its `wellhead_pressure` boundary, and
+the injection pump's setpoint, at its suction pressure when the column of brine is enough. `ParallelExchangerPlant` (case `examples/cases/parallel_exchangers.py`) uses it with three
 parallel exchangers (upstream `parallel_hex_plant`: 125.10 m3/h at 10 bar, the measured 125 m3/h the
 upstream index was fitted to; injection 54.86 bar where upstream computes 44.47 bar, because
 upstream adds the injector's 5.20 bar friction instead of subtracting it, see
@@ -1956,33 +2046,42 @@ upstream adds the injector's 5.20 bar friction instead of subtracting it, see
 recalibrates the injectivity to 2.8430 m3/h/bar, which restores 44.47 bar. `BoilerChpPlant` (case
 `examples/cases/boiler_chp.py`, upstream `doublet_plant`) adds a boiler and a CHP on the secondary
 side and reports `emissions`; its 3100 m injector needs no pump, so the injection pump draws zero
-electricity. Both are handwritten `Module`s, because `produce()` and `inject()` are called with the
-surface equipment between them, and `gm.plants.example(name)` gives each with its upstream data.
+electricity. Both open the doublet, because the surface equipment sits between its limbs, and
+`gm.plants.example(name)` gives each with its upstream data.
 A run sets `esp.frequency`, `wellhead_pressure`, the `split_fraction`s and the setpoints as inputs.
 
 ```python
 from gemini.modules import ESP, ProductionReservoir, ProductionWell
-from gemini.modules.plants._utils import nodal
+from gemini.analysis import solves
 from gemini.physics.geometry import build_path
 
 path = build_path([dict(MD=d, TVD=d, ID=0.15, roughness=0.01) for d in (0, 300, 400, 600, 2400)])
-reservoir = ProductionReservoir().update_params(
-    pressure="250 bar", temperature="80 C", permeability=1e-12, aquifer_thickness=100,
-    drainage_radius=0, top_depth=2400, productivity_index=10 / 3.6e8, wellbore_radius=0.1,
-)
+reservoir = ProductionReservoir().set_params("", {
+    "pressure": "250 bar",
+    "temperature": "80 C",
+    "permeability": 1e-12,
+    "aquifer_thickness": 100,
+    "drainage_radius": 0,
+    "top_depth": 2400,
+    "productivity_index": 10 / 3.6e8,
+    "wellbore_radius": 0.1,
+})
 well, riser = (
-    ProductionWell().update_params(
-        pipe_path=path, soil_temperature="20 C", segment=segment, esp_depth=650
-    )
+    ProductionWell().set_params("", {
+    "pipe_path": path,
+    "soil_temperature": "20 C",
+    "segment": segment,
+    "esp_depth": 650,
+})
     for segment in ("below_esp", "above_esp")
 )
-esp = ESP().update_params(
-    stage_count=10,
-    head_coefficients=[83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
-    power_coefficients=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
-)
+esp = ESP().set_params("", {
+    "stage_count": 10,
+    "head_coefficients": [83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
+    "power_coefficients": [10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+})
 esp.frequency = "69 Hz"
-rate = nodal.solve_production_rate(reservoir, well, 3e5, (5, 60), esp=esp, riser=riser)
+rate = solves.solve_production_rate(reservoir, well, 3e5, (5, 60), esp=esp, riser=riser)
 assert round(rate * 3.6, 4) == 135.8666
 reservoir.production_rate = rate
 ```
@@ -1995,21 +2094,18 @@ boundaries stay inputs of the run.
 - `DistrictEnergyPlant` (`plants/districtenergyplant.py`): a `DistrictNetwork` of two heating
   substations on `hot_in`, and an `ATESPlant` in charge mode chilling a `DistrictNetwork` of one
   cooling substation. `Module.step` carries the storage; the caller feeds `cold_out` back to
-  `cold_in` at the next step. Its grid and air are children called in `forward`.
-- `HackathonPlant` (`gemini/assets/plants/HackathonPlant.json`): the challenge plant as a spec, with no plant
-  ports. Two designed `Doublet`s, `Mixer`, `Degasser`, `Desander`, `InhibitorDosing`, `HeatExchanger`,
+  `cold_in` at the next step.
+- `HackathonPlant`: the challenge plant, with no plant ports. Two designed `Doublet`s, `Mixer`, `Degasser`, `Desander`, `InhibitorDosing`, `HeatExchanger`,
   the source side of `HeatPump` and a `Splitter` back to the doublets; heating water from
   `HeatingGrid` through exchanger, heat pump and `Boiler`, part of it to the generator of an
   `AbsorptionUnit`; co-produced gas through `GasMakeup` to the boiler and a `Flare`; a dry `Cooler`
   on the chiller; `ElectricityGrid`, `GasGrid`, `WasteGrid`, `ChemicalGrid` and `Atmosphere` at the
   edge. The sizes in `inputs/plants/HackathonPlant.json` are assumptions of the case.
 
-### Heating and cooling template
+### Heating and cooling plants
 
-`heating_cooling` (`gm.plants.from_template("heating_cooling", parameters)`, file
-`gemini/assets/templates/heating_cooling.json`) is the Challenge 2 plant: one integrated heating and
-cooling spec whose units switch on and off. It is a plain template: no value ships, every size is a
-`null` default, and the physics is that of the modules below.
+`HeatingCoolingPlant` is the Challenge 2 plant: one integrated heating and cooling plant. The physics
+is that of the modules below; `inputs/plants/<Name>.json` holds example sizes.
 
 - **Wiring.** Brine: `doublet` (`Doublet`) -> `degasser` -> `filters.hot` -> `heat_exchanger` ->
   [`heat_pump`, source side] -> `filters.cold` -> `injection_pump` -> back to the doublet (opened,
@@ -2018,29 +2114,22 @@ cooling spec whose units switch on and off. It is a plain template: no value shi
   [`adsorption_chiller`, generator] -> `heating_supply_pipe` -> `heating_consumer`. Chilled water,
   in series: `cooling_return_pipe` -> [`absorption_chiller`] -> [`adsorption_chiller`] ->
   [`compression_chiller`, a `HeatPump` in cooling mode] -> `cooling_supply_pipe` ->
-  `cooling_consumer`. Brackets are optional units.
+  `cooling_consumer`. Brackets are the units that the other plants leave out.
 - **Ports.** Plant inlets: `heating_return_in`, `cooling_return_in` and the heat-rejection circuits
   `absorption_cooling_in`, `adsorption_cooling_in`, `compression_rejection_in` (each goes with its
   chiller). Plant outlets: `heating_return_out`, `cooling_return_out`, `gas` and the three
   rejection outlets. Totals are read from the edge modules (`gm.kpi.totals`).
-- **Parameters.** `<unit>.enabled` for `heat_pump`, `peak_boiler`, `absorption_chiller`,
-  `adsorption_chiller`, `compression_chiller` and `cooling_loop` (the chillers, the cooling pipes
-  and the cooling consumer together); sizes `heat_exchanger.thermal_conductance`, the chiller, heat pump and boiler
-  capacities, `peak_boiler.efficiency`; length, diameter, elevation change and
-  `heat_transfer_coefficient` of the four network pipes; the consumers' return temperatures. Other values are set
-  with `plant.set_params` after `from_template`.
-- **Presets.** `heating_only` (boiler and heating consumer), `heating_absorption_cooling`,
-  `heating_heat_pump_compression_cooling` and `heating_full_cooling` (all three chillers) are the
-  template filled with the switches off that name them (`tests/unit/modules/plants/_utils/
-  test_templating.py` keeps them equal), as plain specs with the size parameters of what remains.
+- **Other plants.** `HeatingPlant` (boiler and heating consumer), `HeatingAbsorptionCoolingPlant`,
+  `HeatingHeatPumpCoolingPlant` and `HeatingFullCoolingPlant` (all three chillers) are the same plant
+  with fewer units. An agent removes a unit by editing `to_dict(structure=True)`.
 - **Run check.** `tests/integration/test_heating_cooling.py` (slow tier) runs two simulate ticks
-  of every preset and of the full template with units off, with the stated assumptions in
+  of every plant and of one with a unit removed from its dict, with the stated assumptions in
   `tests/fixtures/heating_cooling.py`: the `doublet_heat` example values for the brine side, the
   examples of this document for the other modules, 48.95 kg/s of 21.7 degC heating return, boiler
   setpoint 85 degC. The sorption chillers need a driving temperature of at least 80 degC
   (absorption) and at most 90 degC (adsorption) in this series order.
 - **Left out.** Hot and cold storage (`ThermalStorage`, `IceStorage`) and every closed return loop
-  need a `kind: "state"` connection (the tank couples its charge and discharge circuits through its
+  need a `type: "state"` connection (the tank couples its charge and discharge circuits through its
   state, so a tank on both circuits of one chain is a loop), and running such a plant raises
   `NotImplementedYet` until scan exists. Heat-rejection loops through a `Cooler` are loops too, so
   they are plant ports here. `CHP` is not wired; it would sit beside `peak_boiler`.

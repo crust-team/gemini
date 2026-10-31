@@ -18,14 +18,14 @@ PROJECT = Path(__file__).resolve().parents[2] / "inputs/legacy_project"
 
 
 def main():
-    """Convert the folder and compare the result with the stored plant file."""
-    spec = gm.plants.convert_legacy(PROJECT)
-    plant = gm.plants.from_dict(spec)
+    """Convert the folder and compare the result with the stored plant dict."""
+    data = gm.plants.convert_legacy(PROJECT)
+    plant = gm.plants.from_dict(data)
     rows = pd.read_csv(PROJECT / "doublet_2024_old.csv", sep=";")
     stored = gm.plants.example("DoubletHeatPlant").to_dict()
     print(f"Old project rows:     {len(rows)}")
     print(f"Modules converted:    {len(plant.to_dict(structure=True)['modules'])}")
-    print(f"Same as the stored plant file: {spec == stored}")
+    print(f"Same as the stored plant dict: {data == stored}")
 
 
 if __name__ == "__main__":

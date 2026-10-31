@@ -1,9 +1,11 @@
 # Writing modules
 
-GEMINI modules follow a fluid-first call contract. Child modules and declarations are assigned
-once in `__init__`. Every `forward` receives the same read-only `Ports` mapping and returns a
-dictionary containing exactly the declared fluid outlets. Controls and boundaries are applied by
-the base class and read from `self`. Outputs are computed only after the fluid step succeeds.
+A leaf module computes and a plant connects; no class does both. A leaf `Module` has physics and one
+method, `forward`: it computes once, assigns its outputs and returns its outlets. Every composite is
+a `Plant` ([plants.md](plants.md)): it declares children, ports and connections in `__init__` and
+never writes `forward`. `forward` receives a read-only `Ports` mapping and returns a dictionary
+containing exactly the declared fluid outlets. Controls and boundaries are applied by the base class
+and read from `self`.
 
 Write a module with `Module` from `gemini.modules` (also `gm.modules.Module`) and the
 declarations from `gemini.types`. The base class has no string catalogue, sequential
@@ -35,19 +37,20 @@ Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
 
 ## Construction and metadata
 
-Construct a module without arguments and set its values afterwards; `update_params` returns the
-module, so `ESP().update_params(stage_count=12, ...)` builds a configured pump. Only structural
-tree-shape arguments (for example `ModuleList(modules)`) go to `__init__`. There is no
+Construct a module without arguments and set its values afterwards; `set_params` returns the
+module, so `ESP().set_params("", {"stage_count": 12, ...})` builds a configured pump. Only structural
+tree-shape arguments (for example `ModuleList(modules)`, `DistrictNetwork(consumers=3)`) go to
+`__init__`. There is no
 class-creation hook: `module.name` is the snake_case class name computed on access,
 `Module.help()` reads the first paragraph of the class docstring and lists the declarations, and
 any number of classes may share a name. `module.path` is the dotted position in the tree, or the
-name for a standalone module. `module.fluid` is a validated property saved by `state_dict()`. Plant files
-and checkpoints store the root class as `module:qualname` through `class_path`/`import_class` in
-`module.py`, the only import-by-string in the package.
+name for a standalone module. `module.fluid` is a validated property saved by `state_dict()`. Checkpoints
+store the root class as `module:qualname` through `class_path`/`import_class` in `module.py`, the
+only import-by-string in the package.
 
 ## Registry, categories and streams
 
-`gemini/modules/_utils/registry.py` is the one registry of module and plant types. A class joins it
+`gemini/modules/_utils/registry.py` is the one registry of module and plant classes. A class joins it
 under its class name with `gm.modules.register(cls)`, and every shipped equipment class is
 registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `get(name)` and
 `categories()` read it; an unknown name raises `ValidationError` with its close matches in
@@ -55,7 +58,7 @@ registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `ge
 
 `gm.modules.load_file(path)` imports a Python file, registers every `Module` class it defines that
 states a `category` (a base class without one is skipped) and returns their names, so a new module
-can join a plant spec by `type`. It executes the file; a file that does not import, or defines no
+can join a plant dict by `type`. It executes the file; a file that does not import, or defines no
 such class, raises `ValidationError` (code `invalid_format` or `invalid_value`), and a name that is
 already taken by another class is refused.
 
@@ -98,7 +101,7 @@ against the energy, because the module that receives the energy decides how much
   shows it. A stream inlet is drawn with `Inlet(Stream, drawn=True)`: it receives the conditions the
   source offers and `forward` returns the stream it took. A `many` outlet is drawn, as is any
   `Outlet(..., drawn=True)`: the module receives what its takers drew under the name of the outlet
-  (`outlets.power_out` in `_compute_outputs`, `inlets.power_out` in `forward`). The taker runs before
+  (`inlets.power_out` in `forward`). The taker runs before
   the source.
 - **An offered outlet.** `Outlet(Stream, offered=True)` exists before the other modules run. Its
   module defines `_offer(self, inlets)`, reading parameters, controls, boundaries and the inlets it
@@ -108,18 +111,16 @@ against the energy, because the module that receives the energy decides how much
   that leaves out a `many` port an empty list.
 
 A sub-plant exposes one port for what several children share: `plant.connect("power_in",
-"esp.power_in")` twice, or `"inlets": {"power_in": ["esp.power_in", "pump.power_in"]}` in the spec.
+"esp.power_in")` twice, or `"inlets": {"power_in": ["esp.power_in", "pump.power_in"]}` in the plant dict.
 Its value is the sum of what the ends carry (`energy.total_power`), so from outside a sub-plant reads
-like a leaf. Several ends may share a plant port that carries a power or air, never a plain stream. A
-handwritten composite does the same in code: it returns `power_in` from the `result.inlets.power_in`
-of its children.
+like a leaf. Several ends may share a plant port that carries a power or air, never a plain stream.
 
 ## Describing a module
 
-`Module.describe()`, `Module.parameter_schema()` and `Module.validate_params(params)` work on a
-class (a new instance answers) or on an instance. They live in
-`gemini/modules/_utils/description.py`, return plain JSON (`json.dumps(..., allow_nan=False)`) and
-never change the module.
+`describe()`, `parameter_schema()` and `validate_params(params)` are instance methods: a module's
+declarations exist only once `__init__` has run, so a class answers through a new instance,
+`gm.modules.ESP().describe()`. They live in `gemini/modules/_utils/description.py`, return plain
+JSON (`json.dumps(..., allow_nan=False)`) and never change the module.
 
 `describe()` returns `{name, type, category, summary, doc, parameters, controls, boundaries,
 measured, state, inlets, outlets, outputs, children, connections, values}`:
@@ -138,11 +139,9 @@ measured, state, inlets, outlets, outputs, children, connections, values}`:
 - `outputs` maps a name to `{unit, quantity, soft_sensor}`; `quantity` is the quantity name
   (one of the nine) or `null`.
 - `children` is `{name: type}` and `connections` is `[{source, target, kind, type}]`, both empty
-  for a leaf. A plant exposes its wiring through `_connection_list()`; a handwritten composite has
-  none, because its wiring is code.
+  for a leaf. A plant exposes its wiring through `_connection_list()`.
 - `values` holds the current `parameters`, `controls` and `boundaries`; unset ones are left out
-  and a child's values are keyed by dotted path. On a class they are the defaults of a new
-  instance.
+  and a child's values are keyed by dotted path.
 
 `parameter_schema()` is JSON Schema draft 2020-12: `$schema`, `title`, `type: object`,
 `properties`, `required` (parameters with no default) and `additionalProperties: false`. A child's
@@ -161,18 +160,19 @@ and tells the failures apart by the exception and its cause.
 
 Every declaration listing takes `recurse` with default `True` and keys its result by dotted path
 relative to the module (`"doublet.esp.frequency"` from the root): `parameters()` and
-`named_parameters()` iterate, `calibratable_parameters()` returns a list, and `controls()`,
+`named_parameters()` iterate, and `controls()`,
 `boundaries()`, `inputs()`, `outputs()` and `soft_sensors()` return dicts. Pass `recurse=False`
 for the module's own declarations under their local names. `inlets()` and `outlets()` take no
 `recurse`: a child's ports are internal connections, not ports of the parent.
 `children()`/`named_children()` list direct children and `modules()`/`named_modules()` walk the
-tree. `get_parameter`, `get_control`, `get_boundary` and `get_submodule` resolve one dotted path
-and suggest a close match for a typo.
+tree. `get(path)` returns the declaration at a dotted path, whatever its kind, and
+`get_submodule(path)` the module; both suggest a close match for a typo.
 
 ## Leaf modules
 
-Leaves declare ordinary `Output(kind)` values and implement
-`_compute_outputs(self, inlets, outlets)`. It never needs `super()._compute_outputs()`.
+A leaf computes once, in `forward(self, inlets)`: it calls physics, assigns its outputs under
+`# Outputs` and returns its outlets. `self.flow = ...` records the output of the running call, and
+reading `self.flow` afterwards gives it back.
 
 ```python
 from gemini.modules import Module
@@ -218,107 +218,42 @@ class Pump(Module):
         head = pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         discharge = suction.with_(p=suction.p + head)
 
+        # Outputs
+        self.flow = flow
+        self.head = head
+        self.power = pumps.power(flow, self.frequency, self.stage_count, self.power_coefficients)
+        self.electricity = self.power
+
         outlets = dict(fluid_out=discharge)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        suction = inlets.fluid_in
-        discharge = outlets.fluid_out
-        self.flow = suction.volumetric_flow()
-        self.head = discharge.p - suction.p
-        self.power = pumps.power(self.flow, self.frequency, self.stage_count, self.power_coefficients)
-        self.electricity = self.power
 ```
 
-Derive pressure rise, duty, temperature change and similar outputs from inlet/outlet states when
-that preserves the model's numerical contract. If both phases need an expensive intermediate,
-put the calculation in a small private helper used by both; do not cache call data on `self`.
-Every declared output, including one whose value is `None`, must be assigned on every
-output-enabled call.
+Every declared output, including one whose value is `None`, must be assigned on every call.
+Under `gm.no_outputs()` the assignments still run; nothing validates them and the result drops them.
+Do not cache call data on `self`: it belongs in a local variable of `forward`.
 
-## Composite modules
+## Plants
 
-Composites declare formula outputs in declaration order; a parent never sums its children:
-
-- `Output.of(self.child.output)` copies one descendant output from this call, for example
-  `Output.of(self.heat_exchanger.duty)` or
-  `Output.of(self.producers[0].riser.wellhead_temperature)`. An outlet field is referenced with
-  `Outlet.field(name)`: `Output.of(self.degasser.gas_out.field("m_dot"))`. The descendant must be
-  called exactly once, and the output adopts the target's kind.
-- `Output.ratio(self.thermal_power, self.head)` divides two earlier outputs of the same
-  module and records `None` when either value is `None` or the denominator is zero.
-
-- `Output.difference(self.first, self.second, kind)` subtracts two earlier outputs of the same
-  module, as `kind`, and records `None` when either value is `None`.
-
-Formulas take declaration references, not path strings. Children are assigned first
-(`# Modules`), so the references exist when the outputs are declared. Assigning a formula checks
-it while the class is built: an `Output.of` target outside the descendant tree (or a string), or a
-ratio operand that is not an earlier output of the module, raises `DefinitionError`, an unknown
-outlet field raises `ValidationError` with a close-match suggestion, and a misspelled reference
-(`self.heat_exchanger.dutyy`, `self.heat_exchangerr.duty`) raises `ValidationError` with the
-module path and the closest child, parameter, input, output, state or port (an `AttributeError`,
-so `hasattr` stays false). The first call resolves each reference to its descendant
-path by identity, so deep copies and nested trees resolve to their own children.
-
-```python
-from gemini.modules import HeatExchanger
-
-
-class HeatPlant(Module):
-    """Example composite plant."""
-
-    def __init__(self):
-        super().__init__()
-
-        # Modules
-        self.heat_exchanger = HeatExchanger()
-        self.pump = Pump()
-
-        # Inlets
-        self.primary_in = Inlet(Stream)
-        self.return_in = Inlet(Stream)
-
-        # Outputs
-        self.thermal_power = Output.of(self.heat_exchanger.duty)
-
-        # Outlets
-        self.supply_out = Outlet(Stream)
-
-    def forward(self, inlets):
-        """Evaluate children in physical flow order."""
-
-        # Modules
-        pumped = self.pump(fluid_in=inlets.primary_in)
-        exchanged = self.heat_exchanger(
-            hot_in=pumped.outlets.fluid_out, cold_in=inlets.return_in
-        )
-
-        # Outlets
-        supply_out = exchanged.outlets.cold_out
-
-        outlets = dict(supply_out=supply_out)
-        return outlets
-```
-
-`module.is_leaf` is true exactly when the module has no registered
+A composite is a `Plant`: its shape, connections, loops, constraints and outputs are in
+[plants.md](plants.md). `module.is_leaf` is true exactly when the module has no registered
 children. Composites built from a variable number of children use the containers
 `ModuleList(modules)` (children named `"0"`, `"1"`, ...; inserting or removing renumbers the later
 children) and `ModuleDict(mapping)` (caller-chosen keys that must not shadow module or mapping
 attributes). Containers compare and hash by identity like every module.
 
-### A composite that sets its children's values
+### A plant that sets its children's values
 
-A composite may derive its children's parameters from its own. It overrides `set_params`, computes
-the child values with functions from `gemini/physics/` and calls `super().set_params` with them:
+A plant may derive its children's parameters from its own. It overrides `set_params`, computes the
+child values with functions from `gemini/physics/` and calls `super().set_params` with them:
 
 ```python
-from gemini.modules import Module, ProductionReservoir
+from gemini.modules import ProductionReservoir
+from gemini.modules.plant import Plant
 from gemini.physics import hydraulics
 from gemini.types import Density, Length, Parameter
 
 
-class Column(Module):
+class Column(Plant):
     """A reservoir whose pressure comes from the height of its water column."""
 
     def __init__(self):
@@ -352,54 +287,37 @@ it keeps.
 
 Every route that sets parameters reaches this method: `add(..., params=)`, `from_dict`,
 `set_params(path, ...)` at any depth, a dated `set_params(..., valid_from=)`, a `param_history`
-section, `update_params` of an own parameter and attribute assignment. A fluid section is set
-through the `fluid` property, which a composite that derives from its fluid overrides.
+section and attribute assignment. Setting the fluid of a plant passes it to every child and derives
+again.
 
-`to_dict` stores the module's own parameters and the explicit child values, never a derived value:
-`from_dict(p.to_dict())` derives them again and rebuilds the same numbers. Dated entries of a child
-that only hold derived values are left out in the same way.
-
-### A composite with a closed circuit
-
-A composite with a closed circuit inside one call (a substation's building loop) needs the
-circulated temperature before its first child call. It iterates with trial passes:
-`child.trial_outlets(inlets)` returns the outlets of a call that no running call records, with
-outputs skipped and pre-hooks run, and refuses stateful modules. When the loop has converged
-(`close_loop` in `gemini/modules/plants/_utils/loops.py`), the composite calls every child once, so
-formulas and balances see exactly one call each. `child.start_states()` returns the states a call
-of a stateful child would start from (its entry of the running step, else its initial states),
-for a loop through a stateful child whose outlet depends only on its state.
+All of this is done once, in `Plant`: the formulas go into physics (`gemini/physics/doublet.py`) and
+the plant keeps a short `set_params`. `to_dict` stores the plant's own parameters and the explicit
+child values, never a derived value: `from_dict(p.to_dict())` derives them again and rebuilds the
+same numbers. Dated entries of a child that only hold derived values are left out in the same way.
 
 ## Values
 
 Parameters, controls and boundaries are set by attribute assignment or in bulk:
 
-- `update_params(**changes)` validates parameters by local or dotted path, records them as
-  explicit overrides and returns the module; `clear_param_overrides()` forgets the overrides so
-  values come from the dated snapshots in `param_history` alone; `params_at(at)` returns the
-  values active at an instant and `apply_params_at(at)` applies them to the whole tree.
-- `set_inputs(mapping)` persists validated controls and boundaries addressed by dotted path and
-  returns the module; `module.frequency = 50` persists one value; `has_input_value(name)` says
-  whether a control or boundary has a persisted value.
+- `set_params(path, params, valid_from=None)` validates parameters by local or dotted name and
+  stores them, in the undated base entry or from a date on, and returns the module; `params_at(path,
+  time)` returns the values active at an instant.
+- `module.frequency = 50` persists one control or boundary, and `module.stage_count = 12` sets a
+  parameter as an override that wins over every date.
 - `missing_parameters()` lists uninitialized parameters and `is_initialized` is true when there
   are none.
 - `state_dict()` returns JSON-safe parameter values and the fluid of every module path, and
   `load_state_dict(state, strict=True)` validates all of them before applying any. With
   `strict=False` only the modules named in `state` are filled; unknown paths are always rejected.
-  `to_dict()`/`from_dict()` and `save(path)`/`load(path)` add dated histories, overrides, bindings
-  and boundary defaults.
+  `to_dict()`/`from_dict()` and `save(path)`/`load(path)` of a `Plant` add dated histories,
+  overrides, bindings and boundary defaults; a single module is stored by wrapping it in a plant.
 
 ```python
 curve = [1, 0, 0, 0, 0, 0]
-pump = Pump().update_params(stage_count=10, head_coefficients=curve, power_coefficients=curve)
-plant = HeatPlant()
-plant.load_state_dict({"pump": pump.state_dict()[""]}, strict=False)
-plant.heat_exchanger.update_params(
-    thermal_conductance=5e5, hot_nominal_pressure_drop=0, cold_nominal_pressure_drop=0, hot_nominal_mass_flow=40, cold_nominal_mass_flow=40
+pump = Pump().set_params(
+    "", {"stage_count": 10, "head_coefficients": curve, "power_coefficients": curve}
 )
-assert plant.is_initialized and not pump.has_input_value("frequency")
-plant.set_inputs({"pump.frequency": "50 Hz"})
-assert plant.pump.has_input_value("frequency")
+pump.frequency = "50 Hz"
 ```
 
 ## Calling modules and `Ports`
@@ -419,7 +337,7 @@ assert a.outputs.head == b.outputs.head == c.outputs.head
 assert a.outputs.get("head", unit="bar") == a.outputs.head / 1e5
 ```
 
-`inlets`, `_compute_outputs` outlets, and `result.outlets` are immutable `Ports`. They preserve
+`inlets` and `result.outlets` are immutable `Ports`. They preserve
 declaration order and support both `ports.fluid_in` and `ports["suction"]`. Unknown names report
 the module path, valid names and a close-match suggestion. A call returns a `ModuleResult` with
 `outputs` (a `Values` mapping whose `get(name, unit=...)` converts from the declared unit),
@@ -431,11 +349,10 @@ One call performs these steps:
 
 1. validate inlets and resolve controls and boundaries (call keyword, persisted value, default);
 2. run forward pre-hooks;
-3. run `forward` and validate its fluid outlet dictionary;
-4. run `_compute_outputs`;
-5. evaluate composite formula outputs in declaration order;
-6. run forward hooks;
-7. verify every output was assigned and build `ModuleResult`.
+3. run `forward`, which assigns the outputs, and validate its fluid outlet dictionary;
+4. evaluate the combinations of a plant in declaration order;
+5. run forward hooks;
+6. verify every output was assigned and build `ModuleResult`.
 
 Pre-hooks always receive `(module, inlets)` and forward hooks always receive
 `(module, inlets, outlets)`:
@@ -452,7 +369,7 @@ def observe(module, inlets, outlets):
 pre_handle = pump.register_forward_pre_hook(clamp)
 handle = pump.register_forward_hook(observe)
 clamped = pump(fluid_in=stream, frequency=50)
-assert clamped.inputs["frequency"] == 45 and not pump.has_input_value("frequency")
+assert clamped.inputs["frequency"] == 45
 pre_handle.remove()
 handle.remove()
 ```
@@ -479,13 +396,12 @@ returned `ModuleResult`.
 ## Traced calls
 
 While `gemini.graph` traces a module, its `_Call` carries the running `Trace` (`call.trace`) and a
-child call made inside it, from `forward` or from a helper method such as the `produce()` of `NodalDoublet`,
-is recorded in the graph by `Trace.child` instead of evaluated: the child's controls, boundaries
+child call made inside it is recorded in the graph by `Trace.child` instead of evaluated: the child's controls, boundaries
 and numeric parameters become graph inputs named `<path below the root>.<name>`, supplied keyword
 values win without validation, and the `ModuleResult` of traced values joins the parent's call
-records, so `Output.of`, `Output.ratio` and `ModuleResult.leaves()` work
+records, so the combinations of a plant and `ModuleResult.leaves()` work
 unchanged. `Output.ratio` is `where(bottom == 0, None, top / bottom)` with the division written as
-`ops.truediv`, which gives today's `None` on plain floats. A leaf child that is stateful,
+`ops.truediv`, which gives `None` on plain floats. A leaf child that is stateful,
 has a pre-hook, has a read-only hook or raises `TraceError` becomes one **break node**:
 the graph is rolled back to where the child call started and the child runs on the plain path
 (`module(**row)`, a stateful one from its initial states, hooks included) once per row while the
@@ -509,9 +425,9 @@ violates a bound fails even where the arithmetic never reads the bad value.
 
 ## Skipping outputs
 
-`gm.no_outputs()` is a nestable, context-local context manager and decorator. It skips
-`_compute_outputs`, formulas, forward hooks and output completeness checks. Fluid forwarding,
-pre-hooks and outlet validation still run; the result has an empty `outputs` mapping.
+`gm.no_outputs()` is a nestable, context-local context manager and decorator. It skips validating
+what `forward` assigns, the combinations of a plant, forward hooks and output completeness checks.
+`forward`, pre-hooks and outlet validation still run; the result has an empty `outputs` mapping.
 
 ```python
 with gm.no_outputs():
@@ -524,13 +440,14 @@ assert fast.outlets.fluid_out == a.outlets.fluid_out
 ## State and health
 
 Stateful equipment declares its carried values as `State(kind, default=...)` in the `# States`
-section; `default` is the initial state. `forward` and `_compute_outputs` read a state as a plain
-attribute (`self.temperature`), which gives its value at the start of the step. A stateful leaf
-implements `_advance_states(self, inlets, outlets, dt)`, returning the end-of-step value of every
-state, after `_compute_outputs`; a state is never assigned directly. `module.stateful` is true
+section; `default` is the initial state. `forward` reads a state as a plain attribute
+(`self.temperature`), which gives its value at the start of the step. A stateful leaf implements
+`_advance_states(self, inlets, outlets, dt)`, returning the end-of-step value of every state, after
+`forward`; a state is never assigned directly. `module.stateful` is true
 when a module declares states, and `states(recurse=True)` lists them by dotted path.
 
-`step(state, dt, inlets)` returns `(next_state, result)` for any module. `initial_state()` and
+`step(state, dt, inlets)` returns `(next_state, result)` for any module; `step` and `initial_state`
+stay public, because a module that sets `stateful = True` without declaring states overrides them. `initial_state()` and
 `state` are the module's own `{name: value}` mapping for a leaf and nest by child name for a
 composite, for example `{"storage": {"temperature": 330.0}}`; `None` means the initial states.
 A composite needs no `step` method: its `forward` runs once, every stateful descendant it calls
@@ -575,11 +492,11 @@ class Tank(Module):
         # Outlets
         outlet = inlets.fluid_in.with_(T=self.temperature)
 
+        # Outputs
+        self.duty = self._duty(inlets.fluid_in)
+
         outlets = dict(fluid_out=outlet)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.duty = self._duty(inlets.fluid_in)
 
     def _advance_states(self, inlets, outlets, dt):
         heat = heat_transfer.heat_rate(self._duty(inlets.fluid_in), dt)
@@ -590,7 +507,7 @@ class Tank(Module):
         return heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - self.temperature)
 
 
-tank = Tank().update_params(heat_capacity=4.2e5)
+tank = Tank().set_params("", {"heat_capacity": 4.2e5})
 state, result = tank.step(None, 60, {"fluid_in": stream})
 assert result.outlets.fluid_out.T == 300 and state["temperature"] > 300
 ```
@@ -634,14 +551,14 @@ goes through a port.
 
 ## Structure
 
-Constructor sections are ordered `Modules`, `Parameters`, `Inlets`, `Controls`, `Boundaries`,
-`States`, `Outputs`, `Outlets`, with empty sections omitted. `forward` uses only `# Modules` on
-composites and `# Outlets` when outlets exist. It contains no `self.<name> = ...` assignments and
-ends with `outlets = dict(...)` followed by `return outlets`. Method order is `__init__`,
-`forward`, `_compute_outputs`, `_advance_states` when the module has states, then private
-helpers. Signatures are always
-`forward(self, inlets)` and `_compute_outputs(self, inlets, outlets)`, including modules with no
-ports; parameters have no defaults or variadic forms.
+Constructor sections of a leaf are ordered `Modules`, `Parameters`, `Inlets`, `Controls`,
+`Boundaries`, `States`, `Outputs`, `Outlets`, with empty sections omitted; those of a plant are in
+[plants.md](plants.md#a-plant-class). `forward` uses `# Outlets` when outlets exist and `# Outputs`
+when it assigns outputs, in that order. It assigns only declared outputs on `self` and ends with
+`outlets = dict(...)` followed by `return outlets`. Method order is `__init__`, `forward`,
+`_advance_states` when the module has states, then private helpers. The signature is always
+`forward(self, inlets)`, including modules with no ports; parameters have no defaults or variadic
+forms.
 
 Inlets and outlets accept a `Stream` or a `Power`. What crosses a port is shown by the port, see
 [types.md](types.md#port-quantities). Results keep the same dotted

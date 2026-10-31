@@ -81,18 +81,14 @@ flow in m3/s (their bindings declare `"unit": "m3/s"`), and the unbound status c
 
 ## Where data lives
 
-Two folders hold data, with one rule between them:
+There is one data folder, and no data file inside `gemini/`: a plant is a class.
 
-- `gemini/assets/` is inside the package and installed. It holds only small files that a public
-  function needs to work: `plants/`, the structure of each plant with no parameter values, and
-  `templates/`.
-- `inputs/` is at the repository root, next to `gemini/`, and is not installed. It holds everything
-  else that code reads: `hackathon/` (the organisers' files, with a README), `plants/` (example
-  values), `doublet_heat/` (measured data) and `legacy_project/`. A function that needs it raises
-  `RunError` with code `inputs_missing` when it is absent, as in an installed wheel, and the message
-  names the file. Nothing fails at import time, and `gm.plants.get` and `gm.plants.from_template`
-  work without it.
+`inputs/` is at the repository root, next to `gemini/`, and is not installed. It holds everything
+that code reads: `hackathon/` (the organisers' files, with a README), `plants/` (example values),
+`doublet_heat/` (measured data) and `legacy_project/`. A function that needs it raises `RunError`
+with code `inputs_missing` when it is absent, as in an installed wheel, and the message names the
+file. Nothing fails at import time, and `gm.plants.get` works without it.
 
 `docs/schemas/` is generated documentation, not data. `tests/fixtures/` holds goldens and
 `tests/e2e/expected/` example outputs. `gemini/utils/paths.py` is the one place that knows where the
-two folders are, and `tests/unit/test_code_quality.py` checks the layout.
+folder is, and `tests/unit/test_code_quality.py` checks the layout.

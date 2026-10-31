@@ -14,7 +14,7 @@ Conventions on every entry:
 - Inputs take a number in SI or a string such as `"150 m3/h"`. Outputs are in SI by default.
 - A plant and an engine are not shared across threads: each worker loads its own.
 - The documents exchanged between repositories have a JSON Schema and a sample in `docs/schemas/`:
-  `value`, `problem`, `check`, `module_description`, `plant_spec`, `results_summary`, `profile`
+  `value`, `problem`, `check`, `module_description`, `plant_dict`, `results_summary`, `profile`
   (`<name>.schema.json`, `<name>.sample.json`). Regenerate with `python scripts/write_schemas.py`.
 
 ## Return shapes
@@ -76,8 +76,8 @@ snapshot covers the package API (functions, types, return shapes), not the list 
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.modules.names(category=None)` | sorted registry names; spec plants have category `plants` | real |
-| `gm.modules.get(name)` | the class; a spec plant gives a new plant. Unknown: `ValidationError` with `suggestions` | real |
+| `gm.modules.names(category=None)` | sorted registry names; plant classes have category `plants` | real |
+| `gm.modules.get(name)` | the class. Unknown: `ValidationError` with `suggestions` | real |
 | `gm.modules.categories()` | `subsurface`, `wells`, `pumps`, `treatment`, `exchangers`, `heating`, `cooling`, `power`, `storage`, `piping`, `grids`, `environment`, `control`, `plants`, in display order; each is the folder that holds the module | real |
 | `gm.modules.register(cls)` | `cls`, now in the registry; it states `category = "<one of the list>"`; a taken name is refused | real |
 | `gm.modules.load_file(path)` | names of the `Module` classes of a Python file that state a `category`, registered | real |
@@ -85,14 +85,17 @@ snapshot covers the package API (functions, types, return shapes), not the list 
 | `gm.modules.Boiler`, `ElectricBoiler`, `CHP`, `Flare`, `GasGrid`, `GasMakeup` | the gas chain: `boiler.fuel_in`, `boiler.gas_out`, see [equipment.md](equipment.md) | real |
 | `gm.streams.names()` | `brine`, `hot_water`, `chilled_water`, `gas`, `electricity`, `fuel` | real |
 
-On a class or an instance of `Module` (and on what `gm.modules.get` returns):
+On an instance of `Module`; a class answers through a new instance, `gm.modules.ESP().describe()`:
 
 | Name | Returns | Status |
 | --- | --- | --- |
 | `describe()` | see below; schema `module_description` | real |
 | `parameter_schema()` | JSON Schema draft 2020-12; each property has `unit`, `quantity`; dotted child names | real |
 | `validate_params(params, on_error="raise")` | `[]`, or raises every problem; with `"record"` the list of problems | real |
-| `help()` | text | real |
+| `help()` | text, on the class too | real |
+| `get(path)` | the declaration at a dotted path, whatever its kind | real |
+| `get_submodule(path)`, `named_modules()`, `modules()`, `children()`, `named_children()` | a module, or the tree | real |
+| `step(state, dt, inlets)`, `initial_state()` | advance the states over `dt`; a module author may override them | real |
 
 ```text
 {name, type, category, summary, doc,
@@ -102,7 +105,7 @@ On a class or an instance of `Module` (and on what `gm.modules.get` returns):
  outputs: {name: {unit, quantity, soft_sensor}},
  children: {name: type},
  connections: [{source, target, kind, type}],
- values: {parameters, controls, boundaries}}     on an instance only
+ values: {parameters, controls, boundaries}}
 ```
 
 `kind` is `null` for a port that takes any stream; an output's `quantity` is the quantity or `null`;
@@ -111,28 +114,29 @@ and `maximum` are the closest limit, strict or not. `values` are keyed by dotted
 
 ## Plants
 
-Three levels and one representation: see [plants.md](plants.md). The spec schema is
-`gm.plants.spec_schema()` and the plant file is the spec.
+A leaf computes and a plant connects: see [plants.md](plants.md). Plants are Python classes; the
+plant dict is the JSON form agents use, and `gm.plants.schema()` is its schema.
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.Plant(name)` | an empty plant, a normal composite `Module` | real |
+| `gm.Plant(name)` | an empty plant; subclass it for a plant class | real |
 | `p.add(type, name=None, params=None)` | the added module; `type` is a registry name or a class, `params` the dict `set_params` takes | real |
 | `p.connect(source, target, type=None)` | nothing; `ValidationError` with candidates, see [plants.md](plants.md) | real |
+| `p.constrain(target, by, bounds, equals=None, at_least=None)` | nothing; the engine solves `by` so that `target` reaches its value, see [plants.md](plants.md#constraints) | real |
+| `p.loop_tolerance`, `p.loop_passes` | the settings of a loop, 1e-9 and 50, see [plants.md](plants.md#loops) | real |
 | `p.summary()` | text table | real |
 | `p.validate(on_error="raise")` | as `gm.plants.validate` | real |
-| `p.to_spec()`, `p.to_dict()` | the spec (one function) | real |
-| `gm.plants.from_spec(spec)`, `from_dict(spec)` | a plant (one function); one `ValidationError` carries every problem in `problems` | real |
-| `gm.plants.validate(spec, on_error="raise")` | `[]`, or raises every problem; with `"record"` the list of problems, paths such as `connections[1].target` | real |
-| `gm.plants.spec_schema()` | JSON Schema | real |
-| `gm.plants.migrate(old)` | spec; every older stored format to format 2 | real |
-| `gm.plants.names()` | plant names, the `plants` category | real |
+| `p.to_dict(structure=False)` | the plant dict; `structure=True` gives the modules and connections of a plant of a class | real |
+| `p.save(path)`, `gm.Plant.load(path)` | writes or reads the plant dict as JSON | real |
+| `Output.difference(a, b)`, `Output.ratio(a, b)`, `Output.sum(a, b, ...)` | the outputs of a plant, combinations of paths, see [plants.md](plants.md#outputs) | real |
+| `gm.plants.from_dict(data)` | a plant; one `ValidationError` carries every problem in `problems` | real |
+| `gm.plants.validate(data, on_error="raise")` | `[]`, or raises every problem; with `"record"` the list of problems, paths such as `connections[1].target` | real |
+| `gm.plants.schema()` | JSON Schema of the plant dict, generated from the code | real |
+| `gm.plants.names(category=None)` | plant names; `category` is `heating`, `cooling` or `both`, what a plant serves | real |
 | `gm.plants.get(name)` | a new plant without values | real |
 | `gm.plants.example(name)` | a plant with real values, from `inputs/plants/`; `RunError` (code `inputs_missing`) outside a source checkout | real |
-| `gm.plants.templates()` | `[{name, title, description, purpose}]`, purpose `heating`, `cooling`, `both` | real |
-| `gm.plants.from_template(name, parameters=None)` | a plant; `parameters` are `{"<id>.<param>": value, "<id>.enabled": bool}`, or sizes such as `{"producers": 3}` | real |
-| `gm.plants.convert_legacy(folder)` | spec; expected files in [legacy.md](legacy.md) | real |
-| `gm.plants.HeatingSubstation`, `CoolingSubstation`, `ATESPlant`, `Doublet` | handwritten special cases, see [plants.md](plants.md); a `Doublet` takes a design from its depth | real |
+| `gm.plants.convert_legacy(folder)` | plant dict; expected files in [legacy.md](legacy.md) | real |
+| `gm.plants.<Plant class>` | the plant classes, see [plants.md](plants.md#registered-plants) | real |
 
 On any plant, `path` being a dotted module path (`""` is the root):
 
@@ -143,8 +147,6 @@ On any plant, `path` being a dotted module path (`""` is the root):
 | `param_history(path)` | `[{valid_from, params}]` | real |
 | `bindable(path)` | `{controls: [name], boundaries: [name], inlets: {port: [field]}, measured: [name], state: [name]}` | real |
 | `set_bindings(path, bindings)` | replaces them; flat `{name: column}` or `{name: {column, unit}}`, `name` a declaration or `port.field`; units checked | real |
-| `get_module(path)`, `named_modules()` | a module, `(path, module)` pairs | real |
-| `save(path)`, `Module.load(path)` | writes or reads the spec as JSON | real |
 
 ## Units
 
@@ -265,7 +267,7 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 `gm.optim.calibrate` fits only through replay and returns a `CalibrationResult`. With `apply=True` a
 successful fit replaces the current parameter as an explicit override and adds no dated snapshot.
 Pass parameter objects declared `calibratable=True`, such as
-`plant.get_parameter("heat_exchanger.thermal_conductance")`.
+`plant.get("heat_exchanger.thermal_conductance")`.
 
 ## Errors
 
@@ -284,6 +286,8 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | Leaves compute, plants connect. `_compute_outputs` is gone: a leaf computes once in `forward`. Every composite is a `Plant`, which never writes `forward`, with `HeatingSubstation`, `CoolingSubstation`, `NodalDoublet`, `DistrictEnergyPlant`, `BoilerChpPlant`, `ParallelExchangerPlant` and `ATESPlant` among them. The engine closes loops (`loop_not_converged`) and solves `Plant.constrain`. `CirculationPump` carries the flow of a building circuit, and its electricity is counted. Plant outputs are `Output.difference`, `Output.ratio` and `Output.sum` of paths; `Results` reads a path. |
+| 0.2.0, unreleased changes | | No JSON file in `gemini/`: `gemini/assets/` is gone. A plant of a class stores `{type, size?, params}`, `to_dict(structure=True)` its structure. Templates are the plant classes `HeatingPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant` and `HeatingHeatPumpCoolingPlant`, and `DistrictNetwork` and `MultiWellPlant` take their size. Removed names are listed below. Code `loop_without_state` and `migration_failed` are gone, `loop_not_converged` is new. |
 | 0.2.0, unreleased changes | | File layout of `gemini/modules/`: `plant.py` and `container.py` beside `module.py`, the plant tools in `plants/_utils/`, `heating/_burner.py`, `cooling/_sorption.py`. Private paths only: no change to a name of this page. |
 | 0.2.0, unreleased changes | | Data layout: `gemini/assets/` (installed: plant structures, templates) and `inputs/` (repository only: hackathon inputs, example values, measured data, legacy project); `datasets/` is gone. New code `inputs_missing`: `gm.profiles.get` and `gm.plants.example` raise it outside a source checkout. Templates `DistrictNetwork` and `MultiWellPlant` are now `district_network` and `multi_well`. `gm.plants.example("Doublet")` is the registered class, with the outputs of its structure file. No change to a name of this page. |
 | 0.2.0, unreleased changes | | Plants `NodalDoublet`, `ParallelExchangerPlant`, `BoilerChpPlant`, `DistrictEnergyPlant`, `HackathonPlant`: catalogue only, no change to a name of this page. |
@@ -309,6 +313,28 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 | 0.2.0 | 2026-10-31 | Hackathon example `examples/cases/hackathon.py`. |
 | 0.2.0 | 2026-10-31 | Version 0.2.0: a checkpoint written before 0.2.0 raises `old_format`; `gm.plants.migrate` converts its plant file. |
 | 0.1.0 | 2026-10-30 | First consistent API. |
+
+Names removed or renamed in the unreleased changes of 0.2.0:
+
+| Name | Replaced by |
+| --- | --- |
+| `Module._compute_outputs` | `forward` assigns the outputs |
+| `Output.of`, `Outlet.field` | a path: `results["sub.consumer.unmet_demand"]`, `results["sub.pipe.fluid_out.T"]`, `result.children[...]` |
+| `Doublet.flow`, `.production_temperature`, `.injection_temperature`; the outputs of `ATESPlant`, `HeatingSubstation`, `CoolingSubstation`, `DoubletHeatPlant`, `BoilerChpPlant`, `ParallelExchangerPlant`, `DistrictEnergyPlant`, `MultiWellPlant`, `DistrictNetwork` | the same path below the plant: `d0.reservoir.liquid_flow`, `sub.consumer.unmet_demand` |
+| `HeatingSubstation.building_flow`, `.building_pressure`, same on `CoolingSubstation` | `pump.flow`, `pump.loop_pressure`, with `pump.pressure_rise` |
+| `ATESPlant.groundwater_pressure`, `.groundwater_flow` | `storage.groundwater_pressure`, `storage.groundwater_flow`, with `source_valve` and `load_valve` |
+| `NodalDoublet.produce`, `.inject` | `Plant.constrain` in the class |
+| `to_spec`, `from_spec`, `spec_schema` | `to_dict`, `from_dict`, `schema` |
+| `gm.plants.templates`, `from_template` | `gm.plants.names(category=...)`, `gm.plants.get(name)`; a size is a constructor argument |
+| `gm.plants.migrate`, `scripts/migrate_plants.py` | none: nothing that remains needs it |
+| `Module.to_dict`, `from_dict`, `save`, `load` | on `Plant` only; a single module is stored by wrapping it in a plant |
+| `update_params`, `apply_params_at`, `clear_param_overrides` | `set_params` with `valid_from`; attribute assignment for an override |
+| `get_parameter`, `get_control`, `get_boundary` | `get(path)` |
+| `get_module` | `get_submodule` |
+| `offer`, `set_inputs`, `has_input_value`, `add_module`, `extra_repr` | private; assign a control or boundary on its module, `plant.get(path).owner` |
+| `offered_outlets`, `start_states`, `trial_outlets`, `calibratable_parameters` | gone |
+| `describe`, `parameter_schema`, `validate_params` on a class | on an instance, `gm.modules.ESP().describe()` |
+| `docs/schemas/plant_spec.*` | `docs/schemas/plant_dict.*` |
 
 Before 0.1.0 the API counted integer versions 1 to 5: the first frozen list, `category` as the
 folder of a module, `gm.legacy` moved behind `gm.plants.convert_legacy`, the fits moved to

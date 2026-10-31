@@ -260,6 +260,11 @@ Ground and aquifer heat transport: doublet breakthrough, conduction shapes, Rame
 - `ramey_relaxation_length(capacity_rate, borehole_resistance, rock_resistance)`: Ramey's relaxation
   length of the circuit fluid.
 
+### `doublet.py`
+
+- `design(values, density, viscosity, skins, pressure=None)`: the child values of a doublet that
+  its design values give, by dotted name; a group of values that is not complete derives nothing.
+
 ### `pumps.py`
 
 Pump relations: the TNO R11363 power polynomial, affinity-law curves, efficiencies. `head`,

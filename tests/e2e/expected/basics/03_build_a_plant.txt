@@ -1,4 +1,5 @@
 After 2 filters:     9.9984 bar
+Plant class loss:    0.0016 bar
 Problem:             unconnected_port at boiler.loss_out
 After the fix:       0 problems
 Plant: BoilerPlant

@@ -141,10 +141,10 @@ dataset metadata replaces the binding's unit.
 Simulation binds every leaf control and boundary to its binding's column, or else to a column
 named after its dotted path; an input with neither needs a default or a persisted value. A root
 inlet field binds the same way, to its binding or to a column named `port.field`. Each
-step applies the values with `plant.set_inputs`, then calls the plant with the root inlets, built
+step applies the values to their modules, then calls the plant with the root inlets, built
 from root bindings over `plant.boundary["root_inputs"]`. A missing value skips the whole step,
 counted under the root path `""`. Replay applies each bound twin's controls and boundaries with
-`module.set_inputs` before calling it with only its measured inlets, and skips only the twin
+the module before calling it with only its measured inlets, and skips only the twin
 missing a required observation. Both therefore leave the last tick's inputs persisted on the
 supplied plant. Replay and simulation apply dated parameters at each transition and convert raw
 units at the boundary: volumetric flows become mass flows with the fluid density, and difference
@@ -188,16 +188,16 @@ equipment twins of a replay; the plant in simulate) evaluated over **chunks** of
   the Python backend, or when the call on arrays raises, which finds the rows whose health fails:
   they are errors), and the columns are spread over the chunk (`PathColumns.spread`).
 - **Breaks.** A leaf that is stateful, pre-hooked, untraceable or has a hook that only reads is a
-  break node. A root that cannot be traced as a whole (`close_loop`, `nodal.py`, float32
+  break node. A root that cannot be traced as a whole (a plant with a loop or a constraint, float32
   precision, or a stateful module in a stepped run) is one **root break**: the real module, called
-  row by row with its states, so its results are real `ModuleResult` trees (children, sums and
-  `Output.of` exact). There is one implementation of a break, used by every mode.
+  row by row with its states, so its results are real `ModuleResult` trees (children and
+  combinations exact). There is one implementation of a break, used by every mode.
 - **Skips and errors.** A twin is skipped for the first missing column in this order: controls,
   boundaries, inlet fields (each inlet's stream is checked once its fields are read), observations,
   measured states. In simulate the plant is the one twin: root inlets, then the leaf inputs; a skip
   is counted under `""`. A failing row is recorded as the problem `path`, `code`, `message=str(error)`; in simulate, whatever fails is a whole-step error under `""` and the
   states stay as they were.
-- **Inputs.** Each tick sets the module's controls and boundaries on its twin (`set_inputs`)
+- **Inputs.** Each tick sets the module's controls and boundaries on its twin
   before the module is called, so a failing tick has persisted them; the runner sets them at the
   end of a chunk, for the last tick that applied them (one tick at a time when there are callbacks
   or one-tick chunks), so the plant keeps the last tick's inputs, as an interrupted run does.
@@ -307,7 +307,7 @@ uses `allow_pickle=False`, so no pickle is read, and gives the same bits, units 
 Anything that is not an archive of this format (including the former Parquet and CSV files)
 raises `ValidationError` with the code `invalid_format`. The metadata records `gm.__version__`, and a
 file written before 0.1.0 raises `ValidationError` with the code `old_format`, as a checkpoint
-written before 0.2.0 does: it holds a plant file of an older form.
+written before 0.2.0 does: it holds a plant dict of an older form.
 Checkpoints keep their results in the same file.
 
 **End state.** `results.end_state` is plain JSON `{position, module_states}`: the last committed

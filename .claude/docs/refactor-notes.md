@@ -204,7 +204,7 @@ ported into the refactored structure; only missing behaviour was added.
   minimum **outlet**): upstream re-solves with the source outlet fixed and lets the sink outlet
   drop, which is the duty reduction implemented here. It is optional (default `None`), so no
   existing number changes.
-- Nodal analysis (`plants/_utils/nodal.py`) walks the wells upward from the sandface, as the plant
+- Nodal analysis (`gemini/analysis/solves.py`) walks the wells upward from the sandface, as the plant
   does, where upstream walks downward from the wellhead; both match one balance. On the upstream
   doublet-A inputs the rate is 135.8666 m3/h against the reference 135.9258 m3/h (-0.059 m3/h,
   -0.044 %) and the ESP shaft power 174406.5 W against 174444.7 W (-0.022 %), within upstream's
@@ -261,3 +261,19 @@ decisions outlast the move.
   worst recorded difference is 1.7e-16.
 - The dataset column `heat_exchanger.dp_hot` keeps its name through `tables.DATA_COLUMNS`,
   although the output is now `hot_pressure_drop`.
+
+## Leaves compute, plants connect
+
+- Loop closing moved from the substations into `Plant.forward`: same Wegstein step, tolerance, passes,
+  first guess and limits. A pass of the old `close_loop` and a pass of the plant give the same
+  temperature, so substation numbers are bit-identical on the recorded cases. The nodal solves moved
+  into constraints the same way; `BoilerChpPlant` and `ParallelExchangerPlant` are bit-identical.
+- `CirculationPump` puts the electricity of a building circuit on the energy flow without changing a
+  temperature: all of it leaves as `loss_out`. The example values state a design rise of 0.5 bar, an
+  assumption, so a network draws what its pumps need: 273 W at 3 kg/s and 1091 W at 12 kg/s.
+- `ATESPlant` calls both the exchanger and the heat pump at every tick, the one out of season at zero
+  flow; `HeatExchanger` no longer refuses a reversed pair of inlets at zero flow. Every value of the
+  old plant is bit-identical in both seasons. The storage's `injection_in` now shows the pressure
+  that arrives, not `groundwater_pressure`; `production_out` still does.
+- A plant with a loop or a constraint is a root break, as `close_loop` and the nodal solves were:
+  not one node of a graph, the same row by row on every backend.

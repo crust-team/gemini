@@ -86,21 +86,20 @@ code is never renamed without raising the minor number of `gm.__version__`.
 | `unknown_port` | `ValidationError` | A port does not exist on that module |
 | `invalid_call` | `ValidationError` | A module was called with wrong arguments |
 | `invalid_format` | `ValidationError` | A document has the wrong structure |
-| `old_format` | `ValidationError` | A plant file is older than the current format (use `gm.plants.migrate`), a checkpoint was written before 0.2.0, or a results file before 0.1.0 |
-| `migration_failed` | `ValidationError` | An old plant file cannot be migrated |
+| `old_format` | `ValidationError` | A plant dict is older than the current format, a checkpoint was written before 0.2.0, or a results file before 0.1.0 |
 | `invalid_connection` | `ValidationError` | A connection breaks a wiring rule |
 | `stream_mismatch` | `ValidationError` | The two ends of a connection have different kinds |
 | `ambiguous_port` | `ValidationError` | Automatic port matching found no port or more than one |
 | `port_in_use` | `ValidationError` | An inlet already has a source, or an outlet already has a target |
 | `unconnected_port` | `ValidationError` | A port of a module has no connection and no plant name |
 | `root_plant_port` | `ValidationError` | A plant that is not a registered building block has a plant port; `validate` reports it |
-| `loop_without_state` | `ValidationError` | A cycle has no connection of type `state` |
 | `invalid_binding` | `ValidationError` | A binding does not fit the plant or the data |
 | `missing_column` | `ValidationError` | A bound column is not in the run input |
 | `invalid_design` | `ValidationError` | Equipment design data is missing or inconsistent at call time, or a calibration request does not fit the plant |
 | `invalid_definition` | `DefinitionError` | Declarations, children, hooks, formulas, outputs or outlets of a class written wrongly |
 | `out_of_range` | `PhysicsError` | An input is outside the domain of a correlation |
 | `no_convergence` | `PhysicsError` | An iterative solve did not converge |
+| `loop_not_converged` | `PhysicsError` | A loop of a plant did not converge; the path names its tear stream. In a run its row code is `no_convergence` |
 | `missing_chemistry` | `PhysicsError` | A correlation needs fluid chemistry that was not given |
 | `too_little_data` | `PhysicsError` | A fit or estimate has too few valid observations |
 | `invalid_data` | `RunError` | A dataset or profile cannot be built or read |

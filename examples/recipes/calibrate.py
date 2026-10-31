@@ -1,7 +1,7 @@
 """Fit the heat-exchanger conductance on seven days of data.
 
 Shows ``gm.optim.calibrate`` and ``CalibrationResult``. A calibration takes the parameter object
-of a calibratable parameter, which ``get_parameter`` gives.
+of a calibratable parameter, which ``get`` gives.
 
 Run with ``python examples/recipes/calibrate.py``.
 """

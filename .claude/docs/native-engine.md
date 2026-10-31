@@ -129,16 +129,14 @@ units, for debugging and for the agent to explain where a number comes from.
 
 Nothing that computes outputs today is lost; the user does not mark anything in the common case.
 
-- **Output declarations** (all in `__init__`): leaves compute outputs in `_compute_outputs`
-  (per-output compute methods may come later). Composites use `Output.of(self.child.output)` and
-  `Output.ratio(self.a, self.b)` with direct references, not strings. A parent never sums its
+- **Output declarations** (all in `__init__`): leaves assign their outputs in `forward`. Plants
+  combine paths with `Output.difference`, `Output.ratio` and `Output.sum`. A parent never sums its
   children; a total is read from the ports of the edge modules.
-- **`_compute_outputs` and formula outputs** (`Output.of`, `Output.ratio`) are
-  part of the module call, not hooks. They are traced together with `forward`, in the same
-  fixed order (`forward` -> `_compute_outputs` -> formula outputs -> forward hooks ->
-  `_check_outputs`), and become part of the module graph. `_check_outputs` runs once at trace
-  time (every declared output must get a value). `gm.no_outputs()` traces a graph without the
-  output step.
+- **Outputs assigned in `forward` and combinations of a plant** are part of the module call, not
+  hooks. They are traced together with `forward`, in the same fixed order (`forward` -> combinations
+  -> forward hooks -> `_check_outputs`), and become part of the module graph. `_check_outputs` runs
+  once at trace time (every declared output must get a value). `gm.no_outputs()` traces a graph
+  without the output step.
 - **Forward hooks** are traced too, after the formula outputs. Hooks always return None, so the
   engine looks at what a hook does during the trace:
   - it writes outputs with `gm` ops -> it goes into the graph;
@@ -282,13 +280,13 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Units** are recorded on graph inputs only; the unit-check pass is not implemented.
 - **Graph breaks** are stateful modules (no `scan` yet), modules with pre-hooks, float32 precision
   and any `TraceError` from Python control flow or conversions; section 13 says at which level.
-  The Python solves `close_loop` and `plants/_utils/nodal.py` break their whole composite.
+  A plant with a loop or a constraint breaks its whole root.
 - **Common-subexpression elimination** (`gemini/graph/passes/cse.py`,
   `eliminate_common_subexpressions(graph)`, in place) runs once per trace in `GraphCache`;
   `GraphCache(optimize=False)` turns it off. It merges `elementwise`, `index` and `check` nodes
   with the same op, operands and attributes. A literal operand is its type and exact value (`1`,
   `1.0` and `True` differ; `0.0` and `-0.0` differ; NaN equals itself). Graph inputs are never
-  merged. The ESP graph goes from 141 to 100 nodes (two polynomials instead of four) with
+  merged. The ESP graph goes from 120 to 109 nodes with
   bit-identical outputs. A merged node carries the union of its guards. Because the raised error
   is the lowest code over all outputs and `where` keeps only the selected branch's codes, two
   twins merge only if each one is certain (it reaches a graph output through operands that are
@@ -304,8 +302,8 @@ Where the implementation differs from sections 1 to 11, and why:
   `Trace.child`, and `Trace.run` goes through `Module._evaluate`, the one call sequence. A child's controls, boundaries and numeric parameters are graph inputs named
   `<relative path>.<name>` (the root keeps plain names); a child called twice reuses them; supplied
   keywords win without validation. The `ModuleResult` of traced values joins the parent's
-  `call_records`, so `Output.of`, `Output.ratio` (now `where(bottom == 0, None,
-  truediv(top, bottom))`) and helpers such as the `produce()` of `NodalDoublet` work unchanged. Guards cover every
+  `call_records`, so the combinations of a plant (a ratio is `where(bottom == 0, None,
+  truediv(top, bottom))`) work unchanged. Guards cover every
   module of the tree. This replaces section 2's "each Module is traced on its own".
 - **Breaks.** A stateful, pre-hooked or untraceable *leaf* child becomes one `break` node after the
   graph is rolled back (`Graph.mark`, `Graph.rollback`). It runs `module(**row)` on the plain path
@@ -328,9 +326,9 @@ Where the implementation differs from sections 1 to 11, and why:
   exact exception (`failures.row_error`: `failure()` for a check, `declaration.validate` for a
   declared limit, the module's own exception for a break); and `states` of a stepped root break.
 - **Root break.** `Tracer.trace` never raises for a root. A root that cannot be traced
-  (`close_loop`, `nodal.py`, float32), or a stepped root with a stateful module, is a graph with
+  (a plant with a loop or a constraint, float32), or a stepped root with a stateful module, is a graph with
   one root break that runs the real module per row (`module(streams)` or `module.step`). Its rows are
-  real `ModuleResult` trees, so children, sums and `Output.of` stay exact. `GraphCache` stores
+  real `ModuleResult` trees, so children and combinations stay exact. `GraphCache` stores
   graphs only and the module that an engine runs holds it (`graph_cache`), so its graphs outlive the
   engine; `stepped` is a guard. The design's "only that module breaks" holds for leaves; a
   composite that cannot be traced breaks the root, because its parent reads its leaves' records.
@@ -370,78 +368,52 @@ Known gap: fluid properties and published correlation coefficients stay inline i
 `Parameter` or `Constant` inputs, so a calibration or sensitivity run cannot reach them without a
 retrace. Named physical constants and module-level model constants are `Constant`s.
 
-## 14. The plant builder and the plant spec
+## 14. The plant class and the plant dict
 
-A plant is a normal composite `Module` built from data (`gemini/modules/plant.py`, with its tools
-in `gemini/modules/plants/_utils/`). There is
-one representation: the format 2 spec, which is also the stored plant file. `gm.plants.from_spec`
-and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one method.
+Every composite is a `Plant` (`gemini/modules/plant.py`, with its tools in
+`gemini/modules/plants/_utils/`). A class declares its children, ports and connections; `gm.Plant`
+builds one with `add` and `connect`. There is one `forward`. JSON exists only as the plant dict
+([plants.md](plants.md#the-plant-dict)).
 
-- **Spec keys.** `format` (2), `name`, `modules`, `connections`, `bindings` and `param_history` are
-  always written. `inlets`, `outlets` (plant port name to `"path.port"`), `outputs`, `fluids`,
-  `boundary` are written when non-empty. A module entry is `{type, params}`, a group
-  (`ModuleDict`, `ModuleList`) `{type, modules}`; `type` is a registry name, which may be a
-  shipped plant (a nested spec). Fluids, boundary, bindings and history are keyed by dotted path
-  from the root (`""`). A handwritten root writes its class as `type` and flat dotted `params`.
-- **Files.** `modules/plant.py` (`Plant`: `add`, `connect`, `summary`, `validate`, `simulate`,
-  `to_spec`) and, in `plants/_utils/`, `ports.py` (port lookup and the connection rules), `plan.py` (order and wiring of
-  the steps), `outputs.py` (sum, copy and ratio outputs), `reader.py` and `writer.py` (spec in and
-  out), `spec.py`, `schema.py`, `migration.py`, `library.py` (shipped structure files in `gemini/assets/plants/`,
-  registered with `registry.register_plant`), `factory.py` (a registry type or a group to a module).
-  The dated parameters and bindings of `Module` are `modules/_utils/design.py`; the sections every
-  tree shares are `modules/_utils/serialization.py`.
+- **Files.** `modules/plant.py` (`Plant`: `add`, `connect`, `constrain`, `summary`, `validate`,
+  `to_dict`) and, in `plants/_utils/`, `ports.py` (port lookup and the connection rules), `plan.py`
+  (order and wiring of the steps, tears and constraints), `run.py` (one plant call), `loops.py` (the
+  iteration on the tear streams), `constraints.py` (the solve of a constraint), `outputs.py` (the
+  combinations), `reader.py` and `writer.py` (the plant dict in and out), `schema.py`, `factory.py`
+  (a registry type or a group to a module) and `catalogue.py` (`names`, `get`, `example`,
+  `from_dict`, `validate`). The dated parameters and bindings of `Module` are
+  `modules/_utils/design.py`; the sections every plant shares are `modules/_utils/serialization.py`.
 - **Value order.** A connection orders its modules by the way the value travels: the source first
   on a plain connection, the taker first on a drawn one. An `offered` outlet gives its module one
   offer step and one call, and a loop that passes through an offer is no cycle
   ([ports](modules.md#ports)).
 - **Rules.** Only `connect` wires. An inlet has one source and an outlet one target
   (`port_in_use`); a bare module takes its only fitting free port, several raise `ambiguous_port`
-  with the candidates; different stream types raise `stream_mismatch`; a loop of leaves without a
-  `type: "state"` connection raises `loop_without_state` at `connect`. A connection never reaches
+  with the candidates; different stream types raise `stream_mismatch`. A connection never reaches
   into a plant child (`doublet.esp.fluid_out` is `invalid_connection`) but passes through groups
   (`filters.hot.fluid_out`). Every port of a child is connected or a named plant port, in
-  `inlets`/`outlets`; `connect("return_in", "heat_exchanger.cold_in")` names one. In a spec a connection end must name a port.
+  `inlets`/`outlets`; `connect("return_in", "heat_exchanger.cold_in")` names one. In a plant dict a connection end must name a port.
 - **Order decides bits.** `forward` runs a plan computed once and dropped by `add`/`connect`: the
   modules in topological order (Kahn), ties broken by first appearance in the connection list and
-  then child order. Composite sums add in call order, so the shipped specs list their connections
-  to reproduce the handwritten order: the `Doublet` spec starts with the injection limb, and the
+  then child order. Composite sums add in call order, so the plant classes list their connections
+  to reproduce a fixed order: the `Doublet` starts with the injection limb, and the
   heat plant sums to the same bits as the class it replaced (`tests/integration/test_plant_parity.py`).
 - **Opened plants.** A plant child is one step unless it sits in a cycle of the composite graph
   with no cycle between leaves (the doublet between `supply_out` and `return_in` of the surface
   equipment); then it is opened and its children are steps of the parent, recorded as
   `doublet.reservoir`, ...; its own outputs are not computed. The check repeats until no plant
   child is in a false cycle. A group is never called.
-- **State connections** stay in the spec, the schema and validation; running such a plant raises
-  `NotImplementedYet`, because the first step has no previous value until scan exists.
-- **Round trip.** `to_spec(from_spec(x)) == x`. The plant keeps what the spec stated: a stated
-  parameter, fluid, binding or history stays as written while it equals the current value,
+- **Loops.** A cycle of steps is cut at one plain connection, its tear stream: the one out of a module
+  that gives a first guess, else the last in the connection list. The steps of a cycle are one item
+  of the plan, placed by the order of what feeds them, and so are the steps between the free value
+  and the target of a constraint. See [plants.md](plants.md#loops).
+- **State connections** stay in the plant dict, the schema and validation; running such a plant
+  raises `NotImplementedYet`, because the first step has no previous value until scan exists.
+- **Round trip.** `from_dict(p.to_dict())` rebuilds the same plant. The plant keeps what was stated:
+  a stated parameter, fluid, binding or history stays as written while it equals the current value,
   otherwise the current SI value replaces it; a value that now differs from its starting value is
-  added; unstated defaults stay out. A single undated history entry is not written (it is the
-  `params`).
-- **Validation.** `gm.plants.validate(spec)` reads the spec the way `from_spec` does and collects
+  added; unstated defaults stay out. A single undated history entry is not written.
+- **Validation.** `gm.plants.validate(data)` reads the dict the way `from_dict` does and collects
   every problem as `{path, message, code, suggestions}` (`connections[1].target`); a module that
   failed to build hides the problems that only follow from it. Parameter problems use
   `invalid_unit`, `out_of_bounds`, `unknown_name`.
-- **Migration.** `gm.plants.migrate(old)` converts format 1 files; a root class that is a shipped
-  plant takes that plant's wiring with the stored values that differ from the starting values,
-  any other root becomes a handwritten root. `scripts/migrate_plants.py` runs it over files.
-  Loading an old file raises `ValidationError` with code `old_format`, naming the function.
-- **Shipped plants and templates.** `gemini/assets/plants/` holds the plants that ship as specs
-  (`Doublet`, `DoubletHeatPlant`, `MultiWellPlant`, `DistrictNetwork`, `HackathonPlant`), registered
-  by file name. The two of
-  variable size are written by `generators.py` (`multi_well_spec`, `district_network_spec`): the
-  generator orders the connections to reproduce the call order of the classes they replaced, and
-  the shipped file of the default size equals its output. `gemini/assets/templates/` holds template
-  files and
-  `templating.py` fills them: `from_template(name, parameters)` sets `"<module>.<parameter>"`
-  values, removes every unit whose `"<module>.enabled"` is false with its connections, ports and
-  outputs, validates the plain spec and builds the plant. An optional unit is a module id, or a
-  group of `modules` one switch removes together; its `bypass` items `{source: "<id>.<inlet>",
-  target: "<id>.<outlet>"}` join what fed the inlet to what the outlet fed, one unit at a time, so
-  neighbouring units can leave together. `catalogue.py` has `names()`, `get(name)` (a new plant,
-  parameters unset), `example(name)` (`get(name)` with the values of `inputs/plants/`: the
-  `doublet_heat` values for `Doublet` and `DoubletHeatPlant`, the values of the unit tests for the
-  others, design parameters only; `NotImplementedYet` naming a plant that has none) and
-  `templates()`. The special cases (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) stay
-  classes, because a loop closed by `loops.close_loop` inside one call or a `mode` that chooses
-  which children run is not wiring.

@@ -10,7 +10,7 @@ conversion reads. `read_csv`/`write_csv` handle semicolon data and old timestamp
 JSON whitespace normalisation, keeping each `.param` file's tag-name order; auxiliary files are
 copied byte-for-byte. Malformed or unconvertible files raise `gm.errors.ValidationError`.
 
-`to_plant(project, plant)` fills an existing handwritten plant with converted SI parameters,
+`to_plant(project, plant)` fills an existing plant with converted SI parameters,
 dated histories, fluids, bindings and explicit assumptions (`plant.boundary`), and returns it.
 Old fields it cannot map are listed in one `GeminiWarning`. `to_dataset(project, frame)` renames
 tag columns and converts values to SI; old timestamps are taken as UTC wall time.
@@ -20,9 +20,9 @@ tag columns and converts values to SI; old timestamps are taken as UTC wall time
 one step on a copy of the plant with its assumed root inputs and `tables.TRACE_CONTROLS`, so the
 caller's plant is not changed, and returns an empty list when the wiring matches.
 
-`gm.plants.convert_legacy(folder)` returns the format 2 spec of an old project folder: it reads the
+`gm.plants.convert_legacy(folder)` returns the plant dict of an old project folder: it reads the
 folder with `read_project`, fills `DoubletHeatPlant` (`gm.plants.get`) with `to_plant` and writes
-`to_spec()`. The folder holds `diagram.json`, one `.param` file per diagram node and any other file
+`to_dict()`. The folder holds `diagram.json`, one `.param` file per diagram node and any other file
 (the data CSV, `well_trajectory.csv`, `plant.conf`), which is read as-is and not converted; the data
 CSV is converted with `to_dataset`. On the example project the result equals
 `gm.plants.example("DoubletHeatPlant").to_dict()` exactly (`tests/unit/modules/plants/_utils/

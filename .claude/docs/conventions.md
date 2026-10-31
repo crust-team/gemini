@@ -41,10 +41,10 @@ Packages outside `gemini.utils.legacy` never interpret old project names, tags, 
 mappings. Old-format knowledge stays in `gemini.utils.legacy`, which is internal; its one public entry is
 `gm.plants.convert_legacy(folder)`.
 Equipment performs no file or database access. Calibration predicts only through public replay.
-A plant is data: a `Plant` (`gm.Plant`) is built from `add` and `connect` or read from a format 2
-spec (`gm.plants.from_spec`), and the spec file is the stored plant file. Only leaf modules and the
-documented special cases (`HeatingSubstation`, `CoolingSubstation`, `ATESPlant`) are handwritten
-`Module` subclasses; a handwritten root is written to the same format with its class as `type`.
+A leaf module computes and a plant connects; no class does both. A leaf `Module` has physics calls
+and `forward`. Every composite is a `Plant`, a class that declares children, ports and connections
+and never writes `forward`, or `gm.Plant(name)` with `add` and `connect`. gemini keeps no JSON file:
+the plant dict (`to_dict`, `gm.plants.from_dict`) is the interface agents use.
 
 ## Public API freeze
 
@@ -85,25 +85,26 @@ category, and the public names stay in `gm.modules`. Fitting and calibration bel
 or `gm.optim`, not in modules.
 
 1. Assign declarations and children only in `__init__`, after `super().__init__()`.
-2. Constructor sections are `# Modules`, `# Parameters`, `# Inlets`, `# Controls`,
-   `# Boundaries`, `# States`, `# Outputs`, `# Outlets`, in that order, with empty sections
-   omitted. Stateful equipment declares `State(kind, default=...)` values and implements
+2. Constructor sections are `# Parameters`, `# Inlets`, `# Controls`, `# Boundaries`, `# States`,
+   `# Outputs`, `# Outlets` for a leaf and `# Modules`, `# Parameters`, `# Inlets`, `# Boundaries`,
+   `# Outlets`, `# Connections`, `# Constraints`, `# Outputs` for a plant, in that order, with empty
+   sections omitted. The `__init__` of a plant class has no length limit. Stateful equipment declares `State(kind, default=...)` values and implements
    `_advance_states(self, inlets, outlets, dt)`; see [modules.md](modules.md#state-and-health).
 3. Controls are settable commands; boundaries are uncontrollable external conditions.
 4. `forward` is exactly `forward(self, inlets)` and reads declared streams through the immutable
    `Ports` mapping, such as `inlets.fluid_in`. Controls and boundaries are applied before the call
    and read as plain attributes such as `self.frequency`.
-5. `forward` sections are `# Modules` and `# Outlets`, in that order with empty sections omitted.
-   Only composites use `# Modules`; `forward` never assigns an attribute on `self`.
-6. Leaves assign every plain output in `_compute_outputs(self, inlets, outlets)`. Composites use
-   `Output.of` and `Output.ratio` declarations with direct references; a parent never sums its
-   children, a total is read from the ports of the modules at the plant's edge.
+5. `forward` sections are `# Outlets` and `# Outputs`, in that order with empty sections omitted;
+   `forward` assigns on `self` only its declared outputs, and computes each thing once. No subclass
+   of `Plant` defines `forward`, and no `Module` but a `Plant` or a group holds children.
+6. A plant's own outputs are `Output.difference`, `Output.ratio` and `Output.sum` of paths; a parent
+   never sums its children, a total is read from the ports of the modules at the plant's edge.
 7. End every `forward` with `outlets = dict(...)`, the outlets in declaration order and then the
    drawn inlets, then `return outlets`.
    Zero- and one-outlet modules use the same dictionary shape.
 8. Do not construct `ModuleResult` in module code; `Module.__call__` creates it.
 9. Keep value arguments out of `__init__`; structural tree-shape arguments are the exception.
-   Build a configured module with `ESP().update_params(...)`.
+   Build a configured module with `ESP().set_params("", {...})`.
 10. Never declare metadata or lists that `Module` derives.
 11. Inlets and outlets carry a `Stream` or a `Power`: see [ports](modules.md#ports). A single
     `Power` inlet is drawn: the module computes it in `forward` and returns it under the port's
@@ -129,12 +130,11 @@ Generated output goes under ignored `runs/`.
 
 ## Data files
 
-`gemini/assets/` is for what a public function needs and is installed: plant structures and
-templates. `inputs/` is for everything else that code reads, is not installed, and raises
-`inputs_missing` when absent. `docs/schemas/` is generated documentation. There is no other home for
-data ([data.md](data.md#where-data-lives)). `gemini/utils/paths.py` is the only code that builds a
-path to the first two, except an example, which finds `inputs/` from `__file__` because it uses the
-public API alone. `tests/unit/test_code_quality.py` checks these rules.
+There is no data file inside `gemini/`: a plant is a class. `inputs/` holds everything code reads, is
+not installed, and raises `inputs_missing` when absent. `docs/schemas/` is generated documentation.
+There is no other home for data ([data.md](data.md#where-data-lives)). `gemini/utils/paths.py` is the
+only code that builds a path to `inputs/`, except an example, which finds it from `__file__` because
+it uses the public API alone. `tests/unit/test_code_quality.py` checks these rules.
 
 ## Naming
 
@@ -163,7 +163,7 @@ field symbols `m_dot`, `T` and `p` are reserved for `Stream` fields and binding 
 
 [glossary.md](glossary.md) holds the one name of each concept. Elsewhere use full words, not
 abbreviations. Booleans read as questions (`is_leaf`,
-`is_initialized`, `has_input_value`). Add an SI unit suffix only where the type does not carry the
+`is_initialized`). Add an SI unit suffix only where the type does not carry the
 unit, for example the summary column `energy_J` or the constant `TEST_BUDGET_S`; declared
 quantities carry their unit and never repeat it in the name.
 
@@ -176,8 +176,8 @@ documents; describe the concept itself. `test_no_framework_names_in_tracked_text
 The only comments allowed in code are:
 
 - the fixed section headers: in `__init__` `# Modules`, `# Parameters`, `# Inlets`,
-  `# Controls`, `# Boundaries`, `# States`, `# Outputs`, `# Outlets`; in `forward` `# Modules` and
-  `# Outlets`;
+  `# Controls`, `# Boundaries`, `# States`, `# Outputs`, `# Outlets`, `# Connections` and
+  `# Constraints`; in `forward` `# Outlets` and `# Outputs`;
 - tool directives with a specific code: `# noqa: <code>`, `# type: ignore[<code>]` and
   `# pragma: no cover`.
 
@@ -251,35 +251,36 @@ reason it is needed:
   current control and boundary values (running call, then persisted value, then default),
   outputs recorded in the running call, state values at the start of the running step (the
   initial states outside a step), and otherwise the port and output declarations. This lets
-  `forward` and `_compute_outputs` read `self.thermal_conductance` or `self.frequency` as plain values.
+  `forward` read `self.thermal_conductance` or `self.frequency` as plain values.
 - The values of one call live in one `_Call` record held in the `_current_call` context variable
   of `gemini/modules/module.py`. Modules keep no per-call state on `self`, so nested,
-  re-entrant and concurrent calls stay separate and composite formulas can read the results of
-  their children's calls. During `Module.step` each call record also points to the one `_Step`
+  re-entrant and concurrent calls stay separate and the combinations of a plant can read the results
+  of their children's calls. During `Module.step` each call record also points to the one `_Step`
   record (time step and state trees), so a composite steps its stateful descendants through its
   ordinary `forward` instead of a second, hand-written step method.
 - `gm.no_outputs()` and `gm.runtime.settings()` are context settings built on
   `gemini.utils.context.ContextSetting`: a context variable change usable as a `with` block and
   as a decorator, restored on exit.
-- `describe`, `parameter_schema` and `validate_params` work on a class and on an instance through
-  `_ClassOrInstance` in `gemini/modules/module.py`: on a class they run on a new instance,
-  because a module's declarations exist only once `__init__` has run.
 - `Module.category` is `_FolderCategory` in `gemini/modules/module.py`, a descriptor that reads
   the folder from the import path of the class, so the folder is the one source of a module's
   category. `Plant` alone reads `plants`: its file sits beside `module.py`, not in that folder. A
   class from outside assigns `category` itself, which replaces the descriptor.
 - `class_path`/`import_class` in `gemini/modules/module.py` are the only import-by-string.
-  Only checkpoints use them: a checkpoint names the plant class (`Plant`, or a handwritten root)
-  whose `from_dict` rebuilds the tree from the spec it stores. A plant file names registry types.
+  Only checkpoints use them: a checkpoint names the plant class whose `from_dict` rebuilds the tree
+  from the plant dict it stores. A plant dict names registry types.
 - A plant child that sits in a cycle of composites but not of leaves is *opened*: the parent's
   `forward` calls its children directly, in the order the connections give (see
   [native-engine.md](native-engine.md), section 14). The call order is never configured by hand.
+- A child assigned on a `Plant` is noted as `add` notes it, and `Plant.fluid` passes the fluid to
+  every module below it.
 - Attribute access on mappings: `Ports` and `Values` derive from
   `gemini.utils.mappings.AttributeMapping`, so `result.outlets.fluid_out` equals
   `result.outlets["fluid_out"]`, and `Results[path].field` returns a pandas Series through
   `ModuleSeries.__getattr__`.
-- `Plant.forward` runs a module with an `offered` outlet twice in one step: `Module.offer` first,
-  which no call records, then its call. A drawn inlet takes its value from what `forward` returns,
+- `Plant.forward` runs a module with an `offered` outlet twice in one step: its offer first, which
+  no call records, then its call. A module whose outlet is offered only as it is set says so in
+  `_offers`, and the plan follows. The modules of a loop or a constraint run in trial calls, which
+  no running call records, then once for the record (`Module._trial`). A drawn inlet takes its value from what `forward` returns,
   so `ModuleResult.inlets` shows what was drawn. Both are needed because the value on a connection
   can travel against the energy ([ports](modules.md#ports)).
 - Two optional method protocols: a module that defines `capex(assumptions)` returning a `Cost`

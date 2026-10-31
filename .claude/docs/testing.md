@@ -200,8 +200,7 @@ The suite must remain safe under `pytest -n auto`:
 ## Structure and quality tests
 
 `tests/unit/test_code_quality.py` also enforces the [data layout](data.md#where-data-lives): no data
-file in `gemini/` outside `gemini/assets/`, no parameter value in a structure file, only the allowed
-keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the data
+file in `gemini/`, only the allowed keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the data
 folders outside `gemini/utils/paths.py`. It also enforces the layout of `gemini/modules/`
 ([where a file goes](conventions.md#module-rules)): only `__init__.py`, `module.py`, `plant.py`,
 `container.py` and folders at its top, and a registered plant class in every public file of

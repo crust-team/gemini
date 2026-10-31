@@ -29,7 +29,7 @@ import gemini as gm
 
 plant = gm.plants.example("DoubletHeatPlant")
 design = {name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
-esp = gm.modules.ESP().update_params(**design)
+esp = gm.modules.ESP().set_params("", design)
 stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
 out = esp(fluid_in=stream, frequency="50 Hz")
 assert out.outputs.head == esp({"fluid_in": stream}, frequency="50 Hz").outputs.head
@@ -42,7 +42,7 @@ with gm.no_outputs():
 assert dict(fluid_only.outputs) == {}
 
 esp.frequency = 50.0
-plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
+plant.doublet.esp.frequency = "50 Hz"
 
 frame = pd.read_csv("inputs/doublet_heat/doublet_2024_15min.csv", parse_dates=["time"])
 data = gm.Dataset.from_frame(frame, time_column="time")
@@ -52,27 +52,25 @@ print(results.to_frame(table="energy"))
 print(results["doublet.esp"].power)
 assert len(gm.resume("runs/replay.ckpt")) == len(results)
 
-fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter("heat_exchanger.thermal_conductance")])
+fit = gm.optim.calibrate(plant, data, params=[plant.get("heat_exchanger.thermal_conductance")])
 print(fit)
 ```
 
-A module is built without arguments and configured with `update_params`, which returns it. Calls
+A module is built without arguments and configured with `set_params`, which returns it. Calls
 accept inlets by keyword, mapping or position; controls given at the call apply to that call only,
-while assignment (`esp.frequency = 50.0`) or `plant.set_inputs` persists them by dotted path.
+while assignment (`esp.frequency = 50.0`) persists them.
 
-Plants are data. `gm.plants.names()` lists the shipped plants, `gm.plants.example(name)` returns
-one with real values, `gm.plants.from_template("heating_cooling", {"absorption_chiller.enabled":
-False})` fills a template with switchable units (`gm.plants.templates()` lists them), and
-`gm.plants.convert_legacy(folder)` turns an old project folder into a plant spec. `gm.profiles`
+A leaf module computes and a plant connects: every composite is a `Plant` class that declares its
+children, ports and connections, and `gm.Plant(name)` builds one with `add` and `connect`.
+`gm.plants.names()` lists the plant classes, `gm.plants.example(name)` returns one with real values,
+and `gm.plants.convert_legacy(folder)` turns an old project folder into a plant dict, the JSON form
+agents read and write: `plant.to_dict()`, `gm.plants.from_dict`, `gm.plants.schema()`. `gm.profiles`
 holds the 2027 demand of the heating and cooling challenge, read from the organisers' files.
 
-Data has two homes. `gm.plants.example` and `gm.profiles.get` read `inputs/`, which is in a source
-checkout and not installed, and outside one they raise `inputs_missing`:
+gemini holds no data file. `gm.plants.example` and `gm.profiles.get` read `inputs/`, which is in a
+source checkout and not installed, and outside one they raise `inputs_missing`:
 
 ```text
-gemini/assets/      # installed, read by gemini functions
-  plants/           # plant structures, no parameter values
-  templates/        # plant templates
 inputs/             # repository only
   hackathon/        # the organisers' demand files and requirements, with a README
   plants/           # example values of plants

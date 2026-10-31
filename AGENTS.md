@@ -7,16 +7,21 @@ GEMINI is a composable geothermal digital-twin package. Preserve captured numeri
 Test with the development profile (`make test`); see
 [Testing: Test profiles](.claude/docs/testing.md#test-profiles).
 
+A leaf module computes and a plant connects; no class does both
+([modules](.claude/docs/modules.md), [plants](.claude/docs/plants.md)). A leaf has physics calls and
+one method, `forward`. Every composite is a `Plant`: it declares children, ports and connections in
+`__init__` and never writes `forward`. The engine closes loops and solves constraints.
+
 Physics lives in `gemini/physics/` or `gemini/modules/<category>/_physics.py`: a module declares and
-wires, and calls physics functions. `gemini/modules/` holds `Module`, `Plant`, `ModuleList` and
+calls physics functions. `gemini/modules/` holds `Module`, `Plant`, `ModuleList` and
 `ModuleDict`; machinery goes in an `_utils/` folder, code of one category in a private file of its
 folder, and `gemini/modules/plants/` holds only plant classes
 ([where a file goes](.claude/docs/conventions.md#module-rules)).
 
 Learn the package from [examples/README.md](examples/README.md): quickstart, basics 01 to 06, any
-recipe, then the cases. Data has two homes, never `examples/`: `gemini/assets/` holds what a public
-function needs and is installed, `inputs/` holds everything else and is not
-([data](.claude/docs/data.md#where-data-lives)).
+recipe, then the cases. gemini holds no data file: plants are Python classes, and JSON is only the
+plant dict agents use (`gm.plants.from_dict`, `plant.to_dict`, `gm.plants.schema`). Data lives in
+`inputs/`, never `examples/`, and is not installed ([data](.claude/docs/data.md#where-data-lives)).
 
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
@@ -28,9 +33,9 @@ goes through a port, and a plant total is read from the ports of the modules at 
 ([energy flow](.claude/docs/modules.md#energy-flow)). Check a run with `gm.checks.plant_balance`.
 
 Every port of a module is connected or named as a plant port; there are no automatic plant ports
-([plants](.claude/docs/plants.md#level-1-the-builder)). A composite may derive its children's values
-by overriding `set_params`
-([modules](.claude/docs/modules.md#a-composite-that-sets-its-childrens-values)).
+([plants](.claude/docs/plants.md#the-builder)). A plant may derive its children's values by
+overriding `set_params`
+([modules](.claude/docs/modules.md#a-plant-that-sets-its-childrens-values)).
 
 Every public return uses one of three shapes, value, problem or check, built by
 `gemini/types/shapes.py` ([return shapes](.claude/docs/api.md#return-shapes)). Every public call
@@ -40,7 +45,8 @@ Read every file in `.claude/docs/` before changing the repository:
 
 - [Public API](.claude/docs/api.md): every frozen public name, its return shape and status; start
   here to use the package.
-- [Plants](.claude/docs/plants.md): the builder, the spec, templates, dates and bindings.
+- [Plants](.claude/docs/plants.md): plant classes, the builder, the plant dict, loops, constraints,
+  outputs, dates and bindings.
 - [Conventions](.claude/docs/conventions.md): dependencies, naming, comments and code quality.
 - [Data](.claude/docs/data.md): in-memory datasets, sampling, gaps and where data lives.
 - [Engine](.claude/docs/engine.md): clocks, runs, callbacks, results, checkpoints and live.
@@ -73,7 +79,6 @@ branch unless the user explicitly asks for one, and open a pull request only whe
 ```text
 gemini/
 ├── __init__.py       # curated import gemini as gm API
-├── assets/           # installed data a public function needs: plants/ (structures), templates/
 ├── utils/            # general helpers; the topic files are a leaf that imports nothing else from gemini
 │   ├── data/         # in-memory Dataset and Loader only
 │   └── legacy/       # all old-format I/O, tables and conversion
@@ -96,15 +101,16 @@ gemini/
 docs/schemas/         # generated JSON Schemas and samples of the exchanged documents
 inputs/               # not installed: hackathon/, plants/ (example values), doublet_heat/, legacy_project/
 examples/             # quickstart.py, basics/, recipes/, cases/, scripts only
-scripts/              # test_changed.py, write_schemas.py, migrate_plants.py
+scripts/              # test_changed.py, write_schemas.py
 tests/                # unit mirror, integration, e2e (expected/ holds example outputs), fixtures
 ```
 
 Modules declare parameters and ports in `__init__`; `forward(self, inlets)` receives one
-immutable `Ports` mapping while controls and boundaries are pre-applied and read from `self`. It
-returns a fluid-outlet dictionary; leaf `_compute_outputs(self, inlets, outlets)` methods and
-composite output formulas run automatically afterward. Pre-hooks receive `(module, inlets)` and
-forward hooks receive `(module, inlets, outlets)`. Plants are built from data
-([plants.md](.claude/docs/plants.md)) and own persistence, bindings, and dated design. `gemini.utils.data` is in-memory only. No engine loop sleeps or schedules itself. Keep the public
+immutable `Ports` mapping while controls and boundaries are pre-applied and read from `self`. A leaf
+assigns its outputs there and returns a dictionary of outlets; the combinations of a plant run
+automatically afterward. Pre-hooks receive `(module, inlets)` and forward hooks receive
+`(module, inlets, outlets)`. Plants ([plants.md](.claude/docs/plants.md)) own persistence, bindings,
+and dated design. `gemini.utils.data` is in-memory only. No engine loop sleeps or schedules itself.
+Keep the public
 API small and examples outside the package. Details are in
 [conventions.md](.claude/docs/conventions.md) and [modules.md](.claude/docs/modules.md).

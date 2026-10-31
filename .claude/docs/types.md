@@ -3,7 +3,7 @@
 Import public types from `gemini.types`; quantity aliases are defined in
 `types/quantities.py`. Types depend on the standard library, Pydantic, pandas/NumPy for
 profiles, `gemini.physics` for property calculations, `gemini.errors` and `gemini.utils`. They never
-import equipment, the engine or plant files. `Stream.__init__` reads the runtime default fluid
+import equipment or the engine. `Stream.__init__` reads the runtime default fluid
 through a function-level import of `gemini.backends.runtime` (see
 [conventions.md](conventions.md#dependencies)).
 
@@ -42,9 +42,8 @@ constructors. Output types may be quantity aliases or Python types; inlet and ou
 `Stream` type or `Power`. `Parameter(kind, default=, shape=, calibratable=, description=, **bounds)`
 holds design data; `Control` and `Boundary` take `kind`, `default`, `description` and bounds;
 `State(kind, default=)` declares a stepped value (see [modules.md](modules.md#state-and-health));
-`Output(kind, soft_sensor=, description=)`, the formulas `Output.of` and `Output.ratio` and the
-formula outputs are described in
-[modules.md](modules.md#composite-modules). `UNSET` denotes an uninitialized parameter and stays
+`Output(kind, soft_sensor=, description=)`; `Output.difference`, `Output.ratio` and `Output.sum` are
+the combinations of a plant, described in [plants.md](plants.md#outputs). `UNSET` denotes an uninitialized parameter and stays
 the same object under copy, deep copy and pickling. `shape=` checks fixed vectors; bounds can
 tighten quantity defaults.
 

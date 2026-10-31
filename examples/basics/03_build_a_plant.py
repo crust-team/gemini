@@ -1,14 +1,44 @@
 """Build plants from modules, validate them and fix an unconnected port.
 
-Shows ``gm.Plant``, ``add``, ``connect``, ``validate`` and ``summary``. A plant that buys what it
-needs from the grids has no plant ports; a building block for other plants names its ports.
+A leaf module computes and a plant connects. A plant class declares its children, ports and
+connections and never writes ``forward``; ``gm.Plant`` builds the same with ``add`` and ``connect``.
+Shows a ``gm.Plant`` subclass, ``gm.Plant``, ``add``, ``connect``, ``validate`` and
+``summary``. A plant that buys what it needs from the grids has no plant ports; a building block
+for other plants names its ports.
 
 Run with ``python examples/basics/03_build_a_plant.py``.
 """
 
 import gemini as gm
+from gemini.types import Inlet, Outlet, Output, Stream
 
 FILTERS = 2
+
+
+class FilterTrain(gm.Plant):
+    """Two filters in series, a plant class: it connects and never writes ``forward``."""
+
+    def __init__(self):
+        """Declare the children, the ports, the connections and one output."""
+        super().__init__()
+
+        # Modules
+        self.first = gm.modules.Filter()
+        self.second = gm.modules.Filter()
+
+        # Inlets
+        self.fluid_in = Inlet(Stream)
+
+        # Outlets
+        self.fluid_out = Outlet(Stream)
+
+        # Connections
+        self.connect("fluid_in", "first.fluid_in")
+        self.connect("first.fluid_out", "second.fluid_in")
+        self.connect("second.fluid_out", "fluid_out")
+
+        # Outputs
+        self.pressure_loss = Output.difference("first.fluid_in.p", "second.fluid_out.p")
 
 
 def treatment_train():
@@ -47,6 +77,9 @@ def main():
     result = train(fluid_in=gm.Stream(flow="10 kg/s", T="60 degC", p="10 bar"))
     outlet = result.outlets.fluid_out
     print(f"After {FILTERS} filters:     {gm.units.convert(outlet.p, 'Pa', 'bar'):.4f} bar")
+
+    outputs = FilterTrain()(fluid_in=gm.Stream(flow="10 kg/s", T="60 degC", p="10 bar")).outputs
+    print(f"Plant class loss:    {gm.units.convert(outputs.pressure_loss, 'Pa', 'bar'):.4f} bar")
 
     plant = boiler_plant()
     for problem in plant.validate(on_error="record"):
