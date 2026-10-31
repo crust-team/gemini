@@ -94,6 +94,8 @@ FORMULA_EXCEPTIONS = {
     "gemini/modules/module.py: literal 4": "how many parameters repr shows, not physics",
     "gemini/modules/module.py: np.float64": "the eager scope wraps a recorded float, not maths",
     "gemini/modules/module.py: np.ndarray": "a type test of the array path, not maths",
+    "gemini/modules/plant.py: literal 2": "an item of a plan step and the first suffix of a name",
+    "gemini/modules/plant.py: literal 3": "the end of the suffixes of a generated name",
     "gemini/modules/pumps/esp.py: np.asarray": "the float32 cast of the retained precision",
     "gemini/modules/pumps/esp.py: np.float32": "the float32 cast of the retained precision",
     "gemini/modules/_utils/serialization.py: literal 2": "the plant file format number",

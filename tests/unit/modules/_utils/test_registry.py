@@ -21,11 +21,12 @@ def test_every_registered_type_has_a_listed_category():
 
 
 def test_every_registered_type_has_the_category_of_its_folder():
-    """A module's category is the name of the folder that holds its class."""
+    """A category is the folder of the class; a spec plant, of class ``Plant``, is ``plants``."""
     for name in gm.modules.names():
         item = gm.modules.get(name)
         cls = item if isinstance(item, type) else type(item)
-        assert registry.category(name) == Path(inspect.getfile(cls)).parent.name, name
+        folder = Path(inspect.getfile(cls)).parent.name
+        assert registry.category(name) == ("plants" if cls is gm.Plant else folder), name
 
 
 def test_the_folders_are_the_categories_and_none_is_empty():

@@ -1,6 +1,6 @@
 """Nodal doublet with three parallel heat exchangers on one secondary network."""
 
-from gemini.modules._utils.container import ModuleList
+from gemini.modules.container import ModuleList
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.grids import ElectricityGrid
 from gemini.modules.module import Module

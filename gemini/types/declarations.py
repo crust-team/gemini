@@ -1,4 +1,11 @@
-"""Declarations registered by :class:`gemini.modules.Module`."""
+"""Declarations registered by :class:`gemini.modules.Module`.
+
+A data type says what a value is; a role says how a computation graph treats it. ``Parameter`` is
+calibratable design data; a ``Constant`` is fixed by default and can be released for sensitivity
+studies (defined in ``gemini.ops`` because physics uses it, for example
+``physics.constants.ESP_REFERENCE_FREQUENCY``); a ``State`` is carried from step to step. Each
+numeric parameter and each constant a traced call uses is one named graph input, never a literal.
+"""
 
 import numbers
 from collections.abc import Mapping

@@ -1,8 +1,8 @@
 """The plant spec as data: read it, check it, and the plant file is the same document."""
 
 from gemini.errors.base import reported
+from gemini.modules.plant import Plant
 from gemini.modules.plants import reader
-from gemini.modules.plants.builder import Plant
 
 
 def from_spec(spec):

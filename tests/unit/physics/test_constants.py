@@ -16,7 +16,7 @@ def test_constant_values():
 
 def test_every_constant_is_a_named_constant_object():
     """Each module-level constant is a ``Constant`` named like its variable."""
-    for name in ("G", "G_FT", "CO2_MOLAR_MASS", "MIN_PATH_PRESSURE"):
+    for name in ("G", "G_FT", "CO2_MOLAR_MASS", "MIN_PATH_PRESSURE", "ESP_REFERENCE_FREQUENCY"):
         constant = getattr(constants, name)
         assert isinstance(constant, Constant) and constant.name == name
 

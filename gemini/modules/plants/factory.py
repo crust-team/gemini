@@ -2,7 +2,7 @@
 
 from gemini.errors import ValidationError
 from gemini.modules._utils import registry
-from gemini.modules._utils.container import ModuleDict, ModuleList
+from gemini.modules.container import ModuleDict, ModuleList
 
 GROUPS = {"ModuleDict": ModuleDict, "ModuleList": ModuleList}
 

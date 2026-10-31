@@ -2,9 +2,9 @@
 
 from ._utils import registry
 from ._utils.balance import collect_flows, emissions, energy_balance, mass_balance
-from ._utils.container import ModuleDict, ModuleList
 from ._utils.registry import categories, get, load_file, names, register
 from ._utils.wiring import trace_wiring
+from .container import ModuleDict, ModuleList
 from .control import PIDController
 from .cooling import AbsorptionUnit, AdsorptionChiller
 from .environment import Atmosphere, Formation

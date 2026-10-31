@@ -2,8 +2,8 @@
 
 from gemini.modules._utils.serialization import module_spec
 from gemini.modules.module import Module
+from gemini.modules.plant import Plant
 from gemini.modules.plants import library, writer
-from gemini.modules.plants.builder import Plant
 from gemini.physics import constants, geometry, ground, hydraulics, pumps
 from gemini.types import (
     Efficiency,

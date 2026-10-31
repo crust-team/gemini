@@ -1,7 +1,8 @@
 """Plants built from data, with their spec functions, and the handwritten special cases."""
 
+from gemini.modules.plant import Plant
+
 from .atesplant import ATESPlant
-from .builder import Plant
 from .catalogue import example, get, names, templates
 from .coolingsubstation import CoolingSubstation
 from .doublet import Doublet

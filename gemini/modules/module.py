@@ -281,13 +281,17 @@ class _FolderCategory:
 
     ``gemini/modules/pumps/esp.py`` gives ``pumps``, so a shipped class never declares it. A
     class from outside has no such folder and is ``None`` until it assigns ``category`` itself,
-    which replaces this descriptor; a subclass of a shipped class states its own too.
+    which replaces this descriptor; a subclass of a shipped class states its own too. ``Plant``
+    sits beside this file, not in ``plants/``, and is the one class whose category is not its
+    folder: it is ``plants``, for ``Plant`` alone, so a subclass from outside stays ``None``.
     """
 
     def __get__(self, instance, owner):
         """Return the folder of ``owner``, or ``None`` for a file outside the folders."""
         if not owner.__module__.startswith(f"{__package__}."):
             return None
+        if owner.__module__ == f"{__package__}.plant":
+            return "plants"
         folder, _, file = owner.__module__.removeprefix(f"{__package__}.").partition(".")
         return folder if file and not folder.startswith("_") else None
 
