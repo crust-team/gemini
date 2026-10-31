@@ -17,7 +17,7 @@ def validate(spec, on_error="raise"):
     ``{path, code, message, suggestions}``: the list the error carries in ``problems``. ``path``
     points into the spec, for example ``connections[1].target``.
     """
-    return reported(reader.problems(Plant, spec), on_error)
+    return reported(reader.problems(Plant, spec) + reader.root_problems(spec), on_error)
 
 
 from_dict = from_spec

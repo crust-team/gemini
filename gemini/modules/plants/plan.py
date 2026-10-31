@@ -113,9 +113,17 @@ def declaration(root, end, side):
 def order_of(root, source, target):
     """Return the module pairs ``(first, second)`` that one connection orders."""
     outlet, inlet = declaration(root, source, "outlets"), declaration(root, target, "inlets")
-    if outlet.drawn or inlet.drawn:
+    if taken_back(outlet, inlet):
         return [(target[0], source[0])]
     return [] if outlet.offered else [(source[0], target[0])]
+
+
+def taken_back(outlet, inlet):
+    """Return whether the taker decides the flow of a connection and its source receives it.
+
+    A drawn stream inlet on a plain outlet is a plain connection: there is nothing to take back.
+    """
+    return outlet.drawn or inlet.gives or (inlet.drawn and outlet.offered)
 
 
 def find_path(edges, start, goal):
@@ -316,7 +324,8 @@ class _Wiring:
         self.root = root
         self.nodes = nodes
         self.arguments = {path: {} for path in nodes}
-        self.offers = {path: {} for path, item in nodes.items() if item.offered_outlets()}
+        self.offers = {}
+        self.feeds = {}
         self.ordered = []
         self.given = {}
 
@@ -333,8 +342,8 @@ class _Wiring:
     def _feed_offer(self, target, value, first):
         """Pass ``value`` on to the offer of the target when the offer reads that inlet."""
         path, port = target
-        if path in self.offers and port in self.nodes[path].offer_inlets:
-            self.offers[path][port] = value
+        if port in self.nodes[path].offer_inlets:
+            self.feeds.setdefault(path, {})[port] = value
             self.ordered.append((first, _offer_key(path)))
 
     def connect(self, source, target):
@@ -344,7 +353,9 @@ class _Wiring:
             declaration(self.root, target, "inlets"),
         )
         first = _offer_key(source[0]) if outlet.offered else source[0]
-        drawn = outlet.drawn or inlet.drawn
+        drawn = taken_back(outlet, inlet)
+        if outlet.offered:
+            self.offers.setdefault(source[0], {})
         if not inlet.gives:
             value = ("offer" if outlet.offered else "step", *source)
             self._add(target, value)
@@ -377,7 +388,7 @@ class _Wiring:
                 names[_offer_key(path)] = path
                 self.ordered.append((_offer_key(path), path))
             names[path] = path
-        ordered = [pair for pair in self.ordered if pair[0] is not None]
+        ordered = [pair for pair in self.ordered if pair[0] is not None and pair[1] in names]
         steps = [self._step(name, names[name]) for name in _topological(names, ordered)]
         outlets = {
             name: [
@@ -392,4 +403,4 @@ class _Wiring:
     def _step(self, name, path):
         if name == path:
             return Step(path, self.nodes[path], self.arguments[path])
-        return Step(path, self.nodes[path], self.offers[path], offer=True)
+        return Step(path, self.nodes[path], self.feeds.get(path, {}), offer=True)

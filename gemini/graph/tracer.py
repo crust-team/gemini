@@ -61,7 +61,7 @@ class Tracer:
         """Record the call of ``module`` into ``graph`` and return it."""
         trace = Trace(graph, module)
         fed = {name: _inlet(graph, name, fluids[name]) for name in module._fed_inlets()}
-        inlets = Ports(fed | module._empty_ports(), path=module.path)
+        inlets = Ports(fed | module._empty_ports(fed), path=module.path)
         trace.limit_checks.extend(graph.checks)
         outlets, call = trace.run(module, inlets, {}, None)
         settled = module._settled_inlets(inlets, call)

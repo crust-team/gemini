@@ -20,17 +20,19 @@ def chain():
     """Return the plant of ``api.md``: gas to the makeup, the boiler and the flare."""
     plant = gm.Plant("Chain")
     plant.add("Degasser", name="degasser", params={"separation_efficiency": 1.0})
+    plant.add("GasGrid", name="grid")
     plant.add("GasMakeup", name="makeup")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
     plant.add("Flare", name="flare")
     plant.connect("produced", "degasser.fluid_in")
     plant.connect("degasser.liquid_out", "fluid_out")
-    plant.connect("degasser.gas_out", "makeup.fluid_in")
-    plant.connect("makeup.fluid_out", "boiler.fuel_in")
-    plant.connect("boiler.gas_out", "flare.fluid_in")
+    plant.connect("degasser.gas_out", "makeup.gas_in")
+    plant.connect("grid.gas_out", "makeup.grid_in")
+    plant.connect("makeup.fuel_out", "boiler.fuel_in")
+    plant.connect("makeup.excess_out", "flare.gas_in")
     plant.connect("water_in", "boiler.fluid_in")
     plant.connect("boiler.fluid_out", "water_out")
-    plant.validate()
+    assert {item["code"] for item in plant.validate(on_error="record")} == {"root_plant_port"}
     return plant
 
 
@@ -60,13 +62,11 @@ def test_a_boiler_short_of_gas_buys_the_rest_and_nothing_reaches_the_flare():
 
 
 def test_without_co_produced_gas_the_grid_covers_everything():
-    """``grid.fluid_out`` to ``boiler.fuel_in``, the other wiring of the chain."""
+    """``grid.gas_out`` to ``boiler.fuel_in``, the other wiring of the chain."""
     plant = gm.Plant("Grid")
     plant.add("GasGrid", name="grid")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
-    plant.add("Flare", name="flare")
-    plant.connect("grid.fluid_out", "boiler.fuel_in")
-    plant.connect("boiler.gas_out", "flare.fluid_in")
+    plant.connect("grid.gas_out", "boiler.fuel_in")
     plant.connect("water_in", "boiler.fluid_in")
     plant.connect("boiler.fluid_out", "water_out")
     plant.boiler.temperature_setpoint = "70 degC"

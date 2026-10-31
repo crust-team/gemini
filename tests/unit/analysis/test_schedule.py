@@ -53,11 +53,14 @@ def plant_of_two():
     plant.add("Splitter", name="injection")
     plant.add("GasGrid", name="grid")
     plant.add("Boiler", name="boiler", params={"capacity": "40 MW", "efficiency": 0.9})
-    plant.add("HeatConsumer", name="users", params={"minimum_return_temperature": "40 degC"})
+    plant.add(
+        "HeatingGrid",
+        name="users",
+        params={"return_temperature": "60 degC", "return_pressure": "6 bar"},
+    )
+    plant.get_module("users").fluid = gm.WATER
     wire(plant)
     plant.boiler.temperature_setpoint = "100 degC"
-    water = gm.WATER.model_dump(mode="json")
-    plant.boundary = {"root_inputs": {"heating_return": {"T": 333.15, "p": 6e5, "fluid": water}}}
     return plant
 
 
@@ -73,12 +76,10 @@ def wire(plant):
     plant.connect("hx.hot_out", "injection.fluid_in")
     plant.connect("injection.branch1_out", "d0.return_in")
     plant.connect("injection.branch2_out", "d1.return_in")
-    plant.connect("heating_return", "hx.cold_in")
+    plant.connect("users.return_out", "hx.cold_in")
     plant.connect("hx.cold_out", "boiler.fluid_in")
-    plant.connect("grid.fluid_out", "boiler.fuel_in")
-    plant.connect("boiler.gas_out", "boiler_gas")
+    plant.connect("grid.gas_out", "boiler.fuel_in")
     plant.connect("boiler.fluid_out", "users.supply_in")
-    plant.connect("users.return_out", "heating_out")
 
 
 def demand(*heat):
@@ -123,7 +124,7 @@ def test_the_plan_names_its_columns_after_what_they_drive():
     assert plan["d0.esp.frequency"].iloc[0] == float(constants.ESP_REFERENCE_FREQUENCY)
     assert plan["d0.reservoir.production_rate"].iloc[0] == pytest.approx(300 / 3600 * 1030)
     assert plan["boiler.temperature_setpoint"].iloc[0] == pytest.approx(373.15)
-    assert plan["heating_return.m_dot"].iloc[0] == pytest.approx(FULL / (4217.4 * 40))
+    assert plan["users.flow"].iloc[0] == pytest.approx(FULL / (4217.4 * 40))
     assert str(plan.index.tz) == "UTC"
 
 

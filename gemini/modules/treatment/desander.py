@@ -64,27 +64,34 @@ class Desander(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
+        self.waste_out = Outlet(Stream, kind="waste")
 
     def forward(self, inlets):
         """Apply the quadratic cyclone pressure loss."""
 
         # Outlets
         inlet = inlets.fluid_in
-        outlet = inlet.with_(p=inlet.p - self._pressure_drop(inlet))
+        removed = self._sand(inlet)[0]
+        outlet = inlet.with_(m_dot=inlet.m_dot - removed, p=inlet.p - self._pressure_drop(inlet))
+        waste_out = inlet.with_(m_dot=removed)
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, waste_out=waste_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.fluid_in
-        properties = inlet.fluid.properties(inlet.p, inlet.T)
-        liquid_flow = fluid.liquid_volume_flow(inlet.m_dot, properties.gmf, properties.rho_l)
-        sand = _physics.cyclone_sand(
-            self.separation_efficiency, self.sand_concentration, liquid_flow
-        )
+        sand = self._sand(inlet)
         self.pressure_drop = self._pressure_drop(inlet)
         self.sand_removal_rate = sand[0]
         self.residual_sand_concentration = sand[1]
+
+    def _sand(self, inlet):
+        """Return the sand removal rate [kg/s] and the residual sand concentration [kg/m3]."""
+        properties = inlet.fluid.properties(inlet.p, inlet.T)
+        liquid_flow = fluid.liquid_volume_flow(inlet.m_dot, properties.gmf, properties.rho_l)
+        return _physics.cyclone_sand(
+            self.separation_efficiency, self.sand_concentration, liquid_flow
+        )
 
     def _pressure_drop(self, inlet):
         """Return the cyclone loss [Pa], quadratic in forward mass flow."""

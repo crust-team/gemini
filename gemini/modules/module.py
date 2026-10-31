@@ -904,8 +904,13 @@ class Module:
             outlets = Ports({name: (given | taken)[name] for name in self._outlets}, path=self.path)
             call.drawn = {name: returned[name] for name in self._drawn_inlets()}
         if call.outputs is not None:
-            self._output_step(self._settled_inlets(scoped, call), inlets, outlets, call)
+            self._output_step(self._received_inlets(scoped, call), inlets, outlets, call)
         return outlets
+
+    def _received_inlets(self, inlets, call):
+        """Return the inlets ``_compute_outputs`` reads: what arrived and the powers drawn."""
+        drawn = {name: call.drawn[name] for name, port in self._inlets.items() if port.gives}
+        return Ports._trusted({name: inlets[name] for name in inlets} | drawn, self.path)
 
     def _settled_inlets(self, inlets, call):
         """Return the declared inlets of a call, each drawn one with the value the module drew."""
@@ -995,19 +1000,23 @@ class Module:
         """Return every port a call holds a value for: fed inlets, then the optional ports."""
         return self._fed_inlets() | self._optional_ports()
 
-    def _empty_ports(self):
-        """Return what the optional ports hold when nothing is taken: no list items, the offer."""
+    def _empty_ports(self, values=None):
+        """Return what the optional ports hold when nothing is taken: no list items, the offer.
+
+        ``values`` are the ports of the call, which the offer may read.
+        """
         optional = self._optional_ports()
-        values = {name: [] for name, port in optional.items() if port.many}
-        if len(values) < len(optional):
-            values |= {name: self.offer()[name] for name in optional if name not in values}
-        return values
+        empty = {name: [] for name, port in optional.items() if port.many}
+        if len(empty) == len(optional):
+            return empty
+        fed = {name: (values or {})[name] for name in self.offer_inlets}
+        return empty | {name: value for name, value in self.offer(fed).items() if name in optional}
 
     def _with_optional_ports(self, values):
         """Return ``values`` with the optional ports the call left out."""
         if all(name in values for name in self._optional_ports()):
             return values
-        return self._empty_ports() | dict(values)
+        return self._empty_ports(values) | dict(values)
 
     def _check_keywords(self, kwargs, valid_names):
         unknown = [name for name in kwargs if name not in valid_names]

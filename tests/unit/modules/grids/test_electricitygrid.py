@@ -1,41 +1,38 @@
-"""Grid import/export netting, connection limits, cost rate and use inside a plant."""
+"""Grid import/export netting, connection limits and use inside a plant."""
 
 import pytest
 
 from gemini.modules import Module, collect_flows, energy_balance
+from gemini.modules.grids import ElectricityGrid
 from gemini.modules.heating import ElectricBoiler
-from gemini.modules.power import ORC, GridConnection
-from gemini.types import Inlet, Outlet, Output, Stream
+from gemini.modules.power import ORC
+from gemini.types import Control, Inlet, Outlet, Output, Power, Stream
 from tests.fixtures.equivalence import assert_module_matches
 
 
 def grid(**changes):
-    """Return a connection buying at 0.20 and selling at 0.08 currency per kWh."""
-    params = dict(import_price="0.2 currency/kWh", export_price="0.08 currency/kWh")
-    return GridConnection().update_params(**(params | changes))
+    """Return a connection with ``changes``."""
+    return ElectricityGrid().update_params(**changes)
 
 
 def test_import_and_export_within_unlimited_connection():
-    """Net consumption is imported at the import price; surplus is sold at the export price."""
-    out = grid()(consumption=3e6, generation=1e6).outputs
+    """Net consumption is imported; surplus is exported."""
+    out = grid()(power_out=[2e6, 1e6], power_in=[1e6]).outputs
     assert out.net_import == 2e6 and out.net_export == 0
-    assert out.cost_rate == pytest.approx(2e3 * 0.2 / 3600, rel=1e-12)
     assert not out.is_import_limited and out.unserved_consumption == 0
-    out = grid()(consumption=1e6, generation=4e6).outputs
+    out = grid()(power_out=[1e6], power_in=[4e6]).outputs
     assert out.net_export == 3e6 and out.net_import == 0
-    assert out.cost_rate == pytest.approx(-3e3 * 0.08 / 3600, rel=1e-12)
 
 
 def test_connection_limits():
     """Imports above the limit go unserved; exports above it are curtailed."""
     connection = grid(import_limit="1 MW", export_limit="0.5 MW")
-    out = connection(consumption=3e6, generation=1e6).outputs
+    out = connection(power_out=[3e6], power_in=[1e6]).outputs
     assert out.net_import == 1e6 and out.unserved_consumption == 1e6 and out.is_import_limited
-    out = connection(consumption=0, generation=2e6).outputs
+    out = connection(power_out=[], power_in=[2e6]).outputs
     assert out.net_export == 5e5 and out.curtailed_generation == 1.5e6 and out.is_export_limited
-    out = grid(export_limit=0)(consumption=0, generation=0).outputs
-    assert out.cost_rate == 0 and not out.is_export_limited
-    assert out.get("cost_rate", unit="currency/h") == 0
+    out = grid(export_limit=0)().outputs
+    assert out.net_export == 0 and not out.is_export_limited
 
 
 class GridPlant(Module):
@@ -74,10 +71,7 @@ class GridPlant(Module):
         # Modules
         generated = self.orc(fluid_in=inlets.fluid_in, ambient_temperature=288.15)
         heated = self.boiler(fluid_in=inlets.water_in, temperature_setpoint=353.15)
-        self.grid(
-            consumption=heated.outputs.electricity,
-            generation=generated.outputs.electricity_generated,
-        )
+        self.grid(power_out=[heated.inlets.power_in], power_in=[generated.outlets.power_out])
 
         # Outlets
         fluid_out = generated.outlets.fluid_out
@@ -103,13 +97,35 @@ def test_grid_is_not_counted_in_the_energy_audit():
     assert energy_balance(plant, result)["relative_residual"] < 1e-12
 
 
-class RowCarrier(GridConnection):
-    """A connection with a dummy inlet whose length gives the runner its number of rows."""
+class Connected(Module):
+    """A connection whose both sides are controls, for a run over rows."""
 
     def __init__(self):
         """Declare the connection and the row-carrying inlet."""
         super().__init__()
+
+        # Modules
+        self.grid = grid(import_limit="2 MW")
+
+        # Inlets
         self.rows = Inlet(Stream)
+
+        # Controls
+        self.consumption = Control(Power)
+        self.generation = Control(Power)
+
+        # Outputs
+        self.net_import = Output.of(self.grid.net_import)
+        self.net_export = Output.of(self.grid.net_export)
+
+    def forward(self, inlets):
+        """Settle one row."""
+
+        # Modules
+        self.grid(power_out=[self.consumption], power_in=[self.generation])
+
+        outlets = dict()
+        return outlets
 
 
 def test_traced_call_matches_one_call_per_row():
@@ -118,7 +134,4 @@ def test_traced_call_matches_one_call_per_row():
         dict(rows=Stream(m_dot=1.0, T=300.0, p=1e5), consumption=consumption, generation=generation)
         for consumption, generation in [(3e6, 1e6), (1e6, 4e6), (0.0, 2e6), (5e5, 5e5), (4e6, 0.0)]
     ]
-    prices = dict(import_price="0.2 currency/kWh", export_price="0.08 currency/kWh")
-    assert_module_matches(RowCarrier().update_params(**prices), rows)
-    limited = RowCarrier().update_params(import_limit="1 MW", export_limit="0.5 MW", **prices)
-    assert_module_matches(limited, rows)
+    assert_module_matches(Connected(), rows)

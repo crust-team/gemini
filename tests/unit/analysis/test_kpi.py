@@ -13,8 +13,8 @@ from tests.fixtures.result_tables import make_results
 def plant():
     """Return a plant with one heat and one cooling consumer."""
     plant = gm.Plant("Demo")
-    plant.add("HeatConsumer", "heat")
-    plant.add("CoolingConsumer", "cool")
+    plant.add("HeatingGrid", "heat")
+    plant.add("CoolingGrid", "cool")
     return plant
 
 
@@ -81,7 +81,7 @@ def test_zero_demand_and_zero_electricity_have_reasons(plant):
     kpis = gm.kpi.compute(plant, idle)
     assert kpis["heating_coverage"]["reason"] == "the demand is zero over the window"
     assert kpis["cop"]["reason"] == "no electricity is consumed over the window"
-    assert kpis["cooling_coverage"]["reason"] == "the plant has no CoolingConsumer"
+    assert kpis["cooling_coverage"]["reason"] == "the plant has no CoolingGrid"
 
 
 def test_skipped_ticks_leave_the_ratios_alone(plant):

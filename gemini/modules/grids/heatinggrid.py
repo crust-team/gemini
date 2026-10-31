@@ -1,24 +1,27 @@
 """Space or process heat demand on a hydronic circuit with a steady first-law balance."""
 
 from gemini import ops
-from gemini.errors import PhysicsError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer
 from gemini.types import (
     Boundary,
+    Control,
     HeatSupplied,
     Inlet,
+    MassFlow,
     Outlet,
     Output,
     Parameter,
     Power,
+    Pressure,
     Stream,
     Temperature,
     TemperatureDifference,
 )
 
 
-class HeatConsumer(Module):
+class HeatingGrid(Module):
     """Heat consumer that cools the supply stream by the delivered heat demand.
 
     The circuit's mass flow is imposed by the supply stream (the consumer has no flow control),
@@ -33,6 +36,12 @@ class HeatConsumer(Module):
     example the space temperature plus an emitter approach, or a legionella or process limit).
     Demand beyond ``Q_available`` is ``unmet_demand``. A supply colder than the minimum return
     temperature delivers nothing and returns unchanged; the consumer never heats the water.
+
+    On a closed loop ``return_temperature``, ``return_pressure`` and the control ``flow`` set the
+    return water: ``return_out`` is offered before the other modules run, the heat delivered is the
+    fall of the water from ``supply_in`` to ``return_out``, and what is short of ``heat_demand`` is
+    ``unmet_demand``, never an error. Bind ``heat_demand`` to ``gm.profiles.get("heating_demand")``.
+    Without them the return follows from the demand, as in a substation.
 
     Simplifications: steady state without circuit inventory, constant fluid properties (the
     inlet ``cp``), no pressure drop (pipes and valves carry the hydraulics) and no emitter
@@ -52,10 +61,15 @@ class HeatConsumer(Module):
         super().__init__()
 
         # Parameters
-        self.minimum_return_temperature = Parameter(Temperature)
+        self.minimum_return_temperature = Parameter(Temperature | None, default=None)
+        self.return_temperature = Parameter(Temperature | None, default=None, structural=True)
+        self.return_pressure = Parameter(Pressure | None, default=None)
 
         # Inlets
         self.supply_in = Inlet(Stream, kind="hot_water")
+
+        # Controls
+        self.flow = Control(MassFlow | None, default=None, ge=0)
 
         # Boundaries
         self.heat_demand = Boundary(Power, ge=0)
@@ -69,13 +83,17 @@ class HeatConsumer(Module):
         self.is_unmet = Output(bool)
 
         # Outlets
-        self.return_out = Outlet(Stream, kind="hot_water")
+        self.return_out = Outlet(Stream, kind="hot_water", offered=True)
 
     def forward(self, inlets):
         """Return the supply stream cooled by the delivered heat."""
 
         # Outlets
         supply_in = inlets.supply_in
+        if self.return_temperature is not None:
+            return_out = self._offer(inlets)["return_out"]
+            outlets = dict(return_out=return_out)
+            return outlets
         delivered = self._delivered_heat(supply_in)
         capacity_rate = supply_in.heat_capacity_rate()
         cooled = ops.maximum(
@@ -92,11 +110,30 @@ class HeatConsumer(Module):
         supply_in = inlets.supply_in
         return_out = outlets.return_out
         self.supply_in_T = supply_in.T
-        self.heat_supplied = self._delivered_heat(supply_in)
-        self.unmet_demand = self.heat_demand - self.heat_supplied
+        self.heat_supplied = self._heat_supplied(supply_in, return_out)
+        self.unmet_demand = ops.maximum(self.heat_demand - self.heat_supplied, 0.0)
         self.return_out_T = return_out.T
         self.temperature_difference = supply_in.T - return_out.T
         self.is_unmet = self.unmet_demand > 0
+
+    def _offer(self, inlets):
+        """Offer the return water of a closed loop, at the fixed temperature and the given flow."""
+        if self.return_temperature is None or self.return_pressure is None or self.flow is None:
+            raise ValidationError(
+                f"{self.path}: return_temperature, return_pressure and flow are needed to offer "
+                "return_out; expected all three on a closed loop",
+                code="invalid_design",
+            )
+        offered = Stream(
+            m_dot=self.flow, T=self.return_temperature, p=self.return_pressure, fluid=self.fluid
+        )
+        return {"return_out": offered}
+
+    def _heat_supplied(self, supply_in, return_out):
+        """Return the heat [W] the users take: the fall of the water, or the capped demand."""
+        if self.return_temperature is None:
+            return self._delivered_heat(supply_in)
+        return heat_transfer.heat_rate(supply_in.heat_capacity_rate(), supply_in.T - return_out.T)
 
     def _delivered_heat(self, supply_in):
         """Return the delivered heat [W]: the demand, capped by the return-temperature floor."""
@@ -107,6 +144,12 @@ class HeatConsumer(Module):
             path=self.path,
             m_dot=supply_in.m_dot,
         )
+        if self.minimum_return_temperature is None:
+            raise ValidationError(
+                f"{self.path}: minimum_return_temperature = None; expected a value without a "
+                "return_temperature",
+                code="missing_value",
+            )
         available = heat_transfer.setpoint_duty(
             supply_in.heat_capacity_rate(), supply_in.T - self.minimum_return_temperature
         )

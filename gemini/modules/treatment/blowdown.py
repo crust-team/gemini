@@ -43,7 +43,7 @@ class Blowdown(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
-        self.waste_out = Outlet(Stream, kind="brine")
+        self.waste_out = Outlet(Stream, kind="waste")
 
     def forward(self, inlets):
         """Split the commanded bleed from the feed."""

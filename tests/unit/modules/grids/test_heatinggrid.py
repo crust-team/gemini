@@ -3,7 +3,7 @@
 import pytest
 
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules import HeatConsumer, energy_balance, mass_balance
+from gemini.modules import HeatingGrid, energy_balance, mass_balance
 from gemini.types import Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
@@ -13,7 +13,7 @@ SUPPLY = Stream(m_dot=2.0, T=343.15, p=3e5)
 
 
 def _consumer():
-    return HeatConsumer().update_params(minimum_return_temperature="40 C")
+    return HeatingGrid().update_params(minimum_return_temperature="40 C")
 
 
 def test_met_demand_sets_the_return_temperature():
@@ -64,7 +64,7 @@ def test_invalid_inputs_raise():
     with raises(ValidationError, "missing_value"):
         consumer(supply_in=SUPPLY)
     with raises(ValidationError, "missing_value"):
-        HeatConsumer()(supply_in=SUPPLY, heat_demand=1e4)
+        HeatingGrid()(supply_in=SUPPLY, heat_demand=1e4)
 
 
 def test_traced_call_matches_one_call_per_row():

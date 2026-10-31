@@ -19,6 +19,7 @@ CODES = (
     "ambiguous_port",
     "port_in_use",
     "unconnected_port",
+    "root_plant_port",
     "loop_without_state",
     "invalid_binding",
     "missing_column",

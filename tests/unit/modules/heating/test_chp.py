@@ -14,7 +14,7 @@ from tests.fixtures.errors import raises
 
 CP = 4217.4
 WATER = Stream(m_dot=20, T=333.15, p=3e5)
-GRID_GAS = GasGrid()().outlets.fluid_out
+GRID_GAS = GasGrid().offer()["gas_out"]
 
 
 def engine(**params):

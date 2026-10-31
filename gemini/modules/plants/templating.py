@@ -26,7 +26,7 @@ from gemini.errors import ValidationError
 from gemini.errors.base import reported
 from gemini.modules._utils.serialization import located
 from gemini.modules.plants import generators
-from gemini.modules.plants.spec import from_spec, validate
+from gemini.modules.plants.spec import from_spec
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
@@ -162,6 +162,8 @@ def _remove_ports(spec, gone):
         if side in spec:
             kept = {name: _kept_ends(end, gone) for name, end in spec[side].items()}
             spec[side] = {name: end for name, end in kept.items() if end}
+            if not spec[side]:
+                del spec[side]
 
 
 def _remove_outputs(spec, gone):
@@ -218,7 +220,5 @@ def from_template(name, parameters=None):
     items = _unknown_names(template, given) + _not_flags(given)
     if not items:
         spec, items = _filled(template, given)
-    if not items:
-        items = validate(spec)
     reported(items, "raise")
     return from_spec(spec)

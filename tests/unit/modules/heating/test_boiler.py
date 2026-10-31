@@ -9,7 +9,7 @@ from gemini.physics import gas
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
 
-GRID_GAS = GasGrid()().outlets.fluid_out
+GRID_GAS = GasGrid().offer()["gas_out"]
 COPRODUCED = gm.Fluid(kind="gas", gas_composition={"CH4": 0.8, "CO2": 0.2})
 WATER = Stream(m_dot=10, T=300, p=1e6)
 
@@ -65,19 +65,20 @@ def test_co_produced_gas_is_burned_first_and_the_grid_covers_the_rest():
     assert out.fuel_coproduced == pytest.approx(available)
     assert out.fuel_purchased == pytest.approx(out.fuel - available)
     assert out.burned_mass_flow == pytest.approx(0.01)
-    assert result.outlets.gas_out.m_dot == pytest.approx(0, abs=1e-15)
+    bought = out.fuel_purchased / gas.lower_heating_value(gas.GRID_COMPOSITION)
+    assert result.inlets.fuel_in.m_dot == pytest.approx(0.01 + bought)
     expected = available * COPRODUCED.emission_factor()
     expected += out.fuel_purchased * gas.emission_per_energy(gas.GRID_COMPOSITION)
     assert out.co2_emission == pytest.approx(expected)
 
 
-def test_enough_co_produced_gas_buys_nothing_and_passes_the_surplus():
-    """With gas to spare nothing is bought and ``gas_out`` carries the rest."""
+def test_enough_co_produced_gas_buys_nothing_and_takes_what_it_burns():
+    """With gas to spare nothing is bought and ``fuel_in`` shows what it burned."""
     boiler = Boiler().update_params(capacity=1e6, efficiency=0.8)
     result = boiler(fluid_in=WATER, fuel_in=gas_stream(1.0), temperature_setpoint=320)
     out = result.outputs
     assert out.fuel_purchased == 0 and out.fuel_coproduced == pytest.approx(out.fuel)
-    assert result.outlets.gas_out.m_dot == pytest.approx(1.0 - out.burned_mass_flow)
+    assert result.inlets.fuel_in.m_dot == pytest.approx(out.burned_mass_flow)
 
 
 def test_no_co_produced_gas_buys_everything():

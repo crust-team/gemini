@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 
 from gemini.analysis.series import energy, leaf_total, results_total, window_seconds
-from gemini.modules.demand import CoolingConsumer, HeatConsumer
+from gemini.modules.grids import CoolingGrid, HeatingGrid
 from gemini.types.shapes import value
 
 
@@ -30,13 +30,13 @@ class _Series:
 def _read(plant, results):
     """Return the shared series of a run."""
     frame = results.to_frame()
-    sensible = leaf_total(plant, frame, "unmet_sensible", CoolingConsumer)
-    latent = leaf_total(plant, frame, "unmet_latent", CoolingConsumer)
+    sensible = leaf_total(plant, frame, "unmet_sensible", CoolingGrid)
+    latent = leaf_total(plant, frame, "unmet_latent", CoolingGrid)
     return _Series(
         seconds=window_seconds(results),
-        heat=leaf_total(plant, frame, "heat_supplied", HeatConsumer),
-        heat_unmet=leaf_total(plant, frame, "unmet_demand", HeatConsumer),
-        cold=leaf_total(plant, frame, "heat_absorbed", CoolingConsumer),
+        heat=leaf_total(plant, frame, "heat_supplied", HeatingGrid),
+        heat_unmet=leaf_total(plant, frame, "unmet_demand", HeatingGrid),
+        cold=leaf_total(plant, frame, "heat_absorbed", CoolingGrid),
         cold_unmet=None if sensible is None or latent is None else sensible + latent,
         electricity=results_total(results, frame, "electricity"),
     )
@@ -63,24 +63,24 @@ def _peak(delivered, consumer):
 
 
 def _heating_coverage(series):
-    return _coverage(series.heat, series.heat_unmet, series.seconds, "HeatConsumer")
+    return _coverage(series.heat, series.heat_unmet, series.seconds, "HeatingGrid")
 
 
 def _cooling_coverage(series):
-    return _coverage(series.cold, series.cold_unmet, series.seconds, "CoolingConsumer")
+    return _coverage(series.cold, series.cold_unmet, series.seconds, "CoolingGrid")
 
 
 def _peak_heat(series):
-    return _peak(series.heat, "HeatConsumer")
+    return _peak(series.heat, "HeatingGrid")
 
 
 def _peak_cold(series):
-    return _peak(series.cold, "CoolingConsumer")
+    return _peak(series.cold, "CoolingGrid")
 
 
 def _cop(series):
     if series.heat is None:
-        return None, "the plant has no HeatConsumer"
+        return None, "the plant has no HeatingGrid"
     if series.electricity is None:
         return None, "no leaf declares an electricity output"
     consumed = energy(series.electricity.where(series.heat.notna()), series.seconds)
@@ -124,15 +124,15 @@ def compute(plant, results):
         with E(x) = sum over ticks of x * tick duration [J]:
 
         - ``heating_coverage`` [-] = E(heat_supplied) / E(heat_supplied + unmet_demand) summed
-          over the plant's ``HeatConsumer`` leaves: the share of the demanded heat delivered.
+          over the plant's ``HeatingGrid`` leaves: the share of the demanded heat delivered.
         - ``cooling_coverage`` [-] = E(heat_absorbed) / E(heat_absorbed + unmet_sensible +
-          unmet_latent) over the ``CoolingConsumer`` leaves.
-        - ``cop`` [-] = E(heat_supplied of the HeatConsumer leaves) / E(electricity of every
+          unmet_latent) over the ``CoolingGrid`` leaves.
+        - ``cop`` [-] = E(heat_supplied of the HeatingGrid leaves) / E(electricity of every
           leaf): heat delivered per unit of electricity consumed. Cooling is not counted.
         - ``peak_heat`` [W] = the largest tick sum of ``heat_supplied`` over the
-          ``HeatConsumer`` leaves (delivered power, not the demand peak).
+          ``HeatingGrid`` leaves (delivered power, not the demand peak).
         - ``peak_cold`` [W] = the largest tick sum of ``heat_absorbed`` over the
-          ``CoolingConsumer`` leaves.
+          ``CoolingGrid`` leaves.
 
     A plant without a consumer leaf, for example the doublet heat plant, gives ``None`` for the
     KPIs that need one.

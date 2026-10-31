@@ -21,6 +21,13 @@ HEATING_RETURN = 333.15
 COOLING_RETURN = 298.15
 """Assumed temperature [K] of the cooling return, 25 degC."""
 
+HEATING_GRID = {"return_temperature": HEATING_RETURN, "return_pressure": 6e5}
+COOLING_GRID = {
+    "return_temperature": COOLING_RETURN,
+    "return_pressure": 4e5,
+    "dew_point_margin": 1.0,
+}
+
 COOLING_WATER = 288.15
 """Assumed temperature [K] of the water that cools the chiller, 15 degC."""
 
@@ -100,18 +107,18 @@ def add_modules(plant):
     plant.add("Degasser", name="degasser", params={"separation_efficiency": 1.0})
     plant.add("HeatExchanger", name="hx", params=EXCHANGER)
     plant.add("Splitter", name="injection")
+    plant.add("GasGrid", name="gas_grid")
     plant.add("GasMakeup", name="makeup")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
     plant.add("Flare", name="flare")
     plant.add("HeatPump", name="heat_pump", params=HEAT_PUMP)
     plant.add("Splitter", name="loads")
-    plant.add("HeatConsumer", name="heat_users", params={"minimum_return_temperature": "40 degC"})
+    plant.add("Mixer", name="heat_return")
+    plant.add("HeatingGrid", name="heat_users", params=HEATING_GRID)
     plant.add("AbsorptionUnit", name="chiller", params=CHILLER)
-    plant.add(
-        "CoolingConsumer",
-        name="cool_users",
-        params={"maximum_return_temperature": "30 degC", "dew_point_margin": 1.0},
-    )
+    plant.add("CoolingGrid", name="cool_users", params=COOLING_GRID)
+    plant.get_module("heat_users").fluid = gm.WATER
+    plant.get_module("cool_users").fluid = gm.WATER
 
 
 def connect_brine(plant):
@@ -134,24 +141,24 @@ def connect_power(plant):
 
 def connect_gas(plant):
     """Wire the co-produced gas: the boiler takes what it needs and the flare burns the rest."""
-    plant.connect("degasser.gas_out", "makeup.fluid_in")
-    plant.connect("makeup.fluid_out", "boiler.fuel_in")
-    plant.connect("boiler.gas_out", "flare.fluid_in")
+    plant.connect("degasser.gas_out", "makeup.gas_in")
+    plant.connect("gas_grid.gas_out", "makeup.grid_in")
+    plant.connect("makeup.fuel_out", "boiler.fuel_in")
+    plant.connect("makeup.excess_out", "flare.gas_in")
 
 
 def connect_water(plant):
     """Wire the heating, chilled and cooling water, with the plant ports named."""
-    plant.connect("heating_return", "hx.cold_in")
+    plant.connect("heat_users.return_out", "hx.cold_in")
     plant.connect("hx.cold_out", "heat_pump.sink_in")
     plant.connect("heat_pump.sink_out", "boiler.fluid_in")
     plant.connect("boiler.fluid_out", "loads.fluid_in")
-    plant.connect("loads.branch1_out", "heat_users.supply_in")
+    plant.connect("loads.branch1_out", "heat_return.branch1_in")
     plant.connect("loads.branch2_out", "chiller.generator_in")
-    plant.connect("heat_users.return_out", "heating_out")
-    plant.connect("chiller.generator_out", "chiller_heat_out")
-    plant.connect("cooling_return", "chiller.chilled_in")
+    plant.connect("chiller.generator_out", "heat_return.branch2_in")
+    plant.connect("heat_return.fluid_out", "heat_users.supply_in")
+    plant.connect("cool_users.return_out", "chiller.chilled_in")
     plant.connect("chiller.chilled_out", "cool_users.supply_in")
-    plant.connect("cool_users.return_out", "cooling_out")
     plant.connect("chiller_cooling", "chiller.cooling_in")
     plant.connect("chiller.cooling_out", "chiller_cooling_out")
 
@@ -171,8 +178,6 @@ def set_boundaries(plant):
     plant.cool_users.indoor_relative_humidity = 0.5
     plant.boundary = {
         "root_inputs": {
-            "heating_return": return_stream(HEATING_RETURN, 6e5),
-            "cooling_return": return_stream(COOLING_RETURN, 4e5),
             "chiller_cooling": return_stream(COOLING_WATER, 3e5, COOLING_WATER_FLOW),
         }
     }
@@ -187,7 +192,9 @@ def build():
     connect_gas(plant)
     connect_water(plant)
     set_boundaries(plant)
-    plant.validate()
+    assert [
+        item for item in plant.validate(on_error="record") if item["code"] != "root_plant_port"
+    ] == []
     return plant
 
 
@@ -196,7 +203,7 @@ def hackathon_limits():
     limits = gm.checks.Limits()
     limits.add("d*.flow", min="50 m3/h", max="300 m3/h")
     limits.add("d*.brine_cooling", max="40 K")
-    limits.add("heat_users.supply_in_T", min="100 degC")
+    limits.add("boiler.fluid_out_T", min="100 degC")
     return limits
 
 
@@ -222,7 +229,7 @@ def print_run(results):
     print(f"  heat pump, peak   {frame['heat_pump.useful_duty'].max() / 1e6:8.2f} MW")
     print(f"  gas co-produced   {frame['boiler.fuel_coproduced'].sum() * gwh:8.2f} GWh burnt")
     print(f"  gas purchased     {frame['boiler.fuel_purchased'].sum() * gwh:8.2f} GWh")
-    print(f"  supply, lowest    {frame['heat_users.supply_in_T'].min() - 273.15:8.2f} degC")
+    print(f"  supply, lowest    {frame['boiler.fluid_out_T'].min() - 273.15:8.2f} degC")
 
 
 def print_limits(checks):

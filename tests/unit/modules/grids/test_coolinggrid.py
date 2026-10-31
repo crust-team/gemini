@@ -3,7 +3,7 @@
 import pytest
 
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules import CoolingConsumer, energy_balance, mass_balance
+from gemini.modules import CoolingGrid, energy_balance, mass_balance
 from gemini.physics import psychrometrics
 from gemini.types import Stream
 from tests.fixtures.equivalence import assert_module_matches
@@ -16,7 +16,7 @@ AVAILABLE = 2 * CP * 9
 
 
 def _consumer():
-    return CoolingConsumer().update_params(maximum_return_temperature="16 C", dew_point_margin=3)
+    return CoolingGrid().update_params(maximum_return_temperature="16 C", dew_point_margin=3)
 
 
 def _call(consumer, supply=SUPPLY, sensible=5e4, latent=1e4, **indoor):

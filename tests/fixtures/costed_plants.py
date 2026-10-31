@@ -4,7 +4,7 @@ The consumers join the plant with ``add_module``, so the test classes stay out o
 """
 
 import gemini as gm
-from gemini.modules import CoolingConsumer, HeatConsumer
+from gemini.modules import CoolingGrid, HeatingGrid
 from gemini.types.cost import Cost
 from tests.fixtures.result_tables import make_results
 
@@ -12,7 +12,7 @@ HOURS = 24
 """Ticks of an hour in the runs below."""
 
 
-class CostedHeatConsumer(HeatConsumer):
+class CostedHeatingGrid(HeatingGrid):
     """A heat consumer that declares 1000 EUR, 10 EUR/year fixed and 1e-9 EUR/J variable cost."""
 
     def capex(self, assumptions):
@@ -27,7 +27,7 @@ class CostedHeatConsumer(HeatConsumer):
         )
 
 
-class CostedCoolingConsumer(CoolingConsumer):
+class CostedCoolingGrid(CoolingGrid):
     """A cooling consumer that declares 2000 EUR and no running cost."""
 
     def capex(self, assumptions):
@@ -38,14 +38,14 @@ class CostedCoolingConsumer(CoolingConsumer):
 def heating_plant(costed=True):
     """Return a plant with one heat consumer, costed or not."""
     plant = gm.Plant("Heating")
-    plant.add_module("heat", CostedHeatConsumer() if costed else HeatConsumer())
+    plant.add_module("heat", CostedHeatingGrid() if costed else HeatingGrid())
     return plant
 
 
 def cooling_plant():
     """Return a plant with one costed cooling consumer."""
     plant = gm.Plant("Cooling")
-    plant.add_module("cool", CostedCoolingConsumer())
+    plant.add_module("cool", CostedCoolingGrid())
     return plant
 
 

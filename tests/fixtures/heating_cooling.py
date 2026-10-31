@@ -19,8 +19,10 @@ SIZES = {
     "absorption_chiller.capacity": 3e5,
     "adsorption_chiller.capacity": 1e5,
     "compression_chiller.capacity": 5e5,
-    "heating_consumer.minimum_return_temperature": 313.15,
-    "cooling_consumer.maximum_return_temperature": 289.15,
+    "heating_consumer.return_temperature": 294.85,
+    "heating_consumer.return_pressure": 5e5,
+    "cooling_consumer.return_temperature": 285.15,
+    "cooling_consumer.return_pressure": 5e5,
     "cooling_consumer.dew_point_margin": 3.0,
 }
 """Template parameters of the run; the pipes are added by ``with_pipes``."""
@@ -56,6 +58,8 @@ INPUTS = {
     "adsorption_chiller.temperature_setpoint": 283.15,
     "compression_chiller.temperature_setpoint": 281.15,
     "heating_consumer.heat_demand": 1e5,
+    "heating_consumer.flow": 48.95,
+    "cooling_consumer.flow": 10.0,
     **{f"{pipe}.ambient_temperature": 283.15 for pipe in PIPES},
     "cooling_consumer.sensible_cooling_demand": 5e4,
     "cooling_consumer.latent_cooling_demand": 1e4,
@@ -63,8 +67,6 @@ INPUTS = {
     "cooling_consumer.indoor_relative_humidity": 0.5,
 }
 ROOT_STREAMS = {
-    "heating_return_in": ("48.95 kg/s", "21.7 degC"),
-    "cooling_return_in": ("10 kg/s", "12 degC"),
     "absorption_cooling_in": ("25 kg/s", "30 degC"),
     "adsorption_cooling_in": ("10 kg/s", "27 degC"),
     "compression_rejection_in": ("30 kg/s", "30 degC"),

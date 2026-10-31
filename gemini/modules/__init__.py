@@ -7,13 +7,13 @@ from ._utils.registry import categories, get, load_file, names, register
 from ._utils.wiring import trace_wiring
 from .control import PIDController
 from .cooling import AbsorptionUnit, AdsorptionChiller
-from .demand import CoolingConsumer, HeatConsumer
 from .exchangers import Cooler, HeatExchanger
+from .grids import ChemicalGrid, CoolingGrid, ElectricityGrid, GasGrid, HeatingGrid, WasteGrid
 from .heating import CHP, Boiler, ElectricBoiler, HeatPump
 from .module import Module
-from .piping import GasGrid, GasMakeup, Mixer, Pipe, PressurizationTank, Splitter, Valve
+from .piping import GasMakeup, Mixer, Pipe, PressurizationTank, Splitter, Valve
 from .plants import ATESPlant, CoolingSubstation, HeatingSubstation
-from .power import ORC, FlashTurbine, GridConnection, Separator
+from .power import ORC, FlashTurbine, Separator
 from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
 from .storage import AquiferStorage, IceStorage, ThermalStorage
 from .subsurface import (
@@ -34,6 +34,11 @@ __all__ = [
     "ElectricBoiler",
     "Flare",
     "GasGrid",
+    "ElectricityGrid",
+    "HeatingGrid",
+    "CoolingGrid",
+    "WasteGrid",
+    "ChemicalGrid",
     "GasMakeup",
     "HeatExchanger",
     "HeatPump",
@@ -60,8 +65,6 @@ __all__ = [
     "Desander",
     "InhibitorDosing",
     "Vent",
-    "HeatConsumer",
-    "CoolingConsumer",
     "Mixer",
     "Pipe",
     "PressurizationTank",
@@ -73,7 +76,6 @@ __all__ = [
     "ORC",
     "Separator",
     "FlashTurbine",
-    "GridConnection",
     "HeatingSubstation",
     "CoolingSubstation",
     "ATESPlant",

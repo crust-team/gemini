@@ -132,7 +132,7 @@ def test_fixed_signatures_and_declared_port_accesses(module_class):
     if cls().stateful and "_advance_states" in cls.__dict__:
         _assert_fixed_signature(cls, "_advance_states", ["self", "inlets", "outlets", "dt"])
     module = cls()
-    inlet_names = list(module.inlets())
+    inlet_names = list(module.inlets()) + module._drawn_outlets()
     outlet_names = list(module.outlets())
     _assert_declared_accesses(cls, "forward", "inlets", inlet_names)
     _assert_declared_accesses(cls, "_compute_outputs", "inlets", inlet_names)
@@ -150,7 +150,7 @@ def test_registered_forward_structure(module_class):
     composite = not module.is_leaf
     comments = {comment for comment, _ in _comments(source)}
     assert ("# Modules" in comments) == composite
-    assert ("# Outlets" in comments) == bool(module.outlets())
+    assert ("# Outlets" in comments) == bool(module._given_outlets() or module._drawn_inlets())
     assert not _self_assignments(tree), f"{cls.__name__}: forward assigns to self"
 
     declarations = list(module.inlets().values()) + list(module.outlets().values())

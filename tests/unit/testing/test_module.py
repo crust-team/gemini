@@ -121,5 +121,5 @@ def test_a_shipped_module_with_example_values_passes():
         "inlets": {"supply_in": {"m_dot": "2 kg/s", "T": "70 degC", "p": "3 bar"}},
         "controls": {"heat_demand": "100 kW"},
     }
-    report = gm.testing.check_module(gm.modules.HeatConsumer, example)
+    report = gm.testing.check_module(gm.modules.HeatingGrid, example)
     assert report["passed"] is True and verdicts(report)["call"] is True

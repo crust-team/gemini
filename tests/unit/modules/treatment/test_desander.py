@@ -25,7 +25,9 @@ def test_hand_computed_removal_and_loss():
     result = module(fluid_in=INLET, sand_concentration="50 mg/l")
     out = result.outputs
     assert out.pressure_drop == 25000
-    assert result.outlets.fluid_out == INLET.with_(p=1e6 - 25000)
+    removed = result.outlets.waste_out.m_dot
+    assert result.outlets.fluid_out == INLET.with_(m_dot=INLET.m_dot - removed, p=1e6 - 25000)
+    assert result.outlets.waste_out.m_dot == out.sand_removal_rate
     assert out.sand_removal_rate == pytest.approx(0.9 * 0.05 * 0.02)
     assert out.residual_sand_concentration == pytest.approx(0.005)
     assert mass_balance(module, result)["residual"] == 0

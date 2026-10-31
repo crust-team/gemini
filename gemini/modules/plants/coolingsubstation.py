@@ -1,7 +1,7 @@
 """Building cooling substation: network valve, heat exchanger and the building's cooling loads."""
 
-from gemini.modules.demand import CoolingConsumer
 from gemini.modules.exchangers import HeatExchanger
+from gemini.modules.grids import CoolingGrid
 from gemini.modules.module import Module
 from gemini.modules.piping import Valve
 from gemini.modules.plants import loops
@@ -22,7 +22,7 @@ class CoolingSubstation(Module):
 
     The network chilled water passes the control ``valve`` and the cold side of the
     ``heat_exchanger``; the building circuit, a closed loop inside the substation, passes its
-    hot side and the ``consumer`` (a ``CoolingConsumer`` with the building's sensible and latent
+    hot side and the ``consumer`` (a ``CoolingGrid`` with the building's sensible and latent
     loads and indoor air). The building circuit carries the parameter ``building_flow`` at
     ``building_pressure`` with the substation's ``fluid``; its circulation pump and hydraulics
     are not modelled. This is the indirect energy-transfer-station connection of district
@@ -60,7 +60,7 @@ class CoolingSubstation(Module):
         # Modules
         self.valve = Valve()
         self.heat_exchanger = HeatExchanger()
-        self.consumer = CoolingConsumer()
+        self.consumer = CoolingGrid()
 
         # Parameters
         self.building_flow = Parameter(MassFlow, gt=0)

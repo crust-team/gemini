@@ -45,7 +45,7 @@ above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersi
 Every port is `<role>_in` or `<role>_out` ([conventions.md](conventions.md#naming)). The roles are
 `hot`, `cold`, `source`, `sink`, `generator`, `chilled`, `cooling`, `charge`, `discharge`, `supply`,
 `return`, `gas`, `liquid`, `fuel`, `power`, `loss`, `air`, `waste`, `chemical`, `wellhead`, `bottom`,
-`sandface`, `production`, `injection`, `fluid` and `branch<N>`.
+`sandface`, `production`, `injection`, `fluid`, `branch<N>`, `grid` and `excess`.
 
 ## Retired names
 
@@ -105,14 +105,14 @@ Every port is `<role>_in` or `<role>_out` ([conventions.md](conventions.md#namin
 ```text
 absorbed absorber accumulation active adsorber ambient approach aquifer arrangement auxiliary
 baumann best blowdown borehole bottom bottomhole branch1 branch2 breakthrough brine building bulb burned capacity
-capped carnot change characteristic charge charged chilled clogging co2 coefficient coefficients
+capped carnot change characteristic charge charged chemical chilled clogging co2 coefficient coefficients
 cold combustion command composition concentration condenser condensing conductance conductivity consumption
 cooler cooling cop coproduced correction correlation cost count curtailed decline demand density depth
 derivative dew diameter difference diffusivity direction discharge dose drainage drawdown drift
 driving drop dumped duty effective effectiveness efficiency electric electricity elevation
-emission empty energy error esp evaporation evaporator exhaust export extraction factor factors
+emission empty energy error esp evaporation evaporator excess exhaust export extraction factor factors
 fan feed first flow fluid fouling fraction freezing frequency friction fuel full gain gas
-generated generation generator geothermal gradient gravity gross ground groundwater head heat
+generated generation generator geothermal gradient gravity grid gross ground groundwater head heat
 heating hot humidity hydraulic hydrostatic ice imbalance import in index indoor injected
 injection injectivity inlet inner input integral is isentropic latent length lift limit limited
 liquid load log lorenz loss margin mass maximum mean measurement methane minimum mixed mode

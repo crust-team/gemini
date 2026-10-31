@@ -1,4 +1,4 @@
-"""Electricity exchange of a plant with a grid connection of limited capacity."""
+"""Physics of the grids: the electricity exchange through a connection of limited capacity."""
 
 from dataclasses import dataclass
 
@@ -7,24 +7,16 @@ from gemini import ops
 
 @dataclass(frozen=True)
 class GridExchange:
-    """Powers [W] and cost rate [currency/s] of a grid connection."""
+    """Powers [W] of a grid connection."""
 
     net_import: float
     net_export: float
     unserved_consumption: float
     curtailed_generation: float
-    cost_rate: float
 
 
 @ops.physics
-def net_exchange(
-    consumption: float,
-    generation: float,
-    import_limit,
-    export_limit,
-    import_price: float,
-    export_price: float,
-) -> GridExchange:
+def net_exchange(consumption: float, generation: float, import_limit, export_limit) -> GridExchange:
     """Return the import and export of a plant through a limited grid connection.
 
     Parameters
@@ -34,21 +26,17 @@ def net_exchange(
     import_limit, export_limit : float or None
         Connection limits [W]; ``None`` means unlimited. Whether a limit exists is a
         configuration, not a value, so it is a Python test.
-    import_price, export_price : float
-        Tariffs [currency/J] of imported and exported energy.
 
     Returns
     -------
     GridExchange
         ``net_import`` min(max(0, C - G), limit) and ``net_export`` min(max(0, G - C), limit)
         [W]; ``unserved_consumption`` and ``curtailed_generation``, the parts above the limits
-        [W]; ``cost_rate`` = price_import * net_import - price_export * net_export
-        [currency/s], negative for a revenue.
+        [W].
 
     Notes
     -----
-    Net metering at one connection point with one tariff per direction, without reactive power,
-    losses or demand charges.
+    Net metering at one connection point, without reactive power, losses or demand charges.
 
     Source: A plain power balance at the connection point; no published source is needed.
     """
@@ -61,5 +49,4 @@ def net_exchange(
         net_export=net_export,
         unserved_consumption=demand - net_import,
         curtailed_generation=surplus - net_export,
-        cost_rate=import_price * net_import - export_price * net_export,
     )

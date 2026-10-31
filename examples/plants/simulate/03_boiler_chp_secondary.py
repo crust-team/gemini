@@ -92,7 +92,7 @@ class BoilerChpPlant(gm.modules.Module):
         )
         returned = self.cold_filter(fluid_in=exchanged.outlets.hot_out)
         self.doublet.inject(returned.outlets.fluid_out)
-        gas = self.grid().outlets.fluid_out
+        gas = self.grid.offer()["gas_out"]
         boiled = self.boiler(fluid_in=exchanged.outlets.cold_out, fuel_in=gas)
         cogenerated = self.chp(fluid_in=split.outlets.branch2_out, fuel_in=gas)
         mixed = self.mixer(

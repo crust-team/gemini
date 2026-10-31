@@ -13,6 +13,7 @@ never manufacture heat loss to force a first-law residual to zero.
 """
 
 from gemini import ops
+from gemini.modules.grids import ChemicalGrid, GasGrid, WasteGrid
 from gemini.modules.pumps import ESP, InjectionPump, LineShaftPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.physics import combustion, diagnostics, heat_transfer
@@ -112,15 +113,22 @@ def mass_balance(module, result):
     }
 
 
+def _is_edge(module):
+    """Return whether ``module`` is at the plant's edge: what enters it left the plant."""
+    return isinstance(module, (ChemicalGrid, GasGrid, WasteGrid))
+
+
 def _leaf_mass(module, result):
-    """Return a leaf's mass in- and outflow, counting aquifers as open boundaries."""
+    """Return a leaf's mass in- and outflow, counting aquifers and edges as open boundaries."""
     incoming = sum(s.m_dot for s in _streams(result.inlets))
     outgoing = sum(s.m_dot for s in _streams(result.outlets))
+    if _is_edge(module):
+        return incoming + outgoing, incoming + outgoing
     if isinstance(module, ProductionReservoir):
         incoming += result.inputs["production_rate"]
     elif isinstance(module, InjectionReservoir):
         outgoing += sum(s.m_dot for s in _streams(result.inlets))
-    return incoming, outgoing + result.outputs.get("burned_mass_flow", 0.0)
+    return incoming, outgoing + _burned_mass(result)
 
 
 def energy_balance(module, result):
@@ -173,12 +181,19 @@ def _composite_energy(module, result):
     }
 
 
+def _burned_mass(result):
+    """Return the gas [kg/s] that ends in a leaf: what a burner took, or what a flare burned."""
+    if "fuel_in" in result.inlets:
+        return result.inlets["fuel_in"].m_dot
+    return result.outputs.get("burned_mass_flow", 0.0)
+
+
 def _burned_enthalpy(result):
     """Return the sensible enthalpy [W] of the gas a burner or flare burned, which leaves here."""
     gas = next((s for s in _streams(result.inlets) if s.fluid.kind == "gas"), None)
     if gas is None:
         return 0.0
-    return _enthalpy(gas.with_(m_dot=result.outputs.get("burned_mass_flow", 0.0)))
+    return _enthalpy(gas.with_(m_dot=_burned_mass(result)))
 
 
 def _leaf_energy(module, result, flows):
@@ -190,7 +205,9 @@ def _leaf_energy(module, result, flows):
     """
     incoming = sum(_enthalpy(s) for s in _streams(result.inlets))
     outgoing = sum(_enthalpy(s) for s in _streams(result.outlets))
-    if isinstance(module, ProductionReservoir):
+    if _is_edge(module):
+        incoming = outgoing = incoming + outgoing
+    elif isinstance(module, ProductionReservoir):
         incoming += outgoing
     elif isinstance(module, InjectionReservoir):
         outgoing += incoming

@@ -122,6 +122,26 @@
       "default": null,
       "unit": "K",
       "description": "Margin above the dew point the cooling consumer keeps its supply at."
+    },
+    "heating_consumer.return_temperature": {
+      "default": null,
+      "unit": "K",
+      "description": "Fixed temperature of the heating return."
+    },
+    "heating_consumer.return_pressure": {
+      "default": null,
+      "unit": "Pa",
+      "description": "Pressure of the heating return."
+    },
+    "cooling_consumer.return_temperature": {
+      "default": null,
+      "unit": "K",
+      "description": "Fixed temperature of the cooling return."
+    },
+    "cooling_consumer.return_pressure": {
+      "default": null,
+      "unit": "Pa",
+      "description": "Pressure of the cooling return."
     }
   },
   "optional": {},
@@ -177,7 +197,7 @@
         "params": {}
       },
       "heating_consumer": {
-        "type": "HeatConsumer",
+        "type": "HeatingGrid",
         "params": {}
       },
       "cooling_return_pipe": {
@@ -195,18 +215,42 @@
         "params": {}
       },
       "cooling_consumer": {
-        "type": "CoolingConsumer",
+        "type": "CoolingGrid",
         "params": {}
       },
       "gas_grid": {
         "type": "GasGrid",
         "params": {}
+      },
+      "electricity_grid": {
+        "type": "ElectricityGrid",
+        "params": {}
+      },
+      "gas_makeup": {
+        "type": "GasMakeup",
+        "params": {}
+      },
+      "flare": {
+        "type": "Flare",
+        "params": {}
       }
     },
     "connections": [
       {
-        "source": "gas_grid.fluid_out",
+        "source": "degasser.gas_out",
+        "target": "gas_makeup.gas_in"
+      },
+      {
+        "source": "gas_grid.gas_out",
+        "target": "gas_makeup.grid_in"
+      },
+      {
+        "source": "gas_makeup.fuel_out",
         "target": "peak_boiler.fuel_in"
+      },
+      {
+        "source": "gas_makeup.excess_out",
+        "target": "flare.gas_in"
       },
       {
         "source": "doublet.supply_out",
@@ -261,6 +305,30 @@
         "target": "cooling_consumer.supply_in"
       },
       {
+        "source": "electricity_grid.power_out",
+        "target": "doublet.power_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "heat_pump.power_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "injection_pump.power_in"
+      },
+      {
+        "source": "electricity_grid.power_out",
+        "target": "compression_chiller.power_in"
+      },
+      {
+        "source": "heating_consumer.return_out",
+        "target": "heating_return_pipe.fluid_in"
+      },
+      {
+        "source": "cooling_consumer.return_out",
+        "target": "cooling_return_pipe.fluid_in"
+      },
+      {
         "source": "peak_boiler.fluid_out",
         "target": "heating_supply_pipe.fluid_in"
       },
@@ -270,22 +338,10 @@
       }
     ],
     "inlets": {
-      "heating_return_in": "heating_return_pipe.fluid_in",
-      "cooling_return_in": "cooling_return_pipe.fluid_in",
-      "compression_rejection_in": "compression_chiller.sink_in",
-      "power_in": [
-        "doublet.power_in",
-        "heat_pump.power_in",
-        "injection_pump.power_in",
-        "compression_chiller.power_in"
-      ]
+      "compression_rejection_in": "compression_chiller.sink_in"
     },
     "outlets": {
-      "heating_return_out": "heating_consumer.return_out",
-      "cooling_return_out": "cooling_consumer.return_out",
-      "gas_out": "degasser.gas_out",
-      "compression_rejection_out": "compression_chiller.sink_out",
-      "boiler_gas": "peak_boiler.gas_out"
+      "compression_rejection_out": "compression_chiller.sink_out"
     },
     "bindings": {},
     "param_history": {}

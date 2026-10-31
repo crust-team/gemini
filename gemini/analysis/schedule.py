@@ -14,20 +14,17 @@ import pandas as pd
 from gemini import backends
 from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules.cooling import AbsorptionUnit
-from gemini.modules.demand import CoolingConsumer, HeatConsumer
+from gemini.modules.grids import CoolingGrid, HeatingGrid
 from gemini.modules.heating import Boiler, HeatPump
-from gemini.modules.piping import Splitter
+from gemini.modules.piping import Mixer, Splitter
 from gemini.modules.plants.doublet import Doublet
 from gemini.modules.plants.plan import members, split_end
 from gemini.physics import constants, dispatch, units
 from gemini.physics.fluid import mixture_mass_flow
-from gemini.types.fluid import Fluid
 from gemini.utils.strings import join_names, join_path
 
 SOURCES = ("geothermal", "heat_pump", "boiler")
 RULES = ("order", "doublet_flow", "max_brine_cooling", "operating_days")
-HEATING_RETURN = "heating_return"
-COOLING_RETURN = "cooling_return"
 ARRAY_BACKEND = "numpy"
 """A plan is a balance over the days, on arrays whatever backend the run takes after it."""
 
@@ -139,12 +136,19 @@ def _brine_splits(plant, flows):
     return columns
 
 
+def _load_below(plant, path):
+    """Return the module at ``path``, or the module its mixer feeds when it is a ``Mixer``."""
+    if path is not None and isinstance(plant.get_module(path), Mixer):
+        return _target(plant, path, "fluid_out")
+    return path
+
+
 def _load_splits(plant, consumer, chiller, heat, generator):
     """Return the ``split_fraction`` column of the splitter between the consumer and the chiller."""
     columns = {}
     for path, _ in _of_type(plant, Splitter):
-        first = _target(plant, path, "branch1_out")
-        second = _target(plant, path, "branch2_out")
+        first = _load_below(plant, _target(plant, path, "branch1_out"))
+        second = _load_below(plant, _target(plant, path, "branch2_out"))
         if {first, second} == {consumer, chiller}:
             shares = (generator, heat) if first == consumer else (heat, generator)
             columns[f"{path}.split_fraction"] = dispatch.flow_share(*shares)
@@ -182,14 +186,13 @@ def _doublet_columns(plant, rules, need):
     return flows, columns
 
 
-def _return_flow(plant, port, heat, supply):
-    """Return the ``port.m_dot`` column of a return that carries ``heat`` to ``supply``, if any."""
-    stream = plant.boundary.get("root_inputs", {}).get(port)
-    if port not in plant.inlets() or stream is None:
+def _return_flow(path, grid, heat, supply):
+    """Return the ``flow`` column of a grid whose return carries ``heat`` up to ``supply``."""
+    if path is None or grid.return_temperature is None:
         return {}
-    specific_heat = Fluid.model_validate(stream.get("fluid", {})).properties(0, 0).cp_l
-    difference = abs(supply - stream["T"])
-    return {f"{port}.m_dot": dispatch.circuit_flow(heat, specific_heat, difference)}
+    specific_heat = grid.fluid.properties(0, 0).cp_l
+    difference = abs(supply - grid.return_temperature)
+    return {f"{path}.flow": dispatch.circuit_flow(heat, specific_heat, difference)}
 
 
 def _demand_columns(demand):
@@ -207,7 +210,7 @@ def _demand_columns(demand):
 def _heating_columns(plant, heat, generator):
     """Return the columns of the heat users, the heat pump, the boiler and the return flow."""
     columns, supply = {}, None
-    path, _ = _single(plant, HeatConsumer)
+    path, grid = _single(plant, HeatingGrid)
     if path is not None:
         columns[f"{path}.heat_demand"] = heat
     for kind in (HeatPump, Boiler):
@@ -216,14 +219,14 @@ def _heating_columns(plant, heat, generator):
             supply = _setpoint(unit_path, module)
             columns[f"{unit_path}.temperature_setpoint"] = np.full_like(heat, supply)
     if supply is not None:
-        columns |= _return_flow(plant, HEATING_RETURN, heat + generator, supply)
+        columns |= _return_flow(path, grid, heat + generator, supply)
     return columns
 
 
 def _cooling_columns(plant, cool):
     """Return the columns of the cooling users, the chiller and the return flow."""
     columns = {}
-    path, _ = _single(plant, CoolingConsumer)
+    path, grid = _single(plant, CoolingGrid)
     if path is not None:
         columns[f"{path}.sensible_cooling_demand"] = cool
         columns[f"{path}.latent_cooling_demand"] = np.zeros_like(cool)
@@ -231,7 +234,7 @@ def _cooling_columns(plant, cool):
     if chiller_path is not None:
         supply = _setpoint(chiller_path, chiller)
         columns[f"{chiller_path}.temperature_setpoint"] = np.full_like(cool, supply)
-        columns |= _return_flow(plant, COOLING_RETURN, cool, supply)
+        columns |= _return_flow(path, grid, cool, supply)
     return columns
 
 
@@ -249,7 +252,7 @@ def schedule(plant, demand, rules):
     ----------
     plant : Plant
         The design: its ``Doublet`` children, at most one ``HeatPump``, ``Boiler``,
-        ``AbsorptionUnit``, ``HeatConsumer`` and ``CoolingConsumer``, with the
+        ``AbsorptionUnit``, ``HeatingGrid`` and ``CoolingGrid``, with the
         ``temperature_setpoint`` of the heat pump, boiler and chiller set. Plant ports named
         ``heating_return`` and ``cooling_return`` take their temperature from
         ``plant.boundary["root_inputs"]`` and get their flow from the plan.
@@ -283,7 +286,7 @@ def _plan_columns(plant, demand, checked):
     need = _covered_before_geothermal(plant, checked, heat + generator)
     flows, columns = _doublet_columns(plant, checked, need)
     columns |= _brine_splits(plant, flows)
-    consumer, _ = _single(plant, HeatConsumer)
+    consumer, _ = _single(plant, HeatingGrid)
     columns |= _load_splits(plant, consumer, chiller_path, heat, generator)
     columns |= _heating_columns(plant, heat, generator)
     columns |= _cooling_columns(plant, cool)

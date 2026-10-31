@@ -78,7 +78,7 @@ snapshot covers the package API (functions, types, return shapes), not the list 
 | --- | --- | --- |
 | `gm.modules.names(category=None)` | sorted registry names; spec plants have category `plants` | real |
 | `gm.modules.get(name)` | the class; a spec plant gives a new plant. Unknown: `ValidationError` with `suggestions` | real |
-| `gm.modules.categories()` | `subsurface`, `wells`, `pumps`, `treatment`, `exchangers`, `heating`, `cooling`, `power`, `storage`, `piping`, `demand`, `control`, `plants`, in display order; each is the folder that holds the module | real |
+| `gm.modules.categories()` | `subsurface`, `wells`, `pumps`, `treatment`, `exchangers`, `heating`, `cooling`, `power`, `storage`, `piping`, `grids`, `control`, `plants`, in display order; each is the folder that holds the module | real |
 | `gm.modules.register(cls)` | `cls`, now in the registry; it states `category = "<one of the list>"`; a taken name is refused | real |
 | `gm.modules.load_file(path)` | names of the `Module` classes of a Python file that state a `category`, registered | real |
 | `gm.modules.<Equipment>`, `Module`, `ModuleList`, `ModuleDict`, `collect_flows`, `emissions`, `energy_balance`, `mass_balance`, `trace_wiring` | classes and one-call audits, see [equipment.md](equipment.md) | real |
@@ -283,6 +283,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 | Version | Date | Change |
 | --- | --- | --- |
 | 0.2.0, unreleased changes | | Port names follow `<role>_in` and `<role>_out` (`gm.plants.migrate` converts stored specs). `Inlet(Stream, kind=...)` replaces `stream=`, the first argument of a declaration is `type`, `p.add(type, ...)`, `p.connect(source, target, type=None)`, a connection's `type: "state"`; `describe()` gives ports `{kind, fields}`, outputs `{unit, quantity, soft_sensor}`, connections `{source, target, kind, type}`. |
+| 0.2.0, unreleased changes | | Category `grids`: `ElectricityGrid` (from `GridConnection`, without prices), `GasGrid`, `HeatingGrid` (from `HeatConsumer`), `CoolingGrid` (from `CoolingConsumer`), `WasteGrid`, `ChemicalGrid`; category `demand` removed. `GasMakeup` has `gas_in`, `grid_in`, `fuel_out`, `excess_out`; a burner's `fuel_in` shows what it burned and `gas_out` is gone. `gm.schedule` writes `<grid>.flow`. `validate` reports `root_plant_port`. |
 | 0.2.0, unreleased changes | | Ports carry a `Power`: `Inlet(Power, kind="electricity")`, `Outlet(Power, kind="heat")`; `many=True`, `drawn=True`, `offered=True`; consumers get `power_in`, generators `power_out`; a plant port may list several ends. `gm.streams.names()` adds `heat`, `air`, `waste`, `chemical`. |
 | 0.2.0, unreleased changes | | Layout: helpers in `gemini/modules/_utils/`, physics of one category in its `_physics.py`. Public names unchanged. |
 | 0.2.0 | 2026-10-31 | Demand profiles: `gm.profiles.get` reads the two organiser files of 2027; `profile_schema` describes what `get` returns. |

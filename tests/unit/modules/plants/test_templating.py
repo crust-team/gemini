@@ -64,7 +64,8 @@ def test_listing_names_every_template_with_its_summary():
 def test_every_template_fills_with_its_defaults_into_a_valid_spec(name):
     """The defaults of each shipped template give a spec without problems."""
     spec = templating.fill(templating.load(name), {})
-    assert gm.plants.validate(spec) == []
+    found = gm.plants.validate(spec, on_error="record")
+    assert {item["code"] for item in found} <= {"root_plant_port"}
 
 
 def test_default_sizes_build_the_shipped_plants():
@@ -92,7 +93,7 @@ def test_a_disabled_unit_leaves_with_its_wiring_and_the_bypass_closes_the_gap():
 def test_a_disabled_end_unit_drops_its_ports_and_its_connections():
     """Without a bypass the neighbour's port becomes free and the plant port goes."""
     spec = templating.fill(_chain_template(), {"first.enabled": False})
-    assert spec["inlets"] == {}
+    assert spec.get("inlets", {}) == {}
     assert spec["connections"] == [{"source": "middle.fluid_out", "target": "last.fluid_in"}]
 
 
@@ -134,7 +135,7 @@ def test_neighbouring_units_leave_together_and_a_group_leaves_with_its_members()
     template["parameters"]["tail.enabled"] = {"default": True, "unit": None, "description": "Tail."}
     spec = templating.fill(template, {"tail.enabled": False})
     assert list(spec["modules"]) == ["first"]
-    assert spec["connections"] == [] and spec["outlets"] == {}
+    assert spec["connections"] == [] and spec.get("outlets", {}) == {}
     separate = templating.fill(template, {"middle.enabled": False, "last.enabled": False})
     assert separate["modules"].keys() == spec["modules"].keys()
 
@@ -193,4 +194,6 @@ def test_every_switch_and_parameter_of_a_template_names_something_in_its_spec(na
     for unit, entry in template["optional"].items():
         assert set(entry.get("modules", [unit])) <= modules
         for item in entry.get("bypass", []):
-            assert item["source"].partition(".")[0] == item["target"].partition(".")[0] == unit
+            owner = item["source"].partition(".")[0]
+            assert owner == item["target"].partition(".")[0]
+            assert owner in entry.get("modules", [unit])

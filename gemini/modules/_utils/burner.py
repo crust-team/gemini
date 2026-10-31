@@ -19,10 +19,20 @@ def fuel_split(need, fuel):
     return combustion.fuel_split(need, available_fuel(fuel), fuel.fluid.heating_value())
 
 
-def unburned_gas(need, fuel):
-    """Return the stream ``fuel`` less the gas a burner with fuel need ``need`` burns."""
-    _, _, burnt = fuel_split(need, fuel)
-    return fuel.with_(m_dot=ops.maximum(fuel.m_dot - burnt, 0.0))
+def burned_stream(need, fuel):
+    """Return what a burner with fuel need ``need`` [W] takes through its drawn ``fuel_in``.
+
+    The flow is the co-produced gas it burns and, in kg/s of grid gas, what it buys.
+    """
+    _, purchased, burnt = fuel_split(need, fuel)
+    return fuel.with_(m_dot=burnt + _grid_mass(purchased, fuel))
+
+
+def _grid_mass(purchased, fuel):
+    """Return the grid gas [kg/s] of a purchased fuel power [W]; zero on a stream without a grid."""
+    if not has_grid(fuel):
+        return 0.0
+    return ops.truediv(purchased, gas.lower_heating_value(fuel.fluid.grid_composition))
 
 
 def _grid_factor(fuel):

@@ -27,7 +27,7 @@ CATEGORIES = (
     "power",
     "storage",
     "piping",
-    "demand",
+    "grids",
     "control",
     "plants",
 )

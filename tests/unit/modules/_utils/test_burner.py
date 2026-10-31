@@ -29,7 +29,7 @@ def test_the_split_and_the_gas_left():
     coproduced, purchased, burnt = burner.fuel_split(need, FUEL)
     assert coproduced == pytest.approx(need) and purchased == 0
     assert burnt == pytest.approx(0.025)
-    assert burner.unburned_gas(need, FUEL).m_dot == pytest.approx(0.075)
+    assert burner.burned_stream(need, FUEL).m_dot == pytest.approx(0.025)
     assert burner.fuel_outputs(need, FUEL)["co2_emission"] == pytest.approx(
         need * FLUID.emission_factor()
     )

@@ -29,7 +29,7 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
     """Unit strings stay as written; fluids, history and bindings are kept."""
     spec = {
         "format": 2,
-        "name": "Units",
+        "name": "DoubletHeatPlant",
         "modules": {
             "pipe": {"type": "Pipe", "params": {"length": "100 ft", "inner_diameter": 0.1}},
             "valve": {"type": "Valve", "params": {}},
@@ -59,7 +59,7 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
     """A child of plant type takes dotted params; a group nests children."""
     spec = {
         "format": 2,
-        "name": "Nested",
+        "name": "DoubletHeatPlant",
         "modules": {
             "doublet": {"type": "Doublet", "params": {"esp.stage_count": 12}},
             "filters": {"type": "ModuleDict", "modules": {"hot": {"type": "Filter", "params": {}}}},
@@ -89,7 +89,9 @@ def test_params_set_since_and_validation_agree_with_the_builder():
     plant.add("Pipe", "pipe", params={"length": 5.0})
     plant.connect("feed", "pipe.fluid_in")
     plant.connect("pipe.fluid_out", "product")
-    assert plant.validate() == gm.plants.validate(plant.to_spec()) == []
+    found = plant.validate(on_error="record")
+    assert found == gm.plants.validate(plant.to_spec(), on_error="record")
+    assert {item["code"] for item in found} == {"root_plant_port"}
     with pytest.raises(gm.errors.ValidationError):
         plant.add("Pipe", "bad", params={"length": "5 bar"})
 
@@ -98,7 +100,7 @@ def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
     """``from_dict``, ``gm.plants.validate`` and ``plant.validate`` tell one story in one try."""
     spec = {
         "format": 2,
-        "name": "broken",
+        "name": "DoubletHeatPlant",
         "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe", "params": {"length": -5.0}}},
         "connections": [],
         "inlets": {"feed": "pipe.fluid_in"},
@@ -137,7 +139,7 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
     """Every problem comes at once, also on a connection with one good end."""
     spec = {
         "format": 2,
-        "name": "broken",
+        "name": "DoubletHeatPlant",
         "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe"}},
         "connections": [
             {"source": "a.fluid_out", "target": "b.fluid_in"},

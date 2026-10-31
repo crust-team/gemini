@@ -36,6 +36,7 @@ class InhibitorDosing(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="brine")
+        self.chemical_in = Inlet(Stream, kind="chemical", drawn=True)
 
         # Controls
         self.dose = Control(Fraction)
@@ -59,9 +60,11 @@ class InhibitorDosing(Module):
             path=self.path,
             m_dot=inlet.m_dot,
         )
-        outlet = inlet
+        product, _ = _physics.dosing_flows(self.dose, inlet.m_dot, self.product_concentration)
+        outlet = inlet.with_(m_dot=inlet.m_dot + product)
+        chemical_in = inlets.chemical_in.with_(m_dot=product, T=inlet.T)
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, chemical_in=chemical_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

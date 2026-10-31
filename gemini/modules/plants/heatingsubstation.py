@@ -1,7 +1,7 @@
 """Building heating substation: network valve, heat exchanger and the building's heat demand."""
 
-from gemini.modules.demand import HeatConsumer
 from gemini.modules.exchangers import HeatExchanger
+from gemini.modules.grids import HeatingGrid
 from gemini.modules.module import Module
 from gemini.modules.piping import Valve
 from gemini.modules.plants import loops
@@ -22,7 +22,7 @@ class HeatingSubstation(Module):
 
     The network water passes the control ``valve`` and the hot side of the ``heat_exchanger``;
     the building circuit, a closed loop inside the substation, passes its cold side and the
-    ``consumer`` (a ``HeatConsumer`` with the building's ``heat_demand``). The building circuit
+    ``consumer`` (a ``HeatingGrid`` with the building's ``heat_demand``). The building circuit
     carries the parameter ``building_flow`` at ``building_pressure`` with the substation's
     ``fluid``; its circulation pump and hydraulics are not modelled (their electricity is
     outside the network audit). This is the common indirect connection of district heating
@@ -54,7 +54,7 @@ class HeatingSubstation(Module):
         # Modules
         self.valve = Valve()
         self.heat_exchanger = HeatExchanger()
-        self.consumer = HeatConsumer()
+        self.consumer = HeatingGrid()
 
         # Parameters
         self.building_flow = Parameter(MassFlow, gt=0)

@@ -82,10 +82,10 @@ class Boiler(_BoilerBody):
     """Auxiliary gas boiler with a thermal capacity limit, burning co-produced gas first.
 
     Each step it needs ``duty / efficiency`` of fuel energy. ``fuel_in`` brings the co-produced gas:
-    the boiler burns it first, up to its need, and takes the rest from the grid. ``gas_out`` carries
-    the gas it did not burn. It may draw grid gas when ``fuel_in`` comes from a ``GasMakeup`` or a
-    ``GasGrid``, which mark the stream with the grid composition; without that mark the fuel energy
-    of the stream limits the duty.
+    the boiler burns it first, up to its need, and takes the rest from the grid; the port returns
+    what it burned, and a ``GasMakeup`` sends the rest to ``excess_out``. It may draw grid gas when
+    ``fuel_in`` comes from a ``GasMakeup`` or a ``GasGrid``, which mark the stream with the grid
+    composition; without that mark the fuel energy of the stream limits the duty.
 
     ``fuel`` is the total, ``fuel_coproduced`` and ``fuel_purchased`` its parts [W],
     ``burned_mass_flow`` the co-produced gas burned [kg/s] and ``co2_emission`` the CO2 of
@@ -99,7 +99,7 @@ class Boiler(_BoilerBody):
         super().__init__()
 
         # Inlets
-        self.fuel_in = Inlet(Stream, kind="gas")
+        self.fuel_in = Inlet(Stream, kind="gas", drawn=True)
 
         # Outputs
         self.fuel = Output(Fuel)
@@ -108,19 +108,16 @@ class Boiler(_BoilerBody):
         self.burned_mass_flow = Output(MassFlow)
         self.co2_emission = Output(MassFlow)
 
-        # Outlets
-        self.gas_out = Outlet(Stream, kind="gas")
-
     def forward(self, inlets):
-        """Heat the stream up to its setpoint and pass on the gas not burned."""
+        """Heat the stream up to its setpoint and return the gas it burned."""
 
         # Outlets
         inlet, fuel = inlets.fluid_in, inlets.fuel_in
         duty = ops.minimum(self._requested_duty(inlet), self._duty_limit(fuel))
         outlet = self._heated(inlet, duty)
-        gas_out = burner.unburned_gas(energy.input_power(duty, self.efficiency), fuel)
+        fuel_in = burner.burned_stream(energy.input_power(duty, self.efficiency), fuel)
 
-        outlets = dict(fluid_out=outlet, gas_out=gas_out)
+        outlets = dict(fluid_out=outlet, fuel_in=fuel_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

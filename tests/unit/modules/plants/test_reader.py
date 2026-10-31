@@ -14,7 +14,7 @@ def spec():
     """Return a valid spec with a group, a nested plant, a named port and an output."""
     return {
         "format": 2,
-        "name": "Test",
+        "name": "DoubletHeatPlant",
         "modules": {
             "degasser": {"type": "Degasser", "params": {}},
             "filters": {"type": "ModuleDict", "modules": {"hot": {"type": "Filter", "params": {}}}},

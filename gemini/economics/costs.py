@@ -7,7 +7,7 @@ from gemini.economics.assumptions import require, resolve
 from gemini.economics.emissions import source_energies
 from gemini.economics.outcome import currency_of, reported, unavailable
 from gemini.errors import ValidationError
-from gemini.modules.demand import CoolingConsumer, HeatConsumer
+from gemini.modules.grids import CoolingGrid, HeatingGrid
 from gemini.physics import units
 from gemini.physics.units import SECONDS_PER_YEAR
 from gemini.types.cost import total_cost
@@ -35,14 +35,14 @@ def annual_energies(plant, results):
 
     The run is taken as representative of a year: each energy over the window of the results is
     scaled by one year over that window. The heat is the ``heat_supplied`` of the plant's
-    ``HeatConsumer`` leaves and the cold the ``heat_absorbed`` of its ``CoolingConsumer`` leaves;
+    ``HeatingGrid`` leaves and the cold the ``heat_absorbed`` of its ``CoolingGrid`` leaves;
     a plant without such a leaf delivers none. A tick without a value adds no energy.
     """
     frame = results.to_frame()
     seconds = window_seconds(results)
     scale = SECONDS_PER_YEAR / seconds.sum()
-    heat = leaf_total(plant, frame, "heat_supplied", HeatConsumer)
-    cold = leaf_total(plant, frame, "heat_absorbed", CoolingConsumer)
+    heat = leaf_total(plant, frame, "heat_supplied", HeatingGrid)
+    cold = leaf_total(plant, frame, "heat_absorbed", CoolingGrid)
     _, grid = source_energies(results)
     fuel = results_total(results, frame, "fuel_purchased")
     return Annual(

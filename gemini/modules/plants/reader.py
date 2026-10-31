@@ -3,7 +3,7 @@
 from copy import deepcopy
 
 from gemini.errors import GeminiError, ValidationError
-from gemini.errors.base import reported
+from gemini.errors.base import problem, reported
 from gemini.modules._utils import registry
 from gemini.modules._utils.serialization import (
     SECTIONS,
@@ -141,6 +141,26 @@ def _check_ports(plant, spec, report):
         if end not in named and not report.skips(end):
             with report.guard(""):
                 raise unconnected_port(end)
+
+
+def root_problems(spec):
+    """Return a problem for each plant port of a root plant.
+
+    Every edge of a root plant is a module, so it has no plant ports. A registered plant is a
+    building block for other plants: its ports are its interface.
+    """
+    if not isinstance(spec, dict) or spec.get("name") in registry.names():
+        return []
+    return [
+        problem(
+            f"{side}.{name}",
+            "root_plant_port",
+            f"{name}: a root plant has no plant ports; connect it to a module of the grids or "
+            "the environment",
+        )
+        for side in ("inlets", "outlets")
+        for name in spec.get(side, {})
+    ]
 
 
 def populate(plant, spec, report):

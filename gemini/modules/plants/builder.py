@@ -177,7 +177,8 @@ class Plant(PortResolver, Module):
 
     def validate(self, on_error="raise"):
         """Check the plant's spec as ``gm.plants.validate`` does; the same ``on_error``."""
-        return reported(reader.problems(type(self), self.to_spec()), on_error)
+        spec = self.to_spec()
+        return reported(reader.problems(type(self), spec) + reader.root_problems(spec), on_error)
 
     def _compiled(self):
         if self._plan is None:
