@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from tests.fixtures import SHARED
 
 pytestmark = pytest.mark.e2e
 
@@ -16,7 +15,7 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
     """
     monkeypatch.chdir(tmp_path)
 
-    plant = gm.Plant.load(SHARED / "plant.json")
+    plant = gm.plants.example("DoubletHeatPlant")
     print(plant)
 
     df = pd.read_csv(dataset_path, parse_dates=["time"])

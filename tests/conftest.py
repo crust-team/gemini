@@ -10,6 +10,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules import Module
+from gemini.utils import paths
 from tests.cpu_budget import BUDGET_S, exceeds_budget, measure_cpu
 from tests.fixtures.plant_classes import spec_plant_classes
 
@@ -23,8 +24,8 @@ ROOT = Path(__file__).parents[1]
 CPU_SECONDS = pytest.StashKey[float]()
 SESSION_BUDGET_S = 300.0
 DATASETS = {
-    "fast": ROOT / "datasets/doublet_heat/doublet_2024_15min_month.csv",
-    "slow": ROOT / "datasets/doublet_heat/doublet_2024_15min.csv",
+    "fast": paths.doublet_heat("doublet_2024_15min_month.csv"),
+    "slow": paths.doublet_heat("doublet_2024_15min.csv"),
 }
 
 
@@ -76,7 +77,7 @@ def shared_plant():
     """Load and validate one read-only shared plant design."""
     with warnings.catch_warnings(record=True) as warnings_seen:
         warnings.simplefilter("always")
-        plant = gm.Plant.load(ROOT / "datasets/doublet_heat/plant.json")
+        plant = gm.plants.example("DoubletHeatPlant")
     assert not warnings_seen
     return plant
 

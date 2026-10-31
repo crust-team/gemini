@@ -5,9 +5,6 @@ import json
 import pytest
 
 import gemini as gm
-from tests.fixtures import ROOT
-
-PLANT_FILE = ROOT / "datasets/doublet_heat/plant.json"
 
 
 def test_from_dict_and_from_spec_are_one_function():
@@ -18,7 +15,7 @@ def test_from_dict_and_from_spec_are_one_function():
 
 def test_the_stored_plant_file_round_trips_exactly():
     """``to_spec(from_spec(x)) == x`` for the migrated example plant, JSON-safe."""
-    spec = json.loads(PLANT_FILE.read_text())
+    spec = gm.plants.example("DoubletHeatPlant").to_dict()
     plant = gm.plants.from_spec(spec)
     assert plant.to_spec() == spec
     assert plant.to_dict() == spec

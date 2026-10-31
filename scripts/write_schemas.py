@@ -14,10 +14,11 @@ import pandas as pd
 
 import gemini as gm
 from gemini.types import shapes
+from gemini.utils import paths
 
 ROOT = Path(__file__).parents[1]
 SCHEMAS = ROOT / "docs" / "schemas"
-DATA = ROOT / "datasets" / "doublet_heat" / "doublet_2024_15min_month.csv"
+DATA = paths.doublet_heat("doublet_2024_15min_month.csv")
 ROWS = 4
 PROFILE = "heating_demand"
 

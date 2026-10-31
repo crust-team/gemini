@@ -12,14 +12,14 @@ import pandas as pd
 
 import gemini as gm
 
-DATASETS = Path(__file__).resolve().parents[1] / "datasets"
-MONTH = DATASETS / "doublet_heat/doublet_2024_15min_month.csv"
+INPUTS = Path(__file__).resolve().parents[1] / "inputs"
+MONTH = INPUTS / "doublet_heat/doublet_2024_15min_month.csv"
 DATA = Path(os.environ.get("GEMINI_EXAMPLE_DATASET", MONTH))
 
 
 def main():
     """Load the plant, simulate the data and print its heat, electricity and temperature."""
-    plant = gm.Plant.load(DATASETS / "doublet_heat/plant.json")
+    plant = gm.plants.example("DoubletHeatPlant")
     frame = pd.read_csv(DATA, parse_dates=["time"])
     results = gm.simulate(plant, gm.Dataset.from_frame(frame, time_column="time"))
     summary = results.summary(units={"power": "MW", "temperature": "degC"})

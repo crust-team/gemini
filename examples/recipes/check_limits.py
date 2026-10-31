@@ -13,8 +13,8 @@ import pandas as pd
 
 import gemini as gm
 
-DATASETS = Path(__file__).resolve().parents[2] / "datasets"
-MONTH = DATASETS / "doublet_heat/doublet_2024_15min_month.csv"
+INPUTS = Path(__file__).resolve().parents[2] / "inputs"
+MONTH = INPUTS / "doublet_heat/doublet_2024_15min_month.csv"
 DATA = Path(os.environ.get("GEMINI_EXAMPLE_DATASET", MONTH))
 
 
@@ -28,7 +28,7 @@ def limits():
 
 def main():
     """Simulate the data and print each limit with the worst value of the run."""
-    plant = gm.Plant.load(DATASETS / "doublet_heat/plant.json")
+    plant = gm.plants.example("DoubletHeatPlant")
     frame = pd.read_csv(DATA, parse_dates=["time"])
     results = gm.simulate(plant, gm.Dataset.from_frame(frame, time_column="time"))
     print("Assumptions: at most 60 bar from the injection pump, at least 3.5 MW of heat")

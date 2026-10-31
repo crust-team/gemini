@@ -4,6 +4,8 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.profiles import library
+from gemini.utils import paths
 from tests.fixtures.errors import raises
 
 HOURS_PER_DAY = 24
@@ -46,3 +48,12 @@ def test_an_unknown_profile_has_close_matches():
     with raises(gm.errors.ValidationError, "unknown_name") as unknown:
         gm.profiles.get("heating_demnd")
     assert unknown.value.suggestions[0] == "heating_demand"
+
+
+def test_a_profile_needs_a_source_checkout(tmp_path, monkeypatch):
+    """Without ``inputs/`` the error names the file and the names are still listed."""
+    monkeypatch.setattr(paths, "INPUTS", tmp_path / "absent")
+    with raises(gm.errors.RunError, "inputs_missing") as missing:
+        library.get("heating_demand")
+    assert "GEMINI_Heating_Demand_Daily_2027.csv" in str(missing.value)
+    assert library.names() == ["heating_demand", "cooling_demand"]

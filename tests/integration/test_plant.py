@@ -8,10 +8,10 @@ import gemini as gm
 from gemini.modules._utils.balance import collect_flows, energy_balance, mass_balance
 from gemini.modules._utils.wiring import trace_wiring
 from gemini.utils import legacy
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.reading import reading
 
 ROOT = Path(__file__).parents[2]
-OLD = ROOT / "datasets/legacy_project"
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def test_handwritten_wiring_and_split_helpers(example):
     }
     traced = trace_wiring(plant, inputs)
     assert len(traced) == 10
-    project = legacy.read_project(OLD)
+    project = legacy.read_project(OLD_PROJECT)
     assert legacy.check_wiring(plant, project) == []
     well = plant.doublet.well
     bottom = leaves["doublet.reservoir"].outlets["sandface_out"]

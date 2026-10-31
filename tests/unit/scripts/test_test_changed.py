@@ -18,7 +18,7 @@ FILES = {
     "gemini/engine/other.py": "",
     "tests/__init__.py": "",
     "tests/conftest.py": "import gemini.engine.other\n",
-    "tests/unit/conftest.py": "DATA = 'datasets/shared/data.csv'\n",
+    "tests/unit/conftest.py": "DATA = paths.shared('data.csv')\n",
     "tests/unit/engine/test_base.py": "",
     "tests/unit/engine/test_user.py": "",
     "tests/unit/engine/test_other.py": "",
@@ -26,10 +26,12 @@ FILES = {
     "tests/e2e/test_examples.py": "",
     "examples/recipes/demo.py": "import gemini\n",
     "examples/README.md": "# Examples\n",
-    "datasets/shared/data.csv": "time\n",
-    "datasets/project/well.param": "{}\n",
-    "tests/fixtures/__init__.py": 'PROJECT = ROOT / "datasets/project"\n',
+    "inputs/shared/data.csv": "time\n",
+    "inputs/project/well.param": "{}\n",
+    "inputs/plants/Plant.json": "{}\n",
+    "tests/fixtures/__init__.py": "PROJECT = paths.project()\n",
     "tests/integration/test_project.py": "from tests.fixtures import PROJECT\n",
+    "tests/integration/test_example.py": "gm.plants.example('Plant')\n",
 }
 
 
@@ -103,11 +105,16 @@ def test_test_files_examples_and_data_files(repository):
     }
     assert "tests/e2e/test_examples.py" in select(repository, "examples/recipes/demo.py")
     assert "tests/e2e/test_examples.py" in select(repository, "examples/README.md")
-    assert set(select(repository, "datasets/shared/data.csv")) == {
+    assert set(select(repository, "inputs/shared/data.csv")) == {
         path for path in FILES if test_changed.is_test_file(path) and "tests/unit/" in path
+    } | {"tests/e2e/test_examples.py"}
+    assert set(select(repository, "inputs/project/well.param")) == {
+        "tests/integration/test_project.py",
+        "tests/e2e/test_examples.py",
     }
-    assert set(select(repository, "datasets/project/well.param")) == {
-        "tests/integration/test_project.py"
+    assert set(select(repository, "inputs/plants/Plant.json")) == {
+        "tests/integration/test_example.py",
+        "tests/e2e/test_examples.py",
     }
     assert select(repository, "docs/index.rst") == {}
 

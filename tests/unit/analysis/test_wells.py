@@ -71,7 +71,7 @@ def test_the_plant_is_not_changed(shared_plant, doublet_curves):
 
 def test_a_bracket_outside_the_well_model_fails_that_case_only():
     """Rates up to 200 kg/s drive the pressure below zero: the case carries the error."""
-    plant = gm.Plant.load("datasets/doublet_heat/plant.json")
+    plant = gm.plants.example("DoubletHeatPlant")
     cases = [dict(CASE, rates=[20, 200]), CASE]
     with raises(gm.errors.PhysicsError, "out_of_range"):
         wells.nodal(plant, "doublet", cases)

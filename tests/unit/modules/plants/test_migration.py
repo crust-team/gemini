@@ -7,11 +7,10 @@ import pytest
 
 import gemini as gm
 from gemini.errors import ValidationError
-from tests.fixtures import ROOT
+from tests.fixtures import FIXTURES
 from tests.fixtures.errors import raises
 
-OLD = ROOT / "tests/fixtures/plant_format1.json"
-MIGRATED = ROOT / "datasets/doublet_heat/plant.json"
+OLD = FIXTURES / "plant_format1.json"
 
 
 @pytest.fixture(scope="module")
@@ -23,7 +22,7 @@ def old():
 def test_the_old_example_plant_migrates_to_the_stored_spec(old):
     """A tree whose root is a known plant takes its wiring and keeps every stored value."""
     spec = gm.plants.migrate(old)
-    assert spec == json.loads(MIGRATED.read_text())
+    assert spec == gm.plants.example("DoubletHeatPlant").to_dict()
     assert gm.plants.validate(spec) == []
     assert spec["modules"]["doublet"]["params"]["esp.stage_count"] == 15
     assert "thermal_conductance" in spec["modules"]["heat_exchanger"]["params"]
@@ -32,7 +31,7 @@ def test_the_old_example_plant_migrates_to_the_stored_spec(old):
 
 def test_a_current_spec_is_returned_as_a_copy():
     """Migrating format 2 changes nothing."""
-    spec = json.loads(MIGRATED.read_text())
+    spec = gm.plants.example("DoubletHeatPlant").to_dict()
     assert gm.plants.migrate(spec) == spec and gm.plants.migrate(spec) is not spec
 
 

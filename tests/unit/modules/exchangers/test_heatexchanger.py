@@ -1,7 +1,5 @@
 """Heat exchanger energy balances and validation against the example plant dataset."""
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,10 +11,10 @@ from gemini.types.flows import Stream
 from gemini.types.fluid import WATER
 from gemini.types.results import NOT_ASSESSED
 from gemini.utils.legacy import tables as mapping
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 from tests.fixtures.errors import raises
 
-DATA = Path(__file__).parents[4] / "datasets/legacy_project"
 BRINE_DENSITY = 1050
 """Brine density [kg/m3] that, with the retained cp = 4217.4 J/kg/K, reproduces the CSV duty.
 
@@ -40,7 +38,7 @@ def measured_row(row):
 def exchanger_for(row, measured, ua):
     """Return the example heat exchanger sized for one row and the inlet streams."""
     base = mapping.heatexchanger_params_from_gemini(
-        mapping.read_property(DATA / "heat_exchanger_3410.param")
+        mapping.read_property(OLD_PROJECT / "heat_exchanger_3410.param")
     )
     params = base | dict(
         thermal_conductance=ua,
@@ -62,7 +60,7 @@ def exchanger_for(row, measured, ua):
 
 def test_measured_heat_exchanger_performance():
     """Fit UA from measured terminal temperatures, then reproduce duty, temperatures and loss."""
-    rows = pd.read_csv(DATA / "doublet_2024_old.csv", sep=";", nrows=5)
+    rows = pd.read_csv(OLD_PROJECT / "doublet_2024_old.csv", sep=";", nrows=5)
     for _, row in rows.iterrows():
         measured = measured_row(row)
         ua = gm.analysis.estimate_conductance(**measured)["value"]

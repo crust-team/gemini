@@ -6,11 +6,7 @@ Shows ``set_params`` with ``valid_from``, ``params_at``, ``param_history``, ``se
 Run with ``python examples/basics/04_parameters.py``.
 """
 
-from pathlib import Path
-
 import gemini as gm
-
-PLANT = Path(__file__).resolve().parents[2] / "datasets/doublet_heat/plant.json"
 
 
 def dated_design(plant):
@@ -45,7 +41,7 @@ def bindings(plant):
 
 def main():
     """Show the parameters, inputs and bindings of the doublet heat plant."""
-    plant = gm.Plant.load(PLANT)
+    plant = gm.plants.example("DoubletHeatPlant")
     print(f"Parameters:            {len(list(plant.named_parameters()))}")
     print(f"Root inputs:           {len(plant.inputs(recurse=False))}")
     dated_design(plant)

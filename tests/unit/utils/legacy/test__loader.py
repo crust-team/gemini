@@ -3,7 +3,6 @@
 import json
 import shutil
 import warnings
-from pathlib import Path
 
 import pytest
 
@@ -11,20 +10,19 @@ import gemini as gm
 from gemini.errors import GeminiWarning, ValidationError
 from gemini.utils import legacy
 from gemini.utils.legacy._loader import load_legacy_design, node_kinds
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.errors import raises
-
-OLD = Path(__file__).parents[4] / "datasets/legacy_project"
 
 
 @pytest.fixture(scope="module")
 def project():
     """Parse the example old project once; tests copy it before editing."""
-    return legacy.read_project(OLD)
+    return legacy.read_project(OLD_PROJECT)
 
 
 def _copy(tmp_path):
     folder = tmp_path / "old"
-    shutil.copytree(OLD, folder)
+    shutil.copytree(OLD_PROJECT, folder)
     return folder
 
 

@@ -1,13 +1,37 @@
 """The plant catalogue: names and new plants."""
 
+import hashlib
+import json
+
 import pytest
 
 import gemini as gm
 from gemini.modules._utils import registry
 from gemini.modules.plants import catalogue
-from gemini.utils.files import read_json
-from tests.fixtures import SHARED
+from gemini.utils import paths
 from tests.fixtures.errors import raises
+
+FORMER_EXAMPLES = {
+    "ATESPlant": "87116c4886ba501555865302700e7de155271b690ef063e406d75f7360df95a7",
+    "BoilerChpPlant": "19bff192bf5cd02cf5af650ffb292b578be6d6089be141d167c51cc63d0ad8b3",
+    "CoolingSubstation": "82db77af60518de0843dee1c28ba6692a98cef1f1317a9393afcdc9df621e7bc",
+    "DistrictEnergyPlant": "fb141f0a261aea2823c6f0e9330edb3d4a2eda32a9a3f9486de220b1792501d4",
+    "DistrictNetwork": "a7c09b8338303f47dbac5d0cd71b9a3a5fb4675b86187a8f08eb596df32f4f16",
+    "Doublet": "7e38703b880e458aef5d3957bc7cc7d51ffc8c9b067d8da0b6c3568dd88249e2",
+    "DoubletHeatPlant": "a83a084462d47570c0b880efa2dd0a932500e07af8e306edbab3b5203d18a670",
+    "HackathonPlant": "6da42c88a06d8bc97c03b556097cf0e86396d1dc66c8e5bc74638cb987c570b7",
+    "HeatingSubstation": "18ecd2306a392e393bfb3620a81c8969995e0018bd11382ce876a340c602abcf",
+    "MultiWellPlant": "8946346c436b21e7c3c71f9ca019db963267c67ebad052599100017ade1ee83d",
+    "NodalDoublet": "c888e0c27d07a28500f5bbec579f55e0ccdedb0e35e218c5e7dd07bec4739a5b",
+    "ParallelExchangerPlant": "0b0ca08853e7062ad91f9989550f9effc64bf69add109fd4e95234340e759a01",
+}
+"""Hash of ``to_dict()`` of the plant built from each whole example file these values replaced.
+
+NOTE(refactor): ``HackathonPlant`` is hashed with its 24 stated values in SI, because ``set_params``
+stores SI where the former file kept text such as ``"2500 m"``; its ``state_dict`` was equal, the
+derived child values included. ``Doublet`` is hashed without ``outputs``, which its structure file
+has and its former example file lacked.
+"""
 
 
 def test_names_are_the_registered_plants():
@@ -47,10 +71,19 @@ def test_every_spec_plant_and_special_case_has_an_example_that_round_trips(name)
     assert gm.plants.from_spec(spec).to_spec() == spec
 
 
+@pytest.mark.parametrize("name", catalogue.names())
+def test_every_example_equals_the_plant_of_its_former_file(name):
+    """``get`` and the values of ``inputs/plants/`` give the plant the whole file gave."""
+    spec = catalogue.example(name).to_dict()
+    if name == "Doublet":
+        del spec["outputs"]
+    text = json.dumps(spec, sort_keys=True)
+    assert hashlib.sha256(text.encode()).hexdigest() == FORMER_EXAMPLES[name]
+
+
 def test_the_doublet_examples_carry_the_shared_doublet_heat_values():
-    """The package copy equals the shared plant file; the doublet is its ``doublet`` child."""
-    shared = read_json(SHARED / "plant.json")
-    assert catalogue.example("DoubletHeatPlant").to_spec() == shared
+    """The doublet is the ``doublet`` child of the doublet heat plant."""
+    shared = catalogue.example("DoubletHeatPlant").to_spec()
     doublet = catalogue.example("Doublet")
     expected = shared["modules"]["doublet"]["params"]
     assert {
@@ -95,6 +128,15 @@ def test_a_registered_plant_without_values_names_itself(monkeypatch):
     monkeypatch.setitem(registry._entries, "Unsourced", entry)
     with pytest.raises(gm.errors.NotImplementedYet, match="Unsourced"):
         catalogue.example("Unsourced")
+
+
+def test_an_example_needs_a_source_checkout(tmp_path, monkeypatch):
+    """Without ``inputs/`` the error names the file; the plant itself stays available."""
+    monkeypatch.setattr(paths, "INPUTS", tmp_path / "absent")
+    with raises(gm.errors.RunError, "inputs_missing") as missing:
+        catalogue.example("Doublet")
+    assert "plants/Doublet.json" in str(missing.value)
+    assert catalogue.get("Doublet").name == "Doublet"
 
 
 def test_example_refuses_unknown_names_with_close_matches():

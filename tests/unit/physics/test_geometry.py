@@ -1,13 +1,13 @@
 """Pipe sections, measured-depth paths and trajectory/tally construction."""
 
 import math
-from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from gemini.errors import PhysicsError
 from gemini.physics import geometry
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.equivalence import assert_function_matches
 
 TRAJECTORY = [
@@ -71,8 +71,7 @@ def test_index_at_measured_depth_and_subpath():
 
 def test_project_trajectory_slices():
     """The bridge example trajectory builds and slices without losing length."""
-    data = Path(__file__).parents[3] / "datasets/legacy_project"
-    table = pd.read_csv(data / "well_trajectory.csv", sep=";").to_dict("records")
+    table = pd.read_csv(OLD_PROJECT / "well_trajectory.csv", sep=";").to_dict("records")
     path = geometry.build_path(table)
     assert path.total_length == 2800
     assert path.subpath(600, 2800).total_length + path.subpath(0, 600).total_length == 2800

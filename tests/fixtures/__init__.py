@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
+from gemini.utils import paths
+
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests/fixtures"
-SHARED = ROOT / "datasets/doublet_heat"
-OLD_PROJECT = ROOT / "datasets/legacy_project"
+OLD_PROJECT = paths.legacy_project()

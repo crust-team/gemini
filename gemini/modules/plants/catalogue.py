@@ -1,15 +1,13 @@
 """The plant catalogue: which plants exist and how to get one."""
 
-from pathlib import Path
-
 from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules._utils import registry
+from gemini.modules._utils.serialization import SECTIONS, Report, read_sections
 from gemini.modules.plants import templating
-from gemini.modules.plants.spec import from_spec
+from gemini.modules.plants.builder import Plant
+from gemini.utils import paths
 from gemini.utils.files import read_json
 from gemini.utils.strings import close_matches, did_you_mean, join_names
-
-EXAMPLES = Path(__file__).parent / "specs" / "examples"
 
 
 def names():
@@ -44,16 +42,23 @@ def get(name):
 def example(name):
     """Return a new plant ``name`` with real parameter values.
 
-    ``Doublet`` and ``DoubletHeatPlant`` carry the values of ``datasets/doublet_heat``
-    (``plants/specs/examples/``); the other plants carry the values their unit tests use, the
-    design parameters only: controls and boundaries are inputs of a run. A registered plant
-    without sourced values raises ``NotImplementedYet`` naming it.
+    The plant comes from ``get``; ``inputs/plants/<name>.json`` of a source checkout gives its
+    ``params`` and any ``fluids``, ``boundary``, ``bindings`` and ``param_history``, under the keys
+    of a plant file. ``Doublet`` and ``DoubletHeatPlant`` carry the values of the measured doublet;
+    the other plants carry the values their unit tests use, the design parameters only: controls
+    and boundaries are inputs of a run. A registered plant without a file raises
+    ``NotImplementedYet`` naming it, and without ``inputs/`` this raises ``inputs_missing``.
     """
     _check("example", name)
-    path = EXAMPLES / f"{name}.json"
+    path = paths.plant_values(name)
     if not path.exists():
         raise NotImplementedYet(f"plants.example: {name!r} has no sourced parameter values yet")
-    return from_spec(read_json(path))
+    plant, values = get(name), read_json(path)
+    plant.set_params("", values["params"])
+    read_sections(plant, values, Report(strict=True))
+    if isinstance(plant, Plant):
+        plant._sections = {key: values.get(key, {}) for key in SECTIONS}
+    return plant
 
 
 def templates():

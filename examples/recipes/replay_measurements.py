@@ -12,14 +12,14 @@ import pandas as pd
 
 import gemini as gm
 
-DATASETS = Path(__file__).resolve().parents[2] / "datasets"
-MONTH = DATASETS / "doublet_heat/doublet_2024_15min_month.csv"
+INPUTS = Path(__file__).resolve().parents[2] / "inputs"
+MONTH = INPUTS / "doublet_heat/doublet_2024_15min_month.csv"
 DATA = Path(os.environ.get("GEMINI_EXAMPLE_DATASET", MONTH))
 
 
 def main():
     """Replay the data, then print the pump head and the energy of each module."""
-    plant = gm.Plant.load(DATASETS / "doublet_heat/plant.json")
+    plant = gm.plants.example("DoubletHeatPlant")
     frame = pd.read_csv(DATA, parse_dates=["time"])
     results = gm.replay(plant, gm.Dataset.from_frame(frame, time_column="time"))
     head = results["doublet.esp"].get("head", unit="bar")

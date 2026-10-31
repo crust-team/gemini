@@ -7,11 +7,8 @@ surface and every step fails with a negative pressure, so the sweep starts at 55
 Run with ``python examples/recipes/sweep_esp_frequency.py``.
 """
 
-from pathlib import Path
-
 import gemini as gm
 
-PLANT = Path(__file__).resolve().parents[2] / "datasets/doublet_heat/plant.json"
 FREQUENCIES = ("55 Hz", "60 Hz", "65 Hz")
 DAY = gm.Clock.days(2027, 1, 1, days=1)
 
@@ -29,7 +26,7 @@ def inputs(frequency):
 
 def main():
     """Simulate each frequency and print the energy of each module that has one."""
-    plant = gm.Plant.load(PLANT)
+    plant = gm.plants.example("DoubletHeatPlant")
     for frequency in FREQUENCIES:
         results = gm.simulate(plant, inputs(frequency), clock=DAY)
         closed = all(check["passed"] for check in gm.checks.plant_balance(plant, results))

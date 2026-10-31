@@ -1,14 +1,12 @@
 """The profile catalogue: the organisers' demand files, read as run input."""
 
-from pathlib import Path
-
 import pandas as pd
 
 from gemini.errors import ValidationError
 from gemini.physics import units
+from gemini.utils import paths
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
-DATA = Path(__file__).parent / "data"
 SOURCE = "GEMINI Hackathon challenge requirements, 28 October 2026, section 2"
 SI_UNIT = "W"
 
@@ -42,7 +40,8 @@ def get(name):
     The index is a timezone-aware UTC ``DatetimeIndex`` called ``time``, one row per day of the
     file. The one column is called ``name`` and holds the daily-average demand in W. ``attrs`` has
     ``units``, ``quantities``, ``description`` and ``source``, which names the organiser file. An
-    unknown name raises ``ValidationError`` with close matches.
+    unknown name raises ``ValidationError`` with close matches, and without ``inputs/`` of a source
+    checkout this raises ``inputs_missing``.
     """
     if name not in PROFILES:
         raise ValidationError(
@@ -53,7 +52,7 @@ def get(name):
             code="unknown_name",
         )
     profile = PROFILES[name]
-    data = pd.read_csv(DATA / profile["file"])
+    data = pd.read_csv(paths.hackathon(profile["file"]))
     index = pd.DatetimeIndex(pd.to_datetime(data["date"], utc=True), name="time")
     values = units.array_convert(data[profile["column"]], profile["unit"], SI_UNIT)
     frame = pd.DataFrame({name: values}, index=index)

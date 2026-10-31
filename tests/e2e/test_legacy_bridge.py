@@ -1,16 +1,12 @@
 """End-to-end old/new bridge round trips."""
 
-from pathlib import Path
-
 import pytest
 
 import gemini as gm
-from gemini.utils import legacy
+from gemini.utils import legacy, paths
+from tests.fixtures import OLD_PROJECT as OLD
 
 pytestmark = pytest.mark.e2e
-ROOT = Path(__file__).parents[2]
-OLD = ROOT / "datasets/legacy_project"
-SHARED = ROOT / "datasets/doublet_heat"
 
 
 def test_legacy_bridge(tmp_path):
@@ -25,9 +21,10 @@ def test_legacy_bridge(tmp_path):
     frame.reset_index().to_csv(
         tmp_path / "doublet_2024_15min.csv", index=False, float_format="%.17g"
     )
-    assert (tmp_path / "plant.json").read_bytes() == (SHARED / "plant.json").read_bytes()
+    gm.plants.example("DoubletHeatPlant").save(tmp_path / "example.json")
+    assert (tmp_path / "plant.json").read_bytes() == (tmp_path / "example.json").read_bytes()
     assert (tmp_path / "doublet_2024_15min.csv").read_bytes() == (
-        SHARED / "doublet_2024_15min.csv"
+        paths.doublet_heat("doublet_2024_15min.csv")
     ).read_bytes()
     results = gm.replay(plant, data.window(end=data.start))
     old_results = legacy.results_to_frame(results, project)

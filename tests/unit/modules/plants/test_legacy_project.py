@@ -2,15 +2,14 @@
 
 import gemini as gm
 from gemini.modules.plants import legacy_project
-from gemini.utils.files import read_json
-from tests.fixtures import OLD_PROJECT, SHARED
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.errors import raises
 
 
 def test_the_example_project_converts_to_the_shared_plant_file():
     """The old example project gives the spec of the shared doublet heat plant, exactly."""
     spec = legacy_project.convert_legacy(OLD_PROJECT)
-    assert spec == read_json(SHARED / "plant.json")
+    assert spec == gm.plants.example("DoubletHeatPlant").to_dict()
     assert gm.plants.validate(spec) == []
     assert gm.plants.from_spec(spec).to_spec() == spec
 

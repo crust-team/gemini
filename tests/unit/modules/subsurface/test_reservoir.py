@@ -1,7 +1,5 @@
 """Reservoir IPR and monitoring checks using example design data."""
 
-from pathlib import Path
-
 import pytest
 
 from gemini.errors import ValidationError
@@ -10,19 +8,18 @@ from gemini.types import Inlet
 from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid
 from gemini.utils.legacy import tables as mapping
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
-
-DATA = Path(__file__).parents[4] / "datasets/legacy_project"
 
 
 def test_example_production_and_decline():
     """The example PI controls drawdown, and a 16% decline raises an alarm."""
     p = mapping.reservoir_params_from_gemini(
-        mapping.read_property(DATA / "reservoir_c1b5.param"),
-        mapping.read_property(DATA / "production_well_c774.param"),
+        mapping.read_property(OLD_PROJECT / "reservoir_c1b5.param"),
+        mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
     )
     c = ProductionReservoir().update_params(**p)
-    c.fluid = mapping.reservoir_fluid(mapping.read_property(DATA / "reservoir_c1b5.param"))
+    c.fluid = mapping.reservoir_fluid(mapping.read_property(OLD_PROJECT / "reservoir_c1b5.param"))
     result = c(production_rate=40)
     out, flow = result.outputs, 40 / 1068
     assert out.drawdown == pytest.approx(flow / c.productivity_index)
@@ -34,8 +31,8 @@ def test_example_production_and_decline():
 def test_injection_zero_radius_is_explicit():
     """Unconfigured example drainage radius leaves only radial diagnostics unavailable."""
     p = mapping.reservoir_params_from_gemini(
-        mapping.read_property(DATA / "reservoir_28fc.param"),
-        mapping.read_property(DATA / "injection_well_a06b.param"),
+        mapping.read_property(OLD_PROJECT / "reservoir_28fc.param"),
+        mapping.read_property(OLD_PROJECT / "injection_well_a06b.param"),
         "injection",
     )
     c = InjectionReservoir().update_params(**p)

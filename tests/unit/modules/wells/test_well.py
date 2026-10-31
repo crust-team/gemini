@@ -1,7 +1,5 @@
 """Shared well traversal, correction and direction checks."""
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 
@@ -9,17 +7,16 @@ import gemini as gm
 from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.types.flows import Stream
 from gemini.utils.legacy import tables as mapping
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.errors import raises
-
-DATA = Path(__file__).parents[4] / "datasets/legacy_project"
 
 
 def production_well():
     """Return the example production well."""
     return ProductionWell().update_params(
         **mapping.productionwell_params_from_gemini(
-            mapping.read_property(DATA / "production_well_c774.param"),
-            esp_property=mapping.read_property(DATA / "esp_1ee3.param"),
+            mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
+            esp_property=mapping.read_property(OLD_PROJECT / "esp_1ee3.param"),
         )
     )
 

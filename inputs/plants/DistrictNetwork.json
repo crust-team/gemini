@@ -1,0 +1,40 @@
+{
+  "plant": "DistrictNetwork",
+  "params": {
+    "pump.head_coefficients": [
+      400000.0,
+      0.0,
+      -1000000000.0
+    ],
+    "pump.rated_frequency": "50 Hz",
+    "pump.best_efficiency": 0.75,
+    "pump.best_efficiency_flow": "14.4 m3/h",
+    "pump.motor_efficiency": 0.9,
+    "supply_pipe.length": "500 m",
+    "supply_pipe.inner_diameter": "0.1 m",
+    "supply_pipe.elevation_change": "0 m",
+    "supply_pipe.heat_transfer_coefficient": "1 W/m2/K",
+    "substations.0.building_flow": "3 kg/s",
+    "substations.0.building_pressure": "3 bar",
+    "substations.0.valve.flow_coefficient": "1.756820922315766e-05 m3/s/Pa^0.5",
+    "substations.0.heat_exchanger.thermal_conductance": "20000 W/K",
+    "substations.0.heat_exchanger.hot_nominal_pressure_drop": "0.2 bar",
+    "substations.0.heat_exchanger.cold_nominal_pressure_drop": "0.2 bar",
+    "substations.0.heat_exchanger.hot_nominal_mass_flow": "2 kg/s",
+    "substations.0.heat_exchanger.cold_nominal_mass_flow": "3 kg/s",
+    "substations.0.consumer.minimum_return_temperature": "30 degC",
+    "substations.1.building_flow": "3 kg/s",
+    "substations.1.building_pressure": "3 bar",
+    "substations.1.valve.flow_coefficient": "1.756820922315766e-05 m3/s/Pa^0.5",
+    "substations.1.heat_exchanger.thermal_conductance": "20000 W/K",
+    "substations.1.heat_exchanger.hot_nominal_pressure_drop": "0.2 bar",
+    "substations.1.heat_exchanger.cold_nominal_pressure_drop": "0.2 bar",
+    "substations.1.heat_exchanger.hot_nominal_mass_flow": "2 kg/s",
+    "substations.1.heat_exchanger.cold_nominal_mass_flow": "3 kg/s",
+    "substations.1.consumer.minimum_return_temperature": "30 degC",
+    "return_pipe.length": "500 m",
+    "return_pipe.inner_diameter": "0.1 m",
+    "return_pipe.elevation_change": "0 m",
+    "return_pipe.heat_transfer_coefficient": "1 W/m2/K"
+  }
+}

@@ -1,0 +1,620 @@
+{
+  "plant": "Doublet",
+  "params": {
+    "reservoir.pressure": "220 bar",
+    "reservoir.temperature": "80 degC",
+    "reservoir.permeability": "9.869233e-12 m2",
+    "reservoir.aquifer_thickness": "45 m",
+    "reservoir.drainage_radius": "1000 m",
+    "reservoir.top_depth": "1800 m",
+    "reservoir.productivity_index": "5.833333333333333e-08 m3/s/Pa",
+    "reservoir.wellbore_radius": "0.0765 m",
+    "well.pipe_path": {
+      "sections": [
+        {
+          "length": 400.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 362.0,
+          "inclination": 1.312662130424935,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 188.0,
+          "inclination": 0.9238027730805987,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 550.0,
+          "inclination": 0.814370628980554,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 300.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        }
+      ]
+    },
+    "well.soil_temperature": "15 degC",
+    "well.segment": "below_esp",
+    "well.esp_depth": "600 m",
+    "esp.stage_count": 15,
+    "esp.head_coefficients": [
+      125.518426,
+      -0.0020852856,
+      2.28955651e-07,
+      -1.45640214e-11,
+      2.37859645e-16,
+      -1.18258356e-21
+    ],
+    "esp.power_coefficients": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "esp.pump_type": "DEFAULT-PUMP",
+    "esp.setting_depth": "600 m",
+    "esp.minimum_flow": "82 m3/h",
+    "esp.maximum_flow": "178 m3/h",
+    "esp.best_efficiency_flow": "129.98 m3/h",
+    "esp.tubing": "0.1778 m",
+    "riser.pipe_path": {
+      "sections": [
+        {
+          "length": 400.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 150.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 362.0,
+          "inclination": 1.312662130424935,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 188.0,
+          "inclination": 0.9238027730805987,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 550.0,
+          "inclination": 0.814370628980554,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 250.0,
+          "inclination": 0.9272934315845873,
+          "inner_diameter": 0.273,
+          "roughness": 2e-05
+        },
+        {
+          "length": 100.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 300.0,
+          "inclination": 0.5235987755982988,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        }
+      ]
+    },
+    "riser.soil_temperature": "15 degC",
+    "riser.segment": "above_esp",
+    "riser.esp_depth": "600 m",
+    "injector.pipe_path": {
+      "sections": [
+        {
+          "length": 500.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 500.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        },
+        {
+          "length": 1000.0,
+          "inclination": 1.5707963267948966,
+          "inner_diameter": 0.1778,
+          "roughness": 2e-05
+        }
+      ]
+    },
+    "injector.soil_temperature": "15 degC",
+    "sink.pressure": "220 bar",
+    "sink.temperature": "80 degC",
+    "sink.permeability": "9.869233e-12 m2",
+    "sink.aquifer_thickness": "45 m",
+    "sink.drainage_radius": "0 m",
+    "sink.top_depth": "0 m",
+    "sink.injectivity_index": "5.5555555555555555e-08 m3/s/Pa",
+    "sink.wellbore_radius": "0.0765 m"
+  },
+  "fluids": {
+    "reservoir": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "well": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "esp": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "riser": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "injector": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    },
+    "sink": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1068.0,
+      "viscosity": 0.00065,
+      "specific_heat": 4129.213483146067,
+      "thermal_conductivity": null
+    }
+  },
+  "bindings": {
+    "esp": {
+      "frequency": "doublet.esp.frequency",
+      "head": "doublet.esp.head",
+      "discharge_pressure": "doublet.esp.discharge_pressure",
+      "power": "doublet.esp.power",
+      "fluid_in.m_dot": {
+        "column": "doublet.esp.suction.m_dot",
+        "unit": "m3/s"
+      },
+      "fluid_in.p": "doublet.esp.suction.p",
+      "fluid_in.T": "doublet.esp.suction.T"
+    },
+    "injector": {
+      "wellhead_in.m_dot": {
+        "column": "doublet.injector.wellhead.m_dot",
+        "unit": "m3/s"
+      },
+      "wellhead_in.p": "doublet.injector.wellhead.p",
+      "wellhead_in.T": "doublet.injector.wellhead.T"
+    },
+    "reservoir": {
+      "production_rate": {
+        "column": "doublet.reservoir.production_rate",
+        "unit": "m3/s"
+      }
+    }
+  },
+  "param_history": {
+    "reservoir": [
+      {
+        "valid_from": "2020-01-01T00:00:00Z",
+        "params": {
+          "role": "production",
+          "pressure": 22000000.0,
+          "temperature": 353.15,
+          "permeability": 9.869233e-12,
+          "aquifer_thickness": 45.0,
+          "drainage_radius": 1000.0,
+          "top_depth": 1800.0,
+          "productivity_index": 5.833333333333333e-08,
+          "injectivity_index": null,
+          "skin": 0.0,
+          "wellbore_radius": 0.0765,
+          "decline_threshold": 0.15
+        }
+      }
+    ],
+    "well": [
+      {
+        "valid_from": "2020-01-01T00:00:00Z",
+        "params": {
+          "pipe_path": {
+            "sections": [
+              {
+                "length": 400.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 150.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 150.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 362.0,
+                "inclination": 1.312662130424935,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 188.0,
+                "inclination": 0.9238027730805987,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 100.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 250.0,
+                "inclination": 0.9272934315845873,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 550.0,
+                "inclination": 0.814370628980554,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 250.0,
+                "inclination": 0.9272934315845873,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 100.0,
+                "inclination": 0.5235987755982988,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 300.0,
+                "inclination": 0.5235987755982988,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              }
+            ]
+          },
+          "friction_correlation": "darcy_weisbach",
+          "two_phase_friction_correlation": "BeggsBrill",
+          "correction_factors": [
+            1.0,
+            0.0
+          ],
+          "soil_temperature": 288.15,
+          "heat_transfer_coefficient": 10.0,
+          "segment": "below_esp",
+          "esp_depth": 600.0
+        }
+      }
+    ],
+    "esp": [
+      {
+        "valid_from": "2020-01-01T00:00:00Z",
+        "params": {
+          "stage_count": 15,
+          "head_coefficients": [
+            125.518426,
+            -0.0020852856,
+            2.28955651e-07,
+            -1.45640214e-11,
+            2.37859645e-16,
+            -1.18258356e-21
+          ],
+          "power_coefficients": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "pump_type": "DEFAULT-PUMP",
+          "setting_depth": 600.0,
+          "motor_efficiency": 1.0,
+          "minimum_flow": 0.02277777777777778,
+          "maximum_flow": 0.049444444444444444,
+          "best_efficiency_flow": 0.03610555555555555,
+          "correction_factors": [
+            1.0,
+            0.0
+          ],
+          "tubing": 0.1778,
+          "drift_threshold": 0.1
+        }
+      }
+    ],
+    "riser": [
+      {
+        "valid_from": "2020-01-01T00:00:00Z",
+        "params": {
+          "pipe_path": {
+            "sections": [
+              {
+                "length": 400.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 150.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 150.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 362.0,
+                "inclination": 1.312662130424935,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 188.0,
+                "inclination": 0.9238027730805987,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 100.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 250.0,
+                "inclination": 0.9272934315845873,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 550.0,
+                "inclination": 0.814370628980554,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 250.0,
+                "inclination": 0.9272934315845873,
+                "inner_diameter": 0.273,
+                "roughness": 2e-05
+              },
+              {
+                "length": 100.0,
+                "inclination": 0.5235987755982988,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 300.0,
+                "inclination": 0.5235987755982988,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              }
+            ]
+          },
+          "friction_correlation": "darcy_weisbach",
+          "two_phase_friction_correlation": "BeggsBrill",
+          "correction_factors": [
+            1.0,
+            0.0
+          ],
+          "soil_temperature": 288.15,
+          "heat_transfer_coefficient": 10.0,
+          "segment": "above_esp",
+          "esp_depth": 600.0
+        }
+      }
+    ],
+    "injector": [
+      {
+        "valid_from": "2020-01-01T00:00:00Z",
+        "params": {
+          "pipe_path": {
+            "sections": [
+              {
+                "length": 500.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 500.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              },
+              {
+                "length": 1000.0,
+                "inclination": 1.5707963267948966,
+                "inner_diameter": 0.1778,
+                "roughness": 2e-05
+              }
+            ]
+          },
+          "friction_correlation": "darcy_weisbach",
+          "two_phase_friction_correlation": "BeggsBrill",
+          "correction_factors": [
+            1.0,
+            0.0
+          ],
+          "soil_temperature": 288.15,
+          "heat_transfer_coefficient": 10.0
+        }
+      }
+    ],
+    "sink": [
+      {
+        "valid_from": "2020-01-01T00:00:00Z",
+        "params": {
+          "role": "injection",
+          "pressure": 22000000.0,
+          "temperature": 353.15,
+          "permeability": 9.869233e-12,
+          "aquifer_thickness": 45.0,
+          "drainage_radius": 0.0,
+          "top_depth": 0.0,
+          "productivity_index": null,
+          "injectivity_index": 5.5555555555555555e-08,
+          "skin": 0.0,
+          "wellbore_radius": 0.0765,
+          "decline_threshold": 0.15
+        }
+      }
+    ]
+  }
+}

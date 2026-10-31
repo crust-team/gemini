@@ -18,8 +18,9 @@ Selection rules, applied to the changed files:
    otherwise every change would select the whole suite through shared fixtures.
 4. Any changed file under ``examples/`` selects ``tests/e2e/test_examples.py``.
 5. Any other changed file selects the tests whose source, or whose ``conftest.py``, names its
-   repository path. A file below ``datasets/`` also selects those that name its folder or a
-   constant of ``tests/fixtures/__init__.py`` that holds the folder.
+   repository path. A file below ``inputs/`` also selects its readers: the tests that name its
+   folder, what ``INPUT_READERS`` gives for a folder read through the public API, or a constant
+   of ``tests/fixtures/__init__.py`` that holds the folder, and the example test.
 6. ``tests/unit/test_code_quality.py`` always runs, whatever changed, because the structure and
    style rules apply to every edit.
 
@@ -39,6 +40,9 @@ PACKAGES = ("gemini", "tests", "scripts")
 SELECT_ALL = {"pyproject.toml", "tests/conftest.py", "tests/xdist_plugin.py"}
 EXAMPLES_TEST = "tests/e2e/test_examples.py"
 FIXTURE_PATHS = "tests/fixtures/__init__.py"
+INPUTS = "inputs/"
+INPUT_READERS = {"hackathon": "profiles", "plants": "example("}
+"""What a test names to read a folder of ``inputs/`` through the public API."""
 QUALITY_TEST = "tests/unit/test_code_quality.py"
 QUALITY_REASON = "always runs: code-quality rules apply to every change"
 CACHE = ROOT / ".tmp/test_changed/imports.json"
@@ -161,13 +165,14 @@ def tests_below(directory, tests):
 
 
 def data_names(path, root):
-    """Return the texts by which a source reads ``path``: itself and, for data, its folder."""
-    if not path.startswith("datasets/"):
+    """Return the texts by which a source reads ``path``: itself and, for inputs, its folder."""
+    if not path.startswith(INPUTS):
         return {path}
-    folder = Path(path).parent.as_posix()
+    folder = Path(path).parts[1]
+    name = INPUT_READERS.get(folder, folder)
     fixtures = root / FIXTURE_PATHS
     lines = fixtures.read_text().splitlines() if fixtures.exists() else []
-    return {path, folder} | {line.split()[0] for line in lines if f'"{folder}"' in line}
+    return {path, name} | {line.split()[0] for line in lines if name in line}
 
 
 def naming_tests(path, tests, root):
@@ -193,6 +198,8 @@ def _select_changed_file(path, tests, root):
         return ({path} & tests), "changed test file"
     if path.startswith("examples/"):
         return ({EXAMPLES_TEST} & tests), f"runs example {path}"
+    if path.startswith(INPUTS):
+        return naming_tests(path, tests, root) | ({EXAMPLES_TEST} & tests), f"reads {path}"
     if module_name(path) is None and (root / path).is_file():
         return naming_tests(path, tests, root), f"names {path}"
     return set(), ""

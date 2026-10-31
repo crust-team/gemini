@@ -1,7 +1,5 @@
 """Production well traversal and ESP splitting across a trajectory section."""
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 
@@ -9,16 +7,16 @@ from gemini.graph import run
 from gemini.modules.wells import ProductionWell
 from gemini.types.flows import Stream
 from gemini.utils.legacy import tables as mapping
+from tests.fixtures import OLD_PROJECT
 from tests.fixtures.equivalence import assert_function_matches, assert_module_matches
 
 
 def test_split_esp_traversal():
     """Split at 600 m inside a section; pumping raises the resulting wellhead pressure."""
-    data = Path(__file__).parents[4] / "datasets/legacy_project"
     c = ProductionWell().update_params(
         **mapping.productionwell_params_from_gemini(
-            mapping.read_property(data / "production_well_c774.param"),
-            esp_property=mapping.read_property(data / "esp_1ee3.param"),
+            mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
+            esp_property=mapping.read_property(OLD_PROJECT / "esp_1ee3.param"),
         )
     )
     stream = Stream(m_dot=40, T=353.15, p=25e6)
@@ -34,11 +32,10 @@ def test_split_esp_traversal():
 
 
 def _well(**changes):
-    data = Path(__file__).parents[4] / "datasets/legacy_project"
     return ProductionWell().update_params(
         **mapping.productionwell_params_from_gemini(
-            mapping.read_property(data / "production_well_c774.param"),
-            esp_property=mapping.read_property(data / "esp_1ee3.param"),
+            mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
+            esp_property=mapping.read_property(OLD_PROJECT / "esp_1ee3.param"),
         )
         | changes
     )

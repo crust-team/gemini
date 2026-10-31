@@ -60,7 +60,7 @@ def test_public_names_and_docs():
 
 def test_readable_tree():
     """Printing a loaded plant displays nested equipment and scalar human-unit parameters."""
-    plant = gm.Plant.load(Path(__file__).parents[2] / "datasets/doublet_heat/plant.json")
+    plant = gm.plants.example("DoubletHeatPlant")
     with gm.runtime.settings(display_units="field"):
         rendered = repr(plant)
     assert "DoubletHeatPlant(" in rendered and "(doublet): Doublet(" in rendered

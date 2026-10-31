@@ -10,12 +10,10 @@ from tempfile import TemporaryDirectory
 
 import gemini as gm
 
-PLANT = Path(__file__).resolve().parents[2] / "datasets/doublet_heat/plant.json"
-
 
 def main():
     """Round-trip a plant through a dictionary and through a file."""
-    plant = gm.Plant.load(PLANT)
+    plant = gm.plants.example("DoubletHeatPlant")
     plant.set_params("heat_exchanger", {"thermal_conductance": "3500000 W/K"})
     spec = plant.to_dict()
     print(f"Modules in the spec:     {len(spec['modules'])}")

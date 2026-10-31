@@ -55,7 +55,7 @@
     }
   ],
   "controls": {},
-  "doc": "A plant built from named modules and connections, a normal composite ``Module``.\n\n    ``add`` registers a module, ``connect`` wires an outlet to an inlet and ``to_spec`` writes the\n    plant file. Every port of a child is connected or named as a plant port; a plant port exists\n    only when named. ``name`` is the name given.",
+  "doc": "The shipped doublet, wired by its spec, with its children's values derived from a design.\n\n    ``depth`` is the true vertical depth of the reservoir midpoint, ``thickness`` its gross\n    thickness and ``well_diameter`` the inner diameter of both vertical wells. ``set_params``\n    derives, through ``gemini/physics/``:\n\n    - from ``depth``, ``gradient`` and ``surface_temperature``: the reservoir temperature at the\n      midpoint, the hydrostatic reservoir pressure from the fluid density, the top depth and the\n      soil temperature of the wells, the geotherm at half the depth;\n    - with ``permeability``, ``thickness`` and ``well_diameter``: the productivity and injectivity\n      indices of radial Darcy flow, with the fluid viscosity, ``drainage_radius``, the wellbore\n      radius and the ``skin`` of each reservoir, and the vertical pipe paths of the wells;\n    - with ``nominal_flow``, ``pump_efficiency`` and ``nominal_wellhead_pressure``: the pump setting\n      depth, the shallowest that keeps that pressure at the intake, and a one-stage ESP of constant\n      head that reaches the wellhead pressure at the nominal flow, with that hydraulic efficiency.\n\n    A group of values that is not complete derives nothing, and the old way, setting every child\n    value directly, works as it did. A child value in the same call wins over the derived one and\n    stays explicit. Setting ``fluid`` gives it to every child and derives again.",
   "inlets": {
     "power_in": {
       "fields": {
@@ -80,7 +80,52 @@
       "kind": "brine"
     }
   },
-  "measured": {},
+  "measured": {
+    "brine_cooling": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": null,
+      "quantity": "temperature_difference",
+      "section": "output",
+      "type": "number",
+      "unit": "K"
+    },
+    "flow": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": null,
+      "quantity": "volume_flow",
+      "section": "output",
+      "type": "number",
+      "unit": "m3/s"
+    },
+    "injection_temperature": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "temperature",
+      "section": "output",
+      "type": "number",
+      "unit": "K"
+    },
+    "production_temperature": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "temperature",
+      "section": "output",
+      "type": "number",
+      "unit": "K"
+    }
+  },
   "name": "doublet",
   "outlets": {
     "supply_out": {
@@ -98,15 +143,149 @@
       "kind": "brine"
     }
   },
-  "outputs": {},
-  "parameters": {},
+  "outputs": {
+    "brine_cooling": {
+      "quantity": "temperature_difference",
+      "soft_sensor": false,
+      "unit": "K"
+    },
+    "flow": {
+      "quantity": "volume_flow",
+      "soft_sensor": false,
+      "unit": "m3/s"
+    },
+    "injection_temperature": {
+      "quantity": "temperature",
+      "soft_sensor": false,
+      "unit": "K"
+    },
+    "production_temperature": {
+      "quantity": "temperature",
+      "soft_sensor": false,
+      "unit": "K"
+    }
+  },
+  "parameters": {
+    "depth": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "length",
+      "section": "parameter",
+      "type": "number",
+      "unit": "m"
+    },
+    "drainage_radius": {
+      "default": 1000.0,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "length",
+      "section": "parameter",
+      "type": "number",
+      "unit": "m"
+    },
+    "gradient": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": null,
+      "quantity": "temperature_gradient",
+      "section": "parameter",
+      "type": "number",
+      "unit": "K/m"
+    },
+    "nominal_flow": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": null,
+      "quantity": "volume_flow",
+      "section": "parameter",
+      "type": "number",
+      "unit": "m3/s"
+    },
+    "nominal_wellhead_pressure": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "pressure",
+      "section": "parameter",
+      "type": "number",
+      "unit": "Pa"
+    },
+    "permeability": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "permeability",
+      "section": "parameter",
+      "type": "number",
+      "unit": "m2"
+    },
+    "pump_efficiency": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": 1,
+      "minimum": 0,
+      "quantity": "efficiency",
+      "section": "parameter",
+      "type": "number",
+      "unit": "-"
+    },
+    "surface_temperature": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "temperature",
+      "section": "parameter",
+      "type": "number",
+      "unit": "K"
+    },
+    "thickness": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "length",
+      "section": "parameter",
+      "type": "number",
+      "unit": "m"
+    },
+    "well_diameter": {
+      "default": null,
+      "description": null,
+      "enum": null,
+      "maximum": null,
+      "minimum": 0,
+      "quantity": "length",
+      "section": "parameter",
+      "type": "number",
+      "unit": "m"
+    }
+  },
   "state": {},
-  "summary": "A plant built from named modules and connections, a normal composite ``Module``.",
+  "summary": "The shipped doublet, wired by its spec, with its children's values derived from a design.",
   "type": "Doublet",
   "values": {
     "boundaries": {},
     "controls": {},
     "parameters": {
+      "depth": null,
+      "drainage_radius": 1000.0,
       "esp.best_efficiency_flow": 0.03610555555555555,
       "esp.correction_factors": [
         1.0,
@@ -138,6 +317,7 @@
       "esp.tubing": 0.1778,
       "formation.geothermal_gradient": null,
       "formation.surface_temperature": null,
+      "gradient": null,
       "injector.correction_factors": [
         1.0,
         0.0
@@ -168,6 +348,10 @@
       },
       "injector.soil_temperature": 288.15,
       "injector.two_phase_friction_correlation": "BeggsBrill",
+      "nominal_flow": null,
+      "nominal_wellhead_pressure": null,
+      "permeability": null,
+      "pump_efficiency": null,
       "reservoir.aquifer_thickness": 45.0,
       "reservoir.decline_threshold": 0.15,
       "reservoir.drainage_radius": 1000.0,
@@ -272,6 +456,8 @@
       "sink.temperature": 353.15,
       "sink.top_depth": 0.0,
       "sink.wellbore_radius": 0.0765,
+      "surface_temperature": null,
+      "thickness": null,
       "well.correction_factors": [
         1.0,
         0.0
@@ -351,7 +537,8 @@
       },
       "well.segment": "below_esp",
       "well.soil_temperature": 288.15,
-      "well.two_phase_friction_correlation": "BeggsBrill"
+      "well.two_phase_friction_correlation": "BeggsBrill",
+      "well_diameter": null
     }
   }
 }

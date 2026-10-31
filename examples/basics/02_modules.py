@@ -6,17 +6,14 @@ Shows calling ``gm.modules.ESP``, ``ModuleResult`` (``outputs``, ``outlets``, ``
 Run with ``python examples/basics/02_modules.py``.
 """
 
-from pathlib import Path
-
 import gemini as gm
 
-PLANT = Path(__file__).resolve().parents[2] / "datasets/doublet_heat/plant.json"
 STREAM = gm.Stream(flow="150 m3/h", T="80 degC", p="20 bar")
 
 
 def configured_esp():
     """Return a standalone ESP with the pump design of the doublet heat plant."""
-    design = gm.Plant.load(PLANT).doublet.esp
+    design = gm.plants.example("DoubletHeatPlant").doublet.esp
     values = {name: parameter.value for name, parameter in design.named_parameters()}
     return gm.modules.ESP().update_params(**values)
 
