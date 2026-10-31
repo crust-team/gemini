@@ -2,8 +2,7 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules._utils import sorption
-from gemini.modules.cooling import _physics
+from gemini.modules.cooling import _physics, _sorption
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
@@ -96,7 +95,7 @@ class AdsorptionChiller(Module):
 
         # Outlets
         values = self._performance(inlets)
-        generator_out, chilled_out, cooling_out = sorption.outlet_streams(inlets, values)
+        generator_out, chilled_out, cooling_out = _sorption.outlet_streams(inlets, values)
 
         outlets = dict(
             generator_out=generator_out,
@@ -107,7 +106,7 @@ class AdsorptionChiller(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
+        _sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
 
     def _performance(self, inlets):
         """Return the duties [W], COP and outlet temperatures [K] of one operating point."""
@@ -116,7 +115,7 @@ class AdsorptionChiller(Module):
             inlets.chilled_in,
             inlets.cooling_in,
         )
-        rates = sorption.rates(self.path, inlets)
+        rates = _sorption.rates(self.path, inlets)
         requested = heat_transfer.setpoint_duty(
             rates["chilled_in"], chilled_in.T - self.temperature_setpoint
         )
@@ -137,9 +136,9 @@ class AdsorptionChiller(Module):
             "adsorber_condenser_duty": rejection,
             "electricity": electricity,
             "is_capped": is_capped,
-            "generator_out_T": sorption.outlet_T(generator_in, rates["generator_in"], -generator),
-            "chilled_out_T": sorption.outlet_T(chilled_in, rates["chilled_in"], -evaporator),
-            "cooling_out_T": sorption.outlet_T(cooling_in, rates["cooling_in"], rejection),
+            "generator_out_T": _sorption.outlet_T(generator_in, rates["generator_in"], -generator),
+            "chilled_out_T": _sorption.outlet_T(chilled_in, rates["chilled_in"], -evaporator),
+            "cooling_out_T": _sorption.outlet_T(cooling_in, rates["cooling_in"], rejection),
         }
 
     def _available_duty(self, inlets, rates):
@@ -164,5 +163,5 @@ class AdsorptionChiller(Module):
             driving_T=driving_T,
             maximum=self.maximum_driving_temperature,
         )
-        capacity = sorption.evaporator_capacity(self, inlets, rates)
+        capacity = _sorption.evaporator_capacity(self, inlets, rates)
         return ops.where(driving_T < self.minimum_driving_temperature, 0.0, capacity)

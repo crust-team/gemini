@@ -3,8 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.modules._utils import sorption
-from gemini.modules.cooling import _physics
+from gemini.modules.cooling import _physics, _sorption
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
@@ -98,7 +97,7 @@ class AbsorptionUnit(Module):
 
         # Outlets
         values = self._performance(inlets)
-        generator_out, chilled_out, cooling_out = sorption.outlet_streams(inlets, values)
+        generator_out, chilled_out, cooling_out = _sorption.outlet_streams(inlets, values)
 
         outlets = dict(
             generator_out=generator_out,
@@ -109,7 +108,7 @@ class AbsorptionUnit(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
+        _sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
 
     def capex(self, assumptions):
         """Return the cost of the absorption unit from its capacity."""
@@ -122,7 +121,7 @@ class AbsorptionUnit(Module):
             inlets.chilled_in,
             inlets.cooling_in,
         )
-        rates = sorption.rates(self.path, inlets)
+        rates = _sorption.rates(self.path, inlets)
         if self.mode == "chiller":
             useful_ratio = 1.0
             requested = heat_transfer.setpoint_duty(
@@ -152,12 +151,12 @@ class AbsorptionUnit(Module):
             "absorber_condenser_duty": rejection,
             "electricity": electricity,
             "is_capped": is_capped,
-            "generator_out_T": sorption.outlet_T(generator_in, rates["generator_in"], -generator),
-            "chilled_out_T": sorption.outlet_T(chilled_in, rates["chilled_in"], -evaporator),
-            "cooling_out_T": sorption.outlet_T(cooling_in, rates["cooling_in"], rejection),
+            "generator_out_T": _sorption.outlet_T(generator_in, rates["generator_in"], -generator),
+            "chilled_out_T": _sorption.outlet_T(chilled_in, rates["chilled_in"], -evaporator),
+            "cooling_out_T": _sorption.outlet_T(cooling_in, rates["cooling_in"], rejection),
         }
 
     def _available_duty(self, inlets, rates):
         """Return the evaporator duty [W] the characteristic equation allows at these inlets."""
-        capacity = sorption.evaporator_capacity(self, inlets, rates)
+        capacity = _sorption.evaporator_capacity(self, inlets, rates)
         return ops.where(inlets.generator_in.T < self.minimum_driving_temperature, 0.0, capacity)

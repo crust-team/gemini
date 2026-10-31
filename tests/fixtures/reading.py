@@ -5,7 +5,7 @@ name: ``reading(result).electricity`` is the power on ``power_in``, so each asse
 number and reads it where it now lives.
 """
 
-from gemini.modules._utils import burner
+from gemini.modules.heating import _burner
 from gemini.physics import heat_transfer, units
 
 _PORT_POWERS = {
@@ -16,7 +16,7 @@ _PORT_POWERS = {
 
 
 _FUEL_PARTS = ("fuel_coproduced", "fuel_purchased", "burned_mass_flow")
-"""What ``burner.fuel_split`` returns of a burner, in its order."""
+"""What ``_burner.fuel_split`` returns of a burner, in its order."""
 
 
 def _fall(first, second):
@@ -38,7 +38,7 @@ class Reading:
         if name in result.outputs:
             return result.outputs[name]
         if name in _FUEL_PARTS:
-            parts = burner.fuel_split(result.outputs.fuel, self.offered)
+            parts = _burner.fuel_split(result.outputs.fuel, self.offered)
             return parts[_FUEL_PARTS.index(name)]
         try:
             return _port_quantity(result, name)

@@ -2,7 +2,7 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
-from gemini.modules._utils import burner
+from gemini.modules.heating import _burner
 from gemini.modules.module import Module
 from gemini.physics import energy, heat_transfer
 from gemini.types import (
@@ -97,13 +97,13 @@ class Boiler(_BoilerBody):
         duty = ops.minimum(self._requested_duty(inlet), self._duty_limit(fuel))
         outlet = self._heated(inlet, duty)
         need = energy.input_power(duty, self.efficiency)
-        flue_out = burner.flue_stream(need, fuel)
+        flue_out = _burner.flue_stream(need, fuel)
 
         outlets = dict(
             fluid_out=outlet,
             flue_out=flue_out,
             loss_out=need - duty,
-            fuel_in=burner.burned_stream(need, fuel),
+            fuel_in=_burner.burned_stream(need, fuel),
         )
         return outlets
 
@@ -119,9 +119,9 @@ class Boiler(_BoilerBody):
 
     def _duty_limit(self, fuel):
         """Return the capacity, or less when the stream alone must cover the fuel [W]."""
-        if burner.has_grid(fuel):
+        if _burner.has_grid(fuel):
             return self.capacity
-        useful = energy.output_power(burner.available_fuel(fuel), self.efficiency)
+        useful = energy.output_power(_burner.available_fuel(fuel), self.efficiency)
         return ops.minimum(self.capacity, useful)
 
 

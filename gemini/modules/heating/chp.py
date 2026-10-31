@@ -2,7 +2,7 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
-from gemini.modules._utils import burner
+from gemini.modules.heating import _burner
 from gemini.modules.module import Module
 from gemini.physics import combustion, heat_transfer
 from gemini.types import (
@@ -87,8 +87,8 @@ class CHP(Module):
         inlet, fuel = inlets.fluid_in, inlets.fuel_in
         values = self._performance(inlet, fuel)
         outlet = inlet.with_(T=values["fluid_out_T"])
-        flue_out = burner.flue_stream(values["fuel"], fuel)
-        fuel_in = burner.burned_stream(values["fuel"], fuel)
+        flue_out = _burner.flue_stream(values["fuel"], fuel)
+        fuel_in = _burner.burned_stream(values["fuel"], fuel)
 
         outlets = dict(
             fluid_out=outlet,
@@ -110,7 +110,7 @@ class CHP(Module):
 
     def _load(self, fuel):
         """Return the load: the commanded one, or less when the stream alone must cover it."""
-        if burner.has_grid(fuel):
+        if _burner.has_grid(fuel):
             return self.load_fraction
         need = combustion.willans_fuel_input(
             self.load_fraction,
@@ -118,7 +118,7 @@ class CHP(Module):
             self.electric_efficiency,
             self.no_load_fuel_fraction,
         )
-        return combustion.covered_load(self.load_fraction, need, burner.available_fuel(fuel))
+        return combustion.covered_load(self.load_fraction, need, _burner.available_fuel(fuel))
 
     def _performance(self, inlet, fuel_in):
         """Return fuel, electricity, heat flows [W] and the outlet temperature [K]."""
