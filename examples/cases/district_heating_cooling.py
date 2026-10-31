@@ -81,7 +81,8 @@ def main():
         flows = gm.modules.collect_flows(result)
         heat = consumer_heat(plant, result, gm.modules.HeatingGrid)
         cold = flows["heat_absorbed"] - consumer_heat(plant, result, gm.modules.CoolingGrid)
-        stored = gm.units.convert(result.outputs.stored_energy, "J", "kWh") / 1000
+        storage = result.children["ates"].children["storage"]
+        stored = gm.units.convert(storage.outputs.stored_energy, "J", "kWh") / 1000
         chilled = gm.units.convert(result.children["ates"].outlets.supply_out.T, "K", "degC")
         print(
             f"{hour:4d} {heat / 1e3:8.1f} {cold / 1e3:8.1f} {flows['electricity'] / 1e3:15.2f} "

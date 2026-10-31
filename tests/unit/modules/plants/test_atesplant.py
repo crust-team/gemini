@@ -69,17 +69,16 @@ def test_charge_cools_the_building_with_native_groundwater():
     """Empty stores produce at the aquifer temperature; the exchanger cools the building."""
     plant = _plant()
     result = plant(return_in=SUMMER)
-    out = reading(result)
     exchanger = result.children["heat_exchanger"]
     groundwater = exchanger.inlets.cold_in
-    assert out.production_out_T == 284.15 and groundwater.T > 284.15
+    assert result.children["storage"].outlets.production_out.T == 284.15 and groundwater.T > 284.15
     assert result.outlets.supply_out == exchanger.outlets.hot_out
     assert result.outlets.supply_out.T < SUMMER.T
     storage = result.children["storage"]
     assert storage.inlets.injection_in.T == exchanger.outlets.cold_out.T
     assert storage.outlets.production_out == result.children["pump"].inlets.fluid_in
     assert result.children["heat_pump"].inlets.power_in == 0
-    assert out.heat_accumulation == pytest.approx(
+    assert result.children["storage"].outputs.heat_accumulation == pytest.approx(
         30.0 * CP * (storage.inlets.injection_in.T - 284.15), rel=1e-9
     )
     _check_balances(plant, result)
@@ -95,9 +94,9 @@ def test_two_charge_steps_fill_the_warm_store():
     state, second = plant.step(state, HOUR, {"return_in": SUMMER})
     assert state["storage"]["warm_volume"] == pytest.approx(2 * 30 / 1000 * HOUR)
     assert state["storage"]["warm_temperature_change"] > 0
-    assert first.outputs.stored_energy == 0
-    stored = first.outputs.heat_accumulation * HOUR
-    assert stored > second.outputs.stored_energy > 0.995 * stored
+    assert first.children["storage"].outputs.stored_energy == 0
+    stored = first.children["storage"].outputs.heat_accumulation * HOUR
+    assert stored > second.children["storage"].outputs.stored_energy > 0.995 * stored
     _check_balances(plant, second)
 
 
@@ -110,8 +109,11 @@ def test_discharge_feeds_the_heat_pump_from_the_warm_store():
     state, result = plant.step(state, HOUR, {"return_in": WINTER})
     out = reading(result)
     lifted = result.children["heat_pump"]
-    assert out.production_out_T == pytest.approx(warm, rel=1e-14)
-    assert result.children["pump"].inlets.fluid_in.T == out.production_out_T
+    assert result.children["storage"].outlets.production_out.T == pytest.approx(warm, rel=1e-14)
+    assert (
+        result.children["pump"].inlets.fluid_in.T
+        == result.children["storage"].outlets.production_out.T
+    )
     assert result.outlets.supply_out.T == pytest.approx(313.15, rel=1e-12)
     assert lifted.inlets.source_in == result.children["pump"].outlets.fluid_out
     assert result.children["storage"].inlets.injection_in.T == lifted.outlets.source_out.T < warm
@@ -149,7 +151,7 @@ class Campus(Module):
         self.return_in = Inlet(Stream)
 
         # Outputs
-        self.stored_energy = Output.of(self.ates.stored_energy)
+        self.stored_energy = Output(float)
 
         # Outlets
         self.supply_out = Outlet(Stream)
@@ -159,6 +161,9 @@ class Campus(Module):
 
         # Modules
         served = self.ates(return_in=inlets.return_in)
+
+        # Outputs
+        self.stored_energy = served.children["storage"].outputs.stored_energy
 
         # Outlets
         supply_out = served.outlets.supply_out

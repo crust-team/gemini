@@ -17,9 +17,10 @@ from gemini.engine.chunks import (
 from gemini.errors import ValidationError
 from gemini.errors.lookup import UnknownKey
 from gemini.physics import units as physics_units
+from gemini.types.flows import FIELD_QUANTITIES
 from gemini.types.shapes import OutputUnits, problem, series, value
 from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
+from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path, split_path
 from gemini.utils.time import to_utc
 
 ENERGY_FIELDS = ("power_in", "fuel", "loss_out")
@@ -173,12 +174,23 @@ class Results:
         return len(self._times)
 
     def __getitem__(self, path):
-        """Expose module outputs as pandas Series through attributes."""
+        """Return the series of a module, or one Series: an output or a port field by its path.
+
+        ``results["sub.consumer"].unmet_demand``, ``results["sub.consumer.unmet_demand"]`` and
+        ``results["sub.heat_exchanger.hot_out.T"]`` all read by path.
+        """
         frame = self._cached_frame()
         paths = list(frame.columns.get_level_values(0).unique())
-        if path not in paths:
-            raise _unknown_path(path, paths)
-        return ModuleSeries(frame[path].copy(), path)
+        if path in paths:
+            return ModuleSeries(frame[path].copy(), path)
+        owner, name = split_path(path)
+        if owner in paths and name in frame[owner]:
+            return frame[owner][name].copy()
+        module, port = split_path(owner)
+        column = f"{port}.{FIELD_QUANTITIES.get(name)}"
+        if module in paths and column in frame[module]:
+            return frame[module][column].copy()
+        raise _unknown_path(path, paths)
 
     def _cached_frame(self):
         """Return the shared table, built once after each append; callers must not change it."""

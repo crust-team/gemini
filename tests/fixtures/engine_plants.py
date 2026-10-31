@@ -205,8 +205,8 @@ class Duo(Module):
         self.level = Control(float)
 
         # Outputs
-        self.rise = Output.of(self.back.rise)
-        self.power = Output.of(self.back.power)
+        self.rise = Output(float)
+        self.power = Output(float)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -217,6 +217,10 @@ class Duo(Module):
         # Modules
         first = self.front(fluid_in=inlets.fluid_in, level=self.level)
         second = self.back(fluid_in=first.outlets.fluid_out, level=self.level)
+
+        # Outputs
+        self.rise = second.outputs.rise
+        self.power = second.outputs.power
 
         # Outlets
         outlets = dict(fluid_out=second.outlets.fluid_out)

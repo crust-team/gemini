@@ -64,15 +64,6 @@ class ParallelExchangerPlant(Plant):
         self.connect(f"secondary_mixers.{tees - 1}.fluid_out", "supply_out")
         self.connect("degasser.gas_out", "gas_out")
 
-        # Outputs
-        self._output_specs = {
-            "production_rate": {"of": "doublet.riser.wellhead_out", "field": "m_dot"},
-            "injection_pressure": {"of": "doublet.injection_pump.discharge_pressure"},
-            "injection_pump_power": {"of": "doublet.injection_pump.power"},
-            "supply_out_T": {"of": f"secondary_mixers.{tees - 1}.fluid_out", "field": "T"},
-        }
-        self._refresh()
-
     def _divide(self, cascade, port):
         """Connect a splitter cascade: each sends its share to an exchanger, the last the rest."""
         tees = len(SHARES) - 1

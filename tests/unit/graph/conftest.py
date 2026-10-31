@@ -6,6 +6,7 @@ import pytest
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules import Module
+from gemini.modules.module import outputs_enabled
 from gemini.ops import Constant
 from gemini.types import (
     BRINE,
@@ -203,10 +204,10 @@ class Line(Module):
         self.boost = Control(float, default=1.0)
 
         # Outputs
-        self.rise = Output.of(self.gain.rise)
-        self.pressure = Output.of(self.gain.fluid_out.field("p"))
-        self.electricity = Output.of(self.second.electricity)
-        self.efficiency = Output.ratio(self.rise, self.electricity)
+        self.rise = Output(float)
+        self.pressure = Output(float)
+        self.electricity = Output(float)
+        self.efficiency = Output(float | None)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -218,6 +219,15 @@ class Line(Module):
         metered = self.first(fluid_in=inlets.fluid_in, draw=1.0)
         raised = self.gain(fluid_in=metered.outlets.fluid_out, gain=self.boost)
         metered_again = self.second(fluid_in=raised.outlets.fluid_out)
+
+        # Outputs
+        if outputs_enabled():
+            self.rise = raised.outputs.rise
+            self.pressure = raised.outlets.fluid_out.p
+            self.electricity = metered_again.outputs.electricity
+            self.efficiency = ops.where(
+                ops.eq(self.electricity, 0), None, ops.truediv(self.rise, self.electricity)
+            )
 
         # Outlets
         outlets = dict(fluid_out=metered_again.outlets.fluid_out)
@@ -323,8 +333,8 @@ class Chain(Module):
         self.drive = Control(float, default=1.0)
 
         # Outputs
-        self.value = Output.of(getattr(self.middle, next(iter(middle._outputs))))
-        self.pressure = Output.of(self.last.fluid_out.field("p"))
+        self.value = Output(float)
+        self.pressure = Output(float)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -337,6 +347,10 @@ class Chain(Module):
         controls = {name: self.drive for name in self.middle._controls}
         through = self.middle(fluid_in=metered.outlets.fluid_out, **controls)
         last = self.last(fluid_in=through.outlets.fluid_out, draw=1.0)
+
+        # Outputs
+        self.value = through.outputs[next(iter(self.middle._outputs))]
+        self.pressure = last.outlets.fluid_out.p
 
         # Outlets
         outlets = dict(fluid_out=last.outlets.fluid_out)
@@ -378,7 +392,7 @@ class Opaque(Module):
         self.fluid_in = Inlet(Stream)
 
         # Outputs
-        self.electricity = Output.of(self.meter.electricity)
+        self.electricity = Output(float)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -388,6 +402,9 @@ class Opaque(Module):
 
         # Modules
         metered = self.meter(fluid_in=inlets.fluid_in, draw=float(inlets.fluid_in.T))
+
+        # Outputs
+        self.electricity = metered.outputs.electricity
 
         # Outlets
         outlets = dict(fluid_out=metered.outlets.fluid_out)

@@ -17,8 +17,8 @@ The year, in daily steps:
   supply, lowest      100.00 °C
 
 Limits:
-  d0.flow                      ok        worst 300 m³/h
-  d1.flow                      ok        worst 300 m³/h
+  d0.reservoir.liquid_flow     ok        worst 300 m³/h
+  d1.reservoir.liquid_flow     ok        worst 300 m³/h
   d0.brine_cooling             ok        worst 35.52 K
   d1.brine_cooling             ok        worst 33.77 K
   boiler.fluid_out.temperature ok        worst 100 °C

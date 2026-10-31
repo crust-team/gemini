@@ -170,9 +170,12 @@ def _remove_outputs(spec, gone):
     if "outputs" not in spec:
         return
     outputs = spec["outputs"]
-    dropped = {name for name, item in outputs.items() if _touches(item.get("of", ""), gone)}
-    dropped |= {name for name, item in outputs.items() if dropped & set(item.get("ratio", ()))}
-    spec["outputs"] = {name: item for name, item in outputs.items() if name not in dropped}
+    kept = {
+        name: item
+        for name, item in outputs.items()
+        if not any(_touches(path, gone) for paths in item.values() for path in paths)
+    }
+    spec["outputs"] = kept
 
 
 def _remove_units(spec, template, disabled):

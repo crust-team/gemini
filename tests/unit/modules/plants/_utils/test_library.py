@@ -23,6 +23,3 @@ def test_fill_adds_a_shipped_spec_to_an_empty_plant():
     library.fill(plant, "DoubletHeatPlant")
     assert list(plant.inlets()) == ["return_in", "power_in"]
     assert list(plant.outlets()) == ["supply_out", "gas_out"]
-    assert list(plant.outputs(recurse=False)) == [
-        "thermal_power",
-    ]

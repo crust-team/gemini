@@ -40,7 +40,7 @@ def test_two_producers_mix_into_the_supply(fresh_plant):
     expected = (first.m_dot * first.T + second.m_dot * second.T) / (first.m_dot + second.m_dot)
     assert supply.T == pytest.approx(expected, rel=1e-12)
     assert supply.p == min(first.p, second.p)
-    assert result.outputs.supply_out_T == supply.T
+    assert result.outlets.supply_out.T == supply.T
     assert result.children["injectors.0.well"].inlets.wellhead_in == returned
     leaves = result.leaves().values()
     assert reading(result).electricity == pytest.approx(
@@ -64,7 +64,7 @@ def test_splitters_share_the_return_over_three_injectors(fresh_plant):
     flows = [result.children[f"injectors.{i}.well"].inlets.wellhead_in.m_dot for i in range(3)]
     assert flows == pytest.approx([20.0, 8.0, 12.0], rel=1e-14)
     riser = result.children["producers.0.riser"]
-    assert result.outputs.supply_out_T == reading(riser).wellhead_temperature
+    assert result.outlets.supply_out.T == reading(riser).wellhead_temperature
     assert len(field.mixers) == 0
     assert mass_balance(field, result)["relative_residual"] < 1e-12
 

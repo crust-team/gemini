@@ -69,15 +69,6 @@ class MultiWellPlant(Plant):
         for index in range(injectors):
             self.connect(f"injectors.{index}.well.loss_out", "formation.heat_in")
 
-        # Outputs
-        joined = (
-            f"mixers.{producers - 2}.fluid_out"
-            if producers > 1
-            else "producers.0.riser.wellhead_out"
-        )
-        self._output_specs = {"supply_out_T": {"of": joined, "field": "T"}}
-        self._refresh()
-
     def _connect_production(self, producers):
         """Connect every production limb and mix the limbs in order."""
         for index in range(producers):

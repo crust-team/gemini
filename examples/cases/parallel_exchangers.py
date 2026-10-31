@@ -38,12 +38,13 @@ def recalibrated_injectivity(doublet):
     return doublet.sink.injectivity_from_measurements(flow, bottom.p)
 
 
-def print_injection(label, index, outputs):
+def print_injection(label, index, result):
     """Print the injection pressure and the pump power of one injectivity index."""
+    outputs = result.children["doublet.injection_pump"].outputs
     print(
         f"Injectivity {label:<12}     {gm.units.convert(index, 'm3/s/Pa', 'm3/h/bar'):.4f} "
-        f"m³/h/bar: injection {outputs.get('injection_pressure', unit='bar'):.2f} bar, "
-        f"pump {outputs.get('injection_pump_power', unit='kW'):.1f} kW"
+        f"m³/h/bar: injection {outputs.get('discharge_pressure', unit='bar'):.2f} bar, "
+        f"pump {outputs.get('power', unit='kW'):.1f} kW"
     )
 
 
@@ -65,19 +66,20 @@ def main():
     plant = gm.plants.example("ParallelExchangerPlant")
     plant.set_inputs(INPUTS)
     upstream_index = plant.doublet.sink.injectivity_index
-    upstream = plant(return_in=SECONDARY).outputs
+    upstream = plant(return_in=SECONDARY)
     injectivity = recalibrated_injectivity(plant.doublet)
     plant.doublet.sink.update_params(injectivity_index=injectivity)
     result = plant(return_in=SECONDARY)
-    outputs = result.outputs
-    flow = gm.units.convert(outputs.production_rate / 1000, "m3/s", "m3/h")
+    rate = result.children["doublet.riser"].outlets.wellhead_out.m_dot
+    flow = gm.units.convert(rate / 1000, "m3/s", "m3/h")
+    outlet = gm.units.convert(result.outlets.supply_out.T, "K", "degC")
     electricity = gm.modules.collect_flows(result)["electricity"]
     print("Assumption: 80 °C reservoir; upstream fixes the wellhead temperature at 77 °C")
     print(f"Primary flow (nodal solve):  {flow:.2f} m³/h")
     print_injection("upstream", upstream_index, upstream)
-    print_injection("recalibrated", injectivity, outputs)
+    print_injection("recalibrated", injectivity, result)
     print_exchangers(result)
-    print(f"Secondary outlet:            {outputs.get('supply_out_T', unit='degC'):.2f} °C")
+    print(f"Secondary outlet:            {outlet:.2f} °C")
     print(f"Electricity (ESP and pump):  {electricity / 1e6:.4f} MW")
     print(f"Mass residual:               {gm.modules.mass_balance(plant, result)['residual']} kg/s")
     closed = all(check["passed"] for check in gm.checks.plant_balance(plant, result))

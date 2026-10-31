@@ -57,7 +57,7 @@ class Plant(Module):
         self.supply_in = Inlet(Stream)
 
         # Outputs
-        self.stored_energy = Output.of(self.storage.stored_energy)
+        self.stored_energy = Output(float)
 
         # Outlets
         self.return_out = Outlet(Stream)
@@ -68,6 +68,9 @@ class Plant(Module):
         # Modules
         heated = self.heater(fluid_in=inlets.supply_in, temperature_setpoint=291.15)
         stored = self.storage(injection_in=heated.outlets.fluid_out)
+
+        # Outputs
+        self.stored_energy = stored.outputs.stored_energy
 
         # Outlets
         return_out = stored.outlets.production_out

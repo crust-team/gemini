@@ -69,21 +69,10 @@
     "supply_out": "riser.wellhead_out"
   },
   "outputs": {
-    "flow": {
-      "of": "reservoir.liquid_flow"
-    },
-    "production_temperature": {
-      "of": "riser.wellhead_out",
-      "field": "T"
-    },
-    "injection_temperature": {
-      "of": "injector.wellhead_in",
-      "field": "T"
-    },
     "brine_cooling": {
       "difference": [
-        "production_temperature",
-        "injection_temperature"
+        "riser.wellhead_out.T",
+        "injector.wellhead_in.T"
       ]
     }
   },

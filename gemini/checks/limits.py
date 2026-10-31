@@ -7,11 +7,10 @@ import numpy as np
 from gemini.engine.results import PORT_QUANTITIES, port_fields
 from gemini.errors import ValidationError
 from gemini.physics import units
-from gemini.types.declarations import PortField
+from gemini.types.flows import FIELD_QUANTITIES
 from gemini.types.shapes import check, value
-from gemini.utils.strings import close_matches, did_you_mean, join_path
+from gemini.utils.strings import close_matches, did_you_mean, join_path, split_path
 
-_PORT_COLUMNS = {"m_dot": "mass_flow", "T": "temperature", "p": "pressure"}
 """The results column of each stream field."""
 
 TOLERANCE = 1e-9
@@ -130,10 +129,9 @@ def _fields(plant, path):
     return outputs | port_fields(module)
 
 
-def _port_series(frame, path, module, field):
-    """Return the column of a stream field of a descendant's port, and whether it carried flow."""
-    owner = join_path(path, module._descendant_path(field.port.owner))
-    return _column(frame, owner, f"{field.port.name}.{_PORT_COLUMNS[field.name]}")
+def _port_series(frame, module, port, field):
+    """Return the column of a stream field of a port, and whether the module carried flow."""
+    return _column(frame, module, f"{port}.{FIELD_QUANTITIES[field]}")
 
 
 def _column(frame, path, name):
@@ -144,31 +142,42 @@ def _column(frame, path, name):
 
 
 def _series(plant, frame, path, name):
-    """Return ``(values, active)`` of an output: a leaf column, or the formula of a composite.
+    """Return ``(values, active)`` of an output: a leaf column, or the combination of a plant.
 
-    ``Results`` holds leaf columns, so an output of a composite is computed from the leaves its
-    formula names, and a tick counts when every leaf behind it carried flow.
+    ``Results`` holds leaf columns, so an output of a plant is computed from the paths it names,
+    and a tick counts when every leaf behind it carried flow.
     """
     if join_path(path, name) in frame:
         return _column(frame, path, name)
     module = plant.get_module(path)
-    kind, *operands = module.outputs(recurse=False)[name].formula or (None,)
-    if kind == "of" and isinstance(operands[0], PortField):
-        return _port_series(frame, path, module, operands[0])
-    if kind == "of":
-        target = join_path(path, module._descendant_path(operands[0].owner))
-        return _series(plant, frame, target, operands[0].name)
-    if kind in ("difference", "ratio"):
-        (first, active), (second, also) = (
-            _series(plant, frame, path, item.name) for item in operands
+    key, *paths = module.outputs(recurse=False)[name].formula or (None,)
+    if key is None:
+        raise ValidationError(
+            f"limits: {join_path(path, name)}: the results hold no column of this output",
+            path=join_path(path, name),
+            code="no_value",
         )
-        result = first - second if kind == "difference" else first / second
-        return result, active & also
-    raise ValidationError(
-        f"limits: {join_path(path, name)}: the results hold no column of this output",
-        path=join_path(path, name),
-        code="no_value",
-    )
+    series = [_path_series(plant, frame, path, item) for item in paths]
+    active = np.logical_and.reduce([flag for _, flag in series])
+    return _combined(key, [values for values, _ in series]), active
+
+
+def _combined(key, values):
+    """Return the arrays of a combination, as a plant computes it on one tick."""
+    if key == "sum":
+        return np.sum(values, axis=0)
+    return values[0] - values[1] if key == "difference" else values[0] / values[1]
+
+
+def _path_series(plant, frame, path, item):
+    """Return ``(values, active)`` of a path of the plant at ``path``."""
+    owner, name = split_path(item)
+    if not owner:
+        return _series(plant, frame, path, name)
+    if name in FIELD_QUANTITIES:
+        module, port = split_path(join_path(path, owner))
+        return _port_series(frame, module, port, name)
+    return _series(plant, frame, join_path(path, owner), name)
 
 
 def _worst(values, lower, upper):

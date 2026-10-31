@@ -4,6 +4,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules import Filter, Module, ProductionReservoir
+from gemini.modules.plant import Plant
 from gemini.types import Control, Inlet, Outlet, Output, Parameter, Power, Stream
 from tests.fixtures.errors import raises
 
@@ -186,7 +187,7 @@ class Meter(Module):
         return outlets
 
 
-class Share(Module):
+class Share(Plant):
     """Composite dividing an optional reading by a power."""
 
     def __init__(self):
@@ -197,18 +198,7 @@ class Share(Module):
         self.meter = Meter()
 
         # Outputs
-        self.reading = Output.of(self.meter.reading)
-        self.power = Output.of(self.meter.power)
-        self.share = Output.ratio(self.reading, self.power)
-
-    def forward(self, inlets):
-        """Call the meter once."""
-
-        # Modules
-        self.meter()
-
-        outlets = dict()
-        return outlets
+        self.share = Output.ratio("meter.reading", "meter.power")
 
 
 def test_ratio_with_a_missing_operand_is_none():

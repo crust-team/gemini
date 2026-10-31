@@ -86,12 +86,3 @@ class ATESPlant(Plant):
         self.connect("load_mixer.fluid_out", "supply_out")
         self.connect("pump.loss_out", "loss_out")
         self.connect("storage.loss_out", "loss_out")
-
-        # Outputs
-        self._output_specs = {
-            "heat_accumulation": {"of": "storage.heat_accumulation"},
-            "stored_energy": {"of": "storage.stored_energy"},
-            "production_out_T": {"of": "storage.production_out", "field": "T"},
-            "recovery_efficiency": {"of": "storage.recovery_efficiency"},
-        }
-        self._refresh()

@@ -11,6 +11,7 @@ from gemini.types import (
     Inlet,
     Length,
     Outlet,
+    Output,
     Parameter,
     Permeability,
     Power,
@@ -93,13 +94,7 @@ class Doublet(Plant):
         self.connect("riser.wellhead_out", "supply_out")
 
         # Outputs
-        self._output_specs = {
-            "flow": {"of": "reservoir.liquid_flow"},
-            "production_temperature": {"of": "riser.wellhead_out", "field": "T"},
-            "injection_temperature": {"of": "injector.wellhead_in", "field": "T"},
-            "brine_cooling": {"difference": ["production_temperature", "injection_temperature"]},
-        }
-        self._refresh()
+        self.brine_cooling = Output.difference("riser.wellhead_out.T", "injector.wellhead_in.T")
 
     def set_params(self, path, params, valid_from=None):
         """Derive the children's values from the design, unless the same call states them."""

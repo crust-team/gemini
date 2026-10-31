@@ -27,28 +27,42 @@ def by_name(checks):
 def test_a_doublet_reports_its_flow_and_brine_cooling(run):
     """Volume flow, and the temperature its brine lost between the wells."""
     plant, results = run
-    limits = Limits().add("d*.flow", min="50 m3/h", max="300 m3/h")
+    limits = Limits().add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
     limits.add("d*.brine_cooling", max="40 K")
     found = by_name(gm.checks.limits(plant, results, limits))
-    assert set(found) == {"d0.flow", "d1.flow", "d0.brine_cooling", "d1.brine_cooling"}
-    assert found["d0.flow"]["passed"] is True and found["d0.flow"]["value"]["unit"] == "m3/s"
-    assert found["d0.flow"]["value"]["value"] == pytest.approx(300 / 3600)
-    assert found["d0.flow"]["limit"]["value"] == pytest.approx([50 / 3600, 300 / 3600])
+    assert set(found) == {
+        "d0.reservoir.liquid_flow",
+        "d1.reservoir.liquid_flow",
+        "d0.brine_cooling",
+        "d1.brine_cooling",
+    }
+    assert (
+        found["d0.reservoir.liquid_flow"]["passed"] is True
+        and found["d0.reservoir.liquid_flow"]["value"]["unit"] == "m3/s"
+    )
+    assert found["d0.reservoir.liquid_flow"]["value"]["value"] == pytest.approx(300 / 3600)
+    assert found["d0.reservoir.liquid_flow"]["limit"]["value"] == pytest.approx(
+        [50 / 3600, 300 / 3600]
+    )
     assert 0 < found["d0.brine_cooling"]["value"]["value"] < 40
 
 
 def test_a_doublet_at_rest_is_not_held_to_its_minimum_flow(run):
     """The minimum holds while it runs: the off day of the second doublet does not count."""
     plant, results = run
-    found = by_name(gm.checks.limits(plant, results, Limits().add("d1.flow", min="50 m3/h")))
-    assert found["d1.flow"]["passed"] is True
-    assert found["d1.flow"]["value"]["value"] == pytest.approx(150 / 3600)
+    found = by_name(
+        gm.checks.limits(plant, results, Limits().add("d1.reservoir.liquid_flow", min="50 m3/h"))
+    )
+    assert found["d1.reservoir.liquid_flow"]["passed"] is True
+    assert found["d1.reservoir.liquid_flow"]["value"]["value"] == pytest.approx(150 / 3600)
 
 
 def test_a_violated_limit_is_an_answer(run):
     """The worst value comes back; nothing is raised."""
     plant, results = run
-    found = gm.checks.limits(plant, results, Limits().add("d0.flow", max="100 m3/h"))
+    found = gm.checks.limits(
+        plant, results, Limits().add("d0.reservoir.liquid_flow", max="100 m3/h")
+    )
     assert found[0]["passed"] is False
     assert found[0]["value"]["value"] == pytest.approx(300 / 3600)
 
@@ -65,7 +79,9 @@ def test_a_leaf_output_and_a_temperature_limit(run):
 def test_both_limits_report_the_value_furthest_out(run):
     """Between the two limits the larger excursion is the worst."""
     plant, results = run
-    (found,) = gm.checks.limits(plant, results, Limits().add("d0.flow", min=0.05, max=0.06))
+    (found,) = gm.checks.limits(
+        plant, results, Limits().add("d0.reservoir.liquid_flow", min=0.05, max=0.06)
+    )
     assert found["passed"] is False and found["value"]["value"] == pytest.approx(300 / 3600)
 
 
@@ -89,13 +105,13 @@ def _empty_results():
 def test_units_are_checked_when_a_limit_is_added():
     """No plant is needed for that."""
     with raises(gm.errors.ValidationError, "invalid_unit"):
-        Limits().add("d*.flow", max="300 m3/parsec")
+        Limits().add("d*.reservoir.liquid_flow", max="300 m3/parsec")
 
 
 def test_a_limit_needs_a_bound_and_an_output():
     """The target has a pattern and an output; a limit has at least one bound."""
     with raises(gm.errors.ValidationError, "missing_value"):
-        Limits().add("d*.flow")
+        Limits().add("d*.reservoir.liquid_flow")
     with raises(gm.errors.ValidationError, "invalid_value"):
         Limits().add("flow", max=1.0)
 
@@ -103,10 +119,16 @@ def test_a_limit_needs_a_bound_and_an_output():
 def test_limits_round_trip_through_a_plain_dictionary(run):
     """Stored as JSON and read back, they give the same checks."""
     plant, results = run
-    limits = Limits().add("d*.flow", min="50 m3/h", max="300 m3/h")
+    limits = Limits().add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
     limits.add("users.supply_in.temperature", min="100 degC")
     stored = json.loads(json.dumps(limits.to_dict()))
     assert Limits.from_dict(stored).to_dict() == limits.to_dict()
     assert gm.checks.limits(plant, results, Limits.from_dict(stored)) == gm.checks.limits(
         plant, results, limits
     )
+
+
+def test_a_port_field_of_a_plant_reads_by_path(run):
+    """``results[path]`` reads a port field as a plant's output path names it."""
+    _, results = run
+    assert (results["d0.riser.wellhead_out.T"] > 0).all()

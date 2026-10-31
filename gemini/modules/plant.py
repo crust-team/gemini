@@ -12,7 +12,7 @@ from gemini.modules.plants._utils.plan import STATE, Constraint, compile_plan, i
 from gemini.modules.plants._utils.ports import PortResolver
 from gemini.modules.plants._utils.run import Run
 from gemini.physics import energy
-from gemini.types.declarations import Inlet, Outlet
+from gemini.types.declarations import Inlet, Outlet, Output
 from gemini.utils.strings import join_path, snake_case
 
 
@@ -52,6 +52,7 @@ class Plant(PortResolver, Module):
         self._baselines = {}
         self._sections = {}
         self._plan = None
+        self._planned_offers = ()
 
     @classmethod
     def _empty(cls, name):
@@ -240,11 +241,15 @@ class Plant(PortResolver, Module):
         """Register a declaration; a port assigned by a plant class stays through ``_refresh``."""
         if isinstance(declaration, (Inlet, Outlet)):
             self._declared.add(name)
+        if isinstance(declaration, Output) and declaration.formula is not None:
+            self._output_specs = (self._output_specs or {}) | {
+                name: outputs.spec_of(declaration.formula)
+            }
+            declaration = outputs.typed(self, name, declaration.formula)
         super()._register_declaration(name, declaration)
 
     def _refresh(self):
         self._plan = None
-        self._outputs.clear()
         for side, declare in (("inlets", Inlet), ("outlets", Outlet)):
             for name, ends in self._port_map(side).items():
                 if name in self._declared:
@@ -254,8 +259,6 @@ class Plant(PortResolver, Module):
                 registry = getattr(self, f"_{side}")
                 registry.pop(name, None)
                 Module._register_declaration(self, name, declare(end.type, kind=end.kind))
-        for name, spec in (self._output_specs or {}).items():
-            outputs.declare_output(self, name, spec)
 
     def _connection_list(self):
         """Return the plant's connections as ``[{source, target, kind, type}]``.
@@ -292,8 +295,10 @@ class Plant(PortResolver, Module):
         return reported(reader.problems(type(self), spec) + reader.root_problems(spec), on_error)
 
     def _compiled(self):
-        if self._plan is None:
-            self._plan = compile_plan(self)
+        """Return the plan; which outlets are offered depends on how the modules are set."""
+        offers = tuple(module._offers() for module in self.modules())
+        if self._plan is None or offers != self._planned_offers:
+            self._plan, self._planned_offers = compile_plan(self), offers
         return self._plan
 
     def _iterates(self):
@@ -310,6 +315,23 @@ class Plant(PortResolver, Module):
             yield name, self._plant_value([results[path].outlets[port] for path, port in ends])
         for name, ends in plan.given.items():
             yield name, self._plant_value([results[path].inlets[port] for path, port in ends])
+
+    def _compute_combinations(self, call):
+        """Record the outputs this plant combines from the results of its children."""
+        records = dict(self._recorded_calls(call.call_records))
+        for name, output in self._outputs.items():
+            if output.formula is None:
+                continue
+            key, *paths = output.formula
+            values = [outputs.read(self, records, path) for path in paths]
+            setattr(self, name, outputs.combine(key, values))
+
+    @staticmethod
+    def _recorded_calls(call_records, prefix=""):
+        for path, result in call_records:
+            full_path = join_path(prefix, path)
+            yield full_path, result
+            yield from Plant._recorded_calls(result.call_records, full_path)
 
     def forward(self, inlets):
         """Call the modules in connection order, close the loops and return the plant outlets."""

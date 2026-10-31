@@ -61,7 +61,7 @@ class GridPlant(Module):
         self.water_in = Inlet(Stream)
 
         # Outputs
-        self.net_export = Output.of(self.grid.net_export)
+        self.net_export = Output(float)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -73,7 +73,12 @@ class GridPlant(Module):
         # Modules
         generated = self.orc(fluid_in=inlets.fluid_in, air_in=air(288.15))
         heated = self.boiler(fluid_in=inlets.water_in, temperature_setpoint=353.15)
-        self.grid(power_out=[heated.inlets.power_in], power_in=[generated.outlets.power_out])
+        settled = self.grid(
+            power_out=[heated.inlets.power_in], power_in=[generated.outlets.power_out]
+        )
+
+        # Outputs
+        self.net_export = settled.outputs.net_export
 
         # Outlets
         fluid_out = generated.outlets.fluid_out
@@ -117,14 +122,18 @@ class Connected(Module):
         self.generation = Control(Power)
 
         # Outputs
-        self.net_import = Output.of(self.grid.net_import)
-        self.net_export = Output.of(self.grid.net_export)
+        self.net_import = Output(float)
+        self.net_export = Output(float)
 
     def forward(self, inlets):
         """Settle one row."""
 
         # Modules
-        self.grid(power_out=[self.consumption], power_in=[self.generation])
+        settled = self.grid(power_out=[self.consumption], power_in=[self.generation])
+
+        # Outputs
+        self.net_import = settled.outputs.net_import
+        self.net_export = settled.outputs.net_export
 
         outlets = dict()
         return outlets

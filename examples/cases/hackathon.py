@@ -61,7 +61,7 @@ ASSUMPTIONS = """Assumptions of this case, not of the challenge:
 def hackathon_limits():
     """Return the hard limits of the challenge."""
     limits = gm.checks.Limits()
-    limits.add("d*.flow", min="50 m3/h", max="300 m3/h")
+    limits.add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
     limits.add("d*.brine_cooling", max="40 K")
     limits.add("boiler.fluid_out.temperature", min="100 degC")
     return limits

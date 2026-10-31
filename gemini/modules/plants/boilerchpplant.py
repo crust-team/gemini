@@ -69,12 +69,3 @@ class BoilerChpPlant(Plant):
         self.connect("boiler.loss_out", "air.heat_in")
         self.connect("chp.loss_out", "air.heat_in")
         self.connect("mixer.fluid_out", "supply_out")
-
-        # Outputs
-        self._output_specs = {
-            "production_rate": {"of": "doublet.riser.wellhead_out", "field": "m_dot"},
-            "duty": {"of": "heat_exchanger.duty"},
-            "injection_pump_power": {"of": "doublet.injection_pump.power"},
-            "supply_out_T": {"of": "mixer.fluid_out", "field": "T"},
-        }
-        self._refresh()

@@ -29,15 +29,20 @@ def test_met_loads_close_the_building_loop(plants):
     out = reading(result)
     effectiveness = counterflow_effectiveness(3e4, 3 * CP, 4 * CP)
     assert reading(result.children["consumer"]).heat_absorbed == pytest.approx(7e4, rel=1e-12)
-    assert out.duty == pytest.approx(7e4, rel=1e-9)
-    assert not out.is_unmet
+    assert reading(result.children["heat_exchanger"]).duty == pytest.approx(7e4, rel=1e-9)
+    assert not result.children["consumer"].outputs.is_unmet
     assert out.return_out_T == pytest.approx(279.15 + 7e4 / (3 * CP), rel=1e-12)
     expected_return = 279.15 + 7e4 / (effectiveness * 3 * CP)
-    assert out.building_return_temperature == pytest.approx(expected_return, abs=1e-8)
-    assert out.building_supply_temperature == pytest.approx(
+    assert result.children["consumer"].outlets.return_out.T == pytest.approx(
+        expected_return, abs=1e-8
+    )
+    assert result.children["consumer"].inlets.supply_in.T == pytest.approx(
         expected_return - 7e4 / (4 * CP), abs=1e-8
     )
-    assert out.building_supply_temperature < out.dew_point - 1.0
+    assert (
+        result.children["consumer"].inlets.supply_in.T
+        < result.children["consumer"].outputs.dew_point - 1.0
+    )
     assert energy_balance(substation, result)["relative_residual"] < 1e-12
     assert_plant_closes(substation, result)
     assert mass_balance(substation, result)["residual"] == 0
@@ -47,32 +52,40 @@ def test_warm_network_cannot_dehumidify(plants):
     """A supply too warm for the dew-point margin leaves the latent load unmet."""
     substation = plants["cooling_substation"](CoolingSubstation())
     result = substation(supply_in=NETWORK.with_(T=284.15))
-    out = reading(result)
-    assert out.building_supply_temperature > out.dew_point - 1.0
-    assert out.unmet_latent == 1e4 and out.is_unmet
+    assert (
+        result.children["consumer"].inlets.supply_in.T
+        > result.children["consumer"].outputs.dew_point - 1.0
+    )
+    assert (
+        result.children["consumer"].outputs.unmet_latent == 1e4
+        and result.children["consumer"].outputs.is_unmet
+    )
     assert reading(result.children["consumer"]).heat_absorbed == pytest.approx(6e4, rel=1e-12)
-    assert out.unmet_sensible == pytest.approx(0, abs=1e-6)
+    assert result.children["consumer"].outputs.unmet_sensible == pytest.approx(0, abs=1e-6)
 
 
 def test_large_load_is_capped_at_the_return_limit(plants):
     """Beyond the exchanger's reach the return sits at the 18 degC limit."""
     substation = plants["cooling_substation"](CoolingSubstation(), sensible=5e5)
     result = substation(supply_in=NETWORK)
-    out = reading(result)
     effectiveness = counterflow_effectiveness(3e4, 3 * CP, 4 * CP)
     available = effectiveness * 3 * CP * (291.15 - 279.15)
-    assert out.building_return_temperature == pytest.approx(291.15, abs=1e-8)
+    assert result.children["consumer"].outlets.return_out.T == pytest.approx(291.15, abs=1e-8)
     assert reading(result.children["consumer"]).heat_absorbed == pytest.approx(available, rel=1e-9)
-    assert out.unmet_sensible == pytest.approx(5e5 - available, rel=1e-9)
-    assert out.unmet_latent == 1e4
+    assert result.children["consumer"].outputs.unmet_sensible == pytest.approx(
+        5e5 - available, rel=1e-9
+    )
+    assert result.children["consumer"].outputs.unmet_latent == 1e4
 
 
 def test_stopped_network_and_invalid_inputs(plants):
     """No network flow absorbs nothing; reverse flow raises."""
     substation = plants["cooling_substation"](CoolingSubstation())
     result = substation(supply_in=NETWORK.with_(m_dot=0.0))
-    out = reading(result)
-    assert reading(result.children["consumer"]).heat_absorbed == 0 and out.unmet_sensible == 6e4
+    assert (
+        reading(result.children["consumer"]).heat_absorbed == 0
+        and result.children["consumer"].outputs.unmet_sensible == 6e4
+    )
     with pytest.raises(gm.errors.PhysicsError):
         substation(supply_in=NETWORK.with_(m_dot=-1.0))
 

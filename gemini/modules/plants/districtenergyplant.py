@@ -52,7 +52,3 @@ class DistrictEnergyPlant(Plant):
         self.connect("cooling.loss_out", "air.heat_in")
         self.connect("heating.return_out", "hot_out")
         self.connect("cooling.return_out", "cold_out")
-
-        # Outputs
-        self._output_specs = {"stored_energy": {"of": "ates.stored_energy"}}
-        self._refresh()

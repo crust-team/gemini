@@ -113,15 +113,14 @@ def _port(plant, side, name, ends, report):
 
 def _outputs(plant, specs, report):
     plant._output_specs = {}
-    plant._refresh()
     for name, spec in outputs.ordered(specs):
         with report.guard(f"outputs.{name}"):
             if not isinstance(spec, dict):
                 raise ValidationError(f"{name}: expected a mapping", code="invalid_format")
-            if report.skips(spec.get("of", "")):
+            key, paths = outputs.check(name, spec)
+            if any(report.skips(path) for path in paths):
                 continue
-            outputs.declare_output(plant, name, spec)
-            plant._output_specs[name] = deepcopy(spec)
+            plant._register_declaration(name, outputs.declare(plant, name, spec))
 
 
 def _ends(spec):

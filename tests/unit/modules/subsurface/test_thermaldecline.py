@@ -42,7 +42,7 @@ class Producer(Module):
         self.sandface = Inlet(Stream)
 
         # Outputs
-        self.temperature_drop = Output.of(self.decline.temperature_drop)
+        self.temperature_drop = Output(float)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -53,6 +53,9 @@ class Producer(Module):
         # Modules
         declined = self.decline(fluid_in=inlets.sandface)
         heated = self.heater(fluid_in=declined.outlets.fluid_out, temperature_setpoint=300)
+
+        # Outputs
+        self.temperature_drop = declined.outputs.temperature_drop
 
         # Outlets
         outlet = heated.outlets.fluid_out

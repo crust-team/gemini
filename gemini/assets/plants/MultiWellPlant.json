@@ -153,12 +153,6 @@
   "outlets": {
     "supply_out": "mixers.0.fluid_out"
   },
-  "outputs": {
-    "supply_out_T": {
-      "of": "mixers.0.fluid_out",
-      "field": "T"
-    }
-  },
   "bindings": {},
   "param_history": {}
 }

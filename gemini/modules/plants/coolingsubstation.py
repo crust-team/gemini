@@ -67,16 +67,3 @@ class CoolingSubstation(Plant):
         self.connect("consumer.return_out", "pump.fluid_in")
         self.connect("pump.fluid_out", "heat_exchanger.hot_in")
         self.connect("pump.loss_out", "loss_out")
-
-        # Outputs
-        self._output_specs = {
-            "duty": {"of": "heat_exchanger.duty"},
-            "unmet_sensible": {"of": "consumer.unmet_sensible"},
-            "unmet_latent": {"of": "consumer.unmet_latent"},
-            "is_unmet": {"of": "consumer.is_unmet"},
-            "dew_point": {"of": "consumer.dew_point"},
-            "building_supply_temperature": {"of": "heat_exchanger.hot_out_T"},
-            "building_return_temperature": {"of": "consumer.return_out", "field": "T"},
-            "valve_pressure_drop": {"of": "valve.pressure_drop"},
-        }
-        self._refresh()

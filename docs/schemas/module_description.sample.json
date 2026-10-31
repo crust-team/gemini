@@ -91,39 +91,6 @@
       "section": "output",
       "type": "number",
       "unit": "K"
-    },
-    "flow": {
-      "default": null,
-      "description": null,
-      "enum": null,
-      "maximum": null,
-      "minimum": null,
-      "quantity": "volume_flow",
-      "section": "output",
-      "type": "number",
-      "unit": "m3/s"
-    },
-    "injection_temperature": {
-      "default": null,
-      "description": null,
-      "enum": null,
-      "maximum": null,
-      "minimum": 0,
-      "quantity": "temperature",
-      "section": "output",
-      "type": "number",
-      "unit": "K"
-    },
-    "production_temperature": {
-      "default": null,
-      "description": null,
-      "enum": null,
-      "maximum": null,
-      "minimum": 0,
-      "quantity": "temperature",
-      "section": "output",
-      "type": "number",
-      "unit": "K"
     }
   },
   "name": "doublet",
@@ -146,21 +113,6 @@
   "outputs": {
     "brine_cooling": {
       "quantity": "temperature_difference",
-      "soft_sensor": false,
-      "unit": "K"
-    },
-    "flow": {
-      "quantity": "volume_flow",
-      "soft_sensor": false,
-      "unit": "m3/s"
-    },
-    "injection_temperature": {
-      "quantity": "temperature",
-      "soft_sensor": false,
-      "unit": "K"
-    },
-    "production_temperature": {
-      "quantity": "temperature",
       "soft_sensor": false,
       "unit": "K"
     }

@@ -41,8 +41,8 @@ def _chain_template():
             "inlets": {"feed": "first.fluid_in"},
             "outlets": {"product": "last.fluid_out"},
             "outputs": {
-                "drop": {"of": "middle.pressure_drop"},
-                "last_drop": {"of": "last.pressure_drop"},
+                "drop": {"difference": ["middle.fluid_in.p", "middle.fluid_out.p"]},
+                "last_drop": {"difference": ["last.fluid_in.p", "last.fluid_out.p"]},
             },
             "bindings": {},
             "param_history": {},

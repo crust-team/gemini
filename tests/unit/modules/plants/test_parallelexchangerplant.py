@@ -26,13 +26,13 @@ def run():
 def test_the_call_reproduces_the_upstream_case(run):
     """The rate, the injection and the three duties of the upstream example."""
     _, result = run
-    outputs = result.outputs
-    assert round(outputs.production_rate * 3.6, 2) == 125.10
-    assert round(outputs.get("injection_pressure", unit="bar"), 2) == 54.86
-    assert round(outputs.get("injection_pump_power", unit="kW"), 1) == 195.6
+    pump = result.children["doublet.injection_pump"].outputs
+    assert round(result.children["doublet.riser"].outlets.wellhead_out.m_dot * 3.6, 2) == 125.10
+    assert round(pump.get("discharge_pressure", unit="bar"), 2) == 54.86
+    assert round(pump.get("power", unit="kW"), 1) == 195.6
     duties = [result.children[f"heat_exchangers.{index}"].outputs.duty for index in range(3)]
     assert [round(duty / 1e3, 1) for duty in duties] == [297.8, 178.7, 119.1]
-    assert round(outputs.get("supply_out_T", unit="degC"), 2) == 24.06
+    assert round(gm.units.convert(result.outlets.supply_out.T, "K", "degC"), 2) == 24.06
 
 
 def test_the_shares_divide_both_streams(run):

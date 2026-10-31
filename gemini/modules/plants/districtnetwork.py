@@ -66,10 +66,6 @@ class DistrictNetwork(Plant):
         self.connect("supply_pipe.loss_out", "loss_out")
         self.connect("return_pipe.loss_out", "loss_out")
 
-        # Outputs
-        self._output_specs = {"return_out_T": {"of": "return_pipe.fluid_out", "field": "T"}}
-        self._refresh()
-
     def _connect_feed(self, consumers):
         """Divide the feed over the substations: each splitter serves one, the last what is left."""
         count = consumers - 1

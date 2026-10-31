@@ -12,18 +12,18 @@ from gemini.utils import paths
 from tests.fixtures.errors import raises
 
 FORMER_EXAMPLES = {
-    "ATESPlant": "29d157ac8c1b6006d60bacfc6fb821bb7cbc0c21b058cb8e69642c02f24873da",
-    "BoilerChpPlant": "335077245c94a8df846af18376abf4f275732ea5fb4e3555a797720c848edf8f",
-    "CoolingSubstation": "e724b534942334e8216d459a957dbd42f43f9df34785cc1fabc995abc59d9d16",
-    "DistrictEnergyPlant": "1df6cb451b7b87affc28199318182fd64dc8b49bbf6b8626a15cbd6140f32c90",
-    "DistrictNetwork": "cc5a52fa7e7372f532f8e2aacbb6f14f716737735e0ba1418c90ab3e2e3f91d5",
+    "ATESPlant": "7ae7cf36bd0d34f7039c2881cffb107b769d0ad4f12f53b66359fe1053842210",
+    "BoilerChpPlant": "a9213b64867d13df1d31e86a2e60eda6332b434d532ca822e7a2c3b086dcd7a3",
+    "CoolingSubstation": "e332a3aae55afa8e6e7e947af66dead26b410d88644c3b23bfed1468001e4a5c",
+    "DistrictEnergyPlant": "64940b883163bc81e59fa8ffa4879dbc6cb3d737786f3e200a1f76787a390e76",
+    "DistrictNetwork": "3475084a865a4a441eb0743ab9ae81356d0412ab69144c6a0b0a02e31cd2a9e6",
     "Doublet": "7e38703b880e458aef5d3957bc7cc7d51ffc8c9b067d8da0b6c3568dd88249e2",
-    "DoubletHeatPlant": "a83a084462d47570c0b880efa2dd0a932500e07af8e306edbab3b5203d18a670",
+    "DoubletHeatPlant": "af782a504a4e97d36b00003c1c991e26b4a7aed1ae2aa7c1ec786b0dbcdd2af8",
     "HackathonPlant": "6da42c88a06d8bc97c03b556097cf0e86396d1dc66c8e5bc74638cb987c570b7",
-    "HeatingSubstation": "5e0e18c308feb515bb95398ab341f00e471346b7f79ec78fafc541d385ec832d",
-    "MultiWellPlant": "8946346c436b21e7c3c71f9ca019db963267c67ebad052599100017ade1ee83d",
+    "HeatingSubstation": "f1306278048f262a2b088d3d895882f802aff702f69358c6615de849fc4bddf5",
+    "MultiWellPlant": "30c96f8dec0a190ffb5333e40465dd2437c43fae1952736ee8356344252d4251",
     "NodalDoublet": "612091520ef3c6d1b1b242f746a5277c85854f7a013aee4a21c2dcaa2d9ae674",
-    "ParallelExchangerPlant": "47f565bedb445d011e61e8f3231435886e3ab12a48adb87030d3ed97b0c8d61c",
+    "ParallelExchangerPlant": "d8b21e47275c3b8d0c0d88241c05a1fcd95951dc5cec38e3775ad31ef43eea8b",
 }
 """Hash of ``to_dict()`` of the plant built from each whole example file these values replaced.
 

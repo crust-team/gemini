@@ -10,7 +10,6 @@ numeric parameter and each constant a traced call uses is one named graph input,
 import numbers
 from collections.abc import Mapping
 from copy import deepcopy
-from dataclasses import dataclass, fields
 from datetime import datetime
 from functools import partial
 from inspect import isclass
@@ -25,7 +24,7 @@ from gemini.errors import DefinitionError, PhysicsError, ValidationError
 from gemini.physics import units
 from gemini.types import streams
 from gemini.types.flows import Stream
-from gemini.types.quantities import Power, Ratio
+from gemini.types.quantities import Power
 from gemini.utils.strings import did_you_mean, join_names
 
 
@@ -364,16 +363,6 @@ class _Port(Declaration):
             return [self._item(item) for item in value]
         return self._item(value)
 
-    def field(self, name):
-        """Return a reference to one ``Stream`` field of this port for ``Output.of``."""
-        names = [field.name for field in fields(self.type)]
-        if name not in names:
-            raise DefinitionError(
-                f"{self.path}.{name}: unknown stream field; valid: "
-                f"{join_names(names)}{did_you_mean(name, names)}"
-            )
-        return PortField(self, name)
-
     def _item(self, value):
         """Return a stream of ``type``, or a number: a mapping of fields builds a stream."""
         if not self.carries_stream:
@@ -455,33 +444,31 @@ class Output(Declaration):
         super().__init__(type, description=description)
         self.soft_sensor = soft_sensor
         self.formula = None
-        self._resolved_formula = None
 
     @classmethod
-    def of(cls, target, **kwargs):
-        """Declare an output copied from one exactly-once descendant call.
+    def _combination(cls, *formula):
+        output = cls(Any)
+        output.formula = formula
+        return output
 
-        ``target`` is a descendant's output declaration, such as ``self.heat_exchanger.duty``,
-        or an outlet field, such as ``self.degasser.gas.field("m_dot")``; the output takes the
-        target's type. The owning module checks the reference when the output is assigned.
+    @classmethod
+    def difference(cls, first, second):
+        """Declare ``first - second`` of two paths of a plant, such as ``"riser.wellhead_out.T"``.
+
+        A path is an output or a port field of a child, or a bare name for an earlier output of the
+        plant. The plant gives the output the kind of its paths.
         """
-        output = cls(getattr(target, "type", Any), **kwargs)
-        output.formula = ("of", target)
-        return output
+        return cls._combination("difference", first, second)
 
     @classmethod
-    def ratio(cls, numerator, denominator, **kwargs):
-        """Declare the ratio of two earlier outputs of the same module, given as declarations."""
-        output = cls(Ratio | None, **kwargs)
-        output.formula = ("ratio", numerator, denominator)
-        return output
+    def ratio(cls, numerator, denominator):
+        """Declare ``numerator / denominator`` of two paths of a plant; zero gives ``None``."""
+        return cls._combination("ratio", numerator, denominator)
 
     @classmethod
-    def difference(cls, first, second, type, **kwargs):
-        """Declare ``first - second`` of two earlier outputs of the same module, as ``type``."""
-        output = cls(type, **kwargs)
-        output.formula = ("difference", first, second)
-        return output
+    def sum(cls, first, second, *others):
+        """Declare the sum of two or more paths of a plant."""
+        return cls._combination("sum", first, second, *others)
 
 
 class Outlet(_Port):
@@ -500,21 +487,3 @@ class Outlet(_Port):
         """Declare an outgoing port."""
         super().__init__(type, kind=kind, many=many, drawn=drawn or many, description=description)
         self.offered = offered
-
-
-@dataclass(frozen=True, eq=False)
-class PortField:
-    """One ``Stream`` field of an outlet declaration, the target of an ``Output.of`` formula."""
-
-    port: Outlet
-    name: str
-
-    @property
-    def type(self):
-        """Return the annotated type of the stream field."""
-        return next(field.type for field in fields(self.port.type) if field.name == self.name)
-
-    @property
-    def path(self):
-        """Return the dotted path of the field, for messages."""
-        return f"{self.port.path}.{self.name}"

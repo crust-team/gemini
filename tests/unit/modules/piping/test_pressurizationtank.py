@@ -42,7 +42,7 @@ class Network(Module):
         # Boundaries
 
         # Outputs
-        self.pressure_correction = Output.of(self.tank.pressure_correction)
+        self.pressure_correction = Output(float)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -58,6 +58,9 @@ class Network(Module):
             branch1_in=piped.outlets.fluid_out, branch2_in=throttled.outlets.fluid_out
         )
         held = self.tank(fluid_in=mixed.outlets.fluid_out, pressure_setpoint="3 bar")
+
+        # Outputs
+        self.pressure_correction = held.outputs.pressure_correction
 
         # Outlets
         outlet = held.outlets.fluid_out

@@ -605,11 +605,6 @@
     "gas_out": "degasser.gas_out",
     "supply_out": "heat_exchanger.cold_out"
   },
-  "outputs": {
-    "thermal_power": {
-      "of": "heat_exchanger.duty"
-    }
-  },
   "param_history": {
     "degasser": [
       {

@@ -68,6 +68,14 @@ def test_access_conversion_and_suggestions():
         rows["pump"].get("power_in", unit="kW")
 
 
+def test_a_path_reads_one_output_or_port_field():
+    """An output and a port field read by their path, as a plant's paths name them."""
+    frame = results()
+    assert frame["pump.head"].tolist() == [2e5, 2e5]
+    with raises(gm.errors.ValidationError, "unknown_name"):
+        frame["pump.nothing.T"]
+
+
 def test_summary_integrates_energy_and_counts_alarms_and_skips():
     """Energy is power times dt; alarms and skip reasons are counted per module."""
     summary = results().to_frame(table="energy")

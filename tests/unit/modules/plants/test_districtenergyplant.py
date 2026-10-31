@@ -46,8 +46,10 @@ def run():
 def test_the_store_charges_step_by_step(run):
     """The stored energy starts at zero and grows with the warmed groundwater."""
     _, first, second = run
-    assert first.outputs.stored_energy == 0
-    assert round(second.outputs.stored_energy / 3.6e9, 3) == 0.228
+    assert first.children["ates"].children["storage"].outputs.stored_energy == 0
+    assert (
+        round(second.children["ates"].children["storage"].outputs.stored_energy / 3.6e9, 3) == 0.228
+    )
 
 
 def test_the_chilled_water_follows_the_returned_water(run):

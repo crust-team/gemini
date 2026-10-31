@@ -138,10 +138,6 @@ def multi_well_spec(producers=2, injectors=1):
     splitting, return_in = _split(
         "splitters", [f"injectors.{index}.well.wellhead_in" for index in range(injectors)]
     )
-    joined = (
-        "producers.0.riser.wellhead_out" if producers == 1 else f"mixers.{producers - 2}.fluid_out"
-    )
-    temperature = {"of": joined, "field": "T"}
     return {
         "format": 2,
         "name": "MultiWellPlant",
@@ -160,9 +156,6 @@ def multi_well_spec(producers=2, injectors=1):
             ),
         },
         "outlets": {"supply_out": supply},
-        "outputs": {
-            "supply_out_T": temperature,
-        },
         "bindings": {},
         "param_history": {},
     }
@@ -233,11 +226,6 @@ def district_network_spec(consumers=2, service="heating"):
             + [_link(returned, "return_pipe.fluid_in")]
         ),
         **_network_ports(consumers),
-        "outputs": _network_outputs(service),
         "bindings": {},
         "param_history": {},
     }
-
-
-def _network_outputs(service):
-    return {"return_out_T": {"of": "return_pipe.fluid_out", "field": "T"}}

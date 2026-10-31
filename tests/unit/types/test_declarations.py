@@ -150,8 +150,6 @@ def test_invalid_values_raise_declaration_errors():
         parameter.validate("12 bar")
     with pytest.raises(ValidationError, match="coefficients: shape = \\(1,\\); expected \\(2,\\)"):
         Parameter(list[float], shape=(2,)).bind(None, "coefficients").validate([1])
-    with pytest.raises(DefinitionError, match="outlet.mdot: unknown stream field.*'m_dot'"):
-        Outlet(Stream).bind(None, "outlet").field("mdot")
 
 
 def test_limits_come_from_the_quantity_and_the_bounds():

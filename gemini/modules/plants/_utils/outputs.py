@@ -1,93 +1,158 @@
-"""The outputs of a built plant: copies of one module's value and ratios, from the spec."""
+"""The outputs of a plant: combinations of the values at paths.
 
-from gemini.errors import ValidationError
+An output is ``{"difference": [a, b]}``, ``{"ratio": [a, b]}`` or ``{"sum": [a, b, ...]}`` in a
+plant dict. A path is what ``Plant.constrain`` reads: ``riser.wellhead_out.T``,
+``reservoir.liquid_flow``, or a bare name for an earlier output of the plant. The kind of the
+output follows from its first path.
+"""
+
+from gemini import ops
+from gemini.errors import DefinitionError, ValidationError
 from gemini.types.declarations import Output
-from gemini.types.quantities import TemperatureDifference
-from gemini.utils.strings import close_matches, did_you_mean, join_names
+from gemini.types.flows import STREAM_FIELDS
+from gemini.types.quantities import (
+    MassFlow,
+    Pressure,
+    PressureDifference,
+    Ratio,
+    Temperature,
+    TemperatureDifference,
+)
+from gemini.utils.strings import close_matches, did_you_mean, join_names, split_path
 
-KEYS = ("of", "ratio", "difference")
+KEYS = ("difference", "ratio", "sum")
+FIELD_KINDS = {"m_dot": MassFlow, "T": Temperature, "p": Pressure}
+DIFFERENCES = {"K": TemperatureDifference, "Pa": PressureDifference}
+"""The kind of a difference of two values of a unit, where it is not the kind of the values."""
 
 
-def _unknown(subject, name, valid):
+def _unknown(path, valid):
     return ValidationError(
-        f"{subject}: unknown name {name!r}; valid: {join_names(valid)}{did_you_mean(name, valid)}",
-        suggestions=close_matches(name, valid),
+        f"{path!r}: no such output or port field; valid: {join_names(valid)}"
+        f"{did_you_mean(path, valid)}",
+        suggestions=close_matches(path, valid),
         code="unknown_name",
     )
 
 
-def _target(plant, spec):
-    path, _, local = spec["of"].rpartition(".")
-    module = plant._find_submodule(path) if path else None
+def _module_at(plant, path):
+    module = plant._find_submodule(path)
     if module is None:
-        paths = [item for item, _ in plant.named_modules() if item]
-        raise ValidationError(
-            f"of = {spec['of']!r}: no module {path!r}{did_you_mean(path, paths)}",
-            path="of",
-            suggestions=close_matches(path, paths),
-            code="unknown_name",
-        )
-    if "field" in spec:
-        ports = module._inlets | module._outlets
-        if local not in ports:
-            raise _unknown("of", local, ports)
-        return ports[local].field(spec["field"])
-    if local not in module._outputs:
-        raise _unknown("of", local, module._outputs)
-    return module._outputs[local]
+        names = [item for item, _ in plant.named_modules() if item]
+        raise _unknown(path, names)
+    return module
 
 
-def _ratio(plant, spec):
-    names = spec["ratio"]
-    for name in names:
+def _kind(plant, path):
+    """Return the kind of the value at ``path``."""
+    owner, name = split_path(path)
+    if not owner:
         if name not in plant._outputs:
-            raise _unknown("ratio", name, plant._outputs)
-    return Output.ratio(*(plant._outputs[name] for name in names))
+            raise _unknown(path, plant._outputs)
+        return plant._outputs[name].type
+    module = plant._find_submodule(owner)
+    if module is not None and name in module._outputs:
+        return module._outputs[name].type
+    head, port = (owner, None) if module is not None else split_path(owner)
+    module = _module_at(plant, head)
+    ports = module._inlets | module._outlets
+    if port not in ports or name not in STREAM_FIELDS:
+        names = [f"{head}.{item}" for item in module._outputs]
+        raise _unknown(path, names + [f"{head}.{item}.T" for item in ports])
+    return FIELD_KINDS[name]
 
 
-def _difference(plant, spec):
-    names = spec["difference"]
-    for name in names:
-        if name not in plant._outputs:
-            raise _unknown("difference", name, plant._outputs)
-    return Output.difference(
-        *(plant._outputs[name] for name in names), TemperatureDifference | None
-    )
+def _result_kind(key, kind):
+    """Return the kind of an output of ``key`` over values of ``kind``."""
+    if key == "ratio":
+        return Ratio | None
+    unit = Output(kind).unit
+    return (DIFFERENCES.get(unit, kind) if key == "difference" else kind) | None
 
 
-def declare_output(plant, name, spec):
-    """Declare output ``name`` from a spec entry.
-
-    The entry is ``{"of": path}``, ``{"ratio": [a, b]}`` or
-    ``{"difference": [a, b]}``, the temperature difference of two outputs.
-    """
+def check(name, spec):
+    """Return ``(key, paths)`` of an entry of a plant dict, or raise what is wrong with it."""
     given = [key for key in KEYS if key in spec]
-    if len(given) != 1:
+    if len(given) != 1 or len(spec) != 1:
         raise ValidationError(
             f"{name}: keys = {sorted(spec)}; expected exactly one of {join_names(KEYS)}",
             path="",
             code="invalid_format",
         )
-    builders = {"of": lambda: Output.of(_target(plant, spec))}
-    builders["ratio"] = lambda: _ratio(plant, spec)
-    builders["difference"] = lambda: _difference(plant, spec)
+    key, paths = given[0], spec[given[0]]
+    two = key != "sum"
+    if not isinstance(paths, list) or len(paths) < 2 or (two and len(paths) != 2):
+        raise ValidationError(
+            f"{name}.{key} = {paths!r}; expected a list of {'two' if two else 'two or more'} paths",
+            path=key,
+            code="invalid_format",
+        )
+    return key, paths
+
+
+def declare(plant, name, spec):
+    """Declare output ``name`` of ``plant`` from an entry of a plant dict."""
+    key, paths = check(name, spec)
     if name in plant._children:
         raise ValidationError(f"{name}: an output cannot share the name of a module", path="")
-    plant._register_declaration(name, builders[given[0]]())
+    kinds = [_kind(plant, path) for path in paths]
+    output = Output(_result_kind(key, kinds[0]))
+    output.formula = (key, *paths)
+    return output
+
+
+def typed(plant, name, formula):
+    """Return the output of a ``formula`` assigned by a plant class, of the kind of its paths."""
+    key, *paths = formula
+    return declare(plant, name, {key: paths})
+
+
+def spec_of(formula):
+    """Return the entry of a plant dict of ``formula``."""
+    key, *paths = formula
+    return {key: list(paths)}
+
+
+def combine(key, values):
+    """Return the value of an output; ``None`` when a value is ``None`` or a divisor zero."""
+    if any(value is None for value in values):
+        return None
+    if key == "difference":
+        return values[0] - values[1]
+    if key == "ratio":
+        return ops.where(ops.eq(values[1], 0), None, ops.truediv(values[0], values[1]))
+    total = values[0]
+    for value in values[1:]:
+        total = total + value
+    return total
+
+
+def read(plant, records, path):
+    """Return the value at ``path`` in a finished call: ``records`` are its results by path."""
+    owner, name = split_path(path)
+    if not owner:
+        return getattr(plant, name)
+    if owner in records:
+        return records[owner].outputs[name]
+    head, port = split_path(owner)
+    if head not in records:
+        raise DefinitionError(f"{plant.path}: output path {path!r}: {head!r} was not called")
+    result = records[head]
+    ports = result.outlets if port in result.outlets else result.inlets
+    return getattr(ports[port], name)
 
 
 def ordered(specs):
-    """Return ``(name, spec)`` in given order, a ratio after the outputs it divides."""
-    result, waiting = [], []
+    """Return ``(name, spec)`` in given order, an output after the outputs it reads."""
+    result, waiting = [], list(specs.items())
 
     def ready(item):
-        operands = item[1].get("ratio", ()) or item[1].get("difference", ())
-        return all(operand in {name for name, _ in result} for operand in operands)
+        paths = next((value for key, value in item[1].items() if key in KEYS), ())
+        done = {name for name, _ in result}
+        return all("." in path or path in done for path in paths)
 
-    for item in specs.items():
-        waiting.append(item)
-        while any(ready(candidate) for candidate in waiting):
-            first = next(candidate for candidate in waiting if ready(candidate))
-            waiting.remove(first)
-            result.append(first)
+    while any(ready(item) for item in waiting):
+        first = next(item for item in waiting if ready(item))
+        waiting.remove(first)
+        result.append(first)
     return result + waiting

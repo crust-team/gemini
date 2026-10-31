@@ -43,7 +43,3 @@ class DoubletHeatPlant(Plant):
         self.connect("injection_pump.fluid_out", "doublet.return_in")
         self.connect("heat_exchanger.cold_out", "supply_out")
         self.connect("degasser.gas_out", "gas_out")
-
-        # Outputs
-        self._output_specs = {"thermal_power": {"of": "heat_exchanger.duty"}}
-        self._refresh()

@@ -40,7 +40,6 @@ from gemini.types.declarations import (
     Outlet,
     Output,
     Parameter,
-    PortField,
     State,
 )
 from gemini.types.flows import Stream
@@ -408,47 +407,10 @@ class Module:
             for kind, registry in _REGISTRIES
             if isinstance(declaration, kind)
         )
-        if isinstance(declaration, Output) and declaration.formula is not None:
-            self._check_formula_references(name, declaration.formula)
         registry[name] = declaration.bind(self, name)
         if isinstance(declaration, Parameter) and declaration.initialized:
             initial = self._param_history[0].params
             initial[name] = to_jsonable_python(deepcopy(declaration.value))
-
-    def _check_formula_references(self, name, formula):
-        """Reject a formula whose declaration references do not belong to this module tree.
-
-        ``Output.of`` must reference an output or outlet field of a descendant and
-        ``Output.ratio`` two earlier outputs of this module, so a wrong reference fails while
-        the class is built.
-        """
-        kind, *references = formula
-        if kind == "of":
-            self._check_of_target(name, references[0])
-        if kind in ("ratio", "difference"):
-            self._check_ratio_operands(name, references)
-
-    def _check_of_target(self, name, target):
-        if not isinstance(target, (Output, PortField)):
-            raise DefinitionError(
-                f"{self.path}.{name}: Output.of target = {target!r}; expected a descendant output "
-                "declaration or an outlet field reference such as self.child.fluid_out.field('T')"
-            )
-        owner = target.port.owner if isinstance(target, PortField) else target.owner
-        if owner is None or owner is self or self._descendant_path(owner) is None:
-            raise DefinitionError(
-                f"{self.path}.{name}: Output.of target {target.path} is not an output or "
-                "outlet field of a descendant module"
-            )
-
-    def _check_ratio_operands(self, name, operands):
-        for operand in operands:
-            if not isinstance(operand, Output) or self._outputs.get(operand.name) is not operand:
-                described = operand.path if isinstance(operand, Output) else repr(operand)
-                raise DefinitionError(
-                    f"{self.path}.{name}: Output.ratio operand {described} is not an "
-                    f"earlier output of this module; valid: {join_names(self._outputs)}"
-                )
 
     def _descendant_path(self, module):
         """Return the dotted path of ``module`` below this one, or ``None`` outside the tree."""
@@ -725,13 +687,12 @@ class Module:
         return [name for name, value in self.named_parameters() if not value.initialized]
 
     def _prepare(self):
-        """Reject uninitialized parameters and resolve the formula outputs, before any call."""
+        """Reject uninitialized parameters, before any call."""
         missing = self.missing_parameters()
         if missing:
             raise ValidationError(
                 f"{self.path}: uninitialized parameters: {', '.join(missing)}", code="missing_value"
             )
-        self._resolve_formula_outputs()
 
     @property
     def is_initialized(self):
@@ -940,7 +901,7 @@ class Module:
         Forward hooks see the plain ``inlets``, in a trace through ``call.trace`` which tells
         whether they write an output.
         """
-        self._compute_formula_outputs(call)
+        self._compute_combinations(call)
         for hook in tuple(self._hooks.values()):
             if call.trace is None:
                 hook(self, inlets, outlets)
@@ -1106,71 +1067,8 @@ class Module:
             for name, declaration in (self._controls | self._boundaries).items()
         }
 
-    def _resolve_formula_outputs(self):
-        """Resolve every formula output once and remember how to compute it."""
-        for name, output in self._outputs.items():
-            if output._resolved_formula is not None:
-                continue
-            if output.formula is not None:
-                output._resolved_formula = self._resolve_formula(output.formula)
-
-    def _resolve_formula(self, formula):
-        """Return the descendant path and access of ``Output.of``, or the ratio operand names."""
-        kind, *references = formula
-        if kind in ("ratio", "difference"):
-            return (kind, *(reference.name for reference in references))
-        target = references[0]
-        if isinstance(target, PortField):
-            access = (target.port.section, target.port.name, target.name)
-            return kind, self._descendant_path(target.port.owner), access
-        return kind, self._descendant_path(target.owner), ("output", target.name, None)
-
-    @staticmethod
-    def _recorded_calls(call_records, prefix=""):
-        for path, result in call_records:
-            full_path = join_path(prefix, path)
-            yield full_path, result
-            yield from Module._recorded_calls(result.call_records, full_path)
-
-    def _compute_formula_outputs(self, call):
-        """Record formula outputs in declaration order."""
-        calls = list(self._recorded_calls(call.call_records))
-        for name, output in self._outputs.items():
-            if output._resolved_formula is None:
-                continue
-            kind, *arguments = output._resolved_formula
-            if kind == "of":
-                setattr(self, name, self._output_of(name, calls, *arguments))
-            elif kind == "ratio":
-                setattr(self, name, self._output_ratio(*arguments))
-            elif kind == "difference":
-                setattr(self, name, self._output_difference(*arguments))
-
-    def _output_difference(self, first, second):
-        """Return the difference of two recorded outputs, ``None`` when either is ``None``."""
-        minuend, subtrahend = getattr(self, first), getattr(self, second)
-        if minuend is None or subtrahend is None:
-            return None
-        return minuend - subtrahend
-
-    def _output_of(self, name, calls, module_path, access):
-        section, port, field_name = access
-        matches = [result for path, result in calls if path == module_path]
-        if len(matches) != 1:
-            raise DefinitionError(
-                f"{self.path}.{name}: descendant {module_path!r} was called "
-                f"{len(matches)} times; expected exactly once"
-            )
-        values = getattr(matches[0], f"{section}s")
-        value = values[port]
-        return getattr(value, field_name) if field_name is not None else value
-
-    def _output_ratio(self, numerator, denominator):
-        """Divide two earlier outputs; ``None`` when either is ``None`` or the divisor is zero."""
-        top, bottom = getattr(self, numerator), getattr(self, denominator)
-        if top is None or bottom is None:
-            return None
-        return ops.where(ops.eq(bottom, 0), None, ops.truediv(top, bottom))
+    def _compute_combinations(self, call):
+        """Record the outputs a plant combines from its children; a leaf has none."""
 
     def _check_outputs(self, recorded):
         missing = sorted(self._outputs.keys() - recorded.keys())

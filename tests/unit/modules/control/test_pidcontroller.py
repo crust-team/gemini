@@ -120,7 +120,7 @@ class ControlledTank(Module):
         self.measured_temperature = Boundary(Temperature)
 
         # Outputs
-        self.command = Output.of(self.controller.command)
+        self.command = Output(float)
 
         # Outlets
         self.charge_out = Outlet(Stream)
@@ -135,6 +135,7 @@ class ControlledTank(Module):
         )
         charge_in = inlets.charge_in
         throttled = charge_in.with_(m_dot=charge_in.m_dot * control.outputs.command)
+        self.command = control.outputs.command
         stored = self.storage(
             charge_in=throttled, discharge_in=inlets.discharge_in, air_in=air(293.15)
         )
