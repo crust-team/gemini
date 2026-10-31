@@ -15,18 +15,27 @@ SUMMER = Stream(m_dot=40.0, T=290.15, p=3e5)
 WINTER = SUMMER.with_(T=303.15)
 
 
+def _season(plant, mode):
+    """Command the storage and the two valves together."""
+    plant.storage.mode = mode
+    fraction = 1.0 if mode == "discharge" else 0.0
+    plant.source_valve.split_fraction = fraction
+    plant.load_valve.split_fraction = fraction
+
+
 def _plant(mode="charge"):
     """Return a 30 kg/s ATES plant with a 1 MW/K exchanger and a 2 MW heat pump."""
-    plant = ATESPlant().update_params(groundwater_pressure=3e5)
-    plant.groundwater_flow = 30.0
+    plant = ATESPlant()
+    plant.storage.groundwater_flow = 30.0
     plant.storage.update_params(
+        groundwater_pressure=3e5,
         aquifer_temperature=284.15,
         aquifer_thickness=30,
         porosity=0.3,
         rock_volumetric_heat_capacity=2.0e6,
         ground_conductivity=2.5,
     )
-    plant.storage.mode = mode
+    _season(plant, mode)
     plant.pump.update_params(
         head_coefficients=[3e5, 0.0, -1e8],
         rated_frequency=50,
@@ -68,9 +77,8 @@ def test_charge_cools_the_building_with_native_groundwater():
     assert result.outlets.supply_out.T < SUMMER.T
     storage = result.children["storage"]
     assert storage.inlets.injection_in.T == exchanger.outlets.cold_out.T
-    assert storage.inlets.injection_in.p == 3e5
     assert storage.outlets.production_out == result.children["pump"].inlets.fluid_in
-    assert "heat_pump" not in result.children
+    assert result.children["heat_pump"].inlets.power_in == 0
     assert out.heat_accumulation == pytest.approx(
         30.0 * CP * (storage.inlets.injection_in.T - 284.15), rel=1e-9
     )
@@ -98,7 +106,7 @@ def test_discharge_feeds_the_heat_pump_from_the_warm_store():
     plant = _plant()
     state, _ = plant.step(None, 6 * HOUR, {"return_in": SUMMER})
     warm = 284.15 + state["storage"]["warm_temperature_change"]
-    plant.storage.mode = "discharge"
+    _season(plant, "discharge")
     state, result = plant.step(state, HOUR, {"return_in": WINTER})
     out = reading(result)
     lifted = result.children["heat_pump"]
@@ -107,7 +115,7 @@ def test_discharge_feeds_the_heat_pump_from_the_warm_store():
     assert result.outlets.supply_out.T == pytest.approx(313.15, rel=1e-12)
     assert lifted.inlets.source_in == result.children["pump"].outlets.fluid_out
     assert result.children["storage"].inlets.injection_in.T == lifted.outlets.source_out.T < warm
-    assert "heat_exchanger" not in result.children
+    assert result.children["heat_exchanger"].outputs.duty == 0
     assert out.electricity == pytest.approx(
         reading(lifted).electricity + reading(result.children["pump"]).electricity, rel=1e-14
     )
@@ -118,11 +126,11 @@ def test_discharge_feeds_the_heat_pump_from_the_warm_store():
 def test_idle_moves_no_groundwater_and_flow_is_required_to_stop():
     """Idle passes the building circuit; idle with groundwater flow raises."""
     plant = _plant("idle")
-    plant.groundwater_flow = 0.0
+    plant.storage.groundwater_flow = 0.0
     result = plant(return_in=SUMMER)
     assert result.outlets.supply_out.T == SUMMER.T
     assert reading(result).electricity == 0
-    plant.groundwater_flow = 30.0
+    plant.storage.groundwater_flow = 30.0
     with pytest.raises(gm.errors.PhysicsError, match="idle"):
         plant(return_in=SUMMER)
 

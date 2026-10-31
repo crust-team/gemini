@@ -13,7 +13,16 @@ from .grids import ChemicalGrid, CoolingGrid, ElectricityGrid, GasGrid, HeatingG
 from .heating import CHP, Boiler, ElectricBoiler, HeatPump
 from .module import Module
 from .piping import GasMakeup, Mixer, Pipe, PressurizationTank, Splitter, Valve
-from .plants import ATESPlant, CoolingSubstation, HeatingSubstation
+from .plants import (
+    ATESPlant,
+    CoolingSubstation,
+    DistrictNetwork,
+    Doublet,
+    DoubletHeatPlant,
+    HackathonPlant,
+    HeatingSubstation,
+    MultiWellPlant,
+)
 from .plants.boilerchpplant import BoilerChpPlant
 from .plants.districtenergyplant import DistrictEnergyPlant
 from .plants.nodaldoublet import NodalDoublet
@@ -89,6 +98,11 @@ __all__ = [
     "ParallelExchangerPlant",
     "BoilerChpPlant",
     "DistrictEnergyPlant",
+    "Doublet",
+    "DoubletHeatPlant",
+    "DistrictNetwork",
+    "MultiWellPlant",
+    "HackathonPlant",
     "collect_flows",
     "emissions",
     "energy_balance",

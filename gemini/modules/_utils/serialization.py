@@ -194,9 +194,13 @@ def _module_at(root, path):
     return modules[path]
 
 
-def _read_fluid(module, value):
+def _read_fluid(module, value, alone):
+    """Set the fluid of ``module``; ``alone`` keeps it from passing to the children."""
     try:
-        module.fluid = value
+        if alone:
+            module._set_own_fluid(value)
+        else:
+            module.fluid = value
     except PydanticError as error:
         raise ValidationError(f"fluid: {error}", code="invalid_value") from error
 
@@ -236,10 +240,19 @@ def _read_order(section, entries):
     return entries.items()
 
 
+def _names_below(entries, path):
+    """Return whether a section names a module below ``path``: it then speaks for each itself."""
+    prefix = f"{path}." if path else ""
+    return any(name != path and name.startswith(prefix) for name in entries)
+
+
 def read_sections(root, spec, report):
     """Apply the sections of ``spec`` to the tree, adding each problem to ``report``."""
+    fluids = spec.get("fluids", {})
     readers = {
-        "fluids": lambda path, value: _read_fluid(_module_at(root, path), value),
+        "fluids": lambda path, value: _read_fluid(
+            _module_at(root, path), value, _names_below(fluids, path)
+        ),
         "boundary": lambda path, value: _read_boundary(_module_at(root, path), value),
         "param_history": lambda path, value: _read_history(_module_at(root, path), value),
         "bindings": lambda path, value: _read_bindings(root, path, value),

@@ -2,13 +2,13 @@
 
 from gemini.modules.environment import Atmosphere
 from gemini.modules.grids import ElectricityGrid
-from gemini.modules.module import Module
-from gemini.modules.plants._utils import templating
+from gemini.modules.plant import Plant
 from gemini.modules.plants.atesplant import ATESPlant
-from gemini.types import Inlet, Outlet, Output, Stream
+from gemini.modules.plants.districtnetwork import DistrictNetwork
+from gemini.types import Inlet, Outlet, Stream
 
 
-class DistrictEnergyPlant(Module):
+class DistrictEnergyPlant(Plant):
     """Heating network on a geothermal supply and a cooling network on an ATES plant.
 
     A geothermal supply on ``hot_in`` feeds a heating network with two building substations. In
@@ -19,16 +19,13 @@ class DistrictEnergyPlant(Module):
     """
 
     def __init__(self):
-        """Build both networks and the ATES plant."""
+        """Build both networks and the ATES plant and connect them to the grids."""
         super().__init__()
 
         # Modules
-        self.heating = templating.from_template("district_network", {"consumers": 2})
+        self.heating = DistrictNetwork(consumers=2)
         self.ates = ATESPlant()
-        self.cooling = templating.from_template(
-            "district_network", {"consumers": 1, "service": "cooling"}
-        )
-
+        self.cooling = DistrictNetwork(consumers=1, service="cooling")
         self.electricity_grid = ElectricityGrid()
         self.air = Atmosphere()
 
@@ -37,41 +34,25 @@ class DistrictEnergyPlant(Module):
         self.cold_in = Inlet(Stream)
         self.air_in = Inlet(Stream, kind="air")
 
-        # Outputs
-        self.stored_energy = Output.of(self.ates.stored_energy)
-
         # Outlets
         self.hot_out = Outlet(Stream)
         self.cold_out = Outlet(Stream)
 
-    def forward(self, inlets):
-        """Serve the heating network, chill the cooling water and serve the cooling network."""
+        # Connections
+        self.connect("hot_in", "heating.supply_in")
+        self.connect("air_in", "heating.air_in")
+        self.connect("cold_in", "ates.return_in")
+        self.connect("air_in", "cooling.air_in")
+        self.connect("ates.supply_out", "cooling.supply_in")
+        self.connect("electricity_grid.power_out", "heating.power_in")
+        self.connect("electricity_grid.power_out", "ates.power_in")
+        self.connect("electricity_grid.power_out", "cooling.power_in")
+        self.connect("heating.loss_out", "air.heat_in")
+        self.connect("ates.loss_out", "air.heat_in")
+        self.connect("cooling.loss_out", "air.heat_in")
+        self.connect("heating.return_out", "hot_out")
+        self.connect("cooling.return_out", "cold_out")
 
-        # Modules
-        heated = self.heating(supply_in=inlets.hot_in, air_in=inlets.air_in)
-        chilled = self.ates(return_in=inlets.cold_in)
-        cooled = self.cooling(supply_in=chilled.outlets.supply_out, air_in=inlets.air_in)
-        self.electricity_grid(
-            power_in=[],
-            power_out=[
-                heated.inlets.power_in,
-                chilled.inlets.power_in,
-                cooled.inlets.power_in,
-            ],
-        )
-        self.air(
-            air_in=[],
-            gas_in=[],
-            heat_in=[
-                heated.outlets.loss_out,
-                chilled.outlets.loss_out,
-                cooled.outlets.loss_out,
-            ],
-        )
-
-        # Outlets
-        hot_out = heated.outlets.return_out
-        cold_out = cooled.outlets.return_out
-
-        outlets = dict(hot_out=hot_out, cold_out=cold_out)
-        return outlets
+        # Outputs
+        self._output_specs = {"stored_energy": {"of": "ates.stored_energy"}}
+        self._refresh()

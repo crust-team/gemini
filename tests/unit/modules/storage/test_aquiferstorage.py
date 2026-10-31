@@ -183,7 +183,8 @@ class Reader(Module):
         object.__setattr__(self, "seen", seen)
 
         # Modules
-        self.storage = storage("discharge")
+        self.storage = storage("discharge").update_params(groundwater_pressure=3e5)
+        self.storage.groundwater_flow = 30.0
 
         # Inlets
         self.supply_in = Inlet(Stream)
@@ -195,7 +196,7 @@ class Reader(Module):
         """Read the production temperature, then call the storage."""
 
         # Modules
-        self.seen.append(self.storage.production_temperature())
+        self.seen.append(self.storage.offer()["production_out"].T)
         stored = self.storage(injection_in=inlets.supply_in)
 
         # Outlets
@@ -205,8 +206,8 @@ class Reader(Module):
         return outlets
 
 
-def test_production_temperature_reads_the_running_step():
-    """Before its call a parent reads the start-of-step production temperature of the storage."""
+def test_the_offer_reads_the_running_step():
+    """Before its call a plant reads the start-of-step production temperature of the offer."""
     seen = []
     reader = Reader(seen)
     result = reader(supply_in=COLD)

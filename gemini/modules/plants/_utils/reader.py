@@ -68,7 +68,7 @@ def _entry(plant, prefix, name, entry, report, path):
             )
         key = join_path(prefix, name)
         try:
-            module, _ = make_module(entry["type"])
+            module, _ = make_module(entry["type"], entry.get("size"))
         except GeminiError:
             report.broken.add(key)
             raise

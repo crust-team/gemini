@@ -38,6 +38,14 @@ class PortResolver:
                 f"{name}: plant port name is already taken", path="", code="invalid_connection"
             )
         path, port, declaration = candidates[0]
+        own = getattr(self, f"_{side}").get(name)
+        if own is not None and not _compatible(own, declaration):
+            raise ValidationError(
+                f"stream mismatch: plant port {name} [{own.kind or 'any'}] to "
+                f"{_describe_end(candidates[0])}",
+                path=field,
+                code="stream_mismatch",
+            )
         self._listed[side][name] = (path, port)
         self._refresh()
 
@@ -179,4 +187,9 @@ class PortResolver:
             for path, module in members(self)
             for port, declaration in getattr(module, side)().items()
             if not declaration.many and not self._in_use(path, port, side)
+        ] + [
+            (side, "", name)
+            for side, declared in (("inlets", self._inlets), ("outlets", self._outlets))
+            for name in declared
+            if name not in self._listed[side]
         ]

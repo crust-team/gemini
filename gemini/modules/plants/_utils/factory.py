@@ -7,8 +7,11 @@ from gemini.modules.container import ModuleDict, ModuleList
 GROUPS = {"ModuleDict": ModuleDict, "ModuleList": ModuleList}
 
 
-def make_module(type_name):
-    """Return ``(module, registered name)`` for a registry name, a group name or a class."""
+def make_module(type_name, size=None):
+    """Return ``(module, registered name)`` for a registry name, a group name or a class.
+
+    ``size`` holds the structural arguments of a plant class.
+    """
     if isinstance(type_name, str) and type_name in GROUPS:
         return GROUPS[type_name](), type_name
     name = (
@@ -25,4 +28,4 @@ def make_module(type_name):
             f"add: type = {type_name!r}; register the class with gm.modules.register first",
             code="invalid_value",
         )
-    return (found() if isinstance(found, type) else found), name
+    return (found(**(size or {})) if isinstance(found, type) else found), name

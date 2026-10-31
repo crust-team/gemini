@@ -2,6 +2,7 @@
 
 import pytest
 
+from gemini import backends
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.heating import HeatPump
@@ -10,6 +11,7 @@ from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.parity import BACKENDS
 from tests.fixtures.reading import reading
 
 CP = 4217.4
@@ -252,3 +254,15 @@ def test_cooling_traced_call_matches_one_call_per_row(params):
         (20, 285, 30, 300, 270),
     ]
     assert_module_matches(heat_pump("cooling", **params), _rows(cases))
+
+
+def test_a_stopped_heat_pump_has_no_cop_on_every_backend():
+    """At zero flow the COP is ``None`` also when a backend gives it as a NaN of no dimension."""
+    pump = HeatPump().set_params(
+        "", {"mode": "heating", "capacity": "2 MW", "carnot_fraction": 0.5}
+    )
+    stopped = Stream(m_dot=0.0, T=300.0, p=3e5)
+    for backend in BACKENDS:
+        with backends.settings(backend=backend):
+            result = pump(source_in=stopped, sink_in=stopped, temperature_setpoint=313.15)
+        assert result.outputs.cop is None

@@ -29,7 +29,7 @@ def _add_modules(plant, modules):
 
 def _fill_sections(plant, spec):
     for path, value in spec["fluids"].items():
-        plant.get_module(path).fluid = value
+        plant.get_module(path)._set_own_fluid(value)
     for path, value in spec["boundary"].items():
         plant.get_module(path).boundary = copy.deepcopy(value)
     for path, value in spec["bindings"].items():

@@ -1,7 +1,9 @@
-"""Plants built from data: a ``Module`` whose forward runs its children in connection order."""
+"""Plants: a ``Module`` that connects its children and whose forward runs them in that order."""
 
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
+from gemini.modules._utils import design
+from gemini.modules._utils.serialization import module_spec, tree_params
 from gemini.modules.container import ModuleList
 from gemini.modules.module import Module
 from gemini.modules.plants._utils import listing, outputs, reader, writer
@@ -21,18 +23,31 @@ from gemini.utils.strings import join_path, snake_case
 
 
 class Plant(PortResolver, Module):
-    """A plant built from named modules and connections, a normal composite ``Module``.
+    """Named modules and the connections between them: every composite is a ``Plant``.
 
-    ``add`` registers a module, ``connect`` wires an outlet to an inlet and ``to_spec`` writes the
-    plant file. Every port of a child is connected or named as a plant port; a plant port exists
-    only when named. ``name`` is the name given.
+    A plant class declares its children, ports and connections in ``__init__``, in the sections
+    ``# Modules``, ``# Parameters``, ``# Inlets``, ``# Outlets``, ``# Connections``, ``# Outputs``,
+    and never writes ``forward``; ``gm.Plant(name)`` builds one with ``add`` and ``connect``. A
+    child assigned as an attribute is registered as ``add`` does. Every port of a child is
+    connected or named as a plant port; a plant port exists only when named. ``name`` is the name
+    given, by default the name of the class.
+
+    A plant may override ``set_params`` to derive its children's values from design values. What
+    such a call states explicitly is remembered and wins over what is derived, derived values are
+    never stored, and the fluid of a plant passes to its children.
     """
 
-    def __init__(self, name="plant"):
+    def __init__(self, name=None):
         """Start an empty plant called ``name``."""
+        if name is None:
+            name = "plant" if type(self) is Plant else type(self).__name__
         object.__setattr__(self, "_name", name)
         super().__init__()
+        self._size = {}
         self._connections = []
+        self._declared = set()
+        self._derived_params = set()
+        self._stated_child_params = set()
         self._listed = {"inlets": {}, "outlets": {}}
         self._output_specs = None
         self._stated = {}
@@ -59,6 +74,78 @@ class Plant(PortResolver, Module):
     @property
     def _type_label(self):
         return self._name
+
+    @property
+    def fluid(self):
+        """Return the fluid of the plant."""
+        return self._fluid
+
+    @fluid.setter
+    def fluid(self, value):
+        """Set the fluid of the plant and of every module below it, and derive again."""
+        for module in self.modules():
+            module._set_own_fluid(value)
+
+    def _set_own_fluid(self, value):
+        """Set the fluid of this plant alone and derive again."""
+        super()._set_own_fluid(value)
+        if self._derives_params():
+            self.set_params("", {})
+
+    def _derives_params(self):
+        """Return whether this class overrides ``set_params`` to derive its children's values."""
+        return type(self).set_params is not Plant.set_params
+
+    def set_params(self, path, params, valid_from=None):
+        """Store parameters as ``Module.set_params`` does and remember what the root was given."""
+        if not path:
+            kept = {key: value for key, value in params.items() if key not in self._derived_params}
+            self._stated[""] = self._stated.get("", {}) | kept
+        return super().set_params(path, params, valid_from)
+
+    def _own_values(self, params, valid_from=None):
+        """Return the own parameters in force at ``valid_from`` with those of ``params``, in SI."""
+        given = {name: value for name, value in params.items() if name in self._parameters}
+        checked = {name: self._parameters[name].validate(value) for name, value in given.items()}
+        return self._params_at(valid_from) | checked
+
+    def _keep_derived(self, derived, params):
+        """Return the ``derived`` child values that no explicit value replaces, and record them.
+
+        A deriving ``set_params`` calls this with its derived values and the ``params`` of the
+        call. A dotted name in ``params`` is an explicit child value, now and in later calls, and
+        so is a child value assigned on the child. The names kept are the ones ``to_dict`` leaves
+        out.
+        """
+        self._stated_child_params |= {name for name in params if "." in name}
+        kept = {
+            name: value
+            for name, value in derived.items()
+            if name not in self._stated_child_params and not self._is_overridden(name)
+        }
+        self._derived_params = (self._derived_params | kept.keys()) - self._stated_child_params
+        return kept
+
+    def _is_overridden(self, name):
+        parameter = design.parameter(self, name)
+        return parameter.name in parameter.owner._param_overrides
+
+    def add_module(self, name, module):
+        """Register a child assigned as an attribute, as ``add`` does."""
+        super().add_module(name, module)
+        self._note_child(name, module)
+
+    def _note_child(self, key, module):
+        """Record that nothing has been stated yet for ``module`` and what it starts from."""
+        if key in self._baselines:
+            return
+        self._baselines[key] = {}
+        if is_group(module):
+            for name, child in module.named_children():
+                self._note_child(join_path(key, name), child)
+            return
+        self._stated[key] = {}
+        self._baselines[key] = writer.baseline_of(module)
 
     def add(self, type, name=None, params=None):
         """Add a module of registry name or class ``type`` and return it.
@@ -140,15 +227,24 @@ class Plant(PortResolver, Module):
             )
         self._refresh()
 
+    def _register_declaration(self, name, declaration):
+        """Register a declaration; a port assigned by a plant class stays through ``_refresh``."""
+        if isinstance(declaration, (Inlet, Outlet)):
+            self._declared.add(name)
+        super()._register_declaration(name, declaration)
+
     def _refresh(self):
         self._plan = None
-        for declarations in (self._inlets, self._outlets, self._outputs):
-            declarations.clear()
+        self._outputs.clear()
         for side, declare in (("inlets", Inlet), ("outlets", Outlet)):
             for name, ends in self._port_map(side).items():
+                if name in self._declared:
+                    continue
                 path, port = port_ends(ends)[0]
                 end = getattr(self.get_module(path), side)()[port]
-                self._register_declaration(name, declare(end.type, kind=end.kind))
+                registry = getattr(self, f"_{side}")
+                registry.pop(name, None)
+                Module._register_declaration(self, name, declare(end.type, kind=end.kind))
         for name, spec in (self._output_specs or {}).items():
             outputs.declare_output(self, name, spec)
 
@@ -164,8 +260,17 @@ class Plant(PortResolver, Module):
         return listing.summary(self)
 
     def to_spec(self):
-        """Return the plant file: format 2, modules, connections and the sections of the tree."""
-        return writer.plant_spec(self)
+        """Return the plant file: format 2, modules, connections and the sections of the tree.
+
+        A plant class with design values of its own writes them as flat values instead.
+        """
+        if type(self) is Plant:
+            return writer.plant_spec(self)
+        self._baselines[""] = tree_params(type(self)(**self._size))
+        params = writer.params_spec(self, "", self)
+        if not set(params) & set(self._parameters):
+            return writer.plant_spec(self)
+        return module_spec(self) | {"params": params}
 
     @classmethod
     def from_dict(cls, data):

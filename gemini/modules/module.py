@@ -210,6 +210,14 @@ def _restored(returned, scoped, inlets):
     return {name: originals.get(id(value), value) for name, value in returned.items()}
 
 
+def _scalar_output(declaration, value):
+    """Return an output of a forced backend: a 0-d NaN is the ``None`` of ``X | None``."""
+    is_scalar_array = isinstance(value, np.ndarray) and not value.ndim
+    if is_scalar_array and declaration.accepts_none() and value != value:
+        return None
+    return value
+
+
 def _plain_outlet(value):
     """Return an outlet value with plain scalars; a ``Failed`` field raises its error."""
     if isinstance(value, list):
@@ -314,6 +322,7 @@ class Module:
 
     repr_fields = ()
     offer_inlets = ()
+    _derived_params = frozenset()
     category = _FolderCategory()
     describe = _ClassOrInstance(description.describe, values=False)
     parameter_schema = _ClassOrInstance(description.parameter_schema)
@@ -333,8 +342,6 @@ class Module:
         object.__setattr__(self, "boundary", {})
         object.__setattr__(self, "_param_history", [DatedParams(params={})])
         object.__setattr__(self, "_param_overrides", {})
-        object.__setattr__(self, "_derived_params", set())
-        object.__setattr__(self, "_stated_child_params", set())
         object.__setattr__(self, "_graph_cache", None)
 
     @property
@@ -365,6 +372,10 @@ class Module:
     @fluid.setter
     def fluid(self, value):
         """Set and validate the module fluid; ``state_dict`` saves it."""
+        self._set_own_fluid(value)
+
+    def _set_own_fluid(self, value):
+        """Set the fluid of this module alone."""
         object.__setattr__(self, "_fluid", Fluid.model_validate(value))
 
     def __setattr__(self, name, value):
@@ -472,7 +483,9 @@ class Module:
         if call.trace is not None or not call.recording:
             call.outputs[name] = value
             return
-        call.outputs[name] = self._outputs[name].validate(value)
+        call.outputs[name] = self._outputs[name].validate(
+            _scalar_output(self._outputs[name], value)
+        )
 
     def add_module(self, name, module):
         """Register an immediate child and reject ambiguous names or ownership cycles."""
@@ -742,35 +755,8 @@ class Module:
         self._parameters[name].set(value)
 
     def _derives_params(self):
-        """Return whether this class overrides ``set_params`` to derive its children's values."""
-        return type(self).set_params is not Module.set_params
-
-    def _own_values(self, params, valid_from=None):
-        """Return the own parameters in force at ``valid_from`` with those of ``params``, in SI."""
-        given = {name: value for name, value in params.items() if name in self._parameters}
-        checked = {name: self._parameters[name].validate(value) for name, value in given.items()}
-        return self._params_at(valid_from) | checked
-
-    def _keep_derived(self, derived, params):
-        """Return the ``derived`` child values that no explicit value replaces, and record them.
-
-        A deriving ``set_params`` calls this with its derived values and the ``params`` of the
-        call. A dotted name in ``params`` is an explicit child value, now and in later calls, and
-        so is a child value set through ``update_params``. The names kept are the ones
-        ``to_dict`` leaves out.
-        """
-        self._stated_child_params |= {name for name in params if "." in name}
-        kept = {
-            name: value
-            for name, value in derived.items()
-            if name not in self._stated_child_params and not self._is_overridden(name)
-        }
-        self._derived_params = (self._derived_params | kept.keys()) - self._stated_child_params
-        return kept
-
-    def _is_overridden(self, name):
-        parameter = design.parameter(self, name)
-        return parameter.name in parameter.owner._param_overrides
+        """Return whether this module derives its children's values; only a plant may."""
+        return False
 
     def _params_at(self, at):
         """Return the complete validated parameter mapping active at an instant.
@@ -819,7 +805,8 @@ class Module:
         if parent is not None and parent.trace is not None:
             return parent.trace.offer(self, ports, parent)
         with ops.scope.Scope(self._scalar_mode(), _has_arrays(ports, {})) as scope:
-            call = self._eager_call(self._resolve_inputs({}), parent, None, scope.wrapping)
+            step = parent.step if parent is not None else None
+            call = self._eager_call(self._resolve_inputs({}), parent, step, scope.wrapping)
             token = _current_call.set(call)
             try:
                 offered = self._offer(_numpy_ports(ports) if scope.wrapping else ports)
@@ -1228,17 +1215,6 @@ class Module:
         result = self._run((inlets,), {}, step)
         return step.next_states or None, result
 
-    def start_states(self):
-        """Return the state values a call of this module would start from now.
-
-        Inside a running ``step`` these are the module's start-of-step entry, otherwise its
-        initial states. A composite reads a stateful child's states before calling it when the
-        child's outlet feeds back into the child's own inlet (the groundwater loop of an ATES
-        plant).
-        """
-        parent = _current_call.get()
-        return self._call_states(parent.step if parent is not None else None) or {}
-
     def trial_outlets(self, inlets):
         """Return the outlets of one call that no running call records, with outputs skipped.
 
@@ -1391,9 +1367,9 @@ class Module:
         date the undated base entry and the current values change. Names may be dotted and
         values unit strings. Returns the module.
 
-        Every route that sets parameters comes here. A composite that derives its children's
-        values overrides this method (see ``modules.md``); a value for it, at any depth, reaches
-        that override.
+        Every route that sets parameters comes here. A plant that derives its children's values
+        overrides this method (see ``modules.md``); a value for it, at any depth, reaches that
+        override.
         """
         return design.set_params(self, path, params, valid_from)
 

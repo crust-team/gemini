@@ -1,11 +1,12 @@
 """A composite that derives a child value, as ``modules.md`` shows it."""
 
-from gemini.modules import Module, ProductionReservoir
+from gemini.modules import ProductionReservoir
+from gemini.modules.plant import Plant
 from gemini.physics import hydraulics
 from gemini.types import Density, Length, Parameter
 
 
-class Column(Module):
+class Column(Plant):
     """A reservoir whose pressure comes from the height of its water column."""
 
     category = "plants"

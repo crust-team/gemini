@@ -50,7 +50,7 @@
     "heating.return_pipe.roughness": "4.5e-05 m",
     "heating.return_pipe.elevation_change": "0 m",
     "heating.return_pipe.heat_transfer_coefficient": "0.8 W/m2/K",
-    "ates.groundwater_pressure": "3 bar",
+    "ates.storage.groundwater_pressure": "3 bar",
     "ates.storage.aquifer_temperature": "11 degC",
     "ates.storage.aquifer_thickness": "30 m",
     "ates.storage.porosity": 0.3,
