@@ -53,7 +53,7 @@ BRINE = gm.Fluid(density="1030 kg/m3", viscosity="0.4 mPa*s")
 
 
 def designed(**extra):
-    """Return a doublet in a plant, designed from its depth, with the hackathon brine."""
+    """Return a doublet in a plant, designed from its depth, in a brine of 1030 kg/m3."""
     plant = gm.Plant("Holder")
     doublet = plant.add("Doublet", name="d0", params=DESIGN | extra)
     plant.connect("return_in", "d0.return_in")
@@ -73,7 +73,7 @@ def test_the_reservoir_comes_from_the_depth():
 
 
 def test_the_productivity_index_is_radial_darcy():
-    """12.39 m3/h/bar for the hackathon reservoir, from a hand calculation."""
+    """12.39 m3/h/bar for 200 mD, 100 m and a 0.244 m well, from a hand calculation."""
     _, doublet = designed()
     k_h = 200 * 9.869233e-16 * 100
     expected = 2 * math.pi * k_h / (4e-4 * math.log(1000 / 0.122))
@@ -173,6 +173,35 @@ def test_a_dated_design_derives_at_its_date():
     plant.set_params("d0", {"depth": "3000 m"}, valid_from="2030-01-01")
     assert plant.params_at("d0.reservoir", "2031-01-01")["temperature"] == pytest.approx(375.15)
     assert plant.params_at("d0.reservoir", "2029-01-01")["temperature"] == pytest.approx(360.15)
+
+
+def test_a_depth_without_its_geotherm_is_missing_each_value():
+    """The geotherm has no default: a depth names the gradient and the surface temperature."""
+    doublet = gm.plants.get("Doublet")
+    with pytest.raises(gm.errors.ValidationError) as caught:
+        doublet.set_params("", {"depth": "2500 m"})
+    assert caught.value.code == "missing_value"
+    assert [item["path"] for item in caught.value.problems] == ["gradient", "surface_temperature"]
+    assert doublet.depth is None
+
+
+def test_one_value_of_the_geotherm_is_still_missing_the_other():
+    """A gradient alone does not make a geotherm."""
+    doublet = gm.plants.get("Doublet")
+    with pytest.raises(gm.errors.ValidationError) as caught:
+        doublet.set_params("", {"depth": "2500 m", "gradient": "30 K/km"})
+    assert [item["path"] for item in caught.value.problems] == ["surface_temperature"]
+
+
+def test_the_values_of_a_stored_doublet_rebuild_in_any_order():
+    """The depth before its geotherm in a plant dict is read like the geotherm before the depth."""
+    plant, _ = designed()
+    spec = plant.to_dict()
+    params = spec["modules"]["d0"]["params"]
+    spec["modules"]["d0"]["params"] = dict(reversed(list(params.items())))
+    assert gm.plants.from_dict(spec).d0.reservoir.temperature == pytest.approx(360.15)
+    spec["modules"]["d0"]["params"] = params
+    assert gm.plants.from_dict(spec).d0.reservoir.temperature == pytest.approx(360.15)
 
 
 def test_the_old_way_keeps_working(fresh_plant):

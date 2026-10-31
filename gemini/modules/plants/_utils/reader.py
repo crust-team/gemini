@@ -81,9 +81,7 @@ def _entry(plant, prefix, name, entry, report, path):
                 _entry(plant, key, child, item, report, f"{path}.modules.{child}")
             return
         baseline = baseline_of(module)
-        for pname, value in entry.get("params", {}).items():
-            with report.guard(f"{path}.params.{pname}"):
-                module.set_params("", {pname: value})
+        read_params(module, entry.get("params", {}), report, f"{path}.params")
         plant._attach(key, module, deepcopy(entry.get("params")), baseline)
 
 

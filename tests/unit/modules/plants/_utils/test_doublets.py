@@ -21,6 +21,8 @@ TEMPLATES = (
     "HeatingHeatPumpCoolingPlant",
 )
 WELL_DESIGN = {
+    "gradient": "30 K/km",
+    "surface_temperature": "12 degC",
     "permeability": "200 mD",
     "thickness": "100 m",
     "well_diameter": "0.244 m",
@@ -46,6 +48,11 @@ INPUTS = {
     "injection_pump.pressure_setpoint": "60 bar",
     "atmosphere.temperature": "10 degC",
 }
+GEOTHERM = {
+    f"d{index}.{name}": value
+    for index in range(2)
+    for name, value in (("gradient", "30 K/km"), ("surface_temperature", "12 degC"))
+}
 RULES = {"doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"}, "max_brine_cooling": "40 K"}
 
 
@@ -62,7 +69,7 @@ def brine_side(plant):
 
 
 def designed(count):
-    """Return a heating plant on ``count`` doublets with the values of the challenge."""
+    """Return a heating plant on ``count`` doublets with the sample problem's values."""
     plant = gm.plants.HeatingPlant(doublets=count)
     for module in brine_side(plant):
         module.fluid = BRINE
@@ -124,7 +131,7 @@ def test_depth_gives_the_reservoir_of_every_doublet():
     """3000 m at 30 K/km from 12 degC is 102 degC, and the pressure the brine column's."""
     plant = gm.plants.HeatingPlant(doublets=2)
     plant.d0.fluid = plant.d1.fluid = BRINE
-    plant.set_params("", {"depth": "3000 m"})
+    plant.set_params("", {"depth": "3000 m"} | GEOTHERM)
     for doublet in (plant.d0, plant.d1):
         assert doublet.reservoir.temperature == pytest.approx(375.15)
         assert doublet.sink.temperature == pytest.approx(375.15)
@@ -134,7 +141,7 @@ def test_depth_gives_the_reservoir_of_every_doublet():
 def test_an_explicit_temperature_wins_and_stays_stated():
     """A child value of one doublet is kept against a later depth, on that doublet alone."""
     plant = gm.plants.HeatingPlant(doublets=2)
-    plant.set_params("", {"depth": "3000 m", "d1.reservoir.temperature": "90 degC"})
+    plant.set_params("", {"depth": "3000 m", "d1.reservoir.temperature": "90 degC"} | GEOTHERM)
     plant.set_params("", {"depth": "2000 m"})
     assert plant.d0.reservoir.temperature == pytest.approx(345.15)
     assert plant.d1.reservoir.temperature == pytest.approx(363.15)
@@ -144,5 +151,25 @@ def test_an_explicit_temperature_wins_and_stays_stated():
 def test_the_stored_plant_keeps_the_depth_and_no_derived_value():
     """Only what was given is stored: the depth, not the depth of each doublet."""
     plant = gm.plants.HeatingPlant(doublets=2)
-    plant.set_params("", {"depth": "3000 m"})
-    assert plant.to_dict()["params"] == {"depth": "3000 m"}
+    plant.set_params("", {"depth": "3000 m"} | GEOTHERM)
+    assert plant.to_dict()["params"] == {"depth": "3000 m"} | GEOTHERM
+
+
+def test_depth_without_a_geotherm_names_each_missing_value():
+    """The gradient and the surface temperature have no default: the error names both."""
+    plant = gm.plants.HeatingPlant(doublets=2)
+    with pytest.raises(ValidationError) as caught:
+        plant.set_params("", {"depth": "3000 m"})
+    assert caught.value.code == "missing_value"
+    assert [item["path"] for item in caught.value.problems] == [
+        "gradient",
+        "surface_temperature",
+    ]
+
+
+def test_the_geotherm_of_one_doublet_may_come_in_the_call_of_the_depth():
+    """``depth`` goes to each doublet in the same call that gives the doublet its geotherm."""
+    plant = gm.plants.HeatingPlant(doublets=1)
+    geotherm = {"d0.surface_temperature": "12 degC", "d0.gradient": "30 K/km"}
+    plant.set_params("", {"depth": "3000 m"} | geotherm)
+    assert plant.d0.reservoir.temperature == pytest.approx(375.15)

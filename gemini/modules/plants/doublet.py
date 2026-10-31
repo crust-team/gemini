@@ -1,5 +1,7 @@
 """A doublet: production and injection limbs, designed from its depth or set by hand."""
 
+from gemini.errors import ValidationError
+from gemini.errors.base import problem
 from gemini.modules.environment import Formation
 from gemini.modules.plant import Plant
 from gemini.modules.pumps import ESP
@@ -34,10 +36,10 @@ class Doublet(Plant):
     thickness and ``well_diameter`` the inner diameter of both vertical wells. ``set_params``
     derives, through ``gemini/physics/doublet.py``:
 
-    - from ``depth``, ``gradient`` and ``surface_temperature``, by default the challenge's 30 K/km
-      and 12 degC: the reservoir temperature at the midpoint, the hydrostatic reservoir pressure
-      from the fluid density, the top depth and the soil temperature of the wells, the geotherm at
-      half the depth;
+    - from ``depth``, ``gradient`` and ``surface_temperature``, which have no default: a depth
+      without them raises ``missing_value``. They give the reservoir temperature at the midpoint,
+      the hydrostatic reservoir pressure from the fluid density, the top depth and the soil
+      temperature of the wells, the geotherm at half the depth;
     - with ``permeability``, ``thickness`` and ``well_diameter``: the productivity and injectivity
       indices of radial Darcy flow, with the fluid viscosity, ``drainage_radius``, the wellbore
       radius and the ``skin`` of each reservoir, and the vertical pipe paths of the wells;
@@ -72,8 +74,8 @@ class Doublet(Plant):
 
         # Parameters
         self.depth = Parameter(Length | None, default=None)
-        self.gradient = Parameter(TemperatureGradient, default=ground.GEOTHERMAL_GRADIENT)
-        self.surface_temperature = Parameter(Temperature, default=ground.SURFACE_TEMPERATURE)
+        self.gradient = Parameter(TemperatureGradient | None, default=None)
+        self.surface_temperature = Parameter(Temperature | None, default=None)
         self.permeability = Parameter(Permeability | None, default=None)
         self.thickness = Parameter(Length | None, default=None)
         self.well_diameter = Parameter(Length | None, default=None)
@@ -110,14 +112,37 @@ class Doublet(Plant):
         if path:
             return super().set_params(path, params, valid_from)
         fluid = self.fluid.properties(0, 0)
+        values = self._own_values(params, valid_from)
+        self._require_geotherm(values)
         derived = doublet.design(
-            self._own_values(params, valid_from),
+            values,
             fluid.rho_l,
             fluid.mu_l,
             {name: self.get_submodule(name).skin for name in doublet.RESERVOIRS},
             self._stated_pressure(params),
         )
         return super().set_params("", self._keep_derived(derived, params) | params, valid_from)
+
+    def _require_geotherm(self, values):
+        """Raise ``missing_value`` for each of ``gradient`` and ``surface_temperature`` not given.
+
+        A ``depth`` needs both, in the same call or before it: the geotherm has no default value.
+        """
+        if values["depth"] is None:
+            return
+        missing = [name for name in doublet.COLUMN[1:] if values[name] is None]
+        if missing:
+            raise ValidationError.of(
+                [
+                    problem(
+                        name,
+                        "missing_value",
+                        f"{self.path}: {name} = None with depth = {values['depth']} m; "
+                        "expected a value",
+                    )
+                    for name in missing
+                ]
+            )
 
     def _stated_pressure(self, params):
         """Return the reservoir pressure [Pa] stated by hand, in this call or earlier, or None."""

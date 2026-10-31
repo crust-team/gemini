@@ -264,7 +264,16 @@ def read_sections(root, data, report):
 
 
 def read_params(root, params, report, prefix="params"):
-    """Set flat dotted ``params`` on the tree as undated design values."""
+    """Set flat dotted ``params`` on the tree as undated design values.
+
+    All in one call, so that values which need each other, a depth and its geotherm, may come in
+    any order. If that fails, one by one, so that each problem is reported at its own name.
+    """
+    try:
+        root.set_params("", params)
+        return
+    except GeminiError:
+        pass
     for name, value in params.items():
         with report.guard(f"{prefix}.{name}"):
             root.set_params("", {name: value})

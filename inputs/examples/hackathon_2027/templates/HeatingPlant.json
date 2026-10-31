@@ -6,6 +6,10 @@
   },
   "params": {
     "depth": "2500 m",
+    "d0.gradient": "30 K/km",
+    "d0.surface_temperature": "12 degC",
+    "d1.gradient": "30 K/km",
+    "d1.surface_temperature": "12 degC",
     "d0.thickness": "100 m",
     "d0.permeability": "200 mD",
     "d0.well_diameter": "0.244 m",
