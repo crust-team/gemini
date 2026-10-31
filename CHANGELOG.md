@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-31
+
+The API for the hackathon: see the change log of [api.md](.claude/docs/api.md). Checkpoints written
+before 0.2.0 do not load; `gm.plants.migrate` converts a plant file of an older version.
+
+### Changed
+- Fluids: `density` and `viscosity` replace `liquid_density` and `liquid_viscosity`; reservoirs read
+  their fluid.
+- Plants: an unconnected port is an error, and the automatic plant ports are gone.
+- Boilers and CHP burn from `fuel_in`; `ElectricBoiler` replaces `Boiler(fuel_type="electric")`.
+- Economics: `co2` sums `co2_emission` and `methane_emission`; `gas_price` and `methane_gwp` replace
+  `fuel_price` and `fuel_emission_factor`; a missing assumption has the code `missing_assumption`.
+
+### Added
+- `gm.profiles.get` with the demand of 2027; `gm.plants.Doublet`, designed from its depth;
+  `GasGrid`, `GasMakeup`, `Flare`, `ElectricBoiler`; `Fluid.gas_liquid_ratio`, `gas_composition` and
+  `kind="gas"`; `gm.schedule`; `gm.checks.Limits` and `gm.checks.limits`; `capex(assumptions)` on
+  equipment with sourced cost factors.
+
+### Fixed
+- Wells: the two-phase gas superficial velocity follows the gas mass flow.
+
 ## [0.1.0] - 2026-10-30
 
 First consistent API: see the change log of [api.md](.claude/docs/api.md). The version restarts at

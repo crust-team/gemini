@@ -4,8 +4,10 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.backends import settings
 from gemini.physics import constants
 from tests.fixtures.errors import raises
+from tests.fixtures.parity import BACKENDS
 
 BRINE = gm.Fluid(density=1030.0, viscosity=4e-4, specific_heat=4000.0)
 DESIGN = {
@@ -141,6 +143,16 @@ def test_the_plan_runs_without_a_binding_and_leaves_the_plant_alone():
         [1.2 * FULL, 0.4 * FULL], rel=1e-6
     )
     assert frame["users.unmet_demand"].to_numpy() == pytest.approx([0, 0], abs=1e-3)
+
+
+def test_a_plan_is_the_same_on_every_backend():
+    """The plan runs on arrays, whatever backend is set around it."""
+    plant = plant_of_two()
+    expected = gm.schedule(plant, demand(1.2 * FULL, 0.4 * FULL), RULES)
+    for backend in BACKENDS:
+        with settings(backend=backend):
+            plan = gm.schedule(plant, demand(1.2 * FULL, 0.4 * FULL), RULES)
+        pd.testing.assert_frame_equal(plan, expected)
 
 
 def test_unmet_demand_is_no_error():

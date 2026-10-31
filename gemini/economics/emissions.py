@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from gemini import backends
 from gemini.analysis.series import results_total, window_seconds
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.outcome import reported
@@ -18,7 +19,8 @@ def _weighted_energy(results, fuel_weight, grid_weight):
 
     ``emissions`` is ``fuel * fuel_weight + max(0, electricity - electricity_generated) *
     grid_weight`` over the leaf totals; weights of 1 and 0 give the fuel energy [J] and of 0 and
-    1 the grid electricity energy [J]. A tick without a value adds nothing.
+    1 the grid electricity energy [J]. A tick without a value adds nothing. The columns are arrays
+    of a finished run, whatever backend is set around the call.
     """
     frame = results.to_frame()
     columns = {
@@ -27,7 +29,8 @@ def _weighted_energy(results, fuel_weight, grid_weight):
         if (total := results_total(results, frame, field)) is not None
     }
     total = SimpleNamespace(children={}, outputs=columns)
-    rate = emissions({"": total}, fuel_weight, grid_weight)
+    with backends.settings(backend="numpy"):
+        rate = emissions({"": total}, fuel_weight, grid_weight)
     return float(np.nansum(rate * window_seconds(results)))
 
 

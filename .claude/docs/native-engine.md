@@ -396,9 +396,8 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   with the candidates; different stream types raise `stream_mismatch`; a loop of leaves without a
   `kind: "state"` connection raises `loop_without_state` at `connect`. A connection never reaches
   into a plant child (`doublet.esp.discharge` is `invalid_connection`) but passes through groups
-  (`filters.hot.outlet`). Free ports of the children are the plant's own ports, named in
-  `inlets`/`outlets` or `<path_with_underscores>_<port>`; `connect("secondary_in",
-  "heat_exchanger.cold_in")` names one. In a spec a connection end must name a port.
+  (`filters.hot.outlet`). Every port of a child is connected or a named plant port, in
+  `inlets`/`outlets`; `connect("secondary_in", "heat_exchanger.cold_in")` names one. In a spec a connection end must name a port.
 - **Order decides bits.** `forward` runs a plan computed once and dropped by `add`/`connect`: the
   modules in topological order (Kahn), ties broken by first appearance in the connection list and
   then child order. Composite sums add in call order, so the shipped specs list their connections

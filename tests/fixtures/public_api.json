@@ -160,6 +160,7 @@
   "out_of_bounds",
   "missing_value",
   "no_value",
+  "missing_assumption",
   "invalid_unit",
   "unknown_name",
   "unknown_port",
@@ -171,6 +172,7 @@
   "stream_mismatch",
   "ambiguous_port",
   "port_in_use",
+  "unconnected_port",
   "loop_without_state",
   "invalid_binding",
   "missing_column",
@@ -228,9 +230,13 @@
   "Desander": "class",
   "DownholeHeatExchanger": "class",
   "ESP": "class",
+  "ElectricBoiler": "class",
   "Filter": "class",
+  "Flare": "class",
   "FlashTurbine": "class",
   "GasCompressor": "class",
+  "GasGrid": "class",
+  "GasMakeup": "class",
   "GridConnection": "class",
   "HeatConsumer": "class",
   "HeatExchanger": "class",
@@ -359,12 +365,18 @@
    ]
   },
   "checks": {
+   "Limits": "class",
    "bounds": [
     "plant",
     "results"
    ],
    "energy_balance": [
     "results"
+   ],
+   "limits": [
+    "plant",
+    "results",
+    "limits"
    ],
    "mass_balance": [
     "results"
@@ -462,6 +474,7 @@
   "plants": {
    "ATESPlant": "class",
    "CoolingSubstation": "class",
+   "Doublet": "class",
    "HeatingSubstation": "class",
    "Plant": "class",
    "convert_legacy": [
@@ -602,7 +615,7 @@
  "schemas": {
   "check.schema.json": "8a57d8429749d44399831d8dcedf4288c77070665171246949e55476f138c3b3",
   "module_description.schema.json": "1162b599326e224813c700484e8ca41bba0596fd9d0eced4be43ce8edee48a86",
-  "plant_spec.schema.json": "54ac70e24e72ec4c91bfd73f1e4dc27181a9322f57732b49a4d4340f3de5f4ac",
+  "plant_spec.schema.json": "e71e345f15767022268699fef1c0ce13498477e12e1adf5587890f913ad0735a",
   "problem.schema.json": "98fbbd71c3cdb8b5c55b3cca2d2829999ab8665e4eb7dd1062fcc77d970383b4",
   "profile.schema.json": "1d516189feaf3a16f2ef7090defeebcde7adfa7b0b509e50fdb577db138531ce",
   "results_summary.schema.json": "733213574165c3f2dc0176924aeb6eb350c38a75864b9dd1d146353fa442edf8",
@@ -645,10 +658,11 @@
   "replay",
   "resume",
   "runtime",
+  "schedule",
   "simulate",
   "streams",
   "testing",
   "units"
  ],
- "version": "0.1.0"
+ "version": "0.2.0"
 }

@@ -8,7 +8,10 @@ from pathlib import Path
 import gemini as gm
 from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
-SNAPSHOTS = {"0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b48178a8b"}
+SNAPSHOTS = {
+    "0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b48178a8b",
+    "0.2.0": "54a1cc2d5d2965d3c623cf182c40e6921628f98b277545347e753f08f2e62372",
+}
 """Hash of the snapshot per ``gm.__version__``: an entry never changes, a new version adds one."""
 
 
@@ -91,7 +94,7 @@ def test_the_change_log_lists_the_version():
 def test_the_package_has_one_version():
     """``gm.API_VERSION`` is gone; ``gm.__version__`` is the one version."""
     assert not hasattr(gm, "API_VERSION")
-    assert gm.__version__ == "0.1.0"
+    assert gm.__version__ == "0.2.0"
 
 
 def test_every_economics_function_takes_the_plant_and_the_results():

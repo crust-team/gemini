@@ -1,6 +1,6 @@
 # Public API
 
-Use `import gemini as gm`. This page lists **every public name** at `gm.__version__ = "0.1.0"`, and
+Use `import gemini as gm`. This page lists **every public name** at `gm.__version__ = "0.2.0"`, and
 is the page the other repositories build against. Names not listed here (a helper method such as
 `Results.commit`, anything in `gm.utils`, any import of an internal path such as
 `gemini.engine.results`) are internal and may change. `tests/unit/test_public_api.py` pins the
@@ -279,6 +279,18 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0 | 2026-10-31 | Demand profiles: `gm.profiles.get` reads the two organiser files of 2027; `profile_schema` describes what `get` returns. |
+| 0.2.0 | 2026-10-31 | No dangling ports: an unconnected port is `unconnected_port`; plant ports exist only when named, the automatic `<path>_<port>` ports are gone. |
+| 0.2.0 | 2026-10-31 | A module may set its children's values: every parameter route reaches an overridden `set_params`; `to_dict` stores no derived value. |
+| 0.2.0 | 2026-10-31 | `Fluid`: `density` and `viscosity` replace `liquid_density` and `liquid_viscosity`; `gas_liquid_ratio`, `gas_composition`, `kind="gas"`; reservoirs lose both parameters. |
+| 0.2.0 | 2026-10-31 | Gas chain: `Boiler` and `CHP` get `fuel_in` and `gas_out`; `ElectricBoiler` replaces `fuel_type="electric"`; `GasGrid`, `GasMakeup`, `Flare`; `gm.economics.co2` sums the emission outputs; `gas_price` and `methane_gwp` replace `fuel_price` and `fuel_emission_factor`; code `missing_assumption`. |
+| 0.2.0 | 2026-10-31 | `gm.plants.Doublet`: a doublet designed from its depth; `gm.modules.get("Doublet")` gives that class. |
+| 0.2.0 | 2026-10-31 | Two-phase well check: the gas superficial velocity follows the gas mass flow, at the gas density of the section. |
+| 0.2.0 | 2026-10-31 | `gm.schedule`; a root inlet field binds to a column named `port.field`. |
+| 0.2.0 | 2026-10-31 | `gm.checks.Limits` and `gm.checks.limits`; `Doublet.flow`, `Doublet.brine_cooling`, `HeatConsumer.supply_in_T`, `ProductionReservoir.liquid_flow`, `InjectionWell.wellhead_temperature`, `Output.difference`. |
+| 0.2.0 | 2026-10-31 | Costs: `capex(assumptions)` on equipment, cost factors in `Assumptions`, `heat_cost_share`. |
+| 0.2.0 | 2026-10-31 | Hackathon example `examples/plants/simulate/04_hackathon_plant.py`. |
+| 0.2.0 | 2026-10-31 | Version 0.2.0: a checkpoint written before 0.2.0 raises `old_format`; `gm.plants.migrate` converts its plant file. |
 | 0.1.0 | 2026-10-30 | First consistent API. |
 
 Before 0.1.0 the API counted integer versions 1 to 5: the first frozen list, `category` as the

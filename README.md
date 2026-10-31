@@ -63,7 +63,22 @@ Plants are data. `gm.plants.names()` lists the shipped plants, `gm.plants.exampl
 one with real values, `gm.plants.from_template("heating_cooling", {"absorption_chiller.enabled":
 False})` fills a template with switchable units (`gm.plants.templates()` lists them), and
 `gm.plants.convert_legacy(folder)` turns an old project folder into a plant spec. `gm.profiles`
-holds the demand profiles of the heating and cooling challenge; no demand data ships yet.
+holds the 2027 demand of the heating and cooling challenge, read from the organisers' files.
+
+A plant can be designed from its depth. A `Doublet` derives its reservoir, wells and pump from a few
+design values, `gm.schedule` plans each day from the demand with no bindings to write, and
+`gm.checks.limits` and `gm.economics` judge the run:
+
+```python
+plant.add("Doublet", name="d0", params={
+    "depth": "2500 m", "gradient": "30 K/km", "surface_temperature": "12 degC",
+    "permeability": "200 mD", "thickness": "100 m", "well_diameter": "0.244 m"})
+plan = gm.schedule(plant, demand, rules)
+results = gm.simulate(plant, plan)
+```
+
+`examples/plants/simulate/04_hackathon_plant.py` is that path for the whole challenge plant. Every
+port of a module is connected or named as a plant port (`p.connect("heating_return", "hx.cold_in")`).
 
 The application, not the package, reads CSV, databases, or APIs. `Dataset` accepts pandas, dicts,
 records, NumPy, and profiles already in memory. A plant owns bindings and dated parameters, so

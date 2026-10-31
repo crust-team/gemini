@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from gemini import backends
 from gemini.errors import NotImplementedYet, ValidationError
 from gemini.modules.cooling import AbsorptionUnit
 from gemini.modules.demand import CoolingConsumer, HeatConsumer
@@ -27,6 +28,8 @@ SOURCES = ("geothermal", "heat_pump", "boiler")
 RULES = ("order", "doublet_flow", "max_brine_cooling", "operating_days")
 HEATING_RETURN = "heating_return"
 COOLING_RETURN = "cooling_return"
+ARRAY_BACKEND = "numpy"
+"""A plan is a balance over the days, on arrays whatever backend the run takes after it."""
 
 
 @dataclass(frozen=True)
@@ -268,6 +271,12 @@ def schedule(plant, demand, rules):
         a column of that name, and the schedule changes nothing on the plant.
     """
     checked = _checked_rules(rules)
+    with backends.settings(backend=ARRAY_BACKEND):
+        return _frame(demand, _plan_columns(plant, demand, checked))
+
+
+def _plan_columns(plant, demand, checked):
+    """Return the columns of the plan, computed on arrays over the days."""
     heat, cool = _demand_columns(demand)
     chiller_path, chiller = _single(plant, AbsorptionUnit)
     generator = np.zeros_like(heat) if chiller is None else cool / chiller.thermal_cop
@@ -279,7 +288,7 @@ def schedule(plant, demand, rules):
     columns |= _heating_columns(plant, heat, generator)
     columns |= _cooling_columns(plant, cool)
     columns["boiler_duty"] = _boiler_duty(plant, checked, heat + generator, flows)
-    return _frame(demand, columns)
+    return columns
 
 
 def _boiler_duty(plant, rules, need, flows):

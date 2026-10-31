@@ -48,9 +48,9 @@ def test_load_rejects_escaping_sibling_paths_and_invalid_manifests(tmp_path):
         storage.load(path)
 
 
-@pytest.mark.parametrize("version", [1, 2, None, "0.0.9"])
+@pytest.mark.parametrize("version", [1, 2, None, "0.0.9", "0.1.0"])
 def test_a_checkpoint_written_before_the_oldest_version_does_not_load(tmp_path, version):
-    """The former integer versions and anything before 0.1.0 raise with the code old_format."""
+    """The former integer versions and anything before 0.2.0 raise with the code old_format."""
     path = tmp_path / "old.ckpt"
     path.write_text(json.dumps(json.loads(manifest().model_dump_json()) | {"version": version}))
     with pytest.raises(gm.errors.ValidationError, match="version = ") as caught:

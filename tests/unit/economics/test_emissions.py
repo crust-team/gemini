@@ -3,8 +3,10 @@
 import pytest
 
 import gemini as gm
+from gemini.backends import settings
 from gemini.economics import emissions as module
 from tests.fixtures.costed_plants import HOURS, day, heating_plant
+from tests.fixtures.parity import BACKENDS
 from tests.fixtures.result_tables import make_results
 
 DAY = HOURS * 3600.0
@@ -43,6 +45,15 @@ def test_fuel_alone_emits_nothing_of_its_own():
     run = make_results({"boiler": {"fuel": [500.0]}})
     assert gm.economics.co2(heating_plant(), run)["value"] == 0
     assert gm.economics.co2(heating_plant(), run)["fuel_energy"]["value"] == 500.0 * 3600
+
+
+def test_the_energies_of_a_run_do_not_depend_on_the_backend():
+    """Economics reads the arrays of a finished run under any backend."""
+    run = day(electricity=100.0, generated=40.0, fuel=1000.0)
+    expected = module.source_energies(run)
+    for backend in BACKENDS:
+        with settings(backend=backend):
+            assert module.source_energies(run) == expected
 
 
 def test_a_surplus_of_generation_earns_no_credit():

@@ -25,7 +25,8 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.modules.plants.migration import RENAMED_NAMES
+from gemini.modules.plants import migration
+from gemini.modules.plants.migration import FLUID_NAMES, RENAMED_NAMES
 from tests.fixtures import FIXTURES
 from tests.fixtures.frames import path_frame
 
@@ -48,7 +49,24 @@ TYPE_RENAMES = {
     "injectionwell": "injection_well",
     "productionwell": "production_well",
 }
-NEW_PARAMS = {"degasser": {"separation_efficiency": 0.0}}
+NEW_PARAMS = {
+    "degasser": {"separation_efficiency": 0.0},
+    "doublet": {
+        name: None
+        for name in (
+            "depth",
+            "gradient",
+            "surface_temperature",
+            "permeability",
+            "thickness",
+            "well_diameter",
+            "nominal_flow",
+            "pump_efficiency",
+            "nominal_wellhead_pressure",
+        )
+    }
+    | {"drainage_radius": 1000.0},
+}
 """Parameters added after phase 0, at the defaults that reproduce the phase-0 behaviour."""
 
 
@@ -118,10 +136,11 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
         assert TYPE_RENAMES.get(old["type"], old["type"]) == new["type"]
         old_params = {RENAMED_NAMES.get(key, key): value for key, value in old["params"].items()}
         old_params.pop("coefficient_precision", None)
+        old_params = {key: value for key, value in old_params.items() if key not in FLUID_NAMES}
         if "path" in old_params:
             old_params["pipe_path"] = old_params.pop("path")
         assert old_params | NEW_PARAMS.get(old_path, {}) == new["params"]
-        assert old["fluid"] == new["fluid"]
+        assert migration._fluid_names(old["fluid"]) == new["fluid"]
 
     started = perf_counter()
     replay = path_frame(gm.replay(plant, selected_dataset))

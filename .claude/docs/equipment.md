@@ -57,11 +57,13 @@ Shared conventions, stated once here and not repeated per module:
 | Treatment | `Desander` | `inlet` -> `outlet` | no | constant removal share, quadratic loss |
 | Treatment | `InhibitorDosing` | `inlet` -> `outlet` | no | dose proportional to flow |
 | Treatment | `Vent` | `inlet` -> `outlet` | no | vent or flare emissions |
+| Treatment | `Flare` | `inlet` -> none | no | burns its gas, emissions from the composition |
 | Exchangers | `HeatExchanger` | `hot_in`, `cold_in` -> `hot_out`, `cold_out` | no | effectiveness-NTU |
 | Exchangers | `Cooler` | `inlet` -> `outlet` | no | dry or wet approach, fan power |
-| Heating | `Boiler` | `inlet` -> `outlet` | no | setpoint duty, capacity, efficiency |
+| Heating | `Boiler` | `inlet`, `fuel_in` -> `outlet`, `gas_out` | no | setpoint duty, co-produced gas first |
+| Heating | `ElectricBoiler` | `inlet` -> `outlet` | no | setpoint duty, capacity, efficiency |
 | Heating | `HeatPump` | `source_in`, `sink_in` -> `source_out`, `sink_out` | no | Carnot or Lorenz COP |
-| Heating | `CHP` | `inlet` -> `outlet` | no | Willans line, dump cooler |
+| Heating | `CHP` | `inlet`, `fuel_in` -> `outlet`, `gas_out` | no | Willans line, dump cooler |
 | Cooling | `AbsorptionUnit` | three `*_in` -> `*_out` circuits | no | characteristic equation |
 | Cooling | `AdsorptionChiller` | three `*_in` -> `*_out` circuits | no | characteristic equation |
 | Power | `ORC` | `brine_in` -> `brine_out` | no | Lorenz-cycle fraction, bypass cap |
@@ -72,6 +74,8 @@ Shared conventions, stated once here and not repeated per module:
 | Storage | `ThermalStorage` | `charge_*`, `discharge_*` | yes | fully mixed tank |
 | Storage | `IceStorage` | `inlet` -> `outlet` | yes | lumped ice store, piecewise exact |
 | Piping | `Pipe` | `inlet` -> `outlet` | no | Darcy–Weisbach, static head, exponential loss |
+| Piping | `GasGrid` | none -> `outlet` | no | a fuel source without flow, marks grid gas |
+| Piping | `GasMakeup` | `inlet` -> `outlet` | no | marks that a burner may draw grid gas |
 | Piping | `Valve` | `inlet` -> `outlet` | no | IEC 60534 liquid sizing, inherent curve |
 | Piping | `Splitter` | `feed_in` -> `first_out`, `second_out` | no | commanded mass split |
 | Piping | `Mixer` | `first_in`, `second_in` -> `mixed_out` | no | adiabatic, lower pressure |
@@ -2036,7 +2040,7 @@ cooling spec whose units switch on and off. It is a plain template: no value shi
 - **Parameters.** `<unit>.enabled` for `heat_pump`, `peak_boiler`, `absorption_chiller`,
   `adsorption_chiller`, `compression_chiller` and `cooling_loop` (the chillers, the cooling pipes
   and the cooling consumer together); sizes `heat_exchanger.thermal_conductance`, the chiller, heat pump and boiler
-  capacities, `peak_boiler.fuel_type` and `efficiency`; length, diameter, elevation change and
+  capacities, `peak_boiler.efficiency`; length, diameter, elevation change and
   `heat_transfer_coefficient` of the four network pipes; the consumers' return temperatures. Other values are set
   with `plant.set_params` after `from_template`.
 - **Presets.** `heating_only` (boiler and heating consumer), `heating_absorption_cooling`,

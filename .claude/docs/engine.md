@@ -301,7 +301,8 @@ metadata (units, durations, skips, failures, energy fields, end state) is one JS
 uses `allow_pickle=False`, so no pickle is read, and gives the same bits, units and end state.
 Anything that is not an archive of this format (including the former Parquet and CSV files)
 raises `ValidationError` with the code `invalid_format`. The metadata records `gm.__version__`, and a
-file written before 0.1.0 raises `ValidationError` with the code `old_format`, as a checkpoint does.
+file written before 0.1.0 raises `ValidationError` with the code `old_format`, as a checkpoint
+written before 0.2.0 does: it holds a plant file of an older form.
 Checkpoints keep their results in the same file.
 
 **End state.** `results.end_state` is plain JSON `{position, module_states}`: the last committed

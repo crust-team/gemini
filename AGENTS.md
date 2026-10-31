@@ -11,6 +11,13 @@ Physics lives only in `gemini/physics/`: a module declares and wires, and calls 
 
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
+`gm.schedule` plans the run input of a design from its demand
+([schedule](.claude/docs/engine.md#schedule)).
+
+Every port of a module is connected or named as a plant port; there are no automatic plant ports
+([plants](.claude/docs/plants.md#level-1-the-builder)). A composite may derive its children's values
+by overriding `set_params`
+([modules](.claude/docs/modules.md#a-composite-that-sets-its-childrens-values)).
 
 Every public return uses one of three shapes, value, problem or check, built by
 `gemini/types/shapes.py` ([return shapes](.claude/docs/api.md#return-shapes)). Every public call

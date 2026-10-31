@@ -13,7 +13,7 @@ from pydantic import ValidationError as PydanticError
 from gemini.errors import RunError, ValidationError
 from gemini.utils.data.dataset import Dataset
 from gemini.utils.files import read_cells, read_json, write_cells
-from gemini.utils.version import OLDEST_READABLE, is_older, package_version
+from gemini.utils.version import OLDEST_CHECKPOINT, is_older, package_version
 
 
 class Checkpoint(BaseModel):
@@ -121,10 +121,10 @@ def _remove_unreferenced(folder, old, checkpoint):
 def _check_version(path, manifest):
     """Refuse a manifest written before the oldest readable version."""
     version = manifest.get("version") if isinstance(manifest, dict) else None
-    if isinstance(manifest, dict) and is_older(version):
+    if isinstance(manifest, dict) and is_older(version, OLDEST_CHECKPOINT):
         raise ValidationError(
             f"{path}: version = {version!r}; expected a checkpoint written by gemini "
-            f"{OLDEST_READABLE} or later",
+            f"{OLDEST_CHECKPOINT} or later",
             path="version",
             code="old_format",
         )

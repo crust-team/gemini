@@ -86,7 +86,7 @@ code is never renamed without raising the minor number of `gm.__version__`.
 | `unknown_port` | `ValidationError` | A port does not exist on that module |
 | `invalid_call` | `ValidationError` | A module was called with wrong arguments |
 | `invalid_format` | `ValidationError` | A document has the wrong structure |
-| `old_format` | `ValidationError` | A plant file is older than the current format (use `gm.plants.migrate`), or a checkpoint or results file was written before 0.1.0 |
+| `old_format` | `ValidationError` | A plant file is older than the current format (use `gm.plants.migrate`), a checkpoint was written before 0.2.0, or a results file before 0.1.0 |
 | `migration_failed` | `ValidationError` | An old plant file cannot be migrated |
 | `invalid_connection` | `ValidationError` | A connection breaks a wiring rule |
 | `stream_mismatch` | `ValidationError` | The two ends of a connection carry different stream types |
