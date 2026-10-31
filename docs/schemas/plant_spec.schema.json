@@ -53,6 +53,7 @@
             "CHP",
             "CentrifugalPump",
             "ChemicalGrid",
+            "CirculationPump",
             "Cooler",
             "CoolingGrid",
             "CoolingSubstation",

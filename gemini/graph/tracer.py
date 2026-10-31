@@ -220,6 +220,8 @@ def _untraceable(module, stepped):
         reasons.append("stateful (needs scan)")
     if module._pre_hooks:
         reasons.append("has forward pre-hooks")
+    if module._iterates():
+        reasons.append("closes a loop or solves a constraint (needs scan)")
     if runtime.get_precision() != "float64":
         reasons.append("runtime precision is not float64")
     return reasons

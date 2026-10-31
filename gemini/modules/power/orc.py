@@ -94,7 +94,6 @@ class ORC(Module):
         balance = self._balance(fluid_in, fluid_out, design)
 
         # Outputs
-        fluid_out = fluid_out
         self.gross_power = balance.gross_power
         self.parasitic_power = balance.parasitic_power
         self.condenser_duty = balance.condenser_duty

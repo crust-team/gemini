@@ -143,16 +143,18 @@ def test_a_stream_type_mismatch_is_refused(chain):
     assert caught.value.code == "stream_mismatch"
 
 
-def test_a_loop_needs_a_state_connection():
-    """A cycle raises ``loop_without_state``; the same wire as state is accepted."""
+def test_a_cycle_is_a_loop_and_a_state_connection_waits_for_scan():
+    """A plain connection may close a cycle; the same wire as state does not run yet."""
     plant = gm.Plant("Loop")
     plant.add("Filter", "first")
     plant.add("Filter", "second")
     plant.connect("first.fluid_out", "second.fluid_in")
-    with pytest.raises(ValidationError) as caught:
-        plant.connect("second.fluid_out", "first.fluid_in")
-    assert caught.value.code == "loop_without_state"
-    assert len(plant._connection_list()) == 1
+    plant.connect("second.fluid_out", "first.fluid_in")
+    assert plant._compiled().iterates
+    plant = gm.Plant("Loop")
+    plant.add("Filter", "first")
+    plant.add("Filter", "second")
+    plant.connect("first.fluid_out", "second.fluid_in")
     plant.connect("second.fluid_out", "first.fluid_in", type="state")
     with pytest.raises(NotImplementedYet):
         plant()

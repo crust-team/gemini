@@ -90,6 +90,11 @@ class HeatExchanger(Module):
         outlets = dict(hot_out=hot_out, cold_out=cold_out)
         return outlets
 
+    def _loop_limits(self, inlets):
+        """Keep a loop on one side of what comes in on the other: the exchanger must not reverse."""
+        cold, hot = inlets.get("cold_in"), inlets.get("hot_in")
+        return (None if cold is None else cold.T), (None if hot is None else hot.T)
+
     def capex(self, assumptions):
         """Return the cost of the exchanger from its thermal conductance."""
         return scaled_cost(assumptions, "exchanger_cost", self.thermal_conductance)

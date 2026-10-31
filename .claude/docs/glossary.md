@@ -118,9 +118,9 @@ injection injectivity inlet inner input integral is isentropic latent length lif
 liquid load log loop lorenz loss margin mass maximum mean measurement methane minimum mixed mode
 model motor net network no nominal opening operating or out outlet output overpressure parasitic
 part path period permeability phase pinch pipe point porosity power pressure previous price
-product production productivity proportional pump purchased quality radial radius rangeability rate rated rates
+product production productivity proportional pump pumping purchased quality radial radius rangeability rate rated rates
 ratio recovered recovery reference rejection relative removal residual resistance retained
-return rock role roughness running sand sandface saturated saturation second secondary section segment
+return rise rock role roughness running sand sandface saturated saturation second secondary section segment
 sensible separation service setpoint setting shaft sink skin slope soil source spacing specific
 split stage steam step storage stored suction supplied supply surface tank temperature thermal
 thickness threshold time top transfer tubing two type undisturbed units unmet unserved useful

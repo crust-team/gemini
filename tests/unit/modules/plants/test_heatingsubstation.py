@@ -44,7 +44,7 @@ def test_met_demand_closes_the_building_loop(plants):
     assert energy_balance(substation, result)["relative_residual"] < 1e-12
     assert_plant_closes(substation, result)
     assert mass_balance(substation, result)["residual"] == 0
-    assert list(result.leaves()) == ["valve", "heat_exchanger", "consumer"]
+    assert list(result.leaves()) == ["valve", "pump", "heat_exchanger", "consumer"]
 
 
 def test_large_demand_is_capped_at_the_return_floor(plants):
@@ -77,5 +77,5 @@ def test_invalid_inputs_raise(plants):
     substation.valve.opening = 0.8
     with pytest.raises(gm.errors.PhysicsError):
         substation(supply_in=NETWORK.with_(m_dot=-1.0))
-    with raises(gm.errors.ValidationError, "missing_value", match="building_flow"):
+    with raises(gm.errors.ValidationError, "missing_value", match="pump.flow"):
         HeatingSubstation()(supply_in=NETWORK)

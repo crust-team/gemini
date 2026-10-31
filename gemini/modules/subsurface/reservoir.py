@@ -172,7 +172,6 @@ class ProductionReservoir(_Reservoir):
         sandface = self.sandface_stream(self.production_rate)
 
         # Outputs
-        sandface = sandface
         flow = sandface.volumetric_flow()
         for name, value in self._calculate_outputs(flow, sandface.p).items():
             setattr(self, name, value)
@@ -188,8 +187,8 @@ class ProductionReservoir(_Reservoir):
         """Return the sandface stream [SI] the linear IPR delivers at a production rate [kg/s].
 
         ``p_bh = pressure - Q / productivity_index`` with the volume flow Q at reservoir
-        conditions. ``forward`` uses it for the commanded rate; the nodal solve of
-        ``gemini.modules.plants._utils.nodal`` uses it for trial rates without a call.
+        conditions. ``forward`` uses it for the commanded rate; ``gm.analysis.nodal`` uses it for
+        trial rates without a call.
         """
         if self.productivity_index is None:
             raise ValidationError(
@@ -234,9 +233,8 @@ class InjectionReservoir(_Reservoir):
         """Return the bottomhole pressure [Pa] the linear injectivity needs for a sandface stream.
 
         ``p_bh = pressure + Q / injectivity_index`` with Q the absolute volume flow of the
-        stream. The aquifer accepts any arriving stream; the nodal solve of
-        ``gemini.modules.plants._utils.nodal`` matches the injection well's bottom pressure to
-        this value.
+        stream. The aquifer accepts any arriving stream; a constraint of a plant matches the
+        injection well's bottom pressure to this value, through ``bottomhole_pressure``.
         """
         if self.injectivity_index is None:
             raise ValidationError(

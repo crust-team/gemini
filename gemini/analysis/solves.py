@@ -8,19 +8,16 @@ bottomhole pressure the receiving aquifer needs. The functions are ported from t
 GEMINI simulator (``gemini_simulator.nodal_solver``), which solves the same balances with
 ``scipy.optimize.brentq``.
 
-Every trial evaluates the plant's own modules (``ProductionReservoir.sandface_stream``,
-``InjectionReservoir.required_pressure`` and ``Module.trial_outlets`` of the wells and the ESP),
-so no running call records a trial. Call a solve before the plant call and apply its result
-as a command, for example ``doublet.reservoir.production_rate = rate``. Each solve needs a
+Every trial evaluates the plant's own modules without a running call. A plant states the same
+balances with ``Plant.constrain``, as ``NodalDoublet`` does. Each solve needs a
 bracket whose two ends lie inside the well model's domain and give residuals of opposite sign:
 very small rates can cool a stream below 0 K through the explicit heat loss and very large rates
 can drive the traversed pressure below zero, and a trial there raises ``PhysicsError``
 naming the trial value.
 """
 
-from scipy.optimize import brentq
-
-from gemini.errors import PhysicsError, ValidationError
+from gemini.errors import ValidationError
+from gemini.modules.plants._utils.constraints import evaluate, root
 
 
 def solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, riser=None):
@@ -60,13 +57,13 @@ def solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, r
         )
 
     def residual(rate):
-        stream = well.trial_outlets({"bottom_in": reservoir.sandface_stream(rate)}).wellhead_out
+        stream = well._trial(bottom_in=reservoir.sandface_stream(rate)).outlets.wellhead_out
         if esp is not None:
-            stream = esp.trial_outlets({"fluid_in": stream}).fluid_out
-            stream = riser.trial_outlets({"bottom_in": stream}).wellhead_out
+            stream = esp._trial(fluid_in=stream).outlets.fluid_out
+            stream = riser._trial(bottom_in=stream).outlets.wellhead_out
         return stream.p - wellhead_pressure
 
-    return _root("solve_production_rate", "rate", "kg/s", residual, rates)
+    return root("solve_production_rate", "rate", residual, rates, "kg/s")
 
 
 def solve_injection_rate(well, sink, wellhead, rates):
@@ -92,7 +89,7 @@ def solve_injection_rate(well, sink, wellhead, rates):
     def residual(rate):
         return _injection_residual(well, sink, wellhead.with_(m_dot=rate))
 
-    return _root("solve_injection_rate", "rate", "kg/s", residual, rates)
+    return root("solve_injection_rate", "rate", residual, rates, "kg/s")
 
 
 def solve_injection_pressure(well, sink, wellhead, pressures):
@@ -124,36 +121,12 @@ def solve_injection_pressure(well, sink, wellhead, pressures):
         return _injection_residual(well, sink, wellhead.with_(p=pressure))
 
     low = pressures[0]
-    if _evaluate("solve_injection_pressure", "pressure", "Pa", residual, low) >= 0:
+    if evaluate("solve_injection_pressure", "pressure", residual, low, "Pa") >= 0:
         return None
-    return _root("solve_injection_pressure", "pressure", "Pa", residual, pressures)
+    return root("solve_injection_pressure", "pressure", residual, pressures, "Pa")
 
 
 def _injection_residual(well, sink, wellhead):
     """Return the injection well's bottom pressure minus the aquifer's required pressure [Pa]."""
-    bottom = well.trial_outlets({"wellhead_in": wellhead}).bottom_out
+    bottom = well._trial(wellhead_in=wellhead).outlets.bottom_out
     return bottom.p - sink.required_pressure(bottom)
-
-
-def _root(function, name, unit, residual, bracket):
-    """Return the root of ``residual`` in ``bracket`` after checking a sign change at its ends."""
-    low, high = bracket
-    at_low = _evaluate(function, name, unit, residual, low)
-    at_high = _evaluate(function, name, unit, residual, high)
-    if at_low * at_high > 0:
-        raise PhysicsError(
-            f"{function}: residual = {at_low} Pa at {name} {low} {unit} and {at_high} Pa at "
-            f"{high} {unit}; expected opposite signs (widen or move the bracket)"
-        )
-    return brentq(lambda value: _evaluate(function, name, unit, residual, value), low, high)
-
-
-def _evaluate(function, name, unit, residual, value):
-    """Return ``residual(value)``; a trial outside the well model's domain names the value."""
-    try:
-        return residual(value)
-    except PhysicsError as error:
-        raise PhysicsError(
-            f"{function}: {name} = {value} {unit}; expected a trial inside the well model's "
-            f"domain (narrow the bracket): {error}"
-        ) from error

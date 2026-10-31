@@ -131,7 +131,7 @@ def test_composite_lists_children_and_dotted_values():
     description = substation.describe()
     assert description["children"]
     assert all(isinstance(name, str) for name in description["children"].values())
-    assert description["connections"] == []
+    assert description["connections"]
     schema = substation.parameter_schema()
     assert any("." in name for name in schema["properties"])
     assert_valid_schema(schema)

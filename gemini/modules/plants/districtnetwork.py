@@ -59,6 +59,9 @@ class DistrictNetwork(Plant):
         self._connect_feed(consumers)
         self._connect_returns(consumers)
         self.connect("return_pipe.fluid_out", "return_out")
+        for index in range(consumers):
+            self.connect("power_in", f"substations.{index}.power_in")
+            self.connect(f"substations.{index}.loss_out", "loss_out")
         self.connect("pump.loss_out", "loss_out")
         self.connect("supply_pipe.loss_out", "loss_out")
         self.connect("return_pipe.loss_out", "loss_out")

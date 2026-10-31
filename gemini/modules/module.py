@@ -62,6 +62,7 @@ from gemini.utils.strings import (
 
 _current_call = ContextVar("module_call", default=None)
 _outputs_enabled = ContextVar("module_outputs_enabled", default=True)
+_in_trial = ContextVar("module_in_trial", default=False)
 _FIELD_DISPLAY_UNITS = {"Pa": "bar", "K": "°C", "m3/s": "m3/h", "W": "kW"}
 _REGISTRIES = (
     (Parameter, "_parameters"),
@@ -256,7 +257,7 @@ class _Call:
 
     def kept_outputs(self):
         """Return the outputs the result of this call holds."""
-        return self.outputs if self.recording else {}
+        return self.outputs if self.recording or _in_trial.get() else {}
 
     def owned_by(self, module):
         """Return the innermost call of ``module`` in this chain, or ``None``."""
@@ -1215,25 +1216,48 @@ class Module:
         result = self._run((inlets,), {}, step)
         return step.next_states or None, result
 
-    def trial_outlets(self, inlets):
-        """Return the outlets of one call that no running call records, with outputs skipped.
+    def _trial(self, *args, **kwargs):
+        """Return the result of one call that no running call records, outputs not validated.
 
-        A composite that closes a circulation loop within one call evaluates trial passes with
-        it, then calls each child once with the converged inlets, so formulas and balances see
-        only that call. Controls and boundaries resolve as in a call without keywords, and
-        pre-hooks run. A stateful module would evaluate at its initial states, so it is refused.
+        A plant that closes a loop or solves a constraint evaluates trial passes with it, then
+        calls each module once with the converged inlets, so its outputs and balances see only
+        that call. Pre-hooks run and forward hooks do not. A stateful module would evaluate at its
+        initial states, so it is refused.
         """
         if self.stateful:
             raise ValidationError(
                 f"{self.path}: stateful = True; expected a stateless module for a trial call",
                 code="invalid_design",
             )
-        token = _current_call.set(None)
+        token, trial = _current_call.set(None), _in_trial.set(True)
         try:
             with no_outputs():
-                return self(inlets).outlets
+                return self(*args, **kwargs)
         finally:
+            _in_trial.reset(trial)
             _current_call.reset(token)
+
+    def _offers(self):
+        """Return whether the ``offered`` outlets exist as this module is set; some may not."""
+        return True
+
+    def _loop_start(self, port):
+        """Return the first guess [K] of the temperature on outlet ``port`` of a closed loop.
+
+        A module that can guess it overrides this; the plan then prefers to tear that outlet.
+        """
+        return None
+
+    def _loop_limits(self, inlets):
+        """Return the ``(lower, upper)`` temperatures [K] a loop through this module must keep.
+
+        ``inlets`` are the inlets that come from outside the loop. ``None`` is no limit.
+        """
+        return None, None
+
+    def _iterates(self):
+        """Return whether a call of this module closes a loop or solves a constraint."""
+        return False
 
     def _initial_states(self):
         """Return the validated initial value of every declared state."""

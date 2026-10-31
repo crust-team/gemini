@@ -28,7 +28,14 @@ from .plants.districtenergyplant import DistrictEnergyPlant
 from .plants.nodaldoublet import NodalDoublet
 from .plants.parallelexchangerplant import ParallelExchangerPlant
 from .power import ORC, FlashTurbine, Separator
-from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
+from .pumps import (
+    ESP,
+    CentrifugalPump,
+    CirculationPump,
+    GasCompressor,
+    InjectionPump,
+    LineShaftPump,
+)
 from .storage import AquiferStorage, IceStorage, ThermalStorage
 from .subsurface import (
     BoreholeField,
@@ -65,6 +72,7 @@ __all__ = [
     "ESP",
     "InjectionPump",
     "CentrifugalPump",
+    "CirculationPump",
     "LineShaftPump",
     "GasCompressor",
     "InjectionReservoir",

@@ -1,118 +1,82 @@
-"""Building cooling substation: network valve, heat exchanger and the building's cooling loads."""
+"""Building cooling substation: valve, heat exchanger, the building's loads and its pump."""
 
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.grids import CoolingGrid
-from gemini.modules.module import Module
 from gemini.modules.piping import Valve
-from gemini.modules.plants._utils import loops
-from gemini.types import (
-    Inlet,
-    MassFlow,
-    Outlet,
-    Output,
-    Parameter,
-    Pressure,
-    Stream,
-)
+from gemini.modules.plant import Plant
+from gemini.modules.pumps import CirculationPump
+from gemini.types import Inlet, Outlet, Power, Stream
 
 
-class CoolingSubstation(Module):
+class CoolingSubstation(Plant):
     """Indirect district-cooling substation serving a building chilled-water circuit.
 
     The network chilled water passes the control ``valve`` and the cold side of the
     ``heat_exchanger``; the building circuit, a closed loop inside the substation, passes its
-    hot side and the ``consumer`` (a ``CoolingGrid`` with the building's sensible and latent
-    loads and indoor air). The building circuit carries the parameter ``building_flow`` at
-    ``building_pressure`` with the substation's ``fluid``; its circulation pump and hydraulics
-    are not modelled. This is the indirect energy-transfer-station connection of district
-    cooling customers (ASHRAE 2013, *District Cooling Guide*, consumer interconnection).
+    hot side, the ``consumer`` (a ``CoolingGrid`` with the building's sensible and latent loads
+    and indoor air) and the ``pump``, which sets its flow and its pressure and draws the
+    electricity for it through ``power_in``. This is the indirect energy-transfer-station
+    connection of district cooling customers (ASHRAE 2013, *District Cooling Guide*, consumer
+    interconnection).
 
-    The building return temperature closes the loop within one call: ``loops.close_loop`` finds
-    the return temperature that one pass through exchanger and consumer reproduces (Wegstein
-    iteration, tolerance 1e-9 K, at most 50 passes, ``PhysicsError`` otherwise), with
-    trial passes evaluated by ``Module.trial_outlets``; then every child is called once. The
-    iteration starts at the consumer's return limit, the lower of its
-    ``maximum_return_temperature`` and ``indoor_temperature`` (or the network temperature, if
-    warmer), and never falls below the network temperature after the valve, where the exchanger
-    would reverse. A stopped network or building circuit transfers no heat. The building supply
-    temperature that reaches the consumer decides whether it can dehumidify (its dew-point test).
-    That test is on or off, so near the threshold the loop can lack a steady state: meeting the
-    latent load warms the supply above the threshold and dropping it cools the supply below.
-    The real coil would then dehumidify partly; the consumer model cannot, and the iteration
-    raises ``PhysicsError`` (for the test configuration a band of about 2 K of network
+    The building loop closes within one call: the plant tears it at ``consumer.return_out``,
+    starts at the consumer's return limit, the lower of its ``maximum_return_temperature`` and
+    ``indoor_temperature``, and never falls below the network temperature after the valve, where
+    the exchanger would reverse. The building supply temperature that reaches the consumer
+    decides whether it can dehumidify (its dew-point test). That test is on or off, so near the
+    threshold the loop can lack a steady state: meeting the latent load warms the supply above
+    the threshold and dropping it cools the supply below. The real coil would then dehumidify
+    partly; the consumer model cannot, and the loop raises ``PhysicsError`` (code
+    ``loop_not_converged``; for the test configuration a band of about 2 K of network
     temperature). Lower the network temperature, raise the building flow or the exchanger UA.
 
     The valve only throttles: the network flow is imposed by ``supply_in`` and the valve
     reports the pressure drop that flow causes at the commanded ``valve.opening``. Every child
     is first-law closed, so ``energy_balance`` closes; the converged consumer return and the
-    stream fed back to the exchanger differ by at most the tolerance and appear as a boundary
-    pair in the audit's ``in`` and ``out``.
+    stream fed back differ by at most the tolerance and appear as a boundary pair in the audit's
+    ``in`` and ``out``.
 
     Valid in the ranges of the children: liquid circuits, forward flow, a network supply at
     most as warm as the building return.
     """
 
     def __init__(self):
-        """Declare the substation children, the building circuit and the absorbed heat."""
+        """Declare the substation children, its ports and the circuits."""
         super().__init__()
 
         # Modules
         self.valve = Valve()
         self.heat_exchanger = HeatExchanger()
         self.consumer = CoolingGrid()
-
-        # Parameters
-        self.building_flow = Parameter(MassFlow, gt=0)
-        self.building_pressure = Parameter(Pressure, gt=0)
+        self.pump = CirculationPump()
 
         # Inlets
         self.supply_in = Inlet(Stream, kind="chilled_water")
-
-        # Outputs
-        self.duty = Output.of(self.heat_exchanger.duty)
-        self.unmet_sensible = Output.of(self.consumer.unmet_sensible)
-        self.unmet_latent = Output.of(self.consumer.unmet_latent)
-        self.is_unmet = Output.of(self.consumer.is_unmet)
-        self.dew_point = Output.of(self.consumer.dew_point)
-        self.building_supply_temperature = Output.of(self.heat_exchanger.hot_out_T)
-        self.building_return_temperature = Output.of(self.consumer.return_out.field("T"))
-        self.valve_pressure_drop = Output.of(self.valve.pressure_drop)
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Outlets
         self.return_out = Outlet(Stream, kind="chilled_water")
+        self.loss_out = Outlet(Power, kind="heat")
 
-    def forward(self, inlets):
-        """Throttle the network water, close the building loop and exchange the heat once."""
+        # Connections
+        self.connect("supply_in", "valve.fluid_in")
+        self.connect("power_in", "pump.power_in")
+        self.connect("valve.fluid_out", "heat_exchanger.cold_in")
+        self.connect("heat_exchanger.cold_out", "return_out")
+        self.connect("heat_exchanger.hot_out", "consumer.supply_in")
+        self.connect("consumer.return_out", "pump.fluid_in")
+        self.connect("pump.fluid_out", "heat_exchanger.hot_in")
+        self.connect("pump.loss_out", "loss_out")
 
-        # Modules
-        throttled = self.valve(fluid_in=inlets.supply_in)
-        network = throttled.outlets.fluid_out
-        consumer = self.consumer
-        limit = min(consumer.maximum_return_temperature, consumer.indoor_temperature)
-        return_T = loops.close_loop(
-            lambda temperature: self._pass(network, temperature),
-            max(limit, network.T),
-            self.path,
-            lower=network.T,
-        )
-        exchanged = self.heat_exchanger(hot_in=self._building_return(return_T), cold_in=network)
-        self.consumer(supply_in=exchanged.outlets.hot_out)
-
-        # Outlets
-        return_out = exchanged.outlets.cold_out
-
-        outlets = dict(return_out=return_out)
-        return outlets
-
-    def _pass(self, network, return_T):
-        """Return the building return temperature [K] after one trial pass around the loop."""
-        building = self._building_return(return_T)
-        exchanged = self.heat_exchanger.trial_outlets({"hot_in": building, "cold_in": network})
-        consumed = self.consumer.trial_outlets({"supply_in": exchanged.hot_out})
-        return consumed.return_out.T
-
-    def _building_return(self, temperature):
-        """Return the building circuit stream entering the exchanger at ``temperature`` [K]."""
-        return Stream(
-            m_dot=self.building_flow, T=temperature, p=self.building_pressure, fluid=self.fluid
-        )
+        # Outputs
+        self._output_specs = {
+            "duty": {"of": "heat_exchanger.duty"},
+            "unmet_sensible": {"of": "consumer.unmet_sensible"},
+            "unmet_latent": {"of": "consumer.unmet_latent"},
+            "is_unmet": {"of": "consumer.is_unmet"},
+            "dew_point": {"of": "consumer.dew_point"},
+            "building_supply_temperature": {"of": "heat_exchanger.hot_out_T"},
+            "building_return_temperature": {"of": "consumer.return_out", "field": "T"},
+            "valve_pressure_drop": {"of": "valve.pressure_drop"},
+        }
+        self._refresh()

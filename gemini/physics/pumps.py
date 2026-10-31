@@ -31,6 +31,13 @@ DEFAULT_INJECTION_PUMP_EFFICIENCY = 0.7
 """Default constant overall efficiency [-] of an injection pump without a power curve."""
 
 
+DEFAULT_CIRCULATION_PUMP_EFFICIENCY = 0.55
+"""Efficiency of a building circulation pump [-], from the electricity to the water.
+
+The low end of the 55 to 70 % peak of larger circulators in the trade press (Siegenthaler,
+Plumbing & Mechanical, Modern Hydronics), low because a fixed flow runs away from the peak.
+"""
+
 DEFAULT_INJECTION_PUMP_FREQUENCY = 60
 """Default drive frequency [Hz] of an injection pump, the ESP catalogue frequency."""
 

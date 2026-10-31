@@ -6,17 +6,11 @@ from gemini.modules._utils import design
 from gemini.modules._utils.serialization import module_spec, tree_params
 from gemini.modules.container import ModuleList
 from gemini.modules.module import Module
-from gemini.modules.plants._utils import listing, outputs, reader, writer
+from gemini.modules.plants._utils import listing, loops, outputs, reader, writer
 from gemini.modules.plants._utils.factory import make_module
-from gemini.modules.plants._utils.plan import (
-    STATE,
-    Link,
-    compile_plan,
-    is_group,
-    loop_through,
-    port_ends,
-)
+from gemini.modules.plants._utils.plan import STATE, Constraint, compile_plan, is_group, port_ends
 from gemini.modules.plants._utils.ports import PortResolver
+from gemini.modules.plants._utils.run import Run
 from gemini.physics import energy
 from gemini.types.declarations import Inlet, Outlet
 from gemini.utils.strings import join_path, snake_case
@@ -37,6 +31,9 @@ class Plant(PortResolver, Module):
     never stored, and the fluid of a plant passes to its children.
     """
 
+    loop_tolerance = loops.TOLERANCE
+    loop_passes = loops.MAX_PASSES
+
     def __init__(self, name=None):
         """Start an empty plant called ``name``."""
         if name is None:
@@ -45,6 +42,7 @@ class Plant(PortResolver, Module):
         super().__init__()
         self._size = {}
         self._connections = []
+        self._constraints = []
         self._declared = set()
         self._derived_params = set()
         self._stated_child_params = set()
@@ -216,16 +214,27 @@ class Plant(PortResolver, Module):
         if connection_type == STATE:
             item["type"] = STATE
         self._connections.append(item)
-        link = Link("", (path, port), (target_path, target_port), connection_type)
-        loop = loop_through(self, link)
-        if loop is not None:
-            self._connections.pop()
-            raise ValidationError(
-                f"loop without state: {' -> '.join(loop)}; close it with type='state'",
-                path="target",
-                code="loop_without_state",
-            )
         self._refresh()
+
+    def constrain(self, target, by, bounds, equals=None, at_least=None):
+        """Let the engine find the free value ``by`` at which ``target`` reaches its value.
+
+        ``target`` is a path of the plant: an output or a port field such as
+        ``riser.wellhead_out.p``. ``equals`` is the path of the value it must reach, a parameter,
+        boundary or output. ``by`` is the path of a control or boundary of a child, and
+        ``bounds`` the path of a pair of values, or two numbers or paths. With ``at_least``
+        instead of ``equals`` a target that reaches its value at the lower bound keeps that bound.
+        """
+        if (equals is None) == (at_least is None):
+            raise ValidationError(
+                f"constrain: equals = {equals!r}, at_least = {at_least!r}; expected exactly one",
+                path="equals",
+                code="invalid_value",
+            )
+        limits = bounds if isinstance(bounds, str) else tuple(bounds)
+        value = at_least if equals is None else equals
+        self._constraints.append(Constraint(target, value, by, limits, equals is None))
+        self._plan = None
 
     def _register_declaration(self, name, declaration):
         """Register a declaration; a port assigned by a plant class stays through ``_refresh``."""
@@ -287,16 +296,9 @@ class Plant(PortResolver, Module):
             self._plan = compile_plan(self)
         return self._plan
 
-    def _argument(self, source, inlets, results, offers):
-        if source[0] == "many":
-            return [self._argument(item, inlets, results, offers) for item in source[1]]
-        if source[0] == "inlet":
-            return inlets[source[1]]
-        if source[0] == "offer":
-            return offers[source[1]][source[2]]
-        if source[0] == "drawn":
-            return results[source[1]].inlets[source[2]]
-        return results[source[1]].outlets[source[2]]
+    def _iterates(self):
+        """Return whether a call of this plant closes a loop or solves a constraint."""
+        return self._compiled().iterates
 
     def _plant_value(self, values):
         """Return the value of a plant port: its one end, or the sum of what its ends carry."""
@@ -310,20 +312,13 @@ class Plant(PortResolver, Module):
             yield name, self._plant_value([results[path].inlets[port] for path, port in ends])
 
     def forward(self, inlets):
-        """Call the modules in connection order and return the plant outlets."""
+        """Call the modules in connection order, close the loops and return the plant outlets."""
 
         # Modules
-        results, offers = {}, {}
-        for step in self._compiled().steps:
-            arguments = {
-                port: self._argument(source, inlets, results, offers)
-                for port, source in step.arguments.items()
-            }
-            if step.offer:
-                offers[step.path] = step.module.offer(arguments)
-            else:
-                results[step.path] = step.module(**arguments)
+        run = Run(self, inlets)
+        for item in self._compiled().items:
+            run.execute(item)
 
         # Outlets
-        outlets = dict(self._plan_outlets(results))
+        outlets = dict(self._plan_outlets(run.results))
         return outlets

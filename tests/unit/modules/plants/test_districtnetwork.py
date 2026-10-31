@@ -39,7 +39,8 @@ def test_heating_network_serves_both_substations(plants):
     feeds = [children[f"substations.{index}"].inlets.supply_in.m_dot for index in range(2)]
     assert feeds == [2.0, 2.0]
     assert _leaf_sum(result, "heat_supplied") == pytest.approx(3e5, rel=1e-12)
-    assert out.electricity == reading(children["pump"]).electricity > 0
+    pumps = [children["pump"], *(children[f"substations.{i}"].children["pump"] for i in range(2))]
+    assert out.electricity == pytest.approx(sum(reading(pump).electricity for pump in pumps))
     assert out.heat_loss == pytest.approx(_leaf_sum(result, "heat_loss"), rel=1e-14)
     assert out.heat_absorbed == 0
     mixed = children["mixers.0"].outlets.fluid_out

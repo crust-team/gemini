@@ -3,17 +3,17 @@
 from gemini.modules.container import ModuleList
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.grids import ElectricityGrid
-from gemini.modules.module import Module
 from gemini.modules.piping import Mixer, Splitter
+from gemini.modules.plant import Plant
 from gemini.modules.plants.nodaldoublet import NodalDoublet
 from gemini.modules.treatment import Degasser, Filter
-from gemini.types import Inlet, Outlet, Output, Stream
+from gemini.types import Inlet, Outlet, Stream
 
 SHARES = (0.5, 0.3, 0.2)
 """Shares of the primary and the secondary flow sent to each heat exchanger."""
 
 
-class ParallelExchangerPlant(Module):
+class ParallelExchangerPlant(Plant):
     """Nodal doublet whose brine heats one secondary network through three parallel exchangers.
 
     The port of the upstream GEMINI simulator's ``parallel_hex_plant`` example. The producer is
@@ -28,70 +28,64 @@ class ParallelExchangerPlant(Module):
     def __init__(self):
         """Build the plant; the tees are cascades of two-way splitters and mixers."""
         super().__init__()
+        tees = len(SHARES) - 1
 
         # Modules
         self.doublet = NodalDoublet()
         self.degasser = Degasser()
         self.inlet_filter = Filter()
-        self.primary_splitters = ModuleList(Splitter() for _ in SHARES[1:])
-        self.secondary_splitters = ModuleList(Splitter() for _ in SHARES[1:])
+        self.primary_splitters = ModuleList(Splitter() for _ in range(tees))
+        self.secondary_splitters = ModuleList(Splitter() for _ in range(tees))
         self.heat_exchangers = ModuleList(HeatExchanger() for _ in SHARES)
-        self.primary_mixers = ModuleList(Mixer() for _ in SHARES[1:])
-        self.secondary_mixers = ModuleList(Mixer() for _ in SHARES[1:])
+        self.primary_mixers = ModuleList(Mixer() for _ in range(tees))
+        self.secondary_mixers = ModuleList(Mixer() for _ in range(tees))
         self.outlet_filter = Filter()
         self.electricity_grid = ElectricityGrid()
 
         # Inlets
         self.return_in = Inlet(Stream)
 
-        # Outputs
-        self.production_rate = Output.of(self.doublet.riser.wellhead_out.field("m_dot"))
-        self.injection_pressure = Output.of(self.doublet.injection_pump.discharge_pressure)
-        self.injection_pump_power = Output.of(self.doublet.injection_pump.power)
-        self.supply_out_T = Output.of(self.secondary_mixers[len(SHARES) - 2].fluid_out.field("T"))
-
         # Outlets
         self.supply_out = Outlet(Stream)
+        self.gas_out = Outlet(Stream, kind="gas")
 
-    def forward(self, inlets):
-        """Produce and treat the brine, exchange in parallel, remix and inject it."""
+        # Connections
+        self.connect("return_in", "secondary_splitters.0.fluid_in")
+        self.connect("doublet.supply_out", "degasser.fluid_in")
+        self.connect("degasser.liquid_out", "inlet_filter.fluid_in")
+        self.connect("inlet_filter.fluid_out", "primary_splitters.0.fluid_in")
+        self._divide("primary_splitters", "hot_in")
+        self._divide("secondary_splitters", "cold_in")
+        self._combine("primary_mixers", "hot_out")
+        self._combine("secondary_mixers", "cold_out")
+        self.connect(f"primary_mixers.{tees - 1}.fluid_out", "outlet_filter.fluid_in")
+        self.connect("outlet_filter.fluid_out", "doublet.return_in")
+        self.connect("electricity_grid.power_out", "doublet.power_in")
+        self.connect(f"secondary_mixers.{tees - 1}.fluid_out", "supply_out")
+        self.connect("degasser.gas_out", "gas_out")
 
-        # Modules
-        supply, lift_power, well_losses = self.doublet.produce()
-        degassed = self.degasser(fluid_in=supply)
-        filtered = self.inlet_filter(fluid_in=degassed.outlets.liquid_out)
-        primaries = divide(self.primary_splitters, filtered.outlets.fluid_out)
-        secondaries = divide(self.secondary_splitters, inlets.return_in)
-        exchanged = [
-            exchanger(hot_in=hot, cold_in=cold)
-            for exchanger, hot, cold in zip(self.heat_exchangers, primaries, secondaries)
-        ]
-        cooled = combine(self.primary_mixers, [each.outlets.hot_out for each in exchanged])
-        returned = self.outlet_filter(fluid_in=cooled)
-        injection_power, injection_loss = self.doublet.inject(returned.outlets.fluid_out)
-        self.doublet.formation(heat_in=well_losses + injection_loss)
-        self.electricity_grid(power_in=[], power_out=[lift_power, injection_power])
+        # Outputs
+        self._output_specs = {
+            "production_rate": {"of": "doublet.riser.wellhead_out", "field": "m_dot"},
+            "injection_pressure": {"of": "doublet.injection_pump.discharge_pressure"},
+            "injection_pump_power": {"of": "doublet.injection_pump.power"},
+            "supply_out_T": {"of": f"secondary_mixers.{tees - 1}.fluid_out", "field": "T"},
+        }
+        self._refresh()
 
-        # Outlets
-        supply_out = combine(self.secondary_mixers, [each.outlets.cold_out for each in exchanged])
+    def _divide(self, cascade, port):
+        """Connect a splitter cascade: each sends its share to an exchanger, the last the rest."""
+        tees = len(SHARES) - 1
+        for index in range(tees):
+            self.connect(f"{cascade}.{index}.branch2_out", f"heat_exchangers.{index}.{port}")
+            if index < tees - 1:
+                self.connect(f"{cascade}.{index}.branch1_out", f"{cascade}.{index + 1}.fluid_in")
+        self.connect(f"{cascade}.{tees - 1}.branch1_out", f"heat_exchangers.{tees}.{port}")
 
-        outlets = dict(supply_out=supply_out)
-        return outlets
-
-
-def divide(splitters, stream):
-    """Return the branches of a splitter cascade: each splitter sends its share to a branch."""
-    branches = []
-    for splitter in splitters:
-        split = splitter(fluid_in=stream)
-        branches.append(split.outlets.branch2_out)
-        stream = split.outlets.branch1_out
-    return branches + [stream]
-
-
-def combine(mixers, streams):
-    """Return the stream a mixer cascade makes of ``streams``, the running mix entering first."""
-    mixed = streams[0]
-    for mixer, stream in zip(mixers, streams[1:]):
-        mixed = mixer(branch1_in=mixed, branch2_in=stream).outlets.fluid_out
-    return mixed
+    def _combine(self, cascade, port):
+        """Connect a mixer cascade over the exchangers, the running mix entering first."""
+        running = f"heat_exchangers.0.{port}"
+        for index in range(len(SHARES) - 1):
+            self.connect(running, f"{cascade}.{index}.branch1_in")
+            self.connect(f"heat_exchangers.{index + 1}.{port}", f"{cascade}.{index}.branch2_in")
+            running = f"{cascade}.{index}.fluid_out"

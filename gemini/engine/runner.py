@@ -220,6 +220,8 @@ def row_code(error, inlet=False):
     if inlet:
         return "invalid_inlet"
     code = error.code if isinstance(error, GeminiError) else None
+    if code == "loop_not_converged":
+        return "no_convergence"
     if code in ("no_convergence", "out_of_range"):
         return code
     if isinstance(error, ValidationError) and code in ("out_of_bounds", "invalid_value"):

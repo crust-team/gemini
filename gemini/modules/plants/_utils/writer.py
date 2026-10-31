@@ -89,4 +89,6 @@ def plant_spec(plant):
             spec[side] = {name: _port_text(end) for name, end in plant._listed[side].items()}
     if plant._output_specs is not None:
         spec["outputs"] = deepcopy(plant._output_specs)
+    if plant._constraints:
+        spec["constraints"] = [item.as_dict() for item in plant._constraints]
     return spec | write_sections(plant, plant._sections)

@@ -13,17 +13,17 @@ from tests.fixtures.errors import raises
 
 FORMER_EXAMPLES = {
     "ATESPlant": "29d157ac8c1b6006d60bacfc6fb821bb7cbc0c21b058cb8e69642c02f24873da",
-    "BoilerChpPlant": "19bff192bf5cd02cf5af650ffb292b578be6d6089be141d167c51cc63d0ad8b3",
-    "CoolingSubstation": "82db77af60518de0843dee1c28ba6692a98cef1f1317a9393afcdc9df621e7bc",
-    "DistrictEnergyPlant": "f1b791703c00013700561a5660de5a028fc490ac9ee637aea337c828223cd1af",
-    "DistrictNetwork": "a7c09b8338303f47dbac5d0cd71b9a3a5fb4675b86187a8f08eb596df32f4f16",
+    "BoilerChpPlant": "335077245c94a8df846af18376abf4f275732ea5fb4e3555a797720c848edf8f",
+    "CoolingSubstation": "e724b534942334e8216d459a957dbd42f43f9df34785cc1fabc995abc59d9d16",
+    "DistrictEnergyPlant": "1df6cb451b7b87affc28199318182fd64dc8b49bbf6b8626a15cbd6140f32c90",
+    "DistrictNetwork": "cc5a52fa7e7372f532f8e2aacbb6f14f716737735e0ba1418c90ab3e2e3f91d5",
     "Doublet": "7e38703b880e458aef5d3957bc7cc7d51ffc8c9b067d8da0b6c3568dd88249e2",
     "DoubletHeatPlant": "a83a084462d47570c0b880efa2dd0a932500e07af8e306edbab3b5203d18a670",
     "HackathonPlant": "6da42c88a06d8bc97c03b556097cf0e86396d1dc66c8e5bc74638cb987c570b7",
-    "HeatingSubstation": "18ecd2306a392e393bfb3620a81c8969995e0018bd11382ce876a340c602abcf",
+    "HeatingSubstation": "5e0e18c308feb515bb95398ab341f00e471346b7f79ec78fafc541d385ec832d",
     "MultiWellPlant": "8946346c436b21e7c3c71f9ca019db963267c67ebad052599100017ade1ee83d",
-    "NodalDoublet": "c888e0c27d07a28500f5bbec579f55e0ccdedb0e35e218c5e7dd07bec4739a5b",
-    "ParallelExchangerPlant": "0b0ca08853e7062ad91f9989550f9effc64bf69add109fd4e95234340e759a01",
+    "NodalDoublet": "612091520ef3c6d1b1b242f746a5277c85854f7a013aee4a21c2dcaa2d9ae674",
+    "ParallelExchangerPlant": "47f565bedb445d011e61e8f3231435886e3ab12a48adb87030d3ed97b0c8d61c",
 }
 """Hash of ``to_dict()`` of the plant built from each whole example file these values replaced.
 

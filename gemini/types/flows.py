@@ -124,7 +124,7 @@ class Stream:
         """Return a copy with updated SI stream fields.
 
         The copy skips the constructor: it reuses the same ``Fluid`` and checks only the changed
-        fields against the physical limits, which raise ``PhysicsError`` (``plants._utils.nodal``
+        fields against the physical limits, which raise ``PhysicsError`` (``analysis.solves``
         relies on it to bracket a solver). Values may be floats, arrays or traced values.
         """
         unknown = [name for name in changes if name not in _FIELDS]

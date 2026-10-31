@@ -6,10 +6,10 @@ from typing import Any
 
 import numpy as np
 
+from gemini.analysis import solves
 from gemini.analysis.fits import fit_head_correction
 from gemini.errors import GeminiError, NotImplementedYet, PhysicsError, ValidationError
 from gemini.errors.base import check_on_error
-from gemini.modules.plants._utils import nodal as solves
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import ProductionWell
@@ -83,12 +83,11 @@ def _case_inputs(chain, conditions):
 
 def _lift(chain, rate):
     """Return the wellhead pressure [Pa] that the well lifts the inflow of ``rate`` to."""
-    stream = chain.lower.trial_outlets(
-        {"bottom_in": chain.reservoir.sandface_stream(rate)}
-    ).wellhead_out
+    inflow = chain.reservoir.sandface_stream(rate)
+    stream = chain.lower._trial(bottom_in=inflow).outlets.wellhead_out
     if chain.esp is not None:
-        stream = chain.esp.trial_outlets({"fluid_in": stream}).fluid_out
-        stream = chain.upper.trial_outlets({"bottom_in": stream}).wellhead_out
+        stream = chain.esp._trial(fluid_in=stream).outlets.fluid_out
+        stream = chain.upper._trial(bottom_in=stream).outlets.wellhead_out
     return stream.p
 
 
@@ -147,7 +146,7 @@ def nodal(plant, well, conditions, on_error="raise", units=None):
     The VLP (vertical lift performance) is the wellhead pressure the well, the ESP and the riser
     deliver from that inflow at each rate: the node is the wellhead, and the operating point is
     where the VLP falls to the wellhead pressure the surface plant holds. The solve is the one
-    of ``plants._utils.nodal.solve_production_rate``. The plant is not changed: the ESP frequency
+    of ``solves.solve_production_rate``. The plant is not changed: the ESP frequency
     of a case is set on a copy.
 
     Parameters

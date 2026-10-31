@@ -1,8 +1,9 @@
 {
   "plant": "HeatingSubstation",
   "params": {
-    "building_flow": "3 kg/s",
-    "building_pressure": "3 bar",
+    "pump.flow": "3 kg/s",
+    "pump.pressure_rise": "0.5 bar",
+    "pump.loop_pressure": "3 bar",
     "valve.flow_coefficient": "1.756820922315766e-05 m3/s/Pa^0.5",
     "valve.characteristic": "equal_percentage",
     "valve.rangeability": 50.0,

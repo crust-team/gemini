@@ -7,10 +7,10 @@ changed result, and ``tests/e2e/test_examples.py`` holds what the test does with
 import tempfile
 from pathlib import Path
 
+from gemini.utils import paths
 from tests.e2e.test_examples import EXAMPLES, TIMEOUT_S, expected_path, run_example
-from tests.fixtures import SHARED
 
-FAST = SHARED / "doublet_2024_15min_month.csv"
+FAST = paths.doublet_heat("doublet_2024_15min_month.csv")
 
 
 def main():

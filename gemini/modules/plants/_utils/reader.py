@@ -27,6 +27,7 @@ TYPES = {
     "inlets": dict,
     "outlets": dict,
     "outputs": dict,
+    "constraints": list,
     "params": dict,
     "fluids": dict,
     "boundary": dict,
@@ -177,6 +178,9 @@ def populate(plant, spec, report):
     _check_ports(plant, spec, report)
     if "outputs" in spec:
         _outputs(plant, spec["outputs"], report)
+    for index, item in enumerate(spec.get("constraints", [])):
+        with report.guard(f"constraints[{index}]"):
+            plant.constrain(**item)
     read_sections(plant, spec, report)
     plant._sections = {key: deepcopy(spec.get(key, {})) for key in SECTIONS}
 

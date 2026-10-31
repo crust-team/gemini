@@ -180,6 +180,29 @@ def _network_modules(consumers, service):
     }
 
 
+def _network_ports(consumers):
+    """Return the plant ports of a network."""
+    return {
+        "inlets": {
+            "supply_in": "pump.fluid_in",
+            "power_in": [
+                "pump.power_in",
+                *(f"substations.{index}.power_in" for index in range(consumers)),
+            ],
+            "air_in": ["supply_pipe.air_in", "return_pipe.air_in"],
+        },
+        "outlets": {
+            "return_out": "return_pipe.fluid_out",
+            "loss_out": [
+                *(f"substations.{index}.loss_out" for index in range(consumers)),
+                "pump.loss_out",
+                "supply_pipe.loss_out",
+                "return_pipe.loss_out",
+            ],
+        },
+    }
+
+
 def district_network_spec(consumers=2, service="heating"):
     """Return the spec of a two-pipe network feeding ``consumers`` parallel substations.
 
@@ -209,15 +232,7 @@ def district_network_spec(consumers=2, service="heating"):
             + mixing
             + [_link(returned, "return_pipe.fluid_in")]
         ),
-        "inlets": {
-            "supply_in": "pump.fluid_in",
-            "power_in": "pump.power_in",
-            "air_in": ["supply_pipe.air_in", "return_pipe.air_in"],
-        },
-        "outlets": {
-            "return_out": "return_pipe.fluid_out",
-            "loss_out": ["pump.loss_out", "supply_pipe.loss_out", "return_pipe.loss_out"],
-        },
+        **_network_ports(consumers),
         "outputs": _network_outputs(service),
         "bindings": {},
         "param_history": {},

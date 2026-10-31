@@ -30,6 +30,7 @@ SECTION_HEADERS = {
     "# Outputs",
     "# Outlets",
     "# Connections",
+    "# Constraints",
 }
 TOOL_DIRECTIVE = re.compile(
     r"# (noqa: [A-Z]+\d+(, [A-Z]+\d+)*|type: ignore\[[\w-]+\]|pragma: no cover)"
@@ -191,16 +192,6 @@ PACKAGE_FILES = [
 ]
 
 
-PENDING_COMPOSITES = {
-    "HeatingSubstation",
-    "CoolingSubstation",
-    "NodalDoublet",
-    "BoilerChpPlant",
-    "ParallelExchangerPlant",
-}
-"""Composites that close a loop or solve a rate, until the engine does it for them."""
-
-
 def test_a_leaf_has_no_children_and_every_composite_is_a_plant():
     """Only a ``Plant`` or a group holds modules: a class computes or connects, never both."""
     composites = {
@@ -208,7 +199,7 @@ def test_a_leaf_has_no_children_and_every_composite_is_a_plant():
         for name in gm.modules.names()
         if not issubclass(gm.modules.get(name), Plant) and not gm.modules.get(name)().is_leaf
     }
-    assert composites == PENDING_COMPOSITES
+    assert composites == set()
 
 
 def test_no_plant_class_writes_forward():

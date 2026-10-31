@@ -81,6 +81,10 @@ class Cooler(Module):
         self.fluid_out = Outlet(Stream, kind="hot_water", offered=True)
         self.air_out = Outlet(Stream, kind="air")
 
+    def _offers(self):
+        """Offer only on a closed loop; otherwise the outlet follows from the inlet."""
+        return self.loop_pressure is not None
+
     def _offer(self, inlets):
         """Offer the water of a closed loop, at the setpoint and the given flow."""
         if self.loop_pressure is None or self.flow is None:

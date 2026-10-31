@@ -1,12 +1,10 @@
 """Doublet produced against a wellhead pressure and injected through a solved pump head."""
 
 from gemini.modules.environment import Formation
-from gemini.modules.module import Module
-from gemini.modules.plants._utils import nodal
+from gemini.modules.plant import Plant
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell
-from gemini.physics import energy
 from gemini.types import (
     Boundary,
     Inlet,
@@ -19,25 +17,23 @@ from gemini.types import (
 )
 
 
-class NodalDoublet(Module):
-    """Production and injection limbs whose rate and pump head come from nodal analysis.
+class NodalDoublet(Plant):
+    """Production and injection limbs whose rate and pump head come from two constraints.
 
-    The handwritten counterpart of the upstream GEMINI simulator's ``ProducerWell`` and
-    ``InjectorWell`` components. ``produce()`` solves the production rate at which the
-    reservoir, the well below the ESP, the ESP and the riser deliver the ``wellhead_pressure``
-    boundary (``nodal.solve_production_rate`` within ``production_rates``), then traverses the
-    limb at that rate. ``inject(stream)`` solves the wellhead pressure the injection well and
-    the receiving aquifer need for the returned stream (``nodal.solve_injection_pressure``
-    between the stream's own pressure and ``maximum_injection_pressure``) and commands the
-    injection pump to it. When no pump is needed (the solve returns ``None``) the pump is
-    commanded to its suction pressure, so it adds no head and draws no electricity.
+    The counterpart of the upstream GEMINI simulator's ``ProducerWell`` and ``InjectorWell``
+    components. The first constraint finds the production rate within ``production_rates`` at
+    which the reservoir, the well below the ESP, the ESP and the riser deliver the
+    ``wellhead_pressure`` boundary. The second finds the setpoint of the injection pump, between
+    its suction pressure and ``maximum_injection_pressure``, at which the injection well delivers
+    the bottomhole pressure the receiving aquifer needs. When the column of brine delivers it
+    already, the pump stays at its suction pressure: it adds no head and draws no electricity.
 
-    A parent plant connects the two limbs through its surface equipment, as with ``Doublet``;
-    ``forward`` connects them directly.
+    A parent plant connects the two limbs through its surface equipment, as with ``Doublet``:
+    the parent opens this plant and solves its constraints in its own order.
     """
 
     def __init__(self):
-        """Declare the limbs, the solve brackets and the wellhead boundary."""
+        """Declare the limbs, the solve brackets, the wellhead boundary and the constraints."""
         super().__init__()
 
         # Modules
@@ -64,43 +60,30 @@ class NodalDoublet(Module):
         # Outlets
         self.supply_out = Outlet(Stream)
 
-    def forward(self, inlets):
-        """Inject the return stream and produce the supply stream."""
+        # Connections
+        self.connect("return_in", "injection_pump.fluid_in")
+        self.connect("power_in", "esp.power_in")
+        self.connect("power_in", "injection_pump.power_in")
+        self.connect("injection_pump.fluid_out", "injector.wellhead_in")
+        self.connect("injector.bottom_out", "sink.sandface_in")
+        self.connect("reservoir.sandface_out", "well.bottom_in")
+        self.connect("well.wellhead_out", "esp.fluid_in")
+        self.connect("esp.fluid_out", "riser.bottom_in")
+        self.connect("well.loss_out", "formation.heat_in")
+        self.connect("riser.loss_out", "formation.heat_in")
+        self.connect("injector.loss_out", "formation.heat_in")
+        self.connect("riser.wellhead_out", "supply_out")
 
-        # Modules
-        injection_power, injection_loss = self.inject(inlets.return_in)
-
-        # Outlets
-        supply_out, lift_power, well_losses = self.produce()
-        self.formation(heat_in=well_losses + injection_loss)
-        power_in = energy.total_power([injection_power, lift_power])
-
-        outlets = dict(supply_out=supply_out, power_in=power_in)
-        return outlets
-
-    def produce(self):
-        """Solve the rate for the wellhead pressure; return stream, lift power and losses [W]."""
-        rate = nodal.solve_production_rate(
-            self.reservoir,
-            self.well,
-            self.wellhead_pressure,
-            self.production_rates,
-            esp=self.esp,
-            riser=self.riser,
+        # Constraints
+        self.constrain(
+            "riser.wellhead_out.p",
+            equals="wellhead_pressure",
+            by="reservoir.production_rate",
+            bounds="production_rates",
         )
-        source = self.reservoir(production_rate=rate)
-        lower = self.well(bottom_in=source.outlets.sandface_out)
-        lifted = self.esp(fluid_in=lower.outlets.wellhead_out)
-        upper = self.riser(bottom_in=lifted.outlets.fluid_out)
-        losses = [lower.outlets.loss_out, upper.outlets.loss_out]
-        return upper.outlets.wellhead_out, lifted.inlets.power_in, losses
-
-    def inject(self, stream):
-        """Pump ``stream`` to the solved pressure and inject it; return pump power and loss [W]."""
-        bracket = (stream.p, self.maximum_injection_pressure)
-        required = nodal.solve_injection_pressure(self.injector, self.sink, stream, bracket)
-        setpoint = stream.p if required is None else required
-        pumped = self.injection_pump(fluid_in=stream, pressure_setpoint=setpoint)
-        injection = self.injector(wellhead_in=pumped.outlets.fluid_out)
-        self.sink(sandface_in=injection.outlets.bottom_out)
-        return pumped.inlets.power_in, [injection.outlets.loss_out]
+        self.constrain(
+            "injector.bottom_out.p",
+            at_least="sink.bottomhole_pressure",
+            by="injection_pump.pressure_setpoint",
+            bounds=("injection_pump.fluid_in.p", "maximum_injection_pressure"),
+        )

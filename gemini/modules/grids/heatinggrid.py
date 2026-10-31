@@ -100,6 +100,14 @@ class HeatingGrid(Module):
         outlets = dict(return_out=return_out)
         return outlets
 
+    def _loop_start(self, port):
+        """Start a building loop at the lowest return temperature."""
+        return self.minimum_return_temperature
+
+    def _offers(self):
+        """Offer only on a closed loop; otherwise the outlet follows from the inlet."""
+        return self.return_temperature is not None
+
     def _offer(self, inlets):
         """Offer the return water of a closed loop, at the fixed temperature and the given flow."""
         if self.return_temperature is None or self.return_pressure is None or self.flow is None:

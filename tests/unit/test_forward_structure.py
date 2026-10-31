@@ -27,8 +27,10 @@ PLANT_SECTIONS = (
     "# Modules",
     "# Parameters",
     "# Inlets",
+    "# Boundaries",
     "# Outlets",
     "# Connections",
+    "# Constraints",
     "# Outputs",
 )
 

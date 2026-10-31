@@ -90,7 +90,6 @@ def test_wiring_rules_report_the_connection_and_the_field(spec):
         "port_in_use": ("pipe.fluid_out", "filters.hot.fluid_in", "target"),
         "stream_mismatch": ("degasser.gas_out", "filter2.fluid_in", "target"),
         "invalid_connection": ("pipe", "pipe2.fluid_in", "source"),
-        "loop_without_state": ("pipe.fluid_out", "pipe.fluid_in", "target"),
     }
     for code, (source, target, field) in cases.items():
         extra = {"source": source, "target": target}
