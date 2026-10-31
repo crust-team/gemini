@@ -258,7 +258,7 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.economics.co2(plant, results, assumptions=None, on_error="raise")` | real |
 | `gm.economics.npv(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise")` | real |
 | `gm.economics.payback(plant, results, assumptions=None, on_error="raise")` | real |
-| `gm.kpi.totals(plant, results)` | real: `{name: value}` of what crossed the plant's edge over the run, each read from the ports of the edge modules; `None` with a reason when no edge module shows it |
+| `gm.kpi.totals(plant, results)` | real: `{name: value}` of what crossed the plant's edge over the run, each read from the ports of the edge modules, heat and cold as delivered, useful (at most the demand) and surplus; `None` with a reason when no edge module shows it |
 | `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `{name: value}` of `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
 | `gm.checks.plant_balance(plant, run)` | real, a list of checks: mass and energy of every module within 1e-9 and of the root within 1e-6; `run` is `Results` or a `ModuleResult`. The root's in and out are the ports of the grids and environment modules, the aquifers and the plant ports of a building block run alone; a replay does not close at the root. |
 | `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)` | real, each a check; they are ledger checks, see [economics.md](economics.md) |
@@ -293,6 +293,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `HeatingGrid.surplus` and `CoolingGrid.surplus`, what the water gives above the demand. `gm.kpi.totals` adds `heat_useful`, `heat_surplus`, `cold_useful`, `cold_surplus`; `gm.kpi.compute`, `gm.economics.lcoh`, `lcoc` and `lcts` read the useful energy. `HackathonPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant` and `HeatingAbsorptionCoolingPlant` return the drive water of their chillers through a bypass past the users (`loads` and `heat_return`, `drive_splitter` and `drive_mixer`), a loop the engine closes, and `gm.schedule` sets its split: the heating supply stays at its setpoint. |
 | 0.2.0, unreleased changes | | `gm.schedule` finds roles from the wiring: a unit that feeds the `CoolingGrid` is a cooling unit, a `HeatPump` included. `rules["cooling_order"]`, heat-driven first by default, dispatches absorption, adsorption and compression chillers, each up to its capacity. `Plant.feeds`. |
 | 0.2.0, unreleased changes | | Template plants take `size={"doublets": n}`, 1 to 3: `doublet` is now `d0`, with `d1`, `d2`, `production_mixers` and `injection_splitters`, and a plant-level `depth`. `Doublet.gradient` and `surface_temperature` default to the challenge values. |
 | 0.2.0, unreleased changes | | `Plant.set_inputs`, `Plant.input_value`, `Plant.target_of`, `Plant.source_of`. The plant dict has one key `inputs`, `{path: value}`, in both forms; `gm.plants.from_dict`, `gm.schedule` and a run use it. `boundary[""]["inputs"]` and `boundary[""]["root_inputs"]` are gone: a plant inlet field is the path `port.field`. |

@@ -70,6 +70,7 @@ INPUTS = {
     "heating_consumer.flow": 48.95,
     "cooling_consumer.flow": 10.0,
     "atmosphere.temperature": 283.15,
+    "drive_splitter.split_fraction": 0.5,
     "cooling_consumer.sensible_cooling_demand": 5e4,
     "cooling_consumer.latent_cooling_demand": 1e4,
     "cooling_consumer.indoor_temperature": 297.15,

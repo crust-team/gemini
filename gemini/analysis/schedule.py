@@ -16,7 +16,7 @@ from gemini.analysis import roles
 from gemini.errors import ValidationError
 from gemini.modules.grids import CoolingGrid, HeatingGrid
 from gemini.modules.heating import Boiler
-from gemini.modules.piping import Mixer, Splitter
+from gemini.modules.piping import Splitter
 from gemini.modules.plants._utils.plan import members, split_end
 from gemini.modules.plants.doublet import Doublet
 from gemini.physics import constants, dispatch, units
@@ -258,19 +258,21 @@ def _brine_splits(plant, flows):
     return columns
 
 
-def _load_below(plant, path):
-    """Return the module at ``path``, or the module its mixer feeds when it is a ``Mixer``."""
-    if path is not None and isinstance(plant.get_submodule(path), Mixer):
-        return _target(plant, path, "fluid_out")
-    return path
+def _first_load(plant, outlet, loads):
+    """Return the first of ``loads`` the outlet ``outlet`` reaches, or ``None``."""
+    return next((path for path in plant.feeds(outlet) if path in loads), None)
 
 
-def _load_splits(plant, consumer, chiller, heat, generator):
-    """Return the ``split_fraction`` column of the splitter between the consumer and the chiller."""
+def _bypass_splits(plant, consumer, chiller, heat, generator):
+    """Return the ``split_fraction`` of the splitter that sends drive water past the users.
+
+    The drive water leaves at the setpoint, as the water of the users does, and both come back at
+    the return temperature, so the flows divide as the heats do.
+    """
     columns = {}
     for path, _ in _of_type(plant, Splitter):
-        first = _load_below(plant, _target(plant, path, "branch1_out"))
-        second = _load_below(plant, _target(plant, path, "branch2_out"))
+        first = _first_load(plant, join_path(path, "branch1_out"), (consumer, chiller))
+        second = _first_load(plant, join_path(path, "branch2_out"), (consumer, chiller))
         if {first, second} == {consumer, chiller}:
             shares = (generator, heat) if first == consumer else (heat, generator)
             columns[f"{path}.split_fraction"] = dispatch.flow_share(*shares)
@@ -341,8 +343,11 @@ def _demand_columns(demand):
     return heat, demand["cooling_demand"].to_numpy(dtype=float)
 
 
-def _heating_columns(plant, heat, generator):
-    """Return the columns of the heat users, the heat pump, the boiler and the return flow."""
+def _heating_columns(plant, heat, carried):
+    """Return the columns of the heat users, the heat pump, the boiler and the return flow.
+
+    The users take ``heat``; ``carried`` is the heat of the water that passes them.
+    """
     columns, supply = {}, None
     path, grid = _single(plant, HeatingGrid)
     if path is not None:
@@ -352,7 +357,7 @@ def _heating_columns(plant, heat, generator):
             supply = _setpoint(plant, unit_path)
             columns[f"{unit_path}.temperature_setpoint"] = np.full_like(heat, supply)
     if supply is not None:
-        columns |= _return_flow(path, grid, heat + generator, supply)
+        columns |= _return_flow(path, grid, carried, supply)
     return columns
 
 
@@ -483,8 +488,9 @@ def _plan_columns(plant, demand, checked, outages):
     flows, columns = _doublet_columns(plant, checked, need, off)
     columns |= _brine_splits(plant, flows)
     consumer, _ = _single(plant, HeatingGrid)
-    columns |= _load_splits(plant, consumer, _first_driven(plant), heat, generator)
-    columns |= _heating_columns(plant, heat, generator)
+    bypass = _bypass_splits(plant, consumer, _first_driven(plant), heat, generator)
+    columns |= bypass
+    columns |= _heating_columns(plant, heat, heat if bypass else heat + generator)
     heat_pump = roles.heat_pumps(plant)[0]
     if heat_pump is not None:
         columns[f"{heat_pump}.is_running"] = ~stopped

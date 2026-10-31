@@ -70,7 +70,7 @@ def hackathon_limits():
     limits = gm.checks.Limits()
     limits.add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
     limits.add("d*.brine_cooling", max="40 K")
-    limits.add("boiler.fluid_out.temperature", min="100 degC")
+    limits.add("heat_users.supply_in.temperature", min="100 degC")
     return limits
 
 
@@ -91,7 +91,7 @@ def print_run(plant, results):
         ("heat pump, peak", sink.max() / 1e6, "MW"),
         ("gas co-produced", (frame["boiler.fuel"] - gas).sum() * gwh, "GWh burnt"),
         ("gas purchased", gas.sum() * gwh, "GWh"),
-        ("supply, lowest", frame["boiler.fluid_out.temperature"].min() - 273.15, "°C"),
+        ("supply, lowest", frame["heat_users.supply_in.temperature"].min() - 273.15, "°C"),
     )
     print("\nThe year, in daily steps:")
     for label, value, unit in rows:
@@ -108,7 +108,7 @@ def print_limits(checks):
         if item["name"].endswith("temperature"):
             value, unit = gm.units.convert(value, unit, "degC"), "°C"
         result = "ok" if item["passed"] else "VIOLATED"
-        print(f"  {item['name']:<28} {result:<9} worst {value:.4g} {unit}")
+        print(f"  {item['name']:<33} {result:<9} worst {value:.4g} {unit}")
 
 
 def print_balance(checks):

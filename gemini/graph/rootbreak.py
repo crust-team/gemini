@@ -119,11 +119,17 @@ def stacked(results, rows):
 
     def stack(_):
         index = next(position)
+        missing = _missing(next(iter(columns.values()))[index])
         return stack_column(
-            [columns[row][index] if row in columns else np.nan for row in range(rows)]
+            [columns[row][index] if row in columns else missing for row in range(rows)]
         )
 
     return first.mapped(stack)
+
+
+def _missing(value):
+    """Return what a failed row holds in a column of ``value``: NaN, or a list of them."""
+    return [np.nan] * len(value) if isinstance(value, (list, tuple)) else np.nan
 
 
 def _flatten(result):

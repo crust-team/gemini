@@ -1589,9 +1589,10 @@ delivered heat at the imposed flow.
 - **Parameters**: `minimum_return_temperature` (required): the lowest temperature the emitters
   can cool the water to.
 - **Boundaries**: `heat_demand` (`Power`, >= 0).
-- **Outputs**: `unmet_demand`, `is_unmet`.
+- **Outputs**: `unmet_demand`, `surplus`, `is_unmet`.
 - **Model**: `Q = min(heat_demand, m_dot cp max(0, T_supply - T_min))`, `T_return = T_supply -
-  Q / (m_dot cp)` (ASHRAE Handbook, HVAC Systems and Equipment 2020, chapter 13).
+  Q / (m_dot cp)` (ASHRAE Handbook, HVAC Systems and Equipment 2020, chapter 13). On a closed loop
+  the return is fixed and `Q` is the fall of the water; what it gives above the demand is `surplus`.
 - **Physics**: `heat_transfer.setpoint_duty`, `heat_transfer.temperature_change`
 - **Assumptions**: steady, no emitter characteristic beyond the return floor, no pressure drop;
   a supply colder than the floor delivers nothing.
@@ -1617,7 +1618,7 @@ and a dew-point test.
   surface approach; coil specific, so no default).
 - **Boundaries**: `sensible_cooling_demand`, `latent_cooling_demand` (`Power`, >= 0),
   `indoor_temperature`, `indoor_relative_humidity` (`Fraction`, > 0).
-- **Outputs**: `unmet_sensible`, `unmet_latent`, `dew_point`, `is_unmet`.
+- **Outputs**: `unmet_sensible`, `unmet_latent`, `surplus`, `dew_point`, `is_unmet`.
 - **Model**: `T_limit = min(T_max, T_indoor)`; `Q_available = m_dot cp max(0, T_limit -
   T_supply)`; the sensible load is served first; the latent load only when `T_supply <= T_dew -
   margin` (`psychrometrics.dew_point`; ASHRAE Handbook, HVAC Systems and Equipment 2020,
@@ -2097,8 +2098,8 @@ boundaries stay inputs of the run.
   `cold_in` at the next step.
 - `HackathonPlant`: the challenge plant, with no plant ports. Two designed `Doublet`s, `Mixer`, `Degasser`, `Desander`, `InhibitorDosing`, `HeatExchanger`,
   the source side of `HeatPump` and a `Splitter` back to the doublets; heating water from
-  `HeatingGrid` through exchanger, heat pump and `Boiler`, part of it to the generator of an
-  `AbsorptionUnit`; co-produced gas through `GasMakeup` to the boiler and a `Flare`; a dry `Cooler`
+  `HeatingGrid` through exchanger, heat pump and `Boiler`, and the `Splitter` `loads` sends what the
+  generator of an `AbsorptionUnit` needs past the users, back through the `Mixer` `heat_return`; co-produced gas through `GasMakeup` to the boiler and a `Flare`; a dry `Cooler`
   on the chiller; `ElectricityGrid`, `GasGrid`, `WasteGrid`, `ChemicalGrid` and `Atmosphere` at the
   edge. The sizes in `inputs/plants/HackathonPlant.json` are assumptions of the case.
 
@@ -2109,9 +2110,11 @@ is that of the modules below; `inputs/plants/<Name>.json` holds example sizes.
 
 - **Wiring.** Brine: `d0` to `d{n-1}` (`size={"doublets": n}`, joined by `production_mixers`) -> `degasser` -> `filters.hot` -> `heat_exchanger` ->
   [`heat_pump`, source side] -> `filters.cold` -> `injection_pump` -> `injection_splitters` -> back to the doublets
-  (opened, as in `DoubletHeatPlant`). Hot water, in series: `heating_return_pipe` -> `heat_exchanger` (cold
-  side) -> [`heat_pump`, sink side] -> [`peak_boiler`] -> [`absorption_chiller`, generator] ->
-  [`adsorption_chiller`, generator] -> `heating_supply_pipe` -> `heating_consumer`. Chilled water,
+  (opened, as in `DoubletHeatPlant`). Hot water: `heating_return_pipe` -> [`drive_mixer`] -> `heat_exchanger` (cold
+  side) -> [`heat_pump`, sink side] -> [`peak_boiler`] -> [`drive_splitter`] -> `heating_supply_pipe`
+  -> `heating_consumer`. Drive water: `drive_splitter` -> [`absorption_chiller`, generator] ->
+  [`adsorption_chiller`, generator] -> `drive_mixer`, past the users, a loop the engine closes, so
+  the supply stays at its setpoint and `gm.schedule` sets the split. Chilled water,
   in series: `cooling_return_pipe` -> [`absorption_chiller`] -> [`adsorption_chiller`] ->
   [`compression_chiller`, a `HeatPump` in cooling mode] -> `cooling_supply_pipe` ->
   `cooling_consumer`. Brackets are the units that the other plants leave out.

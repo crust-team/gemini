@@ -17,20 +17,24 @@ The year, in daily steps:
   supply, lowest      100.00 °C
 
 Limits:
-  d0.reservoir.liquid_flow     ok        worst 300 m³/h
-  d1.reservoir.liquid_flow     ok        worst 300 m³/h
-  d0.brine_cooling             ok        worst 35.52 K
-  d1.brine_cooling             ok        worst 33.77 K
-  boiler.fluid_out.temperature ok        worst 100 °C
+  d0.reservoir.liquid_flow          ok        worst 300 m³/h
+  d1.reservoir.liquid_flow          ok        worst 300 m³/h
+  d0.brine_cooling                  ok        worst 35.52 K
+  d1.brine_cooling                  ok        worst 33.77 K
+  heat_users.supply_in.temperature  ok        worst 100 °C
 
 Balance:
   modules that close 70 of 70
-  plant mass         ok    worst 3.8e-16
-  plant energy       ok    worst 5.09e-16
+  plant mass         ok    worst 2.86e-16
+  plant energy       ok    worst 6.01e-16
 
 At the plant's edge:
   heat_delivered          111.668 GWh
+  heat_useful             111.668 GWh
+  heat_surplus              0.000 GWh
   cold_delivered           23.743 GWh
+  cold_useful              23.743 GWh
+  cold_surplus              0.000 GWh
   electricity_bought       26.459 GWh
   electricity_sold          0.000 GWh
   gas_bought                0.000 GWh

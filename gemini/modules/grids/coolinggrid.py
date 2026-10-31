@@ -88,6 +88,7 @@ class CoolingGrid(Module):
         # Outputs
         self.unmet_sensible = Output(Power)
         self.unmet_latent = Output(Power)
+        self.surplus = Output(Power)
         self.dew_point = Output(Temperature)
         self.is_unmet = Output(bool)
 
@@ -102,13 +103,16 @@ class CoolingGrid(Module):
         if self.return_temperature is None:
             sensible, latent = self._met_loads(supply_in)
             return_out = supply_in.with_(T=self._warmed_temperature(supply_in, sensible + latent))
+            surplus = 0.0
         else:
             return_out = self._offer(inlets)["return_out"]
             sensible, latent = self._met_loads(supply_in, return_out)
+            surplus = self._available(supply_in, return_out) - sensible - latent
 
         # Outputs
         self.unmet_sensible = self.sensible_cooling_demand - sensible
         self.unmet_latent = self.latent_cooling_demand - latent
+        self.surplus = surplus
         self.dew_point = psychrometrics.dew_point(
             self.indoor_temperature, self.indoor_relative_humidity
         )
@@ -117,7 +121,7 @@ class CoolingGrid(Module):
         outlets = dict(return_out=return_out)
         return outlets
 
-    def _loop_start(self, port):
+    def _loop_start(self, port, entering):
         """Start a building loop at the warmest return temperature."""
         return min(self.maximum_return_temperature, self.indoor_temperature)
 
@@ -147,6 +151,12 @@ class CoolingGrid(Module):
         )
         return ops.where(absorbed == 0, supply_in.T, warmed)
 
+    def _available(self, supply_in, return_out=None):
+        """Return the cold [W] the water takes up to its return limit."""
+        return heat_transfer.setpoint_duty(
+            supply_in.heat_capacity_rate(), self._return_limit(return_out) - supply_in.T
+        )
+
     def _met_loads(self, supply_in, return_out=None):
         """Return the met sensible and latent loads [W]; the rise of the water on a closed loop."""
         ops.check(
@@ -156,9 +166,7 @@ class CoolingGrid(Module):
             path=self.path,
             m_dot=supply_in.m_dot,
         )
-        available = heat_transfer.setpoint_duty(
-            supply_in.heat_capacity_rate(), self._return_limit(return_out) - supply_in.T
-        )
+        available = self._available(supply_in, return_out)
         dew_point = psychrometrics.dew_point(self.indoor_temperature, self.indoor_relative_humidity)
         dry = supply_in.T > dew_point - self.dew_point_margin
         return heat_transfer.sensible_latent_loads(

@@ -77,6 +77,20 @@ def delivered_cold(plant, frame):
     )
 
 
+def useful_heat(plant, frame):
+    """Return the useful heat [W]: what the ``HeatingGrid`` leaves took, at most their demand."""
+    delivered = delivered_heat(plant, frame)
+    surplus = leaf_total(plant, frame, "surplus", HeatingGrid)
+    return delivered if surplus is None or delivered is None else delivered - surplus
+
+
+def useful_cold(plant, frame):
+    """Return the useful cold [W]: what the ``CoolingGrid`` leaves took, at most their demand."""
+    delivered = delivered_cold(plant, frame)
+    surplus = leaf_total(plant, frame, "surplus", CoolingGrid)
+    return delivered if surplus is None or delivered is None else delivered - surplus
+
+
 def edge_total(plant, frame, field, module_class):
     """Return the sum of column ``field`` over the leaves of ``module_class``, or ``None``."""
     columns = [

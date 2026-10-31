@@ -13,7 +13,9 @@ composite outputs. Everything below is read from the edge modules:
 
 - Heat delivered is what the water loses across the `HeatingGrid` leaves and cold delivered what
   it gains across the `CoolingGrid` leaves (`analysis/series.py`: `delivered_heat`,
-  `delivered_cold`).
+  `delivered_cold`). **Useful** heat and cold are that less the `surplus` of the grid, so at most the
+  demand (`useful_heat`, `useful_cold`). `gm.kpi.totals` gives all three; every KPI and levelised
+  cost reads the useful energy: a heat nobody needed costs money and earns nothing.
 - Electricity bought and sold are `net_import` and `net_export` of the `ElectricityGrid`, gas
   bought is `gas_out.chemical_flow` of the `GasGrid`, waste `waste_in.mass_flow` of the `WasteGrid`
   and chemicals `chemical_out.mass_flow` of the `ChemicalGrid` (`edge_total`). `gm.kpi.totals`
@@ -41,8 +43,8 @@ sum over the lifetime years of `1 / (1 + discount_rate) ** t`, in years. Every f
 | `Assumptions` | frozen object; see the table of sources below |
 | `capex(plant, assumptions=None)` | `total_cost(plant)`: investment in the currency of the declared costs, with `price_year` and `source` |
 | `opex(plant, results, assumptions=None)` | fixed + variable cost per year + yearly bill of grid electricity and purchased gas (`fuel_purchased` at `gas_price`; co-produced gas costs nothing); `components` lists the parts |
-| `lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `(capex + opex A) / (heat A)` in currency/J, `A` the annuity factor |
-| `lcoc(...)` | the same with the cold delivered |
+| `lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `(capex + opex A) / (useful heat A)` in currency/J, `A` the annuity factor |
+| `lcoc(...)` | the same with the useful cold |
 | `annualised_cost(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `capex / A + opex` in currency/year, with `capex`, `opex`, `annuity_factor`, `discount_rate`, `lifetime_years` |
 | `lcts(...)` | levelised cost of thermal supply, the team's design metric: `annualised_cost / (heat + cold)` in currency/J, heat and cold delivered per year, with `annualised_cost`, `heat`, `cold`; it needs no `heat_cost_share` |
 | `co2(plant, results, assumptions=None)` | kg of CO2-equivalent over the window: the leaf `co2_emission`, `methane_emission` times `methane_gwp`, grid electricity times `electricity_emission_factor` |
@@ -117,11 +119,11 @@ E(x) the sum over ticks of x times the tick duration:
 
 | Name | Unit | Definition |
 |---|---|---|
-| `heating_coverage` | - | E(heat delivered) / E(heat delivered + `unmet_demand`) over the `HeatingGrid` leaves |
-| `cooling_coverage` | - | E(cold delivered) / E(cold delivered + `unmet_sensible` + `unmet_latent`) over the `CoolingGrid` leaves |
-| `cop` | - | E(heat delivered) / E(`ElectricityGrid.power_out`); cooling not counted |
-| `peak_heat` | W | largest tick sum of heat delivered (delivered power, not the demand peak) |
-| `peak_cold` | W | largest tick sum of cold delivered |
+| `heating_coverage` | - | E(useful heat) / E(useful heat + `unmet_demand`) over the `HeatingGrid` leaves |
+| `cooling_coverage` | - | E(useful cold) / E(useful cold + `unmet_sensible` + `unmet_latent`) over the `CoolingGrid` leaves |
+| `cop` | - | E(useful heat) / E(`ElectricityGrid.power_out`); cooling not counted |
+| `peak_heat` | W | largest tick sum of useful heat (delivered power, not the demand peak) |
+| `peak_cold` | W | largest tick sum of useful cold |
 
 ## `gm.checks`
 

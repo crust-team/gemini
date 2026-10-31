@@ -16,6 +16,8 @@ from gemini.analysis.series import (
     edge_total,
     energy,
     leaf_total,
+    useful_cold,
+    useful_heat,
     window_seconds,
 )
 from gemini.modules.environment import Atmosphere, Formation
@@ -49,9 +51,9 @@ def _read(plant, results):
     latent = leaf_total(plant, frame, "unmet_latent", CoolingGrid)
     return _Series(
         seconds=window_seconds(results),
-        heat=delivered_heat(plant, frame),
+        heat=useful_heat(plant, frame),
         heat_unmet=leaf_total(plant, frame, "unmet_demand", HeatingGrid),
-        cold=delivered_cold(plant, frame),
+        cold=useful_cold(plant, frame),
         cold_unmet=None if sensible is None or latent is None else sensible + latent,
         electricity=edge_total(plant, frame, "power_out", ElectricityGrid),
     )
@@ -192,9 +194,11 @@ def totals(plant, results):
     Returns
     -------
     dict
-        ``{name: value}``, plain JSON: ``heat_delivered``, ``cold_delivered``,
-        ``electricity_bought``, ``electricity_sold``, ``gas_bought`` (lower heating value) and
-        ``losses`` in J, ``co2_emitted``, ``methane_emitted``, ``waste`` and ``chemicals`` in kg.
+        ``{name: value}``, plain JSON: ``heat_delivered``, ``cold_delivered``, what the water
+        gave the users; ``heat_useful``, ``cold_useful``, the part of it up to their demand;
+        ``heat_surplus``, ``cold_surplus``, the rest; ``electricity_bought``,
+        ``electricity_sold``, ``gas_bought`` (lower heating value) and ``losses`` in J,
+        ``co2_emitted``, ``methane_emitted``, ``waste`` and ``chemicals`` in kg.
         ``losses`` is the net heat into the ``Atmosphere`` and the ``Formation``. A value is
         ``None``, with a ``reason``, when no module at the edge shows it.
     """
@@ -202,7 +206,11 @@ def totals(plant, results):
     seconds = window_seconds(results)
     report = {
         "heat_delivered": _integral(delivered_heat(plant, frame), seconds, "J"),
+        "heat_useful": _integral(useful_heat(plant, frame), seconds, "J"),
+        "heat_surplus": _integral(leaf_total(plant, frame, "surplus", HeatingGrid), seconds, "J"),
         "cold_delivered": _integral(delivered_cold(plant, frame), seconds, "J"),
+        "cold_useful": _integral(useful_cold(plant, frame), seconds, "J"),
+        "cold_surplus": _integral(leaf_total(plant, frame, "surplus", CoolingGrid), seconds, "J"),
     }
     for name, (unit, module_class, field) in _EDGE_TOTALS.items():
         report[name] = _integral(edge_total(plant, frame, field, module_class), seconds, unit)

@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 
 from gemini.analysis.series import (
-    delivered_cold,
-    delivered_heat,
     edge_total,
     energy,
+    useful_cold,
+    useful_heat,
     window_seconds,
 )
 from gemini.economics.assumptions import require, resolve
@@ -38,7 +38,9 @@ class Annual:
 
 
 def annual_energies(plant, results):
-    """Return the heat and cold delivered and the gas and electricity bought per year.
+    """Return the useful heat and cold and the gas and electricity bought per year.
+
+    Useful is at most the demand: a heat the users had no need of costs money and pays nothing.
 
     The run is taken as representative of a year: each energy over the window of the results is
     scaled by one year over that window. Everything is read from the ports of the edge modules; a
@@ -48,8 +50,8 @@ def annual_energies(plant, results):
     seconds = window_seconds(results)
     scale = SECONDS_PER_YEAR / seconds.sum()
     totals = (
-        delivered_heat(plant, frame),
-        delivered_cold(plant, frame),
+        useful_heat(plant, frame),
+        useful_cold(plant, frame),
         edge_total(plant, frame, "gas_out.chemical_flow", GasGrid),
         edge_total(plant, frame, "net_import", ElectricityGrid),
         edge_total(plant, frame, "waste_in.mass_flow", WasteGrid),

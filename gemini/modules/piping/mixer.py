@@ -58,6 +58,10 @@ class Mixer(Module):
         outlets = dict(fluid_out=fluid_out)
         return outlets
 
+    def _loop_start(self, port, entering):
+        """Start a loop at the water that joins from outside: the blend before the loop adds any."""
+        return entering[0].T if entering else None
+
     def _check(self, branch1_in, branch2_in):
         """Reject reverse flow and streams of different fluids."""
         ops.check(

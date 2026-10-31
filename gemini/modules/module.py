@@ -1107,10 +1107,11 @@ class Module:
         """Return whether the ``offered`` outlets exist as this module is set; some may not."""
         return True
 
-    def _loop_start(self, port):
+    def _loop_start(self, port, entering):
         """Return the first guess [K] of the temperature on outlet ``port`` of a closed loop.
 
-        A module that can guess it overrides this; the plan then prefers to tear that outlet.
+        ``entering`` lists the streams that reach this module from outside the loop. A module that
+        can guess overrides this; the plan then prefers to tear that outlet.
         """
         return None
 

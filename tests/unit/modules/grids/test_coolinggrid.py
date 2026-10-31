@@ -2,6 +2,7 @@
 
 import pytest
 
+import gemini as gm
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules import CoolingGrid, energy_balance, mass_balance
 from gemini.physics import psychrometrics
@@ -130,3 +131,23 @@ def test_traced_call_matches_one_call_per_row():
         ]
     ]
     assert_module_matches(_consumer(), rows)
+
+
+def test_a_closed_loop_reports_the_cold_above_the_demand():
+    """More water than the load takes up to the fixed return: the rest is surplus."""
+    grid = CoolingGrid().set_params(
+        "", {"return_temperature": 301.15, "return_pressure": 4e5, "dew_point_margin": 1.0}
+    )
+    grid.fluid = gm.WATER
+    flow = 2e6 / (grid.fluid.properties(0, 0).cp_l * 8.0)
+    supply = gm.Stream(m_dot=flow, T=293.15, p=4e5, fluid=gm.WATER)
+    outputs = grid(
+        supply_in=supply,
+        flow=flow,
+        sensible_cooling_demand=1e6,
+        latent_cooling_demand=0.0,
+        indoor_temperature=303.15,
+        indoor_relative_humidity=0.5,
+    ).outputs
+    assert outputs.surplus == pytest.approx(1e6)
+    assert outputs.unmet_sensible == 0

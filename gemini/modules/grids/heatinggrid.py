@@ -37,9 +37,10 @@ class HeatingGrid(Module):
 
     On a closed loop ``return_temperature``, ``return_pressure`` and the control ``flow`` set the
     return water: ``return_out`` is offered before the other modules run, the heat delivered is the
-    fall of the water from ``supply_in`` to ``return_out``, and what is short of ``heat_demand`` is
-    ``unmet_demand``, never an error. Bind ``heat_demand`` to ``gm.profiles.get("heating_demand")``.
-    Without them the return follows from the demand, as in a substation.
+    fall of the water from ``supply_in`` to ``return_out``, what is short of ``heat_demand`` is
+    ``unmet_demand``, never an error, and what the water gives above it is ``surplus``. Bind
+    ``heat_demand`` to ``gm.profiles.get("heating_demand")``. Without them the return follows from
+    the demand, as in a substation.
 
     Simplifications: steady state without circuit inventory, constant fluid properties (the
     inlet ``cp``), no pressure drop (pipes and valves carry the hydraulics) and no emitter
@@ -74,6 +75,7 @@ class HeatingGrid(Module):
 
         # Outputs
         self.unmet_demand = Output(Power)
+        self.surplus = Output(Power)
         self.is_unmet = Output(bool)
 
         # Outlets
@@ -95,12 +97,13 @@ class HeatingGrid(Module):
 
         # Outputs
         self.unmet_demand = ops.maximum(self.heat_demand - delivered, 0.0)
+        self.surplus = ops.maximum(delivered - self.heat_demand, 0.0)
         self.is_unmet = self.unmet_demand > 0
 
         outlets = dict(return_out=return_out)
         return outlets
 
-    def _loop_start(self, port):
+    def _loop_start(self, port, entering):
         """Start a building loop at the lowest return temperature."""
         return self.minimum_return_temperature
 

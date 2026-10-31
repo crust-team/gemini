@@ -6,7 +6,7 @@ from gemini.modules.environment import Atmosphere
 from gemini.modules.exchangers import Cooler, HeatExchanger
 from gemini.modules.grids import CoolingGrid, ElectricityGrid, GasGrid, HeatingGrid
 from gemini.modules.heating import Boiler, HeatPump
-from gemini.modules.piping import GasMakeup, Pipe
+from gemini.modules.piping import GasMakeup, Mixer, Pipe, Splitter
 from gemini.modules.plants._utils.doublets import DoubletsPlant
 from gemini.modules.pumps import InjectionPump
 from gemini.modules.treatment import Degasser, Filter, Flare
@@ -15,11 +15,12 @@ from gemini.modules.treatment import Degasser, Filter, Flare
 class HeatingCoolingPlant(DoubletsPlant):
     """Integrated heating and cooling on a geothermal doublet.
 
-    A heat exchanger heats the water of a heating network; a heat pump on the brine, a peak boiler
-    and two hot-water-driven chillers (absorption and adsorption) sit in series on the hot water, a
-    compression chiller (a heat pump in cooling mode) joins them on the chilled water, and the
-    heating and cooling consumers close each side. Storage is not included: it needs a state
-    connection.
+    A heat exchanger heats the water of a heating network, then a heat pump on the brine and a peak
+    boiler. ``drive_splitter`` sends what the chillers need of that water through the generators of
+    the two hot-water-driven chillers (absorption and adsorption), and ``drive_mixer`` brings it
+    back to the return without passing the users, so the supply stays at the setpoint. A compression
+    chiller (a heat pump in cooling mode) joins them on the chilled water, and the heating and
+    cooling consumers close each side. Storage is not included: it needs a state connection.
     """
 
     purpose = "both"
@@ -38,6 +39,8 @@ class HeatingCoolingPlant(DoubletsPlant):
         self.peak_boiler = Boiler()
         self.absorption_chiller = AbsorptionUnit()
         self.adsorption_chiller = AdsorptionChiller()
+        self.drive_splitter = Splitter()
+        self.drive_mixer = Mixer()
         self.heating_supply_pipe = Pipe()
         self.heating_consumer = HeatingGrid()
         self.cooling_return_pipe = Pipe()
@@ -65,12 +68,15 @@ class HeatingCoolingPlant(DoubletsPlant):
         self.connect("heat_pump.source_out", "filters.cold.fluid_in")
         self.connect("filters.cold.fluid_out", "injection_pump.fluid_in")
         self._connect_injection("injection_pump.fluid_out")
-        self.connect("heating_return_pipe.fluid_out", "heat_exchanger.cold_in")
+        self.connect("heating_return_pipe.fluid_out", "drive_mixer.branch1_in")
+        self.connect("drive_mixer.fluid_out", "heat_exchanger.cold_in")
         self.connect("heat_exchanger.cold_out", "heat_pump.sink_in")
         self.connect("heat_pump.sink_out", "peak_boiler.fluid_in")
-        self.connect("peak_boiler.fluid_out", "absorption_chiller.generator_in")
+        self.connect("peak_boiler.fluid_out", "drive_splitter.fluid_in")
+        self.connect("drive_splitter.branch2_out", "absorption_chiller.generator_in")
         self.connect("absorption_chiller.generator_out", "adsorption_chiller.generator_in")
-        self.connect("adsorption_chiller.generator_out", "heating_supply_pipe.fluid_in")
+        self.connect("adsorption_chiller.generator_out", "drive_mixer.branch2_in")
+        self.connect("drive_splitter.branch1_out", "heating_supply_pipe.fluid_in")
         self.connect("heating_supply_pipe.fluid_out", "heating_consumer.supply_in")
         self.connect("cooling_return_pipe.fluid_out", "absorption_chiller.chilled_in")
         self.connect("absorption_chiller.chilled_out", "adsorption_chiller.chilled_in")

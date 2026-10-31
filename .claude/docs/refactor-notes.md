@@ -277,3 +277,8 @@ decisions outlast the move.
   that arrives, not `groundwater_pressure`; `production_out` still does.
 - A plant with a loop or a constraint is a root break, as `close_loop` and the nodal solves were:
   not one node of a graph, the same row by row on every backend.
+- The drive water of a chiller returns through a bypass, so the supply stays at its setpoint. On the
+  hackathon year the supply at the users rises from 66.3 to 100.0 degC at its lowest (216 days were
+  below 99.9), and heat, cold, boiler and electricity stay the same to within rounding: the same
+  water, the same split, a different place for the mixer. The plant becomes a root break: a year of
+  it runs row by row, about 10 s against 2 s.

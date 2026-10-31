@@ -122,7 +122,7 @@ product production productivity proportional pump pumping purchased quality radi
 ratio recovered recovery reference rejection relative removal residual resistance retained
 return rise rock role roughness running sand sandface saturated saturation second secondary section segment
 sensible separation service setpoint setting shaft sink skin slope soil source spacing specific
-split stage steam step storage stored suction supplied supply surface tank temperature thermal
+split stage steam step storage stored suction supplied supply surface surplus tank temperature thermal
 thickness threshold time top transfer tubing two type undisturbed units unmet unserved useful
 value valve velocity vented viscosity volume volumetric warm waste water well wellbore wellhead wet
 window

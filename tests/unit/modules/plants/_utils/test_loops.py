@@ -53,7 +53,7 @@ class Relaxer(Module):
         outlets = dict(fluid_out=outlet)
         return outlets
 
-    def _loop_start(self, port):
+    def _loop_start(self, port, entering):
         return self.start
 
     def _loop_limits(self, inlets):
@@ -193,3 +193,16 @@ def test_a_loop_runs_the_same_on_every_backend():
 def test_wegstein_accelerates_a_slope_below_one(current, image, previous, previous_image, expected):
     """No history is substitution, a slope of one or more too, otherwise the secant root."""
     assert loops.proposal(current, image, previous, previous_image) == expected
+
+
+def test_a_tear_stream_without_flow_has_no_temperature_to_converge():
+    """A limit may hold the iterate away from the image: at no flow that carries no energy."""
+    tear = loops._Tear(gm.Stream(m_dot=0.0, T=350.0, p=1e5, fluid=gm.WATER), None, 360.0)
+    image = gm.Stream(m_dot=0.0, T=373.15, p=2e5, fluid=gm.WATER)
+    assert tear.advance(image, 1e-9)
+
+
+def test_a_tear_stream_with_flow_still_converges_on_every_field():
+    """Only a stream that stands still gives up its temperature."""
+    tear = loops._Tear(gm.Stream(m_dot=1.0, T=350.0, p=1e5, fluid=gm.WATER), None, 360.0)
+    assert not tear.advance(gm.Stream(m_dot=1.0, T=373.15, p=1e5, fluid=gm.WATER), 1e-9)

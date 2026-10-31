@@ -7,6 +7,8 @@ import gemini as gm
 from gemini import backends
 from gemini.errors import PhysicsError
 from gemini.graph import GraphCache, evaluate, graph_feeds
+from gemini.graph.rootbreak import stacked
+from gemini.types import Inlet, Outlet, Output, Stream
 
 from .conftest import Chain, Gain, Opaque, Tank
 
@@ -95,3 +97,40 @@ def test_every_row_failing_gives_no_result():
     module.register_forward_pre_hook(lambda module, inlets: None)
     _, evaluation = _evaluate(module, {"gain": np.array([-1.0, -2.0])}, 2)
     assert evaluation.failed.all() and evaluation.result is None
+
+
+class Listing(gm.modules.Module):
+    """A leaf with a list output, as the wells have their section profiles."""
+
+    def __init__(self):
+        """Declare one stream and its list."""
+        super().__init__()
+
+        # Inlets
+        self.fluid_in = Inlet(Stream)
+
+        # Outputs
+        self.profile = Output(list[float])
+
+        # Outlets
+        self.fluid_out = Outlet(Stream)
+
+    def forward(self, inlets):
+        """List the temperature and the pressure."""
+
+        # Outlets
+        stream = inlets.fluid_in
+
+        # Outputs
+        self.profile = [stream.T, stream.p]
+
+        outlets = dict(fluid_out=stream)
+        return outlets
+
+
+def test_a_failed_row_fills_a_list_output_with_as_many_nans():
+    """A list output has one length on every row, so a failed row must not break the column."""
+    result = Listing()(fluid_in=gm.Stream(m_dot=1.0, T=300.0, p=1e5, fluid=gm.WATER))
+    profile = stacked({0: result}, 2).outputs["profile"]
+    assert profile.shape == (2, 2) and profile[0].tolist() == [300.0, 1e5]
+    assert np.isnan(profile[1]).all()

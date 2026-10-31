@@ -76,18 +76,35 @@ class _Tear:
         return Stream(fluid=self.fluid, **values)
 
     def advance(self, image, tolerance):
-        """Move every field; return whether all of them have converged."""
+        """Move every field; return whether all of them have converged.
+
+        A stream that stands still carries nothing, so only its flow has to converge.
+        """
         settled = [
             field.advance(getattr(image, name), tolerance) for name, field in self.fields.items()
         ]
+        if image.m_dot == 0 and self.fields["m_dot"].current == 0:
+            return True
         return all(settled)
 
 
-def _start(run, tear, lower, upper):
-    """Return the first guess of a tear stream: no flow, at what its source module expects."""
+def _entering(run, step):
+    """Return the streams that reach ``step`` from outside its loop."""
+    arguments = run.known_arguments(step).values()
+    return [value for value in arguments if isinstance(value, Stream)]
+
+
+def _start(run, loop, tear, lower, upper):
+    """Return the first guess of a tear stream: no flow, at what its source module expects.
+
+    A module of the loop may set the pressure, as a circulation pump does, and then the guess does
+    not matter. Where none does, the pressure stays the highest that enters the loop, so a pipe in
+    it has something to lose. The fluid is that of the water that enters the module of the tear.
+    """
     path, port = tear.source
-    module = run.nodes[path]
-    temperature = module._loop_start(port)
+    step = next(item for item in loop.steps if item.path == path)
+    module, entering = step.module, _entering(run, step)
+    temperature = module._loop_start(port, entering)
     if temperature is None:
         name = join_path(*tear.source)
         raise ValidationError(
@@ -96,7 +113,11 @@ def _start(run, tear, lower, upper):
             path=name,
             code="invalid_design",
         )
-    return _Tear(Stream(m_dot=0.0, T=temperature, p=0.0, fluid=module.fluid), lower, upper)
+    pressure = max(
+        (stream.p for item in loop.steps for stream in _entering(run, item)), default=0.0
+    )
+    fluid = entering[0].fluid if entering else module.fluid
+    return _Tear(Stream(m_dot=0.0, T=temperature, p=pressure, fluid=fluid), lower, upper)
 
 
 def _limits(run, loop):
@@ -124,7 +145,7 @@ def close(run, loop):
     """Iterate ``loop`` of the running plant until its tear streams converge, then run it once."""
     plant = run.plant
     lower, upper = _limits(run, loop)
-    states = [_start(run, tear, lower, upper) for tear in loop.tears]
+    states = [_start(run, loop, tear, lower, upper) for tear in loop.tears]
     for _ in range(plant.loop_passes):
         run.tears = {tear.index: state.stream() for tear, state in zip(loop.tears, states)}
         for step in loop.steps:

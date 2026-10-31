@@ -423,3 +423,34 @@ def test_an_adsorption_chiller_is_dispatched_with_its_own_cop():
     rules = RULES | {"cooling_order": ["adsorption"]}
     plan = gm.schedule(cooling_plant(), cold_demand(8e6), rules)
     assert plan["d0.flow"].iloc[0] == pytest.approx(5e6 / (1000 * 4217.4 * 40))
+
+
+def test_the_bypass_keeps_the_supply_at_the_setpoint_and_delivers_the_demand():
+    """Three summer days of the hackathon plant: drive water passes the users, not through them."""
+    plant = gm.plants.example("HackathonPlant")
+    plant.set_inputs(
+        {
+            "heat_pump.temperature_setpoint": "100 degC",
+            "boiler.temperature_setpoint": "100 degC",
+            "chiller.temperature_setpoint": "20 degC",
+            "cool_users.indoor_temperature": "26 degC",
+            "cool_users.indoor_relative_humidity": 0.5,
+            "chiller_cooler.temperature_setpoint": "15 degC",
+            "chiller_cooler.flow": "800 kg/s",
+            "air.temperature": "10 degC",
+            "desander.sand_concentration": "20 mg/l",
+            "dosing.dose": "10 ppm",
+        }
+    )
+    frame = pd.concat([gm.profiles.get(name) for name in gm.profiles.names()], axis=1)
+    days = frame.loc["2027-07-18":"2027-07-20"]
+    plan = gm.schedule(plant, days, RULES)
+    assert plan["loads.split_fraction"].min() > 0
+    results = gm.simulate(plant, plan, clock=gm.Clock(days.index, step="24h"))
+    supply = results.get("heat_users", "supply_in.temperature")["value"]
+    assert min(supply) == pytest.approx(373.15, abs=1e-6)
+    totals = gm.kpi.totals(plant, results)
+    assert totals["heat_delivered"]["value"] == pytest.approx(
+        days["heating_demand"].sum() * 86400, rel=1e-9
+    )
+    assert totals["heat_surplus"]["value"] == pytest.approx(0, abs=1e-3)

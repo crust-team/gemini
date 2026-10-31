@@ -203,7 +203,11 @@ A connection that closes a cycle is a tear stream. `Plant.forward` iterates the 
 stream converges, the same way for every plant:
 
 - The tear is the connection out of a module that gives a first guess (`Module._loop_start`), else
-  the last in the connection list. In a substation it is `consumer.return_out`.
+  the last in the connection list. In a substation it is `consumer.return_out`, and on the drive
+  water of a chiller the outlet of the `Mixer`, whose guess is the water that joins from outside.
+  The first guess has no flow, the highest pressure that enters the loop and the fluid that enters
+  the module of the tear.
+- A tear stream without flow carries nothing: only its flow has to converge.
 - Each pass runs the modules of the loop without recording them, and moves each field of the tear
   stream by Wegstein's method (`plants/_utils/loops.py`); then every module is called once with the
   converged stream, so outputs and balances see one call each. A loop through a stateful module is

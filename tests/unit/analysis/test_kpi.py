@@ -3,9 +3,11 @@
 import json
 import math
 
+import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.economics.costs import annual_energies
 from tests.fixtures.result_tables import cold_ports, heat_ports, make_results
 
 
@@ -125,7 +127,11 @@ def test_totals_of_a_run_with_every_edge_module():
     totals = {name: item["value"] for name, item in gm.kpi.totals(plant, run).items()}
     assert totals == {
         "heat_delivered": None,
+        "heat_useful": None,
+        "heat_surplus": None,
         "cold_delivered": None,
+        "cold_useful": None,
+        "cold_surplus": None,
         "electricity_bought": 36000.0,
         "electricity_sold": 3600.0,
         "gas_bought": 72000.0,
@@ -135,3 +141,47 @@ def test_totals_of_a_run_with_every_edge_module():
         "chemicals": 14400.0,
         "losses": 25200.0,
     }
+
+
+def overflowing():
+    """Return a boiler plant and two days of a flow that brings twice the demand."""
+    plant = gm.Plant("Boiler")
+    plant.add("GasGrid", name="grid")
+    plant.add("Boiler", name="boiler", params={"capacity": "20 MW", "efficiency": 0.9})
+    plant.add(
+        "HeatingGrid",
+        name="users",
+        params={"return_temperature": "60 degC", "return_pressure": "6 bar"},
+    )
+    plant.connect("grid.gas_out", "boiler.fuel_in")
+    plant.connect("users.return_out", "boiler.fluid_in")
+    plant.connect("boiler.fluid_out", "users.supply_in")
+    plant.connect("boiler.flue_out", "flue")
+    plant.connect("boiler.loss_out", "loss")
+    plant.users.fluid = gm.WATER
+    index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC", name="time")
+    columns = {
+        "users.heat_demand": 1e6,
+        "users.flow": 2e6 / (4217.4 * 40),
+        "boiler.temperature_setpoint": 373.15,
+    }
+    return plant, gm.simulate(plant, pd.DataFrame(columns, index=index))
+
+
+def test_totals_tell_the_useful_heat_from_the_surplus():
+    """The water gives 2 MW to a demand of 1 MW: half is useful."""
+    plant, results = overflowing()
+    totals = gm.kpi.totals(plant, results)
+    days = 2 * 86400
+    assert totals["heat_delivered"]["value"] == pytest.approx(2e6 * days)
+    assert totals["heat_useful"]["value"] == pytest.approx(1e6 * days)
+    assert totals["heat_surplus"]["value"] == pytest.approx(1e6 * days)
+    assert totals["cold_useful"]["value"] is None
+
+
+def test_the_kpis_and_the_levelised_cost_read_the_useful_heat():
+    """A surplus covers nothing and earns nothing."""
+    plant, results = overflowing()
+    assert gm.kpi.compute(plant, results)["peak_heat"]["value"] == pytest.approx(1e6)
+    annual = annual_energies(plant, results)
+    assert annual.heat == pytest.approx(1e6 * 365.25 * 86400)
