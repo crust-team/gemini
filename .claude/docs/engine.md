@@ -63,14 +63,32 @@ cooling. The heat pump and boiler take the `temperature_setpoint` set on them, t
 temperatures, and cover what is left in the run. Unmet demand is no error: the run reports
 `unmet_demand`.
 
+`operating_days` takes doublets out of service:
+
+- `None`: every doublet on every day that leaves it a need, as above.
+- An integer `n`: each doublet runs exactly `n` days of the demand. Its outage days are the days of
+  lowest total demand, heating plus cooling in W: the first doublet takes the lowest, the next the
+  lowest left, so at most one doublet is off on a day. A count that needs more outage days than the
+  demand has raises `ValidationError` (`invalid_value`).
+- A list of dates: every doublet is off on those UTC days; a date outside the demand raises
+  `ValidationError` (`invalid_value`).
+
+On an outage day a doublet has no flow, `<doublet>.is_running` is false and its heat goes to the
+next sources of `order`: first the next doublet, then the heat pump and the boiler. A heat pump
+whose source only doublets that are off feed stops that day: `<heat pump>.is_running` is false, its
+capacity does not count when it is ordered before `geothermal`, and its source carries no flow in
+the run. The feed is read from the wiring, along the circuit of each module. Under an `operating_days` rule
+a doublet runs every day it is not off, at the minimum flow when no need is left for it, or it would
+not run its days. `plan.attrs["outage_days"]` is `{doublet path: [ISO date]}`, empty lists without
+outages, and `gm.checks.operating_days(plant, results, days)` counts the days of a finished run.
+
 The plan needs no bindings and changes nothing on the plant: **its columns are named after what they
 drive**, so `gm.simulate(plant, plan)` binds them by the rule of a run, below. Leaf controls and
 boundaries have a column named after their dotted path (`d0.reservoir.production_rate`,
 `injection.split_fraction`), and a plant inlet field a column named `port.field`
 (`heating_return.m_dot`); ports `heating_return` and `cooling_return` take their temperature from
-`plant.boundary["root_inputs"]`. `boiler_duty`, `<doublet>.flow` and `<doublet>.is_running` are for
-reading. `operating_days` is `None`, every doublet on every day; an integer or a list of outage dates
-raises `NotImplementedYet` until the meaning of the organisers' "330 daily steps" is decided.
+`plant.boundary["root_inputs"]`. `boiler_duty`, `<doublet>.flow` and `<doublet>.is_running` and
+`<heat pump>.is_running` are for reading.
 
 ## The engine
 

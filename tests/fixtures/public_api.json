@@ -321,13 +321,19 @@
    "mass_balance": [
     "results"
    ],
+   "operating_days": [
+    "plant",
+    "results",
+    "days"
+   ],
    "plant_balance": [
     "plant",
     "run"
    ],
    "run_all": [
     "plant",
-    "results"
+    "results",
+    "days"
    ]
   },
   "economics": {

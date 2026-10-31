@@ -130,7 +130,8 @@ it, and the checks audit what the columns hold:
 | `plant_balance(plant, run)` | mass and energy in = out + losses + change of stored energy, per module (1e-9) and for the root (1e-6) | a list of checks, the worst relative residual of each |
 | `mass_balance(results)` | the leaf outputs whose unit in `results.units` is kg/s: finite or missing, not negative | smallest flow [kg/s], 1e-12 kg/s |
 | `bounds(plant, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
-| `run_all(plant, results)` | the three above | `{passed, checks}` |
+| `operating_days(plant, results, days)` | the days each doublet ran: the UTC days on which `<doublet>.reservoir.liquid_flow`, the column behind `Doublet.flow`, is above zero on a tick | a list of checks, one per doublet, exact: days run, `days`, both in `day` |
+| `run_all(plant, results, days=None)` | the first three above, and `operating_days` when `days` is given | `{passed, checks}` |
 
 `gm.checks.Limits` holds limits a user sets, `(path pattern, output, min, max)`:
 

@@ -2,10 +2,11 @@
 
 from gemini.checks.balances import energy_balance, mass_balance
 from gemini.checks.bounds import bounds
+from gemini.checks.operating import operating_days
 from gemini.utils.jsonable import to_plain
 
 
-def run_all(plant, results):
+def run_all(plant, results, days=None):
     """Run the energy ledger, the mass ledger and the bounds check on a finished run.
 
     Parameters
@@ -14,16 +15,21 @@ def run_all(plant, results):
         The plant that produced ``results``.
     results : Results
         A finished run.
+    days : int, optional
+        The days each doublet has to run; given, ``operating_days`` joins the checks.
 
     Returns
     -------
     dict
         Plain JSON ``{passed, checks}``: ``checks`` lists the results of ``energy_balance``,
-        ``mass_balance`` and ``bounds`` (each ``{name, passed, value, limit}``), and
+        ``mass_balance`` and ``bounds``, then those of ``operating_days`` when ``days`` is given
+        (each ``{name, passed, value, limit}``), and
         ``passed`` is ``False`` if any check failed, ``True`` if none failed and at least one
         passed, and ``None`` if none could judge.
     """
     checks = [energy_balance(results), mass_balance(results), bounds(plant, results)]
+    if days is not None:
+        checks += operating_days(plant, results, days)
     return to_plain({"passed": _verdict([item["passed"] for item in checks]), "checks": checks})
 
 

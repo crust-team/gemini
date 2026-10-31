@@ -177,7 +177,7 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.schedule(plant, demand, rules)` | run input, a UTC DataFrame: the demand and one column per scheduled control, named after its dotted path; `operating_days` other than `None` raises `NotImplementedYet`; see [engine.md](engine.md#schedule) | real |
+| `gm.schedule(plant, demand, rules)` | run input, a UTC DataFrame: the demand and one column per scheduled control, named after its dotted path; `attrs["outage_days"]` is `{doublet path: [ISO date]}`; see [engine.md](engine.md#schedule) | real |
 | `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` | real |
 | `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results`; `results.end_state` is the `state=` of the next call | real |
 | `gm.live(plant, source, checkpoint, step=None, now=None, sink=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` of the new rows; `checkpoint` is a required path | real |
@@ -254,7 +254,8 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `{name: value}` of `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
 | `gm.checks.plant_balance(plant, run)` | real, a list of checks: mass and energy of every module within 1e-9 and of the root within 1e-6; `run` is `Results` or a `ModuleResult`. The root's in and out are the ports of the grids and environment modules, the aquifers and the plant ports of a building block run alone; a replay does not close at the root. |
 | `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)` | real, each a check; they are ledger checks, see [economics.md](economics.md) |
-| `gm.checks.run_all(plant, results)` | real: `{passed, checks: [check]}` |
+| `gm.checks.operating_days(plant, results, days)` | real: a list of checks, one per doublet: the days it carried flow against `days` |
+| `gm.checks.run_all(plant, results, days=None)` | real: `{passed, checks: [check]}`; `days` adds `operating_days` |
 | `gm.checks.Limits()`, `add(target, min=None, max=None)`, `to_dict()`, `from_dict(data)` | real: limits of `"<path pattern>.<output>"`, built without a plant; a plain dictionary |
 | `gm.checks.limits(plant, results, limits)` | real: a list of checks, one per matched module and output, `value` the worst of the run; an unmatched pattern raises `ValidationError` code `unknown_name` |
 | `gm.testing.check_module(cls, example=None)` | real; for developers of a new module class only: a report, never raises |
@@ -284,6 +285,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `rules["operating_days"]` of `gm.schedule` is built: a count or a list of outage dates, `attrs["outage_days"]`, the column `<heat pump>.is_running`. New `gm.checks.operating_days(plant, results, days)`; `gm.checks.run_all` takes `days`. |
 | 0.2.0, unreleased changes | | File layout of `gemini/modules/`: `plant.py` and `container.py` beside `module.py`, the plant tools in `plants/_utils/`, `heating/_burner.py`, `cooling/_sorption.py`. Private paths only: no change to a name of this page. |
 | 0.2.0, unreleased changes | | Data layout: `gemini/assets/` (installed: plant structures, templates) and `inputs/` (repository only: hackathon inputs, example values, measured data, legacy project); `datasets/` is gone. New code `inputs_missing`: `gm.profiles.get` and `gm.plants.example` raise it outside a source checkout. Templates `DistrictNetwork` and `MultiWellPlant` are now `district_network` and `multi_well`. `gm.plants.example("Doublet")` is the registered class, with the outputs of its structure file. No change to a name of this page. |
 | 0.2.0, unreleased changes | | Plants `NodalDoublet`, `ParallelExchangerPlant`, `BoilerChpPlant`, `DistrictEnergyPlant`, `HackathonPlant`: catalogue only, no change to a name of this page. |
