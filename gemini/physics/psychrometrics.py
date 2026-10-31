@@ -6,9 +6,8 @@ without the enhancement factor, which ASHRAE Fundamentals includes in its tabula
 humidity ratios (about 0.4 % at sea level); see ``humidity_ratio``.
 """
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError
-from gemini.physics import units
 
 MINIMUM_TEMPERATURE = 173.15
 """Lower validity limit [K] of the Hyland-Wexler equation over ice (-100 degC)."""

@@ -1,23 +1,22 @@
 """Op dispatch: record an op on traced values, otherwise evaluate it on a backend.
 
 ``dispatch(name, *operands)`` is the single entry of every op. When an operand is
-``Symbolic`` (a traced value of ``gemini.graph``), the op is recorded in that value's graph.
+``Symbolic`` (a traced value of ``gemini.compiler.graph``), the op is recorded in its graph.
 Otherwise every ``Constant`` operand is replaced by its plain Python value and the op runs on
-the backend that ``gemini.backends.select`` chooses. ``Operators`` gives a class the Python
+the backend that ``gemini.ops.kernels.select`` chooses. ``Operators`` gives a class the Python
 operators through the same entry.
 """
 
 import numpy as np
 
-from gemini import backends
-from gemini.ops import registry
+from gemini.ops import kernels, registry
 
 SCALARS = frozenset({float, int, bool, type(None), np.float64, np.int64, np.bool_})
 """Exact types of the scalars of the fast path: Python numbers, ``None`` (a ``where`` branch)
 and the NumPy scalars of the eager scope and of arithmetic on rows of a dataset."""
 
-_PYTHON = backends.get("python")
-_forced_name = backends.forced_name
+_PYTHON = kernels.get("python")
+_forced_name = kernels.forced_name
 
 
 class Symbolic:
@@ -36,7 +35,7 @@ def dispatch(name, *operands, attributes=None):
     values = tuple(
         operand.value if isinstance(operand, Constant) else operand for operand in operands
     )
-    method = backends.implementation(backends.select(values), name)
+    method = kernels.implementation(kernels.select(values), name)
     return method(*values, **(attributes or {}))
 
 
@@ -45,7 +44,7 @@ def elementwise_op(name, arity, summary):
 
     The function evaluates scalars of the types in ``SCALARS`` (exact types, never subclasses)
     directly on the Python backend's method, resolved once here, as long as no
-    ``backends.settings(backend=...)`` is active. Anything else (arrays, NumPy scalars,
+    ``runtime.settings(backend=...)`` is active. Anything else (arrays, NumPy scalars,
     ``Constant``, traced values, a forced backend) goes through ``dispatch``.
     """
     registry.register(name, "elementwise", arity)
@@ -198,7 +197,7 @@ class Constant:
 
     def _number(self):
         """Return the value as ``np.float64`` inside a wrapping eager scope, else as ``float``."""
-        return self._scalar if backends.scope_mode() is backends.WRAP else self.value
+        return self._scalar if kernels.scope_mode() is kernels.WRAP else self.value
 
     def __float__(self):
         """Return the value."""

@@ -149,11 +149,15 @@ def test_state_and_full_results_match_phase_zero(dataset_name, selected_dataset,
     rtol = PARSER_RTOL if int(pd.__version__.split(".")[0]) >= 3 else REPLAY_RTOL
     _assert_values_identical(replay, _baseline_frame(baseline, "replay.csv.gz"), rtol)
 
-    clock = gm.Clock.days(2027, 1, 1, days=1)
+    clock = gm.engine.Clock.days(2027, 1, 1, days=1)
     profiles = {
-        "doublet.reservoir.production_rate": gm.Profile.constant(150, unit="m3/h", clock=clock),
-        "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
-        "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
+        "doublet.reservoir.production_rate": gm.types.Profile.constant(
+            150, unit="m3/h", clock=clock
+        ),
+        "doublet.esp.frequency": gm.types.Profile.constant(55, unit="Hz", clock=clock),
+        "injection_pump.pressure_setpoint": gm.types.Profile.constant(
+            51.5, unit="bar", clock=clock
+        ),
     }
     simulation = path_frame(gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock))
     _assert_values_identical(

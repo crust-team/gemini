@@ -2,11 +2,11 @@
 
 import numpy as np
 
+from gemini.compiler.graph import GraphCache
 from gemini.engine.columns import read
+from gemini.engine.loader import Aligned
 from gemini.engine.outcome import UNCHANGED, StepResults, evaluate_twin
 from gemini.engine.step import BindingPlan
-from gemini.graph import GraphCache
-from gemini.utils.data.loader import Aligned
 from tests.fixtures.engine_tank import ROW, TIME, dataset, tank
 
 

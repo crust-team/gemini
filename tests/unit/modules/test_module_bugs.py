@@ -4,8 +4,9 @@ import pytest
 
 import gemini as gm
 from gemini.modules import Filter, Module, ProductionReservoir
-from gemini.modules.plant import Plant
-from gemini.types import Control, Inlet, Outlet, Output, Parameter, Power, Stream
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
+from gemini.plants.plant import Plant
+from gemini.types import Power, Stream
 from tests.fixtures.errors import raises
 
 STREAM = Stream(m_dot=10, T=330, p=1e6)
@@ -234,7 +235,10 @@ def test_injection_reservoir_without_injectivity_fails_in_forward():
             "wellbore_radius": 0.1,
         },
     )
-    with gm.no_outputs(), raises(gm.errors.ValidationError, "invalid_design", match="injectivity"):
+    with (
+        gm.modules.no_outputs(),
+        raises(gm.errors.ValidationError, "invalid_design", match="injectivity"),
+    ):
         reservoir(sandface_in=STREAM)
 
 

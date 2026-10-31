@@ -4,21 +4,17 @@ from typing import Literal
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import diagnostics
 from gemini.physics import fluid as fluid_physics
 from gemini.physics import hydraulics
 from gemini.types import (
-    Control,
     Dimensionless,
     Fraction,
     Health,
-    Inlet,
     Length,
     MassFlow,
-    Outlet,
-    Output,
-    Parameter,
     Permeability,
     Pressure,
     PressureDifference,
@@ -32,6 +28,8 @@ from gemini.types.results import NOT_ASSESSED
 
 class _Reservoir(Module):
     """Common reservoir parameters and measurement helpers."""
+
+    abstract = True
 
     def __init__(self, role):
         super().__init__()

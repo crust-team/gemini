@@ -6,9 +6,9 @@ through the physics functions.
 
 import numpy as np
 
+from gemini import units as physics_units
 from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import constants, heat_transfer
-from gemini.physics import units as physics_units
 from gemini.types.shapes import OutputUnits, value
 
 CURVE_COEFFICIENTS = 6

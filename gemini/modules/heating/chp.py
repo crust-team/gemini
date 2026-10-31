@@ -2,22 +2,11 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.heating import _burner
 from gemini.modules.module import Module
 from gemini.physics import combustion, heat_transfer
-from gemini.types import (
-    Control,
-    Efficiency,
-    Fraction,
-    Fuel,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    Power,
-    Stream,
-    Temperature,
-)
+from gemini.types import Efficiency, Fraction, Fuel, Power, Stream, Temperature
 from gemini.types.cost import scaled_cost
 
 

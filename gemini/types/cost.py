@@ -21,7 +21,7 @@ class Cost(BaseModel):
 def scaled_cost(assumptions, factor, size=1):
     """Return the ``Cost`` of a design size at the cost factor named ``factor``.
 
-    ``assumptions`` is a ``gm.economics.Assumptions``; a factor without a value raises
+    ``assumptions`` is a ``gm.Assumptions``; a factor without a value raises
     ``ValidationError`` (code ``missing_assumption``). A size of one is a fixed item.
     """
     return Cost(

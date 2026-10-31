@@ -1,9 +1,10 @@
 """The public electricity grid: the plant's edge for bought and sold electricity."""
 
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.grids import _physics
 from gemini.modules.module import Module
 from gemini.physics import energy
-from gemini.types import Inlet, Outlet, Output, Parameter, Power
+from gemini.types import Power
 
 
 class ElectricityGrid(Module):
@@ -14,7 +15,7 @@ class ElectricityGrid(Module):
     positive and exported when negative, each up to its connection limit (``None`` means unlimited;
     ``_physics.net_exchange``). Consumption above the import limit is ``unserved_consumption`` (load
     to shed) and surplus generation above the export limit ``curtailed_generation``. Prices and
-    emission factors live in ``gm.economics.Assumptions``. Assumptions: no reactive power, losses or
+    emission factors live in ``gm.Assumptions``. Assumptions: no reactive power, losses or
     demand charges.
     """
 

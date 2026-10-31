@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Output
 from gemini.types import Ports, Stream
-from gemini.types.declarations import Output
 from gemini.types.quantities import Power, PressureDifference, TemperatureDifference
 from gemini.types.results import Health, ModuleResult, Values
 from tests.fixtures.errors import raises

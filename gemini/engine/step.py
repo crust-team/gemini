@@ -9,13 +9,13 @@ over chunks of ticks.
 from copy import deepcopy
 from dataclasses import dataclass, field
 
+from gemini._utils.strings import close_matches, did_you_mean, join_names, join_path, split_path
 from gemini.errors import ValidationError
 from gemini.modules._utils.design import FIELD_UNITS
+from gemini.modules.declarations import UNSET
+from gemini.run.dataset import bound_unit
 from gemini.types.bindings import Binding, ModuleBindings
-from gemini.types.declarations import UNSET
 from gemini.types.flows import STREAM_FIELDS
-from gemini.utils.data.dataset import bound_unit
-from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path, split_path
 
 VOLUMETRIC_UNITS = {"m3/h", "m3/s"}
 """Flow units converted to mass flow with the fluid density at the boundary."""

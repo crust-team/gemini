@@ -5,12 +5,12 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini import units
+from gemini.data.legacy import tables as mapping
 from gemini.modules.exchangers import HeatExchanger
-from gemini.physics import units
 from gemini.types.flows import Stream
 from gemini.types.fluid import WATER
 from gemini.types.results import NOT_ASSESSED
-from gemini.utils.legacy import tables as mapping
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 from tests.fixtures.errors import raises

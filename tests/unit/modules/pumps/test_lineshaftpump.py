@@ -2,10 +2,10 @@
 
 import pytest
 
+from gemini import units
 from gemini.errors import PhysicsError
 from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.pumps import ESP, LineShaftPump
-from gemini.physics import units
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.reading import reading

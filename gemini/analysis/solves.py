@@ -17,7 +17,7 @@ naming the trial value.
 """
 
 from gemini.errors import ValidationError
-from gemini.modules.plants._utils.constraints import evaluate, root
+from gemini.plants._utils.constraints import evaluate, root
 
 
 def solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, riser=None):

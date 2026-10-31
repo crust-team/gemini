@@ -1,7 +1,7 @@
 """Every example prints the same output on every backend in ``BACKENDS``.
 
 Each example runs once per backend through ``tests/fixtures/run_example.py``, which reads the
-backend from ``GEMINI_EXAMPLE_BACKEND`` and enters ``gemini.backends.settings`` before running the
+backend from ``GEMINI_EXAMPLE_BACKEND`` and enters ``gm.runtime.settings`` before running the
 script with ``runpy``. Standard output must be equal line by line once the lines that report a
 duration and the temporary working directory are removed. Adding a backend means adding it to
 ``tests.fixtures.parity.BACKENDS``.

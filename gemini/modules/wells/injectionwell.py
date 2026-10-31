@@ -1,18 +1,10 @@
 """Injection well from the wellhead down to the sandface."""
 
 from gemini import ops
+from gemini.modules.declarations import Inlet, Outlet, Output
 from gemini.modules.wells.well import _Well
 from gemini.physics import fluid, heat_transfer, hydraulics
-from gemini.types import (
-    Inlet,
-    Outlet,
-    Output,
-    Power,
-    Pressure,
-    PressureDifference,
-    Stream,
-    Temperature,
-)
+from gemini.types import Power, Pressure, PressureDifference, Stream, Temperature
 
 
 class InjectionWell(_Well):

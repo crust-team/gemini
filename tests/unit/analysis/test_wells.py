@@ -6,8 +6,8 @@ import json
 import pytest
 
 import gemini as gm
+from gemini import units
 from gemini.analysis import wells
-from gemini.physics import units
 from gemini.physics.geometry import vertical_path
 from gemini.types.flows import Stream
 from tests.fixtures.errors import raises

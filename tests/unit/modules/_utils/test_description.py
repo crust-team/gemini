@@ -128,7 +128,7 @@ def test_instance_values_follow_the_module():
 
 def test_composite_lists_children_and_dotted_values():
     """A composite names its children and nests their values by dotted path."""
-    substation = gm.modules.HeatingSubstation()
+    substation = gm.plants.HeatingSubstation()
     description = substation.describe()
     assert description["children"]
     assert all(isinstance(name, str) for name in description["children"].values())

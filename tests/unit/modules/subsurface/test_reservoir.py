@@ -2,12 +2,12 @@
 
 import pytest
 
+from gemini.data.legacy import tables as mapping
 from gemini.errors import ValidationError
+from gemini.modules.declarations import Inlet
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
-from gemini.types import Inlet
 from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid
-from gemini.utils.legacy import tables as mapping
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 

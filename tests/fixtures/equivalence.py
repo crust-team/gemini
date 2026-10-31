@@ -1,8 +1,9 @@
 """Check that one source gives the same numbers on floats, arrays and traced graphs.
 
 ``assert_function_matches`` compares a physics function called once per row on Python floats
-with one traced run on the stacked columns (``gemini.graph.run_function``), so an array row can
-cross a ``where`` around a ``check`` as it does in the engine; a direct call on arrays raises at
+with one traced run on the stacked columns (``gemini.compiler.graph.run_function``), so an array
+row can cross a ``where`` around a ``check`` as it does in the engine; a direct call on arrays
+raises at
 the first failing row. ``assert_module_matches`` compares a module called once per row
 with one traced call. ``RTOL`` is the documented tolerance of the NumPy backend against the
 Python path; a ``None`` on the Python path is NaN on arrays. ``assert_same_error`` checks that a
@@ -17,7 +18,7 @@ from collections.abc import Mapping
 import numpy as np
 import pytest
 
-from gemini.graph import run, run_function
+from gemini.compiler.graph import run, run_function
 from gemini.types import Stream
 from gemini.types.flows import STREAM_FIELDS
 from gemini.types.ports import Ports

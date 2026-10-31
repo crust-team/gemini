@@ -9,8 +9,8 @@ import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini._utils import paths
 from gemini.modules import Module
-from gemini.utils import paths
 from tests.cpu_budget import BUDGET_S, exceeds_budget, measure_cpu
 
 TIER_MARKERS = {

@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from gemini.utils.strings import split_path
+from gemini._utils.strings import split_path
 
 PORT_COLUMNS = {
     ("degasser", "gas_mass_flow"): ("degasser.gas_out", "mass_flow"),

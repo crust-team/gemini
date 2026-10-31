@@ -10,10 +10,10 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticError
 
+from gemini._utils.files import read_cells, read_json, write_cells
+from gemini._utils.version import OLDEST_CHECKPOINT, is_older, package_version
 from gemini.errors import RunError, ValidationError
-from gemini.utils.data.dataset import Dataset
-from gemini.utils.files import read_cells, read_json, write_cells
-from gemini.utils.version import OLDEST_CHECKPOINT, is_older, package_version
+from gemini.run.dataset import Dataset
 
 
 class Checkpoint(BaseModel):

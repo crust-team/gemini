@@ -9,11 +9,11 @@ import numpy as np
 import pytest
 from pydantic_core import to_jsonable_python
 
-from gemini.backends import runtime
+from gemini import runtime
 from gemini.errors import PhysicsError, ValidationError
-from gemini.physics.units import Quantity
 from gemini.types.flows import Stream
 from gemini.types.fluid import BRINE, WATER, Fluid
+from gemini.units import Quantity
 from tests.fixtures.errors import raises
 
 

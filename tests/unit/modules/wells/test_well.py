@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 
 import gemini as gm
+from gemini.data.legacy import tables as mapping
 from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.types.flows import Stream
-from gemini.utils.legacy import tables as mapping
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.errors import raises
 

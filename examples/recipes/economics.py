@@ -1,6 +1,6 @@
 """Price a small plant: investment, yearly cost, levelised cost of heat and CO2.
 
-Shows ``gm.economics.Assumptions``, ``capex``, ``opex``, ``lcoh`` and ``co2`` on a boiler that
+Shows ``gm.Assumptions``, ``capex``, ``opex``, ``lcoh`` and ``co2`` on a boiler that
 serves a heating grid. Every price is an assumption of this recipe, not data, and it prints them.
 
 Run with ``python examples/recipes/economics.py``.
@@ -9,13 +9,13 @@ Run with ``python examples/recipes/economics.py``.
 import gemini as gm
 
 MWH = 1000 * gm.units.convert(1, "kWh", "J")
-DAY = gm.Clock.days(2027, 1, 1, days=1)
+DAY = gm.engine.Clock.days(2027, 1, 1, days=1)
 INPUTS = {
     "users.heat_demand": (500, "kW"),
     "users.flow": (15, "kg/s"),
     "boiler.temperature_setpoint": (90, "degC"),
 }
-ASSUMPTIONS = gm.economics.Assumptions(
+ASSUMPTIONS = gm.Assumptions(
     discount_rate=0.05, lifetime_years=25, gas_price=40.0, heat_price=60.0 / MWH
 )
 
@@ -41,15 +41,15 @@ def main():
     """Simulate a representative day and print the economics of a year."""
     print("Assumptions: 5 % discount rate, 25 years, gas at 40 EUR/MWh, heat at 60 EUR/MWh")
     profiles = {
-        path: gm.Profile.constant(value, unit=unit, clock=DAY)
+        path: gm.types.Profile.constant(value, unit=unit, clock=DAY)
         for path, (value, unit) in INPUTS.items()
     }
     plant = build()
     results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=DAY)
-    investment = gm.economics.capex(plant, ASSUMPTIONS)
-    yearly = gm.economics.opex(plant, results, ASSUMPTIONS)
-    heat = gm.economics.lcoh(plant, results, assumptions=ASSUMPTIONS)
-    emitted = gm.economics.co2(plant, results, ASSUMPTIONS)
+    investment = gm.evaluate.capex(plant, ASSUMPTIONS)
+    yearly = gm.evaluate.opex(plant, results, ASSUMPTIONS)
+    heat = gm.evaluate.lcoh(plant, results, assumptions=ASSUMPTIONS)
+    emitted = gm.evaluate.co2(plant, results, ASSUMPTIONS)
     prices = investment["price_year"]["value"]
     print(f"Capex:  {investment['value'] / 1e3:8.1f} kEUR, prices of {prices}")
     print(f"Opex:   {yearly['value'] / 1e3:8.1f} kEUR/year")

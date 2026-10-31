@@ -4,15 +4,11 @@ from typing import Literal
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import dispatch, heat_transfer, psychrometrics
 from gemini.types import (
-    Control,
-    Inlet,
     MassFlow,
-    Outlet,
-    Output,
-    Parameter,
     Power,
     Pressure,
     Ratio,

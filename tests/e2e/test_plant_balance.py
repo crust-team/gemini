@@ -29,11 +29,15 @@ def test_a_heating_and_cooling_plant_closes(name):
 def test_the_doublet_heat_plant_closes(frequency):
     """A simulated day of the shipped example closes tick by tick."""
     plant = gm.plants.example("DoubletHeatPlant")
-    clock = gm.Clock.days(2027, 1, 1, days=1)
+    clock = gm.engine.Clock.days(2027, 1, 1, days=1)
     profiles = {
-        "doublet.reservoir.production_rate": gm.Profile.constant(150, unit="m3/h", clock=clock),
-        "doublet.esp.frequency": gm.Profile.constant(frequency, unit="Hz", clock=clock),
-        "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
+        "doublet.reservoir.production_rate": gm.types.Profile.constant(
+            150, unit="m3/h", clock=clock
+        ),
+        "doublet.esp.frequency": gm.types.Profile.constant(frequency, unit="Hz", clock=clock),
+        "injection_pump.pressure_setpoint": gm.types.Profile.constant(
+            51.5, unit="bar", clock=clock
+        ),
     }
     results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     assert_plant_closes(plant, results)

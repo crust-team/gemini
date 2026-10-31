@@ -37,7 +37,7 @@ assert out.outputs.head == esp(stream, frequency="50 Hz").outputs.head
 print(out.outputs.get("head", unit="bar"), out.outlets.fluid_out)
 assert out.outlets.fluid_out is out.outlets["fluid_out"]
 
-with gm.no_outputs():
+with gm.modules.no_outputs():
     fluid_only = esp(fluid_in=out.outlets.fluid_out, frequency="50 Hz")
 assert dict(fluid_only.outputs) == {}
 
@@ -52,7 +52,7 @@ print(results.to_frame(table="energy"))
 print(results["doublet.esp"].power)
 assert len(gm.resume("runs/replay.ckpt")) == len(results)
 
-fit = gm.optim.calibrate(plant, data, params=[plant.get("heat_exchanger.thermal_conductance")])
+fit = gm.analysis.calibrate(plant, data, params=[plant.get("heat_exchanger.thermal_conductance")])
 print(fit)
 ```
 
@@ -64,8 +64,8 @@ A leaf module computes and a plant connects: every composite is a `Plant` class 
 children, ports and connections, and `gm.Plant(name)` builds one with `add` and `connect`.
 `gm.plants.names()` lists the plant classes, `gm.plants.example(name)` returns one with real values,
 and `gm.plants.convert_legacy(folder)` turns an old project folder into a plant dict, the JSON form
-agents read and write: `plant.to_dict()`, `gm.plants.from_dict`, `gm.plants.schema()`. `gm.profiles`
-reads your demand, from a CSV file (`gm.profiles.from_csv`) or from values (`from_values`).
+agents read and write: `plant.to_dict()`, `gm.plants.from_dict`, `gm.plants.schema()`. `gm.data`
+reads your demand, from a CSV file (`gm.data.from_csv`) or from values (`from_values`).
 
 gemini holds no data file. `gm.plants.example` reads `inputs/`, which is in a
 source checkout and not installed, and outside one it raises `inputs_missing`:
@@ -80,7 +80,7 @@ inputs/             # repository only
 
 A plant can be designed from its depth. A `Doublet` derives its reservoir, wells and pump from a few
 design values, `gm.schedule` plans each day from the demand with no bindings to write, and
-`gm.checks.limits` and `gm.economics` judge the run:
+`gm.evaluate.limits` and `gm.evaluate` judge the run:
 
 ```python
 plant.add("Doublet", name="d0", params={
@@ -99,7 +99,7 @@ a template plant takes its size, `gm.plants.HeatingCoolingPlant(doublets=2)`.
 Everything in the energy flow is a module and everything that crosses between modules goes through
 a port. A plant starts at its edge modules: `ElectricityGrid`, `GasGrid`, `HeatingGrid`,
 `CoolingGrid`, `WasteGrid`, `ChemicalGrid`, `Atmosphere` and `Formation`. Totals are read from them
-(`gm.kpi.totals(plant, results)`) and `gm.checks.plant_balance(plant, results)` closes mass and
+(`gm.evaluate.totals(plant, results)`) and `gm.evaluate.plant_balance(plant, results)` closes mass and
 energy on them.
 
 The application, not the package, reads CSV, databases, or APIs. `Dataset` accepts pandas, dicts,
@@ -109,7 +109,7 @@ engine and optimizer calls never take a separate configuration.
 See [api.md](.claude/docs/api.md), [modules.md](.claude/docs/modules.md),
 [data.md](.claude/docs/data.md), [engine.md](.claude/docs/engine.md),
 [legacy.md](.claude/docs/legacy.md) and [errors.md](.claude/docs/errors.md). Report bugs with the
-output of `python -m gemini.utils.collect_env`.
+output of `python -m gemini._utils.collect_env`.
 
 ## Testing
 

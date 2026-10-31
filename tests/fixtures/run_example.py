@@ -1,6 +1,6 @@
 """Run an example script under the backend named by ``GEMINI_EXAMPLE_BACKEND``.
 
-``python tests/fixtures/run_example.py <script>`` enters ``gemini.backends.settings`` with that
+``python tests/fixtures/run_example.py <script>`` enters ``gm.runtime.settings`` with that
 backend for the whole script and runs it as ``__main__`` with ``runpy``, so an example needs no
 setting of its own. An ``Engine`` applies its own ``backend`` to each run, so the script also
 makes that backend the default of ``Engine(plant, backend=...)`` and of the run functions, which
@@ -12,7 +12,7 @@ import runpy
 import sys
 
 import gemini as gm
-from gemini import backends
+from gemini import runtime
 
 
 def _set_default_backend(function, backend):
@@ -31,7 +31,7 @@ def main():
     backend = os.environ["GEMINI_EXAMPLE_BACKEND"]
     for function in (gm.Engine.__init__, gm.simulate, gm.replay, gm.live):
         _set_default_backend(function, backend)
-    with backends.settings(backend=backend):
+    with runtime.settings(backend=backend):
         runpy.run_path(script, run_name="__main__")
 
 

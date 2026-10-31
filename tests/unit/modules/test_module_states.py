@@ -5,18 +5,8 @@ import pytest
 
 import gemini as gm
 from gemini.modules import Module
-from gemini.types import (
-    Control,
-    Duty,
-    Energy,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    State,
-    Stream,
-    Temperature,
-)
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter, State
+from gemini.types import Duty, Energy, Stream, Temperature
 from gemini.types.bindings import Binding, ModuleBindings
 from tests.fixtures.errors import raises
 from tests.fixtures.reading import reading

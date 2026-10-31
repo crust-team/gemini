@@ -1,36 +1,20 @@
-"""Public composable equipment and plant API."""
+"""Public composable equipment and module API."""
 
-from ._utils import registry
+from gemini._utils.registry import categories, get, names
+
 from ._utils.balance import collect_flows, emissions, energy_balance, mass_balance
-from ._utils.registry import categories, get, load_file, names, register
 from ._utils.wiring import trace_wiring
+from .check import check
 from .container import ModuleDict, ModuleList
 from .control import PIDController
 from .cooling import AbsorptionUnit, AdsorptionChiller
+from .declarations import Boundary, Control, Inlet, Outlet, Output, Parameter, State
 from .environment import Atmosphere, Formation
 from .exchangers import Cooler, HeatExchanger
 from .grids import ChemicalGrid, CoolingGrid, ElectricityGrid, GasGrid, HeatingGrid, WasteGrid
 from .heating import CHP, Boiler, ElectricBoiler, HeatPump
-from .module import Module
+from .module import Module, no_outputs
 from .piping import GasMakeup, Mixer, Pipe, PressurizationTank, Splitter, Valve
-from .plants import (
-    ATESPlant,
-    CoolingSubstation,
-    DistrictNetwork,
-    Doublet,
-    DoubletHeatPlant,
-    HeatingAbsorptionCoolingPlant,
-    HeatingCoolingPlant,
-    HeatingFullCoolingPlant,
-    HeatingHeatPumpCoolingPlant,
-    HeatingPlant,
-    HeatingSubstation,
-    MultiWellPlant,
-)
-from .plants.boilerchpplant import BoilerChpPlant
-from .plants.districtenergyplant import DistrictEnergyPlant
-from .plants.nodaldoublet import NodalDoublet
-from .plants.parallelexchangerplant import ParallelExchangerPlant
 from .power import ORC, FlashTurbine, Separator
 from .pumps import (
     ESP,
@@ -103,22 +87,6 @@ __all__ = [
     "ORC",
     "Separator",
     "FlashTurbine",
-    "HeatingSubstation",
-    "CoolingSubstation",
-    "ATESPlant",
-    "NodalDoublet",
-    "ParallelExchangerPlant",
-    "BoilerChpPlant",
-    "DistrictEnergyPlant",
-    "Doublet",
-    "DoubletHeatPlant",
-    "DistrictNetwork",
-    "MultiWellPlant",
-    "HeatingPlant",
-    "HeatingCoolingPlant",
-    "HeatingFullCoolingPlant",
-    "HeatingAbsorptionCoolingPlant",
-    "HeatingHeatPumpCoolingPlant",
     "collect_flows",
     "emissions",
     "energy_balance",
@@ -127,10 +95,13 @@ __all__ = [
     "names",
     "get",
     "categories",
-    "register",
-    "load_file",
+    "check",
+    "no_outputs",
+    "Parameter",
+    "Inlet",
+    "Control",
+    "Boundary",
+    "State",
+    "Output",
+    "Outlet",
 ]
-
-for _value in map(globals().get, __all__):
-    if isinstance(_value, type) and issubclass(_value, Module) and _value.category is not None:
-        registry.register(_value)

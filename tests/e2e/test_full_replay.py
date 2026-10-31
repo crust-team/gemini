@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 import gemini as gm
+from gemini.data import legacy
 from gemini.engine.callbacks import Callback
-from gemini.utils import legacy
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.frames import path_frame
 
@@ -101,7 +101,7 @@ def _twin_errors(frame, data, normal):
 
 def _holdout(plant, dataset, engine, data):
     """Fit heat-exchanger UA on the first week, then replay it alone on the held-out rows."""
-    fit = gm.optim.calibrate(
+    fit = gm.analysis.calibrate(
         plant,
         dataset,
         params=[plant.get("heat_exchanger.thermal_conductance")],
@@ -130,7 +130,9 @@ def _chain(plant, dataset, data):
     audit = BalanceAudit(sampled_steps)
     handle = plant.register_forward_pre_hook(audit.capture)
     try:
-        chain = gm.Engine(plant, callbacks=[audit]).simulate(dataset, gm.Clock.from_data(dataset))
+        chain = gm.Engine(plant, callbacks=[audit]).simulate(
+            dataset, gm.engine.Clock.from_data(dataset)
+        )
     finally:
         handle.remove()
     frame = path_frame(chain)

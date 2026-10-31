@@ -3,7 +3,8 @@
 import gemini as gm
 from gemini.modules import Filter, Module
 from gemini.modules._utils.wiring import trace_wiring
-from gemini.types import Inlet, Outlet, Stream
+from gemini.modules.declarations import Inlet, Outlet
+from gemini.types import Stream
 from tests.fixtures.errors import raises
 
 STREAM = Stream(m_dot=10, T=330, p=1e6)

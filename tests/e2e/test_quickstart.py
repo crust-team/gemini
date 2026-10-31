@@ -28,16 +28,22 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
 
     res2 = gm.resume("runs/replay.ckpt")
 
-    fit = gm.optim.calibrate(plant, data, params=[plant.get("heat_exchanger.thermal_conductance")])
+    fit = gm.analysis.calibrate(
+        plant, data, params=[plant.get("heat_exchanger.thermal_conductance")]
+    )
     print(fit)
     plant.save("runs/my_plant.json")
     assert gm.Plant.load("runs/my_plant.json").state_dict() == plant.state_dict()
 
-    clock = gm.Clock.days(2027, 1, 1, days=1)
+    clock = gm.engine.Clock.days(2027, 1, 1, days=1)
     profiles = {
-        "doublet.reservoir.production_rate": gm.Profile.constant(150, unit="m3/h", clock=clock),
-        "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
-        "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
+        "doublet.reservoir.production_rate": gm.types.Profile.constant(
+            150, unit="m3/h", clock=clock
+        ),
+        "doublet.esp.frequency": gm.types.Profile.constant(55, unit="Hz", clock=clock),
+        "injection_pump.pressure_setpoint": gm.types.Profile.constant(
+            51.5, unit="bar", clock=clock
+        ),
     }
     sim = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     print(sim.to_frame(table="energy"))

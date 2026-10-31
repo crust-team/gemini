@@ -73,7 +73,7 @@ BUILDERS = {
 @pytest.fixture(scope="module")
 def runs(spec, window):
     """Return the replay and simulate frames of each way of building the plant, per backend."""
-    clock = gm.Clock.days(2024, 6, 7)
+    clock = gm.engine.Clock.days(2024, 6, 7)
     first = window.read(window.start, window.start)
     assumed = gm.Dataset.from_frame(pd.DataFrame([first.iloc[0].to_dict()] * 24, index=list(clock)))
 

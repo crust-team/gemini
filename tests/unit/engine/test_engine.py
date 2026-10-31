@@ -4,9 +4,9 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini.backends import runtime
+from gemini import runtime
 from gemini.modules import Module
-from gemini.types import Control, Output
+from gemini.modules.declarations import Control, Output
 from gemini.types.bindings import Binding, ModuleBindings
 from tests.fixtures.errors import raises
 
@@ -67,7 +67,7 @@ def test_arguments_and_checkpoint_states_are_validated(setup, tmp_path):
 def test_replay_windows_data_and_an_explicit_clock(setup):
     """Start and end bound both the rows and an explicit clock inclusively."""
     plant, data = setup
-    clock = gm.Clock.from_data(data)
+    clock = gm.engine.Clock.from_data(data)
     result = gm.Engine(plant).replay(data, clock=clock, start=data.start, end=clock.ticks[1])
     assert len(result) == 2
 

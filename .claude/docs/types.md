@@ -2,9 +2,9 @@
 
 Import public types from `gemini.types`; quantity aliases are defined in
 `types/quantities.py`. Types depend on the standard library, Pydantic, pandas/NumPy for
-profiles, `gemini.physics` for property calculations, `gemini.errors` and `gemini.utils`. They never
+profiles, `gemini.physics` for property calculations, `gemini.errors` and `gemini._utils`. They never
 import equipment or the engine. `Stream.__init__` reads the runtime default fluid
-through a function-level import of `gemini.backends.runtime` (see
+through a function-level import of `gemini.runtime` (see
 [conventions.md](conventions.md#dependencies)).
 
 | GEMINI | Purpose |
@@ -47,7 +47,7 @@ the combinations of a plant, described in [plants.md](plants.md#outputs). `UNSET
 the same object under copy, deep copy and pickling. `shape=` checks fixed vectors; bounds can
 tighten quantity defaults.
 
-`declaration.validate(value)` converts a unit string or `gm.Quantity(value, unit)` to the declared
+`declaration.validate(value)` converts a unit string or `gm.types.Quantity(value, unit)` to the declared
 SI unit and then validates it with a Pydantic `TypeAdapter`; a failure raises
 `gm.errors.ValidationError`. Plain numbers are taken as SI. A cheap check built once per
 declaration is tried first and accepts only the common case, returned unchanged: an exact `float`
@@ -105,7 +105,7 @@ kg/s; text without a unit such as `flow="150"` raises `gm.errors.ValidationError
 `flow` and `m_dot` raises `gm.errors.ValidationError`, as do an unknown keyword (with a did-you-mean),
 a missing field and a `fluid` that is neither a `Fluid` nor a mapping of its fields. The explicit
 SI `m_dot` field remains supported. Without `fluid` the constructor uses the runtime default
-fluid. All public numeric declarations accept a unit string or `gm.Quantity(value, unit)`.
+fluid. All public numeric declarations accept a unit string or `gm.types.Quantity(value, unit)`.
 `gm.units.convert(value, from_unit, to_unit, quantity=None)` handles explicit output conversion.
 
 `gm.units` is the one unit implementation (`physics/units.py`, one table). Its public names:
@@ -229,7 +229,7 @@ topology: `fuel * fuel_factor + max(0, electricity - electricity_generated) * el
 Factors are SI kg/J (kg/GJ / 1e9, kg/kWh / 3.6e6; the unit table has no emission-factor units). All
 on-site generation offsets the electricity of all consumers (ESP, pumps, compressors, heat pumps), not
 only the ESP as in the upstream GEMINI KPI, before grid electricity is charged; a surplus earns no
-credit. `gm.economics` uses it for the energies drawn; the CO2 of a run comes from the `co2_emission`
+credit. `gm.evaluate` uses it for the energies drawn; the CO2 of a run comes from the `co2_emission`
 and `methane_emission` outputs, which follow the gas composition.
 
 ## Profiles and costs

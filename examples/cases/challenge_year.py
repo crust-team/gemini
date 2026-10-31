@@ -4,9 +4,9 @@ Plans 2027 for the plant dict ``plant.json`` of the sample problem, two doublets
 a boiler and three chillers, and simulates it. The reservoir, the brine, the limits and the supply
 temperatures are the sample problem's; what this case assumes it prints as assumptions.
 
-Shows ``gm.plants.from_dict``, ``gm.profiles.from_csv``, ``gm.schedule``, ``gm.simulate``,
-``gm.checks.Limits.from_dict``, ``gm.checks.limits``, ``gm.checks.operating_time``,
-``gm.kpi.totals`` and ``gm.economics.lcts``.
+Shows ``gm.plants.from_dict``, ``gm.data.from_csv``, ``gm.schedule``, ``gm.simulate``,
+``gm.evaluate.Limits.from_dict``, ``gm.evaluate.limits``, ``gm.evaluate.operating_time``,
+``gm.evaluate.totals`` and ``gm.evaluate.lcts``.
 
 Run with ``python examples/cases/challenge_year.py``.
 """
@@ -37,8 +37,8 @@ def demand():
     cool = {"cooling_demand_MWcool": "cooling_demand"}
     return pd.concat(
         [
-            gm.profiles.from_csv(SAMPLE / HEATING_FILE, heat, "MW", time_column="date"),
-            gm.profiles.from_csv(SAMPLE / COOLING_FILE, cool, "MW", time_column="date"),
+            gm.data.from_csv(SAMPLE / HEATING_FILE, heat, "MW", time_column="date"),
+            gm.data.from_csv(SAMPLE / COOLING_FILE, cool, "MW", time_column="date"),
         ],
         axis=1,
     )
@@ -54,7 +54,7 @@ ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
 
 def print_year(plant, results):
     """Print the energy of the year and the supply temperatures, in daily steps."""
-    totals = gm.kpi.totals(plant, results)
+    totals = gm.evaluate.totals(plant, results)
     frame = results.to_frame()
     boiler = frame["peak_boiler.fluid_out.enthalpy_flow"]
     boiler = boiler - frame["peak_boiler.fluid_in.enthalpy_flow"]
@@ -112,11 +112,11 @@ def main():
     results = gm.simulate(plant, plan, on_error="record")
     print(f"\nFailed days: {len(results.errors())}")
     print_year(plant, results)
-    requirements = gm.checks.Limits.from_dict(sample("limits.json"))
-    times = gm.checks.operating_time(plant, results, rules["operating_time"])
-    print_checks(gm.checks.limits(plant, results, requirements) + times)
-    lcts = gm.economics.lcts(
-        plant, results, assumptions=gm.economics.Assumptions(**sample("assumptions.json"))
+    requirements = gm.evaluate.Limits.from_dict(sample("limits.json"))
+    times = gm.evaluate.operating_time(plant, results, rules["operating_time"])
+    print_checks(gm.evaluate.limits(plant, results, requirements) + times)
+    lcts = gm.evaluate.lcts(
+        plant, results, assumptions=gm.Assumptions(**sample("assumptions.json"))
     )
     print(f"\nLCTS, on the placeholder prices above: {lcts['value'] * MWH:.2f} EUR/MWh")
 

@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from gemini.physics import units
+from gemini import units
 
 
 def quantity(name: str, unit: str, **bounds) -> Any:

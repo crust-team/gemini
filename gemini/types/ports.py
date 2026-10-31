@@ -4,12 +4,12 @@ import numbers
 
 import numpy as np
 
+from gemini._utils.mappings import AttributeMapping
+from gemini._utils.strings import did_you_mean, join_names
 from gemini.errors import ValidationError
 from gemini.errors.lookup import UnknownPort
 from gemini.ops import Symbolic
 from gemini.types.flows import Stream
-from gemini.utils.mappings import AttributeMapping
-from gemini.utils.strings import did_you_mean, join_names
 
 
 def is_port_value(value):

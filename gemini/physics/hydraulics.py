@@ -12,13 +12,13 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import TYPE_CHECKING, Literal
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError, ValidationError
 from gemini.ops import Constant
 
 from . import corrosion, erosion
 from . import fluid as fluid_physics
-from . import gas, geometry, heat_transfer, units
+from . import gas, geometry, heat_transfer
 from .constants import G_FT, MIN_PATH_PRESSURE, VALVE_REFERENCE_DENSITY, G
 
 if TYPE_CHECKING:

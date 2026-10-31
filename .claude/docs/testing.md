@@ -162,7 +162,7 @@ on arrays directly. A module with a list output (the wells' section profiles) co
 `BACKENDS = ("python", "numpy")` in `tests/fixtures/parity.py` is the one list of backends under
 test; the first is the reference, every other one is compared with it, and no test names a
 backend. **Adding a backend means adding its name to `BACKENDS`** (after registering it in
-`gemini.backends`); nothing else changes, and every test below then runs on it.
+`gemini.ops.kernels`); nothing else changes, and every test below then runs on it.
 
 - **Modules.** `assert_module_matches` runs the graph on every backend, forced around the whole
   call (tracing included), compares each with the eager calls and each with the reference, so every
@@ -180,7 +180,7 @@ backend. **Adding a backend means adding its name to `BACKENDS`** (after registe
   column dtypes. Floats compare within `RTOL`; structure and types compare exactly.
 - **Examples** (`tests/e2e/test_backend_parity.py`, `slow`). Each example runs under every
   backend through `tests/fixtures/run_example.py`, which reads `GEMINI_EXAMPLE_BACKEND`, enters
-  `gemini.backends.settings` and runs the script with `runpy`; standard output without timing
+  `gm.runtime.settings` and runs the script with `runpy`; standard output without timing
   lines must be equal.
 
 The engine itself is also compared on both backends with synthetic twins in
@@ -202,19 +202,19 @@ The suite must remain safe under `pytest -n auto`:
 `tests/unit/test_code_quality.py` also enforces the [data layout](data.md#where-data-lives): no file
 under `gemini/` names a sample problem or `inputs/examples/`, no data
 file in `gemini/`, only the allowed keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the data
-folders outside `gemini/utils/paths.py`. It also enforces the layout of `gemini/modules/`
+folders outside `gemini/_utils/paths.py`. It also enforces the layout of `gemini/modules/`
 ([where a file goes](conventions.md#module-rules)): only `__init__.py`, `module.py`, `plant.py`,
 `container.py` and folders at its top, and a registered plant class in every public file of
 `plants/`.
 `test_every_example_equals_the_plant_of_its_former_file` in
 `tests/unit/modules/plants/_utils/test_catalogue.py` pins the hash of each example plant.
 `tests/unit/test_mirror.py` enforces source mirroring: every `gemini/<path>/<name>.py` except
-`__init__.py`, including `gemini/utils/` and `gemini/errors/`, has a mirrored
+`__init__.py`, including `gemini/_utils/` and `gemini/errors/`, has a mirrored
 `tests/unit/<path>/test_<name>.py` that defines at least one test. Its `PLACEHOLDERS` set of
 mirrors still holding only a docstring is empty and must never grow.
 `tests/unit/test_package_boundaries.py` checks that `gemini.errors` and the topic files of
-`gemini.utils` import nothing else from `gemini`, and that `gemini.utils.data` imports no module
-or engine code and `gemini.utils.legacy` no engine code. `tests/unit/test_code_quality.py` enforces the comment rule, the
+`gemini._utils` import nothing else from `gemini`, and that `gemini.run` imports no module
+or engine code and `gemini.data.legacy` no engine code. `tests/unit/test_code_quality.py` enforces the comment rule, the
 nesting limit, the function-length limit with its `LONG_FUNCTIONS` exceptions and the ban on the
 framework name (see [conventions.md](conventions.md#code-quality)); flake8 enforces complexity.
 The same file fails on a formula in a module and on two physics functions with one normalised body;
@@ -268,7 +268,7 @@ the `check_wiring` audit in `tests/e2e/test_full_replay.py`, and the golden reco
 build equipment from the original `.param` files: the subsurface, wells and exchangers unit tests,
 `tests/unit/physics/test_geometry.py`, `tests/integration/test_plant.py` and the historical
 `tests/fixtures/capture_golden.py`. Shared paths live in `tests/fixtures/__init__.py` (`ROOT`,
-`FIXTURES`, `OLD_PROJECT`), and test code reaches `inputs/` through `gemini/utils/paths.py`.
+`FIXTURES`, `OLD_PROJECT`), and test code reaches `inputs/` through `gemini/_utils/paths.py`.
 
 `tests/e2e/test_examples.py` has one case per `.py` file under `examples/`. The cases run in both
 profiles (the development profile selects them when any file under `examples/` changes) and are

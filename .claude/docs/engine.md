@@ -3,7 +3,7 @@
 ## Functions or engine
 
 A run has two levels and one implementation. `gm.simulate`, `gm.replay`, `gm.live` and `gm.resume`
-(`gemini/engine/run.py`) are for everyday use: each builds an `Engine`, calls the matching method
+(`gemini/run/simulate.py`) are for everyday use: each builds an `Engine`, calls the matching method
 and returns its `Results`, with no run logic of its own. `gm.Engine` stays public for complex
 tasks: a stateful run over several calls, a callback that reads the engine, a live run held in
 memory, a manual checkpoint.
@@ -17,7 +17,7 @@ print(results.summary(units={"power": "MW", "temperature": "degC"}))
 ```
 
 No object is kept between calls of the functions, except the traced graphs, which the plant holds
-(`gemini.graph.graph_cache`): calling a function hundreds of times on one plant traces it once,
+(`gemini.compiler.graph.graph_cache`): calling a function hundreds of times on one plant traces it once,
 and an `Engine` built on the plant shares the same graphs. The guards of
 [`GraphCache`](native-engine.md) decide: a changed numeric parameter does not retrace, a changed
 structure does. A copied or pickled plant starts with an empty cache.
@@ -58,10 +58,10 @@ results = gm.simulate(plant, plan)
 `missing_value` naming it. `order` and `cooling_order` have the default orders below, and without
 `operating_time` no doublet has an outage.
 
-`gm.schedule` (`gemini/analysis/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
+`gm.schedule` (`gemini/run/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
 of each step of `demand`, at any constant step (hourly, daily, ...) and any length, from an energy
 balance on the plant's design values, with no simulation inside. It reads the `Doublet` children, the grids and the units by **role, from the wiring**
-(`gemini/analysis/roles.py`, on `plant.feeds`): a unit whose useful outlet feeds the `HeatingGrid` is
+(`gemini/run/_utils/roles.py`, on `plant.feeds`): a unit whose useful outlet feeds the `HeatingGrid` is
 a heating unit and one that feeds the `CoolingGrid` a cooling unit, directly or through mixers,
 splitters and other units. A `HeatPump` is either: on the cooling grid it is the compression chiller,
 with its condenser heat going to its cooler. At most one unit per role and kind, or `invalid_design`.
@@ -88,7 +88,7 @@ doublet off in each: a date is that whole UTC day and `{"start": ..., "end": ...
 not including, its end. On an outage a doublet has no flow and its heat goes to the next sources; a
 heat pump fed only by doublets that are off stops. Under a rule a doublet runs every other step, at
 the minimum flow when no need is left for it. `attrs["outages"]` lists the steps, and
-`gm.checks.operating_time(plant, results, duration)` counts the time each doublet carried flow.
+`gm.evaluate.operating_time(plant, results, duration)` counts the time each doublet carried flow.
 
 A heat-driven chiller on a bypass (a `Splitter` whose branches reach the users and the generator) has
 the drive water pass the users: the plan sets the split from the balance, the heat the users take
@@ -124,7 +124,7 @@ fits parameters by calling `Engine.replay` on a copy of the plant.
 
 One format serves `simulate`, `replay` and `live`: a `gm.Dataset`, or a pandas DataFrame with a
 timezone-aware `DatetimeIndex` (any zone; the instants become UTC) and one column per binding
-`column`. A DataFrame is wrapped by `gemini.utils.data.dataset.as_dataset`; a naive index, a
+`column`. A DataFrame is wrapped by `gemini.run.dataset.as_dataset`; a naive index, a
 non-time index or any other object raises `RunError`. Values have the unit of the binding,
 except that a unit recorded in `Dataset` metadata replaces it (the rule below stays). Without
 `clock`, `simulate` and `replay` use the ticks of the input (`Clock.from_data`).
@@ -145,7 +145,7 @@ module states) and a plant keeps persisted inputs and traced graphs, so a worker
 (`gm.plants.from_dict(...)`) and builds its own engine; settings from `gm.runtime` are
 context-local and a new thread starts from the defaults.
 
-`backend` is applied to every run of the engine with `gemini.backends.settings(backend=...)`:
+`backend` is applied to every run of the engine with `gm.runtime.settings(backend=...)`:
 `"numpy"` evaluates arrays, `"python"` evaluates row by row, and the numbers are the same (the
 parity suite checks it). The backend is saved in checkpoints. An unknown name raises
 `ValidationError` when the engine is built.
@@ -212,8 +212,8 @@ equipment twins of a replay; the plant in simulate) evaluated over **chunks** of
   `Aligned.present`), or an inlet stream the limits refuse (an error with the text of the real
   `Stream` constructor). `outcome.evaluate_twin` builds the inlet streams of the ticks that can be
   evaluated, takes the graph from the plant's `GraphCache` (`graph.breaks` per twin path are in
-  `engine.graph_breaks`), feeds it with `graph_feeds` and calls `gemini.graph.evaluate`: the backend
-  is the one of `gemini.backends.settings(backend=...)`, NumPy over arrays by default, Python row by
+  `engine.graph_breaks`), feeds it with `graph_feeds` and calls `gemini.compiler.graph.evaluate`: the backend
+  is the one of `gm.runtime.settings(backend=...)`, NumPy over arrays by default, Python row by
   row (`backend="python"` is how to debug) and the results are the same. A failing row gets the
   check's class and exact message from `Evaluation.error`; a bound violation on a declaration reads
   `declaration.validate`. Then `health.assess` runs `Module.health` once on the arrays (row by row on
@@ -294,7 +294,7 @@ the columns.
 The ports of a leaf are columns too, by `Stream.quantities()`: `<port>.<quantity>` for a fluid
 (`results.get("hp", "hot_out.enthalpy_flow")`) and the port's name for a `Power`
 (`results.get("grid", "power_out")`); the quantities are listed in [types.md](types.md). A limit
-of `gm.checks.Limits` may name one, and `gm.kpi`, `gm.economics` and the energy report read them.
+of `gm.evaluate.Limits` may name one, and `gm.evaluate`, `gm.evaluate` and the energy report read them.
 
 `Results[path]` returns the series of one module path; `Results[path].field` is a pandas Series
 and an unknown path or field raises `ValidationError`. Only leaf results are stored: twins in
@@ -309,7 +309,7 @@ the plant's output declarations when a run starts (`declared_units`); a field wi
 unit (`operating`, the `health_*` fields, text outputs) is dimensionless, `"-"`. The table is saved
 with the results.
 
-**JSON views.** Every public return passes `gemini.utils.jsonable.to_plain`: NaN and infinity
+**JSON views.** Every public return passes `gemini._utils.jsonable.to_plain`: NaN and infinity
 are `null`, times are ISO 8601 UTC text. Every view takes `units`, a map from quantity to unit
 ([output units](api.md#output-units)), and `results.quantities` is `{path: {field: quantity}}`, saved
 with the results; a field without a quantity is left alone.

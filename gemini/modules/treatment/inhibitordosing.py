@@ -2,9 +2,10 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.treatment import _physics
-from gemini.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Parameter, Stream
+from gemini.types import Fraction, MassFlow, Stream
 
 
 class InhibitorDosing(Module):

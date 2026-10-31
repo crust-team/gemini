@@ -2,25 +2,21 @@
 
 import numpy as np
 
-from gemini import backends, ops
-from gemini.backends import runtime
+from gemini import ops, runtime
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.pumps import _physics
+from gemini.ops import kernels
 from gemini.physics import constants, diagnostics, energy, pumps
 from gemini.types import (
-    Control,
     Count,
     Dimensionless,
     Efficiency,
     Fraction,
     Frequency,
     Health,
-    Inlet,
     Length,
-    Outlet,
-    Output,
-    Parameter,
     Power,
     Pressure,
     PressureDifference,
@@ -97,7 +93,7 @@ class ESP(Module):
         honours float32 precision, so ``_physics.esp_efficiency`` keeps ``ops.truediv``: a
         plain ``/`` by a zero power would raise there.
         """
-        return backends.PLAIN if _float32() else backends.WRAP
+        return kernels.PLAIN if _float32() else kernels.WRAP
 
     def forward(self, inlets):
         """Raise the suction-stream pressure by the pump-curve head."""

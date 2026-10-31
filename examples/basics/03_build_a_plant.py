@@ -10,7 +10,8 @@ Run with ``python examples/basics/03_build_a_plant.py``.
 """
 
 import gemini as gm
-from gemini.types import Inlet, Outlet, Output, Stream
+from gemini.modules import Inlet, Outlet, Output
+from gemini.types import Stream
 
 FILTERS = 2
 

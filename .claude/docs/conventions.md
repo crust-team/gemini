@@ -17,35 +17,35 @@ loader in `examples/`, never the other way round.
 
 A package may import only the packages to its left:
 
-`gemini.utils`, `gemini.errors` ← `gemini.backends` ← `gemini.ops` ← `gemini.physics`
-← `gemini.types` ← `gemini.backends.runtime` ← `gemini.modules` ← `gemini.graph`
-← `gemini.utils.data` ← `gemini.engine` ← `gemini.utils.legacy` ← `optim`, `analysis`,
+`gemini._utils`, `gemini.errors` ← `gemini.ops.kernels` ← `gemini.ops` ← `gemini.physics`
+← `gemini.types` ← `gemini.runtime` ← `gemini.modules` ← `gemini.compiler.graph`
+← `gemini.run` ← `gemini.engine` ← `gemini.data.legacy` ← `optim`, `analysis`,
 `economics`, `checks`, `testing`, `profiles` ← `gemini/__init__`.
 
 Three files and folders live in a package lower in the order than their own place in it:
-`gemini/backends/runtime.py`, `gemini/utils/data/` and `gemini/utils/legacy/`. They stay safe
-because neither `gemini/backends/__init__.py` nor `gemini/utils/__init__.py` imports them, so
+`gemini/runtime/context.py`, `gemini/run/` and `gemini/data/legacy/`. They stay safe
+because neither `gemini/ops/kernels/__init__.py` nor `gemini/_utils/__init__.py` imports them, so
 importing the lower package never loads them.
 
-`gemini.backends` and `gemini.ops` sit below the physics because physics is written with the
-ops; `gemini.graph` sits above `gemini.modules` because its tracer runs module calls (see
+`gemini.ops.kernels` and `gemini.ops` sit below the physics because physics is written with the
+ops; `gemini.compiler.graph` sits above `gemini.modules` because its tracer runs module calls (see
 [native-engine.md](native-engine.md)).
 
-`gemini.utils` (its topic files, not `data/` and `legacy/`) and `gemini.errors` are leaf packages:
+`gemini._utils` (its topic files, not `data/` and `legacy/`) and `gemini.errors` are leaf packages:
 they import only the standard library, installed dependencies and themselves, never another part
 of `gemini` (`tests/unit/test_package_boundaries.py` enforces this). One topic file differs:
-`gemini/utils/paths.py` imports `gemini.errors`, the other leaf, because a missing `inputs/` folder
+`gemini/_utils/paths.py` imports `gemini.errors`, the other leaf, because a missing `inputs/` folder
 raises `inputs_missing` wherever it is needed. There are two documented exceptions to
 the order. `gemini.physics.hydraulics` imports `Stream` and `Fluid` for type checking only, and
-`Stream.__init__` in `gemini.types.flows` imports `gemini.backends.runtime` inside the function to read the
+`Stream.__init__` in `gemini.types.flows` imports `gemini.runtime` inside the function to read the
 default fluid, because a module-level import would form a cycle through `gemini.types.fluid`.
-`gm.plants.convert_legacy` imports `gemini.utils.legacy` inside the function, because the legacy
+`gm.plants.convert_legacy` imports `gemini.data.legacy` inside the function, because the legacy
 bridge sits above `gemini.modules`.
-`gemini.utils.data` imports no module or engine code and `gemini.utils.legacy` imports no engine
+`gemini.run` imports no module or engine code and `gemini.data.legacy` imports no engine
 code (the same test file enforces both).
 
-Packages outside `gemini.utils.legacy` never interpret old project names, tags, tables or node
-mappings. Old-format knowledge stays in `gemini.utils.legacy`, which is internal; its one public entry is
+Packages outside `gemini.data.legacy` never interpret old project names, tags, tables or node
+mappings. Old-format knowledge stays in `gemini.data.legacy`, which is internal; its one public entry is
 `gm.plants.convert_legacy(folder)`.
 Equipment performs no file or database access. Calibration predicts only through public replay.
 A leaf module computes and a plant connects; no class does both. A leaf `Module` has physics calls
@@ -82,10 +82,10 @@ formula twice.
   `module.py` (`Module`), `plant.py` (`Plant`) and `container.py` (`ModuleList`, `ModuleDict`).
 - Machinery goes in an `_utils/` folder, even if some of its functions are exported publicly:
   `gemini/modules/_utils/` (`balance`, `description`, `design`, `registry`, `serialization`,
-  `wiring`), and `gemini/modules/plants/_utils/` for the plant tools.
+  `wiring`), and `gemini/plants/_utils/` for the plant tools.
 - Code shared by the modules of one category goes in that category folder as a private file:
   `heating/_burner.py`, `cooling/_sorption.py`.
-- `gemini/modules/plants/` holds only plant classes.
+- `gemini/plants/` holds only plant classes.
 
 `tests/unit/test_code_quality.py` checks the first and the last. A class in `_utils` belongs to no
 category, and the public names stay in `gm.modules`. Fitting and calibration belong in `gm.analysis`
@@ -139,7 +139,7 @@ Generated output goes under ignored `runs/`.
 
 There is no data file inside `gemini/`: a plant is a class. `inputs/` holds everything code reads, is
 not installed, and raises `inputs_missing` when absent. `docs/schemas/` is generated documentation.
-There is no other home for data ([data.md](data.md#where-data-lives)). `gemini/utils/paths.py` is the
+There is no other home for data ([data.md](data.md#where-data-lives)). `gemini/_utils/paths.py` is the
 only code that builds a path to `inputs/`, except an example, which finds it from `__file__` because
 it uses the public API alone. `tests/unit/test_code_quality.py` checks these rules.
 
@@ -160,7 +160,7 @@ Every port name is `<role>_in` or `<role>_out`. A module with one circuit uses `
 Add a role only when no existing one fits, here and in [glossary.md](glossary.md).
 `test_every_port_follows_the_naming_rule` in `tests/unit/test_code_quality.py` checks every port of
 every registered module against the rule and this list. A port's label says what may be connected:
-`Inlet(Stream, kind="hot_water")`, one of `gm.streams.names()`; `kind` means only this label, and the
+`Inlet(Stream, kind="hot_water")`, one of `gm.types.streams.names()`; `kind` means only this label, and the
 first argument of every declaration is its `type`.
 
 Outputs derived from a port field are named `<port>_<field>`, for example `hot_out_T`. Controls
@@ -265,8 +265,8 @@ reason it is needed:
   of their children's calls. During `Module.step` each call record also points to the one `_Step`
   record (time step and state trees), so a composite steps its stateful descendants through its
   ordinary `forward` instead of a second, hand-written step method.
-- `gm.no_outputs()` and `gm.runtime.settings()` are context settings built on
-  `gemini.utils.context.ContextSetting`: a context variable change usable as a `with` block and
+- `gm.modules.no_outputs()` and `gm.runtime.settings()` are context settings built on
+  `gemini._utils.context.ContextSetting`: a context variable change usable as a `with` block and
   as a decorator, restored on exit.
 - `Module.category` is `_FolderCategory` in `gemini/modules/module.py`, a descriptor that reads
   the folder from the import path of the class, so the folder is the one source of a module's
@@ -281,7 +281,7 @@ reason it is needed:
 - A child assigned on a `Plant` is noted as `add` notes it, and `Plant.fluid` passes the fluid to
   every module below it.
 - Attribute access on mappings: `Ports` and `Values` derive from
-  `gemini.utils.mappings.AttributeMapping`, so `result.outlets.fluid_out` equals
+  `gemini._utils.mappings.AttributeMapping`, so `result.outlets.fluid_out` equals
   `result.outlets["fluid_out"]`, and `Results[path].field` returns a pandas Series through
   `ModuleSeries.__getattr__`.
 - `Plant.forward` runs a module with an `offered` outlet twice in one step: its offer first, which
@@ -296,7 +296,7 @@ reason it is needed:
   after each replayed twin (the base method returns `None`, meaning not assessed).
 
 - Operator overloading on `gemini.ops.Operators`: a `Constant` (`physics/constants.py`)
-  and a traced `gemini.graph.Proxy` route `+`, `*`, `<`, ... through `gemini.ops.dispatch`, so
+  and a traced `gemini.compiler.graph.Proxy` route `+`, `*`, `<`, ... through `gemini.ops.dispatch`, so
   one physics source runs on floats, arrays and traced values. A constant acts as its float on
   concrete values and becomes a named graph input in a trace. The math functions (`ops.log`,
   `ops.sqrt`, `ops.maximum`, ...) and `ops.truediv`/`ops.pow` never raise or warn on an operand
@@ -326,19 +326,19 @@ reason it is needed:
   selected one, like the graph's error codes. A `Failed` carries through every op, raises when used
   as a number (`bool`, `float`, `int`, `format`, a `Stream`, a `Declaration`) and raises its error
   when it leaves the outermost scope. A failing `check` on an eager array raises at once, for the
-  first failing row; tests compare arrays through `gemini.graph.run_function`. In a trace the graph
+  first failing row; tests compare arrays through `gemini.compiler.graph.run_function`. In a trace the graph
   does the same: a check recorded in a physics function guards that function's traced results (all
   of them, through an `identity` node for a passed-through argument) and reaches an outer function
   through data, and a check outside any physics function (inline in `forward`) guards every graph
   output, as it raises at once when eager. Never put the `repr`
   of a physical value in a message (it reads `np.float64(1.0)`) and use `ops.round`, not `round`.
-- A module holds its `GraphCache` in `_graph_cache` (`None` until `gemini.graph.graph_cache` first
+- A module holds its `GraphCache` in `_graph_cache` (`None` until `gemini.compiler.graph.graph_cache` first
   asks for it), so traced graphs outlive an engine and a run function does not trace the plant
   again. It sits on the module because a graph refers to its module, so a cache outside would keep
   the module alive; a copied or pickled module starts with an empty cache
   (`GraphCache.__reduce__`).
 - During a trace the `_Call` record carries the traced parameter values, which
   `Module.__getattr__` returns instead of the stored values, and records outputs without
-  validating them (`gemini/graph/tracer.py`).
+  validating them (`gemini/compiler/graph/tracer.py`).
 
 Adding another implicit mechanism needs a reason of the same weight and an entry here.

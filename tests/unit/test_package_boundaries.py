@@ -1,9 +1,7 @@
-"""``gemini.utils`` and ``gemini.errors`` are leaf packages that import nothing else from GEMINI.
+"""``gemini._utils`` and ``gemini.errors`` are leaf packages that import nothing else from GEMINI.
 
-``gemini/utils/data`` and ``gemini/utils/legacy`` are the exception: they live in ``utils`` but sit
-higher in the dependency order, so they have their own rule here. ``gemini/utils/paths.py`` may
-import ``gemini.errors``, itself a leaf, because a missing ``inputs/`` folder raises
-``inputs_missing``.
+Two files of ``gemini/_utils`` may import ``gemini.errors``, itself a leaf: ``paths.py``, because a
+missing ``inputs/`` folder raises ``inputs_missing``, and ``registry.py``, which refuses a name.
 """
 
 import ast
@@ -12,10 +10,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parents[2]
-LAYERED = {"data": ("gemini.modules", "gemini.engine"), "legacy": ("gemini.engine",)}
-"""Folders of ``gemini.utils`` above the leaf, with the packages each must never import."""
-RAISES_ERRORS = "paths.py"
-"""The topic file that raises a ``gm.errors`` class: it may import ``gemini.errors``."""
+RAISES_ERRORS = ("paths.py", "registry.py")
+"""The topic files that raise a ``gm.errors`` class: they may import ``gemini.errors``."""
 
 
 def imported_modules(path):
@@ -31,47 +27,37 @@ def imported_modules(path):
     return names
 
 
-def leaf_files(package):
-    """Return the files of a leaf package, without the layered folders."""
-    root = ROOT / "gemini" / package
-    return [
-        path
-        for path in sorted(root.rglob("*.py"))
-        if path.relative_to(root).parts[0] not in LAYERED
-    ]
-
-
-def is_layered(name):
-    """Whether an import names one of the layered folders."""
-    return any(name.startswith(f"gemini.utils.{folder}") for folder in LAYERED)
-
-
-@pytest.mark.parametrize("package", ["utils", "errors"])
+@pytest.mark.parametrize("package", ["_utils", "errors"])
 def test_leaf_package_imports_only_itself(package):
     """Every import is the standard library, a dependency, or the package itself."""
     offending = {}
-    for path in leaf_files(package):
+    for path in sorted((ROOT / "gemini" / package).rglob("*.py")):
         names = imported_modules(path) - (
-            {"gemini.errors"} if path.name == RAISES_ERRORS else set()
+            {"gemini.errors"} if path.name in RAISES_ERRORS else set()
         )
         bad = {
             name
             for name in names
             if name.startswith(".")
-            or (name.split(".")[0] == "gemini")
-            and (not name.startswith(f"gemini.{package}") or is_layered(name))
+            or (name.split(".")[0] == "gemini" and not name.startswith(f"gemini.{package}"))
         }
         if bad:
             offending[path.name] = sorted(bad)
     assert offending == {}
 
 
-@pytest.mark.parametrize("folder", LAYERED)
-def test_layered_folders_stay_below_what_they_must_not_know(folder):
-    """The data package knows no modules or engine, the legacy bridge knows no engine."""
-    offending = {}
-    for path in sorted((ROOT / "gemini" / "utils" / folder).rglob("*.py")):
-        bad = {name for name in imported_modules(path) if name.startswith(LAYERED[folder])}
-        if bad:
-            offending[path.name] = sorted(bad)
-    assert offending == {}
+def test_a_dataset_knows_no_modules_or_engine():
+    """``gemini/run/dataset.py`` is in-memory data, with nothing of a run."""
+    names = imported_modules(ROOT / "gemini/run/dataset.py")
+    assert [name for name in names if name.startswith(("gemini.modules", "gemini.engine"))] == []
+
+
+def test_the_legacy_bridge_knows_no_engine():
+    """Old formats reach the package through plants and datasets, never the engine."""
+    bad = [
+        name
+        for path in sorted((ROOT / "gemini/data/legacy").rglob("*.py"))
+        for name in imported_modules(path)
+        if name.startswith("gemini.engine")
+    ]
+    assert bad == []

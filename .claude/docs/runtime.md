@@ -1,6 +1,6 @@
 # Runtime settings
 
-`gm.runtime` (`gemini/backends/runtime.py`) contains process defaults that should not be design parameters:
+`gm.runtime` (`gemini/runtime/context.py`) contains process defaults that should not be design parameters:
 
 - `set_default_fluid` / `get_default_fluid`
 - `set_precision("float64" | "float32")` / `get_precision`
@@ -9,7 +9,7 @@
 - `settings(**changes)`
 
 Use `with gm.runtime.settings(precision="float32", display_units="field"):` or the same call as a
-decorator for temporary changes; it is built on `gemini.utils.context.ContextSetting`, nests, and
+decorator for temporary changes; it is built on `gemini._utils.context.ContextSetting`, nests, and
 restores the previous settings on exit. Settings are context-local: they live in one
 `contextvars.ContextVar`, so a change applies to the current context only. asyncio tasks start
 from a copy of their creator's settings, while new threads start from the defaults; code that

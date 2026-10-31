@@ -4,12 +4,12 @@ from datetime import timedelta
 
 import numpy as np
 
+from gemini import units as physics_units
+from gemini._utils.strings import close_matches, did_you_mean, join_names
+from gemini._utils.time import to_utc
 from gemini.errors import NotImplementedYet, ValidationError
 from gemini.physics import corrosion
-from gemini.physics import units as physics_units
 from gemini.types.shapes import OutputUnits, value
-from gemini.utils.strings import close_matches, did_you_mean, join_names
-from gemini.utils.time import to_utc
 
 _CONDITIONS = {
     "temperature": ("K", "temperature"),

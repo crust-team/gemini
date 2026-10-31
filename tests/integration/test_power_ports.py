@@ -4,12 +4,13 @@ import numpy as np
 import pytest
 
 import gemini as gm
+from gemini._utils import registry
+from gemini.compiler.graph import run
 from gemini.errors import ValidationError
-from gemini.graph import run
 from gemini.modules import Module
-from gemini.modules._utils import registry
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.physics import energy
-from gemini.types import Inlet, Outlet, Output, Parameter, Power, Stream
+from gemini.types import Power, Stream
 
 STREAM = gm.Stream(m_dot=2.0, T=300.0, p=2e5)
 
@@ -18,6 +19,8 @@ class Consumer(Module):
     """Pass the stream on and draw ``rating`` of electricity per kg/s."""
 
     category = "pumps"
+
+    abstract = True
 
     def __init__(self):
         """Declare the rating and the ports."""
@@ -52,6 +55,8 @@ class Bus(Module):
 
     category = "power"
 
+    abstract = True
+
     def __init__(self):
         """Declare both sides of the bus."""
         super().__init__()
@@ -77,6 +82,8 @@ class Source(Module):
     """A source whose stream exists before the other modules run."""
 
     category = "piping"
+
+    abstract = True
 
     def __init__(self):
         """Declare the offer and the return side."""
@@ -113,6 +120,8 @@ class Taker(Module):
 
     category = "piping"
 
+    abstract = True
+
     def __init__(self):
         """Declare the drawn inlet."""
         super().__init__()
@@ -137,6 +146,8 @@ class Offer(Module):
     """A source whose takers decide how much it gives."""
 
     category = "piping"
+
+    abstract = True
 
     def __init__(self):
         """Declare the drawn offer."""

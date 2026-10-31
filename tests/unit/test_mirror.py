@@ -1,6 +1,6 @@
 """Enforce one mirrored unit-test module with real tests for every source file.
 
-Every ``gemini/<path>/<name>.py`` except ``__init__.py`` (including ``gemini/utils/`` and
+Every ``gemini/<path>/<name>.py`` except ``__init__.py`` (including ``gemini/_utils/`` and
 ``gemini/errors/``) needs ``tests/unit/<path>/test_<name>.py`` defining at least one test
 function. ``PLACEHOLDERS`` lists the mirror files that still hold only a docstring while their
 owners write the tests; it is emptied once every file has a test and must never grow.

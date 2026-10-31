@@ -6,14 +6,14 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution
 
-from gemini.analysis import kpi
-from gemini.analysis.schedule import schedule
-from gemini.economics import annualised_cost, co2, lcoc, lcoh, lcts
-from gemini.engine.run import simulate
+from gemini._utils.jsonable import to_plain
+from gemini._utils.strings import close_matches, did_you_mean, join_names, join_path
 from gemini.errors import GeminiError, ValidationError
+from gemini.evaluate import annualised_cost, co2, lcoc, lcoh, lcts
+from gemini.evaluate.totals import KPI_NAMES, totals
+from gemini.run.schedule import schedule
+from gemini.run.simulate import simulate
 from gemini.types.shapes import value
-from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
 
 ECONOMICS = {
     "lcoh": lcoh,
@@ -22,7 +22,7 @@ ECONOMICS = {
     "annualised_cost": annualised_cost,
     "co2": co2,
 }
-"""The metrics of ``gm.economics``; the others are those of ``gm.kpi.names()``."""
+"""The metrics of ``gm.evaluate``; the others are those of ``gm.evaluate.names()``."""
 DISTRIBUTIONS = {
     "normal": ("mean", "std"),
     "uniform": ("lower", "upper"),
@@ -39,7 +39,7 @@ SEED = 0
 
 def _checked_metric(name):
     """Return ``name`` when it is a metric, or raise with the close names."""
-    known = [*kpi.names(), *ECONOMICS]
+    known = [*KPI_NAMES, *ECONOMICS]
     if name not in known:
         raise ValidationError(
             f"optim: metric = {name!r}; expected one of {join_names(known)}"
@@ -55,7 +55,7 @@ def _metric(plant, results, name, assumptions):
     """Return one metric of a finished run; a value it cannot give is ``None`` with a reason."""
     if name in ECONOMICS:
         return ECONOMICS[name](plant, results, assumptions=assumptions, on_error="record")
-    return kpi.compute(plant, results)[name]
+    return totals(plant, results)[name]
 
 
 def _is_demand(profile):
@@ -174,7 +174,7 @@ def minimize(
     """Return the parameter values that minimise a metric of a simulated plant.
 
     Each trial copies the plant, sets the variables with ``set_params``, plans a demand on that
-    design, simulates and reads the objective from ``gm.kpi`` or ``gm.economics``. The search is
+    design, simulates and reads the objective from ``gm.evaluate`` or ``gm.evaluate``. The search is
     ``scipy.optimize.differential_evolution`` from a Latin hypercube, with a fixed seed: it needs no
     gradient, takes a failed trial as infinitely bad, and its population gives the exact number of
     simulations. The plant itself is not changed.
@@ -192,7 +192,7 @@ def minimize(
         The decision variables, each ``{path, parameter, lower, upper}``: the module path, the
         parameter name and its closed bounds in the parameter's SI unit.
     objective : str
-        The metric to minimise, a name of ``gm.kpi.names()`` or of ``lcoh``, ``lcoc``, ``lcts``,
+        The metric to minimise, a KPI of ``gm.evaluate.totals`` or ``lcoh``, ``lcoc``, ``lcts``,
         ``annualised_cost`` or ``co2``; a metric to maximise is given with a leading ``"-"``.
     constraints : list of dict, optional
         Limits on metrics, each ``{metric, minimum, maximum}`` in the unit of the metric, either

@@ -10,7 +10,7 @@ dependency groups with `poetry install` or with `uv pip install -e . --group dev
 Describe what you ran, what you expected and what happened, and include the output of:
 
 ```bash
-python -m gemini.utils.collect_env
+python -m gemini._utils.collect_env
 ```
 
 It prints the Python, platform, GEMINI and dependency versions and the git commit.

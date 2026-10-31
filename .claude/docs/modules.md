@@ -30,10 +30,10 @@ Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
   `module.py` (`Module`), `plant.py` (`Plant`) and `container.py` (`ModuleList`, `ModuleDict`).
 - Machinery goes in an `_utils/` folder, even if some of its functions are exported publicly:
   `gemini/modules/_utils/` (`balance`, `description`, `design`, `registry`, `serialization`,
-  `wiring`), and `gemini/modules/plants/_utils/` for the plant tools.
+  `wiring`), and `gemini/plants/_utils/` for the plant tools.
 - Code shared by the modules of one category goes in that category folder as a private file:
   `heating/_burner.py`, `cooling/_sorption.py`.
-- `gemini/modules/plants/` holds only plant classes.
+- `gemini/plants/` holds only plant classes.
 
 ## Construction and metadata
 
@@ -50,7 +50,7 @@ only import-by-string in the package.
 
 ## Registry, categories and streams
 
-`gemini/modules/_utils/registry.py` is the one registry of module and plant classes. A class joins it
+`gemini/_utils/registry.py` is the one registry of module and plant classes. A class joins it
 under its class name with `gm.modules.register(cls)`, and every shipped equipment class is
 registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `get(name)` and
 `categories()` read it; an unknown name raises `ValidationError` with its close matches in
@@ -62,7 +62,7 @@ can join a plant dict by `type`. It executes the file; a file that does not impo
 such class, raises `ValidationError` (code `invalid_format` or `invalid_value`), and a name that is
 already taken by another class is refused.
 
-Before registering a new class, run `gm.testing.check_module(cls, example=None)`. It never raises
+Before registering a new class, run `gm.modules.check(cls, example=None)`. It never raises
 and returns `{module, passed, checks}`, each check `{name, passed, message}` with `passed` `True`,
 `False` or `None` (undecided). The checks are `is_module`, `instantiate` (the declaration rules
 run in `__init__`), `category`, `forward_signature` (exactly `forward(self, inlets)`), `units`
@@ -78,11 +78,11 @@ There is one classification: a shipped module's category is the name of the fold
 [equipment.md](equipment.md#overview) lists the modules of each. `Module.category` reads the folder
 from the import path of the class, so a shipped class never declares it and the two cannot disagree
 (`tests/unit/modules/_utils/test_registry.py` checks the folders, the list and every class). `Plant`
-is the one class outside its folder: `gemini/modules/plant.py` reads `plants`. A class
+is the one class outside its folder: `gemini/plants/plant.py` reads `plants`. A class
 from outside (`register`, `load_file`) has no folder: it states the class attribute `category`, one
 of the list, and a subclass of a shipped class states its own.
 
-A port declares its label: `Inlet(Stream, kind="brine")`, one of `gm.streams.names()`.
+A port declares its label: `Inlet(Stream, kind="brine")`, one of `gm.types.streams.names()`.
 A port without one, `kind=None`, takes whatever flows through it: piping, `CentrifugalPump`,
 `HeatExchanger` and the source side of `HeatPump`. Labels never change a calculation; they say what may be connected.
 
@@ -229,7 +229,7 @@ class Pump(Module):
 ```
 
 Every declared output, including one whose value is `None`, must be assigned on every call.
-Under `gm.no_outputs()` the assignments still run; nothing validates them and the result drops them.
+Under `gm.modules.no_outputs()` the assignments still run; nothing validates them and the result drops them.
 Do not cache call data on `self`: it belongs in a local variable of `forward`.
 
 ## Plants
@@ -248,7 +248,7 @@ child values with functions from `gemini/physics/` and calls `super().set_params
 
 ```python
 from gemini.modules import ProductionReservoir
-from gemini.modules.plant import Plant
+from gemini.plants.plant import Plant
 from gemini.physics import hydraulics
 from gemini.types import Density, Length, Parameter
 
@@ -395,7 +395,7 @@ returned `ModuleResult`.
 
 ## Traced calls
 
-While `gemini.graph` traces a module, its `_Call` carries the running `Trace` (`call.trace`) and a
+While `gemini.compiler.graph` traces a module, its `_Call` carries the running `Trace` (`call.trace`) and a
 child call made inside it is recorded in the graph by `Trace.child` instead of evaluated: the child's controls, boundaries
 and numeric parameters become graph inputs named `<path below the root>.<name>`, supplied keyword
 values win without validation, and the `ModuleResult` of traced values joins the parent's call
@@ -413,7 +413,7 @@ break (`graph.breaks` lists the leaf breaks with their reasons).
 
 An output of a list or tuple of traced values (the per-section profiles of the wells) is a vector
 output of fixed length: `Graph.output` records each item as `<name>[<index>]`, `graph.vectors`
-keeps the length, and `gemini.graph.run` returns one array of shape `(rows, length)`.
+keeps the length, and `gemini.compiler.graph.run` returns one array of shape `(rows, length)`.
 
 A traced call is not validated, so the tracer adds the validation as graph checks. For every
 traced call (children included, break nodes excepted) each control, boundary and output with
@@ -425,12 +425,12 @@ violates a bound fails even where the arithmetic never reads the bad value.
 
 ## Skipping outputs
 
-`gm.no_outputs()` is a nestable, context-local context manager and decorator. It skips validating
+`gm.modules.no_outputs()` is a nestable, context-local context manager and decorator. It skips validating
 what `forward` assigns, the combinations of a plant, forward hooks and output completeness checks.
 `forward`, pre-hooks and outlet validation still run; the result has an empty `outputs` mapping.
 
 ```python
-with gm.no_outputs():
+with gm.modules.no_outputs():
     fast = pump(fluid_in=stream, frequency="50 Hz")
 
 assert dict(fast.outputs) == {}
@@ -538,8 +538,8 @@ goes through a port.
 
 - **Edge rule.** The grids (`ElectricityGrid`, `GasGrid`, `HeatingGrid`, `CoolingGrid`, `WasteGrid`,
   `ChemicalGrid`) and the environment (`Atmosphere`, `Formation`) are the plant's edge. A plant
-  total is read from their ports (`gm.kpi.totals`), never summed by a parent;
-  `gm.checks.plant_balance` closes the root on them. The aquifers are the one other open boundary.
+  total is read from their ports (`gm.evaluate.totals`), never summed by a parent;
+  `gm.evaluate.plant_balance` closes the root on them. The aquifers are the one other open boundary.
 - **Supply rule.** A root plant has no plant port (`root_plant_port`): what it buys comes from a
   grid, and an unconnected inlet is `unconnected_port`. A registered plant is a building block and
   has plant ports. Nothing supplies itself: there is no default fuel, power or air.

@@ -1,8 +1,9 @@
 """Gas makeup: the co-produced gas first, the grid for the shortfall, the surplus to a flare."""
 
 from gemini import ops
+from gemini.modules.declarations import Inlet, Outlet
 from gemini.modules.module import Module
-from gemini.types import Inlet, Outlet, Stream
+from gemini.types import Stream
 from gemini.types.cost import scaled_cost
 
 

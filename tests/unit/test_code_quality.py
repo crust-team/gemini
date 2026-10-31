@@ -13,10 +13,10 @@ import tokenize
 import pytest
 
 import gemini as gm
+from gemini._utils import paths
+from gemini._utils.files import read_json
 from gemini.modules._utils.serialization import SECTIONS
-from gemini.modules.plant import Plant
-from gemini.utils import paths
-from gemini.utils.files import read_json
+from gemini.plants.plant import Plant
 from tests.fixtures import ROOT
 
 PYTHON_FOLDERS = ("gemini", "examples", "tests", "scripts")
@@ -62,11 +62,11 @@ RAISED_CLASSES = {
     "ValueError",
     "RuntimeError",
 }
-"""What the package raises; the built-ins are for the exempt topics of ``gemini.utils``."""
+"""What the package raises; the built-ins are for the exempt topics of ``gemini._utils``."""
 VALIDATORS = {"model_validator", "field_validator"}
 DATA_FOLDER = re.compile(r"""/ *["'](inputs|assets)\b|["'][^"'`\n]*\b(inputs|assets)/""")
 BUILDS_NO_DATA_PATH = {
-    "gemini/utils/paths.py",
+    "gemini/_utils/paths.py",
     "scripts/test_changed.py",
     "tests/unit/scripts/test_test_changed.py",
     "tests/unit/test_code_quality.py",
@@ -99,8 +99,6 @@ FORMULA_EXCEPTIONS = {
     "gemini/modules/module.py: literal 4": "how many parameters repr shows, not physics",
     "gemini/modules/module.py: np.float64": "the eager scope wraps a recorded float, not maths",
     "gemini/modules/module.py: np.ndarray": "a type test of the array path, not maths",
-    "gemini/modules/plant.py: literal 2": "an item of a plan step and the first suffix of a name",
-    "gemini/modules/plant.py: literal 3": "the end of the suffixes of a generated name",
     "gemini/modules/pumps/esp.py: np.asarray": "the float32 cast of the retained precision",
     "gemini/modules/pumps/esp.py: np.float32": "the float32 cast of the retained precision",
     "gemini/modules/_utils/serialization.py: literal 2": "the plant file format number",
@@ -182,15 +180,20 @@ def nesting(node, depth=0):
 
 
 PYTHON_FILES = python_files()
+EXAMPLE_IMPORTS = ("gemini.engine", "gemini.modules", "gemini.types")
 EXAMPLE_FILES = [path for path in PYTHON_FILES if path.startswith("examples/")]
 IMPORTS_EXAMPLES = re.compile(r"^\s*(from|import) examples\b", re.MULTILINE)
-LAYERED_UTILS = ("gemini/utils/data/", "gemini/utils/legacy/")
-CORE_MODULE_FILES = ("__init__.py", "container.py", "module.py", "plant.py")
+CORE_MODULE_FILES = (
+    "__init__.py",
+    "check.py",
+    "container.py",
+    "declarations.py",
+    "module.py",
+)
 PACKAGE_FILES = [
     path
     for path in PYTHON_FILES
-    if path.startswith("gemini/")
-    and (not path.startswith("gemini/utils/") or path.startswith(LAYERED_UTILS))
+    if path.startswith("gemini/") and not path.startswith("gemini/_utils/")
 ]
 
 
@@ -261,7 +264,7 @@ def test_functions_are_short_or_documented_exceptions(path):
         f"{path}::{function.name}"
         for function in functions(path)
         if body_lines(function) > MAX_LINES
-        and not (path.startswith("gemini/modules/plants/") and function.name == "__init__")
+        and not (path.startswith("gemini/plants/") and function.name == "__init__")
     }
     assert long == {name for name in LONG_FUNCTIONS if name.startswith(f"{path}::")}
 
@@ -305,7 +308,7 @@ def is_validator(function):
 
 @pytest.mark.parametrize("path", PACKAGE_FILES)
 def test_package_code_raises_gemini_errors(path):
-    """Deliberate errors use ``gm.errors``; ``gemini.utils`` topics and validators are exempt."""
+    """Deliberate errors use ``gm.errors``; ``gemini._utils`` topics and validators are exempt."""
     found = [
         f"{path}:{node.lineno} {raised_name(node)}"
         for function in functions(path)
@@ -320,7 +323,7 @@ def test_package_code_raises_gemini_errors(path):
 def test_package_code_raises_only_the_allowed_classes(path):
     """A raise names a public class of ``gm.errors``, a private lookup or a Python protocol error.
 
-    ``TraceError`` is internal to ``gemini/graph/``; a former class has no way back in.
+    ``TraceError`` is internal to ``gemini/compiler/graph/``; a former class has no way back in.
     """
     found = [
         f"{path}:{node.lineno} {raised_name(node)}"
@@ -330,7 +333,7 @@ def test_package_code_raises_only_the_allowed_classes(path):
         if raised_name(node) not in RAISED_CLASSES
     ]
     assert found == []
-    if not str(path).startswith("gemini/graph/"):
+    if not str(path).startswith("gemini/compiler/graph/"):
         assert "TraceError" not in {raised_name(node) for node in _raises(path)}
 
 
@@ -369,8 +372,7 @@ MODULE_FILES = [
     path
     for path in PACKAGE_FILES
     if path.startswith("gemini/modules/")
-    and not path.startswith("gemini/modules/plants/")
-    and not path.endswith("/_physics.py")
+    and not path.endswith(("/_physics.py", "/declarations.py"))
 ]
 PHYSICS_FILES = [
     path
@@ -378,7 +380,7 @@ PHYSICS_FILES = [
     if path.startswith("gemini/physics/") or path.endswith("/_physics.py")
 ]
 CATEGORY_PHYSICS = [path for path in PHYSICS_FILES if path.startswith("gemini/modules/")]
-PHYSICS_IMPORTS = ("gemini.errors", "gemini.ops", "gemini.physics", "gemini.types")
+PHYSICS_IMPORTS = ("gemini.errors", "gemini.ops", "gemini.physics", "gemini.types", "gemini.units")
 
 
 @pytest.mark.parametrize("path", MODULE_FILES)
@@ -567,11 +569,11 @@ def test_an_example_ends_in_main_and_its_guard(path):
 
 @pytest.mark.parametrize("path", EXAMPLE_FILES)
 def test_an_example_uses_the_public_api(path):
-    """An example imports ``gemini`` and the declarations of ``gemini.types``, nothing internal."""
+    """An example imports ``gemini`` and the public names of its folders, nothing internal."""
     internal = {
         name
         for name in imported_modules(path)
-        if name.startswith("gemini.") and name != "gemini.types"
+        if name.startswith("gemini.") and name not in EXAMPLE_IMPORTS
     }
     assert internal == set()
 
@@ -591,7 +593,7 @@ def test_nothing_imports_an_example():
 
 
 def test_only_the_paths_module_builds_a_path_to_the_data_folders():
-    """Code reaches ``inputs/`` through ``gemini/utils/paths.py``.
+    """Code reaches ``inputs/`` through ``gemini/_utils/paths.py``.
 
     An example is a standalone script on the public API, so it finds ``inputs/`` from ``__file__``.
     ``scripts/test_changed.py`` and its test match repository paths and build none.
@@ -618,11 +620,10 @@ def test_the_module_package_holds_only_its_core_classes_and_folders():
 
 
 def test_plants_holds_only_plant_classes():
-    """Every public file of ``gemini/modules/plants/`` defines a registered plant class."""
-    files = [
-        path for path in tracked_files() if re.fullmatch(r"gemini/modules/plants/[^_/][^/]*", path)
-    ]
-    assert files
+    """Every public file of ``gemini/plants/`` defines a registered plant class."""
+    files = [path for path in tracked_files() if re.fullmatch(r"gemini/plants/[^_/][^/]*", path)]
+    assert "gemini/plants/plant.py" in files
+    files.remove("gemini/plants/plant.py")
     for path in files:
         tree = ast.parse((ROOT / path).read_text())
         classes = {node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}

@@ -4,15 +4,11 @@ from typing import Literal
 
 from gemini import ops
 from gemini.modules.cooling import _physics, _sorption
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
-    Control,
     Dimensionless,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
     Power,
     Ratio,
     Stream,

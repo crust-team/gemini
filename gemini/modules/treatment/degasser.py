@@ -1,17 +1,9 @@
 """Degasser separating a share of the free gas from the liquid, with a pressure loss."""
 
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.treatment import _physics
-from gemini.types import (
-    Fraction,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    Pressure,
-    PressureDifference,
-    Stream,
-)
+from gemini.types import Fraction, Pressure, PressureDifference, Stream
 from gemini.types.cost import scaled_cost
 
 

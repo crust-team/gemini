@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, PrivateAttr, model_validator
 
+from gemini import units
+from gemini._utils.time import to_utc_index
 from gemini.errors import RunError, ValidationError
-from gemini.physics import units
-from gemini.utils.time import to_utc_index
 
 _QUANTITIES = {
     "W": "power",

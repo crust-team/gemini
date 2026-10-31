@@ -20,8 +20,9 @@ import math
 import pandas as pd
 
 import gemini as gm
-from gemini import backends
+from gemini import runtime
 from gemini.engine.callbacks import Callback, EventLog
+from gemini.ops import kernels
 from gemini.types.flows import STREAM_FIELDS
 
 RTOL = 1e-12
@@ -36,8 +37,8 @@ TIMING_KEYS = ("ts", "duration_ms")
 
 @contextlib.contextmanager
 def forced(backend):
-    """Force ``backend`` for the block, as ``gemini.backends.settings`` does."""
-    with backends.settings(backend=backend):
+    """Force ``backend`` for the block, as ``gm.runtime.settings`` does."""
+    with runtime.settings(backend=backend):
         yield
 
 
@@ -196,7 +197,7 @@ def run_engine(plant, dataset, mode="replay", *args, callbacks=(), on_error="rec
     ``Recorder`` and the ``EventLog``, which the snapshot reads.
     """
     recorder, log = Recorder(), EventLog()
-    backend = backends.forced_name() or "numpy"
+    backend = kernels.forced_name() or "numpy"
     engine = gm.Engine(plant, backend, [log, recorder, *callbacks], on_error)
     failure = None
     try:

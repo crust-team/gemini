@@ -24,14 +24,24 @@ from functools import partial
 import numpy as np
 from pydantic_core import to_jsonable_python
 
-from gemini import backends, ops
-from gemini.backends import runtime
+from gemini import ops, runtime, units
+from gemini._utils.context import ContextSetting
+from gemini._utils.hooks import RemovableHandle, has_signature
+from gemini._utils.mappings import get_nested, set_nested
+from gemini._utils.registry import register
+from gemini._utils.strings import (
+    close_matches,
+    did_you_mean,
+    first_paragraph,
+    join_names,
+    join_path,
+    snake_case,
+    split_path,
+)
 from gemini.errors import DefinitionError, PhysicsError, ValidationError
 from gemini.errors.lookup import UnknownMember
 from gemini.modules._utils import description, design
-from gemini.physics import units
-from gemini.types.bindings import DatedParams
-from gemini.types.declarations import (
+from gemini.modules.declarations import (
     UNSET,
     Boundary,
     Control,
@@ -42,22 +52,12 @@ from gemini.types.declarations import (
     Parameter,
     State,
 )
+from gemini.ops import kernels
+from gemini.types.bindings import DatedParams
 from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid
 from gemini.types.ports import Ports
 from gemini.types.results import ModuleResult
-from gemini.utils.context import ContextSetting
-from gemini.utils.hooks import RemovableHandle, has_signature
-from gemini.utils.mappings import get_nested, set_nested
-from gemini.utils.strings import (
-    close_matches,
-    did_you_mean,
-    first_paragraph,
-    join_names,
-    join_path,
-    snake_case,
-    split_path,
-)
 
 _current_call = ContextVar("module_call", default=None)
 _outputs_enabled = ContextVar("module_outputs_enabled", default=True)
@@ -234,9 +234,9 @@ class _Call:
     ``call_records`` collects the results of every child call made during this call, in call
     order. ``parent`` is the enclosing call.
     ``states`` holds the module's own state values and ``step`` the running ``_Step``, if any.
-    A traced call (``gemini.graph``) sets ``parameters`` to the traced parameter values that
-    replace the stored ones, and records outputs without validating them. ``trace`` is the
-    running trace of ``gemini.graph``: a call made while it is set is recorded in the graph
+    A traced call (``gemini.compiler.graph``) sets ``parameters`` to the traced parameter values
+    that replace the stored ones, and records outputs without validating them. ``trace`` is the
+    running trace of ``gemini.compiler.graph``: a call made while it is set is recorded in the graph
     through ``trace.child`` instead of being evaluated. ``wrapping`` marks an eager call whose
     physics gets NumPy scalars (``gemini.ops.scope``).
     """
@@ -273,21 +273,20 @@ def _active_call(module):
 
 
 class _FolderCategory:
-    """The ``category`` of a class: the folder of this package that holds its file.
+    """The ``category`` of a class: the folder of the package that holds its file.
 
-    ``gemini/modules/pumps/esp.py`` gives ``pumps``, so a shipped class never declares it. A
-    class from outside has no such folder and is ``None`` until it assigns ``category`` itself,
-    which replaces this descriptor; a subclass of a shipped class states its own too. ``Plant``
-    sits beside this file, not in ``plants/``, and is the one class whose category is not its
-    folder: it is ``plants``, for ``Plant`` alone, so a subclass from outside stays ``None``.
+    ``gemini/modules/pumps/esp.py`` gives ``pumps`` and ``gemini/plants/doublet.py`` gives
+    ``plants``, so a shipped class never declares it. A class from outside has no such folder and
+    is ``None`` until it assigns ``category`` itself, which replaces this descriptor; a subclass of
+    a shipped class states its own too.
     """
 
     def __get__(self, instance, owner):
         """Return the folder of ``owner``, or ``None`` for a file outside the folders."""
+        if owner.__module__.startswith("gemini.plants."):
+            return "plants"
         if not owner.__module__.startswith(f"{__package__}."):
             return None
-        if owner.__module__ == f"{__package__}.plant":
-            return "plants"
         folder, _, file = owner.__module__.removeprefix(f"{__package__}.").partition(".")
         return folder if file and not folder.startswith("_") else None
 
@@ -305,6 +304,13 @@ class Module:
     offer_inlets = ()
     _derived_params = frozenset()
     category = _FolderCategory()
+    abstract = True
+
+    def __init_subclass__(cls, **kwargs):
+        """Register a class that has a category, unless its own body says ``abstract = True``."""
+        super().__init_subclass__(**kwargs)
+        if cls.category is not None and not cls.__dict__.get("abstract", False):
+            register(cls)
 
     def __init__(self):
         """Create the ordered registries and the run-owned metadata."""
@@ -806,7 +812,7 @@ class Module:
         NOTE(refactor): the ESP overrides it for float32 precision, whose arithmetic an
         ``np.float64`` scalar would change; no other module does.
         """
-        return backends.WRAP
+        return kernels.WRAP
 
     def _evaluate(self, inlets, scoped, call):
         """Run pre-hooks, ``forward``, the formula outputs and forward hooks of one call.

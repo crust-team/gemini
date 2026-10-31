@@ -5,8 +5,9 @@ from typing import get_args
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from gemini.physics import units
-from gemini.types import Output, quantities
+from gemini import units
+from gemini.modules.declarations import Output
+from gemini.types import quantities
 from gemini.types.quantities import Efficiency, Pressure, PressureDifference, Temperature
 
 

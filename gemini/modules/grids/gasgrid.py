@@ -1,8 +1,9 @@
 """The gas grid: the plant's edge for bought gas."""
 
+from gemini.modules.declarations import Outlet, Parameter
 from gemini.modules.module import Module
 from gemini.physics import gas
-from gemini.types import Fraction, Outlet, Parameter, Stream
+from gemini.types import Fraction, Stream
 from gemini.types.fluid import grid_gas
 
 

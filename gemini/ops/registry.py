@@ -1,6 +1,6 @@
 """The op registry: the name, kind and operand count of every op.
 
-The registry only describes ops; backends implement them (``gemini.backends``) and the graph
+The registry only describes ops; backends implement them (``gemini.ops.kernels``) and the graph
 records them. The kind is what graph passes rely on: ``elementwise`` ops apply row by row,
 ``index`` selects one item of a vector parameter, ``check`` produces per-row error codes,
 ``solver`` ops (``brentq``, ``newton``) find roots with per-row stopping and keep their function
@@ -11,8 +11,8 @@ traced, row by row on the plain path; its outputs are ``break_output`` nodes.
 
 from dataclasses import dataclass
 
+from gemini._utils.strings import did_you_mean
 from gemini.errors import ValidationError
-from gemini.utils.strings import did_you_mean
 
 KINDS = ("elementwise", "index", "reduction", "interp", "check", "solver", "scan", "break")
 

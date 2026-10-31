@@ -2,10 +2,10 @@
 
 import pytest
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError
 from gemini.modules.pumps import _physics
-from gemini.physics import constants, energy, pumps, units
+from gemini.physics import constants, energy, pumps
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 
 

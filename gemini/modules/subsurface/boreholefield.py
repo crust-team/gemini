@@ -2,18 +2,14 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter, State
 from gemini.modules.module import Module
 from gemini.physics import ground, heat_transfer
 from gemini.types import (
     Count,
-    Inlet,
     Length,
     LinearThermalResistance,
-    Outlet,
-    Output,
-    Parameter,
     Power,
-    State,
     Stream,
     Temperature,
     TemperatureDifference,

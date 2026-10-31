@@ -10,8 +10,8 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from gemini import backends
 from gemini.modules.module import Module
+from gemini.ops import kernels
 from gemini.types import Health
 from gemini.types.results import NOT_ASSESSED
 
@@ -38,7 +38,7 @@ def assess(module, result, measured, count):
     """
     if type(module).health is Module.health or not result.outputs:
         return UNAVAILABLE, {}
-    if backends.forced_name() != "python":
+    if kernels.forced_name() != "python":
         try:
             return module.health(result, measured) or UNAVAILABLE, {}
         except Exception:

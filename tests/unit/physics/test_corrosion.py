@@ -8,9 +8,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError, ValidationError
-from gemini.physics import corrosion, units
+from gemini.physics import corrosion
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 from tests.fixtures.errors import raises
 

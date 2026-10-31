@@ -34,7 +34,7 @@ GEMINI_EXAMPLE_DATASET=inputs/doublet_heat/doublet_2024_15min.csv python example
 | File | What it shows | Main names |
 | --- | --- | --- |
 | [01_streams_and_fluids.py](basics/01_streams_and_fluids.py) | Streams, fluids and unit strings | `gm.Stream`, `gm.Fluid`, `gm.units` |
-| [02_modules.py](basics/02_modules.py) | Call one module and read its outlets, outputs and port quantities | `gm.modules.ESP`, `describe`, `Stream.quantities`, `gm.no_outputs` |
+| [02_modules.py](basics/02_modules.py) | Call one module and read its outlets, outputs and port quantities | `gm.modules.ESP`, `describe`, `Stream.quantities`, `gm.modules.no_outputs` |
 | [03_build_a_plant.py](basics/03_build_a_plant.py) | A plant class and the builder; validate and fix an `unconnected_port` | a `gm.Plant` subclass, `add`, `connect`, `validate` |
 | [04_parameters.py](basics/04_parameters.py) | Dated parameters, controls, boundaries and bindings | `set_params`, `params_at`, attribute assignment, `set_bindings` |
 | [05_simulate_and_results.py](basics/05_simulate_and_results.py) | Simulate and read the results in your units | `gm.simulate`, `Results`, `units=`, `to_frame` |
@@ -48,13 +48,13 @@ One task each, in any order.
 | --- | --- | --- |
 | [replay_measurements.py](recipes/replay_measurements.py) | Replay measured data and read the soft sensors | `gm.replay`, `to_frame(table="energy")` |
 | [live_update.py](recipes/live_update.py) | Process new rows once each, as a scheduler would | `gm.live` |
-| [calibrate.py](recipes/calibrate.py) | Fit the exchanger conductance on seven days | `gm.optim.calibrate` |
-| [schedule_demand.py](recipes/schedule_demand.py) | Plan a year from the heating demand | `gm.profiles`, `gm.schedule` |
-| [check_limits.py](recipes/check_limits.py) | Judge a run against your own limits | `gm.checks.Limits`, `gm.checks.limits` |
-| [energy_balance.py](recipes/energy_balance.py) | Check module and plant balances, read the edge totals | `gm.modules.energy_balance`, `gm.checks.plant_balance`, `gm.kpi.totals` |
-| [economics.py](recipes/economics.py) | Investment, yearly cost, levelised cost and CO2 | `gm.economics` |
-| [write_a_module.py](recipes/write_a_module.py) | Write a module and use it in a plant | `gm.modules.Module`, `gm.modules.register`, `gm.testing.check_module` |
-| [sweep_esp_frequency.py](recipes/sweep_esp_frequency.py) | Compare a simulated day at three pump frequencies | `gm.Clock`, `gm.Profile`, `gm.simulate` |
+| [calibrate.py](recipes/calibrate.py) | Fit the exchanger conductance on seven days | `gm.analysis.calibrate` |
+| [schedule_demand.py](recipes/schedule_demand.py) | Plan a year from the heating demand | `gm.data`, `gm.schedule` |
+| [check_limits.py](recipes/check_limits.py) | Judge a run against your own limits | `gm.evaluate.Limits`, `gm.evaluate.limits` |
+| [energy_balance.py](recipes/energy_balance.py) | Check module and plant balances, read the edge totals | `gm.modules.energy_balance`, `gm.evaluate.plant_balance`, `gm.evaluate.totals` |
+| [economics.py](recipes/economics.py) | Investment, yearly cost, levelised cost and CO2 | `gm.evaluate` |
+| [write_a_module.py](recipes/write_a_module.py) | Write a module and use it in a plant | `gm.modules.Module`, `gm.modules.register`, `gm.modules.check` |
+| [sweep_esp_frequency.py](recipes/sweep_esp_frequency.py) | Compare a simulated day at three pump frequencies | `gm.engine.Clock`, `gm.types.Profile`, `gm.simulate` |
 | [legacy_project.py](recipes/legacy_project.py) | Convert an old project folder | `gm.plants.convert_legacy` |
 
 ## Cases
@@ -67,6 +67,6 @@ sample problem of `inputs/examples/`: a plant dict, rules, limits and a demand.
 | [parallel_exchangers.py](cases/parallel_exchangers.py) | A nodal-solved doublet on three parallel exchangers | `ParallelExchangerPlant`, `NodalDoublet` |
 | [boiler_chp.py](cases/boiler_chp.py) | A nodal-solved doublet with a boiler and a CHP | `BoilerChpPlant`, `NodalDoublet`, `gm.modules.emissions` |
 | [district_heating_cooling.py](cases/district_heating_cooling.py) | Heating and cooling networks on an aquifer store, stepped by the hour | `DistrictEnergyPlant`, `Module.step` |
-| [hackathon.py](cases/hackathon.py) | A sample problem from schedule to economics | `gm.profiles.from_csv`, `gm.plants.from_dict`, `gm.schedule`, `gm.kpi`, `gm.economics` |
-| [challenge_year.py](cases/challenge_year.py) | The demand year of a sample problem, every requirement checked | `gm.profiles.from_csv`, `gm.plants.from_dict`, `gm.checks.Limits.from_dict`, `gm.economics.lcts` |
-| [shallow_district.py](cases/shallow_district.py) | An hourly demand on one shallow doublet, a different sample problem | `gm.profiles.from_csv`, `gm.schedule`, `gm.checks.operating_time` |
+| [hackathon.py](cases/hackathon.py) | A sample problem from schedule to economics | `gm.data.from_csv`, `gm.plants.from_dict`, `gm.schedule`, `gm.evaluate`, `gm.evaluate` |
+| [challenge_year.py](cases/challenge_year.py) | The demand year of a sample problem, every requirement checked | `gm.data.from_csv`, `gm.plants.from_dict`, `gm.evaluate.Limits.from_dict`, `gm.evaluate.lcts` |
+| [shallow_district.py](cases/shallow_district.py) | An hourly demand on one shallow doublet, a different sample problem | `gm.data.from_csv`, `gm.schedule`, `gm.evaluate.operating_time` |

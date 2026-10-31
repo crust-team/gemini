@@ -4,24 +4,19 @@ from typing import Literal
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter, State
 from gemini.modules.module import Module
 from gemini.physics import energy, fluid, ground, heat_transfer
 from gemini.types import (
-    Control,
     Dimensionless,
     Duration,
     Energy,
     Fraction,
     HeatAccumulation,
-    Inlet,
     Length,
     MassFlow,
-    Outlet,
-    Output,
-    Parameter,
     Power,
     Pressure,
-    State,
     Stream,
     Temperature,
     TemperatureDifference,

@@ -7,10 +7,10 @@ work on any plant, on every backend, and a plant has no run method of its own: r
 `results = gm.simulate(plant, profile)`. How it is computed is in
 [native-engine.md](native-engine.md#14-the-plant-class-and-the-plant-dict).
 
-`Plant` is in `gemini/modules/plant.py`, beside `Module`. `gemini/modules/plants/` holds only plant
+`Plant` is in `gemini/plants/plant.py`, beside `Module`. `gemini/plants/` holds only plant
 classes, and every tool of the plants (the plan, the run, ports, loops, constraints, outputs, the
 reader and writer of the plant dict, the schema, the catalogue) is in
-`gemini/modules/plants/_utils/`.
+`gemini/plants/_utils/`.
 
 Plants are defined in Python. gemini keeps no JSON file; JSON exists only as the plant dict that
 agents use: `gm.plants.from_dict`, `plant.to_dict`, `gm.plants.schema`, `gm.plants.validate`.
@@ -21,7 +21,7 @@ agents use: `gm.plants.from_dict`, `plant.to_dict`, `gm.plants.schema`, `gm.plan
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.grids import HeatingGrid
 from gemini.modules.piping import Valve
-from gemini.modules.plant import Plant
+from gemini.plants.plant import Plant
 from gemini.modules.pumps import CirculationPump
 from gemini.types import Inlet, Outlet, Output, Power, Stream
 
@@ -69,7 +69,7 @@ The sections are `# Modules`, `# Parameters`, `# Inlets`, `# Boundaries`, `# Out
 - A structural argument goes to `__init__` and into `self._size`, a dict of those arguments:
   `DistrictNetwork(consumers=3, service="cooling")`, `MultiWellPlant(producers=3, injectors=2)`,
   `HeatingCoolingPlant(doublets=2)`.
-- A plant class in `gemini/modules/plants/` is registered by its class name. `purpose` says what it
+- A plant class in `gemini/plants/` is registered by its class name. `purpose` says what it
   serves (`heating`, `cooling`, `both`); a building block has none.
 - No subclass of `Plant` defines `forward` and no other `Module` holds children
   (`tests/unit/test_code_quality.py`).

@@ -7,7 +7,7 @@ changed result, and ``tests/e2e/test_examples.py`` holds what the test does with
 import tempfile
 from pathlib import Path
 
-from gemini.utils import paths
+from gemini._utils import paths
 from tests.e2e.test_examples import EXAMPLES, TIMEOUT_S, expected_path, run_example
 
 FAST = paths.doublet_heat("doublet_2024_15min_month.csv")

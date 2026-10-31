@@ -2,21 +2,17 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.pumps import _physics
 from gemini.physics import constants, energy, pumps
 from gemini.types import (
-    Control,
     Count,
     Dimensionless,
     Efficiency,
     Frequency,
-    Inlet,
     Length,
     LinearPower,
-    Outlet,
-    Output,
-    Parameter,
     Power,
     PressureDifference,
     Stream,

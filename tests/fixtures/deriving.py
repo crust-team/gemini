@@ -1,15 +1,18 @@
 """A composite that derives a child value, as ``modules.md`` shows it."""
 
 from gemini.modules import ProductionReservoir
-from gemini.modules.plant import Plant
+from gemini.modules.declarations import Parameter
 from gemini.physics import hydraulics
-from gemini.types import Density, Length, Parameter
+from gemini.plants.plant import Plant
+from gemini.types import Density, Length
 
 
 class Column(Plant):
     """A reservoir whose pressure comes from the height of its water column."""
 
     category = "plants"
+
+    abstract = True
 
     def __init__(self):
         """Declare the child and the design values it derives from."""

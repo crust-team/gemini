@@ -5,15 +5,11 @@ import pytest
 
 from gemini.modules import Module
 from gemini.modules._utils.balance import collect_flows, emissions, energy_balance, mass_balance
+from gemini.modules.declarations import Inlet, Outlet
 from gemini.modules.grids import GasGrid
 from gemini.modules.heating import CHP, Boiler, ElectricBoiler
 from gemini.modules.pumps import ESP, InjectionPump
-from gemini.types import (
-    Inlet,
-    Outlet,
-    Power,
-    Stream,
-)
+from gemini.types import Power, Stream
 from gemini.types.ports import Ports
 from gemini.types.results import ModuleResult, Values
 from tests.fixtures.equivalence import STREAM_FIELDS, assert_close

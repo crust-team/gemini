@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from gemini.utils.time import to_utc
+from gemini._utils.time import to_utc
 
 
 class ConfigModel(BaseModel):

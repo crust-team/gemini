@@ -1,6 +1,6 @@
 # Economics, KPIs, checks and well analysis
 
-The packages `gemini.economics`, `gemini.checks`, `gemini.analysis` (with `gm.kpi`), `gemini.testing`
+The packages `gemini.evaluate`, `gemini.evaluate`, `gemini.analysis` (with `gm.evaluate`), `gemini.modules`
 and `gemini.optim` sit above `gemini.engine`. They read a plant and a finished run through the public
 API only, and every return is plain JSON (`to_plain`: no NumPy types, `NaN` and infinity are `null`) in the
 [return shapes](api.md#return-shapes). A value the inputs cannot give is never a guess. Each name is
@@ -14,11 +14,11 @@ composite outputs. Everything below is read from the edge modules:
 - Heat delivered is what the water loses across the `HeatingGrid` leaves and cold delivered what
   it gains across the `CoolingGrid` leaves (`analysis/series.py`: `delivered_heat`,
   `delivered_cold`). **Useful** heat and cold are that less the `surplus` of the grid, so at most the
-  demand (`useful_heat`, `useful_cold`). `gm.kpi.totals` gives all three; every KPI and levelised
+  demand (`useful_heat`, `useful_cold`). `gm.evaluate.totals` gives all three; every KPI and levelised
   cost reads the useful energy: a heat nobody needed costs money and earns nothing.
 - Electricity bought and sold are `net_import` and `net_export` of the `ElectricityGrid`, gas
   bought is `gas_out.chemical_flow` of the `GasGrid`, waste `waste_in.mass_flow` of the `WasteGrid`
-  and chemicals `chemical_out.mass_flow` of the `ChemicalGrid` (`edge_total`). `gm.kpi.totals`
+  and chemicals `chemical_out.mass_flow` of the `ChemicalGrid` (`edge_total`). `gm.evaluate.totals`
   gives them, with the emissions and the losses.
 - CO2 comes from one place: `Atmosphere` computes `co2_emission` and `methane_emission` [kg/s] from
   the gas that reaches `gas_in`.
@@ -29,7 +29,7 @@ composite outputs. Everything below is read from the edge modules:
 A plant without a consumer leaf, such as the doublet heat plant, delivers no heat in these terms, so
 its heat and cold KPIs and levelised costs are `null` with that reason.
 
-## `gm.economics`
+## `gm.evaluate`
 
 Every function returns a value with the parts of its result as more keys, each a value or a text;
 `unit` is the currency (`EUR`), `EUR/year`, `EUR/J`, `year` or `kg`. `A` is the annuity factor, the
@@ -111,9 +111,9 @@ citation of each in `COST_SOURCES`, and `capex` returns it in `source`.
 
 Convert at the boundary: EUR/MWh divided by 3.6e9 is EUR/J, kg/GJ divided by 1e9 is kg/J.
 
-## `gm.kpi`
+## `gm.evaluate`
 
-`gm.kpi.compute(plant, results)` returns `{name: {value, unit}}` for `gm.kpi.names()`; a KPI the run
+`gm.evaluate.totals(plant, results)` returns `{name: {value, unit}}` for `gm.evaluate.names()`; a KPI the run
 cannot give is `null` with a `reason`. With
 E(x) the sum over ticks of x times the tick duration:
 
@@ -125,7 +125,7 @@ E(x) the sum over ticks of x times the tick duration:
 | `peak_heat` | W | largest tick sum of useful heat (delivered power, not the demand peak) |
 | `peak_cold` | W | largest tick sum of useful cold |
 
-## `gm.checks`
+## `gm.evaluate`
 
 Each check returns the check `{name, passed, value, limit}`, `value` and `limit` being values; a
 violated limit is `passed: false`, never an error (`passed` is `None`, with a `reason` in `value`,
@@ -142,14 +142,14 @@ it, and the checks audit what the columns hold:
 | `operating_time(plant, results, duration)` | the time each doublet ran: the sum of the steps in which `<doublet>.reservoir.liquid_flow`, the column behind `Doublet.flow`, is above zero; `duration` is a text or seconds, and it passes within half a step, the rounding of a plan | one check per doublet |
 | `run_all(plant, results, duration=None)` | the first three above, and `operating_time` when `duration` is given | `{passed, checks}` |
 
-`gm.checks.Limits` holds limits a user sets, `(path pattern, output, min, max)`:
+`gm.evaluate.Limits` holds limits a user sets, `(path pattern, output, min, max)`:
 
 ```python
-limits = gm.checks.Limits()
+limits = gm.evaluate.Limits()
 limits.add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
 limits.add("d*.brine_cooling", max="40 K")
 limits.add("heat_users.supply_in_T", min="100 degC")
-checks = gm.checks.limits(plant, results, limits)
+checks = gm.evaluate.limits(plant, results, limits)
 ```
 
 A parameter takes a limit too (`limits.add("d*.pump_efficiency", min=0.7)`): it is judged once
@@ -157,7 +157,7 @@ against its value in the run, or at each date inside the run when it changes, in
 `d*.volume_imbalance` is the produced less the injected liquid volume flow of a doublet.
 
 `add` checks the units and needs no plant; `to_dict` and `from_dict` give a plain dictionary to store.
-`gm.checks.limits` matches each pattern against the module paths, name by name (`*` stays within one
+`gm.evaluate.limits` matches each pattern against the module paths, name by name (`*` stays within one
 name, so `d*.power` is not `d0.esp.power`); a pattern or output that matches nothing raises
 `ValidationError`, code `unknown_name`, with suggestions. It returns one check per matched module and
 output, `value` the worst value of the run and `limit` the limit, `[min, max]` with both. Only ticks
@@ -179,7 +179,7 @@ as a result column; that is a change to the engine, not to this package.
 | `pump_curve(plant, pump, measured=None)` | real | the polynomial head curve of the pump at 60 Hz (the private `_head_curve` of `gemini/analysis/wells.py`), theoretical head of measured points, `gm.analysis.fit_head_correction` |
 | `corrosion_forecast(model, until)` | real | `co2_corrosion_rate`, `wall_loss`, `time_to_minimum_wall` |
 | `injectivity(data, well)` | `NotImplementedYet` | Hall analysis not built |
-| `calibrate_pump(plant, pump, measured)` | `NotImplementedYet` | no module applies the `correction_factors` of `ESP` (only the legacy import and export read it); it will run `gm.optim.calibrate` |
+| `calibrate_pump(plant, pump, measured)` | `NotImplementedYet` | no module applies the `correction_factors` of `ESP` (only the legacy import and export read it); it will run `gm.analysis.calibrate` |
 | `calibrate_corrosion(logs)` | `NotImplementedYet` | no fit of the correlation constants to logs exists |
 | `erosion(plant, well)` | `NotImplementedYet` | a plant holds neither flow nor solids content, and the retained model has no solids fraction |
 
@@ -201,7 +201,7 @@ the pressure. A rate the column of brine injects alone has no pressure to give: 
 
 ## `gm.testing` and `gm.optim`
 
-`gm.testing.check_module` and `gm.modules.load_file` are described in
+`gm.modules.check` and `gm.modules.load_file` are described in
 [modules.md](modules.md#registry-categories-and-streams).
 
 `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *,
@@ -219,7 +219,7 @@ simulations, so `evaluations` is a hard limit and a smaller budget than one popu
 `numpy.random.default_rng(seed)`, one simulation each, and summarises each metric as `mean`, `p5`,
 `p50`, `p95`; a draw whose run failed has its `reason` and stays out of the summary.
 
-A metric is a name of `gm.kpi.names()` or `lcoh`, `lcoc`, `lcts`, `annualised_cost`, `co2`; these
+A metric is a name of `gm.evaluate.names()` or `lcoh`, `lcoc`, `lcts`, `annualised_cost`, `co2`; these
 read `assumptions`. `profile` is required: the run input of a design comes from `gm.schedule`, which
 needs the rules `doublet_flow` and `max_brine_cooling`, and it stays fixed over the trials, so a
 plan made for one design is what every trial runs. `parameters` in `best`, `history` and `samples`

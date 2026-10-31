@@ -2,23 +2,11 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.pumps import _physics
 from gemini.physics import energy
-from gemini.types import (
-    Control,
-    Count,
-    Efficiency,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    Power,
-    Pressure,
-    Ratio,
-    SpecificHeat,
-    Stream,
-)
+from gemini.types import Count, Efficiency, Power, Pressure, Ratio, SpecificHeat, Stream
 
 
 class GasCompressor(Module):

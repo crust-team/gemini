@@ -12,6 +12,7 @@ a public function of ``gemini/physics`` so plain operators are safe in an eager 
 """
 
 from gemini.ops import control, scope
+from gemini.ops.backend import register as register_backend
 from gemini.ops.check import any_nan, check, check_numbers
 from gemini.ops.dispatch import Constant, Operators, Symbolic, dispatch
 from gemini.ops.elementwise import (
@@ -103,6 +104,7 @@ __all__ = [
     "physics",
     "require",
     "pow",
+    "register_backend",
     "round",
     "scope",
     "sign",

@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 
-from gemini import backends, ops
+from gemini import ops, runtime
 
 XP = [0.0, 1.0, 2.5, 4.0]
 FP = [1.0, 3.0, 2.0, -1.0]
@@ -35,7 +35,7 @@ def test_interp_on_arrays_and_non_finite_data():
     """The NumPy backend is ``np.interp``; infinite ordinates follow the same fallback."""
     x = np.array([-1.0, 0.5, 1.0, 3.0, 9.0])
     assert ops.interp(x, np.array(XP), np.array(FP)).tolist() == np.interp(x, XP, FP).tolist()
-    with backends.settings("numpy"):
+    with runtime.settings("numpy"):
         assert ops.interp(0.5, XP, FP) == np.interp(0.5, XP, FP)
     infinite = [0.0, math.inf, math.inf, 1.0]
     for value in (0.5, 1.5, 2.0):

@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from gemini import ops
+from gemini.compiler.graph import run_function
 from gemini.errors import PhysicsError
-from gemini.graph import run_function
 from gemini.ops import Constant, Failed
 
 MESSAGE = "{path}: x = {x} m; expected x >= 0"

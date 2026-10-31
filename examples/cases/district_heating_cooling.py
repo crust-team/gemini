@@ -8,7 +8,7 @@ hourly step is checked for energy closure: the sensible-enthalpy audit closes ex
 flow work.
 
 Shows ``gm.plants.example("DistrictEnergyPlant")``, ``get``, ``Module.step``,
-``gm.modules.energy_balance``, ``gm.modules.collect_flows`` and ``gm.checks.plant_balance``.
+``gm.modules.energy_balance``, ``gm.modules.collect_flows`` and ``gm.evaluate.plant_balance``.
 
 Run with ``python examples/cases/district_heating_cooling.py``.
 """
@@ -70,7 +70,7 @@ def closes(plant, result):
     audit = gm.modules.energy_balance(plant, result)
     leaves = result.leaves().values()
     flow_work = sum(leaf.outputs.get("hydraulic_power", 0.0) for leaf in leaves)
-    balanced = all(check["passed"] for check in gm.checks.plant_balance(plant, result))
+    balanced = all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
     return balanced and abs(audit["residual"] - flow_work) <= 1e-9 * audit["in"]
 
 

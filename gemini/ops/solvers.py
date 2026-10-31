@@ -23,7 +23,7 @@ A solve that fails (no sign change of the bracket, no convergence, a non-finite 
 instead of raising, so that an unselected branch of ``where`` never raises; follow the solver with
 a ``where`` and a ``check`` to give the failure its error. The Python backend is exactly
 ``scipy.optimize.brentq`` and the handwritten Newton loop; the NumPy backend repeats the same
-iterations on all rows with a mask (see ``gemini.backends.solvers``).
+iterations on all rows with a mask (see ``gemini.ops.kernels.solvers``).
 """
 
 from gemini.errors import ValidationError

@@ -10,7 +10,7 @@ from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
 SNAPSHOTS = {
     "0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b48178a8b",
-    "0.2.0": "8859b77cf076104d6c350895557493c0f7b648b5994e385dee7b02b18487b378",
+    "0.2.0": "4459b2339cac2e9b49d0fd1c080219a2516161a6db6c06ccd2a860c076900d2b",
 }
 """Hash of the snapshot per ``gm.__version__``: a released entry never changes."""
 
@@ -18,39 +18,38 @@ SNAPSHOTS = {
 def test_public_names_and_docs():
     """Interactive completion exposes exactly the documented, individually documented names."""
     expected = {
+        "Module",
+        "Plant",
+        "Parameter",
+        "Inlet",
+        "Outlet",
+        "Output",
+        "Stream",
+        "Fluid",
+        "BRINE",
+        "WATER",
+        "Assumptions",
         "schedule",
         "simulate",
         "replay",
         "live",
         "resume",
-        "Engine",
-        "Plant",
+        "call",
         "Results",
-        "evaluate",
-        "Clock",
         "Dataset",
-        "Profile",
-        "Stream",
-        "Ports",
-        "Fluid",
-        "BRINE",
-        "WATER",
-        "Quantity",
-        "runtime",
-        "units",
-        "streams",
+        "Engine",
         "modules",
         "plants",
-        "profiles",
-        "analysis",
-        "economics",
-        "kpi",
-        "checks",
-        "testing",
-        "optim",
+        "physics",
+        "ops",
+        "runtime",
+        "units",
         "errors",
-        "no_outputs",
-        "__version__",
+        "data",
+        "optim",
+        "evaluate",
+        "analysis",
+        "compiler",
     }
     assert set(dir(gm)) == expected == set(gm.__all__)
     assert all(getattr(gm, name).__doc__ for name in expected)
@@ -100,23 +99,22 @@ def test_the_package_has_one_version():
 def test_every_economics_function_takes_the_plant_and_the_results():
     """``capex`` alone has no results; ``co2`` takes the plant too."""
     for name in ("opex", "lcoh", "lcoc", "lcts", "annualised_cost", "co2", "npv", "payback"):
-        arguments = list(inspect.signature(getattr(gm.economics, name)).parameters)
+        arguments = list(inspect.signature(getattr(gm.evaluate, name)).parameters)
         assert arguments[:2] == ["plant", "results"], name
-    assert list(inspect.signature(gm.economics.capex).parameters)[0] == "plant"
+    assert list(inspect.signature(gm.evaluate.capex).parameters)[0] == "plant"
 
 
-def test_evaluate_stays_beside_the_run_functions():
-    """A call at one point is a run at one point; ``gm.testing`` is for developers."""
-    assert "evaluate" in gm.__all__ and "testing" in gm.__all__
-    assert gm.testing.__all__ == ["check_module"]
+def test_call_stays_beside_the_run_functions():
+    """A call at one point is a run at one point; ``gm.modules.check`` is for developers."""
+    assert "call" in gm.__all__ and "check" in gm.modules.__all__
 
 
 def test_utils_stays_private():
     """Helpers are not part of the public API."""
-    assert "utils" not in gm.__all__
+    assert "_utils" not in gm.__all__
 
 
 def test_the_old_project_import_is_public_only_through_convert_legacy():
-    """``gm.legacy`` is gone; ``gm.plants.convert_legacy`` is the one public entry."""
+    """``gm.legacy`` is gone; ``gm.data.convert_legacy`` is the one public entry."""
     assert not hasattr(gm, "legacy")
-    assert "convert_legacy" in gm.plants.__all__
+    assert "convert_legacy" in gm.data.__all__

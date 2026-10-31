@@ -12,7 +12,7 @@ evidence of a numerical change, never a routine update (see ``.claude/docs/testi
 import pandas as pd
 
 import gemini as gm
-from gemini.utils import paths
+from gemini._utils import paths
 from tests.fixtures import FIXTURES
 from tests.fixtures.frames import path_frame
 

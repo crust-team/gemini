@@ -5,8 +5,9 @@ name: ``reading(result).electricity`` is the power on ``power_in``, so each asse
 number and reads it where it now lives.
 """
 
+from gemini import units
 from gemini.modules.heating import _burner
-from gemini.physics import heat_transfer, units
+from gemini.physics import heat_transfer
 
 _PORT_POWERS = {
     "electricity": ("inlets", "power_in"),

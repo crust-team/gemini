@@ -2,18 +2,13 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Boundary, Inlet, Outlet, Output, Parameter, State
 from gemini.modules.module import Module
 from gemini.physics import fluid, ground
 from gemini.types import (
-    Boundary,
     Duration,
     Fraction,
-    Inlet,
     Length,
-    Outlet,
-    Output,
-    Parameter,
-    State,
     Stream,
     Temperature,
     TemperatureDifference,

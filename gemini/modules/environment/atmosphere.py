@@ -2,20 +2,10 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Boundary, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import energy, gas
-from gemini.types import (
-    Boundary,
-    Inlet,
-    MassFlow,
-    Outlet,
-    Output,
-    Parameter,
-    Power,
-    Pressure,
-    Stream,
-    Temperature,
-)
+from gemini.types import MassFlow, Power, Pressure, Stream, Temperature
 from gemini.types.fluid import AIR
 
 

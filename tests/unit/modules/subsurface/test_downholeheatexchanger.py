@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini.graph import run
+from gemini.compiler.graph import run
 from gemini.modules import energy_balance, mass_balance
 from gemini.modules.subsurface import DownholeHeatExchanger
 from gemini.types import Stream

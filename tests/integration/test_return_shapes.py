@@ -28,7 +28,7 @@ CORROSION = {
     "minimum_thickness": 0.005,
     "start": "2024-01-01T00:00:00Z",
 }
-VALUES = gm.economics.Assumptions(
+VALUES = gm.Assumptions(
     electricity_price=2e-8,
     heat_price=5e-8,
     cold_price=4e-8,
@@ -47,12 +47,12 @@ RETIRED = {"values", "units", "tolerance", "timestamp", "class", "type", "module
 
 
 def _limits():
-    return gm.checks.Limits().add("heat_exchanger.duty", min="0 MW")
+    return gm.evaluate.Limits().add("heat_exchanger.duty", min="0 MW")
 
 
 def _run_entries(plant, results):
     return {
-        "evaluate": lambda: gm.evaluate(
+        "evaluate": lambda: gm.call(
             "HeatExchanger",
             {
                 "thermal_conductance": 5e5,
@@ -67,7 +67,7 @@ def _run_entries(plant, results):
             },
             {},
         ),
-        "evaluate.record": lambda: gm.evaluate("Boilr", {}, {}, {}, on_error="record"),
+        "evaluate.record": lambda: gm.call("Boilr", {}, {}, {}, on_error="record"),
         "get": lambda: results.get("heat_exchanger", "duty"),
         "summary": results.summary,
         "errors": results.errors,
@@ -100,16 +100,16 @@ def _economics_entries():
     costed, run = heating_plant(), day()
     cold, chilled = cooling_plant(), day(heat=None, cold=500.0)
     return {
-        "capex": lambda: gm.economics.capex(costed),
-        "opex": lambda: gm.economics.opex(costed, run, VALUES),
-        "lcoh": lambda: gm.economics.lcoh(costed, run, 0.05, 20, VALUES),
-        "lcoc": lambda: gm.economics.lcoc(cold, chilled, 0.05, 20, VALUES),
-        "lcts": lambda: gm.economics.lcts(costed, run, 0.05, 20, VALUES),
-        "annualised_cost": lambda: gm.economics.annualised_cost(costed, run, 0.05, 20, VALUES),
-        "co2": lambda: gm.economics.co2(costed, run, VALUES),
-        "npv": lambda: gm.economics.npv(costed, run, 0.05, 20, VALUES),
-        "payback": lambda: gm.economics.payback(costed, run, VALUES),
-        "economics.record": lambda: gm.economics.lcoh(
+        "capex": lambda: gm.evaluate.capex(costed),
+        "opex": lambda: gm.evaluate.opex(costed, run, VALUES),
+        "lcoh": lambda: gm.evaluate.lcoh(costed, run, 0.05, 20, VALUES),
+        "lcoc": lambda: gm.evaluate.lcoc(cold, chilled, 0.05, 20, VALUES),
+        "lcts": lambda: gm.evaluate.lcts(costed, run, 0.05, 20, VALUES),
+        "annualised_cost": lambda: gm.evaluate.annualised_cost(costed, run, 0.05, 20, VALUES),
+        "co2": lambda: gm.evaluate.co2(costed, run, VALUES),
+        "npv": lambda: gm.evaluate.npv(costed, run, 0.05, 20, VALUES),
+        "payback": lambda: gm.evaluate.payback(costed, run, VALUES),
+        "economics.record": lambda: gm.evaluate.lcoh(
             heating_plant(costed=False), run, 0.05, 20, VALUES, on_error="record"
         ),
     }
@@ -117,15 +117,15 @@ def _economics_entries():
 
 def _ledger_entries(plant, results):
     return {
-        "compute": lambda: gm.kpi.compute(plant, results),
-        "totals": lambda: gm.kpi.totals(plant, results),
-        "energy_balance": lambda: gm.checks.energy_balance(results),
-        "mass_balance": lambda: gm.checks.mass_balance(results),
-        "bounds": lambda: gm.checks.bounds(plant, results),
-        "plant_balance": lambda: gm.checks.plant_balance(plant, results),
-        "limits": lambda: gm.checks.limits(plant, results, _limits()),
-        "run_all": lambda: gm.checks.run_all(plant, results),
-        "operating_time": lambda: gm.checks.operating_time(plant, results, "1 h"),
+        "compute": lambda: gm.evaluate.totals(plant, results),
+        "totals": lambda: gm.evaluate.totals(plant, results),
+        "energy_balance": lambda: gm.evaluate.energy_balance(results),
+        "mass_balance": lambda: gm.evaluate.mass_balance(results),
+        "bounds": lambda: gm.evaluate.bounds(plant, results),
+        "plant_balance": lambda: gm.evaluate.plant_balance(plant, results),
+        "limits": lambda: gm.evaluate.limits(plant, results, _limits()),
+        "run_all": lambda: gm.evaluate.run_all(plant, results),
+        "operating_time": lambda: gm.evaluate.operating_time(plant, results, "1 h"),
         "Limits": lambda: _limits().to_dict(),
     }
 

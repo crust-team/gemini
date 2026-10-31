@@ -36,11 +36,11 @@ from functools import wraps
 
 import numpy as np
 
-from gemini.backends import PLAIN, WRAP
-from gemini.backends.scalars import scope_mode, scope_variable
+from gemini._utils.context import ContextSetting
 from gemini.ops.dispatch import Symbolic
 from gemini.ops.failed import Failed, is_marked
-from gemini.utils.context import ContextSetting
+from gemini.ops.kernels import PLAIN, WRAP
+from gemini.ops.kernels.scalars import scope_mode, scope_variable
 
 _NUMBERS = frozenset({float, int})
 _PASS = frozenset({np.float64, np.int64, bool, str, type(None), np.bool_})

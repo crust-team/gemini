@@ -59,7 +59,7 @@ jobs:
         uv pip install --resolution "${{ matrix.resolution }}" -e . --group test
         echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
     - name: Report the environment
-      run: python -m gemini.utils.collect_env
+      run: python -m gemini._utils.collect_env
     - name: Run development profile against the base
       if: env.PROFILE == 'development'
       env:

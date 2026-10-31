@@ -3,10 +3,11 @@
 import pytest
 
 from gemini.modules import Module, collect_flows, energy_balance
+from gemini.modules.declarations import Control, Inlet, Outlet, Output
 from gemini.modules.grids import ElectricityGrid
 from gemini.modules.heating import ElectricBoiler
 from gemini.modules.power import ORC
-from gemini.types import Control, Inlet, Outlet, Output, Power, Stream
+from gemini.types import Power, Stream
 from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.reading import reading

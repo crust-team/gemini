@@ -3,7 +3,8 @@
 import pytest
 
 from gemini.errors import DefinitionError
-from gemini.types import Inlet, Outlet, Stream, streams
+from gemini.modules.declarations import Inlet, Outlet
+from gemini.types import Stream, streams
 
 
 def test_names_are_the_fixed_list():

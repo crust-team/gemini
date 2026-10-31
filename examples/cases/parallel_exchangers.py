@@ -10,7 +10,7 @@ that adds the injector's friction instead of subtracting it. With the correct si
 54.86 bar, so the case recalibrates it from the same point and runs with both indices.
 
 Shows ``gm.plants.example("ParallelExchangerPlant")``, which holds a ``NodalDoublet``,
-``get``, a direct plant call, ``gm.modules.collect_flows`` and ``gm.checks.plant_balance``.
+``get``, a direct plant call, ``gm.modules.collect_flows`` and ``gm.evaluate.plant_balance``.
 
 Run with ``python examples/cases/parallel_exchangers.py``.
 """
@@ -89,7 +89,7 @@ def main():
     print(f"Secondary outlet:            {outlet:.2f} °C")
     print(f"Electricity (ESP and pump):  {electricity / 1e6:.4f} MW")
     print(f"Mass residual:               {gm.modules.mass_balance(plant, result)['residual']} kg/s")
-    closed = all(check["passed"] for check in gm.checks.plant_balance(plant, result))
+    closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
     print(f"Plant balance closes:        {closed}")
 
 

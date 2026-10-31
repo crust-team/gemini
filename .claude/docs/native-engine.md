@@ -74,7 +74,7 @@ engine treats it):
   shared; the tracer creates one graph input per constant.
 - Declared in modules by attribute assignment (`self.stages = gm.Parameter("50")`); `Module`
   registers them; `named_parameters`, `named_constants`, `named_states` list them.
-- Defined in `gemini/types/declarations.py` (`Parameter`, `State`) and `gemini/ops` (`Constant`).
+- Defined in `gemini/modules/declarations.py` (`Parameter`, `State`) and `gemini/ops` (`Constant`).
   Reuse and extend whatever parameter mechanism already exists.
 
 ## 5. Units and types
@@ -135,7 +135,7 @@ Nothing that computes outputs today is lost; the user does not mark anything in 
 - **Outputs assigned in `forward` and combinations of a plant** are part of the module call, not
   hooks. They are traced together with `forward`, in the same fixed order (`forward` -> combinations
   -> forward hooks -> `_check_outputs`), and become part of the module graph. `_check_outputs` runs
-  once at trace time (every declared output must get a value). `gm.no_outputs()` traces a graph
+  once at trace time (every declared output must get a value). `gm.modules.no_outputs()` traces a graph
   without the output step.
 - **Forward hooks** are traced too, after the formula outputs. Hooks always return None, so the
   engine looks at what a hook does during the trace:
@@ -192,12 +192,12 @@ backend. Solvers as dedicated ops with per-element stopping.
 
 Implemented for one leaf module, the ESP, and everything its call needs:
 
-- `gemini/backends`: `Backend`, `register`, `get`, `settings(backend=...)`, `select` (NumPy for
+- `gemini/ops/kernels`: `Backend`, `register`, `get`, `settings(backend=...)`, `select` (NumPy for
   array operands, Python for scalars) and `implementation` (NumPy fallback for a missing op);
   `python.py` and `numpy.py` with the ops the ESP uses plus `where` and `check`.
 - `gemini/ops`: the registry (name, kind, arity), `dispatch`, `Operators`, `Constant`,
   `where`, `check`, `logical_and`, comparisons, arithmetic, `getitem` and the `scan` definition.
-- `gemini/graph`: `Node` (op, kind, operands, name, role, unit, shape, source line, guards),
+- `gemini/compiler/graph`: `Node` (op, kind, operands, name, role, unit, shape, source line, guards),
   `Graph` (inputs by role, outputs, checks, constants, outlet fluids,
   `describe()`), `Proxy`, `Tracer` (one leaf module), `Interpreter` (value pass, then error
   pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
@@ -212,9 +212,9 @@ Implemented for one leaf module, the ESP, and everything its call needs:
 Where the implementation differs from sections 1 to 11, and why:
 
 - **Names are not public.** The ops are `gemini.ops.where`, `gemini.ops.check`, ... and the
-  backend setting is `gemini.backends.settings(backend=...)`, not `gm.where` or
+  backend setting is `gm.runtime.settings(backend=...)`, not `gm.where` or
   `gm.runtime.settings(backend=...)`: the curated `gm` names are pinned and the public API is
-  unchanged, and `gemini.backends.runtime` sits above the rest of `gemini.backends` in the
+  unchanged, and `gemini.runtime` sits above the rest of `gemini.ops.kernels` in the
   dependency order.
 - **`where` branches are plain values** and both are always evaluated. On the Python backend the
   ops return `inf` or `nan` silently, like NumPy, for division by zero, a negative logarithm or
@@ -239,7 +239,7 @@ Where the implementation differs from sections 1 to 11, and why:
   can fail on some row; the interpreter calls it with concrete arrays. A failing solve returns NaN
   instead of raising, followed by a `where` and a `check` with the old message. The Python backend
   is `scipy.optimize.brentq` and the handwritten Newton loop. **The NumPy backend is not the
-  SciPy routines of section 3**: `gemini/backends/solvers.py` repeats the scalar iterations step
+  SciPy routines of section 3**: `gemini/ops/kernels/solvers.py` repeats the scalar iterations step
   for step with an active-row mask. `find_root` lands up to 1.4e-12 relative from the Python
   result (Brent's own error is within `xtol`, so no setting meets 1e-12) and array
   `scipy.optimize.newton` returns a different iterate, which moved the rounded NORSOK pH on 34 %
@@ -281,7 +281,7 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Graph breaks** are stateful modules (no `scan` yet), modules with pre-hooks, float32 precision
   and any `TraceError` from Python control flow or conversions; section 13 says at which level.
   A plant with a loop or a constraint breaks its whole root.
-- **Common-subexpression elimination** (`gemini/graph/passes/cse.py`,
+- **Common-subexpression elimination** (`gemini/compiler/graph/passes/cse.py`,
   `eliminate_common_subexpressions(graph)`, in place) runs once per trace in `GraphCache`;
   `GraphCache(optimize=False)` turns it off. It merges `elementwise`, `index` and `check` nodes
   with the same op, operands and attributes. A literal operand is its type and exact value (`1`,
@@ -318,8 +318,8 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Limits.** `Declaration.limits()` gives an `ops.check(..., ValidationError)` for every traced
   control, boundary and output, attached to every output so a violated bound always fails the
   row, and the root inlets carry the `Stream` limits.
-- **One evaluation.** `gemini.graph.evaluate(graph, feeds, rows, context)` runs a graph on the
-  backend of `gemini.backends.settings`: NumPy in one pass over arrays, Python row by row with
+- **One evaluation.** `gemini.compiler.graph.evaluate(graph, feeds, rows, context)` runs a graph on the
+  backend of `gm.runtime.settings`: NumPy in one pass over arrays, Python row by row with
   floats, stacked into the same arrays. That is how to debug; there is no second path. `Evaluation`
   gives `result`, the `ModuleResult` tree of the trace mapped to arrays with children; `failed`, the
   rows with an error reaching an output (`Interpreter.reached`, one computation); `error(row)`, the
@@ -370,8 +370,8 @@ retrace. Named physical constants and module-level model constants are `Constant
 
 ## 14. The plant class and the plant dict
 
-Every composite is a `Plant` (`gemini/modules/plant.py`, with its tools in
-`gemini/modules/plants/_utils/`). A class declares its children, ports and connections; `gm.Plant`
+Every composite is a `Plant` (`gemini/plants/plant.py`, with its tools in
+`gemini/plants/_utils/`). A class declares its children, ports and connections; `gm.Plant`
 builds one with `add` and `connect`. There is one `forward`. JSON exists only as the plant dict
 ([plants.md](plants.md#the-plant-dict)).
 

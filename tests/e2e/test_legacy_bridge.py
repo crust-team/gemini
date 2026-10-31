@@ -3,7 +3,8 @@
 import pytest
 
 import gemini as gm
-from gemini.utils import legacy, paths
+from gemini._utils import paths
+from gemini.data import legacy
 from tests.fixtures import OLD_PROJECT as OLD
 
 pytestmark = pytest.mark.e2e

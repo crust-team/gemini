@@ -5,10 +5,10 @@ import pytest
 
 import gemini as gm
 from gemini.engine.columns import read
+from gemini.engine.loader import Aligned
 from gemini.engine.step import BindingPlan
 from gemini.errors import PhysicsError
 from gemini.types.bindings import Binding, ModuleBindings
-from gemini.utils.data.loader import Aligned
 from tests.fixtures.engine_tank import ROW, TIME, dataset, tank
 
 

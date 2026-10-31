@@ -4,13 +4,9 @@ import pytest
 
 import gemini as gm
 from gemini.modules import Module, energy_balance, mass_balance
+from gemini.modules.declarations import Inlet, Outlet, Output
 from gemini.modules.piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
-from gemini.types import (
-    Inlet,
-    Outlet,
-    Output,
-    Stream,
-)
+from gemini.types import Stream
 from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises

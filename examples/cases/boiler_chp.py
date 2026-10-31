@@ -8,7 +8,7 @@ gas-engine CHP. Well, reservoir and ESP data are the upstream example's. The boi
 values are this case's own, because upstream drives both by a gas flow.
 
 Shows ``gm.plants.example("BoilerChpPlant")``, which holds a ``NodalDoublet``, ``get``,
-``gm.modules.collect_flows``, ``gm.modules.emissions`` and ``gm.checks.plant_balance``.
+``gm.modules.collect_flows``, ``gm.modules.emissions`` and ``gm.evaluate.plant_balance``.
 
 Run with ``python examples/cases/boiler_chp.py``.
 """
@@ -60,7 +60,7 @@ def main():
     print(f"Electricity used:            {flows['electricity'] / 1e6:.3f} MW")
     print(f"Injection pump:              {injection_pump:.1f} W (no pump needed)")
     print(f"CO2 emissions:               {emitted:.0f} kg/day")
-    closed = all(check["passed"] for check in gm.checks.plant_balance(plant, result))
+    closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
     print(f"Plant balance closes:        {closed}")
 
 

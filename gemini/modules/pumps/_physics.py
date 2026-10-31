@@ -13,10 +13,10 @@ compressibility factor Z = 1: the isentropic outlet temperature
 low reduced pressure) with a constant heat capacity ratio ``k = cp / cv`` over the stage.
 """
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError
 from gemini.ops import Constant
-from gemini.physics import constants, units
+from gemini.physics import constants
 
 
 @ops.physics

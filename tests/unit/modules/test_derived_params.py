@@ -3,7 +3,7 @@
 import pytest
 
 import gemini as gm
-from gemini.modules._utils import registry
+from gemini._utils import registry
 from gemini.physics import hydraulics
 from tests.fixtures.deriving import Column
 

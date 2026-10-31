@@ -1,8 +1,9 @@
 """The plant's edge for bought chemicals."""
 
+from gemini.modules.declarations import Outlet
 from gemini.modules.module import Module
 from gemini.physics import gas
-from gemini.types import Outlet, Stream
+from gemini.types import Stream
 
 
 class ChemicalGrid(Module):
@@ -10,7 +11,7 @@ class ChemicalGrid(Module):
 
     ``chemical_out`` is offered without flow at normal conditions and the dosing module returns what
     it takes, so the dosed amount is read from the port. The product price is ``chemical_price`` of
-    ``gm.economics.Assumptions``.
+    ``gm.Assumptions``.
     """
 
     def __init__(self):

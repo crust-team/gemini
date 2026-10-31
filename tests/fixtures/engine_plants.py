@@ -11,18 +11,8 @@ import pandas as pd
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules import Module
-from gemini.types import (
-    Control,
-    Electricity,
-    Health,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    Ratio,
-    State,
-    Stream,
-)
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter, State
+from gemini.types import Electricity, Health, Ratio, Stream
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 
 TICKS = pd.date_range("2024-01-01", periods=12, freq="15min", tz="UTC")

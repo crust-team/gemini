@@ -9,10 +9,10 @@ temperature profile of a well in a linear geothermal gradient (Ramey 1962).
 
 import math
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError
 from gemini.ops import Constant
-from gemini.physics import heat_transfer, units
+from gemini.physics import heat_transfer
 
 EULER_GAMMA = 0.5772156649015329
 """Euler-Mascheroni constant [-] of the line-source long-time asymptote."""

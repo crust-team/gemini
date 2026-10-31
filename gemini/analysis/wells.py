@@ -6,6 +6,9 @@ from typing import Any
 
 import numpy as np
 
+from gemini import units as physics_units
+from gemini._utils.jsonable import to_plain
+from gemini._utils.strings import split_path
 from gemini.analysis import solves
 from gemini.analysis.fits import fit_head_correction
 from gemini.errors import GeminiError, NotImplementedYet, PhysicsError, ValidationError
@@ -14,11 +17,8 @@ from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.physics import constants
-from gemini.physics import units as physics_units
 from gemini.types.flows import Stream
 from gemini.types.shapes import OutputUnits, value
-from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import split_path
 
 CURVE_POINTS = 21
 """Number of rates on the IPR and VLP curves of ``nodal``, from the low to the high bracket end."""
@@ -483,6 +483,6 @@ def calibrate_pump(plant, pump, measured):
     Raises
     ------
     NotImplementedYet
-        Always: it will run ``gm.optim.calibrate`` and report the result in this form.
+        Always: it will run ``gm.analysis.calibrate`` and report the result in this form.
     """
     raise NotImplementedYet("analysis.calibrate_pump")

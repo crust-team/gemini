@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from gemini.utils import paths
+from gemini._utils import paths
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "tests/fixtures"

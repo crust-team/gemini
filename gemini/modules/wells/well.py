@@ -7,15 +7,10 @@ Both wells traverse a geothermal pipe path using the original GEMINI DPDT equati
 from typing import Literal
 
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Parameter
 from gemini.modules.module import Module
 from gemini.physics import geometry, hydraulics
-from gemini.types import (
-    Dimensionless,
-    HeatTransferCoefficient,
-    Parameter,
-    PressureDifference,
-    Temperature,
-)
+from gemini.types import Dimensionless, HeatTransferCoefficient, PressureDifference, Temperature
 
 
 class _Well(Module):
@@ -24,6 +19,8 @@ class _Well(Module):
     ``flow_direction`` is the direction the brine flows: ``"up"`` in a production well and
     ``"down"`` in an injection well.
     """
+
+    abstract = True
 
     flow_direction = "up"
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from gemini import backends
+from gemini import runtime
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules._utils.balance import energy_balance, mass_balance
 from gemini.modules.heating import HeatPump
@@ -263,6 +263,6 @@ def test_a_stopped_heat_pump_has_no_cop_on_every_backend():
     )
     stopped = Stream(m_dot=0.0, T=300.0, p=3e5)
     for backend in BACKENDS:
-        with backends.settings(backend=backend):
+        with runtime.settings(backend=backend):
             result = pump(source_in=stopped, sink_in=stopped, temperature_setpoint=313.15)
         assert result.outputs.cop is None

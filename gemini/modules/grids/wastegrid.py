@@ -1,14 +1,15 @@
 """The plant's edge for discarded flows."""
 
+from gemini.modules.declarations import Inlet
 from gemini.modules.module import Module
-from gemini.types import Inlet, Stream
+from gemini.types import Stream
 
 
 class WasteGrid(Module):
     """Where blowdown, sand and other discarded flows leave the plant.
 
     ``waste_in`` takes any number of connections. What leaves is read from the port; the disposal
-    cost per kg is ``waste_disposal_price`` of ``gm.economics.Assumptions``.
+    cost per kg is ``waste_disposal_price`` of ``gm.Assumptions``.
     """
 
     def __init__(self):

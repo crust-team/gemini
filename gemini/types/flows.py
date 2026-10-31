@@ -6,13 +6,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from gemini import ops
+from gemini import ops, units
+from gemini._utils.strings import did_you_mean, join_names
 from gemini.errors import PhysicsError, ValidationError
 from gemini.physics import fluid as fluid_physics
-from gemini.physics import units
 from gemini.types.fluid import Fluid
 from gemini.types.quantities import MassFlow, Pressure, Temperature
-from gemini.utils.strings import did_you_mean, join_names
 
 _ARGUMENTS = ("m_dot", "flow", "T", "p", "fluid")
 STREAM_FIELDS = ("m_dot", "T", "p")
@@ -45,10 +44,10 @@ class Stream:
 
         ``flow`` accepts mass flow, or volume flow converted with the stream's fluid density;
         plain numbers are kg/s. ``fluid`` defaults to the runtime default fluid.
-        ``gemini.backends.runtime`` is imported here because it imports ``gemini.types.fluid``;
+        ``gemini.runtime`` is imported here because it imports ``gemini.types.fluid``;
         a module-level import would form an import cycle through ``gemini.types``.
         """
-        from gemini.backends import runtime
+        from gemini import runtime
 
         _check_arguments(data)
         fluid = runtime.get_default_fluid() if data.get("fluid") is None else data["fluid"]

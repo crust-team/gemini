@@ -7,10 +7,8 @@ import math
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError
-
-from . import units
 
 
 @ops.physics

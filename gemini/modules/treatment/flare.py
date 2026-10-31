@@ -2,19 +2,10 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import combustion, gas
-from gemini.types import (
-    Efficiency,
-    Fuel,
-    Inlet,
-    MassFlow,
-    Outlet,
-    Output,
-    Parameter,
-    Power,
-    Stream,
-)
+from gemini.types import Efficiency, Fuel, MassFlow, Power, Stream
 from gemini.types.cost import scaled_cost
 from gemini.types.fluid import FLUE_CO2, Fluid
 

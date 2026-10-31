@@ -1,6 +1,6 @@
 """Plan a year of one doublet and a boiler from the heating demand, then simulate the plan.
 
-Shows ``gm.profiles.from_csv``, ``gm.schedule`` and ``gm.simulate`` on a small plant built from a
+Shows ``gm.data.from_csv``, ``gm.schedule`` and ``gm.simulate`` on a small plant built from a
 doublet's depth. The doublet design, the sizes and the return temperature are assumptions of this
 recipe and it prints them as such. The daily heating demand is a file of the sample problem in
 ``inputs/examples/hackathon_2027/``; any file with a time column and a demand column in a unit of
@@ -74,7 +74,7 @@ def main():
     plant = build()
     print("Assumptions: a 2500 m doublet, 40 MW boiler, return at 60 °C, supply at 100 °C")
     columns = {"heating_demand_MWth": "heating_demand"}
-    demand = gm.profiles.from_csv(DEMAND / "GEMINI_Heating_Demand_Daily_2027.csv", columns, "MW")
+    demand = gm.data.from_csv(DEMAND / "GEMINI_Heating_Demand_Daily_2027.csv", columns, "MW")
     plan = gm.schedule(plant, demand, RULES)
     lowest = gm.units.convert(plan["d0.flow"].min(), "m3/s", "m3/h")
     highest = gm.units.convert(plan["d0.flow"].max(), "m3/s", "m3/h")
@@ -82,7 +82,7 @@ def main():
     print(f"Doublet flow:     {lowest:.0f} to {highest:.0f} m³/h")
     print(f"Boiler, peak:     {plan['boiler_duty'].max() / 1e6:.2f} MW")
     results = gm.simulate(plant, plan)
-    totals = gm.kpi.totals(plant, results)
+    totals = gm.evaluate.totals(plant, results)
     print(f"Heat delivered:   {totals['heat_delivered']['value'] / 3.6e12:.2f} GWh")
     print(f"Gas bought:       {totals['gas_bought']['value'] / 3.6e12:.2f} GWh")
     print(f"Electricity:      {totals['electricity_bought']['value'] / 3.6e12:.2f} GWh")

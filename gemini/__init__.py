@@ -1,57 +1,70 @@
-"""GEMINI: load a plant, choose a dataset, and simulate, replay or run live."""
+"""GEMINI: a general geothermal heating and cooling package."""
 
-from gemini import analysis, checks, economics, errors, modules, optim, profiles, testing
-from gemini.analysis import kpi
-from gemini.analysis.schedule import schedule
-from gemini.backends import runtime
-from gemini.engine.clock import Clock
+from gemini import (
+    analysis,
+    compiler,
+    data,
+    errors,
+    evaluate,
+    modules,
+    ops,
+    optim,
+    physics,
+    plants,
+    runtime,
+    units,
+)
+from gemini._utils.version import package_version
 from gemini.engine.engine import Engine
-from gemini.engine.evaluate import evaluate
-from gemini.engine.results import Results
-from gemini.engine.run import live, replay, resume, simulate
-from gemini.modules import plants
-from gemini.modules.module import no_outputs
-from gemini.modules.plants import Plant
-from gemini.physics import units
-from gemini.types import BRINE, WATER, Fluid, Ports, Profile, Quantity, Stream, streams
-from gemini.utils.data.dataset import Dataset
-from gemini.utils.version import package_version
+from gemini.modules import Inlet, Module, Outlet, Output, Parameter
+from gemini.plants import Plant
+from gemini.run import (
+    Assumptions,
+    Dataset,
+    Results,
+    call,
+    live,
+    replay,
+    resume,
+    schedule,
+    simulate,
+)
+from gemini.types import BRINE, WATER, Fluid, Stream
 
 __version__ = package_version()
 __all__ = [
+    "Module",
+    "Plant",
+    "Parameter",
+    "Inlet",
+    "Outlet",
+    "Output",
+    "Stream",
+    "Fluid",
+    "BRINE",
+    "WATER",
+    "Assumptions",
     "schedule",
     "simulate",
     "replay",
     "live",
     "resume",
-    "Engine",
-    "Plant",
+    "call",
     "Results",
-    "evaluate",
-    "Clock",
     "Dataset",
-    "Profile",
-    "Stream",
-    "Ports",
-    "Fluid",
-    "BRINE",
-    "WATER",
-    "Quantity",
-    "runtime",
-    "units",
-    "streams",
+    "Engine",
     "modules",
     "plants",
-    "profiles",
-    "analysis",
-    "economics",
-    "kpi",
-    "checks",
-    "testing",
-    "optim",
+    "physics",
+    "ops",
+    "runtime",
+    "units",
     "errors",
-    "no_outputs",
-    "__version__",
+    "data",
+    "optim",
+    "evaluate",
+    "analysis",
+    "compiler",
 ]
 
 

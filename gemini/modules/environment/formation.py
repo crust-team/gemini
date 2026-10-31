@@ -1,7 +1,8 @@
 """The rock around the wells of a doublet."""
 
+from gemini.modules.declarations import Inlet, Parameter
 from gemini.modules.module import Module
-from gemini.types import Inlet, Parameter, Power, Temperature, TemperatureGradient
+from gemini.types import Power, Temperature, TemperatureGradient
 
 
 class Formation(Module):

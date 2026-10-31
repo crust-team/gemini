@@ -2,19 +2,10 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output
 from gemini.modules.module import Module
 from gemini.modules.power import _physics
-from gemini.types import (
-    STEAM,
-    Control,
-    Fraction,
-    Inlet,
-    Outlet,
-    Output,
-    Pressure,
-    Stream,
-    Temperature,
-)
+from gemini.types import STEAM, Fraction, Pressure, Stream, Temperature
 
 
 class Separator(Module):

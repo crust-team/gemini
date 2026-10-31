@@ -1,8 +1,6 @@
 """Henry-law CO2 partition model retained from GEMINI water-analysis workflows."""
 
-from gemini import ops
-
-from . import units
+from gemini import ops, units
 
 
 @ops.physics

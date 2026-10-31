@@ -2,21 +2,10 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.power import _physics
-from gemini.types import (
-    WATER,
-    Efficiency,
-    Fraction,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    Power,
-    Pressure,
-    Ratio,
-    Stream,
-)
+from gemini.types import WATER, Efficiency, Fraction, Power, Pressure, Ratio, Stream
 
 
 class FlashTurbine(Module):

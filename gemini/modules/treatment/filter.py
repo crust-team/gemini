@@ -1,19 +1,11 @@
 """Clean-filter quadratic hydraulic loss and clogging diagnostics."""
 
-from gemini import ops
+from gemini import ops, units
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.treatment import _physics
-from gemini.physics import diagnostics, hydraulics, separation, units
-from gemini.types import (
-    Health,
-    Inlet,
-    MassFlow,
-    Outlet,
-    Output,
-    Parameter,
-    PressureDifference,
-    Stream,
-)
+from gemini.physics import diagnostics, hydraulics, separation
+from gemini.types import Health, MassFlow, PressureDifference, Stream
 
 
 class Filter(Module):

@@ -2,21 +2,10 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Boundary, Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer
-from gemini.types import (
-    Boundary,
-    Control,
-    Inlet,
-    MassFlow,
-    Outlet,
-    Output,
-    Parameter,
-    Power,
-    Pressure,
-    Stream,
-    Temperature,
-)
+from gemini.types import MassFlow, Power, Pressure, Stream, Temperature
 
 
 class HeatingGrid(Module):
@@ -39,7 +28,7 @@ class HeatingGrid(Module):
     return water: ``return_out`` is offered before the other modules run, the heat delivered is the
     fall of the water from ``supply_in`` to ``return_out``, what is short of ``heat_demand`` is
     ``unmet_demand``, never an error, and what the water gives above it is ``surplus``. Bind
-    ``heat_demand`` to a ``gm.profiles.from_csv`` column. Without them the return follows from
+    ``heat_demand`` to a ``gm.data.from_csv`` column. Without them the return follows from
     the demand, as in a substation.
 
     Simplifications: steady state without circuit inventory, constant fluid properties (the

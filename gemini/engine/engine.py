@@ -7,24 +7,24 @@ from pathlib import Path
 
 import pandas as pd
 
-from gemini import backends
-from gemini.backends import runtime
+from gemini import runtime
+from gemini._utils.jsonable import to_plain
+from gemini._utils.strings import close_matches, did_you_mean
+from gemini._utils.time import parse_duration, to_utc
+from gemini.compiler.graph import graph_cache
 from gemini.engine import checkpoint as storage
 from gemini.engine.clock import Clock
-from gemini.engine.results import Results, declared_quantities, declared_units
+from gemini.engine.loader import Loader
 from gemini.engine.runner import Runner
 from gemini.engine.step import BindingPlan
 from gemini.errors import RunError, ValidationError
 from gemini.errors.base import check_on_error
-from gemini.graph import graph_cache
 from gemini.modules._utils import serialization
 from gemini.modules.module import Module, class_path, import_class
-from gemini.modules.plant import Plant
-from gemini.utils.data.dataset import as_dataset
-from gemini.utils.data.loader import Loader
-from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean
-from gemini.utils.time import parse_duration, to_utc
+from gemini.ops import kernels
+from gemini.plants.plant import Plant
+from gemini.run.dataset import as_dataset
+from gemini.run.results import Results, declared_quantities, declared_units
 
 
 def _live_ticks(position, start, end, step):
@@ -72,7 +72,7 @@ class Engine:
                 f"Engine: plant = {type(plant).__name__}; expected a plant or module"
             )
         check_on_error(on_error)
-        backends.get(backend)
+        kernels.get(backend)
         self.plant = plant
         self.backend = backend
         self.callbacks = list(callbacks or [])
@@ -232,7 +232,7 @@ class Engine:
         )
         self._max_gap = loader.max_gap
         try:
-            with backends.settings(backend=self.backend):
+            with runtime.settings(backend=self.backend):
                 self._notify("on_run_start")
                 Runner(self, plan, loader.arrays()).run()
                 self._notify("on_run_end")

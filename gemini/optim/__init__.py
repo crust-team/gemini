@@ -1,6 +1,5 @@
-"""Fit, search and sample plant parameters through the public engine API."""
+"""Search and sample plant designs through the public run functions."""
 
-from .calibrate import CalibrationResult, calibrate
 from .search import minimize, sample
 
-__all__ = ["calibrate", "CalibrationResult", "minimize", "sample"]
+__all__ = ["minimize", "sample"]

@@ -6,7 +6,7 @@ import io
 import textwrap
 import tokenize
 
-from gemini.modules.plant import Plant
+from gemini.plants.plant import Plant
 from gemini.types import Power, Stream
 
 FORWARD_SECTIONS = ("# Modules", "# Outlets", "# Outputs")

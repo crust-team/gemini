@@ -9,19 +9,12 @@ import json
 
 import pytest
 
+from gemini import units
 from gemini.analysis import estimate_reservoir_pressure
 from gemini.modules.pumps import ESP
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell
-from gemini.physics import (
-    chemistry,
-    corrosion,
-    erosion,
-    geometry,
-    heat_transfer,
-    hydraulics,
-    units,
-)
+from gemini.physics import chemistry, corrosion, erosion, geometry, heat_transfer, hydraulics
 from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid
 from tests.fixtures import FIXTURES

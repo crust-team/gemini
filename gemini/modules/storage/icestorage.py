@@ -1,22 +1,18 @@
 """Lumped ice-on-coil or encapsulated ice store on one glycol circuit."""
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError, ValidationError
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter, State
 from gemini.modules.module import Module
 from gemini.modules.storage import _physics
-from gemini.physics import heat_transfer, units
+from gemini.physics import heat_transfer
 from gemini.types import (
     Energy,
     Fraction,
     HeatAccumulation,
-    Inlet,
     Mass,
-    Outlet,
-    Output,
-    Parameter,
     SpecificEnthalpy,
     SpecificHeat,
-    State,
     Stream,
     Temperature,
     ThermalConductance,

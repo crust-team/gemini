@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError, ValidationError
-from gemini.physics import erosion, units
+from gemini.physics import erosion
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 from tests.fixtures.errors import raises
 

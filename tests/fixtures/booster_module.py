@@ -1,13 +1,15 @@
 """A small valid module in a file of its own, as a user would write and load one."""
 
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
-from gemini.types import Inlet, Outlet, Output, Parameter, Pressure, PressureDifference, Stream
+from gemini.types import Pressure, PressureDifference, Stream
 
 
 class Booster(Module):
     """Raise the stream pressure by a fixed gain."""
 
     category = "pumps"
+    abstract = True
 
     def __init__(self):
         """Declare the gain, the suction and discharge ports and the head."""

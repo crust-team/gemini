@@ -4,20 +4,10 @@ from typing import Literal
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Control, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import hydraulics
-from gemini.types import (
-    Control,
-    FlowCoefficient,
-    Fraction,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    PressureDifference,
-    Ratio,
-    Stream,
-)
+from gemini.types import FlowCoefficient, Fraction, PressureDifference, Ratio, Stream
 
 
 class Valve(Module):

@@ -5,8 +5,8 @@ Plans the hourly demand of the sample problem ``shallow_district`` for its plant
 compression chiller. The file names, the unit and the step differ from the challenge's. The values
 are invented for testing; what this case assumes it prints as assumptions.
 
-Shows ``gm.plants.from_dict``, ``gm.profiles.from_csv``, ``gm.schedule``, ``gm.simulate``,
-``gm.checks.Limits.from_dict``, ``gm.checks.limits`` and ``gm.checks.operating_time``.
+Shows ``gm.plants.from_dict``, ``gm.data.from_csv``, ``gm.schedule``, ``gm.simulate``,
+``gm.evaluate.Limits.from_dict``, ``gm.evaluate.limits`` and ``gm.evaluate.operating_time``.
 
 Run with ``python examples/cases/shallow_district.py``.
 """
@@ -36,12 +36,12 @@ def sample(name):
 def demand():
     """Return the hourly heating and cooling demand file of the sample problem."""
     columns = {"heat_kw": "heating_demand", "cool_kw": "cooling_demand"}
-    return gm.profiles.from_csv(SAMPLE / "demand.csv", columns, "kW", time_column="timestamp")
+    return gm.data.from_csv(SAMPLE / "demand.csv", columns, "kW", time_column="timestamp")
 
 
 def print_run(plant, results):
     """Print the energy of the run and the supply temperatures, in hourly steps."""
-    totals = gm.kpi.totals(plant, results)
+    totals = gm.evaluate.totals(plant, results)
     frame = results.to_frame()
     boiler = frame["peak_boiler.fluid_out.enthalpy_flow"]
     boiler = boiler - frame["peak_boiler.fluid_in.enthalpy_flow"]
@@ -94,9 +94,9 @@ def main():
     results = gm.simulate(plant, plan, on_error="record")
     print(f"\nFailed hours: {len(results.errors())}")
     print_run(plant, results)
-    limits = gm.checks.Limits.from_dict(sample("limits.json"))
-    times = gm.checks.operating_time(plant, results, rules["operating_time"])
-    print_checks(gm.checks.limits(plant, results, limits) + times)
+    limits = gm.evaluate.Limits.from_dict(sample("limits.json"))
+    times = gm.evaluate.operating_time(plant, results, rules["operating_time"])
+    print_checks(gm.evaluate.limits(plant, results, limits) + times)
 
 
 if __name__ == "__main__":

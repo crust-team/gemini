@@ -17,10 +17,10 @@ import numpy as np
 import pandas as pd
 
 import gemini as gm
-from gemini import backends
-from gemini.graph import GraphCache, run
+from gemini import runtime
+from gemini._utils import paths
+from gemini.compiler.graph import GraphCache, run
 from gemini.types.flows import Stream
-from gemini.utils import paths
 
 DATASET = paths.doublet_heat("doublet_2024_15min_month.csv")
 COLUMNS = ["fluid_in.m_dot", "fluid_in.T", "fluid_in.p", "frequency"]
@@ -105,7 +105,7 @@ def replay(dataset):
 def simulate(dataset):
     """Simulate a freshly loaded plant over ``dataset`` and return the engine."""
     engine = gm.Engine(gm.plants.example("DoubletHeatPlant"))
-    engine.simulate(dataset, gm.Clock.from_data(dataset))
+    engine.simulate(dataset, gm.engine.Clock.from_data(dataset))
     return engine
 
 
@@ -140,7 +140,7 @@ def run_case(name, function, rows, repeat):
     """Print one case on every backend, checking that the result frames are equal."""
     expected = None
     for backend in ("numpy", "python"):
-        with backends.settings(backend=backend):
+        with runtime.settings(backend=backend):
             seconds, engine = best_time(function, repeat)
         results = engine.results.to_frame()
         if expected is not None:

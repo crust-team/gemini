@@ -1,7 +1,7 @@
 """One twin evaluated over a block of ticks: its result columns, errors and new state.
 
 ``evaluate_twin`` builds the inlet streams and inputs of the ticks a ``Block`` lets through,
-evaluates the twin's graph over them (``gemini.graph.evaluate``, on whichever backend is
+evaluates the twin's graph over them (``gemini.compiler.graph.evaluate``, on whichever backend is
 selected), assesses the health of the rows that worked and spreads the columns over the ticks
 of the chunk. A tick that cannot be evaluated has an error: an invalid inlet stream, the
 exception of the failing row, or the exception of its health.
@@ -13,9 +13,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from gemini.compiler.graph import evaluate, graph_feeds
 from gemini.engine.chunks import PathColumns
 from gemini.engine.health import assess
-from gemini.graph import evaluate, graph_feeds
 from gemini.types import Stream
 from gemini.types.flows import STREAM_FIELDS
 

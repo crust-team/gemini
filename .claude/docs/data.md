@@ -34,7 +34,7 @@ columns are reported together, as one `ValidationError` (code `missing_column`),
 **Run input.** `simulate`, `replay` and `live` take one format: a `Dataset`, or a pandas DataFrame
 with a timezone-aware `DatetimeIndex` and columns named by the binding `column`, in the units of
 the bindings (a unit recorded in the `Dataset` metadata replaces the binding's, as above).
-`gemini.utils.data.dataset.as_dataset(data)` is the one wrapper: a `Dataset` passes through, a
+`gemini.run.dataset.as_dataset(data)` is the one wrapper: a `Dataset` passes through, a
 DataFrame becomes a `Dataset` (any zone is converted to UTC), and a naive index, a non-time index
 or another type raises `RunError`, because a local time without a zone is ambiguous. Rows with
 NaN in a bound column are skipped for the twin that needs them and reported as `missing_value`
@@ -66,7 +66,7 @@ convert in-memory raw values to SI. Profiles combined into a dataset must share 
 
 ## Demand profiles
 
-`gm.profiles` ships no profile: a demand is the caller's. `from_csv(path, columns, unit,
+`gm.data` ships no profile: a demand is the caller's. `from_csv(path, columns, unit,
 time_column=None)` reads a file, and `columns` maps its columns to the quantities of gemini, so a
 file adapts to gemini and gemini takes no name or unit from it. `from_values(values, unit, start,
 step, quantity)` takes numbers. A quantity is `heating_demand` or `cooling_demand`. Both return a
@@ -96,11 +96,11 @@ file. Nothing fails at import time, and `gm.plants.get` works without it.
 
 `inputs/examples/<problem>/` holds one folder per sample problem, a whole problem in the shapes of
 gemini: its source files with a README, `plant.json` (a plant dict), `rules.json` (the rules of
-`gm.schedule`), `limits.json` (a `gm.checks.Limits` dict) and `assumptions.json` when it uses prices.
+`gm.schedule`), `limits.json` (a `gm.evaluate.Limits` dict) and `assumptions.json` when it uses prices.
 `hackathon_2027/` and `shallow_district/` are the two today. **Only `examples/` and `tests/` read this
 folder**: nothing under `gemini/` names it, or a problem, and `tests/unit/test_code_quality.py` checks
 that. A problem is a test of the code, never the source of a default, a name or a structure.
 
 `docs/schemas/` is generated documentation, not data. `tests/fixtures/` holds goldens and
-`tests/e2e/expected/` example outputs. `gemini/utils/paths.py` is the one place that knows where the
+`tests/e2e/expected/` example outputs. `gemini/_utils/paths.py` is the one place that knows where the
 folder is, and `tests/unit/test_code_quality.py` checks the layout.

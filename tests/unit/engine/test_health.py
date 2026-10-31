@@ -3,11 +3,12 @@
 import numpy as np
 import pytest
 
-from gemini import backends
+from gemini import runtime
 from gemini.engine.health import UNAVAILABLE, HealthColumns, assess
 from gemini.errors import PhysicsError
 from gemini.modules import Module
-from gemini.types import Health, ModuleResult, Output, Ports, Values
+from gemini.modules.declarations import Output
+from gemini.types import Health, ModuleResult, Ports, Values
 from gemini.types.results import NOT_ASSESSED
 
 
@@ -58,7 +59,7 @@ def test_health_is_called_once_on_the_arrays_of_the_chunk():
 def test_rows_whose_health_raises_fail_and_the_others_are_stacked(backend):
     """A score outside [0, 1] fails its row with the real error; the other rows keep theirs."""
     measured = {"fraction": np.array([0.2, 2.0, 0.9])}
-    with backends.settings(backend=backend):
+    with runtime.settings(backend=backend):
         health, errors = assess(Gauge(), _result([1.0, 2.0, 3.0]), measured, 3)
     assert list(errors) == [1] and isinstance(errors[1], PhysicsError)
     assert isinstance(health, HealthColumns)

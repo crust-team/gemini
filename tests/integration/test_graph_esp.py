@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 import gemini as gm
+from gemini.compiler.graph import GraphCache, Proxy, run
 from gemini.errors import PhysicsError
-from gemini.graph import GraphCache, Proxy, run
 from gemini.modules.pumps import esp as esp_file
 from gemini.types.flows import Stream
 
@@ -164,7 +164,7 @@ def test_retrace_happens_only_when_a_guard_changes(esp, week):
 
 def test_no_outputs_traces_the_fluid_step_only(esp, week, plain_week):
     """Under ``no_outputs()`` the traced run returns outlets and no outputs."""
-    with gm.no_outputs():
+    with gm.modules.no_outputs():
         traced = run(esp, {"fluid_in": _suction(esp, week)}, {"frequency": week[:, 3]})
     assert traced.outputs == {} and traced.breaks == []
     pressures = [row.outlets.fluid_out.p for row in plain_week]

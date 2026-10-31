@@ -5,9 +5,9 @@ import math
 import numpy as np
 import pytest
 
+from gemini.compiler.graph import Graph
+from gemini.compiler.graph.limits import certain
 from gemini.errors import PhysicsError
-from gemini.graph import Graph
-from gemini.graph.limits import certain
 from gemini.physics import psychrometrics
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 from tests.fixtures.graph_run import graph_outputs

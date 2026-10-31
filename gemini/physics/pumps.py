@@ -7,9 +7,9 @@ a parabolic efficiency (``centrifugal_head``, ``parabolic_efficiency``). The sha
 are the speed ratio, the hydraulic and shaft power and the operating window.
 """
 
-from gemini import ops
+from gemini import ops, units
 
-from . import constants, units
+from . import constants
 
 POLYNOMIAL_COEFFICIENT_COUNT = 6
 """Number of ascending coefficients of the degree-5 TNO head and power polynomials."""

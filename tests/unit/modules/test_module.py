@@ -9,20 +9,10 @@ from copy import deepcopy
 import pytest
 
 import gemini as gm
-from gemini import backends, ops
+from gemini import ops, runtime
 from gemini.modules import Module, ModuleDict
-from gemini.types import (
-    Boundary,
-    Control,
-    Electricity,
-    Frequency,
-    Inlet,
-    Outlet,
-    Output,
-    Parameter,
-    Ports,
-    Stream,
-)
+from gemini.modules.declarations import Boundary, Control, Inlet, Outlet, Output, Parameter
+from gemini.types import Electricity, Frequency, Ports, Stream
 from tests.fixtures.errors import raises
 
 
@@ -457,15 +447,15 @@ def test_no_outputs_is_nested_thread_local_context_and_decorator():
         calls.append(module)
 
     module.register_forward_hook(observe)
-    with gm.no_outputs():
+    with gm.modules.no_outputs():
         assert not module(fluid_in=stream).outputs
-        with gm.no_outputs():
+        with gm.modules.no_outputs():
             assert not module(fluid_in=stream).outputs
         assert not module(fluid_in=stream).outputs
     assert module(fluid_in=stream).outputs.result == 2
     assert calls == [module]
 
-    @gm.no_outputs()
+    @gm.modules.no_outputs()
     def fast_call():
         return module(fluid_in=stream)
 
@@ -652,7 +642,7 @@ def test_a_forced_numpy_backend_keeps_plain_division_silent():
             self.ratio = ops.where(self.gain > 2.0, self.gain / 0.0, ops.add(self.gain, 1.0))
             return outlets
 
-    with backends.settings(backend="numpy"):
+    with runtime.settings(backend="numpy"):
         assert Divider()().outputs.ratio == 2.0
 
 

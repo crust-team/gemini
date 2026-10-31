@@ -2,9 +2,10 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Control, Inlet, Outlet
 from gemini.modules.module import Module
 from gemini.physics import separation
-from gemini.types import Control, Fraction, Inlet, Outlet, Stream
+from gemini.types import Fraction, Stream
 
 
 class Blowdown(Module):

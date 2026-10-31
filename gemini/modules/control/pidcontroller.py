@@ -5,16 +5,9 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import ValidationError
 from gemini.modules.control import _physics
+from gemini.modules.declarations import Boundary, Control, Output, Parameter, State
 from gemini.modules.module import Module
-from gemini.types import (
-    Boundary,
-    Control,
-    Dimensionless,
-    Duration,
-    Output,
-    Parameter,
-    State,
-)
+from gemini.types import Dimensionless, Duration
 
 
 class PIDController(Module):

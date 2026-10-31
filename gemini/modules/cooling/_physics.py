@@ -4,7 +4,7 @@ import math
 
 from gemini import ops
 from gemini.errors import PhysicsError
-from gemini.physics.units import k_to_c
+from gemini.units import k_to_c
 
 ABSORPTION_THERMAL_COP = 0.7
 """Thermal COP of a single-effect water/LiBr absorption chiller [-] (Herold, Radermacher and

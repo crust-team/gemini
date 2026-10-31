@@ -1,5 +1,6 @@
-"""Well performance, well integrity and the plant KPIs."""
+"""Well performance, well integrity, fits and calibration."""
 
+from gemini.analysis.calibrate import CalibrationResult, calibrate
 from gemini.analysis.fits import (
     estimate_conductance,
     estimate_reservoir_pressure,
@@ -14,6 +15,8 @@ from gemini.analysis.integrity import (
 from gemini.analysis.wells import calibrate_pump, injectivity, nodal, pump_curve
 
 __all__ = [
+    "calibrate",
+    "CalibrationResult",
     "nodal",
     "injectivity",
     "pump_curve",

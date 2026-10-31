@@ -1,13 +1,13 @@
 # Utilities
 
-`gemini/utils/` holds general-purpose helpers that know nothing about geothermal physics, modules
+`gemini/_utils/` holds general-purpose helpers that know nothing about geothermal physics, modules
 or the engine. Its topic files are a leaf package: they import only the standard library and
 installed dependencies, never another part of `gemini` (`tests/unit/test_package_boundaries.py`
 enforces this). They therefore cannot raise `gm.errors` classes; their helpers raise built-in exceptions such
 as `TypeError` and `ValueError`, and callers that need a GEMINI error convert them. `paths.py` is the
 one exception: it imports `gemini.errors`, the other leaf, to raise `inputs_missing`. Import helpers
-from their topic module, for example `from gemini.utils.strings import did_you_mean`;
-`gemini/utils/__init__.py` exports nothing.
+from their topic module, for example `from gemini._utils.strings import did_you_mean`;
+`gemini/_utils/__init__.py` exports nothing.
 
 - `strings.py`: `snake_case`, `first_paragraph`, `join_path`, `split_path`, `join_names`,
   `close_matches`, `did_you_mean`.
@@ -26,7 +26,7 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
   is absent.
 - `version.py`: `package_version`, read from `pyproject.toml` or the package metadata, and
   `is_older`, the rule that refuses files written before `OLDEST_READABLE`.
-- `collect_env.py`: `python -m gemini.utils.collect_env` prints the versions a bug report needs.
+- `collect_env.py`: `python -m gemini._utils.collect_env` prints the versions a bug report needs.
 
 Two folders live here without being leaf helpers, and the topic files never import them:
 `data/`, the in-memory `Dataset` and `Loader` ([data.md](data.md)), and `legacy/`, the old-format

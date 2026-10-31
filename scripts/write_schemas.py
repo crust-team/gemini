@@ -2,7 +2,7 @@
 
 Run from the repository root after a change to a shape: ``python scripts/write_schemas.py``. The
 schemas of the plant data and the profile come from ``gm.plants.schema()`` and
-``gm.profiles.profile_schema()`` and those of the three return shapes from
+``gm.data.profile_schema()`` and those of the three return shapes from
 ``gemini.types.shapes``; the others are written by hand. The samples come from the example plant,
 so other repositories can build against real documents.
 """
@@ -13,8 +13,8 @@ from pathlib import Path
 import pandas as pd
 
 import gemini as gm
+from gemini._utils import paths
 from gemini.types import shapes
-from gemini.utils import paths
 
 ROOT = Path(__file__).parents[1]
 SCHEMAS = ROOT / "docs" / "schemas"
@@ -32,7 +32,7 @@ def _results(plant):
 
 def _profile_sample():
     """Return a short heating profile of made-up values, in the document form of a profile."""
-    frame = gm.profiles.from_values(PROFILE_VALUES, "kW", "2030-01-01", "1 h", PROFILE)
+    frame = gm.data.from_values(PROFILE_VALUES, "kW", "2030-01-01", "1 h", PROFILE)
     return {
         "columns": {
             PROFILE: {
@@ -61,7 +61,7 @@ def documents():
     results = _results(plant)
     return {
         "plant_dict.schema.json": gm.plants.schema(),
-        "profile.schema.json": gm.profiles.profile_schema(),
+        "profile.schema.json": gm.data.profile_schema(),
         **{f"{name}.schema.json": schema for name, schema in shapes.SCHEMAS.items()},
         "module_description.sample.json": gm.plants.example("Doublet").describe(),
         "plant_dict.sample.json": data,
@@ -69,7 +69,7 @@ def documents():
         "profile.sample.json": _profile_sample(),
         "value.sample.json": results.summary()["heat_exchanger"]["duty"]["mean"],
         "problem.sample.json": _problem_sample(),
-        "check.sample.json": gm.checks.energy_balance(results),
+        "check.sample.json": gm.evaluate.energy_balance(results),
     }
 
 

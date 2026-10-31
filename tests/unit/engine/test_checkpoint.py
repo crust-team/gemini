@@ -7,7 +7,7 @@ import pytest
 
 import gemini as gm
 from gemini.engine import checkpoint as storage
-from gemini.engine.results import Results
+from gemini.run.results import Results
 from tests.fixtures.errors import raises
 
 

@@ -1,7 +1,8 @@
 """Pressure-holding (expansion) vessel that fixes the static pressure of a closed circuit."""
 
+from gemini.modules.declarations import Control, Inlet, Outlet, Output
 from gemini.modules.module import Module
-from gemini.types import Control, Inlet, Outlet, Output, Pressure, PressureDifference, Stream
+from gemini.types import Pressure, PressureDifference, Stream
 
 
 class PressurizationTank(Module):

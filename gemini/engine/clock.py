@@ -3,8 +3,8 @@
 import numpy as np
 import pandas as pd
 
+from gemini._utils.time import DEFAULT_STEP, interval_seconds, median_step, parse_duration, to_utc
 from gemini.errors import RunError
-from gemini.utils.time import DEFAULT_STEP, interval_seconds, median_step, parse_duration, to_utc
 
 
 def _first_unordered(ticks):

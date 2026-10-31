@@ -11,11 +11,11 @@ from typing import Literal
 
 import numpy as np
 
-from gemini import ops
+from gemini import ops, units
+from gemini._utils.strings import did_you_mean, join_names
 from gemini.errors import PhysicsError, ValidationError
-from gemini.utils.strings import did_you_mean, join_names
 
-from . import geometry, units
+from . import geometry
 from .fluid import DEFAULT_LIQUID_DENSITY
 
 _DEFAULT_COEFFICIENTS = {

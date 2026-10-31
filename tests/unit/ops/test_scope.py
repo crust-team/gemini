@@ -6,10 +6,10 @@ import math
 import numpy as np
 import pytest
 
-from gemini import backends, ops
+from gemini import ops
+from gemini.compiler.graph import run_function
 from gemini.errors import PhysicsError
-from gemini.graph import run_function
-from gemini.ops import Constant
+from gemini.ops import Constant, kernels
 from gemini.types.flows import Stream
 from gemini.types.fluid import BRINE
 
@@ -82,12 +82,12 @@ def test_arrays_leave_the_scope_unwrapped_and_a_plain_module_scope_restores_the_
     values = np.ones(2, dtype=np.float32)
     assert (values * ops.physics(lambda x: x)(2.0)).dtype == np.float32
     with ops.scope.Scope() as outer:
-        assert outer.wrapping and backends.scope_mode() is backends.WRAP
-        with ops.scope.Scope(backends.PLAIN) as inner:
-            assert not inner.wrapping and backends.scope_mode() is backends.PLAIN
+        assert outer.wrapping and kernels.scope_mode() is kernels.WRAP
+        with ops.scope.Scope(kernels.PLAIN) as inner:
+            assert not inner.wrapping and kernels.scope_mode() is kernels.PLAIN
             assert kinds(1.0) == ("float",)
-        assert backends.scope_mode() is backends.WRAP
-    assert backends.scope_mode() is None
+        assert kernels.scope_mode() is kernels.WRAP
+    assert kernels.scope_mode() is None
 
 
 def test_constant_arithmetic_is_silent_inside_and_raises_outside():
@@ -118,7 +118,7 @@ def test_the_scope_restores_the_mode_and_errstate_after_an_error():
 
     with pytest.raises(ValueError, match="boom"):
         failing(1.0)
-    assert backends.scope_mode() is None
+    assert kernels.scope_mode() is None
     with pytest.warns(RuntimeWarning):
         np.float64(1.0) / np.float64(0.0)
 

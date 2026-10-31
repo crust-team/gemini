@@ -5,9 +5,9 @@ import json
 import pytest
 
 import gemini as gm
+from gemini._utils.files import read_json
 from gemini.errors import ValidationError
 from gemini.modules._utils import serialization
-from gemini.utils.files import read_json
 from tests.fixtures import FIXTURES
 from tests.fixtures.errors import raises
 

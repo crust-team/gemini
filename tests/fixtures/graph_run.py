@@ -2,14 +2,14 @@
 
 import numpy as np
 
-from gemini import backends
-from gemini.graph import evaluate
+from gemini import runtime
+from gemini.compiler.graph import evaluate
 
 
 def graph_outputs(graph, feeds, backend="numpy"):
     """Return the output arrays of ``graph`` by name; plain numbers when every feed is a scalar."""
     rows = max([np.size(value) for value in feeds.values()], default=1)
-    with backends.settings(backend=backend):
+    with runtime.settings(backend=backend):
         evaluation = evaluate(graph, feeds, rows)
     evaluation.raise_first()
     scalar = all(np.ndim(value) == 0 for value in feeds.values())

@@ -2,21 +2,11 @@
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Boundary, Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.modules.treatment import _physics
 from gemini.physics import fluid, hydraulics
-from gemini.types import (
-    Boundary,
-    Fraction,
-    Inlet,
-    MassConcentration,
-    MassFlow,
-    Outlet,
-    Output,
-    Parameter,
-    PressureDifference,
-    Stream,
-)
+from gemini.types import Fraction, MassConcentration, MassFlow, PressureDifference, Stream
 
 
 class Desander(Module):

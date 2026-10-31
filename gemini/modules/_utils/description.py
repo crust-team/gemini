@@ -6,12 +6,12 @@ its public methods only.
 
 from copy import deepcopy
 
+from gemini._utils.jsonable import to_plain
+from gemini._utils.strings import close_matches, did_you_mean, first_paragraph
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
-from gemini.types.declarations import UNSET
+from gemini.modules.declarations import UNSET
 from gemini.types.shapes import problem
-from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean, first_paragraph
 
 STREAM_FIELDS = {"m_dot": {"unit": "kg/s"}, "T": {"unit": "K"}, "p": {"unit": "Pa"}}
 """The fields every port stream shows and their SI units."""

@@ -3,7 +3,7 @@
 Use `import gemini as gm`. This page lists **every public name** at `gm.__version__ = "0.2.0"`, and
 is the page the other repositories build against. Names not listed here (a helper method such as
 `Results.commit`, anything in `gm.utils`, any import of an internal path such as
-`gemini.engine.results`) are internal and may change. `tests/unit/test_public_api.py` pins the
+`gemini.run.results`) are internal and may change. `tests/unit/test_public_api.py` pins the
 names, their parameter names and the schema files, and `tests/integration/test_return_shapes.py`
 walks the returns of this page against their schemas. Status is **real**, or **later**: the signature
 is final and the call raises `gm.errors.NotImplementedYet`.
@@ -21,7 +21,7 @@ Conventions on every entry:
 
 Every public return that carries data uses only three shapes, defined once in `gemini/types/shapes.py`
 and built by one helper each, so no module assembles them by hand. Returns are plain JSON: no NumPy
-types, NaN and infinity are `null` (`gemini.utils.jsonable.to_plain`), and
+types, NaN and infinity are `null` (`gemini._utils.jsonable.to_plain`), and
 `json.dumps(result, allow_nan=False)` works.
 
 1. **Value** `{value, unit}`. `value` is a number, an array or `null`; when it is `null`, a `reason`

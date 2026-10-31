@@ -6,17 +6,14 @@ import numpy as np
 
 from gemini import ops
 from gemini.errors import PhysicsError
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import diagnostics, heat_transfer, hydraulics
 from gemini.types import (
     Duty,
     Fraction,
     Health,
-    Inlet,
     MassFlow,
-    Outlet,
-    Output,
-    Parameter,
     PressureDifference,
     Ratio,
     Stream,

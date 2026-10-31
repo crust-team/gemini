@@ -7,10 +7,11 @@ import pytest
 import gemini as gm
 from gemini import ops
 from gemini.modules import Module, energy_balance, mass_balance
+from gemini.modules.declarations import Inlet, Outlet, Output
 from gemini.modules.heating import ElectricBoiler
 from gemini.modules.storage import AquiferStorage
 from gemini.physics import ground
-from gemini.types import Inlet, Outlet, Output, Stream
+from gemini.types import Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 from tests.fixtures.reading import reading
 

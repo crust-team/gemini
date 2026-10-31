@@ -22,10 +22,9 @@ salts and non-condensable gases are not represented.
 
 from dataclasses import dataclass
 
-from gemini import ops
+from gemini import ops, units
 from gemini.errors import PhysicsError
 from gemini.ops import Constant
-from gemini.physics import units
 
 DEFAULT_TURBINE_EFFICIENCY = 0.85
 """Dry isentropic efficiency [-] DiPippo (2016, section 5.5) assumes for geothermal turbines."""

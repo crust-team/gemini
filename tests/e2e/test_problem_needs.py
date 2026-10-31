@@ -52,7 +52,7 @@ def demand_file(folder):
 def read_demand(path):
     """Return the demand of the file, as ``gm.schedule`` takes it."""
     columns = {"heat_kw": "heating_demand", "cold_kw": "cooling_demand"}
-    return gm.profiles.from_csv(path, columns, "kW", time_column="stamp")
+    return gm.data.from_csv(path, columns, "kW", time_column="stamp")
 
 
 def run_on(plant, demand, rules=RULES):
@@ -80,9 +80,9 @@ def results(plant, demand):
 
 def worst(plant, results, target, **bounds):
     """Return the check of one limit on the run, for each module it matches."""
-    limits = gm.checks.Limits()
+    limits = gm.evaluate.Limits()
     limits.add(target, **bounds)
-    return gm.checks.limits(plant, results, limits)
+    return gm.evaluate.limits(plant, results, limits)
 
 
 def test_heating_and_cooling_demand_come_from_a_file(demand):
@@ -119,7 +119,7 @@ def test_co_produced_gas_goes_to_the_boiler_before_the_grid(plant, results):
     """The gas of the brine reaches the fuel of the boiler and burns or leaves by the flare."""
     produced = results.get("degasser", "gas_out.chemical_flow")["value"]
     assert min(produced) > 0
-    fuel = gm.kpi.totals(plant, results)
+    fuel = gm.evaluate.totals(plant, results)
     assert fuel["gas_bought"]["value"] == pytest.approx(0.0, abs=1e-6)
     assert max(results.get("gas_grid", "gas_out.chemical_flow")["value"]) < max(produced)
 
@@ -162,12 +162,12 @@ def test_a_limit_on_the_operating_time(demand):
     """Each doublet runs the time of the rule, with its outages at whole steps."""
     plant = gm.plants.from_dict(sized_dict(2))
     results = run_on(plant, demand, RULES | {"operating_time": "11 h"})
-    checks = gm.checks.operating_time(plant, results, "11 h")
+    checks = gm.evaluate.operating_time(plant, results, "11 h")
     assert [item["passed"] for item in checks] == [True, True]
-    assert not gm.checks.operating_time(plant, results, "5 h")[0]["passed"]
+    assert not gm.evaluate.operating_time(plant, results, "5 h")[0]["passed"]
 
 
 def test_a_levelised_cost_of_heat_and_cold_together(plant, results):
     """LCTS of the run on stated prices."""
-    assumptions = gm.economics.Assumptions(**sample_json("assumptions.json"))
-    assert gm.economics.lcts(plant, results, assumptions=assumptions)["value"] > 0
+    assumptions = gm.Assumptions(**sample_json("assumptions.json"))
+    assert gm.evaluate.lcts(plant, results, assumptions=assumptions)["value"] > 0

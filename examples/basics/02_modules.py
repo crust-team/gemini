@@ -1,7 +1,7 @@
 """Call one module and read its outlets, outputs and port quantities.
 
 Shows calling ``gm.modules.ESP``, ``ModuleResult`` (``outputs``, ``outlets``, ``inlets``),
-``Stream.quantities``, ``describe``, ``gm.no_outputs`` and ``gm.runtime.settings``.
+``Stream.quantities``, ``describe``, ``gm.modules.no_outputs`` and ``gm.runtime.settings``.
 
 Run with ``python examples/basics/02_modules.py``.
 """
@@ -47,7 +47,7 @@ def main():
     esp = configured_esp()
     print_call(esp)
     print_description(esp)
-    with gm.no_outputs():
+    with gm.modules.no_outputs():
         fast = esp(fluid_in=STREAM, frequency="50 Hz")
     print(f"Without outputs:   {len(fast.outputs)} outputs")
     with gm.runtime.settings(precision="float32"):

@@ -1,4 +1,12 @@
 {
+ "call": [
+  "module",
+  "parameters",
+  "inlets",
+  "controls",
+  "on_error",
+  "units"
+ ],
  "classes": {
   "Engine": {
    "__init__": [
@@ -172,6 +180,7 @@
   "missing_assumption",
   "invalid_unit",
   "unknown_name",
+  "duplicate_name",
   "unknown_port",
   "invalid_call",
   "invalid_format",
@@ -209,26 +218,21 @@
   "RunError": "step",
   "ValidationError": "invalid_value"
  },
- "evaluate": [
-  "module",
-  "parameters",
-  "inlets",
-  "controls",
-  "on_error",
-  "units"
- ],
- "kpi_names": [
-  "heating_coverage",
-  "cooling_coverage",
-  "cop",
-  "peak_heat",
-  "peak_cold"
- ],
  "modules": {
+  "Boundary": "class",
+  "Control": "class",
+  "Inlet": "class",
   "Module": "class",
   "ModuleDict": "class",
   "ModuleList": "class",
+  "Outlet": "class",
+  "Output": "class",
+  "Parameter": "class",
+  "State": "class",
   "categories": [],
+  "check": [
+   "example"
+  ],
   "collect_flows": [
    "result_tree"
   ],
@@ -244,9 +248,6 @@
   "get": [
    "name"
   ],
-  "load_file": [
-   "path"
-  ],
   "mass_balance": [
    "module",
    "result"
@@ -254,7 +255,7 @@
   "names": [
    "category"
   ],
-  "register": [],
+  "no_outputs": [],
   "trace_wiring": [
    "plant",
    "inputs"
@@ -262,6 +263,16 @@
  },
  "namespaces": {
   "analysis": {
+   "CalibrationResult": "class",
+   "calibrate": [
+    "plant",
+    "dataset",
+    "params",
+    "start",
+    "end",
+    "backend",
+    "apply"
+   ],
    "calibrate_corrosion": [
     "logs"
    ],
@@ -328,40 +339,27 @@
     "units"
    ]
   },
-  "checks": {
-   "Limits": "class",
-   "bounds": [
-    "plant",
-    "results"
+  "data": {
+   "convert_legacy": [
+    "folder"
    ],
-   "energy_balance": [
-    "results"
+   "from_csv": [
+    "path",
+    "columns",
+    "unit",
+    "time_column"
    ],
-   "limits": [
-    "plant",
-    "results",
-    "limits"
+   "from_values": [
+    "values",
+    "unit",
+    "start",
+    "step",
+    "quantity"
    ],
-   "mass_balance": [
-    "results"
-   ],
-   "operating_time": [
-    "plant",
-    "results",
-    "duration"
-   ],
-   "plant_balance": [
-    "plant",
-    "run"
-   ],
-   "run_all": [
-    "plant",
-    "results",
-    "duration"
-   ]
+   "profile_schema": []
   },
-  "economics": {
-   "Assumptions": "class",
+  "evaluate": {
+   "Limits": "class",
    "annualised_cost": [
     "plant",
     "results",
@@ -369,6 +367,10 @@
     "lifetime",
     "assumptions",
     "on_error"
+   ],
+   "bounds": [
+    "plant",
+    "results"
    ],
    "capex": [
     "plant",
@@ -380,6 +382,9 @@
     "results",
     "assumptions",
     "on_error"
+   ],
+   "energy_balance": [
+    "results"
    ],
    "lcoc": [
     "plant",
@@ -405,6 +410,14 @@
     "assumptions",
     "on_error"
    ],
+   "limits": [
+    "plant",
+    "results",
+    "limits"
+   ],
+   "mass_balance": [
+    "results"
+   ],
    "npv": [
     "plant",
     "results",
@@ -412,6 +425,11 @@
     "lifetime",
     "assumptions",
     "on_error"
+   ],
+   "operating_time": [
+    "plant",
+    "results",
+    "duration"
    ],
    "opex": [
     "plant",
@@ -424,30 +442,22 @@
     "results",
     "assumptions",
     "on_error"
-   ]
-  },
-  "kpi": {
-   "compute": [
-    "plant",
-    "results"
    ],
-   "names": [],
+   "plant_balance": [
+    "plant",
+    "run"
+   ],
+   "run_all": [
+    "plant",
+    "results",
+    "duration"
+   ],
    "totals": [
     "plant",
     "results"
    ]
   },
   "optim": {
-   "CalibrationResult": "class",
-   "calibrate": [
-    "plant",
-    "dataset",
-    "params",
-    "start",
-    "end",
-    "backend",
-    "apply"
-   ],
    "minimize": [
     "plant",
     "profile",
@@ -471,7 +481,9 @@
   },
   "plants": {
    "ATESPlant": "class",
+   "BoilerChpPlant": "class",
    "CoolingSubstation": "class",
+   "DistrictEnergyPlant": "class",
    "DistrictNetwork": "class",
    "Doublet": "class",
    "DoubletHeatPlant": "class",
@@ -482,10 +494,9 @@
    "HeatingPlant": "class",
    "HeatingSubstation": "class",
    "MultiWellPlant": "class",
+   "NodalDoublet": "class",
+   "ParallelExchangerPlant": "class",
    "Plant": "class",
-   "convert_legacy": [
-    "folder"
-   ],
    "example": [
     "name"
    ],
@@ -504,50 +515,12 @@
     "on_error"
    ]
   },
-  "profiles": {
-   "from_csv": [
-    "path",
-    "columns",
-    "unit",
-    "time_column"
-   ],
-   "from_values": [
-    "values",
-    "unit",
-    "start",
-    "step",
-    "quantity"
-   ],
-   "profile_schema": []
-  },
   "runtime": {
-   "get_default_fluid": [],
-   "get_display_units": [],
-   "get_precision": [],
-   "load_state": [
-    "values"
-   ],
-   "set_default_fluid": [
-    "fluid"
-   ],
-   "set_display_units": [
-    "display_units"
-   ],
-   "set_precision": [
-    "precision"
-   ],
    "settings": [
+    "backend",
     "changes"
    ],
    "state": []
-  },
-  "streams": {
-   "names": []
-  },
-  "testing": {
-   "check_module": [
-    "example"
-   ]
   },
   "units": {
    "Quantity": "class",
@@ -640,38 +613,37 @@
   "chemical"
  ],
  "top_level": [
+  "Assumptions",
   "BRINE",
-  "Clock",
   "Dataset",
   "Engine",
   "Fluid",
+  "Inlet",
+  "Module",
+  "Outlet",
+  "Output",
+  "Parameter",
   "Plant",
-  "Ports",
-  "Profile",
-  "Quantity",
   "Results",
   "Stream",
   "WATER",
-  "__version__",
   "analysis",
-  "checks",
-  "economics",
+  "call",
+  "compiler",
+  "data",
   "errors",
   "evaluate",
-  "kpi",
   "live",
   "modules",
-  "no_outputs",
+  "ops",
   "optim",
+  "physics",
   "plants",
-  "profiles",
   "replay",
   "resume",
   "runtime",
   "schedule",
   "simulate",
-  "streams",
-  "testing",
   "units"
  ],
  "version": "0.2.0"

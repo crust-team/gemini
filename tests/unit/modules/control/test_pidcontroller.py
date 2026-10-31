@@ -8,8 +8,9 @@ import pytest
 import gemini as gm
 from gemini.modules import Module
 from gemini.modules.control import PIDController
+from gemini.modules.declarations import Boundary, Control, Inlet, Outlet, Output
 from gemini.modules.storage import ThermalStorage
-from gemini.types import Boundary, Control, Inlet, Outlet, Output, Stream, Temperature
+from gemini.types import Stream, Temperature
 from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_close
 from tests.fixtures.errors import raises

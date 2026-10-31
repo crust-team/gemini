@@ -3,20 +3,10 @@
 from typing import Literal
 
 from gemini.errors import ValidationError
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.wells.well import _Well
 from gemini.physics import fluid, heat_transfer
-from gemini.types import (
-    Inlet,
-    Length,
-    Outlet,
-    Output,
-    Parameter,
-    Power,
-    Pressure,
-    PressureDifference,
-    Stream,
-    Temperature,
-)
+from gemini.types import Length, Power, Pressure, PressureDifference, Stream, Temperature
 
 
 class ProductionWell(_Well):

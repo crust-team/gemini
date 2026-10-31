@@ -3,7 +3,7 @@
 import json
 
 import gemini as gm
-from gemini.utils import paths
+from gemini._utils import paths
 
 HACKATHON_2027 = paths.INPUTS / "examples/hackathon_2027"
 SAMPLE_PLANT = "HeatingCoolingPlant"

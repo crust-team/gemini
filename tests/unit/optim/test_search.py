@@ -9,7 +9,7 @@ import pytest
 import gemini as gm
 from gemini.optim import search
 from tests.fixtures.errors import raises
-from tests.unit.analysis.test_schedule import plant_of_two
+from tests.unit.run.test_schedule import plant_of_two
 
 DEMAND = 1e6
 """Constant heat demand [W]."""
@@ -118,7 +118,7 @@ def test_the_same_call_gives_the_same_trials_and_leaves_the_plant_alone(repeated
 def test_an_economic_metric_reads_the_assumptions():
     """With them a value per year."""
     variables = [dict(CAPACITY[0], lower=DEMAND, upper=2 * DEMAND)]
-    values = gm.economics.Assumptions(discount_rate=0.05, lifetime_years=20, gas_price=40.0)
+    values = gm.Assumptions(discount_rate=0.05, lifetime_years=20, gas_price=40.0)
     run = gm.optim.minimize(
         boiler_plant(), profile(), variables, "annualised_cost", evaluations=5, assumptions=values
     )

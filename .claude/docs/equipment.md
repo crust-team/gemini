@@ -1392,7 +1392,7 @@ assert round(result.outputs.get("stored_energy", unit="kWh") / 1e6, 2) == 1.58
 
 Discrete PID controller with output limits and clamping anti-windup. It has no fluid ports; a
 parent plant calls it once per step in `forward` and uses `result.outputs.command`, so such a
-parent cannot run under `gm.no_outputs()`.
+parent cannot run under `gm.modules.no_outputs()`.
 
 - **Parameters**: `proportional_gain` (> 0), `minimum_output`, `maximum_output` (`minimum_output <
   maximum_output`, else `ValidationError`), `direction` (`"direct"` or `"reverse"`), all
@@ -1548,7 +1548,7 @@ Electricity exchange of a plant with the public grid.
 - **Outputs**: `net_import`, `net_export`, `unserved_consumption`, `curtailed_generation`,
   `is_import_limited`, `is_export_limited`.
 - **Model**: import `max(0, consumption - generation)` and export `max(0, generation -
-  consumption)`, each capped by its limit. Prices are in `gm.economics.Assumptions`.
+  consumption)`, each capped by its limit. Prices are in `gm.Assumptions`.
 - **Physics**: `modules/grids/_physics.net_exchange`
 - **Energy audit**: open boundary.
 
@@ -1568,7 +1568,7 @@ Fuel source of a burner without co-produced gas: `grid.fluid_out` to `boiler.fue
 Where the solids and bleed streams of a plant go.
 
 - **Ports**: `waste_in` -> none.
-- **Energy audit**: open boundary. `gm.kpi.totals` reads `waste_in.mass_flow`, the bill
+- **Energy audit**: open boundary. `gm.evaluate.totals` reads `waste_in.mass_flow`, the bill
   `waste_disposal_price`.
 
 ### ChemicalGrid
@@ -1576,7 +1576,7 @@ Where the solids and bleed streams of a plant go.
 Where the chemicals a plant doses come from.
 
 - **Ports**: none -> `chemical_out`.
-- **Energy audit**: open boundary. `gm.kpi.totals` reads `chemical_out.mass_flow`, the bill
+- **Energy audit**: open boundary. `gm.evaluate.totals` reads `chemical_out.mass_flow`, the bill
   `chemical_price`.
 
 ### HeatingGrid
@@ -1664,7 +1664,7 @@ The rock around a doublet's wells; `Doublet` creates it.
 
 ## Plants
 
-Every composite is a class of `gemini/modules/plants/`, with no `forward` of its own
+Every composite is a class of `gemini/plants/`, with no `forward` of its own
 ([plants.md](plants.md#a-plant-class)); `gm.plants.names()` lists them.
 
 ### Doublet
@@ -2115,7 +2115,7 @@ below; a design is its plant dict.
   [`compression_chiller`, a `HeatPump` in cooling mode] -> `cooling_supply_pipe` ->
   `cooling_consumer`. Brackets are the units that the other plants leave out.
 - **Ports.** None: a root plant has no plant port. Totals are read from the edge modules
-  (`gm.kpi.totals`).
+  (`gm.evaluate.totals`).
 - **Other plants.** `HeatingPlant` (boiler and heating consumer), `HeatingAbsorptionCoolingPlant`,
   `HeatingHeatPumpCoolingPlant` and `HeatingFullCoolingPlant` (all three chillers) are the same plant
   with fewer units. An agent removes a unit by editing `to_dict(structure=True)`.

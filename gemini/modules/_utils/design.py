@@ -12,13 +12,13 @@ from copy import deepcopy
 from pydantic import ValidationError as PydanticError
 from pydantic_core import to_jsonable_python
 
+from gemini import units
+from gemini._utils.jsonable import to_plain
+from gemini._utils.strings import close_matches, did_you_mean, join_names, join_path
+from gemini._utils.time import EARLIEST, to_utc
 from gemini.errors import ValidationError
-from gemini.physics import units
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from gemini.types.flows import STREAM_FIELDS
-from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
-from gemini.utils.time import EARLIEST, to_utc
 
 FIELD_UNITS = {"m_dot": ("kg/s", "m3/s"), "T": ("K",), "p": ("Pa",)}
 """The SI units a column bound to a stream field may have; a volume flow becomes mass flow."""

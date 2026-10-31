@@ -5,8 +5,9 @@ import pytest
 import gemini as gm
 from gemini.errors import PhysicsError
 from gemini.modules import Module, mass_balance
+from gemini.modules.declarations import Inlet, Outlet
 from gemini.modules.power import FlashTurbine, Separator, _physics
-from gemini.types import STEAM, WATER, Inlet, Outlet, Stream
+from gemini.types import STEAM, WATER, Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.reading import reading
 
@@ -124,7 +125,7 @@ def test_a_bad_expansion_rejects_the_call_without_outputs_too():
     module = turbine().set_params("", {"condenser_pressure": "7 bar"})
     with pytest.raises(PhysicsError) as with_outputs:
         module(fluid_in=STEAM_FEED)
-    with gm.no_outputs():
+    with gm.modules.no_outputs():
         with pytest.raises(PhysicsError) as without_outputs:
             module(fluid_in=STEAM_FEED)
     assert str(without_outputs.value) == str(with_outputs.value)

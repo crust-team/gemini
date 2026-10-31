@@ -9,12 +9,9 @@ import pytest
 import gemini as gm
 from gemini import ops
 from gemini.modules import ElectricBoiler, Module, energy_balance, mass_balance
+from gemini.modules.declarations import Inlet, Outlet
 from gemini.modules.storage import ThermalStorage
-from gemini.types import (
-    Inlet,
-    Outlet,
-    Stream,
-)
+from gemini.types import Stream
 from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_close, assert_module_matches
 from tests.fixtures.errors import raises

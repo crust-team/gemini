@@ -1,8 +1,8 @@
 # Legacy bridge
 
-`gemini.utils.legacy` is the only old-format boundary. It is internal: the one public entry is
+`gemini.data.legacy` is the only old-format boundary. It is internal: the one public entry is
 `gm.plants.convert_legacy(folder)`, and everything else on this page is imported from
-`gemini.utils.legacy`.
+`gemini.data.legacy`.
 `read_project(folder)`/`write_project(project, folder)` handle raw diagram and `.param` files
 through typed `GeminiProject` models; the in-memory project, including edits to it, is what the
 conversion reads. `read_csv`/`write_csv` handle semicolon data and old timestamps
@@ -28,7 +28,7 @@ folder with `read_project`, fills `DoubletHeatPlant` (`gm.plants.get`) with `to_
 CSV is converted with `to_dataset`. On the example project the result equals
 `gm.plants.example("DoubletHeatPlant").to_dict()` exactly (`tests/unit/modules/plants/_utils/
 test_legacy_project.py`). The function lives in `modules/plants/_utils/legacy_project.py` and imports
-`gemini.utils.legacy` inside the function, because `gemini.utils.legacy` sits above `gemini.modules`.
+`gemini.data.legacy` inside the function, because `gemini.data.legacy` sits above `gemini.modules`.
 
 The bridge maps exactly the example project: its ten old nodes (`tables.NODE_PATHS`), a project
 folder with exactly one data CSV besides trajectory files, and its data columns and assumptions.

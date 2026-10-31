@@ -1,6 +1,6 @@
 """Convert an old GEMINI project folder into a plant.
 
-Shows ``gm.plants.convert_legacy``, the one public entry to the old format, and
+Shows ``gm.data.convert_legacy``, the one public entry to the old format, and
 ``gm.plants.from_dict``. The conversion gives ``gm.plants.example("DoubletHeatPlant")``. The data
 file of the project is read here only to count its rows: its converted copy is the CSV in
 ``inputs/doublet_heat``.
@@ -19,7 +19,7 @@ PROJECT = Path(__file__).resolve().parents[2] / "inputs/legacy_project"
 
 def main():
     """Convert the folder and compare the result with the stored plant dict."""
-    data = gm.plants.convert_legacy(PROJECT)
+    data = gm.data.convert_legacy(PROJECT)
     plant = gm.plants.from_dict(data)
     rows = pd.read_csv(PROJECT / "doublet_2024_old.csv", sep=";")
     stored = gm.plants.example("DoubletHeatPlant").to_dict()

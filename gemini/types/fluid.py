@@ -7,8 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticError
 from pydantic import model_serializer, model_validator
 
+from gemini import units
+from gemini._utils.strings import did_you_mean, join_names
 from gemini.errors import ValidationError
-from gemini.physics import constants, gas, units
+from gemini.physics import constants, gas
 from gemini.physics.chemistry import henry_constant
 from gemini.physics.fluid import DEFAULT_LIQUID_DENSITY, FluidProperties, mixture_density
 from gemini.types.quantities import (
@@ -21,7 +23,6 @@ from gemini.types.quantities import (
     ThermalConductivity,
     Viscosity,
 )
-from gemini.utils.strings import did_you_mean, join_names
 
 _FIELD_UNITS = {
     "density": "kg/m3",

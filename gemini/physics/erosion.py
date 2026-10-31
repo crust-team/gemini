@@ -7,11 +7,11 @@ SI boundary and returns mm/year, the explicit literature-unit exception of the p
 
 import math
 
-from gemini import ops
+from gemini import ops, units
+from gemini._utils.strings import did_you_mean, join_names
 from gemini.errors import PhysicsError, ValidationError
-from gemini.utils.strings import did_you_mean, join_names
 
-from . import geometry, units
+from . import geometry
 
 _API_C_FACTOR = 125
 """API RP 14E empirical constant C in the historical imperial basis."""

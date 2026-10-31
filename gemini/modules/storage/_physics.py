@@ -7,8 +7,8 @@ Fundamentals of Heat and Mass Transfer), and the exact piecewise integration of 
 ice-on-coil store across its liquid, freezing or melting and solid segments.
 """
 
-from gemini import ops
-from gemini.physics import heat_transfer, units
+from gemini import ops, units
+from gemini.physics import heat_transfer
 
 DEFAULT_LATENT_HEAT = 333550
 """Latent heat of fusion of ice [J/kg]: the conventional 333.55 kJ/kg at 0 degC and 101.325 kPa.

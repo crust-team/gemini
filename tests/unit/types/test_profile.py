@@ -29,7 +29,7 @@ def test_series_previous_and_resample():
     series = profile.to_series()
     series.iloc[0] = 0
     assert profile.values[0] == 283.15
-    clock = gm.Clock.range("2024-01-01 00:00", "2024-01-01 03:00", "1h")
+    clock = gm.engine.Clock.range("2024-01-01 00:00", "2024-01-01 03:00", "1h")
     constant = Profile.constant(10, unit="W", clock=clock)
     assert len(constant.resample(timedelta(hours=2), "mean")) == 2
     assert constant.resample(timedelta(hours=2), "sum").values == [20, 20]
@@ -49,7 +49,7 @@ def test_profiles_drive_scenario():
     from gemini.types.bindings import Binding, ModuleBindings
 
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    clock = gm.Clock.range(start, start + timedelta(hours=2), "1h")
+    clock = gm.engine.Clock.range(start, start + timedelta(hours=2), "1h")
     target = Profile.constant(320, unit="K", clock=clock)
     inlet = dict(m_dot=1, T=300, p=1e5)
     boiler = ElectricBoiler()
@@ -64,7 +64,7 @@ def test_profiles_drive_scenario():
     result = gm.simulate(
         boiler,
         gm.Dataset.from_profiles({"temperature_setpoint": target}),
-        gm.Clock.from_data(gm.Dataset.from_profiles({"temperature_setpoint": target})),
+        gm.engine.Clock.from_data(gm.Dataset.from_profiles({"temperature_setpoint": target})),
         on_error="raise",
     )
     assert len(result) == 3

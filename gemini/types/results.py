@@ -6,14 +6,13 @@ from typing import Any
 
 import numpy as np
 
-from gemini import ops
+from gemini import ops, units
+from gemini._utils.mappings import AttributeMapping
+from gemini._utils.strings import did_you_mean, join_names, join_path
 from gemini.errors import PhysicsError, ValidationError
 from gemini.errors.lookup import UnknownPort
-from gemini.physics import units
 from gemini.types.flows import Stream
 from gemini.types.ports import Ports, map_port_value
-from gemini.utils.mappings import AttributeMapping
-from gemini.utils.strings import did_you_mean, join_names, join_path
 
 NOT_ASSESSED = "No diagnostic model or sufficient measurements"
 """Health message of a row that was not assessed, as a module without health reports it."""

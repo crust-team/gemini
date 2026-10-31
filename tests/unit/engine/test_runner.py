@@ -218,5 +218,5 @@ def test_a_simulation_skips_the_plant_when_data_is_missing():
     )
     frame.loc[frame.index[1], "rate"] = np.nan
     data = gm.Dataset.from_frame(frame)
-    results = gm.Engine(module).simulate(data, gm.Clock.from_data(data))
+    results = gm.Engine(module).simulate(data, gm.engine.Clock.from_data(data))
     assert results.skip_counts == {"": {"rate": 1}} and results[""].flow.dropna().tolist() == [2.0]

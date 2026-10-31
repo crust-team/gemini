@@ -5,8 +5,9 @@ import math
 import pytest
 
 import gemini as gm
+from gemini import units
 from gemini.analysis import integrity
-from gemini.physics import corrosion, units
+from gemini.physics import corrosion
 
 MODEL = {
     "correlation": "DLM",

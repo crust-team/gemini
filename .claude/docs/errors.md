@@ -15,7 +15,7 @@ is raised and the problems go to the call's fixed place:
 | `validate_params`, `p.validate`, `gm.plants.validate` | return the list of problems |
 | `gm.evaluate` | returns them under `errors`, with empty `outlets` and `outputs` |
 | `gm.simulate`, `gm.replay`, `gm.live`, `gm.Engine` | record them in `results.errors()` and continue |
-| `gm.economics.*` | a value the inputs cannot give is `{value: null, unit, reason}` |
+| `gm.evaluate.*` | a value the inputs cannot give is `{value: null, unit, reason}` |
 | `gm.analysis.nodal` | the case holds its problem in `error`; the other cases still run |
 
 `gm.evaluate` has no "never raises" rule. The "never raises" behaviour agents need belongs to
@@ -27,7 +27,7 @@ caller sees every problem in one try. A single error has itself as the one item.
 `{path, code, message, suggestions}`, built by `gemini.errors.base.problem`, which
 `gemini.types.shapes` exports with the other return shapes; `code` is the stable key for machines.
 
-**Checks are not errors.** `gm.checks.*` always return check dicts with `passed`; a violated limit
+**Checks are not errors.** `gm.evaluate.*` always return check dicts with `passed`; a violated limit
 never raises. A real failure inside a check (wrong input) still raises.
 
 ## The classes
@@ -56,10 +56,10 @@ Built-in bases appear only where Python needs them, never two error meanings in 
   and `AttributeError`, for mapping lookups, `Ports` and `Results`) and `UnknownMember` (also
   `AttributeError`, for `hasattr`, `getattr` with a default, `copy` and `pickle` on a module; its
   close-match suggestion is built only when the message is read).
-- `TraceError` is internal to `gemini/graph/` (`gemini/graph/errors.py`). The graph runner catches it
+- `TraceError` is internal to `gemini/compiler/graph/` (`gemini/compiler/graph/errors.py`). The graph runner catches it
   and runs that module as a plain call (a graph break); users never see it.
 
-The other exceptions to raising these classes are the topic files of `gemini.utils`, which cannot
+The other exceptions to raising these classes are the topic files of `gemini._utils`, which cannot
 import them (`paths.py` alone can, and raises `inputs_missing`), pydantic validators, which must raise `ValueError` (pydantic reports it as its own
 validation error), and `NotImplementedError` for an abstract method.
 `test_package_code_raises_gemini_errors` and `test_package_code_raises_only_the_allowed_classes` in
@@ -125,7 +125,7 @@ code is never renamed without raising the minor number of `gm.__version__`.
 
 Write `<module path>: <field> = <value> <unit>; expected <what>[; did you mean 'x'?]`, for example
 `units.convert: unit = 'K'; expected a unit of 'Pa' to convert from 'bar'`. Use
-`gemini.utils.strings.did_you_mean` for the suggestion and `join_names` for lists of valid names.
+`gemini._utils.strings.did_you_mean` for the suggestion and `join_names` for lists of valid names.
 
 ## Adding a code
 

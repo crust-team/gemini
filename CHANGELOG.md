@@ -21,9 +21,9 @@ before 0.2.0 do not load; `gm.plants.migrate` converts a plant file of an older 
   `fuel_price` and `fuel_emission_factor`; a missing assumption has the code `missing_assumption`.
 
 ### Added
-- `gm.profiles.get` with the demand of 2027; `gm.plants.Doublet`, designed from its depth;
+- `gm.data.get` with the demand of 2027; `gm.plants.Doublet`, designed from its depth;
   `GasGrid`, `GasMakeup`, `Flare`, `ElectricBoiler`; `Fluid.gas_liquid_ratio`, `gas_composition` and
-  `kind="gas"`; `gm.schedule`; `gm.checks.Limits` and `gm.checks.limits`; `capex(assumptions)` on
+  `kind="gas"`; `gm.schedule`; `gm.evaluate.Limits` and `gm.evaluate.limits`; `capex(assumptions)` on
   equipment with sourced cost factors.
 
 ### Fixed
@@ -43,7 +43,7 @@ below are the history before it. Checkpoints and results files written before 0.
 - Errors: seven public classes; what the others meant is a `code`. Every public call raises by
   default and `on_error="record"` reports instead. `error.problems` carries every problem.
 - Parameters and bindings: `add(kind, name=None, params=None)`, flat `set_bindings` and plant files.
-- `gm.kpi` is a namespace of `compute` and `names`; `gm.economics.co2` takes `(plant, results)`.
+- `gm.evaluate` is a namespace of `compute` and `names`; `gm.evaluate.co2` takes `(plant, results)`.
 
 ### Added
 - `units`, a map from quantity to unit, on every view of `Results`, on `gm.evaluate` and on
@@ -60,19 +60,19 @@ finite engine, and then cleaned up. Old import paths are not retained.
   builder `gm.Plant` and the JSON plant spec (format 2, `gm.plants.from_spec`, `validate`,
   `spec_schema`, `migrate`, `from_template`, `example`); `describe`, `parameter_schema`,
   `validate_params`; one registry with categories and stream types; `gm.evaluate`; `gm.analysis`,
-  `gm.economics`, `gm.kpi`, `gm.checks`, `gm.testing`, `gm.profiles`; `gm.errors` codes and
+  `gm.evaluate`, `gm.evaluate`, `gm.evaluate`, `gm.testing`, `gm.data`; `gm.errors` codes and
   `to_dict`; JSON Schemas and samples in `docs/schemas/`.
 - Physics and leaf modules are written with `gemini.ops`, so one source runs on floats, arrays and
   traced graphs, and `Engine.replay` evaluates each twin as one traced call with identical results.
-  `gemini.graph.settings(traced=False)` selects the old tick-by-tick path.
+  `gemini.compiler.graph.settings(traced=False)` selects the old tick-by-tick path.
 - Composable `Module` equipment with declared parameters, ports, controls, boundaries and
   outputs, the handwritten `Doublet` plant and the example `DoubletHeatPlant`, portable plant
   JSON with dated parameters and bindings, and the `gm.plants.convert_legacy` bridge from old GEMINI projects.
 - `Engine.simulate`, `Engine.replay` and `Engine.live` with callbacks, results, checkpoints and
   resume; bounded calibration through replay; quantity declarations, immutable fluids, profiles,
   costs and mass/energy audits. Eight runnable examples under `examples/`.
-- Leaf packages `gemini.utils` (shared string, time, hook, mapping, context and file helpers;
-  `python -m gemini.utils.collect_env`) and `gemini.errors` (every error class, also deriving
+- Leaf packages `gemini._utils` (shared string, time, hook, mapping, context and file helpers;
+  `python -m gemini._utils.collect_env`) and `gemini.errors` (every error class, also deriving
   from the matching built-in exception, as `gm.errors`).
 - Development and release test profiles: `make test` runs `scripts/test_changed.py` on what
   changed and what imports it within a 300 s budget, `make test-release` runs every tier on the

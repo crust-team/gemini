@@ -10,7 +10,8 @@ from pydantic_core import to_jsonable_python
 import gemini as gm
 from gemini.engine.callbacks import AutoCheckpoint, EventLog
 from gemini.modules import Module
-from gemini.types import Control, Output, Ports
+from gemini.modules.declarations import Control, Output
+from gemini.types import Ports
 from gemini.types.bindings import Binding, ModuleBindings
 
 

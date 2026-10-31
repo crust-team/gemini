@@ -9,6 +9,7 @@ CODES = (
     "missing_assumption",
     "invalid_unit",
     "unknown_name",
+    "duplicate_name",
     "unknown_port",
     "invalid_call",
     "invalid_format",

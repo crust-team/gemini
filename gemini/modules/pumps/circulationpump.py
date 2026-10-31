@@ -1,15 +1,12 @@
 """Circulation pump of a closed circuit: a fixed flow, a pressure rise and an efficiency."""
 
+from gemini.modules.declarations import Inlet, Outlet, Output, Parameter
 from gemini.modules.module import Module
 from gemini.physics import energy, pumps
 from gemini.types import (
     Efficiency,
     HydraulicPower,
-    Inlet,
     MassFlow,
-    Outlet,
-    Output,
-    Parameter,
     Power,
     Pressure,
     PressureDifference,

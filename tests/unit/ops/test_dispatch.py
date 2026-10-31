@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import pytest
 
-from gemini import backends, ops
+from gemini import ops, runtime
 from gemini.ops import Constant, Operators, Symbolic, dispatch
 
 FREQUENCY = Constant("F", 60, "Hz", "reference frequency")
@@ -58,7 +58,7 @@ def test_constant_is_not_a_float_and_computes_like_its_float():
 def test_plain_scalars_skip_dispatch_and_settings_still_force_a_backend():
     """Floats go straight to the Python backend; a backend setting or an array still dispatches."""
     assert type(ops.log(2.0)) is float and ops.where(True, 1.0, 2.0) == 1.0
-    with backends.settings("numpy"):
+    with runtime.settings("numpy"):
         assert type(ops.log(2.0)) is np.float64
         assert ops.where(True, 1.0, 2.0) == 1.0
         assert type(ops.maximum(1.0, 2.0)) is np.float64

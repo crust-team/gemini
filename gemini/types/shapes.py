@@ -14,11 +14,11 @@ assembles a shape by hand. Each shape has a JSON Schema, written to ``docs/schem
 
 import numpy as np
 
+from gemini import units
+from gemini._utils.jsonable import to_plain
+from gemini._utils.strings import close_matches, did_you_mean, join_names
 from gemini.errors import ValidationError
 from gemini.errors.base import problem
-from gemini.physics import units
-from gemini.utils.jsonable import to_plain
-from gemini.utils.strings import close_matches, did_you_mean, join_names
 
 __all__ = ["value", "series", "statistics", "problem", "check", "OutputUnits", "SCHEMAS"]
 

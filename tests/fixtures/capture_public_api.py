@@ -16,13 +16,9 @@ SNAPSHOT = ROOT / "tests" / "fixtures" / "public_api.json"
 NAMESPACES = (
     "plants",
     "units",
-    "streams",
-    "profiles",
+    "data",
     "analysis",
-    "kpi",
-    "economics",
-    "checks",
-    "testing",
+    "evaluate",
     "optim",
     "runtime",
 )
@@ -141,12 +137,11 @@ def capture():
             "Results": _methods(gm.Results, METHODS["Results"]),
         },
         "run": {name: _parameters(getattr(gm, name)) for name in RUN_FUNCTIONS},
-        "evaluate": _parameters(gm.evaluate),
-        "kpi_names": gm.kpi.names(),
+        "call": _parameters(gm.call),
         "errors": {name: value.code for name, value in classes.items() if hasattr(value, "code")},
         "codes": list(gm.errors.CODES),
         "row_codes": sorted(gm.errors.ROW_CODES),
-        "streams": gm.streams.names(),
+        "streams": gm.types.streams.names(),
         "schemas": _schemas(),
     }
 

@@ -1,7 +1,8 @@
 """Check the balances of a run and read the totals at the plant's edge.
 
 Shows ``gm.modules.energy_balance`` and ``gm.modules.mass_balance`` on one call,
-``gm.checks.plant_balance`` on a run and ``gm.kpi.totals``, on a boiler that serves a heating grid.
+``gm.evaluate.plant_balance`` on a run and ``gm.evaluate.totals``, on a boiler that serves a
+heating grid.
 Its sizes and the demand are assumptions of this recipe.
 
 Run with ``python examples/recipes/energy_balance.py``.
@@ -9,7 +10,7 @@ Run with ``python examples/recipes/energy_balance.py``.
 
 import gemini as gm
 
-DAY = gm.Clock.days(2027, 1, 1, days=1)
+DAY = gm.engine.Clock.days(2027, 1, 1, days=1)
 INPUTS = {
     "users.heat_demand": (500, "kW"),
     "users.flow": (15, "kg/s"),
@@ -54,15 +55,15 @@ def main():
     print("Assumptions: 500 kW demand on 15 kg/s of water, a 1 MW boiler at 90 % efficiency")
     module_balance()
     profiles = {
-        path: gm.Profile.constant(value, unit=unit, clock=DAY)
+        path: gm.types.Profile.constant(value, unit=unit, clock=DAY)
         for path, (value, unit) in INPUTS.items()
     }
     plant = build()
     results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=DAY)
-    checks = gm.checks.plant_balance(plant, results)
+    checks = gm.evaluate.plant_balance(plant, results)
     closed = sum(check["passed"] is True for check in checks)
     print(f"Balances that close: {closed} of {len(checks)}")
-    totals = gm.kpi.totals(plant, results)
+    totals = gm.evaluate.totals(plant, results)
     print(f"Heat delivered:      {totals['heat_delivered']['value'] / 3.6e9:.2f} MWh")
     print(f"CO2 emitted:         {totals['co2_emitted']['value']:.0f} kg")
     print(f"Losses:              {totals['losses']['value'] / 3.6e9:.2f} MWh")

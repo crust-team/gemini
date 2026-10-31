@@ -1,13 +1,14 @@
 """Write a small module of your own and use it in a plant.
 
 Shows ``gm.modules.Module``, the declarations of ``gemini.types`` (``Parameter``, ``Inlet``,
-``Output``, ``Outlet``), ``gm.testing.check_module`` and ``gm.modules.register``.
+``Output``, ``Outlet``), ``gm.modules.check`` and ``gm.modules.register``.
 
 Run with ``python examples/recipes/write_a_module.py``.
 """
 
 import gemini as gm
-from gemini.types import Inlet, Outlet, Output, Parameter, Pressure, PressureDifference, Stream
+from gemini.modules import Inlet, Outlet, Output, Parameter
+from gemini.types import Pressure, PressureDifference, Stream
 
 STREAM = gm.Stream(flow="40 kg/s", T="80 degC", p="6 bar")
 
@@ -49,7 +50,7 @@ class Orifice(gm.modules.Module):
 def main():
     """Check the class, call it alone and run it behind a filter in a plant."""
     example = {"parameters": {"pressure_drop": "1 bar"}, "inlets": {"fluid_in": STREAM}}
-    report = gm.testing.check_module(Orifice, example=example)
+    report = gm.modules.check(Orifice, example=example)
     print(f"Module checks passed: {report['passed']}")
 
     alone = Orifice().set_params("", {"pressure_drop": "1 bar"})(fluid_in=STREAM)

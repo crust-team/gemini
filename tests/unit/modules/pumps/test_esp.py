@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 
 import gemini as gm
-from gemini import analysis, backends
+from gemini import analysis, units
 from gemini.analysis import wells
 from gemini.modules.pumps import ESP
-from gemini.physics import units
+from gemini.ops import kernels
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_health_matches, assert_module_matches
 
@@ -71,12 +71,12 @@ def test_the_esp_alone_asks_for_a_plain_scope_under_float32_precision():
     """Float32 keeps Python floats next to the float32 coefficients; a stopped pump still runs."""
     esp = ESP().set_params("", ESP_PARAMS)
     stopped = dict(frequency=60, fluid_in=Stream(m_dot=0.0, T=300, p=100000))
-    assert esp._scalar_mode() == backends.WRAP
+    assert esp._scalar_mode() == kernels.WRAP
     reference = esp(**stopped).outputs.efficiency
     with gm.runtime.settings(precision="float32"):
-        assert esp._scalar_mode() == backends.PLAIN
+        assert esp._scalar_mode() == kernels.PLAIN
         assert esp(**stopped).outputs.efficiency == reference == 0.0
-    assert backends.scope_mode() is None
+    assert kernels.scope_mode() is None
 
 
 def _health_rows(pump, flows_kg_s):
@@ -128,7 +128,7 @@ def test_no_outputs_keeps_the_outlet_of_a_full_call():
     """Skipping the outputs leaves the outlet stream as it was."""
     esp, stream = _design(), Stream(flow="150 m3/h", T="80 degC", p="20 bar")
     full = esp(fluid_in=stream, frequency="50 Hz")
-    with gm.no_outputs():
+    with gm.modules.no_outputs():
         fast = esp(fluid_in=stream, frequency="50 Hz")
     assert dict(fast.outputs) == {}
     assert fast.outlets.fluid_out == full.outlets.fluid_out

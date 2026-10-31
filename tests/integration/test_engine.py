@@ -8,11 +8,12 @@ import pandas as pd
 import pytest
 
 import gemini as gm
-from gemini import backends
+from gemini import runtime
 from gemini.engine import checkpoint
 from gemini.engine.callbacks import AutoCheckpoint, Callback, EventLog
-from gemini.engine.results import Results
-from gemini.types import Control, Output
+from gemini.modules.declarations import Control, Output
+from gemini.ops import kernels
+from gemini.run.results import Results
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from tests.fixtures.errors import raises
 from tests.fixtures.frames import on_ports, path_frame
@@ -90,7 +91,7 @@ def test_reference_replay_and_simulate(setup):
     actual = path_frame(gm.Engine(plant, on_error="raise").replay(data))
     old = _reference("replay.pkl", actual)
     pd.testing.assert_frame_equal(actual[old.columns], old, check_names=False)
-    clock = gm.Clock.days(2024, 6, 7)
+    clock = gm.engine.Clock.days(2024, 6, 7)
     raw = data.read(data.start, data.start)
     assumed = pd.DataFrame([raw.iloc[0].to_dict()] * 24, index=list(clock))
     result = gm.Engine(plant, on_error="raise").simulate(gm.Dataset.from_frame(assumed), clock)
@@ -115,7 +116,7 @@ def test_replay_can_skip_outputs(setup):
     """A no-output replay retains fluid execution without running diagnostics on empty values."""
     plant, data = setup
     first = data.window(end=data.start)
-    with gm.no_outputs():
+    with gm.modules.no_outputs():
         result = gm.Engine(plant, on_error="raise").replay(first)
     assert len(result) == 1
     fields = set(path_frame(result).columns.get_level_values("field"))
@@ -167,7 +168,7 @@ def test_interrupt_resume(setup, tmp_path, kind):
     """Fresh-engine resume reproduces uninterrupted results and integration exactly."""
     plant, data = setup
     data = data.window(end=data.start + pd.Timedelta(hours=2, minutes=45))
-    clock = gm.Clock.from_data(data)
+    clock = gm.engine.Clock.from_data(data)
     args = [data] + ([clock] if kind == "simulate" else [])
     expected = getattr(gm.Engine(plant, on_error="raise"), kind)(*args)
     path = tmp_path / "run.ckpt"
@@ -384,7 +385,7 @@ def test_resume_keeps_held_rows_when_the_clock_is_finer_than_the_data(tmp_path, 
     """Bug E-engine-001: resume lost the held row, or refused to resume after the last row."""
     index = pd.date_range("2024-01-01", periods=4, freq="1h", tz="UTC")
     plant, data = accumulator(pd.DataFrame({"rate": [1.0, 2.0, 3.0, 4.0]}, index=index))
-    clock = gm.Clock.range("2024-01-01T00:00Z", "2024-01-01T04:00Z", "15min")
+    clock = gm.engine.Clock.range("2024-01-01T00:00Z", "2024-01-01T04:00Z", "15min")
     expected = gm.Engine(plant, on_error="raise").simulate(data, clock)
     path = tmp_path / "run.ckpt"
     with pytest.raises(Interrupted):
@@ -615,10 +616,10 @@ def test_the_engine_applies_its_own_backend_to_the_run():
 
     class Watch(Callback):
         def on_step_start(self, engine, sample):
-            seen.append(backends.forced_name())
+            seen.append(kernels.forced_name())
 
     plant, data = accumulated(2)
     for backend in ("python", "numpy"):
-        with backends.settings(backend="numpy" if backend == "python" else "python"):
+        with runtime.settings(backend="numpy" if backend == "python" else "python"):
             gm.Engine(plant, backend, [Watch()]).replay(data)
     assert seen == ["python", "python", "numpy", "numpy"]

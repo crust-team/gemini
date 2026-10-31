@@ -12,7 +12,8 @@ from time import perf_counter
 import pandas as pd
 
 import gemini as gm
-from gemini.utils import paths
+from gemini._utils import paths
+from gemini.types import Profile
 from tests.fixtures import FIXTURES
 from tests.fixtures.frames import path_frame
 
@@ -33,11 +34,11 @@ def main():
     replay_seconds = perf_counter() - started
     path_frame(replay).to_csv(OUTPUT / "replay.csv.gz", compression="gzip")
 
-    clock = gm.Clock.days(2027, 1, 1, days=1)
+    clock = gm.engine.Clock.days(2027, 1, 1, days=1)
     profiles = {
-        "doublet.reservoir.m_dot": gm.Profile.constant(150, unit="m3/h", clock=clock),
-        "doublet.esp.frequency": gm.Profile.constant(55, unit="Hz", clock=clock),
-        "injection_pump.pressure_setpoint": gm.Profile.constant(51.5, unit="bar", clock=clock),
+        "doublet.reservoir.m_dot": Profile.constant(150, unit="m3/h", clock=clock),
+        "doublet.esp.frequency": Profile.constant(55, unit="Hz", clock=clock),
+        "injection_pump.pressure_setpoint": Profile.constant(51.5, unit="bar", clock=clock),
     }
     simulation = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
     path_frame(simulation).to_csv(OUTPUT / "simulate.csv.gz", compression="gzip")

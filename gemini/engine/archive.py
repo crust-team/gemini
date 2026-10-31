@@ -13,8 +13,8 @@ import zipfile
 import numpy as np
 import pandas as pd
 
+from gemini._utils.version import OLDEST_READABLE, is_older, package_version
 from gemini.errors import ValidationError
-from gemini.utils.version import OLDEST_READABLE, is_older, package_version
 
 TIME_NAME = "time"
 METADATA_NAME = "metadata"

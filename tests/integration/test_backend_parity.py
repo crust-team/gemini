@@ -185,7 +185,9 @@ def test_a_composite_twin_gives_the_same_result_tree():
 def _simulate(plant, frame):
     data = _dataset(frame)
     return on_each_backend(
-        lambda backend: run_engine(copy.deepcopy(plant), data, "simulate", gm.Clock.from_data(data))
+        lambda backend: run_engine(
+            copy.deepcopy(plant), data, "simulate", gm.engine.Clock.from_data(data)
+        )
     )
 
 

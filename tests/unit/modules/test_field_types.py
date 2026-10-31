@@ -2,7 +2,7 @@
 
 import inspect
 
-from gemini.modules.plant import Plant
+from gemini.plants.plant import Plant
 
 SECTIONS = [
     "# Modules",
