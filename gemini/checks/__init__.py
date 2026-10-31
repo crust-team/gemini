@@ -1,4 +1,4 @@
-"""Energy, mass and bounds checks over a finished run."""
+"""Energy, mass, bounds, limits and operating-days checks over a finished run."""
 
 from gemini.checks.balances import energy_balance, mass_balance, plant_balance
 from gemini.checks.bounds import bounds
