@@ -15,10 +15,10 @@ MOLAR_GAS_CONSTANT = Constant(
 )
 
 NORMAL_TEMPERATURE = 273.15
-"""Temperature [K] of a normal cubic metre: 0 degC (challenge requirements, section 3.2)."""
+"""Temperature [K] of a normal cubic metre: 0 degC, the normal state of DIN 1343."""
 
 NORMAL_PRESSURE = 101325.0
-"""Pressure [Pa] of a normal cubic metre: 1.01325 bar(a) (challenge requirements, section 3.2)."""
+"""Pressure [Pa] of a normal cubic metre: 1.01325 bar(a), the normal state of DIN 1343."""
 
 SPECIES = {
     "CH4": (float(METHANE_MOLAR_MASS), 802.3e3, 1),
@@ -102,13 +102,20 @@ def ideal_gas_density(pressure: float, temperature: float, mass_per_mole: float)
     return pressure * mass_per_mole / (MOLAR_GAS_CONSTANT * temperature)
 
 
-def normal_density(composition: dict) -> float:
-    """Return the density [kg/Nm3] of a gas at 0 degC and 1.01325 bar(a).
+def normal_density(
+    composition: dict,
+    temperature: float = NORMAL_TEMPERATURE,
+    pressure: float = NORMAL_PRESSURE,
+) -> float:
+    """Return the density [kg/Nm3] of a gas at its reference conditions, by default normal ones.
 
     Parameters
     ----------
     composition : dict
         Mole fraction [-] per species of ``SPECIES``.
+    temperature, pressure : float
+        Reference conditions [K, Pa] of the cubic metre a gas-liquid ratio counts; by default
+        the normal state, 0 degC and 1.01325 bar(a). Pass 288.15 K for standard conditions.
 
     Returns
     -------
@@ -117,12 +124,13 @@ def normal_density(composition: dict) -> float:
 
     Notes
     -----
-    ``ideal_gas_density`` at ``NORMAL_PRESSURE`` and ``NORMAL_TEMPERATURE``.
+    ``ideal_gas_density`` at the reference conditions.
 
     Validity: The published normal density of a real gas is up to about 0.5 % higher.
-    Source: The normal conditions of the challenge requirements, section 3.2.
+    Source: DIN 1343, Reference conditions, normal conditions, normal volume: normal temperature
+    273.15 K and normal pressure 101325 Pa. ISO 13443 names other reference conditions, 288.15 K.
     """
-    return ideal_gas_density(NORMAL_PRESSURE, NORMAL_TEMPERATURE, molar_mass(composition))
+    return ideal_gas_density(pressure, temperature, molar_mass(composition))
 
 
 def lower_heating_value(composition: dict) -> float:

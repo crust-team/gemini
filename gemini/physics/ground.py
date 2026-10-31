@@ -94,8 +94,9 @@ def geotherm_temperature(surface_temperature: float, gradient: float, depth: flo
 
     Notes
     -----
-    Linear conductive geotherm, the estimate the challenge requirements (section 3.1) prescribe
-    for other depths. Valid where conduction dominates and the gradient is constant with depth.
+    Linear conductive geotherm, the steady conduction profile of a layer of uniform conductivity
+    without heat production. Valid where conduction dominates and the gradient is constant with
+    depth.
     Reference: Turcotte and Schubert, Geodynamics, chapter 4.
     """
     return surface_temperature + gradient * depth

@@ -255,8 +255,7 @@ def fuel_split(need: float, available: float, heating_value: float) -> tuple:
 
     Notes
     -----
-    Validity: Nonnegative inputs. Source: The dispatch rule of the challenge model; a plain energy
-    balance, no published source is needed.
+    Validity: Nonnegative inputs. Source: A plain energy balance; no published source is needed.
     """
     coproduced = ops.minimum(need, available)
     burnt = ops.where(heating_value > 0, ops.truediv(coproduced, heating_value), 0.0)

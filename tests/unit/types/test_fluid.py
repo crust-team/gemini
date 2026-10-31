@@ -67,7 +67,7 @@ def test_corrosion_inputs_on_arrays_match_floats():
     assert values["co2_partial_pressure"].shape == (2,)
 
 
-HACKATHON = dict(
+DEGASSED_BRINE = dict(
     density="1030 kg/m3",
     viscosity="0.4 mPa*s",
     gas_liquid_ratio="0.8 Nm3/m3",
@@ -75,9 +75,9 @@ HACKATHON = dict(
 )
 
 
-def test_the_hackathon_brine_derives_its_gas_mass_fraction():
+def test_a_brine_with_a_gas_ratio_derives_its_gas_mass_fraction():
     """Unit strings become SI; 0.8 Nm3/m3 of the 80/20 gas is 7.49e-4 of the mass."""
-    brine = Fluid(**HACKATHON)
+    brine = Fluid(**DEGASSED_BRINE)
     assert brine.density == 1030 and brine.viscosity == pytest.approx(4e-4)
     assert brine.normal_density() == pytest.approx(0.96534, abs=1e-4)
     assert brine.gas_mass_fraction == pytest.approx(7.4923e-4, rel=1e-3)
@@ -86,7 +86,7 @@ def test_the_hackathon_brine_derives_its_gas_mass_fraction():
 
 def test_a_fluid_with_a_ratio_round_trips_and_hashes():
     """A dump leaves the derived fraction out and reads back; a composition has a hash."""
-    brine = Fluid(**HACKATHON)
+    brine = Fluid(**DEGASSED_BRINE)
     dumped = brine.model_dump(mode="json")
     assert "gas_mass_fraction" not in dumped
     again = Fluid.model_validate(dumped)
@@ -128,7 +128,7 @@ def test_a_gas_fluid_is_an_ideal_gas_of_its_composition():
 
 def test_a_brine_with_a_composition_mixes_with_its_gas_at_the_stream_pressure():
     """The mixture is denser at depth; a flow in m3/h is the liquid volume at high pressure."""
-    brine = Fluid(**HACKATHON)
+    brine = Fluid(**DEGASSED_BRINE)
     deep, shallow = brine.density_at(200e5, 360.0), brine.density_at(5e5, 360.0)
     assert brine.gas_density_at(200e5, 360.0) == pytest.approx(144.6, abs=0.5)
     assert 1020 < deep < 1030 and shallow < deep

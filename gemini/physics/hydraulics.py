@@ -1032,9 +1032,11 @@ def hydrostatic_pressure(rho: float, depth: float) -> float:
 
     Notes
     -----
-    The reservoir pressure the challenge requirements (section 3.1) prescribe for other depths.
+    The pressure of a reservoir in hydrostatic equilibrium with the surface, the usual first
+    estimate of an aquifer pressure.
     Validity: A static column of uniform density.
-    Source: The hydrostatic balance, as in ``hydrostatic_dp``.
+    Source: The hydrostatic balance, as in ``hydrostatic_dp`` (White, Fluid Mechanics, 8th ed.,
+    section 2.3).
     """
     return gas.NORMAL_PRESSURE + hydrostatic_dp(rho, depth)
 

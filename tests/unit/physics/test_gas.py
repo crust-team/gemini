@@ -23,8 +23,15 @@ def test_ideal_gas_density():
 
 
 def test_normal_density_of_the_produced_gas():
-    """The hackathon gas is about 0.97 kg/Nm3."""
+    """A gas of 80 % CH4 and 20 % CO2 by mole is about 0.97 kg/Nm3."""
     assert gas.normal_density(PRODUCED) == pytest.approx(0.9653, abs=1e-3)
+
+
+def test_the_reference_conditions_of_a_normal_density_are_arguments():
+    """DIN 1343 normal conditions by default; the ISO 13443 standard ones, 15 degC, on request."""
+    assert gas.normal_density(PRODUCED) == gas.normal_density(PRODUCED, 273.15, 101325.0)
+    standard = gas.normal_density(PRODUCED, 288.15, 101325.0)
+    assert standard == pytest.approx(gas.normal_density(PRODUCED) * 273.15 / 288.15)
 
 
 def test_heating_value_of_methane_is_the_constant_of_combustion():

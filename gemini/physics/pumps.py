@@ -81,9 +81,9 @@ def constant_head_curves(design_head, efficiency):
 
     Notes
     -----
-    A pump sized from a design point, without a catalogue curve: the challenge requirements
-    (section 3) give a hydraulic efficiency of 70 % and no pump curve. Hydraulic power is the
-    relation of ``hydraulic_power``.
+    A pump sized from a design point, without a catalogue curve: the head is the one the design
+    needs at any flow and the power is the hydraulic power over the efficiency, the relation of
+    ``hydraulic_power``.
 
     Validity: One stage, at the reference frequency of the ESP.
     Source: The hydraulic power of a pump, Karassik et al., Pump Handbook.
