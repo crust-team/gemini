@@ -1,13 +1,19 @@
 """Plan a year of one doublet and a boiler from the heating demand, then simulate the plan.
 
-Shows ``gm.profiles.get``, ``gm.schedule`` and ``gm.simulate`` on a small plant built from a
+Shows ``gm.profiles.from_csv``, ``gm.schedule`` and ``gm.simulate`` on a small plant built from a
 doublet's depth. The doublet design, the sizes and the return temperature are assumptions of this
-recipe and it prints them as such.
+recipe and it prints them as such. The daily heating demand is a file of the sample problem in
+``inputs/examples/hackathon_2027/``; any file with a time column and a demand column in a unit of
+power works the same, at any step.
 
 Run with ``python examples/recipes/schedule_demand.py``.
 """
 
+from pathlib import Path
+
 import gemini as gm
+
+DEMAND = Path(__file__).resolve().parents[2] / "inputs/examples/hackathon_2027"
 
 BRINE = gm.Fluid(density="1030 kg/m3", viscosity="0.4 mPa*s", specific_heat="4000 J/kg/K")
 DOUBLET = {
@@ -32,7 +38,7 @@ RULES = {
     "order": ["geothermal", "boiler"],
     "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
     "max_brine_cooling": "40 K",
-    "operating_days": None,
+    "operating_time": None,
 }
 
 
@@ -64,10 +70,12 @@ def build():
 
 
 def main():
-    """Schedule the demand of 2027, simulate the plan and print what it covers."""
+    """Schedule the demand of a year, simulate the plan and print what it covers."""
     plant = build()
     print("Assumptions: a 2500 m doublet, 40 MW boiler, return at 60 °C, supply at 100 °C")
-    plan = gm.schedule(plant, gm.profiles.get("heating_demand"), RULES)
+    columns = {"heating_demand_MWth": "heating_demand"}
+    demand = gm.profiles.from_csv(DEMAND / "GEMINI_Heating_Demand_Daily_2027.csv", columns, "MW")
+    plan = gm.schedule(plant, demand, RULES)
     lowest = gm.units.convert(plan["d0.flow"].min(), "m3/s", "m3/h")
     highest = gm.units.convert(plan["d0.flow"].max(), "m3/s", "m3/h")
     print(f"Days planned:     {len(plan)}")

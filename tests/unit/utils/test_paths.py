@@ -14,7 +14,6 @@ def test_the_package_finds_its_folders():
 @pytest.mark.parametrize(
     ("call", "name"),
     [
-        (lambda: paths.hackathon("demand.csv"), "examples/hackathon_2027/demand.csv"),
         (lambda: paths.plant_values("Doublet"), "plants/Doublet.json"),
         (lambda: paths.doublet_heat("data.csv"), "doublet_heat/data.csv"),
         (paths.legacy_project, "legacy_project"),

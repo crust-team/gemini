@@ -3,7 +3,7 @@
 Schedules 2027 from the daily demand on the plant dict ``plant_with_treatment.json`` of the sample
 problem and simulates it. The reservoir, brine, limits and supply temperatures are the sample
 problem's; what this case assumes it prints as assumptions. Shows ``gm.plants.from_dict``,
-``gm.checks.Limits.from_dict``, ``gm.economics.Assumptions``, ``gm.schedule``, ``gm.simulate``,
+``gm.profiles.from_csv``, ``gm.checks.Limits.from_dict``, ``gm.economics.Assumptions``, ``gm.schedule``, ``gm.simulate``,
 ``gm.checks.limits``, ``gm.checks.plant_balance``, ``gm.kpi.totals``, ``gm.kpi.compute`` and
 ``gm.economics``.
 
@@ -21,11 +21,26 @@ MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
 SAMPLE = Path(__file__).resolve().parents[2] / "inputs/examples/hackathon_2027"
 """The sample problem, read by this example only."""
+HEATING_FILE = "GEMINI_Heating_Demand_Daily_2027.csv"
+COOLING_FILE = "GEMINI_Cooling_Demand_Daily_2027.csv"
 
 
 def sample(name):
     """Return the JSON file ``name`` of the sample problem as data."""
     return json.loads((SAMPLE / name).read_text())
+
+
+def demand():
+    """Return the heating and cooling demand of the two files of the sample problem."""
+    heat = {"heating_demand_MWth": "heating_demand"}
+    cool = {"cooling_demand_MWcool": "cooling_demand"}
+    return pd.concat(
+        [
+            gm.profiles.from_csv(SAMPLE / HEATING_FILE, heat, "MW", time_column="date"),
+            gm.profiles.from_csv(SAMPLE / COOLING_FILE, cool, "MW", time_column="date"),
+        ],
+        axis=1,
+    )
 
 
 ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
@@ -122,9 +137,8 @@ def main():
     plant = gm.plants.from_dict(sample("plant_with_treatment.json"))
     rules = sample("rules.json") | {"operating_days": None}
     limits = gm.checks.Limits.from_dict(sample("limits_with_treatment.json"))
-    profiles = [gm.profiles.get("heating_demand"), gm.profiles.get("cooling_demand")]
     print(ASSUMPTIONS)
-    results = gm.simulate(plant, gm.schedule(plant, pd.concat(profiles, axis=1), rules))
+    results = gm.simulate(plant, gm.schedule(plant, demand(), rules))
     print_run(plant, results)
     print_limits(gm.checks.limits(plant, results, limits))
     print_balance(gm.checks.plant_balance(plant, results))

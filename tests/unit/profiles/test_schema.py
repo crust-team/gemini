@@ -18,4 +18,4 @@ def test_a_column_needs_a_unit_and_a_quantity():
     """Units are never implied: the column schema requires them."""
     column = gm.profiles.profile_schema()["properties"]["columns"]["additionalProperties"]
     assert column["required"] == ["unit", "quantity"]
-    assert set(column["properties"]) == {"unit", "quantity", "description"}
+    assert set(column["properties"]) == {"unit", "quantity"}

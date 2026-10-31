@@ -21,6 +21,7 @@ SCHEMAS = ROOT / "docs" / "schemas"
 DATA = paths.doublet_heat("doublet_2024_15min_month.csv")
 ROWS = 4
 PROFILE = "heating_demand"
+PROFILE_VALUES = [120.0, 135.5, 150.0, 142.5]
 
 
 def _results(plant):
@@ -30,12 +31,9 @@ def _results(plant):
 
 
 def _profile_sample():
-    """Return the first rows of a real profile, in the document form of ``gm.profiles.get``."""
-    frame = gm.profiles.get(PROFILE).iloc[:ROWS]
+    """Return a short heating profile of made-up values, in the document form of a profile."""
+    frame = gm.profiles.from_values(PROFILE_VALUES, "kW", "2030-01-01", "1 h", PROFILE)
     return {
-        "name": PROFILE,
-        "description": frame.attrs["description"],
-        "source": frame.attrs["source"],
         "columns": {
             PROFILE: {
                 "unit": frame.attrs["units"][PROFILE],

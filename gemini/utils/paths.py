@@ -26,11 +26,6 @@ def _input(relative):
     return INPUTS / relative
 
 
-def hackathon(name):
-    """Return the path of the file ``name`` of the hackathon inputs."""
-    return _input(f"examples/hackathon_2027/{name}")
-
-
 def plant_values(name):
     """Return the path of the example values of plant ``name``; the file may not exist."""
     return _input(f"plants/{name}.json")

@@ -6,9 +6,6 @@
       "additionalProperties": {
         "additionalProperties": false,
         "properties": {
-          "description": {
-            "type": "string"
-          },
           "quantity": {
             "type": "string"
           },
@@ -24,16 +21,6 @@
       },
       "minProperties": 1,
       "type": "object"
-    },
-    "description": {
-      "type": "string"
-    },
-    "name": {
-      "type": "string"
-    },
-    "source": {
-      "description": "Where the data comes from.",
-      "type": "string"
     },
     "time": {
       "items": {
@@ -57,9 +44,6 @@
     }
   },
   "required": [
-    "name",
-    "description",
-    "source",
     "columns",
     "time",
     "values"

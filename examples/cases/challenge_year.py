@@ -4,7 +4,7 @@ Plans 2027 for the plant dict ``plant.json`` of the sample problem, two doublets
 a boiler and three chillers, and simulates it. The reservoir, the brine, the limits and the supply
 temperatures are the sample problem's; what this case assumes it prints as assumptions.
 
-Shows ``gm.plants.from_dict``, ``gm.profiles.demand``, ``gm.schedule``, ``gm.simulate``,
+Shows ``gm.plants.from_dict``, ``gm.profiles.from_csv``, ``gm.schedule``, ``gm.simulate``,
 ``gm.checks.Limits.from_dict``, ``gm.checks.limits``, ``gm.checks.operating_days``,
 ``gm.kpi.totals`` and ``gm.economics.lcts``.
 
@@ -14,17 +14,34 @@ Run with ``python examples/cases/challenge_year.py``.
 import json
 from pathlib import Path
 
+import pandas as pd
+
 import gemini as gm
 
 MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
 SAMPLE = Path(__file__).resolve().parents[2] / "inputs/examples/hackathon_2027"
 """The sample problem, read by this example only."""
+HEATING_FILE = "GEMINI_Heating_Demand_Daily_2027.csv"
+COOLING_FILE = "GEMINI_Cooling_Demand_Daily_2027.csv"
 
 
 def sample(name):
     """Return the JSON file ``name`` of the sample problem as data."""
     return json.loads((SAMPLE / name).read_text())
+
+
+def demand():
+    """Return the heating and cooling demand of the two files of the sample problem."""
+    heat = {"heating_demand_MWth": "heating_demand"}
+    cool = {"cooling_demand_MWcool": "cooling_demand"}
+    return pd.concat(
+        [
+            gm.profiles.from_csv(SAMPLE / HEATING_FILE, heat, "MW", time_column="date"),
+            gm.profiles.from_csv(SAMPLE / COOLING_FILE, cool, "MW", time_column="date"),
+        ],
+        axis=1,
+    )
 
 
 ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
@@ -89,7 +106,7 @@ def main():
     plant = gm.plants.from_dict(sample("plant.json"))
     print(ASSUMPTIONS)
     rules = sample("rules.json")
-    plan = gm.schedule(plant, gm.profiles.demand(), rules)
+    plan = gm.schedule(plant, demand(), rules)
     results = gm.simulate(plant, plan, on_error="record")
     print(f"\nFailed days: {len(results.errors())}")
     print_year(plant, results)

@@ -1,12 +1,12 @@
-"""Design-year demand profiles in the run-input format.
+"""Demand profiles in the run-input format.
 
-``names()`` lists the profiles, ``get(name)`` returns one as a pandas DataFrame with a UTC index and
-one column per quantity, ready for ``Engine.simulate``, ``demand()`` both in one frame, and
-``profile_schema()`` is the JSON Schema of the profile file. The demand files are in
-``inputs/hackathon/`` of a source checkout: ``get`` raises ``inputs_missing`` without them.
+gemini ships no profile. ``from_csv(path, columns, unit)`` reads one from a file and
+``from_values(values, unit, start, step, quantity)`` builds one from numbers; both return a pandas
+DataFrame with a UTC index called ``time`` at a constant step and one column per demand quantity in
+W, ready for ``gm.schedule``. ``profile_schema()`` is the JSON Schema of the profile document.
 """
 
-from .library import demand, get, names
+from .loaders import from_csv, from_values
 from .schema import profile_schema
 
-__all__ = ["names", "get", "demand", "profile_schema"]
+__all__ = ["from_csv", "from_values", "profile_schema"]
