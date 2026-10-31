@@ -32,7 +32,7 @@ class Tank(Module):
         self.temperature = Parameter(Temperature)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.m_dot = Control(MassFlow)
@@ -41,15 +41,15 @@ class Tank(Module):
         self.flow = Output(MassFlow)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the inlet stream through."""
 
         # Outlets
-        outlet = inlets.inlet
+        outlet = inlets.fluid_in
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -92,7 +92,7 @@ def tank(unit="kg/s"):
     }
     module.bindings = {
         "": ModuleBindings(
-            controls={"m_dot": Binding(column="rate", unit=unit)}, inlets={"inlet": stream}
+            controls={"m_dot": Binding(column="rate", unit=unit)}, inlets={"fluid_in": stream}
         )
     }
     return module

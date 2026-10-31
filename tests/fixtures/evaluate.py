@@ -96,7 +96,7 @@ def _esp(parameters, inputs):
     """Evaluate the ESP polynomial at one frequency; efficiency in percent as captured."""
     outputs = configured(ESP, parameters)(
         frequency=inputs["pump_freq"],
-        suction=Stream(m_dot=inputs["pump_flow"] * 1000, T=300, p=1e5),
+        fluid_in=Stream(m_dot=inputs["pump_flow"] * 1000, T=300, p=1e5),
     ).outputs
     return dict(pump_head=outputs.head, pump_power=outputs.power, pump_eff=outputs.efficiency * 100)
 
@@ -119,7 +119,7 @@ def _reservoir_parameters():
 def _injection_ipr(inputs):
     """Evaluate the injection inflow performance at one sandface flow."""
     reservoir = configured(InjectionReservoir, _reservoir_parameters())
-    outputs = reservoir(sandface=Stream(m_dot=inputs["flow"] * 1000, T=300, p=23e6)).outputs
+    outputs = reservoir(sandface_in=Stream(m_dot=inputs["flow"] * 1000, T=300, p=23e6)).outputs
     return dict(bottomhole_pressure=outputs.bottomhole_pressure)
 
 
@@ -190,9 +190,9 @@ def _pipe_path(parameters):
 def _well(is_production, parameters, inputs):
     """March one well from its inlet end and report the outlet state and pressure terms."""
     module_class, inlet, outlet = (
-        (ProductionWell, "bottom", "wellhead")
+        (ProductionWell, "bottom_in", "wellhead_out")
         if is_production
-        else (InjectionWell, "wellhead", "bottom")
+        else (InjectionWell, "wellhead_in", "bottom_out")
     )
     well = configured(
         module_class,

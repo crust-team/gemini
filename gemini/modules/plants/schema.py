@@ -46,7 +46,7 @@ def _connection():
         "properties": {
             "source": PORT,
             "target": PORT,
-            "kind": {"enum": ["state", None]},
+            "type": {"enum": ["state", None]},
         },
     }
 

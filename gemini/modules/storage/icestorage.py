@@ -37,7 +37,7 @@ class IceStorage(Module):
     so with ``C = m_dot * cp`` of the glycol its effectiveness is ``e = 1 - exp(-UA / C)``
     (Incropera et al., *Fundamentals of Heat and Mass Transfer*, effectiveness-NTU method). The
     heat flow from the glycol into the store is ``duty = e * C * (T_in - T)`` and the glycol
-    leaves at ``outlet_T = T_in - e * (T_in - T)``. A glycol inlet below T_f charges the store
+    leaves at ``fluid_out_T = T_in - e * (T_in - T)``. A glycol inlet below T_f charges the store
     (negative duty: water freezes, then the ice subcools), one above T_f discharges it (positive
     duty: the store cools the glycol, the ice melts, then the water warms).
 
@@ -91,7 +91,7 @@ class IceStorage(Module):
         self.ice_specific_heat = Parameter(SpecificHeat, default=_physics.DEFAULT_ICE_HEAT_CAPACITY)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="chilled_water")
+        self.fluid_in = Inlet(Stream, kind="chilled_water")
 
         # States
         self.ice_fraction = State(Fraction, default=0)
@@ -101,18 +101,18 @@ class IceStorage(Module):
         self.stored_cold = Output(Energy)
         self.duty = Output(Duty)
         self.heat_accumulation = Output(HeatAccumulation)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.is_full = Output(bool)
         self.is_empty = Output(bool)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="chilled_water")
+        self.fluid_out = Outlet(Stream, kind="chilled_water")
 
     def forward(self, inlets):
         """Return the glycol after exchanging heat with the start-of-step store."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         effectiveness = self._effectiveness(inlet)
         outlet = inlet.with_(
             T=heat_transfer.effectiveness_outlet_temperature(
@@ -120,22 +120,22 @@ class IceStorage(Module):
             )
         )
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         self.stored_cold = _physics.ice_stored_cold(
             self.water_mass, self.latent_heat, self.ice_fraction
         )
         self.duty = heat_transfer.heat_rate(self._conductance(inlet), inlet.T - self.temperature)
         self.heat_accumulation = self.duty
-        self.outlet_T = outlets.outlet.T
+        self.fluid_out_T = outlets.fluid_out.T
         self.is_full = self.ice_fraction >= 1
         self.is_empty = self.ice_fraction <= 0
 
     def _advance_states(self, inlets, outlets, dt):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         fraction, temperature = _physics.ice_advance(
             self.ice_fraction,
             self.temperature,
@@ -155,7 +155,7 @@ class IceStorage(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
             path=self.path,
             m_dot=inlet.m_dot,
         )

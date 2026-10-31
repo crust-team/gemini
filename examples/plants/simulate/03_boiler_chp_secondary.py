@@ -65,42 +65,44 @@ class BoilerChpPlant(gm.modules.Module):
         self.mixer = Mixer()
 
         # Inlets
-        self.secondary_in = Inlet(Stream)
+        self.return_in = Inlet(Stream)
 
         # Outputs
-        self.production_rate = Output.of(self.doublet.riser.wellhead.field("m_dot"))
+        self.production_rate = Output.of(self.doublet.riser.wellhead_out.field("m_dot"))
         self.exchanger_duty = Output.of(self.heat_exchanger.duty)
         self.injection_pump_electricity = Output.of(self.doublet.injection_pump.electricity)
         self.electricity = Output(Electricity)
         self.electricity_generated = Output(ElectricityGenerated)
         self.fuel = Output(Fuel)
-        self.secondary_out_T = Output.of(self.mixer.mixed_out_T)
+        self.secondary_out_T = Output.of(self.mixer.fluid_out_T)
 
         # Outlets
-        self.secondary_out = Outlet(Stream)
+        self.supply_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Produce, treat, exchange and inject the brine; heat and remix the secondary water."""
 
         # Modules
         supply = self.doublet.produce()
-        degassed = self.degasser(inlet=supply)
-        filtered = self.hot_filter(inlet=degassed.outlets.liquid)
-        split = self.splitter(feed_in=inlets.secondary_in)
+        degassed = self.degasser(fluid_in=supply)
+        filtered = self.hot_filter(fluid_in=degassed.outlets.liquid_out)
+        split = self.splitter(fluid_in=inlets.return_in)
         exchanged = self.heat_exchanger(
-            hot_in=filtered.outlets.outlet, cold_in=split.outlets.first_out
+            hot_in=filtered.outlets.fluid_out, cold_in=split.outlets.branch1_out
         )
-        returned = self.cold_filter(inlet=exchanged.outlets.hot_out)
-        self.doublet.inject(returned.outlets.outlet)
-        gas = self.grid().outlets.outlet
-        boiled = self.boiler(inlet=exchanged.outlets.cold_out, fuel_in=gas)
-        cogenerated = self.chp(inlet=split.outlets.second_out, fuel_in=gas)
-        mixed = self.mixer(first_in=boiled.outlets.outlet, second_in=cogenerated.outlets.outlet)
+        returned = self.cold_filter(fluid_in=exchanged.outlets.hot_out)
+        self.doublet.inject(returned.outlets.fluid_out)
+        gas = self.grid().outlets.fluid_out
+        boiled = self.boiler(fluid_in=exchanged.outlets.cold_out, fuel_in=gas)
+        cogenerated = self.chp(fluid_in=split.outlets.branch2_out, fuel_in=gas)
+        mixed = self.mixer(
+            branch1_in=boiled.outlets.fluid_out, branch2_in=cogenerated.outlets.fluid_out
+        )
 
         # Outlets
-        secondary_out = mixed.outlets.mixed_out
+        supply_out = mixed.outlets.fluid_out
 
-        outlets = dict(secondary_out=secondary_out)
+        outlets = dict(supply_out=supply_out)
         return outlets
 
 
@@ -163,7 +165,7 @@ plant = BoilerChpPlant()
 configure_doublet(plant.doublet)
 configure_surface(plant)
 secondary = gm.Stream(flow="140 m3/h", T="20 degC", p="3 bar", fluid=gm.Fluid(kind="water"))
-result = plant(secondary_in=secondary)
+result = plant(return_in=secondary)
 out = result.outputs
 pump_power = out.injection_pump_electricity
 print(f"Primary flow (nodal solve):  {out.production_rate / 1000 * 3600:.2f} m3/h")

@@ -34,9 +34,9 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
             "pipe": {"type": "Pipe", "params": {"length": "100 ft", "inner_diameter": 0.1}},
             "valve": {"type": "Valve", "params": {}},
         },
-        "connections": [{"source": "pipe.outlet", "target": "valve.inlet"}],
-        "inlets": {"feed": "pipe.inlet"},
-        "outlets": {"product": "valve.outlet"},
+        "connections": [{"source": "pipe.fluid_out", "target": "valve.fluid_in"}],
+        "inlets": {"feed": "pipe.fluid_in"},
+        "outlets": {"product": "valve.fluid_out"},
         "bindings": {"pipe": {"heat_loss": {"column": "q", "unit": "kW"}, "velocity": "v"}},
         "param_history": {
             "pipe": [
@@ -64,9 +64,9 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
             "doublet": {"type": "Doublet", "params": {"esp.stage_count": 12}},
             "filters": {"type": "ModuleDict", "modules": {"hot": {"type": "Filter", "params": {}}}},
         },
-        "connections": [{"source": "doublet.supply_out", "target": "filters.hot.inlet"}],
+        "connections": [{"source": "doublet.supply_out", "target": "filters.hot.fluid_in"}],
         "inlets": {"return_in": "doublet.return_in"},
-        "outlets": {"product": "filters.hot.outlet"},
+        "outlets": {"product": "filters.hot.fluid_out"},
         "bindings": {},
         "param_history": {},
     }
@@ -87,8 +87,8 @@ def test_params_set_since_and_validation_agree_with_the_builder():
     """``Plant.validate()`` is ``gm.plants.validate`` of its spec."""
     plant = gm.Plant("Same")
     plant.add("Pipe", "pipe", params={"length": 5.0})
-    plant.connect("feed", "pipe.inlet")
-    plant.connect("pipe.outlet", "product")
+    plant.connect("feed", "pipe.fluid_in")
+    plant.connect("pipe.fluid_out", "product")
     assert plant.validate() == gm.plants.validate(plant.to_spec()) == []
     with pytest.raises(gm.errors.ValidationError):
         plant.add("Pipe", "bad", params={"length": "5 bar"})
@@ -101,8 +101,8 @@ def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
         "name": "broken",
         "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe", "params": {"length": -5.0}}},
         "connections": [],
-        "inlets": {"feed": "pipe.inlet"},
-        "outlets": {"product": "pipe.outlet"},
+        "inlets": {"feed": "pipe.fluid_in"},
+        "outlets": {"product": "pipe.fluid_out"},
         "bindings": {},
         "param_history": {},
     }
@@ -140,8 +140,8 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
         "name": "broken",
         "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe"}},
         "connections": [
-            {"source": "a.outlet", "target": "b.inlet"},
-            {"source": "a.outlet", "target": "pipe.inlt"},
+            {"source": "a.fluid_out", "target": "b.fluid_in"},
+            {"source": "a.fluid_out", "target": "pipe.inlt"},
         ],
         "bindings": {},
         "param_history": {},
@@ -151,6 +151,6 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
         "modules.a.type",
         "connections[0].target",
         "connections[1].target",
-        "pipe.inlet",
-        "pipe.outlet",
+        "pipe.fluid_in",
+        "pipe.fluid_out",
     }

@@ -60,10 +60,10 @@ def solve_production_rate(reservoir, well, wellhead_pressure, rates, esp=None, r
         )
 
     def residual(rate):
-        stream = well.trial_outlets({"bottom": reservoir.sandface_stream(rate)}).wellhead
+        stream = well.trial_outlets({"bottom_in": reservoir.sandface_stream(rate)}).wellhead_out
         if esp is not None:
-            stream = esp.trial_outlets({"suction": stream}).discharge
-            stream = riser.trial_outlets({"bottom": stream}).wellhead
+            stream = esp.trial_outlets({"fluid_in": stream}).fluid_out
+            stream = riser.trial_outlets({"bottom_in": stream}).wellhead_out
         return stream.p - wellhead_pressure
 
     return _root("solve_production_rate", "rate", "kg/s", residual, rates)
@@ -131,7 +131,7 @@ def solve_injection_pressure(well, sink, wellhead, pressures):
 
 def _injection_residual(well, sink, wellhead):
     """Return the injection well's bottom pressure minus the aquifer's required pressure [Pa]."""
-    bottom = well.trial_outlets({"wellhead": wellhead}).bottom
+    bottom = well.trial_outlets({"wellhead_in": wellhead}).bottom_out
     return bottom.p - sink.required_pressure(bottom)
 
 

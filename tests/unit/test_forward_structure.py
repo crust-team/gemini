@@ -155,7 +155,7 @@ def test_registered_forward_structure(module_class):
 
     declarations = list(module.inlets().values()) + list(module.outlets().values())
     assert all(
-        isinstance(declaration.kind, type) and issubclass(declaration.kind, Stream)
+        isinstance(declaration.type, type) and issubclass(declaration.type, Stream)
         for declaration in declarations
     )
     _assert_return_block(cls, tree, list(module.outlets()))

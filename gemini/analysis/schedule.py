@@ -121,7 +121,7 @@ def _doublets_below(plant, path, doublets):
         return []
     return [
         doublet
-        for port in ("first_out", "second_out")
+        for port in ("branch1_out", "branch2_out")
         for doublet in _doublets_below(plant, _target(plant, path, port), doublets)
     ]
 
@@ -130,8 +130,8 @@ def _brine_splits(plant, flows):
     """Return the ``split_fraction`` columns of the splitters that share the injected brine."""
     columns = {}
     for path, _ in _of_type(plant, Splitter):
-        first = _doublets_below(plant, _target(plant, path, "first_out"), flows)
-        second = _doublets_below(plant, _target(plant, path, "second_out"), flows)
+        first = _doublets_below(plant, _target(plant, path, "branch1_out"), flows)
+        second = _doublets_below(plant, _target(plant, path, "branch2_out"), flows)
         if first and second:
             columns[f"{path}.split_fraction"] = dispatch.flow_share(
                 sum(flows[item] for item in second), sum(flows[item] for item in first)
@@ -143,8 +143,8 @@ def _load_splits(plant, consumer, chiller, heat, generator):
     """Return the ``split_fraction`` column of the splitter between the consumer and the chiller."""
     columns = {}
     for path, _ in _of_type(plant, Splitter):
-        first = _target(plant, path, "first_out")
-        second = _target(plant, path, "second_out")
+        first = _target(plant, path, "branch1_out")
+        second = _target(plant, path, "branch2_out")
         if {first, second} == {consumer, chiller}:
             shares = (generator, heat) if first == consumer else (heat, generator)
             columns[f"{path}.split_fraction"] = dispatch.flow_share(*shares)

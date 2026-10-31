@@ -44,28 +44,28 @@ class Producer(Module):
         self.temperature_drop = Output.of(self.decline.temperature_drop)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the produced stream through both children."""
 
         # Modules
-        declined = self.decline(inlet=inlets.sandface)
-        heated = self.heater(inlet=declined.outlets.outlet, temperature_setpoint=300)
+        declined = self.decline(fluid_in=inlets.sandface)
+        heated = self.heater(fluid_in=declined.outlets.fluid_out, temperature_setpoint=300)
 
         # Outlets
-        outlet = heated.outlets.outlet
+        outlet = heated.outlets.fluid_out
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
 def test_plain_call_uses_the_initial_state():
     """Without injected volume the reservoir temperature passes; V_B / Q is the G-S time."""
     module = decline()
-    result = module(inlet=STREAM)
+    result = module(fluid_in=STREAM)
     assert module.initial_state() == {"injected_volume": 0}
-    assert result.outlets.outlet == STREAM
+    assert result.outlets.fluid_out == STREAM
     assert result.outputs.temperature_drop == 0
     assert result.outputs.breakthrough_time == pytest.approx(BREAKTHROUGH / (50 / 1000))
     assert result.outputs.breakthrough_time / 3.15576e7 == pytest.approx(22.37, abs=0.01)
@@ -74,22 +74,22 @@ def test_plain_call_uses_the_initial_state():
 def test_two_steps_accumulate_the_produced_volume():
     """Each step adds Q dt; the temperature uses the start-of-step volume."""
     module = decline()
-    state, result = module.step(None, 3600, {"inlet": STREAM})
+    state, result = module.step(None, 3600, {"fluid_in": STREAM})
     assert state == {"injected_volume": pytest.approx(50 / 1000 * 3600)}
-    state, result = module.step(state, 3600, {"inlet": STREAM})
+    state, result = module.step(state, 3600, {"fluid_in": STREAM})
     assert state["injected_volume"] == pytest.approx(2 * 50 / 1000 * 3600)
-    assert result.outputs.outlet_T == STREAM.T
+    assert result.outputs.fluid_out_T == STREAM.T
 
 
 def test_decline_after_breakthrough_is_the_dipole_cold_share():
     """At three breakthrough volumes half the produced flow is at the injection temperature."""
     module = decline()
-    state, result = module.step({"injected_volume": 3 * BREAKTHROUGH}, 3600, {"inlet": STREAM})
+    state, result = module.step({"injected_volume": 3 * BREAKTHROUGH}, 3600, {"fluid_in": STREAM})
     assert result.outputs.temperature_drop == pytest.approx(0.5 * (353.15 - 313.15), rel=1e-12)
-    assert result.outlets.outlet.T == pytest.approx(333.15)
-    assert result.outlets.outlet.p == STREAM.p and result.outlets.outlet.m_dot == STREAM.m_dot
+    assert result.outlets.fluid_out.T == pytest.approx(333.15)
+    assert result.outlets.fluid_out.p == STREAM.p and result.outlets.fluid_out.m_dot == STREAM.m_dot
     drops = [
-        module.step({"injected_volume": ratio * BREAKTHROUGH}, 60, {"inlet": STREAM})[
+        module.step({"injected_volume": ratio * BREAKTHROUGH}, 60, {"fluid_in": STREAM})[
             1
         ].outputs.temperature_drop
         for ratio in (0.99, 1.01, 2, 10, 100)
@@ -100,7 +100,7 @@ def test_decline_after_breakthrough_is_the_dipole_cold_share():
 def test_balances_show_the_boundary_correction():
     """Mass passes unchanged; the energy residual is the documented boundary correction."""
     module = decline()
-    _, result = module.step({"injected_volume": 3 * BREAKTHROUGH}, 3600, {"inlet": STREAM})
+    _, result = module.step({"injected_volume": 3 * BREAKTHROUGH}, 3600, {"fluid_in": STREAM})
     assert mass_balance(module, result)["residual"] == 0
     residual = energy_balance(module, result)["residual"]
     assert residual == pytest.approx(50 * 4217.4 * 20, rel=1e-9)
@@ -109,10 +109,10 @@ def test_balances_show_the_boundary_correction():
 def test_zero_and_reverse_flow():
     """Zero flow keeps the state and has no breakthrough time; reverse flow is rejected."""
     module = decline()
-    state, result = module.step({"injected_volume": 1e7}, 3600, {"inlet": STREAM.with_(m_dot=0)})
+    state, result = module.step({"injected_volume": 1e7}, 3600, {"fluid_in": STREAM.with_(m_dot=0)})
     assert state == {"injected_volume": 1e7} and result.outputs.breakthrough_time is None
-    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot = -1"):
-        module(inlet=STREAM.with_(m_dot=-1))
+    with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot = -1"):
+        module(fluid_in=STREAM.with_(m_dot=-1))
     with pytest.raises(gm.errors.ValidationError):
         module.update_params(porosity=1)
 

@@ -48,39 +48,39 @@
   },
   "connections": [
     {
-      "source": "pump.discharge",
-      "target": "supply_pipe.inlet"
+      "source": "pump.fluid_out",
+      "target": "supply_pipe.fluid_in"
     },
     {
-      "source": "supply_pipe.outlet",
-      "target": "splitters.0.feed_in"
+      "source": "supply_pipe.fluid_out",
+      "target": "splitters.0.fluid_in"
     },
     {
-      "source": "splitters.0.second_out",
-      "target": "substations.0.network_in"
+      "source": "splitters.0.branch2_out",
+      "target": "substations.0.supply_in"
     },
     {
-      "source": "splitters.0.first_out",
-      "target": "substations.1.network_in"
+      "source": "splitters.0.branch1_out",
+      "target": "substations.1.supply_in"
     },
     {
-      "source": "substations.0.network_out",
-      "target": "mixers.0.first_in"
+      "source": "substations.0.return_out",
+      "target": "mixers.0.branch1_in"
     },
     {
-      "source": "substations.1.network_out",
-      "target": "mixers.0.second_in"
+      "source": "substations.1.return_out",
+      "target": "mixers.0.branch2_in"
     },
     {
-      "source": "mixers.0.mixed_out",
-      "target": "return_pipe.inlet"
+      "source": "mixers.0.fluid_out",
+      "target": "return_pipe.fluid_in"
     }
   ],
   "inlets": {
-    "supply_in": "pump.suction"
+    "supply_in": "pump.fluid_in"
   },
   "outlets": {
-    "return_out": "return_pipe.outlet"
+    "return_out": "return_pipe.fluid_out"
   },
   "outputs": {
     "heat_supplied": {
@@ -96,7 +96,7 @@
       "sum": "electricity"
     },
     "return_out_T": {
-      "of": "return_pipe.outlet_T"
+      "of": "return_pipe.fluid_out_T"
     }
   },
   "bindings": {},

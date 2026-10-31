@@ -243,27 +243,27 @@
   },
   "connections": [
     {
-      "source": "injector.bottom",
-      "target": "sink.sandface"
+      "source": "injector.bottom_out",
+      "target": "sink.sandface_in"
     },
     {
-      "source": "reservoir.sandface",
-      "target": "well.bottom"
+      "source": "reservoir.sandface_out",
+      "target": "well.bottom_in"
     },
     {
-      "source": "well.wellhead",
-      "target": "esp.suction"
+      "source": "well.wellhead_out",
+      "target": "esp.fluid_in"
     },
     {
-      "source": "esp.discharge",
-      "target": "riser.bottom"
+      "source": "esp.fluid_out",
+      "target": "riser.bottom_in"
     }
   ],
   "inlets": {
-    "return_in": "injector.wellhead"
+    "return_in": "injector.wellhead_in"
   },
   "outlets": {
-    "supply_out": "riser.wellhead"
+    "supply_out": "riser.wellhead_out"
   },
   "outputs": {
     "electricity": {
@@ -279,20 +279,20 @@
       "head": "doublet.esp.head",
       "discharge_pressure": "doublet.esp.discharge_pressure",
       "power": "doublet.esp.power",
-      "suction.m_dot": {
+      "fluid_in.m_dot": {
         "column": "doublet.esp.suction.m_dot",
         "unit": "m3/s"
       },
-      "suction.p": "doublet.esp.suction.p",
-      "suction.T": "doublet.esp.suction.T"
+      "fluid_in.p": "doublet.esp.suction.p",
+      "fluid_in.T": "doublet.esp.suction.T"
     },
     "injector": {
-      "wellhead.m_dot": {
+      "wellhead_in.m_dot": {
         "column": "doublet.injector.wellhead.m_dot",
         "unit": "m3/s"
       },
-      "wellhead.p": "doublet.injector.wellhead.p",
-      "wellhead.T": "doublet.injector.wellhead.T"
+      "wellhead_in.p": "doublet.injector.wellhead.p",
+      "wellhead_in.T": "doublet.injector.wellhead.T"
     },
     "reservoir": {
       "production_rate": {

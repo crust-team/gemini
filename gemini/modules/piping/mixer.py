@@ -30,59 +30,59 @@ class Mixer(Module):
         super().__init__()
 
         # Inlets
-        self.first_in = Inlet(Stream)
-        self.second_in = Inlet(Stream)
+        self.branch1_in = Inlet(Stream)
+        self.branch2_in = Inlet(Stream)
 
         # Outputs
-        self.mixed_out_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.pressure_imbalance = Output(PressureDifference)
 
         # Outlets
-        self.mixed_out = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Combine both inlet streams at the lower inlet pressure."""
 
         # Outlets
-        first_in = inlets.first_in
-        second_in = inlets.second_in
-        self._check(first_in, second_in)
-        mixed_out = first_in.with_(
-            m_dot=first_in.m_dot + second_in.m_dot,
-            T=self._mixed_temperature(first_in, second_in),
-            p=ops.minimum(first_in.p, second_in.p),
+        branch1_in = inlets.branch1_in
+        branch2_in = inlets.branch2_in
+        self._check(branch1_in, branch2_in)
+        fluid_out = branch1_in.with_(
+            m_dot=branch1_in.m_dot + branch2_in.m_dot,
+            T=self._mixed_temperature(branch1_in, branch2_in),
+            p=ops.minimum(branch1_in.p, branch2_in.p),
         )
 
-        outlets = dict(mixed_out=mixed_out)
+        outlets = dict(fluid_out=fluid_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.mixed_out_T = outlets.mixed_out.T
-        self.pressure_imbalance = ops.abs(inlets.first_in.p - inlets.second_in.p)
+        self.fluid_out_T = outlets.fluid_out.T
+        self.pressure_imbalance = ops.abs(inlets.branch1_in.p - inlets.branch2_in.p)
 
-    def _check(self, first_in, second_in):
+    def _check(self, branch1_in, branch2_in):
         """Reject reverse flow and streams of different fluids."""
         ops.check(
-            ops.logical_and(first_in.m_dot >= 0, second_in.m_dot >= 0),
+            ops.logical_and(branch1_in.m_dot >= 0, branch2_in.m_dot >= 0),
             PhysicsError,
-            "{path}: first_in.m_dot = {first_m_dot} kg/s, second_in.m_dot = "
+            "{path}: branch1_in.m_dot = {first_m_dot} kg/s, branch2_in.m_dot = "
             "{second_m_dot} kg/s; expected both >= 0",
             path=self.path,
-            first_m_dot=first_in.m_dot,
-            second_m_dot=second_in.m_dot,
+            first_m_dot=branch1_in.m_dot,
+            second_m_dot=branch2_in.m_dot,
         )
-        if first_in.fluid != second_in.fluid:
+        if branch1_in.fluid != branch2_in.fluid:
             raise ValidationError(
-                f"{self.path}: first_in.fluid = {first_in.fluid!r}, second_in.fluid = "
-                f"{second_in.fluid!r}; expected the same fluid",
+                f"{self.path}: branch1_in.fluid = {branch1_in.fluid!r}, branch2_in.fluid = "
+                f"{branch2_in.fluid!r}; expected the same fluid",
                 code="invalid_design",
             )
 
-    def _mixed_temperature(self, first_in, second_in):
+    def _mixed_temperature(self, branch1_in, branch2_in):
         """Return the adiabatic mixing temperature [K] weighted by heat capacity rates."""
         return heat_transfer.mixed_temperature(
-            first_in.heat_capacity_rate(),
-            first_in.T,
-            second_in.heat_capacity_rate(),
-            second_in.T,
+            branch1_in.heat_capacity_rate(),
+            branch1_in.T,
+            branch2_in.heat_capacity_rate(),
+            branch2_in.T,
         )

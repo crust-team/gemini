@@ -64,7 +64,7 @@ class CoolingConsumer(Module):
         self.dew_point_margin = Parameter(TemperatureDifference, ge=0)
 
         # Inlets
-        self.supply_in = Inlet(Stream, stream="chilled_water")
+        self.supply_in = Inlet(Stream, kind="chilled_water")
 
         # Boundaries
         self.sensible_cooling_demand = Boundary(Power, ge=0)
@@ -81,7 +81,7 @@ class CoolingConsumer(Module):
         self.is_unmet = Output(bool)
 
         # Outlets
-        self.return_out = Outlet(Stream, stream="chilled_water")
+        self.return_out = Outlet(Stream, kind="chilled_water")
 
     def forward(self, inlets):
         """Return the supply stream warmed by the absorbed building heat."""

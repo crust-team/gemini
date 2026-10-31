@@ -20,7 +20,7 @@ from gemini.types.ports import Ports
 from gemini.types.results import ModuleResult, Values
 from tests.fixtures.equivalence import STREAM_FIELDS, assert_close
 
-GRID_GAS = GasGrid()().outlets.outlet
+GRID_GAS = GasGrid()().outlets.fluid_out
 
 
 class Radiator(Module):
@@ -66,7 +66,7 @@ def boiler_of(fuel):
 def test_boiler_balance(fuel):
     """Electric and gas boilers conserve total modeled energy."""
     boiler, gas = boiler_of(fuel)
-    result = boiler(inlet=Stream(m_dot=10, T=300, p=1e6), temperature_setpoint=320, **gas)
+    result = boiler(fluid_in=Stream(m_dot=10, T=300, p=1e6), temperature_setpoint=320, **gas)
     assert mass_balance(boiler, result)["residual"] == 0
     assert energy_balance(boiler, result)["relative_residual"] < 1e-12
     assert collect_flows(result)["electricity" if fuel == "electric" else "fuel"] > 0
@@ -75,7 +75,7 @@ def test_boiler_balance(fuel):
 def test_unresolved_pump_work():
     """Isothermal pump electricity remains explicit unresolved work."""
     pump = InjectionPump().update_params(efficiency=0.8)
-    result = pump(suction=Stream(m_dot=10, T=300, p=1e6), pressure_setpoint=2e6)
+    result = pump(fluid_in=Stream(m_dot=10, T=300, p=1e6), pressure_setpoint=2e6)
     balance = energy_balance(pump, result)
     assert balance["unresolved_power"] == pytest.approx(result.outputs.power)
     assert balance["relative_thermal_residual"] < 1e-12
@@ -89,9 +89,9 @@ def test_esp_motor_efficiency_does_not_change_shaft_power():
         power_coefficients=[1, 0, 0, 0, 0, 0],
     )
     inlet = Stream(m_dot=30, T=300, p=1e6)
-    first = pump(frequency=60, suction=inlet)
+    first = pump(frequency=60, fluid_in=inlet)
     pump.motor_efficiency = 0.5
-    second = pump(frequency=60, suction=inlet)
+    second = pump(frequency=60, fluid_in=inlet)
     assert second.outputs.power == first.outputs.power
     assert second.outputs.electricity == 2 * first.outputs.power
 
@@ -139,12 +139,12 @@ class GasHeatedInjection(Module):
         """Pass the stream through CHP, boiler and pump in flow order."""
 
         # Modules
-        heated = self.chp(inlet=inlets.return_in, fuel_in=GRID_GAS).outlets.outlet
-        topped = self.boiler(inlet=heated, fuel_in=GRID_GAS).outlets.outlet
-        pumped = self.pump(suction=topped)
+        heated = self.chp(fluid_in=inlets.return_in, fuel_in=GRID_GAS).outlets.fluid_out
+        topped = self.boiler(fluid_in=heated, fuel_in=GRID_GAS).outlets.fluid_out
+        pumped = self.pump(fluid_in=topped)
 
         # Outlets
-        injected = pumped.outlets.discharge
+        injected = pumped.outlets.fluid_out
 
         outlets = dict(injected=injected)
         return outlets
@@ -174,7 +174,7 @@ def test_emissions_charge_fuel_and_net_grid_electricity(load):
 def test_emissions_without_energy_outputs_are_zero():
     """A leaf that burns and draws nothing emits nothing."""
     result = Boiler().update_params(capacity=1e6, efficiency=0.9)(
-        inlet=Stream(m_dot=10, T=350, p=2e5), fuel_in=GRID_GAS, temperature_setpoint=340
+        fluid_in=Stream(m_dot=10, T=350, p=2e5), fuel_in=GRID_GAS, temperature_setpoint=340
     )
     assert emissions(result, GAS_FACTOR, GRID_FACTOR) == 0
 
@@ -224,7 +224,7 @@ def test_balances_match_on_stacked_boiler_results(fuel):
     """Audits and emissions on array-valued results equal the audits per row."""
     boiler, gas = boiler_of(fuel)
     results = [
-        boiler(inlet=Stream(m_dot=m_dot, T=300, p=1e6), temperature_setpoint=setpoint, **gas)
+        boiler(fluid_in=Stream(m_dot=m_dot, T=300, p=1e6), temperature_setpoint=setpoint, **gas)
         for m_dot, setpoint in [(10, 320), (2, 310), (0.5, 300)]
     ]
     _assert_balances_match(boiler, results, BALANCE_KEYS)

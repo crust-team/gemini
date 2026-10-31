@@ -23,17 +23,17 @@ plant.connect("injector", "sink")
 plant.connect("reservoir", "well")
 plant.connect("well", "esp")
 plant.connect("esp", "riser")
-plant.connect("return_in", "injector.wellhead")
-plant.connect("riser.wellhead", "supply_out")
+plant.connect("return_in", "injector.wellhead_in")
+plant.connect("riser.wellhead_out", "supply_out")
 print(plant.summary())
 print(plant.validate())
 ```
 
-`add(kind, name=None, params=None)` takes a registry name or a class and one dict of parameters,
+`add(type, name=None, params=None)` takes a registry name or a class and one dict of parameters,
 the dict `set_params` takes: unit strings accepted, dotted names for a composite
 (`params={"reservoir.temperature": "87 degC"}`). `connect`
 takes a handle, `"path.port"` or a module path. A module path picks the only free port of a fitting
-stream type; a port without a stream type fits anything. If several pairs fit, a `ValidationError`
+kind; a port without a kind fits anything. If several pairs fit, a `ValidationError`
 with code `ambiguous_port` lists them. A bare word that names no module is a plant port, as in
 `return_in` above. Only `connect` wires modules; there is no call syntax.
 
@@ -56,12 +56,12 @@ The same plant as JSON. This is the stored plant file, the input of geomind's `b
              "riser": {"type": "ProductionWell", "params": {}},
              "injector": {"type": "InjectionWell", "params": {}},
              "sink": {"type": "InjectionReservoir", "params": {}}},
- "connections": [{"source": "injector.bottom", "target": "sink.sandface"},
-                 {"source": "reservoir.sandface", "target": "well.bottom"},
-                 {"source": "well.wellhead", "target": "esp.suction"},
-                 {"source": "esp.discharge", "target": "riser.bottom"}],
- "inlets": {"return_in": "injector.wellhead"},
- "outlets": {"supply_out": "riser.wellhead"},
+ "connections": [{"source": "injector.bottom_out", "target": "sink.sandface_in"},
+                 {"source": "reservoir.sandface_out", "target": "well.bottom_in"},
+                 {"source": "well.wellhead_out", "target": "esp.fluid_in"},
+                 {"source": "esp.fluid_out", "target": "riser.bottom_in"}],
+ "inlets": {"return_in": "injector.wellhead_in"},
+ "outlets": {"supply_out": "riser.wellhead_out"},
  "bindings": {}, "param_history": {}}
 ```
 
@@ -76,7 +76,7 @@ assert plant.to_spec() == spec
 | `format` | yes | 2 |
 | `name` | yes | plant name; `module.name` is its snake case |
 | `modules` | yes | `{id: {type, params}}`; a group is `{type: "ModuleDict", modules: {...}}` |
-| `connections` | yes | `[{source, target, kind?}]`, ends are `"path.port"` |
+| `connections` | yes | `[{source, target, type?}]`, ends are `"path.port"` |
 | `bindings` | yes | `{path: {name: column}}`, flat; see [bindings](#parameters-by-date-and-bindings) |
 | `param_history` | yes | `{path: [{valid_from, params}]}`; one undated entry is the same as `params` and is not written |
 | `inlets`, `outlets` | no | `{plant port: "path.port"}` |
@@ -87,8 +87,8 @@ assert plant.to_spec() == spec
 - `type` is a registry name. It may name a registered plant, whose parameters are then dotted
   (`"esp.stage_count"`), so templates can contain sub-plants.
 - `ModuleDict` and `ModuleList` are groups: they hold children and have no wiring of their own.
-  Connections reach through a group (`filters.hot.outlet`) but never into a plant child:
-  `doublet.supply_out` is right, `doublet.esp.discharge` is an error.
+  Connections reach through a group (`filters.hot.fluid_out`) but never into a plant child:
+  `doublet.supply_out` is right, `doublet.esp.fluid_out` is an error.
 - An inlet has one source and an outlet feeds one inlet (`port_in_use`). Splitting and mixing are
   `Splitter` and `Mixer`.
 - A port no connection uses is named in `inlets` / `outlets`, or it is `unconnected_port`.
@@ -101,7 +101,7 @@ assert plant.to_spec() == spec
 
 ### Loops
 
-A connection with `"kind": "state"` closes a loop and reads the value of the previous step. A cycle
+A connection with `"type": "state"` closes a loop and reads the value of the previous step. A cycle
 without one is `loop_without_state`. State connections are valid in the spec, the schema and
 validation; **running such a plant raises `NotImplementedYet`** until scan exists, because a first
 step has no previous value.
@@ -165,7 +165,7 @@ plant.param_history("doublet.esp")
 plant.bindable("doublet.esp")
 plant.set_bindings("doublet.esp", {
     "frequency": "esp_hz",
-    "suction.p": {"column": "p_in", "unit": "bar"},
+    "fluid_in.p": {"column": "p_in", "unit": "bar"},
 })
 ```
 

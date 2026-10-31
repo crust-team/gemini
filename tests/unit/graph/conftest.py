@@ -39,7 +39,7 @@ class Gain(Module):
         self.label = Parameter(str, default="x")
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.gain = Control(float)
@@ -49,13 +49,13 @@ class Gain(Module):
         self.boost = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Raise the pressure."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         ops.check(
             self.gain >= 0,
             PhysicsError,
@@ -65,11 +65,11 @@ class Gain(Module):
         )
         outlet = inlet.with_(p=inlet.p + self.gain * self.scale * REFERENCE)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.rise = outlets.outlet.p - inlets.inlet.p
+        self.rise = outlets.fluid_out.p - inlets.fluid_in.p
         self.boost = ops.where(self.rise > 0, ops.truediv(self.rise, self.gain), 0.0)
 
 
@@ -102,19 +102,19 @@ class Stepper(Module):
         self.increment = Parameter(float, default=1.0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Add the increment once per step."""
 
         # Outlets
-        pressure = inlets.inlet.p
+        pressure = inlets.fluid_in.p
         for _ in range(self.steps):
             pressure = pressure + self.increment
-        return dict(outlet=inlets.inlet.with_(p=pressure))
+        return dict(fluid_out=inlets.fluid_in.with_(p=pressure))
 
 
 @pytest.fixture
@@ -137,17 +137,17 @@ class Source(Module):
         self.double = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Emit the stream."""
 
         # Outlets
         outlet = Stream(m_dot=self.rate, T=300.0, p=1e5, fluid=self.fluid)
-        return dict(outlet=outlet)
+        return dict(fluid_out=outlet)
 
     def _compute_outputs(self, inlets, outlets):
-        self.double = 2 * outlets.outlet.m_dot
+        self.double = 2 * outlets.fluid_out.m_dot
 
 
 @pytest.fixture
@@ -167,7 +167,7 @@ class Meter(Module):
         self.scale = Parameter(float, default=2.0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.draw = Control(float, ge=0)
@@ -176,13 +176,13 @@ class Meter(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream."""
 
         # Outlets
-        outlets = dict(outlet=inlets.inlet)
+        outlets = dict(fluid_out=inlets.fluid_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -202,30 +202,30 @@ class Line(Module):
         self.second = Meter()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.boost = Control(float, default=1.0)
 
         # Outputs
         self.rise = Output.of(self.gain.rise)
-        self.pressure = Output.of(self.gain.outlet.field("p"))
+        self.pressure = Output.of(self.gain.fluid_out.field("p"))
         self.electricity = Output(Electricity)
         self.efficiency = Output.ratio(self.rise, self.electricity)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Connect the children in series; the second meter draws the line's own control."""
 
         # Modules
-        metered = self.first(inlet=inlets.inlet, draw=1.0)
-        raised = self.gain(inlet=metered.outlets.outlet, gain=self.boost)
-        metered_again = self.second(inlet=raised.outlets.outlet)
+        metered = self.first(fluid_in=inlets.fluid_in, draw=1.0)
+        raised = self.gain(fluid_in=metered.outlets.fluid_out, gain=self.boost)
+        metered_again = self.second(fluid_in=raised.outlets.fluid_out)
 
         # Outlets
-        outlets = dict(outlet=metered_again.outlets.outlet)
+        outlets = dict(fluid_out=metered_again.outlets.fluid_out)
         return outlets
 
 
@@ -248,23 +248,23 @@ class Tank(Module):
         self.level = State(float, default=0.0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.content = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream."""
 
         # Outlets
-        outlets = dict(outlet=inlets.inlet)
+        outlets = dict(fluid_out=inlets.fluid_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.content = self.level + inlets.inlet.m_dot
+        self.content = self.level + inlets.fluid_in.m_dot
 
     def _advance_states(self, inlets, outlets, dt):
         return dict(level=self.content)
@@ -281,21 +281,21 @@ class Twice(Module):
         self.gain = Gain().update_params(scale=3.0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Call the child twice; both calls share its inputs."""
 
         # Modules
-        first = self.gain(inlet=inlets.inlet)
-        second = self.gain(inlet=inlets.inlet)
+        first = self.gain(fluid_in=inlets.fluid_in)
+        second = self.gain(fluid_in=inlets.fluid_in)
 
         # Outlets
-        outlet = inlets.inlet.with_(p=first.outlets.outlet.p + second.outlets.outlet.p)
-        outlets = dict(outlet=outlet)
+        outlet = inlets.fluid_in.with_(p=first.outlets.fluid_out.p + second.outlets.fluid_out.p)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -324,30 +324,30 @@ class Chain(Module):
         self.last = Meter()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.drive = Control(float, default=1.0)
 
         # Outputs
         self.value = Output.of(getattr(self.middle, next(iter(middle._outputs))))
-        self.pressure = Output.of(self.last.outlet.field("p"))
+        self.pressure = Output.of(self.last.fluid_out.field("p"))
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Connect the children in series; every control of the middle module gets ``drive``."""
 
         # Modules
-        metered = self.first(inlet=inlets.inlet, draw=1.0)
+        metered = self.first(fluid_in=inlets.fluid_in, draw=1.0)
         controls = {name: self.drive for name in self.middle._controls}
-        through = self.middle(inlet=metered.outlets.outlet, **controls)
-        last = self.last(inlet=through.outlets.outlet, draw=1.0)
+        through = self.middle(fluid_in=metered.outlets.fluid_out, **controls)
+        last = self.last(fluid_in=through.outlets.fluid_out, draw=1.0)
 
         # Outlets
-        outlets = dict(outlet=last.outlets.outlet)
+        outlets = dict(fluid_out=last.outlets.fluid_out)
         return outlets
 
 
@@ -365,8 +365,8 @@ class Stubborn(Gain):
             path=self.path,
             gain=self.gain,
         )
-        outlet = inlets.inlet.with_(p=inlets.inlet.p + self.gain * float(inlets.inlet.T))
-        outlets = dict(outlet=outlet)
+        outlet = inlets.fluid_in.with_(p=inlets.fluid_in.p + self.gain * float(inlets.fluid_in.T))
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -381,22 +381,22 @@ class Opaque(Module):
         self.meter = Meter()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Refuse a traced value."""
 
         # Modules
-        metered = self.meter(inlet=inlets.inlet, draw=float(inlets.inlet.T))
+        metered = self.meter(fluid_in=inlets.fluid_in, draw=float(inlets.fluid_in.T))
 
         # Outlets
-        outlets = dict(outlet=metered.outlets.outlet)
+        outlets = dict(fluid_out=metered.outlets.fluid_out)
         return outlets
 
 
@@ -411,26 +411,28 @@ class Switcher(Module):
         self.level = State(float, default=0.0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.seen = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream; the fluid depends on the value of a row."""
 
         # Outlets
-        fluid = WATER if inlets.inlet.T < 305.0 else BRINE
+        fluid = WATER if inlets.fluid_in.T < 305.0 else BRINE
         outlets = dict(
-            outlet=Stream(m_dot=inlets.inlet.m_dot, T=inlets.inlet.T, p=inlets.inlet.p, fluid=fluid)
+            fluid_out=Stream(
+                m_dot=inlets.fluid_in.m_dot, T=inlets.fluid_in.T, p=inlets.fluid_in.p, fluid=fluid
+            )
         )
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.seen = inlets.inlet.T
+        self.seen = inlets.fluid_in.T
 
     def _advance_states(self, inlets, outlets, dt):
         return dict(level=self.seen)
@@ -444,23 +446,23 @@ class Vectored(Module):
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.profile = Output(list[float])
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream."""
 
         # Outlets
-        outlets = dict(outlet=inlets.inlet)
+        outlets = dict(fluid_out=inlets.fluid_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.profile = [inlets.inlet.p, inlets.inlet.p + 1.0]
+        self.profile = [inlets.fluid_in.p, inlets.fluid_in.p + 1.0]
 
 
 class Bounded(Module):
@@ -471,7 +473,7 @@ class Bounded(Module):
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.setpoint = Control(Pressure)
@@ -485,19 +487,19 @@ class Bounded(Module):
         self.share = Output(Ratio | None)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream."""
 
         # Outlets
-        outlets = dict(outlet=inlets.inlet)
+        outlets = dict(fluid_out=inlets.fluid_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.margin = inlets.inlet.p - self.setpoint
+        self.margin = inlets.fluid_in.p - self.setpoint
         self.profile = [self.setpoint, self.setpoint - 1.0]
-        self.share = ops.where(self.ambient > 1000.0, None, self.setpoint / inlets.inlet.p)
+        self.share = ops.where(self.ambient > 1000.0, None, self.setpoint / inlets.fluid_in.p)
 
 
 @pytest.fixture

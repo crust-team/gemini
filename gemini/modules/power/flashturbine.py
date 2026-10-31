@@ -24,7 +24,7 @@ from gemini.types import (
 class FlashTurbine(Module):
     """Condensing steam turbine and generator fed with dry saturated steam from a separator.
 
-    The inlet is dry saturated steam (``Fluid`` kind ``steam``, as ``Separator.gas`` emits) at
+    The inlet is dry saturated steam (``Fluid`` kind ``steam``, as ``Separator.gas_out`` emits) at
     the inlet pressure; the inlet temperature is not used because the pressure fixes the
     saturated state. The steam expands to ``condenser_pressure`` with the Baumann rule:
     eta = eta_dry (1 - a (1 - x_out) / 2) for the mean exhaust moisture (see
@@ -60,7 +60,7 @@ class FlashTurbine(Module):
         self.generator_efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="gas")
+        self.fluid_in = Inlet(Stream, kind="gas")
 
         # Outputs
         self.gross_power = Output(Power)
@@ -70,23 +70,23 @@ class FlashTurbine(Module):
         self.exhaust_quality = Output(Fraction)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="gas")
+        self.fluid_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Expand the steam and return the condensate at the condenser saturation state."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         ops.require(self._expansion(inlet))
         condenser = _physics.saturation_properties(self.condenser_pressure)
 
         outlet = inlet.with_(T=condenser.temperature, p=self.condenser_pressure, fluid=WATER)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         expansion = self._expansion(inlet)
         condensate = _physics.saturation_properties(self.condenser_pressure).liquid_enthalpy
         balance = _physics.turbine_balance(
@@ -111,7 +111,7 @@ class FlashTurbine(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )
@@ -122,7 +122,7 @@ class FlashTurbine(Module):
         ops.check(
             inlet.p > self.condenser_pressure,
             PhysicsError,
-            "{path}: inlet.p = {p} Pa; expected above the condenser pressure "
+            "{path}: fluid_in.p = {p} Pa; expected above the condenser pressure "
             "{condenser_pressure} Pa",
             path=self.path,
             p=inlet.p,

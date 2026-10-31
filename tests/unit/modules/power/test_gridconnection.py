@@ -58,32 +58,32 @@ class GridPlant(Module):
         self.grid = grid(export_limit="10 MW")
 
         # Inlets
-        self.brine_in = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
         self.water_in = Inlet(Stream)
 
         # Outputs
         self.net_export = Output.of(self.grid.net_export)
 
         # Outlets
-        self.brine_out = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
         self.water_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Generate, consume, then settle with the grid."""
 
         # Modules
-        generated = self.orc(brine_in=inlets.brine_in, ambient_temperature=288.15)
-        heated = self.boiler(inlet=inlets.water_in, temperature_setpoint=353.15)
+        generated = self.orc(fluid_in=inlets.fluid_in, ambient_temperature=288.15)
+        heated = self.boiler(fluid_in=inlets.water_in, temperature_setpoint=353.15)
         self.grid(
             consumption=heated.outputs.electricity,
             generation=generated.outputs.electricity_generated,
         )
 
         # Outlets
-        brine_out = generated.outlets.brine_out
-        water_out = heated.outlets.outlet
+        fluid_out = generated.outlets.fluid_out
+        water_out = heated.outlets.fluid_out
 
-        outlets = dict(brine_out=brine_out, water_out=water_out)
+        outlets = dict(fluid_out=fluid_out, water_out=water_out)
         return outlets
 
 
@@ -91,7 +91,7 @@ def test_grid_is_not_counted_in_the_energy_audit():
     """Plant totals keep the ORC and boiler energy once; the grid adds none."""
     plant = GridPlant()
     result = plant(
-        brine_in=Stream(m_dot=100, T=423.15, p=10e5), water_in=Stream(m_dot=5, T=313.15, p=3e5)
+        fluid_in=Stream(m_dot=100, T=423.15, p=10e5), water_in=Stream(m_dot=5, T=313.15, p=3e5)
     )
     orc, boiler = result.children["orc"].outputs, result.children["boiler"].outputs
     flows = collect_flows(result)

@@ -27,13 +27,13 @@ INJECTION_LIMB = (("well", "InjectionWell"), ("sink", "InjectionReservoir"))
 """Name and type of the modules of an injection limb, in flow order."""
 
 PRODUCTION_FLOW = (
-    ("reservoir.sandface", "well.bottom"),
-    ("well.wellhead", "esp.suction"),
-    ("esp.discharge", "riser.bottom"),
+    ("reservoir.sandface_out", "well.bottom_in"),
+    ("well.wellhead_out", "esp.fluid_in"),
+    ("esp.fluid_out", "riser.bottom_in"),
 )
 """Connections inside a production limb, in flow order."""
 
-INJECTION_FLOW = (("well.bottom", "sink.sandface"),)
+INJECTION_FLOW = (("well.bottom_out", "sink.sandface_in"),)
 """Connections inside an injection limb."""
 
 
@@ -69,28 +69,28 @@ def _mix(prefix, sources):
     """Return ``(links, outlet)`` of a mixer cascade that joins ``sources`` in order."""
     links, running = [], sources[0]
     for index, source in enumerate(sources[1:]):
-        links.append(_link(running, f"{prefix}.{index}.first_in"))
-        links.append(_link(source, f"{prefix}.{index}.second_in"))
-        running = f"{prefix}.{index}.mixed_out"
+        links.append(_link(running, f"{prefix}.{index}.branch1_in"))
+        links.append(_link(source, f"{prefix}.{index}.branch2_in"))
+        running = f"{prefix}.{index}.fluid_out"
     return links, running
 
 
 def _split(prefix, targets):
     """Return ``(links, inlet)`` of a splitter cascade that divides a flow over ``targets``.
 
-    Splitter ``i`` sends its ``second_out`` to ``targets[i]`` and its ``first_out`` on to the next
-    splitter; the last target takes what is left.
+    Splitter ``i`` sends its ``branch2_out`` to ``targets[i]`` and its ``branch1_out`` on to the
+    next splitter; the last target takes what is left.
     """
     count = len(targets) - 1
     if count == 0:
         return [], targets[0]
     links = [
-        _link(f"{prefix}.{index}.first_out", f"{prefix}.{index + 1}.feed_in")
+        _link(f"{prefix}.{index}.branch1_out", f"{prefix}.{index + 1}.fluid_in")
         for index in range(count - 1)
     ]
-    links += [_link(f"{prefix}.{index}.second_out", targets[index]) for index in range(count)]
-    links.append(_link(f"{prefix}.{count - 1}.first_out", targets[count]))
-    return links, f"{prefix}.0.feed_in"
+    links += [_link(f"{prefix}.{index}.branch2_out", targets[index]) for index in range(count)]
+    links.append(_link(f"{prefix}.{count - 1}.branch1_out", targets[count]))
+    return links, f"{prefix}.0.fluid_in"
 
 
 def _check(**counts):
@@ -109,14 +109,14 @@ def multi_well_spec(producers=2, injectors=1):
     ``heat_loss`` and ``supply_out_T``.
     """
     _check(producers=producers, injectors=injectors)
-    mixing, supply = _mix("mixers", [f"producers.{i}.riser.wellhead" for i in range(producers)])
+    mixing, supply = _mix("mixers", [f"producers.{i}.riser.wellhead_out" for i in range(producers)])
     splitting, return_in = _split(
-        "splitters", [f"injectors.{index}.well.wellhead" for index in range(injectors)]
+        "splitters", [f"injectors.{index}.well.wellhead_in" for index in range(injectors)]
     )
     temperature = (
         "producers.0.riser.wellhead_temperature"
         if producers == 1
-        else f"mixers.{producers - 2}.mixed_out_T"
+        else f"mixers.{producers - 2}.fluid_out_T"
     )
     return {
         "format": 2,
@@ -160,10 +160,10 @@ def district_network_spec(consumers=2, service="heating"):
         )
     _check(consumers=consumers)
     splitting, feed = _split(
-        "splitters", [f"substations.{index}.network_in" for index in range(consumers)]
+        "splitters", [f"substations.{index}.supply_in" for index in range(consumers)]
     )
     mixing, returned = _mix(
-        "mixers", [f"substations.{index}.network_out" for index in range(consumers)]
+        "mixers", [f"substations.{index}.return_out" for index in range(consumers)]
     )
     return {
         "format": 2,
@@ -177,13 +177,13 @@ def district_network_spec(consumers=2, service="heating"):
             "return_pipe": _module("Pipe"),
         },
         "connections": (
-            [_link("pump.discharge", "supply_pipe.inlet"), _link("supply_pipe.outlet", feed)]
+            [_link("pump.fluid_out", "supply_pipe.fluid_in"), _link("supply_pipe.fluid_out", feed)]
             + splitting
             + mixing
-            + [_link(returned, "return_pipe.inlet")]
+            + [_link(returned, "return_pipe.fluid_in")]
         ),
-        "inlets": {"supply_in": "pump.suction"},
-        "outlets": {"return_out": "return_pipe.outlet"},
+        "inlets": {"supply_in": "pump.fluid_in"},
+        "outlets": {"return_out": "return_pipe.fluid_out"},
         "outputs": _network_outputs(service),
         "bindings": {},
         "param_history": {},
@@ -193,4 +193,4 @@ def district_network_spec(consumers=2, service="heating"):
 def _network_outputs(service):
     sums = ["heat_supplied"] if service == "heating" else []
     outputs = {name: {"sum": name} for name in (*sums, "heat_absorbed", "heat_loss", "electricity")}
-    return outputs | {"return_out_T": {"of": "return_pipe.outlet_T"}}
+    return outputs | {"return_out_T": {"of": "return_pipe.fluid_out_T"}}

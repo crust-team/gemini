@@ -10,13 +10,13 @@
     "sink": {"type": "InjectionReservoir", "params": {}}
   },
   "connections": [
-    {"source": "injector.bottom", "target": "sink.sandface"},
-    {"source": "reservoir.sandface", "target": "well.bottom"},
-    {"source": "well.wellhead", "target": "esp.suction"},
-    {"source": "esp.discharge", "target": "riser.bottom"}
+    {"source": "injector.bottom_out", "target": "sink.sandface_in"},
+    {"source": "reservoir.sandface_out", "target": "well.bottom_in"},
+    {"source": "well.wellhead_out", "target": "esp.fluid_in"},
+    {"source": "esp.fluid_out", "target": "riser.bottom_in"}
   ],
-  "inlets": {"return_in": "injector.wellhead"},
-  "outlets": {"supply_out": "riser.wellhead"},
+  "inlets": {"return_in": "injector.wellhead_in"},
+  "outlets": {"supply_out": "riser.wellhead_out"},
   "outputs": {
     "electricity": {"sum": "electricity"},
     "heat_loss": {"sum": "heat_loss"},

@@ -21,21 +21,21 @@ class Heater(Module):
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.rise = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Warm the stream by the precision-dependent rise."""
 
         # Outlets
-        outlet = inlets.inlet.with_(T=inlets.inlet.T + _rise())
+        outlet = inlets.fluid_in.with_(T=inlets.fluid_in.T + _rise())
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -58,25 +58,25 @@ class Twice(Module):
         self.heater = Heater()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.rise = Output.of(self.heater.rise)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Use the detached trial as the recorded call's inlet."""
 
         # Modules
-        trial = self.heater.trial_outlets({"inlet": inlets.inlet})
-        heated = self.heater(inlet=trial.outlet)
+        trial = self.heater.trial_outlets({"fluid_in": inlets.fluid_in})
+        heated = self.heater(fluid_in=trial.fluid_out)
 
         # Outlets
-        outlet = heated.outlets.outlet
+        outlet = heated.outlets.fluid_out
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -112,8 +112,8 @@ def test_diverging_loop_raises():
 def test_detached_call_is_not_recorded():
     """The trial call is invisible to the parent; the recorded call is the only child call."""
     plant = Twice()
-    result = plant(inlet=STREAM)
-    assert result.outlets.outlet.T == 302.0
+    result = plant(fluid_in=STREAM)
+    assert result.outlets.fluid_out.T == 302.0
     assert list(result.leaves()) == ["heater"]
     assert result.outputs.rise == 1.0
 
@@ -121,8 +121,8 @@ def test_detached_call_is_not_recorded():
 def test_detached_call_keeps_runtime_settings():
     """A trial call runs with the caller's runtime settings."""
     with gm.runtime.settings(precision="float32"):
-        trial = Heater().trial_outlets({"inlet": STREAM})
-    assert trial.outlet.T == 302.0
+        trial = Heater().trial_outlets({"fluid_in": STREAM})
+    assert trial.fluid_out.T == 302.0
 
 
 def test_detached_call_rejects_stateful_modules():

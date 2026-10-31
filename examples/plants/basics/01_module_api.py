@@ -20,14 +20,14 @@ def configured_esp(plant):
 
 def call_forms(esp, stream):
     """Keyword, mapping and positional inlets agree; a persisted control applies by default."""
-    a = esp(suction=stream, frequency="50 Hz")
-    b = esp({"suction": stream}, frequency="50 Hz")
+    a = esp(fluid_in=stream, frequency="50 Hz")
+    b = esp({"fluid_in": stream}, frequency="50 Hz")
     c = esp(stream, frequency="50 Hz")
     assert a.outputs.head == b.outputs.head == c.outputs.head
     esp.frequency = 50.0
-    persistent = esp(suction=stream)
+    persistent = esp(fluid_in=stream)
     assert a.outputs.head == persistent.outputs.head
-    print(a.outputs.head, a.outlets.discharge.p, a.outputs.electricity)
+    print(a.outputs.head, a.outlets.fluid_out.p, a.outputs.electricity)
     print(a.outputs.get("head", unit="bar"))
     return persistent
 
@@ -35,9 +35,9 @@ def call_forms(esp, stream):
 def fluid_only(esp, stream, persistent):
     """``no_outputs`` keeps the outlets and skips every computed output."""
     with gm.no_outputs():
-        result = esp(suction=stream)
+        result = esp(fluid_in=stream)
     assert dict(result.outputs) == {}
-    assert result.outlets.discharge == persistent.outlets.discharge
+    assert result.outlets.fluid_out == persistent.outlets.fluid_out
 
 
 def clamp(module, inlets):
@@ -48,7 +48,7 @@ def clamp(module, inlets):
 def clamped_call(esp, stream, persistent):
     """Clamp the frequency of one call with a pre-hook."""
     handle = esp.register_forward_pre_hook(clamp)
-    clamped = esp(suction=stream)
+    clamped = esp(fluid_in=stream)
     handle.remove()
     assert esp.frequency == 50.0
     assert clamped.outputs.head < persistent.outputs.head
@@ -87,7 +87,7 @@ def runtime_settings(esp, stream):
     """Apply runtime settings inside a ``with`` block; they are restored afterwards."""
     assert gm.runtime.get_precision() == "float64"
     with gm.runtime.settings(precision="float32", display_units="field"):
-        print(esp(suction=stream, frequency=50))
+        print(esp(fluid_in=stream, frequency=50))
     assert gm.runtime.get_precision() == "float64"
 
 

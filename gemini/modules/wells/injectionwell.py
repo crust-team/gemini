@@ -32,7 +32,7 @@ class InjectionWell(_Well):
         super().__init__()
 
         # Inlets
-        self.wellhead = Inlet(Stream, stream="brine")
+        self.wellhead_in = Inlet(Stream, kind="brine")
 
         # Outputs
         self.wellhead_temperature = Output(Temperature, soft_sensor=True)
@@ -45,13 +45,13 @@ class InjectionWell(_Well):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.bottom = Outlet(Stream, stream="brine")
+        self.bottom_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Traverse the injection path with the legacy negative flow convention."""
 
         # Outlets
-        wellhead = inlets.wellhead
+        wellhead = inlets.wellhead_in
         stream = self._traversal_stream(wellhead)
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
         slope, offset = self.correction_factors
@@ -62,12 +62,12 @@ class InjectionWell(_Well):
             m_dot=wellhead.m_dot,
         )
 
-        outlets = dict(bottom=bottom)
+        outlets = dict(bottom_out=bottom)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        wellhead = inlets.wellhead
-        bottom = outlets.bottom
+        wellhead = inlets.wellhead_in
+        bottom = outlets.bottom_out
         stream = self._traversal_stream(wellhead)
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
         self.wellhead_temperature = wellhead.T

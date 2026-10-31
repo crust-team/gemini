@@ -8,7 +8,7 @@ from gemini.modules.plants import plan
 
 def test_split_end_splits_at_the_last_dot():
     """A port is the last part of an end."""
-    assert plan.split_end("filters.hot.outlet") == ("filters.hot", "outlet")
+    assert plan.split_end("filters.hot.fluid_out") == ("filters.hot", "fluid_out")
 
 
 def test_find_path_returns_the_modules_of_a_cycle_or_none():
@@ -33,10 +33,10 @@ def test_the_plan_names_where_every_inlet_comes_from():
     plant = gm.plants.library.build("Doublet")
     steps = plant._compiled()
     sink = next(step for step in steps.steps if step.path == "sink")
-    assert sink.arguments == {"sandface": ("step", "injector", "bottom")}
+    assert sink.arguments == {"sandface_in": ("step", "injector", "bottom_out")}
     injector = steps.steps[0]
-    assert injector.arguments == {"wellhead": ("inlet", "return_in")}
-    assert steps.outlets == {"supply_out": ("riser", "wellhead")}
+    assert injector.arguments == {"wellhead_in": ("inlet", "return_in")}
+    assert steps.outlets == {"supply_out": ("riser", "wellhead_out")}
 
 
 def test_state_connections_cannot_run_yet():
@@ -44,8 +44,8 @@ def test_state_connections_cannot_run_yet():
     plant = gm.Plant("State")
     plant.add("Pipe", "one")
     plant.add("Pipe", "two")
-    plant.connect("one.outlet", "two.inlet")
-    plant.connect("two.outlet", "one.inlet", kind="state")
+    plant.connect("one.fluid_out", "two.fluid_in")
+    plant.connect("two.fluid_out", "one.fluid_in", type="state")
     with pytest.raises(gm.errors.NotImplementedYet):
         plan.compile_plan(plant)
 
@@ -55,8 +55,8 @@ def test_a_loop_through_a_plant_child_opens_it():
     plant = gm.Plant("Loop")
     plant.add("Doublet", "doublet")
     plant.add("Pipe", "pipe")
-    plant.connect("doublet.supply_out", "pipe.inlet")
-    plant.connect("pipe.outlet", "doublet.return_in")
+    plant.connect("doublet.supply_out", "pipe.fluid_in")
+    plant.connect("pipe.fluid_out", "doublet.return_in")
     assert [step.path for step in plant._compiled().steps][-2:] == [
         "doublet.injector",
         "doublet.sink",

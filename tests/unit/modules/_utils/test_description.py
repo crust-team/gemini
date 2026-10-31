@@ -102,11 +102,11 @@ def test_leaf_description_shape():
     efficiency = description["parameters"]["motor_efficiency"]
     assert (efficiency["minimum"], efficiency["maximum"], efficiency["unit"]) == (0, 1, "-")
     assert description["parameters"]["stage_count"]["default"] is None
-    assert description["inlets"]["suction"]["stream"] == "brine"
-    assert description["inlets"]["suction"]["fields"]["T"] == {"unit": "K"}
+    assert description["inlets"]["fluid_in"]["kind"] == "brine"
+    assert description["inlets"]["fluid_in"]["fields"]["T"] == {"unit": "K"}
     assert description["outputs"]["electricity"] == {
         "unit": "W",
-        "kind": "electricity",
+        "quantity": "electricity",
         "soft_sensor": False,
     }
     assert description["outputs"]["head"]["soft_sensor"] is True
@@ -151,7 +151,7 @@ def test_a_spec_plant_lists_its_connections():
         "sink",
     ]
     assert len(description["connections"]) == 4
-    assert {item["source"] for item in description["connections"]} >= {"esp.discharge"}
+    assert {item["source"] for item in description["connections"]} >= {"esp.fluid_out"}
     assert any("." in name for name in doublet.parameter_schema()["properties"])
 
 

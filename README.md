@@ -30,14 +30,14 @@ plant = gm.Plant.load(f"{SHARED}/plant.json")
 design = {name: parameter.value for name, parameter in plant.doublet.esp.named_parameters()}
 esp = gm.modules.ESP().update_params(**design)
 stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
-out = esp(suction=stream, frequency="50 Hz")
-assert out.outputs.head == esp({"suction": stream}, frequency="50 Hz").outputs.head
+out = esp(fluid_in=stream, frequency="50 Hz")
+assert out.outputs.head == esp({"fluid_in": stream}, frequency="50 Hz").outputs.head
 assert out.outputs.head == esp(stream, frequency="50 Hz").outputs.head
-print(out.outputs.get("head", unit="bar"), out.outlets.discharge)
-assert out.outlets.discharge is out.outlets["discharge"]
+print(out.outputs.get("head", unit="bar"), out.outlets.fluid_out)
+assert out.outlets.fluid_out is out.outlets["fluid_out"]
 
 with gm.no_outputs():
-    fluid_only = esp(suction=out.outlets.discharge, frequency="50 Hz")
+    fluid_only = esp(fluid_in=out.outlets.fluid_out, frequency="50 Hz")
 assert dict(fluid_only.outputs) == {}
 
 esp.frequency = 50.0

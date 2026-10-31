@@ -32,15 +32,15 @@ def test_two_producers_mix_into_the_supply(fresh_plant):
     field = _field(fresh_plant.doublet)
     returned = Stream(m_dot=70, T=330, p=5e6, fluid=field.producers[0].riser.fluid)
     result = field(return_in=returned)
-    first = result.children["producers.0.riser"].outlets.wellhead
-    second = result.children["producers.1.riser"].outlets.wellhead
+    first = result.children["producers.0.riser"].outlets.wellhead_out
+    second = result.children["producers.1.riser"].outlets.wellhead_out
     supply = result.outlets.supply_out
     assert supply.m_dot == pytest.approx(70, rel=1e-12)
     expected = (first.m_dot * first.T + second.m_dot * second.T) / (first.m_dot + second.m_dot)
     assert supply.T == pytest.approx(expected, rel=1e-12)
     assert supply.p == min(first.p, second.p)
     assert result.outputs.supply_out_T == supply.T
-    assert result.children["injectors.0.well"].inlets.wellhead == returned
+    assert result.children["injectors.0.well"].inlets.wellhead_in == returned
     leaves = result.leaves().values()
     assert result.outputs.electricity == pytest.approx(
         sum(leaf.outputs.get("electricity", 0.0) for leaf in leaves)
@@ -60,7 +60,7 @@ def test_splitters_share_the_return_over_three_injectors(fresh_plant):
     field.splitters[1].split_fraction = 0.4
     returned = Stream(m_dot=40, T=330, p=5e6, fluid=field.producers[0].riser.fluid)
     result = field(return_in=returned)
-    flows = [result.children[f"injectors.{i}.well"].inlets.wellhead.m_dot for i in range(3)]
+    flows = [result.children[f"injectors.{i}.well"].inlets.wellhead_in.m_dot for i in range(3)]
     assert flows == pytest.approx([20.0, 8.0, 12.0], rel=1e-14)
     riser = result.children["producers.0.riser"]
     assert result.outputs.supply_out_T == riser.outputs.wellhead_temperature

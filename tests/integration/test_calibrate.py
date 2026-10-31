@@ -98,7 +98,7 @@ def _head_rows(plant, source, flows, column_scale=1.0):
     first = source.read(source.start, source.start).iloc[0]
     pump = plant.doublet.esp
     bindings = plant.bindings["doublet.esp"]
-    column = bindings.inlets["suction"]["m_dot"].column
+    column = bindings.inlets["fluid_in"]["m_dot"].column
     rows = []
     for flow in flows:
         row = first.to_dict()
@@ -128,7 +128,7 @@ def test_esp_head_guess_converts_any_mass_flow_unit(fresh_plant, fast_dataset):
     fits = {}
     for unit, column_scale in (("kg/s", 1.0), ("t/h", 3.6)):
         plant = copy.deepcopy(fresh_plant)
-        suction = plant.bindings["doublet.esp"].inlets["suction"]
+        suction = plant.bindings["doublet.esp"].inlets["fluid_in"]
         suction["m_dot"] = Binding(column=suction["m_dot"].column, unit=unit)
         data = _head_rows(plant, fast_dataset, np.linspace(25, 45, 16), column_scale)
         head = plant.get_parameter("doublet.esp.head_coefficients")

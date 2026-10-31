@@ -14,8 +14,8 @@ GEOFLUID = Stream(m_dot=100, T=523.15, p=40e5)
 
 def test_flash_split_matches_steam_tables():
     """250 degC liquid flashed to 6 bar: x = (1085.8 - 670.4) / 2085.9 = 0.199 (steam tables)."""
-    result = Separator()(inlet=GEOFLUID, pressure_setpoint="6 bar")
-    out, liquid, gas = result.outputs, result.outlets.liquid, result.outlets.gas
+    result = Separator()(fluid_in=GEOFLUID, pressure_setpoint="6 bar")
+    out, liquid, gas = result.outputs, result.outlets.liquid_out, result.outlets.gas_out
     assert out.steam_fraction == pytest.approx((1085.8 - 670.4) / 2085.9, abs=2e-4)
     assert out.saturation_temperature == pytest.approx(431.98, abs=0.01)
     assert out.steam_mass_flow == gas.m_dot == pytest.approx(100 * out.steam_fraction)
@@ -27,12 +27,12 @@ def test_flash_split_matches_steam_tables():
 
 def test_closed_in_if97_enthalpies():
     """Closure: m h_in = m_gas h_g + m_liquid h_f; the cp*T audit cannot show latent heat."""
-    result = Separator()(inlet=GEOFLUID, pressure_setpoint=6e5)
+    result = Separator()(fluid_in=GEOFLUID, pressure_setpoint=6e5)
     saturation = _physics.saturation_properties(6e5)
     incoming = GEOFLUID.m_dot * _physics.liquid_enthalpy(GEOFLUID.p, GEOFLUID.T)
     outgoing = (
-        result.outlets.gas.m_dot * saturation.vapour_enthalpy
-        + result.outlets.liquid.m_dot * saturation.liquid_enthalpy
+        result.outlets.gas_out.m_dot * saturation.vapour_enthalpy
+        + result.outlets.liquid_out.m_dot * saturation.liquid_enthalpy
     )
     assert outgoing == pytest.approx(incoming, rel=1e-12)
 
@@ -40,7 +40,7 @@ def test_closed_in_if97_enthalpies():
 def test_inlet_below_its_saturation_pressure_uses_the_liquid_enthalpy():
     """A wellhead stream already below saturation is the liquid at its temperature."""
     flashing = GEOFLUID.with_(p=8e5)
-    result = Separator()(inlet=flashing, pressure_setpoint=6e5)
+    result = Separator()(fluid_in=flashing, pressure_setpoint=6e5)
     enthalpy = _physics.liquid_enthalpy(_physics.saturation_pressure(523.15), 523.15)
     assert result.outputs.steam_fraction == pytest.approx(_physics.flash_fraction(enthalpy, 6e5))
 
@@ -48,11 +48,11 @@ def test_inlet_below_its_saturation_pressure_uses_the_liquid_enthalpy():
 def test_subcooled_and_zero_flow():
     """A subcooled inlet passes as liquid at its temperature; zero flow splits nothing."""
     subcooled = Stream(m_dot=50, T=393.15, p=10e5)
-    result = Separator()(inlet=subcooled, pressure_setpoint=6e5)
-    assert result.outputs.steam_fraction == 0 and result.outlets.gas.m_dot == 0
-    assert result.outlets.liquid.T == 393.15 and result.outlets.liquid.m_dot == 50
-    stopped = Separator()(inlet=GEOFLUID.with_(m_dot=0), pressure_setpoint=6e5)
-    assert stopped.outputs.steam_mass_flow == 0 and stopped.outlets.liquid.m_dot == 0
+    result = Separator()(fluid_in=subcooled, pressure_setpoint=6e5)
+    assert result.outputs.steam_fraction == 0 and result.outlets.gas_out.m_dot == 0
+    assert result.outlets.liquid_out.T == 393.15 and result.outlets.liquid_out.m_dot == 50
+    stopped = Separator()(fluid_in=GEOFLUID.with_(m_dot=0), pressure_setpoint=6e5)
+    assert stopped.outputs.steam_mass_flow == 0 and stopped.outlets.liquid_out.m_dot == 0
     assert stopped.outputs.steam_fraction > 0
 
 
@@ -67,15 +67,15 @@ def test_invalid_inlets_and_setpoints_raise():
     ]
     for inlet, setpoint in cases:
         with pytest.raises(gm.errors.PhysicsError):
-            separator(inlet=inlet, pressure_setpoint=setpoint)
+            separator(fluid_in=inlet, pressure_setpoint=setpoint)
     with pytest.raises(gm.errors.PhysicsError, match="separator: pressure_setpoint"):
-        separator(inlet=GEOFLUID, pressure_setpoint=50e5)
+        separator(fluid_in=GEOFLUID, pressure_setpoint=50e5)
 
 
 def test_traced_call_matches_one_call_per_row():
     """Flashing and subcooled rows at several setpoints trace and equal one call per row."""
     rows = [
-        dict(inlet=Stream(m_dot=m_dot, T=T, p=p), pressure_setpoint=setpoint)
+        dict(fluid_in=Stream(m_dot=m_dot, T=T, p=p), pressure_setpoint=setpoint)
         for m_dot, T, p, setpoint in [
             (100.0, 523.15, 40e5, 6e5),
             (50.0, 523.15, 8e5, 6e5),

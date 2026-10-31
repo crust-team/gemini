@@ -27,7 +27,7 @@ class Flare(Module):
         self.combustion_efficiency = Parameter(Efficiency, default=combustion.FLARE_EFFICIENCY)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="gas")
+        self.fluid_in = Inlet(Stream, kind="gas")
 
         # Outputs
         self.burned_mass_flow = Output(MassFlow)
@@ -37,17 +37,17 @@ class Flare(Module):
     def forward(self, inlets):
         """Refuse reverse flow; the flare has no outlet."""
         ops.check(
-            inlets.inlet.m_dot >= 0,
+            inlets.fluid_in.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
-            m_dot=inlets.inlet.m_dot,
+            m_dot=inlets.fluid_in.m_dot,
         )
         outlets = dict()
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         composition = inlet.fluid.gas_composition or {}
         carried, formed, methane = 0.0, 0.0, 0.0
         if composition:

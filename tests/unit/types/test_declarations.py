@@ -42,7 +42,7 @@ class Declared(Module):
         self.coefficients = Parameter(list[float], shape=(2,))
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.command = Control(float, default=1)
@@ -54,16 +54,16 @@ class Declared(Module):
         self.value = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Return the inlet after recording a value."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -104,12 +104,12 @@ def test_parameter_history_projects_module_snapshots():
 def test_all_sections_list_own_declarations():
     """Section listings expose declaration objects without duplicate schemas."""
     module = _declared(length=1, coefficients=[1, 2])
-    assert list(module.inlets()) == ["inlet"]
+    assert list(module.inlets()) == ["fluid_in"]
     assert list(module.controls()) == ["command"]
     assert list(module.boundaries()) == ["weather"]
     assert list(module.inputs()) == ["command", "weather"]
     assert list(module.outputs()) == ["value"]
-    assert list(module.outlets()) == ["outlet"]
+    assert list(module.outlets()) == ["fluid_out"]
 
 
 def test_inlets_and_outlets_accept_fluid_stream_types_only():
@@ -219,7 +219,7 @@ def test_the_quick_check_gives_the_result_or_error_of_the_full_path(module_class
     seen = set()
     for _, owner in module.named_modules():
         for declaration in owner._declarations().values():
-            signature = (repr(declaration.kind), repr(declaration.bounds), declaration.unit)
+            signature = (repr(declaration.type), repr(declaration.bounds), declaration.unit)
             if isinstance(declaration, (Inlet, Outlet)) or signature in seen:
                 continue
             seen.add(signature)

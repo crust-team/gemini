@@ -25,7 +25,7 @@ into the vocabulary in the commit that first uses it, only if it is a full word 
 | share of an ideal cycle | `carnot_fraction`, `lorenz_fraction` | `carnot_efficiency`, `fraction_of_carnot` |
 | flow at the best-efficiency point | `best_efficiency_flow`, `best_efficiency_ratio` | `bep` |
 | boolean | `is_<state>`: `is_capped`, `is_in_operating_window` | a bare `capped` |
-| temperature at a port | `<port>_T`: `outlet_T`, `hot_out_T`, `production_out_T` | |
+| temperature at a port | `<port>_T`: `fluid_out_T`, `hot_out_T`, `production_out_T` | |
 | temperature elsewhere | `<place>_temperature`: `ground_temperature`, `approach_temperature` | `_T` |
 | number of transfer units | `transfer_units` | `ntu` |
 | logarithmic mean difference | `log_mean_temperature_difference` | `lmtd` |
@@ -39,6 +39,13 @@ into the vocabulary in the commit that first uses it, only if it is a full word 
 
 Four short forms stay because the full word would be longer and no clearer in this field: `T` (see
 above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersible pump).
+
+## Port roles
+
+Every port is `<role>_in` or `<role>_out` ([conventions.md](conventions.md#naming)). The roles are
+`hot`, `cold`, `source`, `sink`, `generator`, `chilled`, `cooling`, `charge`, `discharge`, `supply`,
+`return`, `gas`, `liquid`, `fuel`, `power`, `loss`, `air`, `waste`, `chemical`, `wellhead`, `bottom`,
+`sandface`, `production`, `injection`, `fluid` and `branch<N>`.
 
 ## Retired names
 
@@ -97,7 +104,7 @@ above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersi
 
 ```text
 absorbed absorber accumulation active adsorber ambient approach aquifer arrangement auxiliary
-baumann best blowdown borehole bottom bottomhole breakthrough brine building bulb burned capacity
+baumann best blowdown borehole bottom bottomhole branch1 branch2 breakthrough brine building bulb burned capacity
 capped carnot change characteristic charge charged chilled clogging co2 coefficient coefficients
 cold combustion command composition concentration condenser condensing conductance conductivity consumption
 cooler cooling cop coproduced correction correlation cost count curtailed decline demand density depth
@@ -117,6 +124,6 @@ return rock role roughness running sand sandface saturated saturation second sec
 sensible separation service setpoint setting shaft sink skin slope soil source spacing specific
 split stage steam step storage stored suction supplied supply surface tank temperature thermal
 thickness threshold time top transfer tubing two type undisturbed units unmet unserved useful
-value valve velocity vented viscosity volume volumetric warm water well wellbore wellhead wet
+value valve velocity vented viscosity volume volumetric warm waste water well wellbore wellhead wet
 window
 ```

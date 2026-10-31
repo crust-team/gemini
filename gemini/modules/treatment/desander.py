@@ -52,7 +52,7 @@ class Desander(Module):
         self.nominal_mass_flow = Parameter(MassFlow, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Boundaries
         self.sand_concentration = Boundary(MassConcentration)
@@ -63,20 +63,20 @@ class Desander(Module):
         self.residual_sand_concentration = Output(MassConcentration)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Apply the quadratic cyclone pressure loss."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet.with_(p=inlet.p - self._pressure_drop(inlet))
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         properties = inlet.fluid.properties(inlet.p, inlet.T)
         liquid_flow = fluid.liquid_volume_flow(inlet.m_dot, properties.gmf, properties.rho_l)
         sand = _physics.cyclone_sand(
@@ -91,7 +91,7 @@ class Desander(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )
@@ -101,7 +101,7 @@ class Desander(Module):
         ops.check(
             drop <= inlet.p,
             PhysicsError,
-            "{path}: pressure_drop = {drop} Pa; expected at most inlet.p = {pressure} Pa",
+            "{path}: pressure_drop = {drop} Pa; expected at most fluid_in.p = {pressure} Pa",
             path=self.path,
             drop=drop,
             pressure=inlet.p,

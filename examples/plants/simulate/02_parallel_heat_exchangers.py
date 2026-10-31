@@ -93,42 +93,40 @@ class ParallelExchangerPlant(gm.modules.Module):
         self.outlet_filter = Filter()
 
         # Inlets
-        self.secondary_in = Inlet(Stream)
+        self.return_in = Inlet(Stream)
 
         # Outputs
-        self.production_rate = Output.of(self.doublet.riser.wellhead.field("m_dot"))
+        self.production_rate = Output.of(self.doublet.riser.wellhead_out.field("m_dot"))
         self.injection_pressure = Output.of(self.doublet.injection_pump.discharge_pressure)
         self.injection_pump_electricity = Output.of(self.doublet.injection_pump.electricity)
         self.duty = Output(Duty)
         self.electricity = Output(Electricity)
-        self.secondary_out_T = Output.of(self.secondary_mixers[len(SHARES) - 2].mixed_out_T)
+        self.secondary_out_T = Output.of(self.secondary_mixers[len(SHARES) - 2].fluid_out_T)
 
         # Outlets
-        self.secondary_out = Outlet(Stream)
+        self.supply_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Produce and treat the brine, exchange in parallel, remix and inject it."""
 
         # Modules
         supply = self.doublet.produce()
-        degassed = self.degasser(inlet=supply)
-        filtered = self.inlet_filter(inlet=degassed.outlets.liquid)
-        primaries = divide(self.primary_splitters, filtered.outlets.outlet)
-        secondaries = divide(self.secondary_splitters, inlets.secondary_in)
+        degassed = self.degasser(fluid_in=supply)
+        filtered = self.inlet_filter(fluid_in=degassed.outlets.liquid_out)
+        primaries = divide(self.primary_splitters, filtered.outlets.fluid_out)
+        secondaries = divide(self.secondary_splitters, inlets.return_in)
         exchanged = [
             exchanger(hot_in=hot, cold_in=cold)
             for exchanger, hot, cold in zip(self.heat_exchangers, primaries, secondaries)
         ]
         cooled = combine(self.primary_mixers, [each.outlets.hot_out for each in exchanged])
-        returned = self.outlet_filter(inlet=cooled)
-        self.doublet.inject(returned.outlets.outlet)
+        returned = self.outlet_filter(fluid_in=cooled)
+        self.doublet.inject(returned.outlets.fluid_out)
 
         # Outlets
-        secondary_out = combine(
-            self.secondary_mixers, [each.outlets.cold_out for each in exchanged]
-        )
+        supply_out = combine(self.secondary_mixers, [each.outlets.cold_out for each in exchanged])
 
-        outlets = dict(secondary_out=secondary_out)
+        outlets = dict(supply_out=supply_out)
         return outlets
 
 
@@ -136,9 +134,9 @@ def divide(splitters, stream):
     """Return the branches of a splitter cascade: each splitter sends its share to a branch."""
     branches = []
     for splitter in splitters:
-        split = splitter(feed_in=stream)
-        branches.append(split.outlets.second_out)
-        stream = split.outlets.first_out
+        split = splitter(fluid_in=stream)
+        branches.append(split.outlets.branch2_out)
+        stream = split.outlets.branch1_out
     return branches + [stream]
 
 
@@ -146,7 +144,7 @@ def combine(mixers, streams):
     """Return the stream a mixer cascade makes of ``streams``, the running mix entering first."""
     mixed = streams[0]
     for mixer, stream in zip(mixers, streams[1:]):
-        mixed = mixer(first_in=mixed, second_in=stream).outlets.mixed_out
+        mixed = mixer(branch1_in=mixed, branch2_in=stream).outlets.fluid_out
     return mixed
 
 
@@ -204,7 +202,7 @@ def recalibrated_injectivity(doublet):
     ``InjectionReservoir.injectivity_from_measurements`` gives Q / (p_bh - p_res) with the
     volume flow Q at the aquifer's fluid density.
     """
-    bottom = doublet.injector(wellhead=FITTED_INJECTION).outlets.bottom
+    bottom = doublet.injector(wellhead_in=FITTED_INJECTION).outlets.bottom_out
     flow = abs(bottom.m_dot) / doublet.sink.fluid.properties(bottom.p, bottom.T).rho_l
     return doublet.sink.injectivity_from_measurements(flow, bottom.p)
 
@@ -230,10 +228,10 @@ plant = ParallelExchangerPlant()
 configure_doublet(plant.doublet)
 configure_exchangers(plant)
 secondary = gm.Stream(flow="125.1 m3/h", T="20 degC", p="3 bar", fluid=gm.Fluid(kind="water"))
-upstream = plant(secondary_in=secondary).outputs
+upstream = plant(return_in=secondary).outputs
 injectivity = recalibrated_injectivity(plant.doublet)
 plant.doublet.sink.update_params(injectivity_index=injectivity)
-result = plant(secondary_in=secondary)
+result = plant(return_in=secondary)
 out = result.outputs
 print(f"Primary flow (nodal solve):  {out.production_rate / 1000 * 3600:.2f} m3/h")
 for label, index, run in (

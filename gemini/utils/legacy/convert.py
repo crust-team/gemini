@@ -47,6 +47,16 @@ def _entries(section, values):
     ]
 
 
+def _data_column(path, keys):
+    """Return the column of the shipped datasets for the binding ``keys`` of the module at ``path``.
+
+    The datasets were written before the port names of the ``<role>_in`` rule and stay as they are.
+    """
+    port = tables.DATA_PORTS.get((path, keys[0]), keys[0])
+    name = join_path(path, ".".join((port, *keys[1:])))
+    return tables.DATA_COLUMNS.get(name, name)
+
+
 def _converted_bindings(design):
     """Return SI bindings to new column names, and the old binding of each new column.
 
@@ -58,8 +68,7 @@ def _converted_bindings(design):
         bound = ModuleBindings()
         for section in _SECTIONS:
             for keys, binding in _entries(section, getattr(old, section)):
-                name = join_path(path, ".".join(keys))
-                name = tables.DATA_COLUMNS.get(name, name)
+                name = _data_column(path, keys)
                 new = Binding(column=name, unit=_si_unit(binding.unit))
                 set_nested(getattr(bound, section), keys, new)
                 sources[name] = binding
@@ -266,9 +275,9 @@ def _expected_edges(project):
                 f"{link.target}.{link.target_port}"
             )
             continue
-        if source[0] in pumps and source[1] == "discharge":
-            expected.add((*source, pumps[source[0]], "bottom"))
-            source = (pumps[source[0]], "wellhead")
+        if source[0] in pumps and source[1] == "fluid_out":
+            expected.add((*source, pumps[source[0]], "bottom_in"))
+            source = (pumps[source[0]], "wellhead_out")
         expected.add((*source, *target))
     return expected, errors
 

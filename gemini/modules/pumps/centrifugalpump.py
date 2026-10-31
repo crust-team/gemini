@@ -68,7 +68,7 @@ class CentrifugalPump(Module):
         self.motor_efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.suction = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.frequency = Control(Frequency)
@@ -81,32 +81,32 @@ class CentrifugalPump(Module):
         self.efficiency = Output(Fraction)
         self.electricity = Output(Electricity)
         self.heat_loss = Output(HeatLoss)
-        self.discharge_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
 
         # Outlets
-        self.discharge = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Raise the suction pressure by the head and heat the liquid by the pump losses."""
 
         # Outlets
-        suction = inlets.suction
+        suction = inlets.fluid_in
         performance = self._performance(suction)
         losses = performance["shaft_power"] - performance["hydraulic_power"]
         rise = heat_transfer.temperature_change(losses, suction.heat_capacity_rate())
 
         discharge = suction.with_(p=suction.p + performance["head"], T=suction.T + rise)
 
-        outlets = dict(discharge=discharge)
+        outlets = dict(fluid_out=discharge)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        performance = self._performance(inlets.suction)
+        performance = self._performance(inlets.fluid_in)
         for name, value in performance.items():
             setattr(self, name, value)
         self.electricity = energy.input_power(performance["shaft_power"], self.motor_efficiency)
         self.heat_loss = self.electricity - performance["shaft_power"]
-        self.discharge_T = outlets.discharge.T
+        self.fluid_out_T = outlets.fluid_out.T
 
     def _performance(self, suction):
         """Return flow [m3/s], head [Pa], hydraulic and shaft power [W] and efficiency [-]."""

@@ -116,31 +116,31 @@ def add_modules(plant):
 
 def connect_brine(plant):
     """Wire the brine from the doublets through the exchanger and heat pump and back."""
-    plant.connect("d0.supply_out", "production.first_in")
-    plant.connect("d1.supply_out", "production.second_in")
-    plant.connect("production.mixed_out", "degasser.inlet")
-    plant.connect("degasser.liquid", "hx.hot_in")
+    plant.connect("d0.supply_out", "production.branch1_in")
+    plant.connect("d1.supply_out", "production.branch2_in")
+    plant.connect("production.fluid_out", "degasser.fluid_in")
+    plant.connect("degasser.liquid_out", "hx.hot_in")
     plant.connect("hx.hot_out", "heat_pump.source_in")
-    plant.connect("heat_pump.source_out", "injection.feed_in")
-    plant.connect("injection.first_out", "d0.return_in")
-    plant.connect("injection.second_out", "d1.return_in")
+    plant.connect("heat_pump.source_out", "injection.fluid_in")
+    plant.connect("injection.branch1_out", "d0.return_in")
+    plant.connect("injection.branch2_out", "d1.return_in")
 
 
 def connect_gas(plant):
     """Wire the co-produced gas: the boiler takes what it needs and the flare burns the rest."""
-    plant.connect("degasser.gas", "makeup.inlet")
-    plant.connect("makeup.outlet", "boiler.fuel_in")
-    plant.connect("boiler.gas_out", "flare.inlet")
+    plant.connect("degasser.gas_out", "makeup.fluid_in")
+    plant.connect("makeup.fluid_out", "boiler.fuel_in")
+    plant.connect("boiler.gas_out", "flare.fluid_in")
 
 
 def connect_water(plant):
     """Wire the heating, chilled and cooling water, with the plant ports named."""
     plant.connect("heating_return", "hx.cold_in")
     plant.connect("hx.cold_out", "heat_pump.sink_in")
-    plant.connect("heat_pump.sink_out", "boiler.inlet")
-    plant.connect("boiler.outlet", "loads.feed_in")
-    plant.connect("loads.first_out", "heat_users.supply_in")
-    plant.connect("loads.second_out", "chiller.generator_in")
+    plant.connect("heat_pump.sink_out", "boiler.fluid_in")
+    plant.connect("boiler.fluid_out", "loads.fluid_in")
+    plant.connect("loads.branch1_out", "heat_users.supply_in")
+    plant.connect("loads.branch2_out", "chiller.generator_in")
     plant.connect("heat_users.return_out", "heating_out")
     plant.connect("chiller.generator_out", "chiller_heat_out")
     plant.connect("cooling_return", "chiller.chilled_in")

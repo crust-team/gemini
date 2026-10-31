@@ -67,8 +67,8 @@ class CHP(Module):
         self.maximum_outlet_temperature = Parameter(Temperature)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="hot_water")
-        self.fuel_in = Inlet(Stream, stream="gas")
+        self.fluid_in = Inlet(Stream, kind="hot_water")
+        self.fuel_in = Inlet(Stream, kind="gas")
 
         # Controls
         self.load_fraction = Control(Fraction)
@@ -83,26 +83,26 @@ class CHP(Module):
         self.heat_recovered = Output(Power)
         self.dumped_heat = Output(Power)
         self.heat_loss = Output(HeatLoss)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="hot_water")
-        self.gas_out = Outlet(Stream, stream="gas")
+        self.fluid_out = Outlet(Stream, kind="hot_water")
+        self.gas_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Heat the water circuit by the recovered engine heat and pass on the gas not burned."""
 
         # Outlets
-        inlet, fuel = inlets.inlet, inlets.fuel_in
+        inlet, fuel = inlets.fluid_in, inlets.fuel_in
         values = self._performance(inlet, fuel)
-        outlet = inlet.with_(T=values["outlet_T"])
+        outlet = inlet.with_(T=values["fluid_out_T"])
         gas_out = burner.unburned_gas(values["fuel"], fuel)
 
-        outlets = dict(outlet=outlet, gas_out=gas_out)
+        outlets = dict(fluid_out=outlet, gas_out=gas_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        values = self._performance(inlets.inlet, inlets.fuel_in)
+        values = self._performance(inlets.fluid_in, inlets.fuel_in)
         values |= burner.fuel_outputs(values["fuel"], inlets.fuel_in)
         for name, value in values.items():
             setattr(self, name, value)
@@ -136,7 +136,7 @@ class CHP(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )
@@ -158,5 +158,5 @@ class CHP(Module):
             "heat_recovered": recovered,
             "dumped_heat": engine_heat - recovered,
             "heat_loss": fuel - generated - recovered,
-            "outlet_T": inlet.T + heat_transfer.temperature_change(recovered, rate),
+            "fluid_out_T": inlet.T + heat_transfer.temperature_change(recovered, rate),
         }

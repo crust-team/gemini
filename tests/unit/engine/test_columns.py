@@ -33,7 +33,9 @@ def test_volumetric_controls_convert_with_the_module_reference_state():
     block = _read(module)
     density = module.fluid.properties(2e5, 320.0).density
     assert block.inputs["m_dot"][0] == pytest.approx(2.0 / 3600 * density)
-    assert block.fields["inlet", "m_dot"][0] == 10.0 and block.fields["inlet", "T"][0] == 330.0
+    assert (
+        block.fields["fluid_in", "m_dot"][0] == 10.0 and block.fields["fluid_in", "T"][0] == 330.0
+    )
     assert block.status.tolist() == [0] and block.measured == {}
 
 

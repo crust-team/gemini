@@ -12,6 +12,7 @@ import tokenize
 
 import pytest
 
+import gemini as gm
 from tests.fixtures import ROOT
 
 PYTHON_FOLDERS = ("gemini", "examples", "tests", "scripts")
@@ -375,6 +376,27 @@ def physics_copies():
                 name = f"{short}::{function.name}"
                 bodies.setdefault(normalised_body(function), []).append(name)
     return [tuple(sorted(names)) for names in bodies.values() if len(names) > 1]
+
+
+def port_roles():
+    """Return the port roles of the naming rule in ``.claude/docs/glossary.md``."""
+    section = (ROOT / ".claude/docs/glossary.md").read_text().split("## Port roles")[1]
+    return set(re.findall(r"`(\w+)`", section.split("## ")[0]))
+
+
+@pytest.mark.parametrize("name", gm.modules.names())
+def test_every_port_follows_the_naming_rule(name):
+    """Every port is ``<role>_in`` or ``<role>_out``, the role from the glossary."""
+    described = gm.modules.get(name).describe()
+    roles = port_roles()
+    wrong = [
+        port
+        for port, suffix in [(port, "_in") for port in described["inlets"]]
+        + [(port, "_out") for port in described["outlets"]]
+        if not port.endswith(suffix)
+        or re.sub(r"branch\d+", "branch", port.removesuffix(suffix)) not in roles | {"branch"}
+    ]
+    assert wrong == []
 
 
 def gemini_imports(path):

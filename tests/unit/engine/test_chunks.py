@@ -63,7 +63,7 @@ HEALTH = {
     "twin": dict(assessed=False, score=1.0, alarm=False, message="none", metrics={}),
     "tank": None,
 }
-SKIPS = [{}, {}, {}, {}, {"pump": {"pump.suction.p": 1}}, {}, {}, {}]
+SKIPS = [{}, {}, {}, {}, {"pump": {"pump.fluid_in.p": 1}}, {}, {}, {}]
 ERRORS = [(3, problem("pump", "module_error", "boom"))]
 CUTS = [[8], [1] * 8, [3, 5], [2, 2, 4], [4, 1, 3], [7, 1]]
 

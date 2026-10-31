@@ -34,7 +34,7 @@ def _esp_theoretical_values(row, esp_property):
     with gm.runtime.settings(precision="float32"):
         outputs = pump(
             frequency=row.ESP_freq,
-            suction=Stream(
+            fluid_in=Stream(
                 m_dot=units.m3h_to_m3s(row.Qp) * 1000,
                 T=300,
                 p=units.bar_to_pa(row.ESP_Pin),
@@ -97,7 +97,7 @@ def _esp_vlp_values(row, well_property, esp_property, reservoir_property):
         reservoir_parameters["pressure"], reservoir_parameters["temperature"]
     ).rho_l
     mass = units.m3h_to_m3s(row.Qp) * density
-    intake = well.intake_conditions(reservoir(production_rate=mass).outlets["sandface"])
+    intake = well.intake_conditions(reservoir(production_rate=mass).outlets["sandface_out"])
     wellhead = Stream(
         m_dot=mass, p=units.bar_to_pa(row.Pwh_prod), T=units.c_to_k(row.T_p_in), fluid=well.fluid
     )
@@ -129,7 +129,7 @@ def _injection_values(row):
         T=temperature,
         fluid=well.fluid,
     )
-    outputs = well(wellhead=wellhead).outputs
+    outputs = well(wellhead_in=wellhead).outputs
     injectivity = reservoir.injectivity_from_measurements(
         units.m3h_to_m3s(row.Qp), outputs.bottomhole_pressure
     )

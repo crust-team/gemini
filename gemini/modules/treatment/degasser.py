@@ -64,21 +64,21 @@ class Degasser(Module):
         self.separation_efficiency = Parameter(Fraction, default=0, structural=True)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Outputs
         self.gas_mass_flow = Output(MassFlow, soft_sensor=True)
         self.pressure_drop = Output(PressureDifference, soft_sensor=True)
 
         # Outlets
-        self.liquid = Outlet(Stream, stream="brine")
-        self.gas = Outlet(Stream, stream="gas")
+        self.liquid_out = Outlet(Stream, kind="brine")
+        self.gas_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Split the separated free gas from the liquid at the vessel pressure."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         pressure = (
             self.outlet_pressure
             if self.outlet_pressure is not None
@@ -92,13 +92,13 @@ class Degasser(Module):
         )
         gas = liquid.with_(m_dot=gas_flow, fluid=inlet.fluid.free_gas())
 
-        outlets = dict(liquid=liquid, gas=gas)
+        outlets = dict(liquid_out=liquid, gas_out=gas)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
-        liquid = outlets.liquid
-        gas = outlets.gas
+        inlet = inlets.fluid_in
+        liquid = outlets.liquid_out
+        gas = outlets.gas_out
         self.gas_mass_flow = gas.m_dot
         self.pressure_drop = inlet.p - liquid.p
 

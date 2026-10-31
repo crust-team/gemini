@@ -24,13 +24,13 @@ def counterflow_effectiveness(ua, c_min, c_max):
 def test_met_demand_closes_the_building_loop(plants):
     """With the demand met the return follows from e C_min (T_network - T_return) = Q."""
     substation = plants["heating_substation"](HeatingSubstation())
-    result = substation(network_in=NETWORK)
+    result = substation(supply_in=NETWORK)
     out = result.outputs
     effectiveness = counterflow_effectiveness(2e4, 2 * CP, 3 * CP)
     assert out.heat_supplied == pytest.approx(1.5e5, rel=1e-12)
     assert out.duty == pytest.approx(1.5e5, rel=1e-9)
     assert not out.is_unmet and out.unmet_demand == pytest.approx(0, abs=1e-6)
-    assert out.network_out_T == pytest.approx(348.15 - 1.5e5 / (2 * CP), rel=1e-12)
+    assert out.return_out_T == pytest.approx(348.15 - 1.5e5 / (2 * CP), rel=1e-12)
     expected_return = 348.15 - 1.5e5 / (effectiveness * 2 * CP)
     assert out.building_return_temperature == pytest.approx(expected_return, abs=1e-8)
     assert out.building_supply_temperature == pytest.approx(
@@ -38,7 +38,7 @@ def test_met_demand_closes_the_building_loop(plants):
     )
     valve = result.children["valve"]
     assert out.valve_pressure_drop == valve.outputs.pressure_drop > 0
-    assert result.outlets.network_out.p == pytest.approx(6e5 - out.valve_pressure_drop - 2e4)
+    assert result.outlets.return_out.p == pytest.approx(6e5 - out.valve_pressure_drop - 2e4)
     assert energy_balance(substation, result)["relative_residual"] < 1e-12
     assert mass_balance(substation, result)["residual"] == 0
     assert list(result.leaves()) == ["valve", "heat_exchanger", "consumer"]
@@ -47,7 +47,7 @@ def test_met_demand_closes_the_building_loop(plants):
 def test_large_demand_is_capped_at_the_return_floor(plants):
     """Beyond the exchanger's reach the return sits at the floor and the rest is unmet."""
     substation = plants["heating_substation"](HeatingSubstation(), demand=5e5)
-    out = substation(network_in=NETWORK).outputs
+    out = substation(supply_in=NETWORK).outputs
     effectiveness = counterflow_effectiveness(2e4, 2 * CP, 3 * CP)
     available = effectiveness * 2 * CP * (348.15 - 303.15)
     assert out.building_return_temperature == pytest.approx(303.15, abs=1e-8)
@@ -58,10 +58,10 @@ def test_large_demand_is_capped_at_the_return_floor(plants):
 def test_stopped_or_cold_network_delivers_nothing(plants):
     """No network flow, or a supply below the return floor, leaves the demand unmet."""
     substation = plants["heating_substation"](HeatingSubstation())
-    stopped = substation(network_in=NETWORK.with_(m_dot=0.0)).outputs
+    stopped = substation(supply_in=NETWORK.with_(m_dot=0.0)).outputs
     assert stopped.heat_supplied == 0 and stopped.unmet_demand == 1.5e5
-    assert stopped.valve_pressure_drop == 0 and stopped.network_out_T == 348.15
-    cold = substation(network_in=NETWORK.with_(T=300.15)).outputs
+    assert stopped.valve_pressure_drop == 0 and stopped.return_out_T == 348.15
+    cold = substation(supply_in=NETWORK.with_(T=300.15)).outputs
     assert cold.heat_supplied == 0 and cold.building_return_temperature == 300.15
 
 
@@ -70,9 +70,9 @@ def test_invalid_inputs_raise(plants):
     substation = plants["heating_substation"](HeatingSubstation())
     substation.valve.opening = 0
     with pytest.raises(gm.errors.PhysicsError, match="closed valve"):
-        substation(network_in=NETWORK)
+        substation(supply_in=NETWORK)
     substation.valve.opening = 0.8
     with pytest.raises(gm.errors.PhysicsError):
-        substation(network_in=NETWORK.with_(m_dot=-1.0))
+        substation(supply_in=NETWORK.with_(m_dot=-1.0))
     with raises(gm.errors.ValidationError, "missing_value", match="building_flow"):
-        HeatingSubstation()(network_in=NETWORK)
+        HeatingSubstation()(supply_in=NETWORK)

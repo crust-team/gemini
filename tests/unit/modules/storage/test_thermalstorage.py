@@ -170,8 +170,8 @@ class BoilerCharging(Module):
         """Heat the charge water, then pass both circuits through the tank."""
 
         # Modules
-        heated = self.boiler(inlet=inlets.charge_in)
-        stored = self.storage(charge_in=heated.outlets.outlet, discharge_in=inlets.discharge_in)
+        heated = self.boiler(fluid_in=inlets.charge_in)
+        stored = self.storage(charge_in=heated.outlets.fluid_out, discharge_in=inlets.discharge_in)
 
         # Outlets
         charge_out = stored.outlets.charge_out

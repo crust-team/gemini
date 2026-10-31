@@ -39,7 +39,7 @@ class ORC(Module):
     generating power from low-temperature geothermal fluids, Geothermics 33, 565-586).
 
     When the gross power would exceed ``capacity``, part of the brine bypasses the plant: the
-    processed share is capacity / uncapped gross power and ``brine_out`` is the adiabatic mix
+    processed share is capacity / uncapped gross power and ``fluid_out`` is the adiabatic mix
     of bypassed and cooled brine. The cycle efficiency is unchanged at part load (part-load
     degradation is not modelled). An inlet no hotter than T_out produces nothing and leaves
     unchanged.
@@ -67,7 +67,7 @@ class ORC(Module):
         self.capacity = Parameter(Power, gt=0)
 
         # Inlets
-        self.brine_in = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Boundaries
         self.ambient_temperature = Boundary(Temperature)
@@ -81,33 +81,33 @@ class ORC(Module):
         self.heat_loss = Output(HeatLoss)
         self.thermal_efficiency = Output(Fraction | None)
         self.condensing_temperature = Output(Temperature)
-        self.brine_out_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.is_capped = Output(bool)
 
         # Outlets
-        self.brine_out = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Cool the brine by the heat the cycle takes at the operating point."""
 
         # Outlets
-        brine_in = inlets.brine_in
-        design = self._design(brine_in)
-        brine_out_T = heat_transfer.effectiveness_outlet_temperature(
-            brine_in.T, design.processed_share, design.outlet_temperature
+        fluid_in = inlets.fluid_in
+        design = self._design(fluid_in)
+        fluid_out_T = heat_transfer.effectiveness_outlet_temperature(
+            fluid_in.T, design.processed_share, design.outlet_temperature
         )
 
-        brine_out = brine_in.with_(T=brine_out_T)
+        fluid_out = fluid_in.with_(T=fluid_out_T)
 
-        outlets = dict(brine_out=brine_out)
+        outlets = dict(fluid_out=fluid_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        brine_in = inlets.brine_in
-        brine_out = outlets.brine_out
-        design = self._design(brine_in)
+        fluid_in = inlets.fluid_in
+        fluid_out = outlets.fluid_out
+        design = self._design(fluid_in)
         self.heat_input = heat_transfer.heat_rate(
-            brine_in.heat_capacity_rate(), brine_in.T - brine_out.T
+            fluid_in.heat_capacity_rate(), fluid_in.T - fluid_out.T
         )
         balance = _physics.plant_balance(
             self.heat_input, design.cycle_efficiency, self.parasitic_fraction
@@ -119,22 +119,22 @@ class ORC(Module):
         self.heat_loss = balance.heat_loss
         self.thermal_efficiency = balance.thermal_efficiency
         self.condensing_temperature = design.condensing_temperature
-        self.brine_out_T = brine_out.T
+        self.fluid_out_T = fluid_out.T
         self.is_capped = design.is_capped
 
-    def _design(self, brine_in):
+    def _design(self, fluid_in):
         """Return the ``_physics.cycle_design`` of the brine inlet."""
         ops.check(
-            brine_in.m_dot >= 0,
+            fluid_in.m_dot >= 0,
             PhysicsError,
-            "{path}: brine_in.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
-            m_dot=brine_in.m_dot,
+            m_dot=fluid_in.m_dot,
         )
-        cp = brine_in.fluid.properties(brine_in.p, brine_in.T).cp_l
+        cp = fluid_in.fluid.properties(fluid_in.p, fluid_in.T).cp_l
         return _physics.cycle_design(
-            brine_in.T,
-            brine_in.m_dot,
+            fluid_in.T,
+            fluid_in.m_dot,
             cp,
             self.ambient_temperature,
             self.condenser_approach,

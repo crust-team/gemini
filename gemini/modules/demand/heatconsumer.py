@@ -55,7 +55,7 @@ class HeatConsumer(Module):
         self.minimum_return_temperature = Parameter(Temperature)
 
         # Inlets
-        self.supply_in = Inlet(Stream, stream="hot_water")
+        self.supply_in = Inlet(Stream, kind="hot_water")
 
         # Boundaries
         self.heat_demand = Boundary(Power, ge=0)
@@ -69,7 +69,7 @@ class HeatConsumer(Module):
         self.is_unmet = Output(bool)
 
         # Outlets
-        self.return_out = Outlet(Stream, stream="hot_water")
+        self.return_out = Outlet(Stream, kind="hot_water")
 
     def forward(self, inlets):
         """Return the supply stream cooled by the delivered heat."""

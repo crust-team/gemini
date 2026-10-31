@@ -163,7 +163,7 @@ class ProductionReservoir(_Reservoir):
         self.liquid_flow = Output(VolumeFlow)
 
         # Outlets
-        self.sandface = Outlet(Stream, stream="brine")
+        self.sandface_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Apply the linear production IPR and emit the sandface stream."""
@@ -171,11 +171,11 @@ class ProductionReservoir(_Reservoir):
         # Outlets
         sandface = self.sandface_stream(self.production_rate)
 
-        outlets = dict(sandface=sandface)
+        outlets = dict(sandface_out=sandface)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        sandface = outlets.sandface
+        sandface = outlets.sandface_out
         flow = sandface.volumetric_flow()
         for name, value in self._calculate_outputs(flow, sandface.p).items():
             setattr(self, name, value)
@@ -210,7 +210,7 @@ class InjectionReservoir(_Reservoir):
         super().__init__("injection")
 
         # Inlets
-        self.sandface = Inlet(Stream, stream="brine")
+        self.sandface_in = Inlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Receive the sandface stream; the aquifer has no outlet."""
@@ -224,7 +224,7 @@ class InjectionReservoir(_Reservoir):
 
     def _compute_outputs(self, inlets, outlets):
         """Calculate the bottomhole pressure the sandface flow requires."""
-        sandface = inlets.sandface
+        sandface = inlets.sandface_in
         flow = fluid_physics.volume_flow(
             ops.abs(sandface.m_dot), self.fluid.properties(sandface.p, sandface.T).rho_l
         )

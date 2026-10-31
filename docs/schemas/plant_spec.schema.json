@@ -123,12 +123,6 @@
       "items": {
         "additionalProperties": false,
         "properties": {
-          "kind": {
-            "enum": [
-              "state",
-              null
-            ]
-          },
           "source": {
             "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
             "type": "string"
@@ -136,6 +130,12 @@
           "target": {
             "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
             "type": "string"
+          },
+          "type": {
+            "enum": [
+              "state",
+              null
+            ]
           }
         },
         "required": [

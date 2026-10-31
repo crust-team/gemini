@@ -13,11 +13,11 @@ def test_names_are_the_fixed_list():
 
 def test_a_port_keeps_its_stream():
     """A port may name a stream type or take whatever flows through it."""
-    assert Inlet(Stream, stream="brine").stream == "brine"
-    assert Outlet(Stream).stream is None
+    assert Inlet(Stream, kind="brine").kind == "brine"
+    assert Outlet(Stream).kind is None
 
 
 def test_an_unknown_stream_suggests_the_closest():
     """A misspelt stream type fails while the class is built."""
     with pytest.raises(DefinitionError, match="did you mean 'brine'"):
-        Inlet(Stream, stream="brin")
+        Inlet(Stream, kind="brin")

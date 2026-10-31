@@ -21,11 +21,11 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["unit", "kind", "soft_sensor"],
+        "required": ["unit", "quantity", "soft_sensor"],
         "additionalProperties": false,
         "properties": {
           "unit": {"type": ["string", "null"]},
-          "kind": {"type": ["string", "null"]},
+          "quantity": {"type": ["string", "null"]},
           "soft_sensor": {"type": "boolean"}
         }
       }
@@ -35,13 +35,13 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["source", "target", "stream", "kind"],
+        "required": ["source", "target", "kind", "type"],
         "additionalProperties": false,
         "properties": {
           "source": {"type": "string"},
           "target": {"type": "string"},
-          "stream": {"type": ["string", "null"]},
-          "kind": {"enum": ["state", null]}
+          "kind": {"type": ["string", "null"]},
+          "type": {"enum": ["state", null]}
         }
       }
     },
@@ -78,10 +78,10 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["stream", "fields"],
+        "required": ["kind", "fields"],
         "additionalProperties": false,
         "properties": {
-          "stream": {"type": ["string", "null"]},
+          "kind": {"type": ["string", "null"]},
           "fields": {
             "type": "object",
             "additionalProperties": {

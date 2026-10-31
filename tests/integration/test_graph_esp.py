@@ -41,7 +41,7 @@ def _untraced(esp, week):
     suction = _suction(esp, week)
     return [
         esp(
-            suction=gm.Stream(
+            fluid_in=gm.Stream(
                 m_dot=suction.m_dot[row], T=week[row, 1], p=week[row, 2], fluid=esp.fluid
             ),
             frequency=week[row, 3],
@@ -89,13 +89,13 @@ def _assert_equal(traced, expected):
         values = [row.outputs[name] for row in expected]
         np.testing.assert_allclose(traced.outputs[name], values, rtol=RTOL, atol=0, err_msg=name)
     for field in ("m_dot", "T", "p"):
-        values = [getattr(row.outlets.discharge, field) for row in expected]
-        np.testing.assert_allclose(traced.outlets["discharge"][field], values, rtol=RTOL, atol=0)
+        values = [getattr(row.outlets.fluid_out, field) for row in expected]
+        np.testing.assert_allclose(traced.outlets["fluid_out"][field], values, rtol=RTOL, atol=0)
 
 
 def test_numpy_backend_equals_the_untraced_path(esp, week, plain_week):
     """Every ESP output and outlet field of one traced NumPy call matches tick by tick."""
-    traced = run(esp, {"suction": _suction(esp, week)}, {"frequency": week[:, 3]})
+    traced = run(esp, {"fluid_in": _suction(esp, week)}, {"frequency": week[:, 3]})
     expected = plain_week
     assert traced.breaks == []
     assert set(traced.outputs) == set(esp.outputs(recurse=False)) == set(expected[0].outputs)
@@ -104,12 +104,12 @@ def test_numpy_backend_equals_the_untraced_path(esp, week, plain_week):
 
 def test_python_backend_interprets_the_same_graph(esp, week):
     """The graph on the Python backend, row by row, gives the untraced values."""
-    traced = run(esp, {"suction": _suction(esp, week[:4])}, {"frequency": week[:4, 3]})
+    traced = run(esp, {"fluid_in": _suction(esp, week[:4])}, {"frequency": week[:4, 3]})
     expected = _untraced(esp, week[:4])
     for row in range(4):
         one = week[row : row + 1]
         scalar = run(
-            esp, {"suction": _suction(esp, one)}, {"frequency": one[0, 3]}, backend="python"
+            esp, {"fluid_in": _suction(esp, one)}, {"frequency": one[0, 3]}, backend="python"
         )
         assert scalar.outputs["head"][0] == pytest.approx(expected[row].outputs.head, rel=RTOL)
         assert traced.outputs["power"][row] == expected[row].outputs.power
@@ -117,7 +117,7 @@ def test_python_backend_interprets_the_same_graph(esp, week):
 
 def test_parameters_and_constants_are_named_inputs_without_baked_values(esp):
     """The graph reads parameters and constants as inputs; no parameter value is a literal."""
-    graph = GraphCache().graph(esp, {"suction": esp.fluid})
+    graph = GraphCache().graph(esp, {"fluid_in": esp.fluid})
     parameters = set(graph.by_role("parameter"))
     assert {
         "stage_count",
@@ -151,7 +151,7 @@ def test_parameters_and_constants_are_named_inputs_without_baked_values(esp):
 def test_retrace_happens_only_when_a_guard_changes(esp, week):
     """New parameter values reuse the graph and change the results; a new hook retraces."""
     cache = GraphCache()
-    inlets, inputs = {"suction": _suction(esp, week)}, {"frequency": week[:, 3]}
+    inlets, inputs = {"fluid_in": _suction(esp, week)}, {"frequency": week[:, 3]}
     before = run(esp, inlets, inputs, cache=cache).outputs["head"]
     esp.update_params(stage_count=2 * esp.stage_count)
     after = run(esp, inlets, inputs, cache=cache).outputs["head"]
@@ -165,10 +165,10 @@ def test_retrace_happens_only_when_a_guard_changes(esp, week):
 def test_no_outputs_traces_the_fluid_step_only(esp, week, plain_week):
     """Under ``no_outputs()`` the traced run returns outlets and no outputs."""
     with gm.no_outputs():
-        traced = run(esp, {"suction": _suction(esp, week)}, {"frequency": week[:, 3]})
+        traced = run(esp, {"fluid_in": _suction(esp, week)}, {"frequency": week[:, 3]})
     assert traced.outputs == {} and traced.breaks == []
-    pressures = [row.outlets.discharge.p for row in plain_week]
-    np.testing.assert_allclose(traced.outlets["discharge"]["p"], pressures, rtol=RTOL)
+    pressures = [row.outlets.fluid_out.p for row in plain_week]
+    np.testing.assert_allclose(traced.outlets["fluid_out"]["p"], pressures, rtol=RTOL)
 
 
 def test_reverse_flow_raises_the_untraced_error_at_the_physics_line(esp, week):
@@ -177,13 +177,13 @@ def test_reverse_flow_raises_the_untraced_error_at_the_physics_line(esp, week):
     reversed_flow = suction.with_(m_dot=suction.m_dot * np.array([1, -1, -1]))
     with pytest.raises(PhysicsError) as untraced:
         esp(
-            suction=gm.Stream(
+            fluid_in=gm.Stream(
                 m_dot=reversed_flow.m_dot[1], T=week[1, 1], p=week[1, 2], fluid=esp.fluid
             ),
             frequency=week[1, 3],
         )
     with pytest.raises(PhysicsError) as traced:
-        run(esp, {"suction": reversed_flow}, {"frequency": week[:3, 3]})
+        run(esp, {"fluid_in": reversed_flow}, {"frequency": week[:3, 3]})
     assert str(traced.value) == str(untraced.value)
     source, first = inspect.getsourcelines(esp_file.ESP.forward)
     note = traced.value.__notes__[0]
@@ -193,7 +193,7 @@ def test_reverse_flow_raises_the_untraced_error_at_the_physics_line(esp, week):
 
 def test_hooks_on_the_traced_esp(esp, week, plain_week, motor_loss_week, untraceable_week):
     """A reading hook breaks the root and sees real rows, a gm-op hook joins the graph."""
-    inlets, inputs = {"suction": _suction(esp, week)}, {"frequency": week[:, 3]}
+    inlets, inputs = {"fluid_in": _suction(esp, week)}, {"frequency": week[:, 3]}
     seen = []
     reader = esp.register_forward_hook(lambda module, inlets, outlets: seen.append(module.head))
     traced = run(esp, inlets, inputs)

@@ -39,7 +39,7 @@ class Booster(Module):
         self.gain = Parameter(float, default=2.0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.level = Control(float)
@@ -51,7 +51,7 @@ class Booster(Module):
         self.inverse = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Raise the pressure."""
@@ -64,13 +64,13 @@ class Booster(Module):
             path=self.path,
             level=self.level,
         )
-        outlet = inlets.inlet.with_(p=inlets.inlet.p + self.level * self.gain)
-        outlets = dict(outlet=outlet)
+        outlet = inlets.fluid_in.with_(p=inlets.fluid_in.p + self.level * self.gain)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.rise = outlets.outlet.p - inlets.inlet.p
-        self.power = self.rise * inlets.inlet.m_dot
+        self.rise = outlets.fluid_out.p - inlets.fluid_in.p
+        self.power = self.rise * inlets.fluid_in.m_dot
         self.share = ops.where(self.level == 0, None, self.rise / ops.maximum(self.level, 1e-9))
         self.inverse = ops.truediv(1.0, self.level)
 
@@ -91,23 +91,23 @@ class Reservoir(Module):
         self.total = State(float, default=0.0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.content = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream."""
 
         # Outlets
-        outlets = dict(outlet=inlets.inlet)
+        outlets = dict(fluid_out=inlets.fluid_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.content = self.total + inlets.inlet.m_dot
+        self.content = self.total + inlets.fluid_in.m_dot
 
     def _advance_states(self, inlets, outlets, dt):
         return dict(total=self.content)
@@ -140,12 +140,12 @@ def pair_bindings(path_prefix=""):
     return {
         f"{path_prefix}first": ModuleBindings(
             controls={"level": Binding(column="level", unit="bar")},
-            inlets={"inlet": inlet_bindings()},
+            inlets={"fluid_in": inlet_bindings()},
             measured={"rise": Binding(column="rise", unit="bar")},
         ),
         f"{path_prefix}second": ModuleBindings(
             controls={"level": Binding(column="level2", unit="Pa")},
-            inlets={"inlet": inlet_bindings()},
+            inlets={"fluid_in": inlet_bindings()},
             measured={"rise": Binding(column="rise", unit="bar")},
         ),
     }
@@ -156,7 +156,7 @@ def pair_plant(with_tank=False):
     plant = Pair()
     plant.bindings = pair_bindings()
     if with_tank:
-        plant.bindings["tank"] = ModuleBindings(inlets={"inlet": inlet_bindings()})
+        plant.bindings["tank"] = ModuleBindings(inlets={"fluid_in": inlet_bindings()})
     return plant
 
 
@@ -203,7 +203,7 @@ class Duo(Module):
         self.back = Booster()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.level = Control(float)
@@ -213,17 +213,17 @@ class Duo(Module):
         self.power = Output(Electricity)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Both boosters get the duo's level."""
 
         # Modules
-        first = self.front(inlet=inlets.inlet, level=self.level)
-        second = self.back(inlet=first.outlets.outlet, level=self.level)
+        first = self.front(fluid_in=inlets.fluid_in, level=self.level)
+        second = self.back(fluid_in=first.outlets.fluid_out, level=self.level)
 
         # Outlets
-        outlets = dict(outlet=second.outlets.outlet)
+        outlets = dict(fluid_out=second.outlets.fluid_out)
         return outlets
 
 
@@ -244,13 +244,13 @@ def holder_plant(nested=False):
     plant.bindings = {
         "duo": ModuleBindings(
             controls={"level": Binding(column="level", unit="bar")},
-            inlets={"inlet": inlet_bindings()},
+            inlets={"fluid_in": inlet_bindings()},
         )
     }
     if nested:
         plant.bindings["duo.front"] = ModuleBindings(
             controls={"level": Binding(column="level", unit="bar")},
-            inlets={"inlet": inlet_bindings()},
+            inlets={"fluid_in": inlet_bindings()},
             measured={"rise": Binding(column="rise", unit="bar")},
         )
     return plant

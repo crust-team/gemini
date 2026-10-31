@@ -31,14 +31,14 @@ def test_heating_network_serves_both_substations(plants):
     result = network(supply_in=HOT)
     out = result.outputs
     children = result.children
-    feeds = [children[f"substations.{index}"].inlets.network_in.m_dot for index in range(2)]
+    feeds = [children[f"substations.{index}"].inlets.supply_in.m_dot for index in range(2)]
     assert feeds == [2.0, 2.0]
     assert out.heat_supplied == pytest.approx(3e5, rel=1e-12)
     assert out.electricity == children["pump"].outputs.electricity > 0
     assert out.heat_loss == pytest.approx(_leaf_sum(result, "heat_loss"), rel=1e-14)
     assert out.heat_absorbed == 0
-    mixed = children["mixers.0"].outlets.mixed_out
-    substation = children["substations.0"].outlets.network_out
+    mixed = children["mixers.0"].outlets.fluid_out
+    substation = children["substations.0"].outlets.return_out
     assert mixed.T == pytest.approx(substation.T, rel=1e-14) and mixed.m_dot == 4.0
     transfer = 1.0 * math.pi * 0.1 * 500 / (4.0 * CP)
     expected = 283.15 + (mixed.T - 283.15) * math.exp(-transfer)
@@ -66,7 +66,7 @@ def test_three_way_split_and_mix(plants):
     """The cascades give every substation a third and mix three returns."""
     network = plants["network"](_network(consumers=3), plants["heating_substation"])
     result = network(supply_in=HOT.with_(m_dot=4.5))
-    feeds = [result.children[f"substations.{index}"].inlets.network_in.m_dot for index in range(3)]
+    feeds = [result.children[f"substations.{index}"].inlets.supply_in.m_dot for index in range(3)]
     assert feeds == pytest.approx([1.5] * 3, rel=1e-15)
     assert len(network.splitters) == len(network.mixers) == 2
     assert result.outlets.return_out.m_dot == pytest.approx(4.5, rel=1e-15)

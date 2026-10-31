@@ -71,6 +71,91 @@ FLUID_NAMES = {"liquid_density": "density", "liquid_viscosity": "viscosity"}
 """Fluid fields renamed in 0.2.0; a reservoir parameter of these names moved onto its fluid."""
 
 
+RENAMED_PORTS = {
+    "inlet": "fluid_in",
+    "suction": "fluid_in",
+    "feed_in": "fluid_in",
+    "brine_in": "fluid_in",
+    "outlet": "fluid_out",
+    "discharge": "fluid_out",
+    "mixed_out": "fluid_out",
+    "retained_out": "fluid_out",
+    "brine_out": "fluid_out",
+    "first_in": "branch1_in",
+    "second_in": "branch2_in",
+    "first_out": "branch1_out",
+    "second_out": "branch2_out",
+    "blowdown_out": "waste_out",
+    "secondary_in": "return_in",
+    "secondary_out": "supply_out",
+    "network_in": "supply_in",
+    "network_out": "return_out",
+    "building_in": "return_in",
+    "building_out": "supply_out",
+    "liquid": "liquid_out",
+    "gas": "gas_out",
+}
+"""Port names before the ``<role>_in`` and ``<role>_out`` rule and their current names."""
+
+SUFFIXED_PORTS = {"wellhead", "bottom", "sandface"}
+"""Old port names that were an inlet on one module and an outlet on another."""
+
+
+def _current_port(port, side):
+    """Return the current name of ``port``, an old or current inlet or outlet name."""
+    if port in SUFFIXED_PORTS:
+        return f"{port}_{'in' if side == 'inlets' else 'out'}"
+    return RENAMED_PORTS.get(port, port)
+
+
+def _current_end(end, side):
+    """Return the ``"path.port"`` end of a connection with the current port name."""
+    path, _, port = end.rpartition(".")
+    return join_path(path, _current_port(port, side))
+
+
+def _current_binding_names(bindings):
+    """Return flat bindings of one module with the current port of each ``port.field`` key."""
+    current = {}
+    for key, value in bindings.items():
+        port, dot, field = key.partition(".")
+        current[f"{_current_port(port, 'inlets')}{dot}{field}"] = value
+    return current
+
+
+def _current_stored_inputs(boundary):
+    """Return stored ``boundary`` values whose streams are keyed by current port names."""
+    current = dict(boundary)
+    if "root_inputs" in boundary:
+        current["root_inputs"] = {
+            _current_port(port, "inlets"): value for port, value in boundary["root_inputs"].items()
+        }
+    if "stream_defaults" in boundary:
+        current["stream_defaults"] = {
+            path: {_current_port(port, "inlets"): value for port, value in ports.items()}
+            for path, ports in boundary["stream_defaults"].items()
+        }
+    return current
+
+
+def _current_ports(spec):
+    """Return a format 2 spec whose connection ends, plant ports and bindings use current ports."""
+    for item in spec.get("connections", []):
+        item["source"] = _current_end(item["source"], "outlets")
+        item["target"] = _current_end(item["target"], "inlets")
+    for side in ("inlets", "outlets"):
+        if side in spec:
+            spec[side] = {name: _current_end(end, side) for name, end in spec[side].items()}
+    spec["bindings"] = {
+        path: _current_binding_names(values) for path, values in spec.get("bindings", {}).items()
+    }
+    if "boundary" in spec:
+        spec["boundary"] = {
+            path: _current_stored_inputs(values) for path, values in spec["boundary"].items()
+        }
+    return spec
+
+
 def _failed(message, path=None):
     return ValidationError(message, code="migration_failed", path=path)
 
@@ -164,7 +249,10 @@ def _current_names(values):
 
 def _current_bindings(bindings):
     """Return the bindings of one module with the current name of each measured output."""
-    return bindings | {"measured": _current_names(bindings.get("measured", {}))}
+    inlets = {
+        _current_port(port, "inlets"): value for port, value in bindings.get("inlets", {}).items()
+    }
+    return bindings | {"measured": _current_names(bindings.get("measured", {})), "inlets": inlets}
 
 
 def _current_entry(entry):
@@ -195,7 +283,7 @@ def _convert(old):
     name = old["plant_type"].split(":")[-1].split(".")[-1]
     entries = {path: _current_entry(entry) for path, entry in old["modules"].items()}
     if library.has(name):
-        spec = _current_fluids(_structured(name, entries))
+        spec = _current_fluids(_current_ports(_structured(name, entries)))
         problems = reader.problems(Plant, spec)
         if problems:
             raise _failed(
@@ -265,7 +353,7 @@ def _current_boilers(spec):
         if entry.get("type") in ("Boiler", "CHP") and f"{path}.fuel_in" not in fed:
             grid = f"{path.replace('.', '_')}_grid"
             spec["modules"][grid] = {"type": "GasGrid", "params": {}}
-            spec["connections"].append({"source": f"{grid}.outlet", "target": f"{path}.fuel_in"})
+            spec["connections"].append({"source": f"{grid}.gas_out", "target": f"{path}.fuel_in"})
     return spec
 
 
@@ -287,8 +375,9 @@ def _named_ports(spec):
 def migrate(old):
     """Convert a format 1 plant file to a format 2 spec; a spec is returned as a copy.
 
-    A format 2 spec written before 0.2.0 gets explicit names for its free ports, the fluid fields
-    of 0.2.0 and the reservoir ``liquid_density`` and ``liquid_viscosity`` on the module's fluid;
+    A format 2 spec gets the current port names (``RENAMED_PORTS``) and, written before 0.2.0,
+    explicit names for its free ports, the fluid fields of 0.2.0 and the reservoir
+    ``liquid_density`` and ``liquid_viscosity`` on the module's fluid;
     a ``Boiler`` of ``fuel_type="electric"`` becomes an ``ElectricBoiler``, and a gas ``Boiler`` or
     a ``CHP`` without a ``fuel_in`` gets a ``GasGrid``.
 
@@ -297,7 +386,7 @@ def migrate(old):
     Failures raise ``ValidationError`` with code ``migration_failed``.
     """
     if isinstance(old, dict) and old.get("format") == FORMAT:
-        return _named_ports(_current_boilers(_current_fluids(deepcopy(old))))
+        return _named_ports(_current_boilers(_current_fluids(_current_ports(deepcopy(old)))))
     try:
         return _convert(old)
     except GeminiError:

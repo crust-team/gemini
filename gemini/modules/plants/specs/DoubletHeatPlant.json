@@ -15,15 +15,15 @@
     "injection_pump": {"type": "InjectionPump", "params": {}}
   },
   "connections": [
-    {"source": "doublet.supply_out", "target": "degasser.inlet"},
-    {"source": "degasser.liquid", "target": "filters.hot.inlet"},
-    {"source": "filters.hot.outlet", "target": "heat_exchanger.hot_in"},
-    {"source": "heat_exchanger.hot_out", "target": "filters.cold.inlet"},
-    {"source": "filters.cold.outlet", "target": "injection_pump.suction"},
-    {"source": "injection_pump.discharge", "target": "doublet.return_in"}
+    {"source": "doublet.supply_out", "target": "degasser.fluid_in"},
+    {"source": "degasser.liquid_out", "target": "filters.hot.fluid_in"},
+    {"source": "filters.hot.fluid_out", "target": "heat_exchanger.hot_in"},
+    {"source": "heat_exchanger.hot_out", "target": "filters.cold.fluid_in"},
+    {"source": "filters.cold.fluid_out", "target": "injection_pump.fluid_in"},
+    {"source": "injection_pump.fluid_out", "target": "doublet.return_in"}
   ],
-  "inlets": {"secondary_in": "heat_exchanger.cold_in"},
-  "outlets": {"secondary_out": "heat_exchanger.cold_out", "gas": "degasser.gas"},
+  "inlets": {"return_in": "heat_exchanger.cold_in"},
+  "outlets": {"supply_out": "heat_exchanger.cold_out", "gas_out": "degasser.gas_out"},
   "outputs": {
     "thermal_power": {"of": "heat_exchanger.duty"},
     "electricity": {"sum": "electricity"},

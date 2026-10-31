@@ -14,7 +14,7 @@ def declare_automatic(plant):
     """Declare the sum of each energy output that some descendant leaf declares."""
     leaves = plant._descendant_leaves()
     for name in ENERGY:
-        kinds = [leaf._outputs[name].kind for leaf in leaves if name in leaf._outputs]
+        kinds = [leaf._outputs[name].type for leaf in leaves if name in leaf._outputs]
         if kinds:
             plant._register_declaration(name, Output(kinds[0]))
 
@@ -57,7 +57,7 @@ def _summed(plant, spec):
         raise _unknown("sum", name, names)
     if not declarations[0].additive:
         raise ValidationError(f"sum = {name!r}: not an additive output", path="sum")
-    return Output(declarations[0].kind)
+    return Output(declarations[0].type)
 
 
 def _ratio(plant, spec):

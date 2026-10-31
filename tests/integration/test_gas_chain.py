@@ -23,13 +23,13 @@ def chain():
     plant.add("GasMakeup", name="makeup")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
     plant.add("Flare", name="flare")
-    plant.connect("produced", "degasser.inlet")
-    plant.connect("degasser.liquid", "brine_out")
-    plant.connect("degasser.gas", "makeup.inlet")
-    plant.connect("makeup.outlet", "boiler.fuel_in")
-    plant.connect("boiler.gas_out", "flare.inlet")
-    plant.connect("water_in", "boiler.inlet")
-    plant.connect("boiler.outlet", "water_out")
+    plant.connect("produced", "degasser.fluid_in")
+    plant.connect("degasser.liquid_out", "fluid_out")
+    plant.connect("degasser.gas_out", "makeup.fluid_in")
+    plant.connect("makeup.fluid_out", "boiler.fuel_in")
+    plant.connect("boiler.gas_out", "flare.fluid_in")
+    plant.connect("water_in", "boiler.fluid_in")
+    plant.connect("boiler.fluid_out", "water_out")
     plant.validate()
     return plant
 
@@ -60,15 +60,15 @@ def test_a_boiler_short_of_gas_buys_the_rest_and_nothing_reaches_the_flare():
 
 
 def test_without_co_produced_gas_the_grid_covers_everything():
-    """``grid.outlet`` to ``boiler.fuel_in``, the other wiring of the chain."""
+    """``grid.fluid_out`` to ``boiler.fuel_in``, the other wiring of the chain."""
     plant = gm.Plant("Grid")
     plant.add("GasGrid", name="grid")
     plant.add("Boiler", name="boiler", params={"capacity": "30 MW", "efficiency": 0.9})
     plant.add("Flare", name="flare")
-    plant.connect("grid.outlet", "boiler.fuel_in")
-    plant.connect("boiler.gas_out", "flare.inlet")
-    plant.connect("water_in", "boiler.inlet")
-    plant.connect("boiler.outlet", "water_out")
+    plant.connect("grid.fluid_out", "boiler.fuel_in")
+    plant.connect("boiler.gas_out", "flare.fluid_in")
+    plant.connect("water_in", "boiler.fluid_in")
+    plant.connect("boiler.fluid_out", "water_out")
     plant.boiler.temperature_setpoint = "70 degC"
     outputs = plant(water_in=WATER).leaves()["boiler"].outputs
     assert outputs.fuel_coproduced == 0 and outputs.fuel_purchased == pytest.approx(outputs.fuel)

@@ -36,8 +36,8 @@ class DownholeHeatExchanger(Module):
     14(4), 427-435; ``ground.ramey_time_function``). The steady energy balance
     m_dot cp dT/dz = (T_rock(z) - T) / R gives Ramey's exact profile with the relaxation
     length A = m_dot cp R (``ground.ramey_fluid_temperature``), and the fluid leaves at the
-    bottom-hole temperature: outlet_T = T(depth). ``heat_extraction_rate`` is
-    m_dot cp (outlet_T - T_in); heat taken from the rock is ``heat_absorbed`` and heat given to
+    bottom-hole temperature: fluid_out_T = T(depth). ``heat_extraction_rate`` is
+    m_dot cp (fluid_out_T - T_in); heat taken from the rock is ``heat_absorbed`` and heat given to
     it (an inlet warmer than the rock) ``heat_loss``, so the stream audit closes.
 
     Assumptions: steady state at a fixed operating time (no load history; the rock
@@ -65,33 +65,33 @@ class DownholeHeatExchanger(Module):
         self.operating_time = Parameter(Duration, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="hot_water")
+        self.fluid_in = Inlet(Stream, kind="hot_water")
 
         # Outputs
         self.heat_extraction_rate = Output(Power)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.heat_absorbed = Output(HeatAbsorbed)
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="hot_water")
+        self.fluid_out = Outlet(Stream, kind="hot_water")
 
     def forward(self, inlets):
         """Return the fluid at the temperature it reaches at the bottom of the annulus."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet.with_(T=self._outlet_temperature(inlet))
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
-        outlet = outlets.outlet
+        inlet = inlets.fluid_in
+        outlet = outlets.fluid_out
         rate = heat_transfer.heat_rate(inlet.heat_capacity_rate(), outlet.T - inlet.T)
         self.heat_extraction_rate = rate
-        self.outlet_T = outlet.T
+        self.fluid_out_T = outlet.T
         self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 
     def _outlet_temperature(self, inlet):
@@ -103,7 +103,7 @@ class DownholeHeatExchanger(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )

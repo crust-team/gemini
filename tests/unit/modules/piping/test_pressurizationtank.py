@@ -37,7 +37,7 @@ class Network(Module):
         self.tank = PressurizationTank()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Boundaries
         self.ambient_temperature = Boundary(Temperature)
@@ -47,37 +47,39 @@ class Network(Module):
         self.pressure_correction = Output.of(self.tank.pressure_correction)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Split, pass both branches, mix and hold the circuit pressure."""
 
         # Modules
-        split = self.splitter(feed_in=inlets.inlet, split_fraction=0.4)
+        split = self.splitter(fluid_in=inlets.fluid_in, split_fraction=0.4)
         piped = self.pipe(
-            inlet=split.outlets.first_out, ambient_temperature=self.ambient_temperature
+            fluid_in=split.outlets.branch1_out, ambient_temperature=self.ambient_temperature
         )
-        throttled = self.valve(inlet=split.outlets.second_out, opening=0.8)
-        mixed = self.mixer(first_in=piped.outlets.outlet, second_in=throttled.outlets.outlet)
-        held = self.tank(inlet=mixed.outlets.mixed_out, pressure_setpoint="3 bar")
+        throttled = self.valve(fluid_in=split.outlets.branch2_out, opening=0.8)
+        mixed = self.mixer(
+            branch1_in=piped.outlets.fluid_out, branch2_in=throttled.outlets.fluid_out
+        )
+        held = self.tank(fluid_in=mixed.outlets.fluid_out, pressure_setpoint="3 bar")
 
         # Outlets
-        outlet = held.outlets.outlet
+        outlet = held.outlets.fluid_out
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
 def test_outlet_leaves_at_the_setpoint():
     """The tank sets the pressure and reports the correction; flow and temperature pass."""
-    result = PressurizationTank()(inlet=RETURN, pressure_setpoint="2 bar")
-    outlet = result.outlets.outlet
+    result = PressurizationTank()(fluid_in=RETURN, pressure_setpoint="2 bar")
+    outlet = result.outlets.fluid_out
     assert outlet.p == 2e5 and (outlet.m_dot, outlet.T) == (10, 323.15)
     assert result.outputs.pressure_correction == pytest.approx(0.8e5)
-    relieved = PressurizationTank()(inlet=RETURN, pressure_setpoint="1 bar").outputs
+    relieved = PressurizationTank()(fluid_in=RETURN, pressure_setpoint="1 bar").outputs
     assert relieved.pressure_correction == pytest.approx(-0.2e5)
-    reverse = PressurizationTank()(inlet=RETURN.with_(m_dot=-1), pressure_setpoint=2e5)
-    assert reverse.outlets.outlet.m_dot == -1
+    reverse = PressurizationTank()(fluid_in=RETURN.with_(m_dot=-1), pressure_setpoint=2e5)
+    assert reverse.outlets.fluid_out.m_dot == -1
     assert energy_balance(PressurizationTank(), result)["residual"] == 0
     assert mass_balance(PressurizationTank(), result)["residual"] == 0
 
@@ -85,20 +87,20 @@ def test_outlet_leaves_at_the_setpoint():
 def test_invalid_setpoint_and_missing_command_raise():
     """A zero or missing pressure setpoint is rejected."""
     with pytest.raises(gm.errors.ValidationError):
-        PressurizationTank()(inlet=RETURN, pressure_setpoint=0)
+        PressurizationTank()(fluid_in=RETURN, pressure_setpoint=0)
     with raises(gm.errors.ValidationError, "missing_value"):
-        PressurizationTank()(inlet=RETURN)
+        PressurizationTank()(fluid_in=RETURN)
 
 
 def test_piping_network_closes_mass_and_energy():
     """A split, pipe, valve, mixer and tank network conserves mass and sensible energy."""
     network = Network()
-    result = network(inlet=RETURN.with_(p=4e5), ambient_temperature=283.15)
-    outlet = result.outlets.outlet
+    result = network(fluid_in=RETURN.with_(p=4e5), ambient_temperature=283.15)
+    outlet = result.outlets.fluid_out
     assert outlet.m_dot == pytest.approx(10, rel=1e-15) and outlet.p == 3e5
     assert outlet.T < RETURN.T and result.outputs.heat_loss > 0
-    pipe_out = result.children["pipe"].outlets.outlet.p
-    valve_out = result.children["valve"].outlets.outlet.p
+    pipe_out = result.children["pipe"].outlets.fluid_out.p
+    valve_out = result.children["valve"].outlets.fluid_out.p
     assert result.children["mixer"].outputs.pressure_imbalance == pytest.approx(
         abs(pipe_out - valve_out)
     )
@@ -110,7 +112,7 @@ def test_piping_network_closes_mass_and_energy():
 def test_pressurization_tank_matches_traced():
     """Setpoint above and below the inlet pressure traces correctly."""
     rows = [
-        dict(inlet=Stream(m_dot=10, T=323.15, p=p), pressure_setpoint=3e5)
+        dict(fluid_in=Stream(m_dot=10, T=323.15, p=p), pressure_setpoint=3e5)
         for p in (1.2e5, 3e5, 5e5)
     ]
     assert_module_matches(PressurizationTank(), rows)

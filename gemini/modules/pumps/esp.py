@@ -73,7 +73,7 @@ class ESP(Module):
         )
 
         # Inlets
-        self.suction = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.frequency = Control(Frequency)
@@ -89,7 +89,7 @@ class ESP(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.discharge = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def _scalar_mode(self):
         """Return ``PLAIN`` under float32 precision, else ``WRAP``.
@@ -105,7 +105,7 @@ class ESP(Module):
         """Raise the suction-stream pressure by the pump-curve head."""
 
         # Outlets
-        suction = inlets.suction
+        suction = inlets.fluid_in
         flow = suction.volumetric_flow()
         ops.check(
             flow >= 0,
@@ -118,12 +118,12 @@ class ESP(Module):
 
         discharge = suction.with_(p=suction.p + head)
 
-        outlets = dict(discharge=discharge)
+        outlets = dict(fluid_out=discharge)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        suction = inlets.suction
-        discharge = outlets.discharge
+        suction = inlets.fluid_in
+        discharge = outlets.fluid_out
         self.flow = suction.volumetric_flow()
         self.head = self.head_function(self.flow, self.frequency)
         self.power = self.power_function(self.flow, self.frequency)

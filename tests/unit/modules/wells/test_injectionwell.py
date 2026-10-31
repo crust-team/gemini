@@ -19,10 +19,10 @@ def test_injection_flow_sign_and_pressure():
             mapping.read_property(data / "injection_well_a06b.param")
         )
     )
-    result = c(wellhead=Stream(m_dot=40, T=300, p=5e6))
+    result = c(wellhead_in=Stream(m_dot=40, T=300, p=5e6))
     out, streams = result.outputs, result.outlets
     assert out.friction_pressure_drop < 0 and out.gravity_pressure_drop > 0
-    assert streams["bottom"].m_dot == 40
+    assert streams["bottom_out"].m_dot == 40
     assert out.bottomhole_pressure > 5e6
 
 
@@ -73,15 +73,15 @@ def test_injection_traversal_matches_on_arrays():
 def test_injection_well_traces_with_its_section_profiles():
     """The per-section lists are vector outputs: the module traces and equals one call per row."""
     rows = [
-        {"wellhead": Stream(m_dot=40.0, T=353.15, p=25e6)},
-        {"wellhead": Stream(m_dot=10.0, T=340.0, p=20e6)},
-        {"wellhead": Stream(m_dot=25.0, T=300.0, p=5e6)},
+        {"wellhead_in": Stream(m_dot=40.0, T=353.15, p=25e6)},
+        {"wellhead_in": Stream(m_dot=10.0, T=340.0, p=20e6)},
+        {"wellhead_in": Stream(m_dot=25.0, T=300.0, p=5e6)},
     ]
     assert_module_matches(_well(), rows)
     traced = run(
         _well(),
         {
-            "wellhead": Stream(
+            "wellhead_in": Stream(
                 m_dot=np.array([40.0, 10.0]), T=np.array([353.15, 340.0]), p=np.array([25e6, 20e6])
             )
         },

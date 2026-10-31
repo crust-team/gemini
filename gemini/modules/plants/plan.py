@@ -50,7 +50,7 @@ class Link:
     owner: str
     source: tuple
     target: tuple
-    kind: str | None
+    type: str | None
 
 
 def all_links(plant, owner=""):
@@ -60,7 +60,7 @@ def all_links(plant, owner=""):
             owner,
             _absolute(owner, split_end(item["source"])),
             _absolute(owner, split_end(item["target"])),
-            item.get("kind"),
+            item.get("type"),
         )
         for item in plant._connections
     ]
@@ -114,7 +114,7 @@ def loop_through(root, link):
 
     The link must already be in the plant; state links never close a loop.
     """
-    if link.kind == STATE:
+    if link.type == STATE:
         return None
     source, target = _leaf(root, link, "source"), _leaf(root, link, "target")
     if source == target:
@@ -122,7 +122,7 @@ def loop_through(root, link):
     ends = [
         (_leaf(root, item, "source"), _leaf(root, item, "target"))
         for item in all_links(root)
-        if item != link and item.kind != STATE
+        if item != link and item.type != STATE
     ]
     return find_path(ends, target, source)
 
@@ -156,7 +156,7 @@ def _node_ends(root, links, opened, nodes):
             node_end(root, link.target, "inlets", nodes),
         )
         for link in links
-        if link.kind != STATE and link.owner in ({""} | opened)
+        if link.type != STATE and link.owner in ({""} | opened)
     ]
 
 
@@ -236,7 +236,7 @@ def compile_plan(root):
     for _, path, port in root._unconnected_ports():
         raise unconnected_port(join_path(path, port))
     links = all_links(root)
-    if any(link.kind == STATE for link in links):
+    if any(link.type == STATE for link in links):
         raise NotImplementedYet(
             f"{root.path}: state connections; running a loop needs a previous-step value, "
             "which lands with scan"

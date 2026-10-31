@@ -23,8 +23,8 @@ def _chain_template():
             },
         },
         "optional": {
-            "middle": {"bypass": [{"source": "middle.inlet", "target": "middle.outlet"}]},
-            "first": {"bypass": [{"source": "first.inlet", "target": "first.outlet"}]},
+            "middle": {"bypass": [{"source": "middle.fluid_in", "target": "middle.fluid_out"}]},
+            "first": {"bypass": [{"source": "first.fluid_in", "target": "first.fluid_out"}]},
         },
         "spec": {
             "format": 2,
@@ -35,11 +35,11 @@ def _chain_template():
                 "last": {"type": "Filter", "params": {}},
             },
             "connections": [
-                {"source": "first.outlet", "target": "middle.inlet"},
-                {"source": "middle.outlet", "target": "last.inlet"},
+                {"source": "first.fluid_out", "target": "middle.fluid_in"},
+                {"source": "middle.fluid_out", "target": "last.fluid_in"},
             ],
-            "inlets": {"feed": "first.inlet"},
-            "outlets": {"product": "last.outlet"},
+            "inlets": {"feed": "first.fluid_in"},
+            "outlets": {"product": "last.fluid_out"},
             "outputs": {
                 "drop": {"of": "middle.pressure_drop"},
                 "last_drop": {"of": "last.pressure_drop"},
@@ -84,16 +84,16 @@ def test_a_disabled_unit_leaves_with_its_wiring_and_the_bypass_closes_the_gap():
     """The middle filter, its connections and its output go; the bypass joins its neighbours."""
     spec = templating.fill(_chain_template(), {"middle.enabled": False})
     assert list(spec["modules"]) == ["first", "last"]
-    assert spec["connections"] == [{"source": "first.outlet", "target": "last.inlet"}]
+    assert spec["connections"] == [{"source": "first.fluid_out", "target": "last.fluid_in"}]
     assert list(spec["outputs"]) == ["last_drop"]
-    assert spec["inlets"] == {"feed": "first.inlet"}
+    assert spec["inlets"] == {"feed": "first.fluid_in"}
 
 
 def test_a_disabled_end_unit_drops_its_ports_and_its_connections():
     """Without a bypass the neighbour's port becomes free and the plant port goes."""
     spec = templating.fill(_chain_template(), {"first.enabled": False})
     assert spec["inlets"] == {}
-    assert spec["connections"] == [{"source": "middle.outlet", "target": "last.inlet"}]
+    assert spec["connections"] == [{"source": "middle.fluid_out", "target": "last.fluid_in"}]
 
 
 def test_the_original_template_is_not_changed_by_filling():
@@ -127,7 +127,9 @@ def test_a_template_value_of_the_wrong_unit_is_a_problem_of_the_spec(monkeypatch
 def test_neighbouring_units_leave_together_and_a_group_leaves_with_its_members():
     """Each unit closes its own gap in turn, so a run of optional units can all leave."""
     template = _chain_template()
-    template["optional"]["last"] = {"bypass": [{"source": "last.inlet", "target": "last.outlet"}]}
+    template["optional"]["last"] = {
+        "bypass": [{"source": "last.fluid_in", "target": "last.fluid_out"}]
+    }
     template["optional"]["tail"] = {"modules": ["middle", "last"]}
     template["parameters"]["tail.enabled"] = {"default": True, "unit": None, "description": "Tail."}
     spec = templating.fill(template, {"tail.enabled": False})
@@ -140,7 +142,7 @@ def test_neighbouring_units_leave_together_and_a_group_leaves_with_its_members()
 def test_a_bypass_joins_what_fed_the_inlet_to_what_the_outlet_fed():
     """Removing the middle of three filters joins the first outlet to the last inlet."""
     spec = templating.fill(_chain_template(), {"middle.enabled": False})
-    assert spec["connections"] == [{"source": "first.outlet", "target": "last.inlet"}]
+    assert spec["connections"] == [{"source": "first.fluid_out", "target": "last.fluid_in"}]
 
 
 HEATING_COOLING_PRESETS = {

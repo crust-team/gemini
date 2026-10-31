@@ -47,7 +47,7 @@ def test_unknown_values_suggest_close_names(values):
 def test_module_result_leaves():
     """Leaves flatten descendant results with relative paths."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    leaf = ModuleResult(outputs=Values(), outlets=Ports({"outlet": stream}))
+    leaf = ModuleResult(outputs=Values(), outlets=Ports({"fluid_out": stream}))
     parent = ModuleResult(
         outputs=Values(), outlets=Ports(), children={"a": leaf, "b": leaf}, is_leaf=False
     )
@@ -102,8 +102,8 @@ def chunk_tree():
             {"power": np.array([1.0, np.nan, 3.0]), "ok": np.array([True, False, True])},
             {"power": Output(float | None), "ok": Output(bool)},
         ),
-        outlets=Ports({"outlet": stream}),
-        inlets=Ports({"inlet": stream}),
+        outlets=Ports({"fluid_out": stream}),
+        inlets=Ports({"fluid_in": stream}),
         inputs={"speed": np.array([5.0, 6.0, 7.0]), "label": "x"},
     )
     root = ModuleResult(
@@ -124,10 +124,10 @@ def test_row_gives_plain_python_values_of_one_row():
     assert dict(leaf.outputs) == {"power": 1.0, "ok": True}
     assert type(leaf.outputs.power) is float and type(leaf.outputs.ok) is bool
     assert dict(second.children["leaf"].outputs) == {"power": None, "ok": False}
-    assert leaf.outlets.outlet.m_dot == 1.0 and type(leaf.outlets.outlet.T) is float
+    assert leaf.outlets.fluid_out.m_dot == 1.0 and type(leaf.outlets.fluid_out.T) is float
     assert leaf.inputs == {"speed": 5.0, "label": "x"}
     assert first.call_records[0][1] is leaf and first.leaves() == {"leaf": leaf}
-    assert second.children["leaf"].outlets.outlet.m_dot == 2.0
+    assert second.children["leaf"].outlets.fluid_out.m_dot == 2.0
 
 
 def test_mapped_applies_a_function_to_every_value_and_keeps_sharing():
@@ -136,9 +136,9 @@ def test_mapped_applies_a_function_to_every_value_and_keeps_sharing():
     doubled = root.mapped(lambda value: value * 2 if isinstance(value, np.ndarray) else value)
     leaf = doubled.children["leaf"]
     assert leaf.outputs.power[0] == 2.0 and leaf.inputs["speed"].tolist() == [10.0, 12.0, 14.0]
-    assert leaf.outlets.outlet.m_dot.tolist() == [2.0, 4.0, 6.0]
+    assert leaf.outlets.fluid_out.m_dot.tolist() == [2.0, 4.0, 6.0]
     assert doubled.call_records[0][1] is leaf and doubled.is_leaf is False
-    assert leaf.outlets.outlet.fluid is root.children["leaf"].outlets.outlet.fluid
+    assert leaf.outlets.fluid_out.fluid is root.children["leaf"].outlets.fluid_out.fluid
 
 
 def test_health_numbers_that_are_numpy_scalars_become_floats():

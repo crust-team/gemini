@@ -35,7 +35,8 @@ class BoreholeField(Module):
     r_e = s / sqrt(pi) (``ground.steady_flux_resistance``, Hellstrom 1991). With the
     conductance UA = N H / (R_b + R_sf), plug flow along the loop gives the effectiveness
     eps = 1 - exp(-UA / (m_dot cp)), the extraction rate Q = eps m_dot cp (T_g - T_in) and
-    outlet_T = T_in + eps (T_g - T_in); ``fluid_mean_temperature`` is the arithmetic mean of inlet
+    fluid_out_T = T_in + eps (T_g - T_in); ``fluid_mean_temperature`` is the arithmetic mean of
+    inlet
     and outlet, the usual design convention. A positive Q is heat taken from the ground
     (``heat_absorbed``), a negative Q heat rejected into it (``heat_loss``; the ground is the
     plant's environment), so the stream audit closes.
@@ -76,7 +77,7 @@ class BoreholeField(Module):
         self.undisturbed_ground_temperature = Parameter(Temperature)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="hot_water")
+        self.fluid_in = Inlet(Stream, kind="hot_water")
 
         # States
         self.ground_temperature_change = State(TemperatureDifference, default=0)
@@ -85,37 +86,37 @@ class BoreholeField(Module):
         self.heat_extraction_rate = Output(Power)
         self.fluid_mean_temperature = Output(Temperature)
         self.ground_temperature = Output(Temperature)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.heat_absorbed = Output(HeatAbsorbed)
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="hot_water")
+        self.fluid_out = Outlet(Stream, kind="hot_water")
 
     def forward(self, inlets):
         """Exchange heat between the loop fluid and the start-of-step ground temperature."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         capacity_rate = self._capacity_rate(inlet)
         rate = self._extraction_rate(inlet)
-        outlet_T = inlet.T + heat_transfer.temperature_change(rate, capacity_rate)
-        outlet = inlet.with_(T=outlet_T)
+        fluid_out_T = inlet.T + heat_transfer.temperature_change(rate, capacity_rate)
+        outlet = inlet.with_(T=fluid_out_T)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         rate = self._extraction_rate(inlet)
         self.heat_extraction_rate = rate
-        self.fluid_mean_temperature = heat_transfer.mean_temperature(inlet.T, outlets.outlet.T)
+        self.fluid_mean_temperature = heat_transfer.mean_temperature(inlet.T, outlets.fluid_out.T)
         self.ground_temperature = self._ground_temperature()
-        self.outlet_T = outlets.outlet.T
+        self.fluid_out_T = outlets.fluid_out.T
         self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 
     def _advance_states(self, inlets, outlets, dt):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         change = ground.borehole_field_temperature_change(
             self.ground_temperature_change,
             self._effective_conductance(inlet),
@@ -183,7 +184,7 @@ class BoreholeField(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )

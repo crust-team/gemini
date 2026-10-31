@@ -12,7 +12,7 @@ ESP_PARAMETERS = {
     "head_coefficients": [1.2e-10, -2.5e-6, 4e-3, 0.2, 5.0, 100.0],
     "power_coefficients": [1.0e-10, -1.0e-6, 3.0e-3, 0.3, 4.0, 200.0],
 }
-SUCTION = {"suction": {"flow": "150 m3/h", "T": "80 degC", "p": "20 bar"}}
+SUCTION = {"fluid_in": {"flow": "150 m3/h", "T": "80 degC", "p": "20 bar"}}
 
 
 def call(**changes):
@@ -27,7 +27,7 @@ def test_evaluate_returns_outlets_and_outputs_with_units():
     """Outlet streams and outputs are ``{value, unit}`` in SI and the result is plain JSON."""
     result = call()
     assert result["errors"] == []
-    discharge = result["outlets"]["discharge"]
+    discharge = result["outlets"]["fluid_out"]
     assert set(discharge) == {"m_dot", "T", "p"}
     assert discharge["m_dot"]["unit"] == "kg/s" and discharge["T"]["unit"] == "K"
     assert discharge["p"]["unit"] == "Pa" and discharge["p"]["value"] > 20e5
@@ -44,13 +44,13 @@ def test_evaluate_equals_a_direct_call_bit_for_bit():
     )
     for module in ("ESP", ESP):
         result = call(module=module)
-        assert result["outlets"]["discharge"]["p"]["value"] == direct.outlets.discharge.p
+        assert result["outlets"]["fluid_out"]["p"]["value"] == direct.outlets.fluid_out.p
         assert result["outputs"]["head"]["value"] == direct.outputs.head
 
 
 def test_evaluate_accepts_si_numbers_as_well_as_unit_strings():
     """Plain numbers are SI."""
-    inlets = {"suction": {"m_dot": 12.0, "T": 353.15, "p": 2e6}}
+    inlets = {"fluid_in": {"m_dot": 12.0, "T": 353.15, "p": 2e6}}
     assert call(inlets=inlets)["errors"] == []
 
 
@@ -63,7 +63,7 @@ def test_evaluate_accepts_si_numbers_as_well_as_unit_strings():
         ({"parameters": {"stage_count": "many"}}, "invalid_value"),
         ({"inlets": {}}, "invalid_call"),
         ({"controls": {"frequency": "50 bar"}}, "invalid_unit"),
-        ({"inlets": {"suction": {"flow": "1 m3/h", "T": "-5 K", "p": "1 bar"}}}, "invalid_call"),
+        ({"inlets": {"fluid_in": {"flow": "1 m3/h", "T": "-5 K", "p": "1 bar"}}}, "invalid_call"),
     ],
 )
 def test_a_recorded_failure_returns_errors_instead_of_raising(changes, code):
@@ -92,7 +92,7 @@ def test_units_convert_outlets_and_outputs():
     """Stream fields and outputs say the unit used; the numbers are those of SI."""
     plain = call()
     converted = call(units={"pressure": "bar", "temperature": "degC", "power": "kW"})
-    outlet, stored = converted["outlets"]["discharge"], plain["outlets"]["discharge"]
+    outlet, stored = converted["outlets"]["fluid_out"], plain["outlets"]["fluid_out"]
     assert outlet["p"] == {"value": stored["p"]["value"] / 1e5, "unit": "bar"}
     assert outlet["T"]["value"] == pytest.approx(stored["T"]["value"] - 273.15)
     assert outlet["m_dot"] == stored["m_dot"]

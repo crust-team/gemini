@@ -36,7 +36,7 @@ class HeatingSubstation(Module):
     temperature, if colder) and never exceeds the network temperature after the valve, where
     the exchanger would reverse. A stopped network or building circuit transfers no heat.
 
-    The valve only throttles: the network flow is imposed by ``network_in`` (in a
+    The valve only throttles: the network flow is imposed by ``supply_in`` (in a
     ``DistrictNetwork`` by its splitters), and the valve reports the pressure drop that flow
     causes at the commanded ``valve.opening``. Every child is first-law closed and the building
     loop passes the same mass flow, so ``energy_balance`` closes; the converged loop still
@@ -61,7 +61,7 @@ class HeatingSubstation(Module):
         self.building_pressure = Parameter(Pressure, gt=0)
 
         # Inlets
-        self.network_in = Inlet(Stream, stream="hot_water")
+        self.supply_in = Inlet(Stream, kind="hot_water")
 
         # Outputs
         self.duty = Output.of(self.heat_exchanger.duty)
@@ -70,18 +70,18 @@ class HeatingSubstation(Module):
         self.is_unmet = Output.of(self.consumer.is_unmet)
         self.building_supply_temperature = Output.of(self.heat_exchanger.cold_out_T)
         self.building_return_temperature = Output.of(self.consumer.return_out_T)
-        self.network_out_T = Output.of(self.heat_exchanger.hot_out_T)
+        self.return_out_T = Output.of(self.heat_exchanger.hot_out_T)
         self.valve_pressure_drop = Output.of(self.valve.pressure_drop)
 
         # Outlets
-        self.network_out = Outlet(Stream, stream="hot_water")
+        self.return_out = Outlet(Stream, kind="hot_water")
 
     def forward(self, inlets):
         """Throttle the network water, close the building loop and exchange the heat once."""
 
         # Modules
-        throttled = self.valve(inlet=inlets.network_in)
-        network = throttled.outlets.outlet
+        throttled = self.valve(fluid_in=inlets.supply_in)
+        network = throttled.outlets.fluid_out
         start = min(self.consumer.minimum_return_temperature, network.T)
         return_T = loops.close_loop(
             lambda temperature: self._pass(network, temperature),
@@ -93,9 +93,9 @@ class HeatingSubstation(Module):
         self.consumer(supply_in=exchanged.outlets.cold_out)
 
         # Outlets
-        network_out = exchanged.outlets.hot_out
+        return_out = exchanged.outlets.hot_out
 
-        outlets = dict(network_out=network_out)
+        outlets = dict(return_out=return_out)
         return outlets
 
     def _pass(self, network, return_T):

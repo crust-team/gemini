@@ -67,10 +67,9 @@ from the import path of the class, so a shipped class never declares it and the 
 from outside (`register`, `load_file`) has no folder: it states the class attribute `category`, one
 of the list, and a subclass of a shipped class states its own.
 
-A port declares its stream type: `Inlet(Stream, stream="brine")`, one of `gm.streams.names()`.
-A port without one, `stream=None`, takes whatever flows through it: piping, `CentrifugalPump`,
-`HeatExchanger` and the source side of `HeatPump`. Stream types never change a calculation; they
-say what may be connected.
+A port declares its label: `Inlet(Stream, kind="brine")`, one of `gm.streams.names()`.
+A port without one, `kind=None`, takes whatever flows through it: piping, `CentrifugalPump`,
+`HeatExchanger` and the source side of `HeatPump`. Labels never change a calculation; they say what may be connected.
 
 ## Describing a module
 
@@ -91,11 +90,11 @@ measured, state, inlets, outlets, outputs, children, connections, values}`:
   declarations are listed; children appear under `children`.
 - `measured` lists every output of the module itself: replay (`engine/step.py`) takes a measured
   binding for any output name and compares it with that output; no narrower rule exists.
-- `inlets` and `outlets` map a port to `{stream, fields: {m_dot: {unit: "kg/s"}, T: {unit: "K"},
-  p: {unit: "Pa"}}}`; `stream` is `null` for a port that takes any stream.
-- `outputs` maps a name to `{unit, kind, soft_sensor}`; `kind` is the additive quantity name
+- `inlets` and `outlets` map a port to `{kind, fields: {m_dot: {unit: "kg/s"}, T: {unit: "K"},
+  p: {unit: "Pa"}}}`; `kind` is `null` for a port that takes any stream.
+- `outputs` maps a name to `{unit, quantity, soft_sensor}`; `quantity` is the additive quantity name
   (one of the nine) or `null`.
-- `children` is `{name: type}` and `connections` is `[{source, target, stream, kind}]`, both empty
+- `children` is `{name: type}` and `connections` is `[{source, target, kind, type}]`, both empty
   for a leaf. A plant exposes its wiring through `_connection_list()`; a handwritten composite has
   none, because its wiring is code.
 - `values` holds the current `parameters`, `controls` and `boundaries`; unset ones are left out
@@ -153,7 +152,7 @@ class Pump(Module):
         self.power_coefficients = Parameter(list[float], shape=(6,))
 
         # Inlets
-        self.suction = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.frequency = Control(Frequency)
@@ -165,23 +164,23 @@ class Pump(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.discharge = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Raise the suction pressure."""
 
         # Outlets
-        suction = inlets.suction
+        suction = inlets.fluid_in
         flow = suction.volumetric_flow()
         head = pumps.head(flow, self.frequency, self.stage_count, self.head_coefficients)
         discharge = suction.with_(p=suction.p + head)
 
-        outlets = dict(discharge=discharge)
+        outlets = dict(fluid_out=discharge)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        suction = inlets.suction
-        discharge = outlets.discharge
+        suction = inlets.fluid_in
+        discharge = outlets.fluid_out
         self.flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
         self.power = pumps.power(self.flow, self.frequency, self.stage_count, self.power_coefficients)
@@ -202,7 +201,7 @@ record their own value for an additive output:
 - `Output.of(self.child.output)` copies one descendant output from this call, for example
   `Output.of(self.heat_exchanger.duty)` or
   `Output.of(self.producers[0].riser.wellhead_temperature)`. An outlet field is referenced with
-  `Outlet.field(name)`: `Output.of(self.degasser.gas.field("m_dot"))`. The descendant must be
+  `Outlet.field(name)`: `Output.of(self.degasser.gas_out.field("m_dot"))`. The descendant must be
   called exactly once, and the output adopts the target's kind.
 - An output of an additive quantity declared without a formula, such as
   `self.electricity = Output(Electricity)`, is the automatic sum of the descendant leaf outputs
@@ -244,7 +243,7 @@ class HeatPlant(Module):
 
         # Inlets
         self.primary_in = Inlet(Stream)
-        self.secondary_in = Inlet(Stream)
+        self.return_in = Inlet(Stream)
 
         # Outputs
         self.thermal_power = Output.of(self.heat_exchanger.duty)
@@ -252,21 +251,21 @@ class HeatPlant(Module):
         self.cop = Output.ratio(self.thermal_power, self.electricity)
 
         # Outlets
-        self.secondary_out = Outlet(Stream)
+        self.supply_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Evaluate children in physical flow order."""
 
         # Modules
-        pumped = self.pump(suction=inlets.primary_in)
+        pumped = self.pump(fluid_in=inlets.primary_in)
         exchanged = self.heat_exchanger(
-            hot_in=pumped.outlets.discharge, cold_in=inlets.secondary_in
+            hot_in=pumped.outlets.fluid_out, cold_in=inlets.return_in
         )
 
         # Outlets
-        secondary_out = exchanged.outlets.cold_out
+        supply_out = exchanged.outlets.cold_out
 
-        outlets = dict(secondary_out=secondary_out)
+        outlets = dict(supply_out=supply_out)
         return outlets
 ```
 
@@ -381,15 +380,15 @@ only. Do not combine an inlet mapping with inlet keywords.
 import gemini as gm
 
 stream = gm.Stream(flow="150 m3/h", T="80 C", p="20 bar")
-a = pump(suction=stream, frequency="50 Hz")
-b = pump({"suction": stream}, frequency="50 Hz")
+a = pump(fluid_in=stream, frequency="50 Hz")
+b = pump({"fluid_in": stream}, frequency="50 Hz")
 c = pump(stream, frequency="50 Hz")
 assert a.outputs.head == b.outputs.head == c.outputs.head
 assert a.outputs.get("head", unit="bar") == a.outputs.head / 1e5
 ```
 
 `inlets`, `_compute_outputs` outlets, and `result.outlets` are immutable `Ports`. They preserve
-declaration order and support both `ports.suction` and `ports["suction"]`. Unknown names report
+declaration order and support both `ports.fluid_in` and `ports["suction"]`. Unknown names report
 the module path, valid names and a close-match suggestion. A call returns a `ModuleResult` with
 `outputs` (a `Values` mapping whose `get(name, unit=...)` converts from the declared unit),
 `outlets`, `inlets`, the resolved `inputs` and the `children` results of the call.
@@ -415,12 +414,12 @@ def clamp(module, inlets):
 
 
 def observe(module, inlets, outlets):
-    print(module.head, inlets.suction.p, outlets.discharge.p)
+    print(module.head, inlets.fluid_in.p, outlets.fluid_out.p)
 
 
 pre_handle = pump.register_forward_pre_hook(clamp)
 handle = pump.register_forward_hook(observe)
-clamped = pump(suction=stream, frequency=50)
+clamped = pump(fluid_in=stream, frequency=50)
 assert clamped.inputs["frequency"] == 45 and not pump.has_input_value("frequency")
 pre_handle.remove()
 handle.remove()
@@ -484,10 +483,10 @@ pre-hooks and outlet validation still run; the result has an empty `outputs` map
 
 ```python
 with gm.no_outputs():
-    fast = pump(suction=stream, frequency="50 Hz")
+    fast = pump(fluid_in=stream, frequency="50 Hz")
 
 assert dict(fast.outputs) == {}
-assert fast.outlets.discharge == a.outlets.discharge
+assert fast.outlets.fluid_out == a.outlets.fluid_out
 ```
 
 ## State and health
@@ -527,7 +526,7 @@ class Tank(Module):
         self.heat_capacity = Parameter(float, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # States
         self.temperature = State(Temperature, default=300)
@@ -536,22 +535,22 @@ class Tank(Module):
         self.duty = Output(Power)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Leave at the tank temperature of the start of the step."""
 
         # Outlets
-        outlet = inlets.inlet.with_(T=self.temperature)
+        outlet = inlets.fluid_in.with_(T=self.temperature)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.duty = self._duty(inlets.inlet)
+        self.duty = self._duty(inlets.fluid_in)
 
     def _advance_states(self, inlets, outlets, dt):
-        heat = heat_transfer.heat_rate(self._duty(inlets.inlet), dt)
+        heat = heat_transfer.heat_rate(self._duty(inlets.fluid_in), dt)
         rise = heat_transfer.temperature_change(heat, self.heat_capacity)
         return {"temperature": self.temperature + rise}
 
@@ -560,8 +559,8 @@ class Tank(Module):
 
 
 tank = Tank().update_params(heat_capacity=4.2e5)
-state, result = tank.step(None, 60, {"inlet": stream})
-assert result.outlets.outlet.T == 300 and state["temperature"] > 300
+state, result = tank.step(None, 60, {"fluid_in": stream})
+assert result.outlets.fluid_out.T == 300 and state["temperature"] > 300
 ```
 
 A module with a diagnostic model overrides `health(self, result, measured)`. It receives the

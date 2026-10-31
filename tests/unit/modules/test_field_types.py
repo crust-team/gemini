@@ -22,7 +22,7 @@ def test_quantity_declarations_expose_units(module_class):
         numeric = schema.get("type") in {"number", "integer"} or any(
             item.get("type") in {"number", "integer"} for item in schema.get("anyOf", [])
         )
-        if numeric and declaration.kind not in {float, int}:
+        if numeric and declaration.type not in {float, int}:
             assert declaration.unit is not None, (cls, declaration.name)
 
 

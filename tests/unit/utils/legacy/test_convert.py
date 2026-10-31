@@ -54,8 +54,8 @@ def test_to_plant_fills_parameters_bindings_and_boundary(converted):
     assert converted.bindings["doublet.reservoir"].controls["production_rate"].column == (
         "doublet.reservoir.production_rate"
     )
-    assert converted.bindings[""].inlets["secondary_in"]["T"].unit == "K"
-    assert converted.boundary["root_inputs"]["secondary_in"]["m_dot"] == 40
+    assert converted.bindings[""].inlets["return_in"]["T"].unit == "K"
+    assert converted.boundary["root_inputs"]["return_in"]["m_dot"] == 40
     assert converted.fluid.density == 1068
     assert not hasattr(converted, "legacy_info")
 

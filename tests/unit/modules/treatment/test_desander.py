@@ -22,10 +22,10 @@ def desander():
 def test_hand_computed_removal_and_loss():
     """Quadratic loss and removal from the liquid volume flow, with mg/l accepted."""
     module = desander()
-    result = module(inlet=INLET, sand_concentration="50 mg/l")
+    result = module(fluid_in=INLET, sand_concentration="50 mg/l")
     out = result.outputs
     assert out.pressure_drop == 25000
-    assert result.outlets.outlet == INLET.with_(p=1e6 - 25000)
+    assert result.outlets.fluid_out == INLET.with_(p=1e6 - 25000)
     assert out.sand_removal_rate == pytest.approx(0.9 * 0.05 * 0.02)
     assert out.residual_sand_concentration == pytest.approx(0.005)
     assert mass_balance(module, result)["residual"] == 0
@@ -35,22 +35,22 @@ def test_hand_computed_removal_and_loss():
 def test_limits():
     """Zero flow removes nothing; reverse flow and a loss above inlet pressure raise."""
     module = desander()
-    stopped = module(inlet=INLET.with_(m_dot=0), sand_concentration=0.05).outputs
+    stopped = module(fluid_in=INLET.with_(m_dot=0), sand_concentration=0.05).outputs
     assert stopped.pressure_drop == 0 and stopped.sand_removal_rate == 0
-    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot"):
-        module(inlet=INLET.with_(m_dot=-1), sand_concentration=0.05)
+    with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot"):
+        module(fluid_in=INLET.with_(m_dot=-1), sand_concentration=0.05)
     with pytest.raises(gm.errors.PhysicsError, match="pressure_drop"):
-        module(inlet=INLET.with_(m_dot=200, p=2e5), sand_concentration=0.05)
+        module(fluid_in=INLET.with_(m_dot=200, p=2e5), sand_concentration=0.05)
     with pytest.raises(gm.errors.ValidationError):
-        module(inlet=INLET, sand_concentration=-1)
+        module(fluid_in=INLET, sand_concentration=-1)
     with raises(gm.errors.ValidationError, "missing_value"):
-        Desander()(inlet=INLET, sand_concentration=0.05)
+        Desander()(fluid_in=INLET, sand_concentration=0.05)
 
 
 def test_desander_matches_traced():
     """The cyclone loss and sand removal trace and equal one call per row."""
     rows = [
-        dict(inlet=Stream(m_dot=m_dot, T=350, p=1e6), sand_concentration=sand)
+        dict(fluid_in=Stream(m_dot=m_dot, T=350, p=1e6), sand_concentration=sand)
         for m_dot, sand in [(0, 0.05), (20, 0.05), (40, 0.001), (60, 0.2)]
     ]
     assert_module_matches(desander(), rows)

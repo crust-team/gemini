@@ -44,12 +44,12 @@ def test_outlet_follows_ramey_and_the_balance_closes():
     """The fluid leaves at Ramey's bottom-hole temperature; extracted heat closes the audit."""
     module = exchanger()
     assert module.geothermal_gradient == pytest.approx(0.03)
-    result = module(inlet=INLET)
+    result = module(fluid_in=INLET)
     out = result.outputs
-    assert out.outlet_T == pytest.approx(hand_outlet(5, 303.15), rel=1e-12)
-    assert out.heat_extraction_rate == pytest.approx(5 * CP * (out.outlet_T - 303.15))
+    assert out.fluid_out_T == pytest.approx(hand_outlet(5, 303.15), rel=1e-12)
+    assert out.heat_extraction_rate == pytest.approx(5 * CP * (out.fluid_out_T - 303.15))
     assert out.heat_absorbed == out.heat_extraction_rate > 0 and out.heat_loss == 0
-    assert result.outlets.outlet.p == INLET.p and result.outlets.outlet.m_dot == 5
+    assert result.outlets.fluid_out.p == INLET.p and result.outlets.fluid_out.m_dot == 5
     assert energy_balance(module, result)["relative_residual"] < 1e-12
     assert mass_balance(module, result)["residual"] == 0
 
@@ -57,19 +57,19 @@ def test_outlet_follows_ramey_and_the_balance_closes():
 def test_flow_limits():
     """Slow flow approaches the bottom-hole rock temperature; zero flow passes unchanged."""
     module = exchanger()
-    slow = module(inlet=INLET.with_(m_dot=0.01)).outputs.outlet_T
+    slow = module(fluid_in=INLET.with_(m_dot=0.01)).outputs.fluid_out_T
     assert slow == pytest.approx(hand_outlet(0.01, 303.15)) and 0 < 283.15 + 75 - slow < 0.5
-    still = module(inlet=INLET.with_(m_dot=0))
-    assert still.outlets.outlet == INLET.with_(m_dot=0)
+    still = module(fluid_in=INLET.with_(m_dot=0))
+    assert still.outlets.fluid_out == INLET.with_(m_dot=0)
     assert still.outputs.heat_extraction_rate == 0
-    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot = -1"):
-        module(inlet=INLET.with_(m_dot=-1))
+    with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot = -1"):
+        module(fluid_in=INLET.with_(m_dot=-1))
 
 
 def test_hot_inlet_heats_the_rock():
     """An inlet hotter than the rock everywhere loses heat to it as heat_loss."""
     module = exchanger()
-    result = module(inlet=INLET.with_(T=400))
+    result = module(fluid_in=INLET.with_(T=400))
     assert result.outputs.heat_extraction_rate < 0 and result.outputs.heat_absorbed == 0
     assert result.outputs.heat_loss == -result.outputs.heat_extraction_rate
     assert energy_balance(module, result)["relative_residual"] < 1e-12
@@ -79,13 +79,13 @@ def test_short_operating_time_is_bad_design_data():
     """Ramey's long-time function needs alpha t / r**2 >= 25."""
     module = exchanger().update_params(operating_time=3600)
     with raises(gm.errors.ValidationError, "invalid_design", match="operating_time rejected"):
-        module(inlet=INLET)
+        module(fluid_in=INLET)
 
 
 def test_exchanger_matches_traced():
     """Extraction, heat loss and zero flow equal one call per row."""
     rows = [
-        dict(inlet=INLET.with_(m_dot=m_dot, T=T))
+        dict(fluid_in=INLET.with_(m_dot=m_dot, T=T))
         for m_dot, T in [(5, 303.15), (0.01, 303.15), (0, 303.15), (20, 400), (1, 283.15)]
     ]
     assert_module_matches(exchanger(), rows)
@@ -94,14 +94,14 @@ def test_exchanger_matches_traced():
 def test_early_operating_time_is_not_evaluated_at_zero_flow():
     """A stopped exchanger needs no rock resistance, so a short operating time does not raise."""
     module = exchanger().update_params(operating_time=3600)
-    assert module(inlet=INLET.with_(m_dot=0)).outputs.heat_extraction_rate == 0
+    assert module(fluid_in=INLET.with_(m_dot=0)).outputs.heat_extraction_rate == 0
 
 
 def test_traced_early_operating_time_raises_only_for_flowing_rows():
     """In a traced call the configuration error belongs to the rows that flow."""
     module = exchanger().update_params(operating_time=3600)
     stopped = Stream(m_dot=np.zeros(2), T=np.full(2, 303.15), p=np.full(2, 3e5))
-    assert run(module, {"inlet": stopped}).outputs["heat_extraction_rate"].tolist() == [0, 0]
+    assert run(module, {"fluid_in": stopped}).outputs["heat_extraction_rate"].tolist() == [0, 0]
     mixed = Stream(m_dot=np.array([0.0, 5.0]), T=np.full(2, 303.15), p=np.full(2, 3e5))
     with raises(gm.errors.ValidationError, "invalid_design", match="operating_time rejected"):
-        run(module, {"inlet": mixed})
+        run(module, {"fluid_in": mixed})

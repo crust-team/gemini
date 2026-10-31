@@ -25,8 +25,8 @@ def pump(**changes):
 def test_pump_stages_match_the_esp_basis_and_friction_scales_with_speed():
     """Head and pump power equal the ESP curves; friction is loss * depth * f / 60 Hz."""
     suction = Stream(m_dot=units.m3h_to_m3s(200) * 1000, T=340, p=1e6)
-    esp = ESP().update_params(**CURVES)(suction=suction, frequency=50).outputs
-    result = pump()(suction=suction, frequency=50)
+    esp = ESP().update_params(**CURVES)(fluid_in=suction, frequency=50).outputs
+    result = pump()(fluid_in=suction, frequency=50)
     out = result.outputs
     assert out.head == pytest.approx(esp.head)
     assert out.pump_power == pytest.approx(esp.power)
@@ -34,14 +34,14 @@ def test_pump_stages_match_the_esp_basis_and_friction_scales_with_speed():
     assert out.shaft_power == pytest.approx(esp.power + 1250)
     assert out.electricity == pytest.approx((esp.power + 1250) / 0.9)
     assert out.efficiency == pytest.approx(out.flow * out.head / out.pump_power)
-    assert result.outlets.discharge.T == 340
-    assert result.outlets.discharge.p == pytest.approx(1e6 + esp.head)
+    assert result.outlets.fluid_out.T == 340
+    assert result.outlets.fluid_out.p == pytest.approx(1e6 + esp.head)
 
 
 def test_isothermal_electricity_is_unresolved_pump_power():
     """The audit reports all electricity as unresolved; the thermal part closes."""
     machine = pump()
-    result = machine(suction=Stream(m_dot=40, T=340, p=1e6), frequency=55)
+    result = machine(fluid_in=Stream(m_dot=40, T=340, p=1e6), frequency=55)
     balance = energy_balance(machine, result)
     assert balance["unresolved_power"] == result.outputs.electricity
     assert balance["relative_thermal_residual"] < 1e-12
@@ -50,7 +50,7 @@ def test_isothermal_electricity_is_unresolved_pump_power():
 
 def test_zero_flow_runs_at_shutoff():
     """At zero flow the pump holds its shutoff head and draws the shutoff power."""
-    out = pump(shaft_friction_loss=0)(suction=Stream(m_dot=0, T=340, p=1e6), frequency=60).outputs
+    out = pump(shaft_friction_loss=0)(fluid_in=Stream(m_dot=0, T=340, p=1e6), frequency=60).outputs
     assert out.head == pytest.approx(units.ft_head_to_pa(12 * 83.08389282))
     assert out.pump_power == pytest.approx(units.bhp_to_w(12 * 10.02089977))
     assert out.efficiency == 0
@@ -60,17 +60,17 @@ def test_reverse_flow_and_off_curve_raise():
     """Reverse flow, a negative head and a negative pump power raise PhysicsError."""
     suction = Stream(m_dot=40, T=340, p=1e6)
     with pytest.raises(PhysicsError, match="reverse flow"):
-        pump()(suction=suction.with_(m_dot=-1), frequency=50)
+        pump()(fluid_in=suction.with_(m_dot=-1), frequency=50)
     with pytest.raises(PhysicsError, match="head curve"):
-        pump(head_coefficients=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
+        pump(head_coefficients=[-1, 0, 0, 0, 0, 0])(fluid_in=suction, frequency=50)
     with pytest.raises(PhysicsError, match="power curve"):
-        pump(power_coefficients=[-1, 0, 0, 0, 0, 0])(suction=suction, frequency=50)
+        pump(power_coefficients=[-1, 0, 0, 0, 0, 0])(fluid_in=suction, frequency=50)
 
 
 def test_traced_call_matches_one_call_per_row():
     """Shutoff, running and stopped-efficiency rows trace and equal one call per row."""
     rows = [
-        dict(suction=Stream(m_dot=m_dot, T=330.0, p=3e5), frequency=frequency)
+        dict(fluid_in=Stream(m_dot=m_dot, T=330.0, p=3e5), frequency=frequency)
         for m_dot, frequency in [(0.0, 50.0), (5.0, 50.0), (10.0, 60.0)]
     ]
     assert_module_matches(pump(), rows)

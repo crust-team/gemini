@@ -57,10 +57,10 @@ def test_profiles_drive_scenario():
     boiler.bindings = {
         "": ModuleBindings(
             controls={"temperature_setpoint": Binding(column="temperature_setpoint", unit="K")},
-            inlets={"inlet": {}},
+            inlets={"fluid_in": {}},
         )
     }
-    boiler.boundary = {"stream_defaults": {"": {"inlet": inlet}}}
+    boiler.boundary = {"stream_defaults": {"": {"fluid_in": inlet}}}
     result = gm.simulate(
         boiler,
         gm.Dataset.from_profiles({"temperature_setpoint": target}),
@@ -68,7 +68,7 @@ def test_profiles_drive_scenario():
         on_error="raise",
     )
     assert len(result) == 3
-    assert result.to_frame()["outlet_T"].tolist() == [320] * 3
+    assert result.to_frame()["fluid_out_T"].tolist() == [320] * 3
 
 
 def test_units_come_from_the_unit_table():

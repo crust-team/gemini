@@ -43,7 +43,7 @@ class CoolingSubstation(Module):
     raises ``PhysicsError`` (for the test configuration a band of about 2 K of network
     temperature). Lower the network temperature, raise the building flow or the exchanger UA.
 
-    The valve only throttles: the network flow is imposed by ``network_in`` and the valve
+    The valve only throttles: the network flow is imposed by ``supply_in`` and the valve
     reports the pressure drop that flow causes at the commanded ``valve.opening``. Every child
     is first-law closed, so ``energy_balance`` closes; the converged consumer return and the
     stream fed back to the exchanger differ by at most the tolerance and appear as a boundary
@@ -67,7 +67,7 @@ class CoolingSubstation(Module):
         self.building_pressure = Parameter(Pressure, gt=0)
 
         # Inlets
-        self.network_in = Inlet(Stream, stream="chilled_water")
+        self.supply_in = Inlet(Stream, kind="chilled_water")
 
         # Outputs
         self.duty = Output.of(self.heat_exchanger.duty)
@@ -78,18 +78,18 @@ class CoolingSubstation(Module):
         self.dew_point = Output.of(self.consumer.dew_point)
         self.building_supply_temperature = Output.of(self.heat_exchanger.hot_out_T)
         self.building_return_temperature = Output.of(self.consumer.return_out_T)
-        self.network_out_T = Output.of(self.heat_exchanger.cold_out_T)
+        self.return_out_T = Output.of(self.heat_exchanger.cold_out_T)
         self.valve_pressure_drop = Output.of(self.valve.pressure_drop)
 
         # Outlets
-        self.network_out = Outlet(Stream, stream="chilled_water")
+        self.return_out = Outlet(Stream, kind="chilled_water")
 
     def forward(self, inlets):
         """Throttle the network water, close the building loop and exchange the heat once."""
 
         # Modules
-        throttled = self.valve(inlet=inlets.network_in)
-        network = throttled.outlets.outlet
+        throttled = self.valve(fluid_in=inlets.supply_in)
+        network = throttled.outlets.fluid_out
         consumer = self.consumer
         limit = min(consumer.maximum_return_temperature, consumer.indoor_temperature)
         return_T = loops.close_loop(
@@ -102,9 +102,9 @@ class CoolingSubstation(Module):
         self.consumer(supply_in=exchanged.outlets.hot_out)
 
         # Outlets
-        network_out = exchanged.outlets.cold_out
+        return_out = exchanged.outlets.cold_out
 
-        outlets = dict(network_out=network_out)
+        outlets = dict(return_out=return_out)
         return outlets
 
     def _pass(self, network, return_T):

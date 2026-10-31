@@ -65,8 +65,8 @@ class Plant(Module):
         """Heat the supply, store it and return the cold-well water."""
 
         # Modules
-        heated = self.heater(inlet=inlets.supply_in, temperature_setpoint=291.15)
-        stored = self.storage(injection_in=heated.outlets.outlet)
+        heated = self.heater(fluid_in=inlets.supply_in, temperature_setpoint=291.15)
+        stored = self.storage(injection_in=heated.outlets.fluid_out)
 
         # Outlets
         return_out = stored.outlets.production_out

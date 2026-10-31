@@ -14,7 +14,7 @@ from tests.fixtures.errors import raises
 
 CP = 4217.4
 WATER = Stream(m_dot=20, T=333.15, p=3e5)
-GRID_GAS = GasGrid()().outlets.outlet
+GRID_GAS = GasGrid()().outlets.fluid_out
 
 
 def engine(**params):
@@ -31,13 +31,13 @@ def engine(**params):
 def test_full_load_hand_value_and_closure():
     """Full load burns 2.5 MW, recovers 1.125 MW and loses the remaining 0.375 MW."""
     unit = engine()
-    result = unit(inlet=WATER, fuel_in=GRID_GAS, load_fraction=1)
+    result = unit(fluid_in=WATER, fuel_in=GRID_GAS, load_fraction=1)
     out = result.outputs
     assert out.fuel == pytest.approx(2.5e6) and out.electricity_generated == 1e6
     assert out.heat_recovered == pytest.approx(1.125e6) and out.dumped_heat == 0
     assert out.heat_loss == pytest.approx(0.375e6)
-    assert out.outlet_T == pytest.approx(WATER.T + 1.125e6 / (20 * CP))
-    assert result.outlets.outlet.p == WATER.p
+    assert out.fluid_out_T == pytest.approx(WATER.T + 1.125e6 / (20 * CP))
+    assert result.outlets.fluid_out.p == WATER.p
     assert energy_balance(unit, result)["relative_residual"] < 1e-12
     assert mass_balance(unit, result)["residual"] == 0
 
@@ -45,30 +45,30 @@ def test_full_load_hand_value_and_closure():
 def test_part_load_willans_line():
     """With a no-load fuel share the electric efficiency falls at part load."""
     unit = engine(no_load_fuel_fraction=0.1)
-    result = unit(inlet=WATER, fuel_in=GRID_GAS, load_fraction=0.5)
+    result = unit(fluid_in=WATER, fuel_in=GRID_GAS, load_fraction=0.5)
     out = result.outputs
     assert out.fuel == pytest.approx(2.5e6 * (0.1 + 0.9 * 0.5))
     assert out.electricity_generated / out.fuel == pytest.approx(0.4 * 0.5 / 0.55)
     assert out.heat_recovered == pytest.approx(0.45 * out.fuel)
     assert energy_balance(unit, result)["relative_residual"] < 1e-12
-    constant = engine()(inlet=WATER, fuel_in=GRID_GAS, load_fraction=0.5).outputs
+    constant = engine()(fluid_in=WATER, fuel_in=GRID_GAS, load_fraction=0.5).outputs
     assert constant.electricity_generated / constant.fuel == pytest.approx(0.4)
 
 
 def test_heat_dumping_and_engine_off():
     """Heat above the outlet limit or without flow is dumped; zero load burns nothing."""
     small = WATER.with_(m_dot=2)
-    out = engine()(inlet=small, fuel_in=GRID_GAS, load_fraction=1).outputs
-    assert out.outlet_T == pytest.approx(363.15)
+    out = engine()(fluid_in=small, fuel_in=GRID_GAS, load_fraction=1).outputs
+    assert out.fluid_out_T == pytest.approx(363.15)
     assert out.heat_recovered == pytest.approx(2 * CP * 30)
     assert out.dumped_heat == pytest.approx(1.125e6 - 2 * CP * 30)
     unit = engine()
-    result = unit(inlet=WATER.with_(m_dot=0), fuel_in=GRID_GAS, load_fraction=1)
+    result = unit(fluid_in=WATER.with_(m_dot=0), fuel_in=GRID_GAS, load_fraction=1)
     assert result.outputs.heat_recovered == 0 and result.outputs.heat_loss == pytest.approx(1.5e6)
     assert energy_balance(unit, result)["relative_residual"] < 1e-12
-    off = engine()(inlet=WATER, fuel_in=GRID_GAS, load_fraction=0).outputs
+    off = engine()(fluid_in=WATER, fuel_in=GRID_GAS, load_fraction=0).outputs
     assert off.fuel == off.heat_loss == off.electricity_generated == 0
-    assert off.outlet_T == WATER.T
+    assert off.fluid_out_T == WATER.T
 
 
 def test_invalid_design_and_flow_raise():
@@ -76,16 +76,16 @@ def test_invalid_design_and_flow_raise():
     with raises(
         ValidationError, "invalid_design", match="electric_efficiency \\+ thermal_efficiency"
     ):
-        engine(thermal_efficiency=0.7)(inlet=WATER, fuel_in=GRID_GAS, load_fraction=1)
-    with pytest.raises(PhysicsError, match="inlet.m_dot = -1"):
-        engine()(inlet=WATER.with_(m_dot=-1), fuel_in=GRID_GAS, load_fraction=1)
+        engine(thermal_efficiency=0.7)(fluid_in=WATER, fuel_in=GRID_GAS, load_fraction=1)
+    with pytest.raises(PhysicsError, match="fluid_in.m_dot = -1"):
+        engine()(fluid_in=WATER.with_(m_dot=-1), fuel_in=GRID_GAS, load_fraction=1)
 
 
 def test_traced_call_matches_one_call_per_row():
     """Off, part load, full load, dumping and stopped-water rows trace and equal per-row calls."""
     unit = engine(no_load_fuel_fraction=0.1)
     rows = [
-        dict(inlet=Stream(m_dot=m_dot, T=T, p=3e5), fuel_in=GRID_GAS, load_fraction=load)
+        dict(fluid_in=Stream(m_dot=m_dot, T=T, p=3e5), fuel_in=GRID_GAS, load_fraction=load)
         for m_dot, T, load in [
             (20, 333.15, 1),
             (20, 333.15, 0.5),
@@ -102,7 +102,7 @@ def test_an_engine_on_co_produced_gas_buys_what_it_lacks():
     """Co-produced gas comes first, as in a boiler; the rest is purchased."""
     fluid = Fluid(kind="gas", gas_composition={"CH4": 1.0}).with_grid(gas.GRID_COMPOSITION)
     fuel = Stream(m_dot=0.01, T=330, p=2e5, fluid=fluid)
-    out = engine()(inlet=WATER, fuel_in=fuel, load_fraction=1).outputs
+    out = engine()(fluid_in=WATER, fuel_in=fuel, load_fraction=1).outputs
     assert out.fuel == pytest.approx(2.5e6)
     assert out.fuel_coproduced == pytest.approx(0.01 * fluid.heating_value())
     assert out.fuel_purchased == pytest.approx(out.fuel - out.fuel_coproduced)
@@ -112,6 +112,6 @@ def test_an_engine_without_a_grid_mark_is_limited_by_its_gas():
     """On an unmarked stream the gas sets the load."""
     fluid = Fluid(kind="gas", gas_composition={"CH4": 1.0})
     fuel = Stream(m_dot=0.01, T=330, p=2e5, fluid=fluid)
-    out = engine()(inlet=WATER, fuel_in=fuel, load_fraction=1).outputs
+    out = engine()(fluid_in=WATER, fuel_in=fuel, load_fraction=1).outputs
     assert out.fuel_purchased == 0
     assert out.fuel == pytest.approx(0.01 * fluid.heating_value())

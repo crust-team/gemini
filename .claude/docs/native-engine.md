@@ -356,7 +356,7 @@ Where the implementation differs from sections 1 to 11, and why:
   or a month go through the same code and chunks merge on first read. `Health` is a plain slots
   dataclass of scalars or arrays, and `health` is written with ops; a row a module cannot assess reads
   like a module without health: score 1, no alarm, `NOT_ASSESSED`, NaN metrics.
-- **A direct call is not a second implementation.** `esp(suction=...)` is the same `forward` and the
+- **A direct call is not a second implementation.** `esp(fluid_in=...)` is the same `forward` and the
   same ops on the Python backend, without a graph; a break node calls exactly that.
 - **Not done.** `scan`, the unit-check pass, `gm.explain`.
 
@@ -394,10 +394,10 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
 - **Rules.** Only `connect` wires. An inlet has one source and an outlet one target
   (`port_in_use`); a bare module takes its only fitting free port, several raise `ambiguous_port`
   with the candidates; different stream types raise `stream_mismatch`; a loop of leaves without a
-  `kind: "state"` connection raises `loop_without_state` at `connect`. A connection never reaches
-  into a plant child (`doublet.esp.discharge` is `invalid_connection`) but passes through groups
-  (`filters.hot.outlet`). Every port of a child is connected or a named plant port, in
-  `inlets`/`outlets`; `connect("secondary_in", "heat_exchanger.cold_in")` names one. In a spec a connection end must name a port.
+  `type: "state"` connection raises `loop_without_state` at `connect`. A connection never reaches
+  into a plant child (`doublet.esp.fluid_out` is `invalid_connection`) but passes through groups
+  (`filters.hot.fluid_out`). Every port of a child is connected or a named plant port, in
+  `inlets`/`outlets`; `connect("return_in", "heat_exchanger.cold_in")` names one. In a spec a connection end must name a port.
 - **Order decides bits.** `forward` runs a plan computed once and dropped by `add`/`connect`: the
   modules in topological order (Kahn), ties broken by first appearance in the connection list and
   then child order. Composite sums add in call order, so the shipped specs list their connections

@@ -230,7 +230,7 @@ def _head_coefficient_guess(module, path, observed, measured, valid):
     """
     if "head" not in measured:
         return None
-    suction = observed.bindings.inlets["suction"]
+    suction = observed.bindings.inlets["fluid_in"]
     flows = observed.values(suction["m_dot"])
     if observed.unit(suction["m_dot"]) in _MASS_FLOW_UNITS:
         pressures, temperatures = observed.values(suction["p"]), observed.values(suction["T"])

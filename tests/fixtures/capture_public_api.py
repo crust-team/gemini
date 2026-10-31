@@ -107,15 +107,21 @@ def _schemas():
     }
 
 
+def _package_api(namespace):
+    """Return the namespace without the module catalogue, which is never a version matter."""
+    catalogue = set(gm.modules.names())
+    return {name: value for name, value in _namespace(namespace).items() if name not in catalogue}
+
+
 def capture():
-    """Return the snapshot of the public API."""
+    """Return the snapshot of the public API: functions, types and return shapes, no catalogue."""
     errors = {name: getattr(gm.errors, name) for name in gm.errors.__all__}
     classes = {name: value for name, value in errors.items() if isinstance(value, type)}
     return {
         "version": gm.__version__,
         "top_level": sorted(gm.__all__),
         "namespaces": {name: _namespace(getattr(gm, name)) for name in NAMESPACES},
-        "modules": _namespace(gm.modules),
+        "modules": _package_api(gm.modules),
         "classes": {
             "Module": _methods(gm.modules.Module, METHODS["Module"]),
             "Plant": _methods(gm.Plant, METHODS["Plant"]),
@@ -128,7 +134,6 @@ def capture():
         "errors": {name: value.code for name, value in classes.items() if hasattr(value, "code")},
         "codes": list(gm.errors.CODES),
         "row_codes": sorted(gm.errors.ROW_CODES),
-        "categories": gm.modules.categories(),
         "streams": gm.streams.names(),
         "schemas": _schemas(),
     }

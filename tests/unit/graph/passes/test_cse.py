@@ -79,8 +79,8 @@ def test_esp_graph_shrinks_and_keeps_its_results(esp, week):
     """The merged ESP graph is much smaller and its outputs equal the unmerged ones exactly."""
     plain, merged = GraphCache(optimize=False), GraphCache()
     inputs = {"frequency": week[:, 3]}
-    expected = run(esp, {"suction": _suction(esp, week)}, inputs, cache=plain)
-    actual = run(esp, {"suction": _suction(esp, week)}, inputs, cache=merged)
+    expected = run(esp, {"fluid_in": _suction(esp, week)}, inputs, cache=plain)
+    actual = run(esp, {"fluid_in": _suction(esp, week)}, inputs, cache=merged)
     assert len(actual.graph.nodes) < 0.8 * len(expected.graph.nodes)
     assert len(actual.graph.checks) <= len(expected.graph.checks)
     for name, values in expected.outputs.items():
@@ -95,7 +95,7 @@ def test_esp_graph_raises_the_same_error(esp, week):
     messages = []
     for cache in (GraphCache(optimize=False), GraphCache()):
         with pytest.raises(PhysicsError) as raised:
-            run(esp, {"suction": _suction(esp, rows)}, {"frequency": rows[:, 3]}, cache=cache)
+            run(esp, {"fluid_in": _suction(esp, rows)}, {"frequency": rows[:, 3]}, cache=cache)
         messages.append(str(raised.value))
     assert messages[0] == messages[1]
 
@@ -310,7 +310,7 @@ def test_pass_is_idempotent_and_describes_the_graph():
 
 def test_cache_merges_by_default_and_not_when_disabled(esp):
     """``GraphCache`` merges once per trace; ``optimize=False`` keeps the traced graph."""
-    fluids = {"suction": esp.fluid}
+    fluids = {"fluid_in": esp.fluid}
     merged = GraphCache().graph(esp, fluids)
     plain = GraphCache(optimize=False).graph(esp, fluids)
     assert len(merged.nodes) < len(plain.nodes)
@@ -323,9 +323,15 @@ def test_composite_graph_shrinks_and_keeps_its_results(twice):
         m_dot=np.ones(3), T=np.full(3, 300.0), p=np.array([1e5, 2e5, 3e5]), fluid=twice.fluid
     )
     plain, merged = GraphCache(optimize=False), GraphCache()
-    expected = run(twice, {"inlet": stream}, {"gain.gain": np.array([1.0, 2.0, 3.0])}, cache=plain)
-    actual = run(twice, {"inlet": stream}, {"gain.gain": np.array([1.0, 2.0, 3.0])}, cache=merged)
+    expected = run(
+        twice, {"fluid_in": stream}, {"gain.gain": np.array([1.0, 2.0, 3.0])}, cache=plain
+    )
+    actual = run(
+        twice, {"fluid_in": stream}, {"gain.gain": np.array([1.0, 2.0, 3.0])}, cache=merged
+    )
     assert len(actual.graph.nodes) < len(expected.graph.nodes)
     assert len(actual.graph.checks) < len(expected.graph.checks)
-    np.testing.assert_array_equal(actual.outlets["outlet"]["p"], expected.outlets["outlet"]["p"])
-    assert actual.outlets["outlet"]["p"].tolist() == [2e5 + 12, 4e5 + 24, 6e5 + 36]
+    np.testing.assert_array_equal(
+        actual.outlets["fluid_out"]["p"], expected.outlets["fluid_out"]["p"]
+    )
+    assert actual.outlets["fluid_out"]["p"].tolist() == [2e5 + 12, 4e5 + 24, 6e5 + 36]

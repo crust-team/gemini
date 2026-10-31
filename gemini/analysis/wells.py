@@ -83,10 +83,12 @@ def _case_inputs(chain, conditions):
 
 def _lift(chain, rate):
     """Return the wellhead pressure [Pa] that the well lifts the inflow of ``rate`` to."""
-    stream = chain.lower.trial_outlets({"bottom": chain.reservoir.sandface_stream(rate)}).wellhead
+    stream = chain.lower.trial_outlets(
+        {"bottom_in": chain.reservoir.sandface_stream(rate)}
+    ).wellhead_out
     if chain.esp is not None:
-        stream = chain.esp.trial_outlets({"suction": stream}).discharge
-        stream = chain.upper.trial_outlets({"bottom": stream}).wellhead
+        stream = chain.esp.trial_outlets({"fluid_in": stream}).fluid_out
+        stream = chain.upper.trial_outlets({"bottom_in": stream}).wellhead_out
     return stream.p
 
 

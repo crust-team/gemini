@@ -15,24 +15,26 @@ from tests.fixtures.errors import raises
 
 def test_trace_names_inputs_by_role_and_records_outputs(gain):
     """Inlet fields (the fluid is static), controls, parameters and constants are inputs."""
-    graph = Tracer().trace(gain, {"inlet": gain.fluid})
+    graph = Tracer().trace(gain, {"fluid_in": gain.fluid})
     roles = {name: node.role for name, node in graph.inputs.items()}
     assert roles == {
-        "inlet.m_dot": "inlet",
-        "inlet.T": "inlet",
-        "inlet.p": "inlet",
+        "fluid_in.m_dot": "inlet",
+        "fluid_in.T": "inlet",
+        "fluid_in.p": "inlet",
         "gain": "control",
         "scale": "parameter",
         "REFERENCE": "constant",
     }
     assert set(graph.outputs) == {
-        "outlets.outlet.m_dot",
-        "outlets.outlet.T",
-        "outlets.outlet.p",
+        "outlets.fluid_out.m_dot",
+        "outlets.fluid_out.T",
+        "outlets.fluid_out.p",
         "outputs.rise",
         "outputs.boost",
     }
-    assert graph.inputs["inlet.p"].unit == "Pa" and graph.outlet_fluids == {"outlet": gain.fluid}
+    assert graph.inputs["fluid_in.p"].unit == "Pa" and graph.outlet_fluids == {
+        "fluid_out": gain.fluid
+    }
     assert all(node.op != "input" or node.name for node in graph.nodes)
     assert 3.0 not in [operand for node in graph.nodes for operand in node.operands]
 
@@ -40,7 +42,7 @@ def test_trace_names_inputs_by_role_and_records_outputs(gain):
 def test_no_outputs_traces_only_the_fluid_step(gain):
     """Under ``no_outputs()`` the graph has outlet fields only."""
     with gm.no_outputs():
-        graph = Tracer().trace(gain, {"inlet": gain.fluid})
+        graph = Tracer().trace(gain, {"fluid_in": gain.fluid})
     assert all(name.startswith("outlets.") for name in graph.outputs)
 
 
@@ -54,15 +56,15 @@ def test_hooks_are_classified_by_what_they_do(gain):
         return module.rise
 
     handle = gain.register_forward_hook(doubles)
-    graph = Tracer().trace(gain, {"inlet": gain.fluid})
+    graph = Tracer().trace(gain, {"fluid_in": gain.fluid})
     assert graph.root is None and graph.outputs["outputs.boost"].op == "mul"
     handle_reads = gain.register_forward_hook(reads)
-    reading = Tracer().trace(gain, {"inlet": gain.fluid})
+    reading = Tracer().trace(gain, {"fluid_in": gain.fluid})
     assert reading.root is gain and "only reads and runs on real values" in reading.breaks[0][1]
     handle.remove()
     handle_reads.remove()
     gain.register_forward_hook(lambda module, inlets, outlets: float(module.rise))
-    broken = Tracer().trace(gain, {"inlet": gain.fluid})
+    broken = Tracer().trace(gain, {"fluid_in": gain.fluid})
     assert broken.root is gain and re.search("forward hook .*float", broken.breaks[0][1])
 
 
@@ -75,16 +77,16 @@ def test_unassigned_outputs_fail_at_trace_time(gain):
 
     module = Forgetful().update_params(scale=1.0)
     with pytest.raises(DefinitionError, match="boost"):
-        Tracer().trace(module, {"inlet": module.fluid})
+        Tracer().trace(module, {"fluid_in": module.fluid})
 
 
 def test_untraceable_modules_name_every_reason(gain, tank):
     """Stateful modules, pre-hooks and float32 precision make the root a break, never an error."""
-    graph = Tracer().trace(tank, {"inlet": gain.fluid})
+    graph = Tracer().trace(tank, {"fluid_in": gain.fluid})
     assert graph.root is tank and "stateful" in graph.breaks[0][1]
     gain.register_forward_pre_hook(lambda module, inlets: None)
     with gm.runtime.settings(precision="float32"):
-        graph = Tracer().trace(gain, {"inlet": gain.fluid})
+        graph = Tracer().trace(gain, {"fluid_in": gain.fluid})
     assert graph.root is gain and "pre-hooks; runtime precision" in graph.breaks[0][1]
 
 
@@ -100,34 +102,34 @@ def test_a_stream_built_in_forward_traces_and_keeps_its_limits(gain):
 
     class Drop(type(gain)):
         def forward(self, inlets):
-            inlet = inlets.inlet
+            inlet = inlets.fluid_in
             drop = self.gain * 1e6
             return {
-                "outlet": gm.Stream(
+                "fluid_out": gm.Stream(
                     m_dot=inlet.m_dot, T=inlet.T, p=inlet.p - drop, fluid=inlet.fluid
                 )
             }
 
     module = Drop().update_params(scale=1.0)
-    graph = Tracer().trace(module, {"inlet": module.fluid})
+    graph = Tracer().trace(module, {"fluid_in": module.fluid})
     assert any(node.op == "check" for node in graph.nodes)
     stream = gm.Stream(m_dot=np.array([1.0, 1.0]), T=300.0, p=np.array([2e5, 1e5]))
-    assert run(module, {"inlet": stream}, {"gain": 0.0}).outlets["outlet"]["p"].tolist() == [
+    assert run(module, {"fluid_in": stream}, {"gain": 0.0}).outlets["fluid_out"]["p"].tolist() == [
         2e5,
         1e5,
     ]
     with pytest.raises(PhysicsError, match="p = -800000.0 Pa"):
-        run(module, {"inlet": stream}, {"gain": 1.0})
+        run(module, {"fluid_in": stream}, {"gain": 1.0})
 
 
 def test_composite_inputs_are_named_by_relative_path(line):
     """Child controls, boundaries and parameters are prefixed; the root's are not."""
-    graph = Tracer().trace(line, {"inlet": line.fluid})
+    graph = Tracer().trace(line, {"fluid_in": line.fluid})
     roles = {name: node.role for name, node in graph.inputs.items()}
     assert roles == {
-        "inlet.m_dot": "inlet",
-        "inlet.T": "inlet",
-        "inlet.p": "inlet",
+        "fluid_in.m_dot": "inlet",
+        "fluid_in.T": "inlet",
+        "fluid_in.p": "inlet",
         "boost": "control",
         "first.scale": "parameter",
         "gain.scale": "parameter",
@@ -145,14 +147,14 @@ def test_composite_inputs_are_named_by_relative_path(line):
 
 def test_a_child_called_twice_reuses_its_inputs(twice):
     """The second call finds the first call's graph inputs."""
-    graph = Tracer().trace(twice, {"inlet": twice.fluid})
+    graph = Tracer().trace(twice, {"fluid_in": twice.fluid})
     assert [name for name in graph.inputs if name.startswith("gain")] == ["gain.gain", "gain.scale"]
 
 
 def test_composite_without_outputs_traces_the_fluid_step(line):
     """Under ``no_outputs()`` a composite graph has outlet fields only."""
     with gm.no_outputs():
-        graph = Tracer().trace(line, {"inlet": line.fluid})
+        graph = Tracer().trace(line, {"fluid_in": line.fluid})
     assert all(name.startswith("outlets.") for name in graph.outputs)
 
 
@@ -160,13 +162,13 @@ def test_uninitialized_parameters_of_the_tree_are_refused(line):
     """A parameter without a value anywhere below the root cannot be traced."""
     line.gain._parameters["scale"].value = UNSET
     with raises(ValidationError, "missing_value", match="line: uninitialized parameters"):
-        Tracer().trace(line, {"inlet": line.fluid})
+        Tracer().trace(line, {"fluid_in": line.fluid})
 
 
 def test_a_reading_hook_on_a_leaf_child_makes_it_a_break_node(line):
     """An unmarked hook that only reads cannot be replayed, so the leaf child runs untraced."""
     line.gain.register_forward_hook(lambda module, inlets, outlets: module.rise)
-    graph = Tracer().trace(line, {"inlet": line.fluid})
+    graph = Tracer().trace(line, {"fluid_in": line.fluid})
     assert [path for path, _ in graph.breaks] == ["gain"]
     assert "only reads" in graph.breaks[0][1]
 
@@ -179,6 +181,6 @@ def test_writing_hooks_on_a_child_join_the_graph(line):
 
     line.gain.register_forward_hook(doubles)
     inlet = gm.Stream(m_dot=np.ones(3), T=np.full(3, 300.0), p=np.full(3, 1e5), fluid=line.fluid)
-    result = run(line, {"inlet": inlet}, {"boost": np.array([1.0, 2.0, 3.0])})
+    result = run(line, {"fluid_in": inlet}, {"boost": np.array([1.0, 2.0, 3.0])})
     assert result.graph is not None
     assert result.outputs["rise"].tolist() == [12.0, 24.0, 36.0]

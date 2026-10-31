@@ -56,17 +56,17 @@ def _check_balances(plant, result):
 def test_charge_cools_the_building_with_native_groundwater():
     """Empty stores produce at the aquifer temperature; the exchanger cools the building."""
     plant = _plant()
-    result = plant(building_in=SUMMER)
+    result = plant(return_in=SUMMER)
     out = result.outputs
     exchanger = result.children["heat_exchanger"]
     groundwater = exchanger.inlets.cold_in
     assert out.production_out_T == 284.15 and groundwater.T > 284.15
-    assert result.outlets.building_out == exchanger.outlets.hot_out
-    assert result.outlets.building_out.T < SUMMER.T
+    assert result.outlets.supply_out == exchanger.outlets.hot_out
+    assert result.outlets.supply_out.T < SUMMER.T
     storage = result.children["storage"]
     assert storage.inlets.injection_in.T == exchanger.outlets.cold_out.T
     assert storage.inlets.injection_in.p == 3e5
-    assert storage.outlets.production_out == result.children["pump"].inlets.suction
+    assert storage.outlets.production_out == result.children["pump"].inlets.fluid_in
     assert "heat_pump" not in result.children
     assert out.heat_accumulation == pytest.approx(
         30.0 * CP * (storage.inlets.injection_in.T - 284.15), rel=1e-9
@@ -80,8 +80,8 @@ def test_two_charge_steps_fill_the_warm_store():
     The conduction loss that sets in during the first hour takes about 0.15 %.
     """
     plant = _plant()
-    state, first = plant.step(None, HOUR, {"building_in": SUMMER})
-    state, second = plant.step(state, HOUR, {"building_in": SUMMER})
+    state, first = plant.step(None, HOUR, {"return_in": SUMMER})
+    state, second = plant.step(state, HOUR, {"return_in": SUMMER})
     assert state["storage"]["warm_volume"] == pytest.approx(2 * 30 / 1000 * HOUR)
     assert state["storage"]["warm_temperature_change"] > 0
     assert first.outputs.stored_energy == 0
@@ -93,16 +93,16 @@ def test_two_charge_steps_fill_the_warm_store():
 def test_discharge_feeds_the_heat_pump_from_the_warm_store():
     """After charging, the warm store feeds the evaporator and the condenser heats the building."""
     plant = _plant()
-    state, _ = plant.step(None, 6 * HOUR, {"building_in": SUMMER})
+    state, _ = plant.step(None, 6 * HOUR, {"return_in": SUMMER})
     warm = 284.15 + state["storage"]["warm_temperature_change"]
     plant.storage.mode = "discharge"
-    state, result = plant.step(state, HOUR, {"building_in": WINTER})
+    state, result = plant.step(state, HOUR, {"return_in": WINTER})
     out = result.outputs
     lifted = result.children["heat_pump"]
     assert out.production_out_T == pytest.approx(warm, rel=1e-14)
-    assert result.children["pump"].inlets.suction.T == out.production_out_T
-    assert result.outlets.building_out.T == pytest.approx(313.15, rel=1e-12)
-    assert lifted.inlets.source_in == result.children["pump"].outlets.discharge
+    assert result.children["pump"].inlets.fluid_in.T == out.production_out_T
+    assert result.outlets.supply_out.T == pytest.approx(313.15, rel=1e-12)
+    assert lifted.inlets.source_in == result.children["pump"].outlets.fluid_out
     assert result.children["storage"].inlets.injection_in.T == lifted.outlets.source_out.T < warm
     assert "heat_exchanger" not in result.children
     assert out.electricity == pytest.approx(
@@ -116,12 +116,12 @@ def test_idle_moves_no_groundwater_and_flow_is_required_to_stop():
     """Idle passes the building circuit; idle with groundwater flow raises."""
     plant = _plant("idle")
     plant.groundwater_flow = 0.0
-    result = plant(building_in=SUMMER)
-    assert result.outlets.building_out.T == SUMMER.T
+    result = plant(return_in=SUMMER)
+    assert result.outlets.supply_out.T == SUMMER.T
     assert result.outputs.electricity == 0
     plant.groundwater_flow = 30.0
     with pytest.raises(gm.errors.PhysicsError, match="idle"):
-        plant(building_in=SUMMER)
+        plant(return_in=SUMMER)
 
 
 class Campus(Module):
@@ -147,10 +147,10 @@ class Campus(Module):
         """Cool the building return."""
 
         # Modules
-        served = self.ates(building_in=inlets.return_in)
+        served = self.ates(return_in=inlets.return_in)
 
         # Outlets
-        supply_out = served.outlets.building_out
+        supply_out = served.outlets.supply_out
 
         outlets = dict(supply_out=supply_out)
         return outlets

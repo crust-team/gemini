@@ -38,7 +38,7 @@ class PassThrough(Module):
         self.value = Parameter(float, gt=0, calibratable=True)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.multiplier = Control(float, default=1, gt=0)
@@ -47,16 +47,16 @@ class PassThrough(Module):
         self.result = Output(float, soft_sensor=True)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Record the scalar product and return the stream."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -84,13 +84,13 @@ def test_call_output_and_signature_guards():
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = PassThrough().update_params(value=2)
     results = [
-        module(inlet=stream, multiplier=4),
-        module({"inlet": stream}, multiplier=4),
-        module(Ports({"inlet": stream}), multiplier=4),
+        module(fluid_in=stream, multiplier=4),
+        module({"fluid_in": stream}, multiplier=4),
+        module(Ports({"fluid_in": stream}), multiplier=4),
         module(stream, multiplier=4),
     ]
     assert [result.outputs.result for result in results] == [8, 8, 8, 8]
-    assert all(result.outlets.outlet is stream for result in results)
+    assert all(result.outlets.fluid_out is stream for result in results)
     assert all(isinstance(result.inlets, Ports) for result in results)
     assert all(isinstance(result.outlets, Ports) for result in results)
     assert module.result.soft_sensor
@@ -103,33 +103,33 @@ def test_a_wrong_call_names_the_inlets():
     with raises(
         gm.errors.ValidationError,
         "invalid_call",
-        match="pass_through.*missing.*inlet.*valid names: inlet",
+        match="pass_through.*missing.*fluid_in.*valid names: fluid_in",
     ):
         module()
     with raises(
         gm.errors.ValidationError,
         "invalid_call",
-        match="pass_through.*inlett.*valid names.*did you mean 'inlet'",
+        match="pass_through.*fluid_ni.*valid names.*did you mean 'fluid_in'",
     ):
-        module(inlett=stream)
+        module(fluid_ni=stream)
     with raises(
         gm.errors.ValidationError,
         "invalid_call",
-        match="pass_through.*cannot mix.*inlet.*valid names: inlet",
+        match="pass_through.*cannot mix.*fluid_in.*valid names: fluid_in",
     ):
-        module({"inlet": stream}, inlet=stream)
+        module({"fluid_in": stream}, fluid_in=stream)
     with raises(
         gm.errors.ValidationError,
         "invalid_call",
-        match="pass_through.*invalid inlet 'inlet'.*valid names: inlet",
+        match="pass_through.*invalid inlet 'fluid_in'.*valid names: fluid_in",
     ):
-        module(inlet=1)
+        module(fluid_in=1)
     with raises(
         gm.errors.ValidationError,
         "invalid_call",
         match="pass_through.*multiple values.*inlet.*valid names",
     ):
-        module(stream, inlet=stream)
+        module(stream, fluid_in=stream)
 
 
 def test_outlet_dict_names_and_flow_types_are_checked(monkeypatch):
@@ -138,23 +138,23 @@ def test_outlet_dict_names_and_flow_types_are_checked(monkeypatch):
     module = PassThrough().update_params(value=2)
 
     def scalar_forward(inlets):
-        return inlets.inlet
+        return inlets.fluid_in
 
     monkeypatch.setattr(module, "forward", scalar_forward)
     with pytest.raises(gm.errors.DefinitionError, match="outlet dict"):
-        module(inlet=stream)
+        module(fluid_in=stream)
 
     monkeypatch.setattr(module, "forward", lambda inlets: {})
-    with pytest.raises(gm.errors.DefinitionError, match=r"pass_through.*missing=\['outlet'\]"):
-        module(inlet=stream)
-    monkeypatch.setattr(module, "forward", lambda inlets: {"outlet": stream, "extra": stream})
+    with pytest.raises(gm.errors.DefinitionError, match=r"pass_through.*missing=\['fluid_out'\]"):
+        module(fluid_in=stream)
+    monkeypatch.setattr(module, "forward", lambda inlets: {"fluid_out": stream, "extra": stream})
     with pytest.raises(gm.errors.DefinitionError, match=r"pass_through.*extra=\['extra'\]"):
-        module(inlet=stream)
-    monkeypatch.setattr(module, "forward", lambda inlets: {"outlet": 1})
+        module(fluid_in=stream)
+    monkeypatch.setattr(module, "forward", lambda inlets: {"fluid_out": 1})
     with pytest.raises(
-        gm.errors.DefinitionError, match="pass_through.*invalid outlet 'outlet'.*valid names"
+        gm.errors.DefinitionError, match="pass_through.*invalid outlet 'fluid_out'.*valid names"
     ):
-        module(inlet=stream)
+        module(fluid_in=stream)
 
 
 class NestedParent(Module):
@@ -168,24 +168,24 @@ class NestedParent(Module):
         self.children_by_name = ModuleDict({"child": PassThrough().update_params(value=3)})
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.child_value = Output.of(self.children_by_name.child.result)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Call the child and copy its recorded output."""
 
         # Modules
-        child = self.children_by_name.child(inlet=inlets.inlet, multiplier=2)
+        child = self.children_by_name.child(fluid_in=inlets.fluid_in, multiplier=2)
 
         # Outlets
-        outlet = child.outlets.outlet
+        outlet = child.outlets.fluid_out
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -194,7 +194,9 @@ def test_output_records_are_thread_local():
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = PassThrough().update_params(value=2)
     with ThreadPoolExecutor(max_workers=4) as pool:
-        values = list(pool.map(lambda value: module(inlet=stream, multiplier=value), range(1, 9)))
+        values = list(
+            pool.map(lambda value: module(fluid_in=stream, multiplier=value), range(1, 9))
+        )
     assert [result.outputs.result for result in values] == [2 * value for value in range(1, 9)]
     assert module.result.soft_sensor
 
@@ -202,10 +204,10 @@ def test_output_records_are_thread_local():
 def test_output_records_are_nested_per_call():
     """A child's call inside its parent keeps its own inputs and outputs."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    result = NestedParent()(inlet=stream)
+    result = NestedParent()(fluid_in=stream)
     assert result.outputs.child_value == 6
     assert result.children["children_by_name.child"].outputs.result == 6
-    assert NestedParent().children_by_name.child(inlet=stream).outputs.result == 3
+    assert NestedParent().children_by_name.child(fluid_in=stream).outputs.result == 3
 
 
 def test_uninitialized_and_hooks():
@@ -213,12 +215,12 @@ def test_uninitialized_and_hooks():
     module = PassThrough()
     assert module.missing_parameters() == ["value"]
     with raises(gm.errors.ValidationError, "missing_value", match="uninitialized"):
-        module(inlet=Stream(m_dot=1, T=300, p=1e5))
+        module(fluid_in=Stream(m_dot=1, T=300, p=1e5))
     module.value = 2
     calls = []
     before = module.register_forward_pre_hook(lambda module, inlets: calls.append("before"))
     after = module.register_forward_hook(lambda module, inlets, outlets: calls.append("after"))
-    module(inlet=Stream(m_dot=1, T=300, p=1e5))
+    module(fluid_in=Stream(m_dot=1, T=300, p=1e5))
     assert calls == ["before", "after"]
     before.remove()
     after.remove()
@@ -232,7 +234,7 @@ class RequiredInputs(Module):
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.frequency = Control(Frequency, gt=0, le=60)
@@ -244,16 +246,16 @@ class RequiredInputs(Module):
         self.total = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Read applied values through ordinary attributes."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -268,8 +270,8 @@ def test_input_resolution_units_bounds_and_metadata():
     module.grid_frequency = 50
     assert module.get_control("frequency").unit == "Hz"
     assert module.get_boundary("grid_frequency").unit == "Hz"
-    assert module(inlet=stream).outputs.total == 90
-    assert module(inlet=stream, frequency="45 Hz").outputs.total == 95
+    assert module(fluid_in=stream).outputs.total == 90
+    assert module(fluid_in=stream, frequency="45 Hz").outputs.total == 95
     assert module.frequency == 40
     with pytest.raises(gm.errors.ValidationError, match="frequency.*invalid control.*Hz"):
         module.frequency = "61 Hz"
@@ -282,16 +284,16 @@ def test_missing_input_and_unknown_keyword_errors_are_complete():
     with raises(
         gm.errors.ValidationError, "missing_value", match="required_inputs.frequency.*control.*Hz"
     ):
-        module(inlet=stream)
+        module(fluid_in=stream)
     module.frequency = 50
     with raises(
         gm.errors.ValidationError,
         "missing_value",
         match="required_inputs.grid_frequency.*boundary.*Hz",
     ):
-        module(inlet=stream)
+        module(fluid_in=stream)
     with raises(gm.errors.ValidationError, "invalid_call", match="valid names"):
-        module(inlet=stream, typo=1)
+        module(fluid_in=stream, typo=1)
 
 
 def test_call_inputs_and_hook_assignments_do_not_leak():
@@ -307,10 +309,10 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
         current.frequency = min(current.frequency, 45)
 
     handle = module.register_forward_pre_hook(clamp)
-    assert module(inlet=stream).outputs.total == 95
+    assert module(fluid_in=stream).outputs.total == 95
     handle.remove()
     assert module.frequency == 50
-    assert module(inlet=stream).outputs.total == 100
+    assert module(fluid_in=stream).outputs.total == 100
     assert seen == [50]
 
     class AssignInForward(RequiredInputs):
@@ -320,10 +322,10 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
             """Override frequency for only the current call."""
 
             # Outlets
-            inlet = inlets.inlet
+            inlet = inlets.fluid_in
             outlet = inlet
 
-            outlets = dict(outlet=outlet)
+            outlets = dict(fluid_out=outlet)
             return outlets
 
         def _compute_outputs(self, inlets, outlets):
@@ -332,7 +334,7 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
 
     assigned = AssignInForward()
     assigned.set_inputs({"frequency": 50, "grid_frequency": 50})
-    assert assigned(inlet=stream).outputs.total == 60
+    assert assigned(fluid_in=stream).outputs.total == 60
     assert assigned.frequency == 50
 
 
@@ -354,16 +356,16 @@ def test_hooks_are_ordered_removable_and_observe_named_ports():
 
     def observe(module, inlets, outlets):
         calls.append(("post", module))
-        return {"outlet": replacement}
+        return {"fluid_out": replacement}
 
     post = module.register_forward_hook(observe)
-    result = module(inlet=stream)
+    result = module(fluid_in=stream)
     assert [name for name, _ in calls] == ["first", "second", "post"]
-    assert result.outlets.outlet is stream
+    assert result.outlets.fluid_out is stream
     second.remove()
     post.remove()
     first.remove()
-    assert module(inlet=stream).outlets.outlet is stream
+    assert module(fluid_in=stream).outlets.fluid_out is stream
     state = module.state_dict()
     restored = PassThrough().update_params(value=1).load_state_dict(state)
     assert not restored._pre_hooks and not restored._hooks
@@ -387,7 +389,7 @@ def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
 
             # Modules
             self.child(
-                inlet=Stream(m_dot=1, T=300, p=1e5),
+                fluid_in=Stream(m_dot=1, T=300, p=1e5),
             )
 
             outlets = dict()
@@ -424,12 +426,12 @@ def test_missing_output_and_named_hook_ordering():
 
         def __init__(self):
             super().__init__()
-            self.inlet = Inlet(Stream)
+            self.fluid_in = Inlet(Stream)
             self.value = Output(float)
-            self.outlet = Outlet(Stream)
+            self.fluid_out = Outlet(Stream)
 
         def forward(self, inlets):
-            outlets = dict(outlet=inlets.inlet)
+            outlets = dict(fluid_out=inlets.fluid_in)
             return outlets
 
         def _compute_outputs(self, inlets, outlets):
@@ -438,16 +440,16 @@ def test_missing_output_and_named_hook_ordering():
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = MissingOutput()
     with pytest.raises(gm.errors.DefinitionError, match="missing_output.*value"):
-        module(inlet=stream)
+        module(fluid_in=stream)
 
     good = PassThrough().update_params(value=3)
     seen = []
 
     def observe(module, inlets, outlets):
-        seen.append((module.result, inlets.inlet, outlets.outlet))
+        seen.append((module.result, inlets.fluid_in, outlets.fluid_out))
 
     good.register_forward_hook(observe)
-    good(inlet=stream, multiplier=2)
+    good(fluid_in=stream, multiplier=2)
     assert seen == [(6, stream, stream)]
 
 
@@ -462,16 +464,16 @@ def test_no_outputs_is_nested_thread_local_context_and_decorator():
 
     module.register_forward_hook(observe)
     with gm.no_outputs():
-        assert not module(inlet=stream).outputs
+        assert not module(fluid_in=stream).outputs
         with gm.no_outputs():
-            assert not module(inlet=stream).outputs
-        assert not module(inlet=stream).outputs
-    assert module(inlet=stream).outputs.result == 2
+            assert not module(fluid_in=stream).outputs
+        assert not module(fluid_in=stream).outputs
+    assert module(fluid_in=stream).outputs.result == 2
     assert calls == [module]
 
     @gm.no_outputs()
     def fast_call():
-        return module(inlet=stream)
+        return module(fluid_in=stream)
 
     assert not fast_call().outputs
 
@@ -485,13 +487,13 @@ class EnergyLeaf(Module):
     def __init__(self):
         """Declare one stream path and an electricity output."""
         super().__init__()
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
         self.electricity = Output(Electricity)
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Return the inlet stream."""
-        outlets = dict(outlet=inlets.inlet)
+        outlets = dict(fluid_out=inlets.fluid_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -507,18 +509,18 @@ class FormulaParent(Module):
         """Declare one child and every formula kind."""
         super().__init__()
         self.child = EnergyLeaf()
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
         self.copied = Output.of(self.child.electricity)
         self.electricity = Output(Electricity)
         self.ratio = Output.ratio(self.copied, self.electricity)
-        self.mass = Output.of(self.child.outlet.field("m_dot"))
-        self.outlet = Outlet(Stream)
+        self.mass = Output.of(self.child.fluid_out.field("m_dot"))
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Call the child ``calls`` times."""
         for _ in range(self.calls):
-            child = self.child(inlet=inlets.inlet)
-        outlets = dict(outlet=child.outlets.outlet)
+            child = self.child(fluid_in=inlets.fluid_in)
+        outlets = dict(fluid_out=child.outlets.fluid_out)
         return outlets
 
 
@@ -531,7 +533,7 @@ class RepeatedParent(FormulaParent):
 def test_formula_outputs_copy_sum_divide_and_read_outlet_fields():
     """Formula outputs use this call's exact descendant records in declaration order."""
     module = FormulaParent()
-    result = module(inlet=STREAM)
+    result = module(fluid_in=STREAM)
     assert dict(result.outputs) == {"copied": 2, "electricity": 2, "ratio": 1, "mass": 1}
     assert module.outputs()["copied"].quantity == "electricity"
 
@@ -547,8 +549,8 @@ class RepeatedTotal(Module):
 
     def forward(self, inlets):
         """Call the child twice."""
-        self.child(inlet=STREAM)
-        self.child(inlet=STREAM)
+        self.child(fluid_in=STREAM)
+        self.child(fluid_in=STREAM)
         outlets = dict()
         return outlets
 
@@ -557,8 +559,8 @@ def test_reference_formulas_survive_deep_copy_and_nesting():
     """A copied or nested composite resolves its references to its own descendants."""
     copy = deepcopy(FormulaParent())
     holder = ModuleDict({"inner": FormulaParent()})
-    assert copy(inlet=STREAM).outputs.copied == 2
-    assert holder.inner(inlet=STREAM).outputs.mass == 1
+    assert copy(fluid_in=STREAM).outputs.copied == 2
+    assert holder.inner(fluid_in=STREAM).outputs.mass == 1
 
 
 def test_wrong_references_fail_when_the_class_is_built():
@@ -591,7 +593,7 @@ def test_wrong_references_fail_when_the_class_is_built():
     with pytest.raises(gm.errors.DefinitionError, match="not an earlier output of this module"):
         ChildOperand()
     with pytest.raises(gm.errors.DefinitionError, match="did you mean 'm_dot'"):
-        EnergyLeaf().outlet.field("mdot")
+        EnergyLeaf().fluid_out.field("mdot")
 
 
 def test_total_counts_every_call():
@@ -619,7 +621,7 @@ class SummedParent(Module):
 
         # Modules
         for _ in range(self.calls):
-            self.child(inlet=STREAM)
+            self.child(fluid_in=STREAM)
 
         outlets = dict()
         return outlets
@@ -644,7 +646,7 @@ class NestedSum(Module):
         """Call every child once."""
 
         # Modules
-        self.leaf(inlet=STREAM)
+        self.leaf(fluid_in=STREAM)
         self.first()
         self.second()
 
@@ -669,9 +671,9 @@ class PowerLeaf(EnergyLeaf):
     def __init__(self):
         """Declare the same name with another quantity."""
         Module.__init__(self)
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
         self.electricity = Output(Power)
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
 
 def test_summed_output_rejects_the_same_name_with_another_quantity():
@@ -722,7 +724,7 @@ def test_forward_hook_sees_the_automatic_sum():
 def test_copy_needs_exactly_one_call():
     """``Output.of`` refuses a descendant that was called twice."""
     with pytest.raises(gm.errors.DefinitionError, match="child.*called 2 times"):
-        RepeatedParent()(inlet=STREAM)
+        RepeatedParent()(fluid_in=STREAM)
 
 
 class PowerUse(Module):
@@ -829,8 +831,8 @@ class OutletFormula(Module):
 
 def test_misspelled_outlet_suggests_the_outlet():
     """A misspelled outlet is suggested from the ports of the child."""
-    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'outlet'"):
-        OutletFormula("outlett")
+    with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'fluid_out'"):
+        OutletFormula("fluid_ot")
 
 
 class RatioTypo(Module):
@@ -929,7 +931,7 @@ class Quotient(Module):
         self.coefficients = Parameter(list[float], default=[1.0, 2.0], shape=(2,))
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.divisor = Control(float, default=0.0)
@@ -941,14 +943,14 @@ class Quotient(Module):
         self.again = Output(float)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Divide the inlet flow by the control and raise the pressure by one pascal."""
-        stream = inlets.inlet
+        stream = inlets.fluid_in
         self.kinds = (type(stream.m_dot), type(self.numerator), type(self.divisor))
         self.quotient = stream.m_dot / self.divisor
-        return dict(outlet=stream.with_(p=stream.p + 1.0))
+        return dict(fluid_out=stream.with_(p=stream.p + 1.0))
 
     def _compute_outputs(self, inlets, outlets):
         self.ratio = self.numerator / self.divisor
@@ -961,17 +963,17 @@ def test_an_eager_call_divides_silently_and_returns_plain_python_values():
     """Parameters, controls and inlet fields are NumPy scalars inside; results are Python."""
     module = Quotient()
     stream = Stream(m_dot=0.0, T=300.0, p=1e5)
-    result = module(inlet=stream)
+    result = module(fluid_in=stream)
     assert [kind.__name__ for kind in module.kinds] == ["float64"] * 3
     assert math.isinf(result.outputs.ratio) and type(result.outputs.ratio) is float
     assert type(result.outputs.finite) is bool and result.outputs.finite is False
     assert result.outputs.seen == [math.inf, math.inf]
     assert result.outputs.again == math.inf and type(result.outputs.again) is float
     assert all(type(item) is float for item in result.outputs.seen)
-    assert math.isnan(module.quotient) and type(result.outlets.outlet.p) is float
-    assert result.inlets.inlet is stream and type(stream.m_dot) is float
+    assert math.isnan(module.quotient) and type(result.outlets.fluid_out.p) is float
+    assert result.inlets.fluid_in is stream and type(stream.m_dot) is float
     assert type(result.inputs["divisor"]) is float
-    assert "np.float64" not in str(result.outlets.outlet) and "np.float64" not in str(stream)
+    assert "np.float64" not in str(result.outlets.fluid_out) and "np.float64" not in str(stream)
 
 
 def test_a_forced_numpy_backend_keeps_plain_division_silent():

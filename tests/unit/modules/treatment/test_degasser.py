@@ -14,18 +14,18 @@ GASSY = Fluid(gas_mass_fraction=0.02)
 def test_equipment_forward():
     """Equipment preserves mass and valid pressure/temperature."""
     c = Degasser().update_params(heat_transfer_coefficient=100000)
-    result = c(inlet=Stream(m_dot=1, T=300, p=1e6))
+    result = c(fluid_in=Stream(m_dot=1, T=300, p=1e6))
     assert sum(s.m_dot for s in result.outlets.values() if isinstance(s, Stream)) == 1
-    assert result.outlets["liquid"].T == 300
-    assert result.outlets["liquid"].p >= 0
+    assert result.outlets["liquid_out"].T == 300
+    assert result.outlets["liquid_out"].p >= 0
 
 
 def test_default_reproduces_the_liquid_only_model_for_any_fluid():
     """Zero default efficiency: no gas, liquid unchanged except the 0.149 bar loss."""
     inlet = Stream(m_dot=40, T=350, p=1e6, fluid=GASSY)
-    result = Degasser()(inlet=inlet)
-    assert result.outlets.liquid == inlet.with_(p=1e6 - 14900)
-    assert result.outlets.gas == inlet.with_(p=1e6 - 14900, m_dot=0)
+    result = Degasser()(fluid_in=inlet)
+    assert result.outlets.liquid_out == inlet.with_(p=1e6 - 14900)
+    assert result.outlets.gas_out == inlet.with_(p=1e6 - 14900, m_dot=0)
     assert result.outputs.gas_mass_flow == 0
     assert result.outputs.pressure_drop == 14900
 
@@ -34,8 +34,8 @@ def test_separation_conserves_gas_mass_and_energy():
     """The separated share of the free gas leaves through gas; the rest stays in the liquid."""
     degasser = Degasser().update_params(separation_efficiency=0.75, outlet_pressure=2e5)
     inlet = Stream(m_dot=10, T=350, p=1e6, fluid=GASSY)
-    result = degasser(inlet=inlet)
-    liquid, gas = result.outlets.liquid, result.outlets.gas
+    result = degasser(fluid_in=inlet)
+    liquid, gas = result.outlets.liquid_out, result.outlets.gas_out
     assert gas.m_dot == pytest.approx(0.75 * 0.02 * 10)
     assert liquid.m_dot == pytest.approx(10 - 0.15)
     assert liquid.fluid.gas_mass_fraction == pytest.approx(0.005 / 0.985)
@@ -50,11 +50,11 @@ def test_separation_conserves_gas_mass_and_energy():
 def test_full_efficiency_and_zero_flow():
     """Perfect separation leaves a gas-free liquid; zero flow separates nothing."""
     degasser = Degasser().update_params(separation_efficiency=1)
-    result = degasser(inlet=Stream(m_dot=5, T=350, p=1e6, fluid=GASSY))
-    assert result.outlets.liquid.fluid.gas_mass_fraction == 0
-    assert result.outlets.gas.m_dot == pytest.approx(0.1)
-    stopped = degasser(inlet=Stream(m_dot=0, T=350, p=1e6, fluid=GASSY))
-    assert stopped.outlets.gas.m_dot == 0 and stopped.outlets.liquid.m_dot == 0
+    result = degasser(fluid_in=Stream(m_dot=5, T=350, p=1e6, fluid=GASSY))
+    assert result.outlets.liquid_out.fluid.gas_mass_fraction == 0
+    assert result.outlets.gas_out.m_dot == pytest.approx(0.1)
+    stopped = degasser(fluid_in=Stream(m_dot=0, T=350, p=1e6, fluid=GASSY))
+    assert stopped.outlets.gas_out.m_dot == 0 and stopped.outlets.liquid_out.m_dot == 0
 
 
 def test_degasser_matches_traced():
@@ -63,6 +63,7 @@ def test_degasser_matches_traced():
         for settings in (dict(separation_efficiency=0.75), dict(outlet_pressure=2e5)):
             module = Degasser().update_params(**settings)
             rows = [
-                dict(inlet=Stream(m_dot=m_dot, T=350, p=1e6, fluid=fluid)) for m_dot in (0, 1, 10)
+                dict(fluid_in=Stream(m_dot=m_dot, T=350, p=1e6, fluid=fluid))
+                for m_dot in (0, 1, 10)
             ]
             assert_module_matches(module, rows)

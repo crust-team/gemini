@@ -41,7 +41,7 @@ class ThermalDecline(Module):
     f = theta / pi of the flow on streamlines whose thermal travel time
     3 (sin theta - theta cos theta) / sin(theta)**3 * t_B has passed arrives at the injection
     temperature (``ground.doublet_cold_fraction``), so
-    outlet_T = T_in - f(V / V_B) (T_in - injection_temperature), where T_in is the reservoir
+    fluid_out_T = T_in - f(V / V_B) (T_in - injection_temperature), where T_in is the reservoir
     temperature carried by the inlet.
 
     Assumptions: homogeneous, isotropic, confined aquifer of constant thickness; fully
@@ -52,7 +52,7 @@ class ThermalDecline(Module):
     properties; and the current injection temperature applies to all injected water. Mass and
     pressure pass unchanged. The module is deliberately not first-law closed: the temperature
     drop is a correction of the open aquifer boundary, so the stream audit shows the residual
-    m_dot cp (T_in - outlet_T), which is not heat lost to the environment.
+    m_dot cp (T_in - fluid_out_T), which is not heat lost to the environment.
 
     NOTE(refactor): written with ops, but a graph break while the graph has no ``scan``: the
     injected volume is a state.
@@ -69,7 +69,7 @@ class ThermalDecline(Module):
         self.rock_volumetric_heat_capacity = Parameter(VolumetricHeatCapacity)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Boundaries
         self.injection_temperature = Boundary(Temperature)
@@ -80,31 +80,31 @@ class ThermalDecline(Module):
         # Outputs
         self.breakthrough_time = Output(Duration | None)
         self.temperature_drop = Output(TemperatureDifference)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Lower the reservoir temperature by the cold-water share of the produced flow."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet.with_(T=inlet.T - self._temperature_drop(inlet))
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         flow = self._liquid_flow(inlet)
         volume = self._breakthrough_volume(inlet)
         self.breakthrough_time = ground.doublet_breakthrough_time(volume, flow)
         self.temperature_drop = self._temperature_drop(inlet)
-        self.outlet_T = outlets.outlet.T
+        self.fluid_out_T = outlets.fluid_out.T
 
     def _advance_states(self, inlets, outlets, dt):
-        flow = self._liquid_flow(inlets.inlet)
+        flow = self._liquid_flow(inlets.fluid_in)
         return {"injected_volume": self.injected_volume + ground.injected_volume(flow, dt)}
 
     def _temperature_drop(self, inlet):
@@ -133,7 +133,7 @@ class ThermalDecline(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (production)",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0 (production)",
             path=self.path,
             m_dot=inlet.m_dot,
         )

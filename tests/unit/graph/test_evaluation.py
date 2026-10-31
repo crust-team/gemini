@@ -19,8 +19,8 @@ def _inlet(rows):
 
 
 def _evaluation(module, inputs, rows, backend=None, cache=None):
-    inlets = {"inlet": _inlet(rows)}
-    graph = (cache or GraphCache()).graph(module, {"inlet": inlets["inlet"].fluid})
+    inlets = {"fluid_in": _inlet(rows)}
+    graph = (cache or GraphCache()).graph(module, {"fluid_in": inlets["fluid_in"].fluid})
     feeds = graph_feeds(graph, module, inlets, inputs)
     with backends.settings(backend=backend):
         return evaluate(graph, feeds, rows)
@@ -41,8 +41,8 @@ def test_python_backend_matches_numpy_on_a_composite(line):
         assert slow.outputs[name] == pytest.approx(fast.outputs[name], rel=1e-12)
     assert np.isnan(slow.outputs["efficiency"][1]) and np.isnan(fast.outputs["efficiency"][1])
     for path, child in _leaves(fast).items():
-        expected = child.outlets.outlet.p
-        assert _leaves(slow)[path].outlets.outlet.p == pytest.approx(expected, rel=1e-12)
+        expected = child.outlets.fluid_out.p
+        assert _leaves(slow)[path].outlets.fluid_out.p == pytest.approx(expected, rel=1e-12)
 
 
 @pytest.mark.parametrize("backend", [None, "python"])
@@ -53,11 +53,11 @@ def test_result_rows_equal_direct_calls(line, backend):
     inlet = _inlet(3)
     for index in range(3):
         stream = gm.Stream(m_dot=1.0, T=inlet.T[index], p=inlet.p[index], fluid=inlet.fluid)
-        direct = line(inlet=stream, boost=boosts[index])
+        direct = line(fluid_in=stream, boost=boosts[index])
         row = result.row(index)
         assert row.outputs.rise == direct.outputs.rise
         assert row.children["gain"].outputs.rise == direct.children["gain"].outputs.rise
-        assert row.outlets.outlet.p == direct.outlets.outlet.p
+        assert row.outlets.fluid_out.p == direct.outlets.fluid_out.p
 
 
 @pytest.mark.parametrize("backend", [None, "python"])

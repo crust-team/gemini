@@ -35,7 +35,7 @@ class InhibitorDosing(Module):
         self.product_concentration = Parameter(Fraction, gt=0)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.dose = Control(Fraction)
@@ -45,28 +45,28 @@ class InhibitorDosing(Module):
         self.active_mass_flow = Output(MassFlow)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Pass the treated stream through unchanged."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )
         outlet = inlet
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         product, active = _physics.dosing_flows(
-            self.dose, inlets.inlet.m_dot, self.product_concentration
+            self.dose, inlets.fluid_in.m_dot, self.product_concentration
         )
         self.product_mass_flow = product
         self.active_mass_flow = active

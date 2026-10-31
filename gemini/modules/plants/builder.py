@@ -58,14 +58,14 @@ class Plant(PortResolver, Module):
     def _type_label(self):
         return self._name
 
-    def add(self, kind, name=None, params=None):
-        """Add a module of registry name or class ``kind`` and return it.
+    def add(self, type, name=None, params=None):
+        """Add a module of registry name or class ``type`` and return it.
 
         ``params`` is one dict of design values, the dict ``set_params`` takes: unit strings
         accepted, dotted names for a composite. ``name`` defaults to the snake case type, numbered
         when taken; a dotted name adds into a group such as ``filters.hot``.
         """
-        module, type_name = make_module(kind)
+        module, type_name = make_module(type)
         key = self._free_name(name, type_name)
         baseline = writer.baseline_of(module)
         stated = dict(params or {})
@@ -97,21 +97,21 @@ class Plant(PortResolver, Module):
         candidates = [base] + [f"{base}_{number}" for number in range(2, len(taken) + 3)]
         return next(item for item in candidates if item not in taken)
 
-    def connect(self, source, target, kind=None):
-        """Connect an outlet to an inlet; ``kind="state"`` closes a loop through the last step.
+    def connect(self, source, target, type=None):
+        """Connect an outlet to an inlet; ``type="state"`` closes a loop through the last step.
 
         An end is a module, a port declaration or ``"path.port"``. A bare module path picks its
-        only free port of a fitting stream type; several fitting pairs raise ``ambiguous_port``.
-        A bare word that names no module is a plant port: ``connect("secondary_in",
+        only free port of a fitting kind; several fitting pairs raise ``ambiguous_port``.
+        A bare word that names no module is a plant port: ``connect("return_in",
         "heat_exchanger.cold_in")`` names a plant inlet.
         """
-        self._link(source, target, kind, explicit=False)
+        self._link(source, target, type, explicit=False)
 
-    def _link(self, source, target, kind, explicit):
+    def _link(self, source, target, type, explicit):
         """Add one connection or name one plant port; ``explicit`` requires ``path.port`` ends."""
-        if kind not in (None, STATE):
+        if type not in (None, STATE):
             raise ValidationError(
-                f"kind = {kind!r}; expected 'state' or null", path="kind", code="invalid_value"
+                f"type = {type!r}; expected 'state' or null", path="type", code="invalid_value"
             )
         if self._is_port_name(source):
             return self._name_port("inlets", source, target, explicit)
@@ -120,19 +120,19 @@ class Plant(PortResolver, Module):
         first = self._candidates(source, "source", explicit)
         second = self._candidates(target, "target", explicit)
         (path, port, _), (target_path, target_port, _) = self._choose(first, second)
-        self._add_connection(path, port, target_path, target_port, kind)
+        self._add_connection(path, port, target_path, target_port, type)
 
-    def _add_connection(self, path, port, target_path, target_port, kind):
+    def _add_connection(self, path, port, target_path, target_port, connection_type):
         item = {"source": join_path(path, port), "target": join_path(target_path, target_port)}
-        if kind == STATE:
-            item["kind"] = STATE
+        if connection_type == STATE:
+            item["type"] = STATE
         self._connections.append(item)
-        link = Link("", (path, port), (target_path, target_port), kind)
+        link = Link("", (path, port), (target_path, target_port), connection_type)
         loop = loop_through(self, link)
         if loop is not None:
             self._connections.pop()
             raise ValidationError(
-                f"loop without state: {' -> '.join(loop)}; close it with kind='state'",
+                f"loop without state: {' -> '.join(loop)}; close it with type='state'",
                 path="target",
                 code="loop_without_state",
             )
@@ -145,7 +145,7 @@ class Plant(PortResolver, Module):
         for side, declare in (("inlets", Inlet), ("outlets", Outlet)):
             for name, (path, port) in self._port_map(side).items():
                 end = getattr(self.get_module(path), side)()[port]
-                self._register_declaration(name, declare(end.kind, stream=end.stream))
+                self._register_declaration(name, declare(end.type, kind=end.kind))
         if self._output_specs is None:
             outputs.declare_automatic(self)
             return
@@ -153,9 +153,9 @@ class Plant(PortResolver, Module):
             outputs.declare_output(self, name, spec)
 
     def _connection_list(self):
-        """Return the plant's connections as ``[{source, target, stream, kind}]``.
+        """Return the plant's connections as ``[{source, target, kind, type}]``.
 
-        ``stream`` is the stream type of the typed end, ``None`` when both ends take anything.
+        ``kind`` is the label of the labelled end, ``None`` when both ends take anything.
         """
         return listing.connection_list(self)
 

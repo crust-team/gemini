@@ -108,7 +108,7 @@ class AquiferStorage(Module):
         self.storage_period = Parameter(Duration, default=ground.HALF_YEAR, gt=0)
 
         # Inlets
-        self.injection_in = Inlet(Stream, stream="brine")
+        self.injection_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.mode = Control(Literal["charge", "discharge", "idle"])
@@ -132,7 +132,7 @@ class AquiferStorage(Module):
         self.heat_accumulation = Output(HeatAccumulation)
 
         # Outlets
-        self.production_out = Outlet(Stream, stream="brine")
+        self.production_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Produce the injected mass flow from the source store of the current mode."""

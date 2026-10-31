@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 DATASET = ROOT / "examples/shared/doublet_heat/doublet_2024_15min_month.csv"
 PLANT = ROOT / "examples/shared/doublet_heat/plant.json"
-COLUMNS = ["suction.m_dot", "suction.T", "suction.p", "frequency"]
+COLUMNS = ["fluid_in.m_dot", "fluid_in.T", "fluid_in.p", "frequency"]
 RTOL = 1e-12
 
 
@@ -42,7 +42,7 @@ def direct_calls(esp, rows):
     """Call the ESP once per row and return the results."""
     return [
         esp(
-            suction=gm.Stream(m_dot=m_dot, T=temperature, p=pressure, fluid=esp.fluid),
+            fluid_in=gm.Stream(m_dot=m_dot, T=temperature, p=pressure, fluid=esp.fluid),
             frequency=frequency,
         )
         for m_dot, temperature, pressure, frequency in rows
@@ -52,7 +52,7 @@ def direct_calls(esp, rows):
 def traced(esp, rows, cache):
     """Evaluate the ESP on all rows in one traced NumPy call."""
     suction = Stream(m_dot=rows[:, 0], T=rows[:, 1], p=rows[:, 2], fluid=esp.fluid)
-    return run(esp, {"suction": suction}, {"frequency": rows[:, 3]}, cache=cache)
+    return run(esp, {"fluid_in": suction}, {"frequency": rows[:, 3]}, cache=cache)
 
 
 def best_time(function, repeat):
@@ -81,7 +81,7 @@ def check_agreement(results, graph_run):
 def benchmark_esp(repeat):
     """Print the ESP tick by tick and traced, with and without common-subexpression elimination."""
     esp, rows = load()
-    trace_time, _ = best_time(lambda: GraphCache().graph(esp, {"suction": esp.fluid}), 1)
+    trace_time, _ = best_time(lambda: GraphCache().graph(esp, {"fluid_in": esp.fluid}), 1)
     merged, unmerged = GraphCache(), GraphCache(optimize=False)
     traced(esp, rows, merged)
     traced(esp, rows, unmerged)

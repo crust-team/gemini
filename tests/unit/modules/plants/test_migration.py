@@ -84,6 +84,6 @@ def test_a_format_2_spec_with_free_ports_keeps_their_old_names():
         "unconnected_port",
     ]
     spec = gm.plants.migrate(old)
-    assert spec["inlets"] == {"pipe_inlet": "pipe.inlet"}
-    assert spec["outlets"] == {"pipe_outlet": "pipe.outlet"}
+    assert spec["inlets"] == {"pipe_fluid_in": "pipe.fluid_in"}
+    assert spec["outlets"] == {"pipe_fluid_out": "pipe.fluid_out"}
     assert gm.plants.validate(spec) == []

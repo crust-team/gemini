@@ -41,7 +41,7 @@ class ProductionWell(_Well):
         self.esp_depth = Parameter(Length | None, default=None, structural=True)
 
         # Inlets
-        self.bottom = Inlet(Stream, stream="brine")
+        self.bottom_in = Inlet(Stream, kind="brine")
 
         # Outputs
         self.wellhead_pressure = Output(Pressure, soft_sensor=True)
@@ -53,22 +53,22 @@ class ProductionWell(_Well):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.wellhead = Outlet(Stream, stream="brine")
+        self.wellhead_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Traverse the selected segment upward and apply the pressure correction."""
 
         # Outlets
-        bottom = inlets.bottom
+        bottom = inlets.bottom_in
         start, end = self._segment_interval()
         wellhead = self.corrected(bottom, self.traverse(bottom, start, end, "up"))
 
-        outlets = dict(wellhead=wellhead)
+        outlets = dict(wellhead_out=wellhead)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        bottom = inlets.bottom
-        wellhead = outlets.wellhead
+        bottom = inlets.bottom_in
+        wellhead = outlets.wellhead_out
         start, end = self._segment_interval()
         result = self.traverse(bottom, start, end, "up")
         self.wellhead_pressure = wellhead.p

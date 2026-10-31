@@ -35,7 +35,7 @@ def test_the_result_tree_of_a_tick_is_plain_values():
     outcome = _outcome(tank(), rate=[2.0, 3.0], flow=[10.0] * 2, p=[3e5] * 2, T=[330.0] * 2)
     result = outcome.result(1)
     assert result.outputs.flow == 3.0 and result.inputs["m_dot"] == 3.0
-    assert isinstance(result.outlets["outlet"].m_dot, float)
+    assert isinstance(result.outlets["fluid_out"].m_dot, float)
 
 
 def test_step_results_build_a_tick_lazily_and_leave_out_the_failed():

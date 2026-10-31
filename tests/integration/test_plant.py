@@ -41,10 +41,12 @@ def test_handwritten_wiring_and_split_helpers(example):
     project = legacy.read_project(OLD)
     assert legacy.check_wiring(plant, project) == []
     well = plant.doublet.well
-    bottom = leaves["doublet.reservoir"].outlets["sandface"]
-    assert well.intake_conditions(bottom) == leaves["doublet.well"].outlets["wellhead"]
-    discharge = leaves["doublet.esp"].outlets["discharge"]
-    assert well.wellhead_from_discharge(discharge) == leaves["doublet.riser"].outlets["wellhead"]
+    bottom = leaves["doublet.reservoir"].outlets["sandface_out"]
+    assert well.intake_conditions(bottom) == leaves["doublet.well"].outlets["wellhead_out"]
+    discharge = leaves["doublet.esp"].outlets["fluid_out"]
+    assert (
+        well.wellhead_from_discharge(discharge) == leaves["doublet.riser"].outlets["wellhead_out"]
+    )
     assert result.outputs.electricity == collect_flows(result)["electricity"]
     assert result.outputs.cop == pytest.approx(
         result.outputs.thermal_power / result.outputs.electricity

@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass, fields
 from datetime import datetime
 from functools import partial
+from inspect import isclass
 from typing import Annotated, Any
 
 import numpy as np
@@ -168,15 +169,15 @@ class Declaration:
     section = "declaration"
     _validated_default = _MISS
 
-    def __init__(self, kind, *, default=UNSET, description=None, **bounds):
-        """Build validation metadata for one declared value."""
-        self.kind = kind
+    def __init__(self, type, *, default=UNSET, description=None, **bounds):
+        """Build validation metadata for one declared value of ``type``."""
+        self.type = type
         self.default = default
         self.description = description
         self.bounds = dict(bounds)
         self.name = None
         self.owner = None
-        self._adapter = _adapter(kind, bounds)
+        self._adapter = _adapter(type, bounds)
         self._limits = None
         self.schema, self.quantity, self.unit, self.additive = _schema_metadata(self._adapter)
         self._quick = _quick_check(self.schema, self.limits())
@@ -254,7 +255,7 @@ class Parameter(Declaration):
 
     def __init__(
         self,
-        kind,
+        type,
         *,
         default=UNSET,
         shape=None,
@@ -269,7 +270,7 @@ class Parameter(Declaration):
         that changes a ``Fluid``): a trace reads it as a plain value and its value is a guard of
         the graph cache, never a graph input.
         """
-        super().__init__(kind, default=default, description=description, **bounds)
+        super().__init__(type, default=default, description=description, **bounds)
         self.shape = shape
         self.calibratable = calibratable
         self.structural = structural
@@ -312,28 +313,28 @@ class Parameter(Declaration):
         return self.value
 
 
-class _StreamPort(Declaration):
-    """Fluid port declaration; ``kind`` must be a ``Stream`` type.
+class _Port(Declaration):
+    """Port declaration; ``type`` must be a ``Stream`` type.
 
     A port has no JSON schema, quantity or unit: ``schema`` is empty, ``quantity`` and ``unit``
     are ``None`` and ``additive`` is false. Stream dataclasses do not go through Pydantic.
-    ``stream`` is the stream type of the port, one of ``streams.NAMES``, or ``None`` for a port
+    ``kind`` is the label of the connection, one of ``streams.NAMES``, or ``None`` for a port
     that takes whatever flows through it (a pipe, a valve, either side of a heat exchanger).
     """
 
-    def __init__(self, kind=Stream, *, stream=None, description=None):
-        """Declare a fluid port carrying streams of ``kind`` and stream type ``stream``."""
-        if stream is not None and stream not in streams.NAMES:
+    def __init__(self, type=Stream, *, kind=None, description=None):
+        """Declare a port carrying values of ``type`` with the connection label ``kind``."""
+        if kind is not None and kind not in streams.NAMES:
             raise DefinitionError(
-                f"{type(self).__name__}: stream = {stream!r}; expected one of "
-                f"{join_names(streams.NAMES)}{did_you_mean(stream, streams.NAMES)}"
+                f"{self.__class__.__name__}: kind = {kind!r}; expected one of "
+                f"{join_names(streams.NAMES)}{did_you_mean(kind, streams.NAMES)}"
             )
-        if not isinstance(kind, type) or not issubclass(kind, Stream):
+        if not isclass(type) or not issubclass(type, Stream):
             raise DefinitionError(
-                f"{type(self).__name__}: kind = {kind!r}; expected a fluid Stream type"
+                f"{self.__class__.__name__}: type = {type!r}; expected a fluid Stream type"
             )
+        self.type = type
         self.kind = kind
-        self.stream = stream
         self.default = UNSET
         self.description = description
         self.bounds = {}
@@ -343,17 +344,17 @@ class _StreamPort(Declaration):
         self.schema, self.quantity, self.unit, self.additive = {}, None, None, False
 
     def validate(self, value):
-        """Return a stream of ``kind``: an instance passes, a mapping of its fields builds one."""
-        if isinstance(value, self.kind):
+        """Return a stream of ``type``: an instance passes, a mapping of its fields builds one."""
+        if isinstance(value, self.type):
             return value
         if isinstance(value, Mapping):
-            return self.kind(**value)
+            return self.type(**value)
         raise ValidationError(
-            f"{self.path}: invalid {self.section} value {value!r}; expected a {self.kind.__name__}"
+            f"{self.path}: invalid {self.section} value {value!r}; expected a {self.type.__name__}"
         )
 
 
-class Inlet(_StreamPort):
+class Inlet(_Port):
     """Incoming flow port."""
 
     section = "inlet"
@@ -380,9 +381,9 @@ class State(Declaration):
 
     section = "state"
 
-    def __init__(self, kind, *, default, description=None, **bounds):
+    def __init__(self, type, *, default, description=None, **bounds):
         """Declare a carried value with its initial state."""
-        super().__init__(kind, default=default, description=description, **bounds)
+        super().__init__(type, default=default, description=description, **bounds)
         self.validate(deepcopy(default))
 
 
@@ -391,9 +392,9 @@ class Output(Declaration):
 
     section = "output"
 
-    def __init__(self, kind, *, soft_sensor=False, description=None):
+    def __init__(self, type, *, soft_sensor=False, description=None):
         """Declare a computed value and its recording semantics."""
-        super().__init__(kind, description=description)
+        super().__init__(type, description=description)
         self.soft_sensor = soft_sensor
         self.formula = None
         self._resolved_formula = None
@@ -404,9 +405,9 @@ class Output(Declaration):
 
         ``target`` is a descendant's output declaration, such as ``self.heat_exchanger.duty``,
         or an outlet field, such as ``self.degasser.gas.field("m_dot")``; the output takes the
-        target's kind. The owning module checks the reference when the output is assigned.
+        target's type. The owning module checks the reference when the output is assigned.
         """
-        output = cls(getattr(target, "kind", Any), **kwargs)
+        output = cls(getattr(target, "type", Any), **kwargs)
         output.formula = ("of", target)
         return output
 
@@ -418,21 +419,21 @@ class Output(Declaration):
         return output
 
     @classmethod
-    def difference(cls, first, second, kind, **kwargs):
-        """Declare ``first - second`` of two earlier outputs of the same module, as ``kind``."""
-        output = cls(kind, **kwargs)
+    def difference(cls, first, second, type, **kwargs):
+        """Declare ``first - second`` of two earlier outputs of the same module, as ``type``."""
+        output = cls(type, **kwargs)
         output.formula = ("difference", first, second)
         return output
 
 
-class Outlet(_StreamPort):
+class Outlet(_Port):
     """Outgoing fluid stream port."""
 
     section = "outlet"
 
     def field(self, name):
         """Return a reference to one ``Stream`` field of this outlet for ``Output.of``."""
-        names = [field.name for field in fields(self.kind)]
+        names = [field.name for field in fields(self.type)]
         if name not in names:
             raise DefinitionError(
                 f"{self.path}.{name}: unknown stream field; valid: "
@@ -449,9 +450,9 @@ class PortField:
     name: str
 
     @property
-    def kind(self):
-        """Return the annotated kind of the stream field."""
-        return next(field.type for field in fields(self.port.kind) if field.name == self.name)
+    def type(self):
+        """Return the annotated type of the stream field."""
+        return next(field.type for field in fields(self.port.type) if field.name == self.name)
 
     @property
     def path(self):

@@ -20,14 +20,14 @@ from gemini.types.fluid import Fluid
 from gemini.utils.files import read_json
 
 PORTS = {
-    "production_reservoir": {"out": "sandface"},
-    "injection_reservoir": {"in": "sandface"},
-    "production_well": {"in": "bottom", "out": "wellhead"},
-    "injection_well": {"in": "wellhead", "out": "bottom"},
-    "esp": {"in": "suction", "out": "discharge"},
-    "injection_pump": {"in": "suction", "out": "discharge"},
-    "filter": {"in": "inlet", "out": "outlet"},
-    "degasser": {"in": "inlet", "out1": "liquid", "out2": "gas"},
+    "production_reservoir": {"out": "sandface_out"},
+    "injection_reservoir": {"in": "sandface_in"},
+    "production_well": {"in": "bottom_in", "out": "wellhead_out"},
+    "injection_well": {"in": "wellhead_in", "out": "bottom_out"},
+    "esp": {"in": "fluid_in", "out": "fluid_out"},
+    "injection_pump": {"in": "fluid_in", "out": "fluid_out"},
+    "filter": {"in": "fluid_in", "out": "fluid_out"},
+    "degasser": {"in": "fluid_in", "out1": "liquid_out", "out2": "gas_out"},
     "heat_exchanger": {
         "PrimIn": "hot_in",
         "PrimOut": "hot_out",
@@ -128,35 +128,35 @@ PROPERTIES = {
 TAGS = {
     "esp": {
         "esp_frequency": ("controls.frequency", "Hz"),
-        "esp_flow": ("inlets.suction.m_dot", "m3/h"),
-        "esp_inlet_pressure": ("inlets.suction.p", "bar"),
-        "esp_inlet_temperature": ("inlets.suction.T", "degC"),
+        "esp_flow": ("inlets.fluid_in.m_dot", "m3/h"),
+        "esp_inlet_pressure": ("inlets.fluid_in.p", "bar"),
+        "esp_inlet_temperature": ("inlets.fluid_in.T", "degC"),
         "esp_head": ("measured.head", "bar"),
         "esp_outlet_pressure": ("measured.discharge_pressure", "bar"),
         "esp_power_consumption": ("measured.power", "W"),
     },
     "filter": {
-        "filter_flow": ("inlets.inlet.m_dot", "m3/h"),
-        "filter_inlet_pressure": ("inlets.inlet.p", "bar"),
-        "filter_inlet_temperature": ("inlets.inlet.T", "degC"),
+        "filter_flow": ("inlets.fluid_in.m_dot", "m3/h"),
+        "filter_inlet_pressure": ("inlets.fluid_in.p", "bar"),
+        "filter_inlet_temperature": ("inlets.fluid_in.T", "degC"),
     },
     "degasser": {
-        "degasser_inlet_flow": ("inlets.inlet.m_dot", "m3/h"),
-        "degasser_pressure": ("inlets.inlet.p", "bar"),
+        "degasser_inlet_flow": ("inlets.fluid_in.m_dot", "m3/h"),
+        "degasser_pressure": ("inlets.fluid_in.p", "bar"),
     },
     "injection_pump": {
-        "injectionpump_flow": ("inlets.suction.m_dot", "m3/h"),
-        "injectionpump_inlet_pressure": ("inlets.suction.p", "bar"),
-        "injectionpump_inlet_temperature": ("inlets.suction.T", "degC"),
+        "injectionpump_flow": ("inlets.fluid_in.m_dot", "m3/h"),
+        "injectionpump_inlet_pressure": ("inlets.fluid_in.p", "bar"),
+        "injectionpump_inlet_temperature": ("inlets.fluid_in.T", "degC"),
         "injectionpump_outlet_pressure": ("controls.pressure_setpoint", "bar"),
         "injectionpump_power_consumption": ("measured.power", "W"),
         "injectionpump_frequency": ("controls.frequency", "Hz"),
         "injectionpump_head": ("measured.head", "bar"),
     },
     "injection_well": {
-        "injectionwell_flow": ("inlets.wellhead.m_dot", "m3/h"),
-        "injectionwell_wellhead_pressure": ("inlets.wellhead.p", "bar"),
-        "injectionwell_wellhead_temperature": ("inlets.wellhead.T", "degC"),
+        "injectionwell_flow": ("inlets.wellhead_in.m_dot", "m3/h"),
+        "injectionwell_wellhead_pressure": ("inlets.wellhead_in.p", "bar"),
+        "injectionwell_wellhead_temperature": ("inlets.wellhead_in.T", "degC"),
         "injectionwell_bottomhole_pressure": ("measured.bottomhole_pressure", "bar"),
         "injectionwell_bottomhole_temperature": ("measured.bottomhole_temperature", "degC"),
     },
@@ -191,8 +191,19 @@ IGNORED_TAGS = {
 DATA_COLUMNS = {"heat_exchanger.hot_pressure_drop": "heat_exchanger.dp_hot"}
 """Column of the shipped datasets for a binding whose output was renamed after they were written."""
 
+DATA_PORTS = {
+    ("", "return_in"): "secondary_in",
+    ("degasser", "fluid_in"): "inlet",
+    ("doublet.esp", "fluid_in"): "suction",
+    ("doublet.injector", "wellhead_in"): "wellhead",
+    ("filters.cold", "fluid_in"): "inlet",
+    ("filters.hot", "fluid_in"): "inlet",
+    ("injection_pump", "fluid_in"): "suction",
+}
+"""Port in the column names of the shipped datasets, which predate the current port names."""
+
 SUPPLEMENTS = {
-    "degasser": [("inlets.inlet.T", "T_p_in", "degC")],
+    "degasser": [("inlets.fluid_in.T", "T_p_in", "degC")],
     "heat_exchanger": [
         ("measured.duty", "Thermal_PowerGen", "W"),
         ("measured.hot_pressure_drop", "HEX_PDrop", "bar"),
@@ -209,7 +220,7 @@ also bind their pressure drop from the ``_PDrop`` column next to their ``_Pin`` 
 EXTRA_COLUMNS = {"Pwh_prod": ("production_wellhead_pressure", "bar")}
 """Unbound data CSV columns that ``to_dataset`` keeps, converted to SI: old -> (new, unit)."""
 
-ROOT_INLETS = {"secondary_in": {"m_dot": ("Qs", "m3/h"), "T": ("T_s_in", "degC")}}
+ROOT_INLETS = {"return_in": {"m_dot": ("Qs", "m3/h"), "T": ("T_s_in", "degC")}}
 """Data CSV columns of the plant's secondary inlet: field -> (column, unit)."""
 
 ASSUMED_SECONDARY_PRESSURE = 5e5
@@ -239,7 +250,7 @@ setpoint. The example efficiency is explicit in the snapshot; no curve is fabric
 EXAMPLE_BULK_HEAT_CAPACITY = 4.410e6
 """Volumetric heat capacity [J/m3/K] inferred from the example heat balance."""
 
-ROOT_DEFAULTS = {"secondary_in": {"m_dot": 40, "T": 293.15, "p": ASSUMED_SECONDARY_PRESSURE}}
+ROOT_DEFAULTS = {"return_in": {"m_dot": 40, "T": 293.15, "p": ASSUMED_SECONDARY_PRESSURE}}
 """Plant inlets assumed by simulations without their measurements: kg/s, K, Pa.
 
 NOTE(refactor): two-control simulations need an assumed secondary boundary. Store 40 kg/s,

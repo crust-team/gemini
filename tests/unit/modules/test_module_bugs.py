@@ -20,18 +20,18 @@ def define_module():
             super().__init__()
 
             # Inlets
-            self.inlet = Inlet(Stream)
+            self.fluid_in = Inlet(Stream)
 
             # Outlets
-            self.outlet = Outlet(Stream)
+            self.fluid_out = Outlet(Stream)
 
         def forward(self, inlets):
             """Return the inlet."""
 
             # Outlets
-            outlet = inlets.inlet
+            outlet = inlets.fluid_in
 
-            outlets = dict(outlet=outlet)
+            outlets = dict(fluid_out=outlet)
             return outlets
 
     return Repeated
@@ -41,7 +41,7 @@ def test_redefining_a_module_class_works():
     """E-modules-001: a second definition with the same name no longer collides."""
     first, second = define_module(), define_module()
     assert first is not second
-    assert second()(STREAM).outlets.outlet == STREAM
+    assert second()(STREAM).outlets.fluid_out == STREAM
 
 
 def test_user_class_may_reuse_a_builtin_name():
@@ -67,7 +67,7 @@ def test_subclass_of_a_concrete_module_may_add_declarations():
 
     module = ScoredFilter()
     assert "score" in dict(module.named_parameters())
-    assert module(inlet=STREAM).outputs.pressure_drop >= 0
+    assert module(fluid_in=STREAM).outputs.pressure_drop >= 0
 
 
 def test_missing_super_init_is_explicit():
@@ -106,18 +106,18 @@ class Child(Module):
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Return the inlet."""
 
         # Outlets
-        outlet = inlets.inlet
+        outlet = inlets.fluid_in
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -132,24 +132,24 @@ class Parent(Module):
         self.child = Child()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.setting = Control(float, default=1.0)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream through the child."""
 
         # Modules
-        result = self.child(inlet=inlets.inlet)
+        result = self.child(fluid_in=inlets.fluid_in)
 
         # Outlets
-        outlet = result.outlets.outlet
+        outlet = result.outlets.fluid_out
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -161,7 +161,7 @@ def test_child_hook_reads_the_parent_call_value():
         seen.append(parent.setting)
 
     parent.child.register_forward_hook(observe)
-    parent(inlet=STREAM, setting=5.0)
+    parent(fluid_in=STREAM, setting=5.0)
     assert seen == [5.0]
     assert parent.setting == 1.0
 
@@ -229,7 +229,7 @@ def test_composite_step_refuses_stateful_descendants():
     parent = Parent()
     parent.child = Tank()
     with raises(gm.errors.ValidationError, "invalid_design", match="child"):
-        parent.step(None, 900.0, {"inlet": STREAM})
+        parent.step(None, 900.0, {"fluid_in": STREAM})
 
 
 def test_injection_reservoir_without_injectivity_fails_in_forward():
@@ -244,7 +244,7 @@ def test_injection_reservoir_without_injectivity_fails_in_forward():
         wellbore_radius=0.1,
     )
     with gm.no_outputs(), raises(gm.errors.ValidationError, "invalid_design", match="injectivity"):
-        reservoir(sandface=STREAM)
+        reservoir(sandface_in=STREAM)
 
 
 def test_reservoir_health_without_design_index_is_not_assessed():

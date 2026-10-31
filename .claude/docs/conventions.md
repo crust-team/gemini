@@ -80,7 +80,7 @@ Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
    `_advance_states(self, inlets, outlets, dt)`; see [modules.md](modules.md#state-and-health).
 3. Controls are settable commands; boundaries are uncontrollable external conditions.
 4. `forward` is exactly `forward(self, inlets)` and reads declared streams through the immutable
-   `Ports` mapping, such as `inlets.suction`. Controls and boundaries are applied before the call
+   `Ports` mapping, such as `inlets.fluid_in`. Controls and boundaries are applied before the call
    and read as plain attributes such as `self.frequency`.
 5. `forward` sections are `# Modules` and `# Outlets`, in that order with empty sections omitted.
    Only composites use `# Modules`; `forward` never assigns an attribute on `self`.
@@ -109,14 +109,23 @@ Shared artifacts live in `examples/shared/`, and generated output goes under ign
 
 ## Naming
 
-Ports name the place where the stream crosses the module boundary, chosen in this order:
+Every port name is `<role>_in` or `<role>_out`. A module with one circuit uses `fluid_in` and
+`fluid_out`. Splitter and mixer branches are `branch1_out`, `branch2_out` and `branch1_in`,
+`branch2_in`, with `fluid_in` or `fluid_out` for the common side. The roles are:
 
-1. established equipment terms: pumps `suction`/`discharge`, wells `wellhead`/`bottom`,
-   reservoirs `sandface`;
-2. phase-split outlets by phase: `liquid`, `gas`;
-3. a module with one inlet and one outlet of the same stream: `inlet`/`outlet`;
-4. otherwise `<stream>_in`/`<stream>_out`, always both halves (`hot_in`, `cold_out`,
-   `secondary_in`, `return_in`, `supply_out`).
+| Group | Roles |
+| --- | --- |
+| Two sides of an exchanger or a machine | `hot`, `cold`, `source`, `sink`, `generator`, `chilled`, `cooling` |
+| Storage and circuits | `charge`, `discharge`, `supply`, `return`, `production`, `injection` |
+| Carriers | `gas`, `liquid`, `fuel`, `power`, `loss`, `air`, `waste`, `chemical` |
+| Wells and rock | `wellhead`, `bottom`, `sandface` |
+| One circuit and branches | `fluid`, `branch<N>` |
+
+Add a role only when no existing one fits, here and in [glossary.md](glossary.md).
+`test_every_port_follows_the_naming_rule` in `tests/unit/test_code_quality.py` checks every port of
+every registered module against the rule and this list. A port's label says what may be connected:
+`Inlet(Stream, kind="hot_water")`, one of `gm.streams.names()`; `kind` means only this label, and the
+first argument of every declaration is its `type`.
 
 Outputs derived from a port field are named `<port>_<field>`, for example `hot_out_T`. Controls
 and boundaries name the commanded quantity in full words (`frequency`, `production_rate`);
@@ -190,7 +199,7 @@ test-first bug fixes) are checked in review.
 - Behaviour is identical on every backend: values, error class and message, skips, `Results`
   structure with children, output types, callbacks and health, bit-identical on the Python path and
   within `1e-12` on NumPy.
-- A direct call (`esp(suction=...)`, `pumps.head(...)`) is **eager**: the same `forward`, the same
+- A direct call (`esp(fluid_in=...)`, `pumps.head(...)`) is **eager**: the same `forward`, the same
   ops, no graph, on the Python backend. It is not a second implementation. The eager scope below
   makes plain operators safe in it; a function never has a "checked" and an "unchecked" version.
 - Physics code uses plain operators (`/`, `**`, `-`) where the Python and NumPy results agree. A
@@ -236,8 +245,8 @@ reason it is needed:
   `forward` calls its children directly, in the order the connections give (see
   [native-engine.md](native-engine.md), section 14). The call order is never configured by hand.
 - Attribute access on mappings: `Ports` and `Values` derive from
-  `gemini.utils.mappings.AttributeMapping`, so `result.outlets.discharge` equals
-  `result.outlets["discharge"]`, and `Results[path].field` returns a pandas Series through
+  `gemini.utils.mappings.AttributeMapping`, so `result.outlets.fluid_out` equals
+  `result.outlets["fluid_out"]`, and `Results[path].field` returns a pandas Series through
   `ModuleSeries.__getattr__`.
 - Two optional method protocols: a module that defines `capex(assumptions)` returning a `Cost`
   declares its own cost for `gemini.types.cost.total_cost(plant, assumptions)`, which looks the method up by name; a

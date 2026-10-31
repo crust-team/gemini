@@ -68,7 +68,7 @@ class LineShaftPump(Module):
         self.motor_efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.suction = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.frequency = Control(Frequency)
@@ -83,22 +83,22 @@ class LineShaftPump(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.discharge = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Raise the suction pressure by the pump-curve head."""
 
         # Outlets
-        suction = inlets.suction
+        suction = inlets.fluid_in
         head = self._head(suction.volumetric_flow())
 
         discharge = suction.with_(p=suction.p + head)
 
-        outlets = dict(discharge=discharge)
+        outlets = dict(fluid_out=discharge)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        flow = inlets.suction.volumetric_flow()
+        flow = inlets.fluid_in.volumetric_flow()
         pump_power = pumps.power(flow, self.frequency, self.stage_count, self.power_coefficients)
         ops.check(
             pump_power >= 0,
@@ -114,7 +114,7 @@ class LineShaftPump(Module):
             self.shaft_friction_loss, self.setting_depth, speed
         )
         self.flow = flow
-        self.head = outlets.discharge.p - inlets.suction.p
+        self.head = outlets.fluid_out.p - inlets.fluid_in.p
         self.pump_power = pump_power
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction

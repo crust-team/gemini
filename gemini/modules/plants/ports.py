@@ -10,12 +10,12 @@ SIDE_OF = {"source": "outlets", "target": "inlets"}
 
 
 def _compatible(first, second):
-    return first.stream is None or second.stream is None or first.stream == second.stream
+    return first.kind is None or second.kind is None or first.kind == second.kind
 
 
 def _describe_end(candidate):
     path, port, declaration = candidate
-    return f"{join_path(path, port)} [{declaration.stream or 'any'}]"
+    return f"{join_path(path, port)} [{declaration.kind or 'any'}]"
 
 
 class PortResolver:

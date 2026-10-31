@@ -17,26 +17,26 @@ class Booster(Module):
         self.gain = Parameter(PressureDifference, default=1e5)
 
         # Inlets
-        self.suction = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outputs
         self.head = Output(Pressure)
 
         # Outlets
-        self.discharge = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Return the suction stream at a pressure raised by the gain."""
 
         # Outlets
-        discharge = inlets.suction.with_(p=inlets.suction.p + self.gain)
+        discharge = inlets.fluid_in.with_(p=inlets.fluid_in.p + self.gain)
 
-        outlets = dict(discharge=discharge)
+        outlets = dict(fluid_out=discharge)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         self.head = self.gain
 
 
-EXAMPLE = {"inlets": {"suction": {"m_dot": "10 kg/s", "T": "50 degC", "p": "2 bar"}}}
+EXAMPLE = {"inlets": {"fluid_in": {"m_dot": "10 kg/s", "T": "50 degC", "p": "2 bar"}}}
 """Values for one call of ``Booster``, the arguments of ``gm.evaluate``."""

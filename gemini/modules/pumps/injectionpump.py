@@ -45,7 +45,7 @@ class InjectionPump(Module):
         )
 
         # Inlets
-        self.suction = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.pressure_setpoint = Control(Pressure | None, default=None)
@@ -58,13 +58,13 @@ class InjectionPump(Module):
         self.electricity = Output(Electricity)
 
         # Outlets
-        self.discharge = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Raise pressure from a supplied curve or discharge-pressure setpoint."""
 
         # Outlets
-        suction = inlets.suction
+        suction = inlets.fluid_in
         head = self._head(suction)
         ops.check(
             head >= 0,
@@ -76,12 +76,12 @@ class InjectionPump(Module):
 
         discharge = suction.with_(p=suction.p + head)
 
-        outlets = dict(discharge=discharge)
+        outlets = dict(fluid_out=discharge)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        suction = inlets.suction
-        discharge = outlets.discharge
+        suction = inlets.fluid_in
+        discharge = outlets.fluid_out
         flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
         if self.head_coefficients is not None and self.power_coefficients is not None:

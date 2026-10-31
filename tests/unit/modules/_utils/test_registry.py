@@ -154,8 +154,8 @@ def test_load_file_registers_the_module_classes_of_a_file(monkeypatch):
     monkeypatch.setattr(registry, "_entries", dict(registry._entries))
     assert gm.modules.load_file(BOOSTER_FILE) == ["Booster"]
     assert "Booster" in gm.modules.names("pumps")
-    result = gm.evaluate("Booster", {}, {"suction": {"m_dot": 10, "T": 300, "p": 2e5}}, {})
-    assert result["outlets"]["discharge"]["p"]["value"] == pytest.approx(3e5)
+    result = gm.evaluate("Booster", {}, {"fluid_in": {"m_dot": 10, "T": 300, "p": 2e5}}, {})
+    assert result["outlets"]["fluid_out"]["p"]["value"] == pytest.approx(3e5)
 
 
 def test_load_file_accepts_a_text_path_and_refuses_a_second_class_of_a_taken_name(monkeypatch):

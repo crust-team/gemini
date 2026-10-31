@@ -43,10 +43,10 @@ def test_plan_rejects_volumetric_flows_it_cannot_convert():
     ):
         BindingPlan(valve, dataset(rate=1.0), "replay")
     module = tank()
-    module.bindings[""].inlets["inlet"]["m_dot"].unit = "m3/s"
-    del module.bindings[""].inlets["inlet"]["p"]
+    module.bindings[""].inlets["fluid_in"]["m_dot"].unit = "m3/s"
+    del module.bindings[""].inlets["fluid_in"]["p"]
     with raises(
-        gm.errors.ValidationError, "invalid_binding", match=r"inlet.m_dot = 'flow' \[m3/s\]"
+        gm.errors.ValidationError, "invalid_binding", match=r"fluid_in.m_dot = 'flow' \[m3/s\]"
     ):
         BindingPlan(module, dataset(**ROW), "replay")
 

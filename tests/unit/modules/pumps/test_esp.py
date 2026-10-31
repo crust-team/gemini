@@ -39,7 +39,7 @@ def test_original_nonzero_power_reference():
         ESP()
         .update_params(**ESP_PARAMS)(
             frequency=60,
-            suction=Stream(m_dot=units.m3h_to_m3s(200) * 1000, T=300, p=100000),
+            fluid_in=Stream(m_dot=units.m3h_to_m3s(200) * 1000, T=300, p=100000),
         )
         .outputs
     )
@@ -57,7 +57,7 @@ def test_fit_recovers_curve_and_health_threshold():
     fitted = analysis.fit_head_coefficients(flows, freq, heads, 12)["value"]
     other = ESP().update_params(**dict(ESP_PARAMS, head_coefficients=fitted))
     assert other.head_function(0.037, 53) == pytest.approx(pump.head_function(0.037, 53), rel=1e-9)
-    result = pump(frequency=60, suction=Stream(m_dot=40, T=300, p=1e5))
+    result = pump(frequency=60, fluid_in=Stream(m_dot=40, T=300, p=1e5))
     power = result.outputs.power
     assert not pump.health(result, {"power": power}).alarm
     assert pump.health(result, {"power": power * 1.11}).alarm
@@ -70,7 +70,7 @@ def test_fit_recovers_curve_and_health_threshold():
 def test_the_esp_alone_asks_for_a_plain_scope_under_float32_precision():
     """Float32 keeps Python floats next to the float32 coefficients; a stopped pump still runs."""
     esp = ESP().update_params(**ESP_PARAMS)
-    stopped = dict(frequency=60, suction=Stream(m_dot=0.0, T=300, p=100000))
+    stopped = dict(frequency=60, fluid_in=Stream(m_dot=0.0, T=300, p=100000))
     assert esp._scalar_mode() == backends.WRAP
     reference = esp(**stopped).outputs.efficiency
     with gm.runtime.settings(precision="float32"):
@@ -80,7 +80,7 @@ def test_the_esp_alone_asks_for_a_plain_scope_under_float32_precision():
 
 
 def _health_rows(pump, flows_kg_s):
-    return [pump(frequency=60, suction=Stream(m_dot=m_dot, T=300, p=1e5)) for m_dot in flows_kg_s]
+    return [pump(frequency=60, fluid_in=Stream(m_dot=m_dot, T=300, p=1e5)) for m_dot in flows_kg_s]
 
 
 def test_health_on_arrays_equals_one_call_per_row():
@@ -101,7 +101,7 @@ def test_health_on_arrays_equals_one_call_per_row():
 def test_traced_call_matches_one_call_per_row_on_every_backend():
     """Low, nominal and high flow, a trickle and a low frequency, on every backend."""
     rows = [
-        dict(suction=Stream(m_dot=m_dot, T=300, p=1e5), frequency=frequency)
+        dict(fluid_in=Stream(m_dot=m_dot, T=300, p=1e5), frequency=frequency)
         for m_dot, frequency in ((5, 60), (60, 60), (200, 50), (500, 60), (1e-3, 60), (60, 35))
     ]
     assert_module_matches(ESP().update_params(**ESP_PARAMS), rows)

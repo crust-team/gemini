@@ -31,7 +31,7 @@ class ATESPlant(Module):
 
     - ``"charge"`` (cooling season, free cooling): groundwater from the cold well is pumped
       through the cold side of the ``heat_exchanger``, which cools the building circuit
-      (``building_in`` on its hot side, ``building_out`` its hot outlet), and is injected warmed
+      (``return_in`` on its hot side, ``supply_out`` its hot outlet), and is injected warmed
       into the warm well. The heat pump is not called.
     - ``"discharge"`` (heating season): groundwater from the warm well is pumped through the
       evaporator (``source_in``) of the ``heat_pump`` and injected cooled into the cold well;
@@ -72,7 +72,7 @@ class ATESPlant(Module):
         self.groundwater_pressure = Parameter(Pressure, gt=0)
 
         # Inlets
-        self.building_in = Inlet(Stream)
+        self.return_in = Inlet(Stream)
 
         # Controls
         self.groundwater_flow = Control(MassFlow, ge=0)
@@ -87,7 +87,7 @@ class ATESPlant(Module):
         self.recovery_efficiency = Output.of(self.storage.recovery_efficiency)
 
         # Outlets
-        self.building_out = Outlet(Stream)
+        self.supply_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Produce, condition and reinject the groundwater; serve the building circuit."""
@@ -99,17 +99,17 @@ class ATESPlant(Module):
             p=self.groundwater_pressure,
             fluid=self.storage.fluid,
         )
-        groundwater = self.pump(suction=production).outlets.discharge
+        groundwater = self.pump(fluid_in=production).outlets.fluid_out
         if self.storage.mode == "discharge":
-            lifted = self.heat_pump(source_in=groundwater, sink_in=inlets.building_in)
+            lifted = self.heat_pump(source_in=groundwater, sink_in=inlets.return_in)
             injected, building = lifted.outlets.source_out, lifted.outlets.sink_out
         else:
-            cooled = self.heat_exchanger(hot_in=inlets.building_in, cold_in=groundwater)
+            cooled = self.heat_exchanger(hot_in=inlets.return_in, cold_in=groundwater)
             injected, building = cooled.outlets.cold_out, cooled.outlets.hot_out
         self.storage(injection_in=injected.with_(p=self.groundwater_pressure))
 
         # Outlets
-        building_out = building
+        supply_out = building
 
-        outlets = dict(building_out=building_out)
+        outlets = dict(supply_out=supply_out)
         return outlets

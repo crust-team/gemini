@@ -58,7 +58,7 @@ class Valve(Module):
         self.rangeability = Parameter(Ratio, default=hydraulics.DEFAULT_VALVE_RANGEABILITY, gt=1)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.opening = Control(Fraction)
@@ -68,18 +68,18 @@ class Valve(Module):
         self.effective_flow_coefficient = Output(FlowCoefficient)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Throttle the inlet stream by the sizing-equation pressure drop."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         drop = self._pressure_drop(inlet)
         ops.check(
             drop <= inlet.p,
             PhysicsError,
-            "{path}: pressure drop = {drop} Pa; expected at most inlet.p = {inlet_p} Pa "
+            "{path}: pressure drop = {drop} Pa; expected at most fluid_in.p = {inlet_p} Pa "
             "(open the valve or reduce the flow)",
             path=self.path,
             drop=drop,
@@ -87,11 +87,11 @@ class Valve(Module):
         )
         outlet = inlet.with_(p=inlet.p - drop)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.pressure_drop = inlets.inlet.p - outlets.outlet.p
+        self.pressure_drop = inlets.fluid_in.p - outlets.fluid_out.p
         self.effective_flow_coefficient = self._effective_flow_coefficient()
 
     def _effective_flow_coefficient(self):
@@ -108,7 +108,7 @@ class Valve(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is not modelled)",
             path=self.path,
             m_dot=inlet.m_dot,
         )
@@ -121,7 +121,7 @@ class Valve(Module):
         ops.check(
             ops.logical_or(inlet.m_dot == 0, coefficient != 0),
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s through a closed valve "
+            "{path}: fluid_in.m_dot = {m_dot} kg/s through a closed valve "
             "(opening = 0); expected zero flow",
             path=self.path,
             m_dot=inlet.m_dot,

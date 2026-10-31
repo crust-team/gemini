@@ -88,10 +88,10 @@ def _connection(plant, item, report):
     if not isinstance(item, dict) or not all(
         isinstance(item.get(k), str) for k in ("source", "target")
     ):
-        raise ValidationError("expected {source, target, kind?}", path="", code="invalid_format")
+        raise ValidationError("expected {source, target, type?}", path="", code="invalid_format")
     usable = [end for end in ("source", "target") if not report.skips(item[end])]
     if len(usable) == 2:
-        plant._link(item["source"], item["target"], item.get("kind"), explicit=True)
+        plant._link(item["source"], item["target"], item.get("type"), explicit=True)
         return
     for end in usable:
         plant._candidates(item[end], end, explicit=True)

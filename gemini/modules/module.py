@@ -391,7 +391,7 @@ class Module:
         if not isinstance(target, (Output, PortField)):
             raise DefinitionError(
                 f"{self.path}.{name}: Output.of target = {target!r}; expected a descendant output "
-                "declaration or an outlet field reference such as self.child.outlet.field('T')"
+                "declaration or an outlet field reference such as self.child.fluid_out.field('T')"
             )
         owner = target.port.owner if isinstance(target, PortField) else target.owner
         if owner is None or owner is self or self._descendant_path(owner) is None:

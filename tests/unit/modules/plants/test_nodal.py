@@ -86,9 +86,9 @@ def test_production_rate_reproduces_the_wellhead_pressure(producer):
     """Commanding the solved rate makes the ordinary chain arrive at the wellhead pressure."""
     reservoir, well, esp, riser = producer
     rate = solve(producer, 65)
-    lower = well(bottom=reservoir(production_rate=rate).outlets.sandface)
-    lifted = riser(bottom=esp(suction=lower.outlets.wellhead).outlets.discharge)
-    assert lifted.outlets.wellhead.p == pytest.approx(3e5, abs=1e-3)
+    lower = well(bottom_in=reservoir(production_rate=rate).outlets.sandface_out)
+    lifted = riser(bottom_in=esp(fluid_in=lower.outlets.wellhead_out).outlets.fluid_out)
+    assert lifted.outlets.wellhead_out.p == pytest.approx(3e5, abs=1e-3)
 
 
 def test_production_rate_and_esp_power_match_the_upstream_reference(producer):
@@ -103,8 +103,8 @@ def test_production_rate_and_esp_power_match_the_upstream_reference(producer):
     assert flow == pytest.approx(135.8666, abs=1e-4)
     reservoir, well, esp, _ = producer
     rate = solve(producer, 65)
-    suction = well(bottom=reservoir.sandface_stream(rate)).outlets.wellhead
-    power = esp(suction=suction).outputs.power
+    suction = well(bottom_in=reservoir.sandface_stream(rate)).outlets.wellhead_out
+    power = esp(fluid_in=suction).outputs.power
     assert power == pytest.approx(UPSTREAM_ESP_POWER_65_HZ, rel=0.01)
 
 
@@ -115,7 +115,7 @@ def test_production_rate_without_esp():
     )
     well = ProductionWell().update_params(pipe_path=vertical_path(2400), soil_temperature=293.15)
     rate = nodal.solve_production_rate(reservoir, well, 3e5, (1, 60))
-    arrived = well(bottom=reservoir.sandface_stream(rate)).outlets.wellhead
+    arrived = well(bottom_in=reservoir.sandface_stream(rate)).outlets.wellhead_out
     assert arrived.p == pytest.approx(3e5, abs=1e-3)
 
 
@@ -124,7 +124,7 @@ def test_injection_rate_balances_well_and_aquifer(injector):
     well, sink = injector
     wellhead = Stream(m_dot=1, T=293.15, p=1e5)
     rate = nodal.solve_injection_rate(well, sink, wellhead, (1, 200))
-    bottom = well(wellhead=wellhead.with_(m_dot=rate)).outlets.bottom
+    bottom = well(wellhead_in=wellhead.with_(m_dot=rate)).outlets.bottom_out
     assert bottom.p == pytest.approx(sink.required_pressure(bottom), abs=1e-3)
 
 
@@ -137,7 +137,7 @@ def test_injection_pressure_balances_a_shallow_injector():
     wellhead = Stream(flow="129.02 m3/h", T=293.15, p=2e5)
     pressure = nodal.solve_injection_pressure(well, sink, wellhead, (2e5, 1e8))
     assert pressure > 2e5
-    bottom = well(wellhead=wellhead.with_(p=pressure)).outlets.bottom
+    bottom = well(wellhead_in=wellhead.with_(p=pressure)).outlets.bottom_out
     assert bottom.p == pytest.approx(sink.required_pressure(bottom), abs=1e-3)
 
 
@@ -151,7 +151,7 @@ def test_deep_injector_needs_no_pump_and_draws_no_power(injector):
     wellhead = Stream(flow="129.02 m3/h", T=293.15, p=1e3)
     assert nodal.solve_injection_pressure(well, sink, wellhead, (1e3, 1e8)) is None
     pump = InjectionPump()
-    result = pump(suction=wellhead, pressure_setpoint=wellhead.p)
+    result = pump(fluid_in=wellhead, pressure_setpoint=wellhead.p)
     assert result.outputs.head == 0 and result.outputs.electricity == 0
 
 
@@ -198,7 +198,7 @@ def test_injection_pressure_gap_to_upstream_is_the_friction_sign():
     )
     wellhead = Stream(flow="125.1 m3/h", T=343.15, p=1e5)
     pressure = nodal.solve_injection_pressure(well, sink, wellhead, (1e5, 1e8))
-    out = well(wellhead=wellhead.with_(p=pressure)).outputs
+    out = well(wellhead_in=wellhead.with_(p=pressure)).outputs
     assert out.friction_pressure_drop == pytest.approx(-5.197358519692272e5, rel=1e-9)
     assert out.gravity_pressure_drop - UPSTREAM_GRAVITY == pytest.approx(0.0085e5, abs=10)
     gap = -2 * out.friction_pressure_drop - (out.gravity_pressure_drop - UPSTREAM_GRAVITY)

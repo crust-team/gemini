@@ -21,22 +21,22 @@ class Train(Module):
         self.second = Filter()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Pass the stream through both filters."""
 
         # Modules
-        first = self.first(inlet=inlets.inlet)
-        second = self.second(inlet=first.outlets.outlet)
+        first = self.first(fluid_in=inlets.fluid_in)
+        second = self.second(fluid_in=first.outlets.fluid_out)
 
         # Outlets
-        outlet = second.outlets.outlet
+        outlet = second.outlets.fluid_out
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -47,7 +47,9 @@ def hook_counts(plant):
 
 def test_trace_reports_leaf_to_leaf_edges():
     """The second filter consumes exactly the stream the first produced."""
-    assert trace_wiring(Train(), {"inlet": STREAM}) == {("first", "outlet", "second", "inlet")}
+    assert trace_wiring(Train(), {"fluid_in": STREAM}) == {
+        ("first", "fluid_out", "second", "fluid_in")
+    }
 
 
 def test_trace_removes_its_hooks_after_a_failure():

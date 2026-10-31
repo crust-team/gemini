@@ -38,26 +38,26 @@ class Filter(Module):
         )
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Outputs
         self.pressure_drop = Output(PressureDifference, soft_sensor=True)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Apply a quadratic clean-filter pressure loss."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet.with_(p=inlet.p - self._pressure_drop(inlet))
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.pressure_drop = self._pressure_drop(inlets.inlet)
+        self.pressure_drop = self._pressure_drop(inlets.fluid_in)
 
     def health(self, result, measured):
         """Alarm when measured filter pressure loss exceeds the clogging limit."""

@@ -4,9 +4,9 @@ from gemini.modules.plants.plan import members, split_end
 
 
 def connection_list(plant):
-    """Return the plant's connections as ``[{source, target, stream, kind}]``.
+    """Return the plant's connections as ``[{source, target, kind, type}]``.
 
-    ``stream`` is the stream type of the typed end, ``None`` when both ends take anything.
+    ``kind`` is the label of the labelled end, ``None`` when both ends take anything.
     """
     result = []
     for item in plant._connections:
@@ -17,8 +17,8 @@ def connection_list(plant):
             {
                 "source": item["source"],
                 "target": item["target"],
-                "stream": first.stream or second.stream,
-                "kind": item.get("kind"),
+                "kind": first.kind or second.kind,
+                "type": item.get("type"),
             }
         )
     return result

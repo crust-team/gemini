@@ -62,9 +62,9 @@ def test_event_log_records_calls_in_order_without_hooks():
 def test_event_log_serialises_a_stream_inlet_as_before():
     """A stream is logged with ``m_dot``, ``T``, ``p`` and its fluid, in that order."""
     stream = gm.Stream(m_dot=2, T=300, p=1e5, fluid=gm.WATER)
-    logged = to_jsonable_python(dict(Ports({"inlet": stream})), fallback=str)
-    assert list(logged["inlet"]) == ["m_dot", "T", "p", "fluid"]
-    assert logged["inlet"] == {
+    logged = to_jsonable_python(dict(Ports({"fluid_in": stream})), fallback=str)
+    assert list(logged["fluid_in"]) == ["m_dot", "T", "p", "fluid"]
+    assert logged["fluid_in"] == {
         "m_dot": 2.0,
         "T": 300.0,
         "p": 100000.0,

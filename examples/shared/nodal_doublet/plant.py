@@ -89,16 +89,16 @@ class NodalDoublet(Module):
             riser=self.riser,
         )
         source = self.reservoir(production_rate=rate)
-        lower = self.well(bottom=source.outlets.sandface)
-        lifted = self.esp(suction=lower.outlets.wellhead)
-        upper = self.riser(bottom=lifted.outlets.discharge)
-        return upper.outlets.wellhead
+        lower = self.well(bottom_in=source.outlets.sandface_out)
+        lifted = self.esp(fluid_in=lower.outlets.wellhead_out)
+        upper = self.riser(bottom_in=lifted.outlets.fluid_out)
+        return upper.outlets.wellhead_out
 
     def inject(self, stream):
         """Pump ``stream`` to the solved wellhead pressure, or not at all, and inject it."""
         bracket = (stream.p, self.maximum_injection_pressure)
         required = nodal.solve_injection_pressure(self.injector, self.sink, stream, bracket)
         setpoint = stream.p if required is None else required
-        pumped = self.injection_pump(suction=stream, pressure_setpoint=setpoint)
-        injection = self.injector(wellhead=pumped.outlets.discharge)
-        self.sink(sandface=injection.outlets.bottom)
+        pumped = self.injection_pump(fluid_in=stream, pressure_setpoint=setpoint)
+        injection = self.injector(wellhead_in=pumped.outlets.fluid_out)
+        self.sink(sandface_in=injection.outlets.bottom_out)

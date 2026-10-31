@@ -30,7 +30,7 @@ class GasCompressor(Module):
     The gas is an ideal gas with the constant ``gas_specific_heat`` ``cp`` and
     ``heat_capacity_ratio`` ``k``; both are required because the non-condensable gas of
     geothermal brines ranges from nearly pure CO2 to methane-rich mixtures. The suction
-    ``Stream`` carries the gas mass flow in ``m_dot`` (as ``Degasser.gas`` does); its ``fluid``
+    ``Stream`` carries the gas mass flow in ``m_dot`` (as ``Degasser.gas_out`` does); its ``fluid``
     is passed through unchanged and its liquid property model is not used. The overall pressure
     ratio ``r = pressure_setpoint / p_suction`` is split equally over ``stage_count`` adiabatic
     stages with intercoolers that return the gas to the suction temperature
@@ -67,7 +67,7 @@ class GasCompressor(Module):
         self.motor_efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.suction = Inlet(Stream, stream="gas")
+        self.fluid_in = Inlet(Stream, kind="gas")
 
         # Controls
         self.pressure_setpoint = Control(Pressure)
@@ -76,30 +76,30 @@ class GasCompressor(Module):
         self.pressure_ratio = Output(Ratio)
         self.shaft_power = Output(Power, soft_sensor=True)
         self.electricity = Output(Electricity)
-        self.discharge_T = Output(Temperature, soft_sensor=True)
+        self.fluid_out_T = Output(Temperature, soft_sensor=True)
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.discharge = Outlet(Stream, stream="gas")
+        self.fluid_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Compress the gas to the pressure setpoint and heat it by the last stage."""
 
         # Outlets
-        suction = inlets.suction
+        suction = inlets.fluid_in
         stage_ratio = _physics.stage_pressure_ratio(self._pressure_ratio(suction), self.stage_count)
-        discharge_T = _physics.stage_outlet_temperature(
+        fluid_out_T = _physics.stage_outlet_temperature(
             suction.T, stage_ratio, self.heat_capacity_ratio, self.isentropic_efficiency
         )
 
-        discharge = suction.with_(p=self.pressure_setpoint, T=discharge_T)
+        discharge = suction.with_(p=self.pressure_setpoint, T=fluid_out_T)
 
-        outlets = dict(discharge=discharge)
+        outlets = dict(fluid_out=discharge)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        suction = inlets.suction
-        discharge = outlets.discharge
+        suction = inlets.fluid_in
+        discharge = outlets.fluid_out
         self.pressure_ratio = self._pressure_ratio(suction)
         work = _physics.specific_compression_work(
             suction.T,
@@ -111,7 +111,7 @@ class GasCompressor(Module):
         )
         self.shaft_power = _physics.shaft_power(suction.m_dot, work)
         self.electricity = energy.input_power(self.shaft_power, self.motor_efficiency)
-        self.discharge_T = discharge.T
+        self.fluid_out_T = discharge.T
         self.heat_loss = _physics.heat_rejected(
             self.electricity, self.shaft_power, self.stage_count
         )
@@ -121,14 +121,14 @@ class GasCompressor(Module):
         ops.check(
             ops.logical_not(suction.m_dot < 0),
             PhysicsError,
-            "{path}: suction.m_dot = {m_dot} kg/s; reverse flow is unsupported",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; reverse flow is unsupported",
             path=self.path,
             m_dot=suction.m_dot,
         )
         ops.check(
             ops.logical_not(ops.logical_or(suction.p <= 0, self.pressure_setpoint < suction.p)),
             PhysicsError,
-            "{path}: pressure_setpoint = {setpoint} Pa, suction.p = {p} Pa; expected a "
+            "{path}: pressure_setpoint = {setpoint} Pa, fluid_in.p = {p} Pa; expected a "
             "positive suction pressure at or below the setpoint",
             path=self.path,
             setpoint=self.pressure_setpoint,

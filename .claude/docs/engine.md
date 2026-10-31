@@ -209,7 +209,7 @@ equipment twins of a replay; the plant in simulate) evaluated over **chunks** of
   the cause in replay, the exception itself in simulate. A later twin of the failing tick is not
   evaluated when the chunk is one tick.
 
-A direct call such as `esp(suction=...)` stays eager: the same `forward` and ops.
+A direct call such as `esp(fluid_in=...)` stays eager: the same `forward` and ops.
 
 ## Callbacks
 

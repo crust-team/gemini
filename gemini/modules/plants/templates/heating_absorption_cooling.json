@@ -194,75 +194,75 @@
     },
     "connections": [
       {
-        "source": "gas_grid.outlet",
+        "source": "gas_grid.fluid_out",
         "target": "peak_boiler.fuel_in"
       },
       {
         "source": "doublet.supply_out",
-        "target": "degasser.inlet"
+        "target": "degasser.fluid_in"
       },
       {
-        "source": "degasser.liquid",
-        "target": "filters.hot.inlet"
+        "source": "degasser.liquid_out",
+        "target": "filters.hot.fluid_in"
       },
       {
-        "source": "filters.hot.outlet",
+        "source": "filters.hot.fluid_out",
         "target": "heat_exchanger.hot_in"
       },
       {
-        "source": "filters.cold.outlet",
-        "target": "injection_pump.suction"
+        "source": "filters.cold.fluid_out",
+        "target": "injection_pump.fluid_in"
       },
       {
-        "source": "injection_pump.discharge",
+        "source": "injection_pump.fluid_out",
         "target": "doublet.return_in"
       },
       {
-        "source": "heating_return_pipe.outlet",
+        "source": "heating_return_pipe.fluid_out",
         "target": "heat_exchanger.cold_in"
       },
       {
-        "source": "peak_boiler.outlet",
+        "source": "peak_boiler.fluid_out",
         "target": "absorption_chiller.generator_in"
       },
       {
-        "source": "heating_supply_pipe.outlet",
+        "source": "heating_supply_pipe.fluid_out",
         "target": "heating_consumer.supply_in"
       },
       {
-        "source": "cooling_return_pipe.outlet",
+        "source": "cooling_return_pipe.fluid_out",
         "target": "absorption_chiller.chilled_in"
       },
       {
-        "source": "cooling_supply_pipe.outlet",
+        "source": "cooling_supply_pipe.fluid_out",
         "target": "cooling_consumer.supply_in"
       },
       {
         "source": "heat_exchanger.cold_out",
-        "target": "peak_boiler.inlet"
+        "target": "peak_boiler.fluid_in"
       },
       {
         "source": "heat_exchanger.hot_out",
-        "target": "filters.cold.inlet"
+        "target": "filters.cold.fluid_in"
       },
       {
         "source": "absorption_chiller.generator_out",
-        "target": "heating_supply_pipe.inlet"
+        "target": "heating_supply_pipe.fluid_in"
       },
       {
         "source": "absorption_chiller.chilled_out",
-        "target": "cooling_supply_pipe.inlet"
+        "target": "cooling_supply_pipe.fluid_in"
       }
     ],
     "inlets": {
-      "heating_return_in": "heating_return_pipe.inlet",
-      "cooling_return_in": "cooling_return_pipe.inlet",
+      "heating_return_in": "heating_return_pipe.fluid_in",
+      "cooling_return_in": "cooling_return_pipe.fluid_in",
       "absorption_cooling_in": "absorption_chiller.cooling_in"
     },
     "outlets": {
       "heating_return_out": "heating_consumer.return_out",
       "cooling_return_out": "cooling_consumer.return_out",
-      "gas": "degasser.gas",
+      "gas_out": "degasser.gas_out",
       "absorption_cooling_out": "absorption_chiller.cooling_out",
       "boiler_gas": "peak_boiler.gas_out"
     },

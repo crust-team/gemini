@@ -26,7 +26,7 @@ class GasGrid(Module):
         )
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="gas")
+        self.fluid_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Emit the marked stream without flow."""
@@ -39,7 +39,7 @@ class GasGrid(Module):
             fluid=grid_gas(self.composition),
         )
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
 
@@ -61,19 +61,19 @@ class GasMakeup(Module):
         )
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="gas")
+        self.fluid_in = Inlet(Stream, kind="gas")
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="gas")
+        self.fluid_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Pass the gas on with the grid mark."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = inlet.with_(fluid=inlet.fluid.with_grid(self.composition))
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def capex(self, assumptions):

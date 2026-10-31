@@ -13,7 +13,7 @@ from .conftest import Chain, Gain, Opaque, Tank
 
 def _inlets(rows):
     return {
-        "inlet": gm.Stream(
+        "fluid_in": gm.Stream(
             m_dot=np.arange(1.0, rows + 1),
             T=np.full(rows, 300.0),
             p=np.full(rows, 1e5),
@@ -24,7 +24,7 @@ def _inlets(rows):
 
 def _evaluate(module, inputs, rows, stepped=False, context=None, backend=None):
     inlets = _inlets(rows)
-    graph = GraphCache().graph(module, {"inlet": gm.WATER}, stepped)
+    graph = GraphCache().graph(module, {"fluid_in": gm.WATER}, stepped)
     feeds = graph_feeds(graph, module, inlets, inputs)
     with backends.settings(backend=backend):
         return graph, evaluate(graph, feeds, rows, context)
@@ -42,8 +42,8 @@ def test_a_composite_root_break_gives_real_trees(backend):
     row = chain(gm.Stream(m_dot=2.0, T=300.0, p=1e5, fluid=gm.WATER))
     assert evaluation.result.row(1).outputs.electricity == row.outputs.electricity
     assert (
-        evaluation.result.row(1).children["last"].outlets.outlet.p
-        == row.children["last"].outlets.outlet.p
+        evaluation.result.row(1).children["last"].outlets.fluid_out.p
+        == row.children["last"].outlets.fluid_out.p
     )
 
 

@@ -7,7 +7,7 @@ from gemini.utils.legacy import tables
 
 def test_tables_are_centralised():
     """Known old node, port and module names map in the legacy package only."""
-    assert tables.PORTS["esp"]["out"] == "discharge"
+    assert tables.PORTS["esp"]["out"] == "fluid_out"
     assert tables.NODE_PATHS["esp_1ee3"] == "doublet.esp"
     assert tables.MODULE_CLASSES["heat_exchanger"].__name__ == "HeatExchanger"
     assert set(tables.CONVERTERS) <= set(tables.MODULE_CLASSES)

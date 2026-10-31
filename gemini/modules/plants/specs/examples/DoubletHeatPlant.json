@@ -256,35 +256,35 @@
   "connections": [
     {
       "source": "doublet.supply_out",
-      "target": "degasser.inlet"
+      "target": "degasser.fluid_in"
     },
     {
-      "source": "degasser.liquid",
-      "target": "filters.hot.inlet"
+      "source": "degasser.liquid_out",
+      "target": "filters.hot.fluid_in"
     },
     {
-      "source": "filters.hot.outlet",
+      "source": "filters.hot.fluid_out",
       "target": "heat_exchanger.hot_in"
     },
     {
       "source": "heat_exchanger.hot_out",
-      "target": "filters.cold.inlet"
+      "target": "filters.cold.fluid_in"
     },
     {
-      "source": "filters.cold.outlet",
-      "target": "injection_pump.suction"
+      "source": "filters.cold.fluid_out",
+      "target": "injection_pump.fluid_in"
     },
     {
-      "source": "injection_pump.discharge",
+      "source": "injection_pump.fluid_out",
       "target": "doublet.return_in"
     }
   ],
   "inlets": {
-    "secondary_in": "heat_exchanger.cold_in"
+    "return_in": "heat_exchanger.cold_in"
   },
   "outlets": {
-    "secondary_out": "heat_exchanger.cold_out",
-    "gas": "degasser.gas"
+    "supply_out": "heat_exchanger.cold_out",
+    "gas_out": "degasser.gas_out"
   },
   "outputs": {
     "thermal_power": {
@@ -507,7 +507,7 @@
         "Profiles lacking secondary measurements assume 40 kg/s at 20 C and 5 bar."
       ],
       "root_inputs": {
-        "secondary_in": {
+        "return_in": {
           "m_dot": 40,
           "T": 293.15,
           "p": 500000.0,
@@ -532,42 +532,42 @@
   },
   "bindings": {
     "degasser": {
-      "inlet.m_dot": {
+      "fluid_in.m_dot": {
         "column": "degasser.inlet.m_dot",
         "unit": "m3/s"
       },
-      "inlet.p": "degasser.inlet.p",
-      "inlet.T": "degasser.inlet.T"
+      "fluid_in.p": "degasser.inlet.p",
+      "fluid_in.T": "degasser.inlet.T"
     },
     "doublet.esp": {
       "frequency": "doublet.esp.frequency",
       "head": "doublet.esp.head",
       "discharge_pressure": "doublet.esp.discharge_pressure",
       "power": "doublet.esp.power",
-      "suction.m_dot": {
+      "fluid_in.m_dot": {
         "column": "doublet.esp.suction.m_dot",
         "unit": "m3/s"
       },
-      "suction.p": "doublet.esp.suction.p",
-      "suction.T": "doublet.esp.suction.T"
+      "fluid_in.p": "doublet.esp.suction.p",
+      "fluid_in.T": "doublet.esp.suction.T"
     },
     "filters.cold": {
       "pressure_drop": "filters.cold.pressure_drop",
-      "inlet.m_dot": {
+      "fluid_in.m_dot": {
         "column": "filters.cold.inlet.m_dot",
         "unit": "m3/s"
       },
-      "inlet.p": "filters.cold.inlet.p",
-      "inlet.T": "filters.cold.inlet.T"
+      "fluid_in.p": "filters.cold.inlet.p",
+      "fluid_in.T": "filters.cold.inlet.T"
     },
     "filters.hot": {
       "pressure_drop": "filters.hot.pressure_drop",
-      "inlet.m_dot": {
+      "fluid_in.m_dot": {
         "column": "filters.hot.inlet.m_dot",
         "unit": "m3/s"
       },
-      "inlet.p": "filters.hot.inlet.p",
-      "inlet.T": "filters.hot.inlet.T"
+      "fluid_in.p": "filters.hot.inlet.p",
+      "fluid_in.T": "filters.hot.inlet.T"
     },
     "heat_exchanger": {
       "hot_out_T": "heat_exchanger.hot_out_T",
@@ -589,20 +589,20 @@
     "injection_pump": {
       "pressure_setpoint": "injection_pump.pressure_setpoint",
       "power": "injection_pump.power",
-      "suction.m_dot": {
+      "fluid_in.m_dot": {
         "column": "injection_pump.suction.m_dot",
         "unit": "m3/s"
       },
-      "suction.p": "injection_pump.suction.p",
-      "suction.T": "injection_pump.suction.T"
+      "fluid_in.p": "injection_pump.suction.p",
+      "fluid_in.T": "injection_pump.suction.T"
     },
     "doublet.injector": {
-      "wellhead.m_dot": {
+      "wellhead_in.m_dot": {
         "column": "doublet.injector.wellhead.m_dot",
         "unit": "m3/s"
       },
-      "wellhead.p": "doublet.injector.wellhead.p",
-      "wellhead.T": "doublet.injector.wellhead.T"
+      "wellhead_in.p": "doublet.injector.wellhead.p",
+      "wellhead_in.T": "doublet.injector.wellhead.T"
     },
     "doublet.reservoir": {
       "production_rate": {
@@ -611,11 +611,11 @@
       }
     },
     "": {
-      "secondary_in.m_dot": {
+      "return_in.m_dot": {
         "column": "secondary_in.m_dot",
         "unit": "m3/s"
       },
-      "secondary_in.T": "secondary_in.T"
+      "return_in.T": "secondary_in.T"
     }
   },
   "param_history": {

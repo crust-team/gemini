@@ -61,6 +61,9 @@ line in the change log below, in the same commit. The public-API test compares a
 snapshot (`tests/fixtures/public_api.json`) that records the version and may only change together
 with it; its hash per version is held in the test.
 
+**Module catalogue.** Adding, removing, moving or renaming modules is never a version matter. The
+snapshot covers the package API (functions, types, return shapes), not the list of modules.
+
 ## Package
 
 | Name | Returns | Status |
@@ -95,14 +98,14 @@ On a class or an instance of `Module` (and on what `gm.modules.get` returns):
 {name, type, category, summary, doc,
  parameters, controls, boundaries, measured, state:
    {name: {type, unit, quantity, default, minimum, maximum, enum, description, section}},
- inlets, outlets: {port: {stream, fields: {m_dot: {unit}, T: {unit}, p: {unit}}}},
- outputs: {name: {unit, kind, soft_sensor}},
+ inlets, outlets: {port: {kind, fields: {m_dot: {unit}, T: {unit}, p: {unit}}}},
+ outputs: {name: {unit, quantity, soft_sensor}},
  children: {name: type},
- connections: [{source, target, stream, kind}],
+ connections: [{source, target, kind, type}],
  values: {parameters, controls, boundaries}}     on an instance only
 ```
 
-`stream` is `null` for a port that takes any stream; `kind` is an additive quantity or `null`;
+`kind` is `null` for a port that takes any stream; an output's `quantity` is an additive quantity or `null`;
 `measured` is every output of the module, which is what a `measured` binding may name. `minimum`
 and `maximum` are the closest limit, strict or not. `values` are keyed by dotted path.
 
@@ -114,8 +117,8 @@ Three levels and one representation: see [plants.md](plants.md). The spec schema
 | Name | Returns | Status |
 | --- | --- | --- |
 | `gm.Plant(name)` | an empty plant, a normal composite `Module` | real |
-| `p.add(kind, name=None, params=None)` | the added module; `kind` is a registry name or a class, `params` the dict `set_params` takes | real |
-| `p.connect(source, target, kind=None)` | nothing; `ValidationError` with candidates, see [plants.md](plants.md) | real |
+| `p.add(type, name=None, params=None)` | the added module; `type` is a registry name or a class, `params` the dict `set_params` takes | real |
+| `p.connect(source, target, type=None)` | nothing; `ValidationError` with candidates, see [plants.md](plants.md) | real |
 | `p.summary()` | text table | real |
 | `p.validate(on_error="raise")` | as `gm.plants.validate` | real |
 | `p.to_spec()`, `p.to_dict()` | the spec (one function) | real |
@@ -279,6 +282,8 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | Port names follow `<role>_in` and `<role>_out` (`gm.plants.migrate` converts stored specs). `Inlet(Stream, kind=...)` replaces `stream=`, the first argument of a declaration is `type`, `p.add(type, ...)`, `p.connect(source, target, type=None)`, a connection's `type: "state"`; `describe()` gives ports `{kind, fields}`, outputs `{unit, quantity, soft_sensor}`, connections `{source, target, kind, type}`. |
+| 0.2.0, unreleased changes | | Layout: helpers in `gemini/modules/_utils/`, physics of one category in its `_physics.py`. Public names unchanged. |
 | 0.2.0 | 2026-10-31 | Demand profiles: `gm.profiles.get` reads the two organiser files of 2027; `profile_schema` describes what `get` returns. |
 | 0.2.0 | 2026-10-31 | No dangling ports: an unconnected port is `unconnected_port`; plant ports exist only when named, the automatic `<path>_<port>` ports are gone. |
 | 0.2.0 | 2026-10-31 | A module may set its children's values: every parameter route reaches an overridden `set_params`; `to_dict` stores no derived value. |

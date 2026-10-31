@@ -85,7 +85,7 @@ class HeatPump(Module):
 
         # Inlets
         self.source_in = Inlet(Stream)
-        self.sink_in = Inlet(Stream, stream="hot_water")
+        self.sink_in = Inlet(Stream, kind="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -104,7 +104,7 @@ class HeatPump(Module):
 
         # Outlets
         self.source_out = Outlet(Stream)
-        self.sink_out = Outlet(Stream, stream="hot_water")
+        self.sink_out = Outlet(Stream, kind="hot_water")
 
     def forward(self, inlets):
         """Cool the source and heat the sink circuit by the solved duties."""
@@ -304,7 +304,7 @@ class HeatPump(Module):
         if self.cop_model == "lorenz":
             return self._lorenz_source_outlet_T(source_in, sink_in, rate, sink_T, duty)
         inlet_T = source_in.T
-        outlet_T = refrigeration.carnot_heating_source_outlet(
+        fluid_out_T = refrigeration.carnot_heating_source_outlet(
             inlet_T,
             heat_transfer.temperature_change(duty, rate),
             sink_T,
@@ -312,7 +312,7 @@ class HeatPump(Module):
             self.minimum_temperature_lift,
         )
         ops.check(
-            ops.where(duty == 0, True, self._cop(source_in, sink_in, outlet_T, sink_T) > 1),
+            ops.where(duty == 0, True, self._cop(source_in, sink_in, fluid_out_T, sink_T) > 1),
             PhysicsError,
             "{path}: source_in.T = {inlet_T} K; expected above {minimum} K for a heating COP "
             "above 1 at sink outlet {sink_T} K",
@@ -321,7 +321,7 @@ class HeatPump(Module):
             minimum=refrigeration.heating_cop_minimum_source(sink_T, self.carnot_fraction),
             sink_T=sink_T,
         )
-        return outlet_T
+        return fluid_out_T
 
     def _lorenz_source_outlet_T(self, source_in, sink_in, rate, sink_T, duty):
         """Return the source outlet [K] that balances a heating duty [W] with the Lorenz COP.
@@ -384,7 +384,7 @@ class HeatPump(Module):
         (``refrigeration.carnot_cooling_sink_outlet``) and needs a sink capacity rate above
         ``refrigeration.cooling_minimum_sink_rate`` unless the lift floor applies.
         """
-        outlet_T, within_floor, denominator = refrigeration.carnot_cooling_sink_outlet(
+        fluid_out_T, within_floor, denominator = refrigeration.carnot_cooling_sink_outlet(
             inlet_T,
             heat_transfer.temperature_change(duty, rate),
             source_T,
@@ -401,7 +401,7 @@ class HeatPump(Module):
             minimum=refrigeration.cooling_minimum_sink_rate(duty, self.carnot_fraction, source_T),
             duty=duty,
         )
-        return outlet_T
+        return fluid_out_T
 
 
 def _rate(path, port, stream):

@@ -21,7 +21,7 @@ def _inlet(pressures):
 
 def _run(module, pressures, setpoint, ambient=300.0):
     inputs = {"setpoint": np.array(setpoint), "ambient": ambient}
-    return run(module, {"inlet": _inlet(pressures)}, inputs)
+    return run(module, {"fluid_in": _inlet(pressures)}, inputs)
 
 
 def test_within_bounds_the_values_equal_the_untraced_call(bounded):
@@ -48,7 +48,7 @@ def test_a_violated_bound_raises_a_declaration_error(bounded, pressures, setpoin
     with pytest.raises(ValidationError):
         for row in range(2):
             bounded(
-                inlet=gm.Stream(m_dot=1.0, T=300.0, p=pressures[row], fluid=gm.WATER),
+                fluid_in=gm.Stream(m_dot=1.0, T=300.0, p=pressures[row], fluid=gm.WATER),
                 setpoint=setpoint[row],
                 ambient=ambient[row] if isinstance(ambient, np.ndarray) else ambient,
             )
@@ -62,7 +62,7 @@ def test_a_list_item_out_of_bounds_fails_the_row(bounded):
 
 def test_the_bound_fails_even_when_the_value_does_not_reach_an_output(bounded):
     """Bound checks guard every output, so a control the arithmetic ignores still fails."""
-    graph = Tracer().trace(bounded, {"inlet": bounded.fluid})
+    graph = Tracer().trace(bounded, {"fluid_in": bounded.fluid})
     bounded_checks = [
         check for check in graph.checks if check.attributes["error"] is ValidationError
     ]
@@ -73,11 +73,11 @@ def test_the_bound_fails_even_when_the_value_does_not_reach_an_output(bounded):
 
 def test_inlet_limits_fail_the_row_with_the_stream_error(gain):
     """The traced inlet carries the stream limits, since the engine feeds raw columns."""
-    graph = Tracer().trace(gain, {"inlet": gain.fluid})
+    graph = Tracer().trace(gain, {"fluid_in": gain.fluid})
     feeds = {
-        "inlet.m_dot": np.ones(2),
-        "inlet.T": np.array([300.0, 0.0]),
-        "inlet.p": np.full(2, 1e5),
+        "fluid_in.m_dot": np.ones(2),
+        "fluid_in.T": np.array([300.0, 0.0]),
+        "fluid_in.p": np.full(2, 1e5),
         "gain": 1.0,
         "scale": 3.0,
         "REFERENCE": 2.0,
@@ -91,4 +91,4 @@ def test_not_a_number_against_a_bound_fails_like_the_untraced_call(bounded):
     with pytest.raises(ValidationError, match="bounded"):
         _run(bounded, [2e5], [np.nan])
     with pytest.raises(ValidationError):
-        bounded(inlet=gm.Stream(m_dot=1.0, T=300.0, p=2e5, fluid=gm.WATER), setpoint=np.nan)
+        bounded(fluid_in=gm.Stream(m_dot=1.0, T=300.0, p=2e5, fluid=gm.WATER), setpoint=np.nan)

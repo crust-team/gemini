@@ -43,7 +43,7 @@ def results():
             dict(head=2e5, electricity=power),
             health,
             3600.0,
-            {"pump": {"pump.suction.p": 1}},
+            {"pump": {"pump.fluid_in.p": 1}},
         )
     return rows
 
@@ -74,7 +74,7 @@ def test_summary_integrates_energy_and_counts_alarms_and_skips():
     row = summary.loc[("pump", "electricity")]
     assert row["energy_J"] == 4000.0 * 3600
     assert row["peak_W"] == 3000.0 and row["alarms"] == 2 and row["skipped"] == 2
-    assert row["reasons"] == {"pump.suction.p": 2}
+    assert row["reasons"] == {"pump.fluid_in.p": 2}
 
 
 def test_the_energy_report_is_the_table_as_plain_values():
@@ -87,7 +87,7 @@ def test_the_energy_report_is_the_table_as_plain_values():
     assert entry["peak"] == {"value": 3000.0, "unit": "W"}
     assert entry["alarms"] == {"value": 2, "unit": "-"}
     assert entry["skipped"] == {"value": 2, "unit": "-"}
-    assert entry["reasons"] == {"pump.suction.p": 2}
+    assert entry["reasons"] == {"pump.fluid_in.p": 2}
     table = rows.to_frame(table="energy").loc[("pump", "electricity")]
     assert entry["hours"] == {"value": table["hours"], "unit": "h"}
 
@@ -102,7 +102,7 @@ def test_slice_and_lossless_files(tmp_path):
     """A slice keeps its own skips; saved results load with identical cells and summary."""
     rows = results()
     tail = rows.slice(1)
-    assert len(tail) == 1 and tail.skip_counts == {"pump": {"pump.suction.p": 1}}
+    assert len(tail) == 1 and tail.skip_counts == {"pump": {"pump.fluid_in.p": 1}}
     path = rows.save(tmp_path / "results.npz")
     loaded = Results.load(path)
     pd.testing.assert_frame_equal(loaded.to_frame(), rows.to_frame())
@@ -171,7 +171,7 @@ def test_errors_list_failed_and_skipped_rows_with_their_codes():
             [datetime(2024, 1, 1, 2, tzinfo=timezone.utc)],
             [3600.0],
             {},
-            [{"pump": {"pump.suction.p": 1}}],
+            [{"pump": {"pump.fluid_in.p": 1}}],
             [(0, problem("pump", "module_error", "boom"))],
         )
     )
@@ -187,7 +187,7 @@ def test_errors_list_failed_and_skipped_rows_with_their_codes():
         "suggestions": [],
         "time": "2024-01-01T02:00:00+00:00",
     }
-    assert errors[0]["message"] == "pump.suction.p"
+    assert errors[0]["message"] == "pump.fluid_in.p"
     assert {row["code"] for row in errors} <= set(gm.errors.ROW_CODES)
     json.dumps(errors, allow_nan=False)
 

@@ -13,17 +13,17 @@ def _break_graph(tank):
     graph = Graph("test")
     inlets = Ports(
         {
-            "inlet": gm.Stream._trusted(
-                m_dot=graph.input("inlet.m_dot", "inlet"),
-                T=graph.input("inlet.T", "inlet"),
-                p=graph.input("inlet.p", "inlet"),
+            "fluid_in": gm.Stream._trusted(
+                m_dot=graph.input("fluid_in.m_dot", "inlet"),
+                T=graph.input("fluid_in.T", "inlet"),
+                p=graph.input("fluid_in.p", "inlet"),
                 fluid=tank.fluid,
             )
         }
     )
     outlets, outputs, _ = record_break(graph, tank, inlets, {}, True, "stateful")
     graph.output("content", outputs["content"])
-    graph.output("p", outlets.outlet.p)
+    graph.output("p", outlets.fluid_out.p)
     return graph
 
 
@@ -51,6 +51,6 @@ def test_evaluate_break_stacks_rows_and_marks_failures(tank):
 def test_interpreter_gives_scalar_results_for_scalar_operands(tank):
     """On the Python backend the break node returns plain numbers."""
     graph = _break_graph(tank)
-    feeds = {"inlet.m_dot": 2.0, "inlet.T": 300.0, "inlet.p": 1e5}
+    feeds = {"fluid_in.m_dot": 2.0, "fluid_in.T": 300.0, "fluid_in.p": 1e5}
     values = graph_outputs(graph, feeds, "python")
     assert values["content"] == 2.0 and values["p"] == 1e5

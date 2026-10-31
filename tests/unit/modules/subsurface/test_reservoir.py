@@ -39,7 +39,7 @@ def test_injection_zero_radius_is_explicit():
         "injection",
     )
     c = InjectionReservoir().update_params(**p)
-    result = c(sandface=Stream(m_dot=-40, T=300, p=23e6))
+    result = c(sandface_in=Stream(m_dot=-40, T=300, p=23e6))
     out = result.outputs
     assert out.bottomhole_pressure > c.pressure
     assert out.radial_bottomhole_pressure is None
@@ -69,7 +69,9 @@ def test_ipr_helpers_match_the_call_outputs():
         pressure=240e5, injectivity_index=10 / 3.6e8, **common
     )
     arriving = Stream(m_dot=-40, T=300, p=230e5)
-    assert sink.required_pressure(arriving) == sink(sandface=arriving).outputs.bottomhole_pressure
+    assert (
+        sink.required_pressure(arriving) == sink(sandface_in=arriving).outputs.bottomhole_pressure
+    )
     assert sink.required_pressure(arriving) == pytest.approx(240e5 + 40 / 1000 * 3.6e8 / 10)
 
 
@@ -129,7 +131,7 @@ def test_injection_reservoir_matches_traced():
         skin=1,
     )
     rows = [
-        dict(sandface=Stream(m_dot=m_dot, T=300, p=230e5)) for m_dot in (-40.0, -5.0, 0.0, 20.0)
+        dict(sandface_in=Stream(m_dot=m_dot, T=300, p=230e5)) for m_dot in (-40.0, -5.0, 0.0, 20.0)
     ]
     assert_module_matches(sink, rows)
 
@@ -186,7 +188,7 @@ def test_injection_health_matches_on_arrays():
         injectivity_index=10 / 3.6e8,
         decline_threshold=0.2,
     )
-    results, measured = _health_rows(sink, dict(sandface=Stream(m_dot=-5.0, T=300, p=230e5)))
+    results, measured = _health_rows(sink, dict(sandface_in=Stream(m_dot=-5.0, T=300, p=230e5)))
     assert_health_matches(sink, results, measured)
 
 

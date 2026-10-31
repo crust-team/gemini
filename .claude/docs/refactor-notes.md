@@ -45,8 +45,8 @@ implementation or test.
   `separation_efficiency` defaults to 0, which keeps zero gas flow and reproduces the former
   liquid-only model exactly for every fluid; the example brine carries no free gas either.
 - The former pass-through placeholders are real models now: `BoosterPump` was replaced by
-  `CentrifugalPump`, and `Blowdown` bleeds a commanded `blowdown_fraction` from `feed_in` to
-  `blowdown_out`. Neither reports `modelled` any more. The example plant uses neither, so its
+  `CentrifugalPump`, and `Blowdown` bleeds a commanded `blowdown_fraction` from `fluid_in` to
+  `waste_out`. Neither reports `modelled` any more. The example plant uses neither, so its
   numbers are unchanged.
 - No injection-pump curves exist in the project. Use the measured discharge setpoint in twins;
   Q*deltaP/PowerDraw implies efficiency 0.80000 within CSV rounding. The example explicitly

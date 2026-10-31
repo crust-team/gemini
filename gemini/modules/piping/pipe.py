@@ -67,7 +67,7 @@ class Pipe(Module):
         self.heat_transfer_coefficient = Parameter(HeatTransferCoefficient)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Boundaries
         self.ambient_temperature = Boundary(Temperature)
@@ -75,18 +75,18 @@ class Pipe(Module):
         # Outputs
         self.pressure_drop = Output(PressureDifference)
         self.velocity = Output(Speed)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.heat_loss = Output(HeatLoss)
         self.heat_absorbed = Output(HeatAbsorbed)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Apply friction, static head and heat exchange to the inlet stream."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         self._check(inlet)
         rho = inlet.fluid.properties(inlet.p, inlet.T).rho_l
         static = hydraulics.hydrostatic_dp(rho, self.elevation_change)
@@ -94,7 +94,7 @@ class Pipe(Module):
         ops.check(
             outlet_p >= 0,
             PhysicsError,
-            "{path}: outlet pressure = {outlet_p} Pa from inlet.p = {inlet_p} Pa; "
+            "{path}: outlet pressure = {outlet_p} Pa from fluid_in.p = {inlet_p} Pa; "
             "expected the friction and static drops to leave a nonnegative pressure",
             path=self.path,
             outlet_p=outlet_p,
@@ -102,18 +102,18 @@ class Pipe(Module):
         )
         outlet = inlet.with_(T=self._outlet_temperature(inlet), p=outlet_p)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.inlet
-        outlet = outlets.outlet
+        inlet = inlets.fluid_in
+        outlet = outlets.fluid_out
         heat = heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - outlet.T)
         loss, absorbed = heat_transfer.signed_parts(heat)
         self.pressure_drop = inlet.p - outlet.p
         properties = inlet.fluid.properties(inlet.p, inlet.T)
         self.velocity = geometry.mean_velocity(inlet.m_dot, properties.rho_l, self.inner_diameter)
-        self.outlet_T = outlet.T
+        self.fluid_out_T = outlet.T
         self.heat_loss = loss
         self.heat_absorbed = absorbed
 
@@ -132,7 +132,7 @@ class Pipe(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is "
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0 (reverse flow is "
             "not modelled; wire the pipe in the flow direction)",
             path=self.path,
             m_dot=inlet.m_dot,

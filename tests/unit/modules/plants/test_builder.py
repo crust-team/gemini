@@ -17,11 +17,11 @@ def chain():
     plant.add("Degasser", "degasser")
     plant.add("Filter", "first")
     plant.add("Filter", "second")
-    plant.connect("feed", "degasser.inlet")
+    plant.connect("feed", "degasser.fluid_in")
     plant.connect("degasser", "first")
-    plant.connect("first.outlet", "second.inlet")
-    plant.connect("degasser.gas", "gas")
-    plant.connect("second.outlet", "product")
+    plant.connect("first.fluid_out", "second.fluid_in")
+    plant.connect("degasser.gas_out", "gas_out")
+    plant.connect("second.fluid_out", "product")
     return plant
 
 
@@ -40,7 +40,7 @@ def test_a_plant_is_a_module_in_the_plant_category():
 def test_names_follow_the_type_and_plant_ports_exist_only_when_named(chain):
     """Only a named port is a plant port; an added module does not add one."""
     assert list(chain.inlets()) == ["feed"]
-    assert list(chain.outlets()) == ["gas", "product"]
+    assert list(chain.outlets()) == ["gas_out", "product"]
     assert chain.add("Filter").name == "filter"
     assert "filter_2" not in dict(chain.named_children())
     assert chain.add("Filter") is chain.get_module("filter_2")
@@ -51,50 +51,55 @@ def test_a_built_plant_runs_in_connection_order(chain):
     """The degasser feeds the filters; the plant outlets are the named outlets."""
     result = chain(feed=stream())
     assert [name for name, _ in result.call_records] == ["degasser", "first", "second"]
-    assert result.outlets.gas.m_dot < 10.0
+    assert result.outlets.gas_out.m_dot < 10.0
 
 
 def test_an_unconnected_port_is_reported_with_its_path():
     """``validate`` lists every dangling port and the plant does not run."""
     plant = gm.Plant("Open")
     plant.add("Degasser", "degasser")
-    plant.connect("feed", "degasser.inlet")
-    plant.connect("degasser.liquid", "product")
+    plant.connect("feed", "degasser.fluid_in")
+    plant.connect("degasser.liquid_out", "product")
     assert [(item["path"], item["code"]) for item in plant.validate(on_error="record")] == [
-        ("degasser.gas", "unconnected_port")
+        ("degasser.gas_out", "unconnected_port")
     ]
     with raises(ValidationError, "unconnected_port"):
         plant.validate()
     with raises(ValidationError, "unconnected_port") as caught:
         plant(feed=stream())
-    assert caught.value.path == "degasser.gas"
+    assert caught.value.path == "degasser.gas_out"
 
 
 def test_a_bare_word_names_a_plant_port(chain):
     """``connect("name", "path.port")`` names a plant inlet and is stored beside the wiring."""
     plant = gm.Plant("Named")
     plant.add("Filter", "filter")
-    plant.connect("feed", "filter.inlet")
-    plant.connect("filter.outlet", "product")
+    plant.connect("feed", "filter.fluid_in")
+    plant.connect("filter.fluid_out", "product")
     spec = plant.to_spec()
-    assert spec["inlets"] == {"feed": "filter.inlet"}
-    assert spec["outlets"] == {"product": "filter.outlet"}
+    assert spec["inlets"] == {"feed": "filter.fluid_in"}
+    assert spec["outlets"] == {"product": "filter.fluid_out"}
     assert spec["connections"] == []
     assert list(plant.inlets()) == ["feed"] and list(plant.outlets()) == ["product"]
 
 
-def test_connection_list_gives_streams_and_kind(chain):
-    """The typed end names the stream; both ends untyped give null."""
+def test_connection_list_gives_kind_and_type(chain):
+    """The labelled end names the kind; both ends unlabelled give null."""
     assert chain._connection_list() == [
-        {"source": "degasser.liquid", "target": "first.inlet", "stream": "brine", "kind": None},
-        {"source": "first.outlet", "target": "second.inlet", "stream": "brine", "kind": None},
+        {
+            "source": "degasser.liquid_out",
+            "target": "first.fluid_in",
+            "kind": "brine",
+            "type": None,
+        },
+        {"source": "first.fluid_out", "target": "second.fluid_in", "kind": "brine", "type": None},
     ]
     plant = gm.Plant("Untyped")
     plant.add("Pipe", "one")
     plant.add("Pipe", "two")
-    plant.connect("one.outlet", "two.inlet", kind="state")
+    plant.connect("one.fluid_out", "two.fluid_in", type="state")
     assert plant._connection_list() == [
-        {"source": "one.outlet", "target": "two.inlet", "stream": None, "kind": "state"}
+        {"source": "one.fluid_out", "target": "two.fluid_in", "kind": None, "type": "state"}
     ]
 
 
@@ -103,7 +108,7 @@ def test_summary_is_a_table_with_totals(chain):
     lines = chain.summary().splitlines()
     assert lines[0] == "Plant: Chain"
     assert lines[1].split() == ["Module", "Type", "Category", "Connected", "to", "Parameters"]
-    assert "inlet <- degasser.liquid" in lines[3]
+    assert "fluid_in <- degasser.liquid_out" in lines[3]
     assert lines[-1].startswith("Total parameters: ")
 
 
@@ -111,10 +116,10 @@ def test_an_inlet_has_one_source_and_an_outlet_one_target(chain):
     """A second connection to a used port raises ``port_in_use``."""
     chain.add("Filter", "third")
     with pytest.raises(ValidationError) as caught:
-        chain.connect("first.outlet", "third.inlet")
+        chain.connect("first.fluid_out", "third.fluid_in")
     assert caught.value.code == "port_in_use" and caught.value.path == "source"
     with pytest.raises(ValidationError) as caught:
-        chain.connect("degasser.liquid", "second.inlet")
+        chain.connect("degasser.liquid_out", "second.fluid_in")
     assert caught.value.code == "port_in_use"
 
 
@@ -127,7 +132,7 @@ def test_ambiguous_matches_list_the_candidates():
         plant.connect("splitter", "exchanger")
     assert caught.value.code == "ambiguous_port"
     assert len(caught.value.suggestions) == 4
-    assert "splitter.first_out [any] -> exchanger.hot_in [any]" in caught.value.suggestions
+    assert "splitter.branch1_out [any] -> exchanger.hot_in [any]" in caught.value.suggestions
 
 
 def test_a_stream_type_mismatch_is_refused(chain):
@@ -135,7 +140,7 @@ def test_a_stream_type_mismatch_is_refused(chain):
     chain.add("Degasser", "other")
     chain.add("Filter", "third")
     with pytest.raises(ValidationError) as caught:
-        chain.connect("other.gas", "third.inlet")
+        chain.connect("other.gas_out", "third.fluid_in")
     assert caught.value.code == "stream_mismatch"
 
 
@@ -144,12 +149,12 @@ def test_a_loop_needs_a_state_connection():
     plant = gm.Plant("Loop")
     plant.add("Filter", "first")
     plant.add("Filter", "second")
-    plant.connect("first.outlet", "second.inlet")
+    plant.connect("first.fluid_out", "second.fluid_in")
     with pytest.raises(ValidationError) as caught:
-        plant.connect("second.outlet", "first.inlet")
+        plant.connect("second.fluid_out", "first.fluid_in")
     assert caught.value.code == "loop_without_state"
     assert len(plant._connection_list()) == 1
-    plant.connect("second.outlet", "first.inlet", kind="state")
+    plant.connect("second.fluid_out", "first.fluid_in", type="state")
     with pytest.raises(NotImplementedYet):
         plant()
 
@@ -157,24 +162,24 @@ def test_a_loop_needs_a_state_connection():
 def test_unknown_names_come_with_suggestions(chain):
     """Modules and ports that do not exist suggest the closest ones."""
     with raises(ValidationError, "unknown_name") as caught:
-        chain.connect("frist.outlet", "second.inlet")
+        chain.connect("frist.fluid_out", "second.fluid_in")
     assert caught.value.suggestions == ("first",)
     chain.add("Filter", "third")
     with pytest.raises(ValidationError) as caught:
-        chain.connect("second.outlt", "third.inlet")
-    assert caught.value.code == "unknown_port" and caught.value.suggestions == ("outlet",)
+        chain.connect("second.fluid_ot", "third.fluid_in")
+    assert caught.value.code == "unknown_port" and caught.value.suggestions == ("fluid_out",)
 
 
 def test_connections_reach_through_groups_but_never_into_plants():
-    """``filters.hot.outlet`` is valid; ``doublet.esp.discharge`` is not."""
+    """``filters.hot.fluid_out`` is valid; ``doublet.esp.fluid_out`` is not."""
     plant = gm.Plant("Reach")
     plant.add("ModuleDict", "filters")
     plant.add("Filter", "filters.hot")
     plant.add("Filter", "filters.cold")
     plant.add("Doublet", "doublet")
-    plant.connect("filters.hot.outlet", "filters.cold.inlet")
+    plant.connect("filters.hot.fluid_out", "filters.cold.fluid_in")
     with pytest.raises(ValidationError) as caught:
-        plant.connect("doublet.esp.discharge", "filters.hot.inlet")
+        plant.connect("doublet.esp.fluid_out", "filters.hot.fluid_in")
     assert caught.value.code == "invalid_connection"
     assert "supply_out" in str(caught.value)
     with pytest.raises(ValidationError):

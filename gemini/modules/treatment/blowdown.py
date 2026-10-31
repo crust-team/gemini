@@ -16,12 +16,12 @@ class Blowdown(Module):
     "Cooling Towers", water treatment). The bleed is modelled as an ideal flow split, the share
     commanded by the blowdown valve or conductivity controller:
 
-    - ``blowdown_out.m_dot = blowdown_fraction * feed_in.m_dot``;
-    - ``retained_out.m_dot = feed_in.m_dot - blowdown_out.m_dot``.
+    - ``waste_out.m_dot = blowdown_fraction * fluid_in.m_dot``;
+    - ``fluid_out.m_dot = fluid_in.m_dot - waste_out.m_dot``.
 
     Both outlets keep the feed temperature, pressure and fluid: the valve pressure loss and any
     flash of the drained water are not modelled. The drained stream carries its own enthalpy, so
-    there is no ``heat_loss`` output: when ``blowdown_out`` leaves the plant, the stream audit
+    there is no ``heat_loss`` output: when ``waste_out`` leaves the plant, the stream audit
     counts it as an outflow, and mass and sensible energy close exactly. The fraction is a
     control because operators and controllers adjust it to the measured concentration (for a
     make-up stream ``M`` and ``C`` cycles of concentration the bleed is ``M / C``). Reverse
@@ -33,7 +33,7 @@ class Blowdown(Module):
         super().__init__()
 
         # Inlets
-        self.feed_in = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.blowdown_fraction = Control(Fraction)
@@ -42,27 +42,27 @@ class Blowdown(Module):
         self.blowdown_mass_flow = Output(MassFlow)
 
         # Outlets
-        self.retained_out = Outlet(Stream, stream="brine")
-        self.blowdown_out = Outlet(Stream, stream="brine")
+        self.fluid_out = Outlet(Stream, kind="brine")
+        self.waste_out = Outlet(Stream, kind="brine")
 
     def forward(self, inlets):
         """Split the commanded bleed from the feed."""
 
         # Outlets
-        feed_in = inlets.feed_in
+        fluid_in = inlets.fluid_in
         ops.check(
-            feed_in.m_dot >= 0,
+            fluid_in.m_dot >= 0,
             PhysicsError,
-            "{path}: feed_in.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
-            m_dot=feed_in.m_dot,
+            m_dot=fluid_in.m_dot,
         )
-        retained, bleed = separation.split_flow(feed_in.m_dot, self.blowdown_fraction)
-        retained_out = feed_in.with_(m_dot=retained)
-        blowdown_out = feed_in.with_(m_dot=bleed)
+        retained, bleed = separation.split_flow(fluid_in.m_dot, self.blowdown_fraction)
+        fluid_out = fluid_in.with_(m_dot=retained)
+        waste_out = fluid_in.with_(m_dot=bleed)
 
-        outlets = dict(retained_out=retained_out, blowdown_out=blowdown_out)
+        outlets = dict(fluid_out=fluid_out, waste_out=waste_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.blowdown_mass_flow = outlets.blowdown_out.m_dot
+        self.blowdown_mass_flow = outlets.waste_out.m_dot

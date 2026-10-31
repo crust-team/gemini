@@ -76,9 +76,9 @@ class AbsorptionUnit(Module):
         )
 
         # Inlets
-        self.generator_in = Inlet(Stream, stream="hot_water")
-        self.chilled_in = Inlet(Stream, stream="chilled_water")
-        self.cooling_in = Inlet(Stream, stream="hot_water")
+        self.generator_in = Inlet(Stream, kind="hot_water")
+        self.chilled_in = Inlet(Stream, kind="chilled_water")
+        self.cooling_in = Inlet(Stream, kind="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -97,9 +97,9 @@ class AbsorptionUnit(Module):
         self.cooling_out_T = Output(Temperature)
 
         # Outlets
-        self.generator_out = Outlet(Stream, stream="hot_water")
-        self.chilled_out = Outlet(Stream, stream="chilled_water")
-        self.cooling_out = Outlet(Stream, stream="hot_water")
+        self.generator_out = Outlet(Stream, kind="hot_water")
+        self.chilled_out = Outlet(Stream, kind="chilled_water")
+        self.cooling_out = Outlet(Stream, kind="hot_water")
 
     def forward(self, inlets):
         """Cool the generator and chilled circuits and heat the cooling circuit."""

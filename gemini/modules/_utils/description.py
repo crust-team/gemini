@@ -80,7 +80,7 @@ def _entries(declarations):
 def _ports(declarations):
     return {
         name: {
-            "stream": declaration.stream,
+            "kind": declaration.kind,
             "fields": {k: dict(v) for k, v in STREAM_FIELDS.items()},
         }
         for name, declaration in declarations.items()
@@ -91,7 +91,7 @@ def _outputs(declarations):
     return {
         name: {
             "unit": declaration.unit,
-            "kind": declaration.quantity if declaration.additive else None,
+            "quantity": declaration.quantity if declaration.additive else None,
             "soft_sensor": declaration.soft_sensor,
         }
         for name, declaration in declarations.items()
@@ -154,10 +154,10 @@ def describe(module, values=True):
     - ``measured`` lists the outputs of the module itself: replay accepts a measured binding for
       any of them and compares it with the output of the same name.
     - ``minimum`` and ``maximum`` are the closest limit, strict (``gt``, ``lt``) or not.
-    - ``stream`` of a port is ``None`` for a port that takes any stream.
-    - ``kind`` of an output is its additive quantity name, else ``None``.
+    - ``kind`` of a port is ``None`` for a port that takes any stream.
+    - ``quantity`` of an output is its additive quantity name, else ``None``.
     - ``children`` maps a child name to its type; ``connections`` lists
-      ``{source, target, stream, kind}`` for a plant and is empty for a handwritten composite.
+      ``{source, target, kind, type}`` for a plant and is empty for a handwritten composite.
     - ``values`` holds the current parameter, control and boundary values. It is only on an
       instance: a class stores no values.
     """

@@ -64,7 +64,7 @@ class Cooler(Module):
         )
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="hot_water")
+        self.fluid_in = Inlet(Stream, kind="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -75,30 +75,30 @@ class Cooler(Module):
 
         # Outputs
         self.duty = Output(Duty)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.electricity = Output(Electricity)
         self.heat_loss = Output(HeatLoss)
         self.evaporation_rate = Output(MassFlow)
         self.is_capped = Output(bool)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="hot_water")
+        self.fluid_out = Outlet(Stream, kind="hot_water")
 
     def forward(self, inlets):
         """Cool the stream by the rejected duty; its mass flow is unchanged."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         duty, rate, _ = self._duty(inlet)
         outlet = inlet.with_(T=inlet.T - heat_transfer.temperature_change(duty, rate))
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        duty, _, requested = self._duty(inlets.inlet)
+        duty, _, requested = self._duty(inlets.fluid_in)
         self.duty = duty
-        self.outlet_T = outlets.outlet.T
+        self.fluid_out_T = outlets.fluid_out.T
         self.electricity = heat_transfer.fan_power(duty, self.specific_fan_power)
         self.heat_loss = duty + self.electricity
         self.evaporation_rate = (
@@ -113,7 +113,7 @@ class Cooler(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )

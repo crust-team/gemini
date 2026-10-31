@@ -20,12 +20,12 @@ def spec():
             "filters": {"type": "ModuleDict", "modules": {"hot": {"type": "Filter", "params": {}}}},
             "pipe": {"type": "Pipe", "params": {"length": "100 ft"}},
         },
-        "connections": [{"source": "degasser.liquid", "target": "filters.hot.inlet"}],
-        "inlets": {"feed": "degasser.inlet", "pipe_in": "pipe.inlet"},
+        "connections": [{"source": "degasser.liquid_out", "target": "filters.hot.fluid_in"}],
+        "inlets": {"feed": "degasser.fluid_in", "pipe_in": "pipe.fluid_in"},
         "outlets": {
-            "product": "filters.hot.outlet",
-            "gas": "degasser.gas",
-            "pipe_out": "pipe.outlet",
+            "product": "filters.hot.fluid_out",
+            "gas": "degasser.gas_out",
+            "pipe_out": "pipe.fluid_out",
         },
         "outputs": {"loss": {"sum": "heat_loss"}},
         "bindings": {},
@@ -48,7 +48,7 @@ def test_an_unconnected_port_is_reported_with_its_path(spec):
     del spec["outlets"]["gas"]
     found = problems_of(spec)
     assert [(item["code"], item["path"]) for item in found] == [
-        ("unconnected_port", "degasser.gas")
+        ("unconnected_port", "degasser.gas_out")
     ]
     with pytest.raises(ValidationError) as caught:
         gm.plants.from_dict(spec)
@@ -84,12 +84,12 @@ def test_wiring_rules_report_the_connection_and_the_field(spec):
     spec["modules"]["filter2"] = {"type": "Filter", "params": {}}
     del spec["inlets"]["pipe_in"], spec["outlets"]["pipe_out"]
     cases = {
-        "unknown_name": ("pipe.outlet", "filter.hot.inlet", "target"),
-        "unknown_port": ("pipe.outlt", "pipe2.inlet", "source"),
-        "port_in_use": ("pipe.outlet", "filters.hot.inlet", "target"),
-        "stream_mismatch": ("degasser.gas", "filter2.inlet", "target"),
-        "invalid_connection": ("pipe", "pipe2.inlet", "source"),
-        "loop_without_state": ("pipe.outlet", "pipe.inlet", "target"),
+        "unknown_name": ("pipe.fluid_out", "filter.hot.fluid_in", "target"),
+        "unknown_port": ("pipe.outlt", "pipe2.fluid_in", "source"),
+        "port_in_use": ("pipe.fluid_out", "filters.hot.fluid_in", "target"),
+        "stream_mismatch": ("degasser.gas_out", "filter2.fluid_in", "target"),
+        "invalid_connection": ("pipe", "pipe2.fluid_in", "source"),
+        "loop_without_state": ("pipe.fluid_out", "pipe.fluid_in", "target"),
     }
     for code, (source, target, field) in cases.items():
         extra = {"source": source, "target": target}
@@ -102,10 +102,10 @@ def test_wiring_rules_report_the_connection_and_the_field(spec):
 def test_ambiguous_ports_are_listed(spec):
     """A bare module name needs a port in a spec; an ambiguous pair is refused elsewhere."""
     spec["modules"]["splitter"] = {"type": "Splitter", "params": {}}
-    spec["connections"].append({"source": "splitter", "target": "pipe.inlet"})
+    spec["connections"].append({"source": "splitter", "target": "pipe.fluid_in"})
     (item,) = wiring_problems_of(spec)
     assert item["code"] == "invalid_connection"
-    assert item["suggestions"] == ["splitter.first_out", "splitter.second_out"]
+    assert item["suggestions"] == ["splitter.branch1_out", "splitter.branch2_out"]
 
 
 def test_a_failed_module_does_not_bury_the_report_in_follow_ups(spec):

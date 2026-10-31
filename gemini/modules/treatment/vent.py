@@ -30,7 +30,7 @@ class Vent(Module):
     gas analysis gives. ``mode="vent"`` releases it unburnt; ``mode="flare"`` burns the
     methane with ``combustion_efficiency``, CH4 + 2 O2 -> CO2 + 2 H2O:
 
-    - ``vented_mass_flow = inlet.m_dot`` (the gas mass flow, see ``Degasser.gas``);
+    - ``vented_mass_flow = inlet.m_dot`` (the gas mass flow, see ``Degasser.gas_out``);
     - burnt methane ``m_b = combustion_efficiency * x_CH4 * m_dot`` when flaring, else 0;
     - ``co2_emission = x_CO2 * m_dot + m_b * M_CO2 / M_CH4``;
     - ``methane_emission = x_CH4 * m_dot - m_b``;
@@ -62,7 +62,7 @@ class Vent(Module):
         self.combustion_efficiency = Parameter(Efficiency, default=combustion.FLARE_EFFICIENCY)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="gas")
+        self.fluid_in = Inlet(Stream, kind="gas")
 
         # Outputs
         self.vented_mass_flow = Output(MassFlow)
@@ -72,21 +72,21 @@ class Vent(Module):
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="gas")
+        self.fluid_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Release the gas from the plant unchanged."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         self._check(inlet)
         outlet = inlet
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        gas_flow = inlets.inlet.m_dot
+        gas_flow = inlets.fluid_in.m_dot
         efficiency = self.combustion_efficiency if self.mode == "flare" else 0.0
         co2, methane, fuel = combustion.flare_emissions(
             gas_flow,
@@ -106,7 +106,7 @@ class Vent(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )

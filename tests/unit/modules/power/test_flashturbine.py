@@ -22,7 +22,7 @@ def test_power_matches_dipippo_hand_calculation():
 
     Steam-table values: h_g(6 bar) = 2756.1, h_f(0.1 bar) = 191.8, h_fg = 2392.8 kJ/kg.
     """
-    out = turbine()(inlet=STEAM_FEED).outputs
+    out = turbine()(fluid_in=STEAM_FEED).outputs
     assert out.exhaust_quality == pytest.approx(0.868, abs=1e-3)
     assert out.gross_power / 20 == pytest.approx(2756.1e3 - (191.8e3 + 0.8677 * 2392.8e3), rel=2e-3)
     assert out.electricity_generated == pytest.approx(0.98 * out.gross_power, rel=1e-12)
@@ -31,8 +31,8 @@ def test_power_matches_dipippo_hand_calculation():
 def test_closed_in_steam_enthalpies_and_condensate():
     """Closure: m h_g(p_in) = electricity + heat_loss + m h_f(p_cond); condensate is saturated."""
     module = turbine()
-    result = module(inlet=STEAM_FEED)
-    out, outlet = result.outputs, result.outlets.outlet
+    result = module(fluid_in=STEAM_FEED)
+    out, outlet = result.outputs, result.outlets.fluid_out
     condenser = _physics.saturation_properties(1e4)
     incoming = 20 * _physics.saturation_properties(6e5).vapour_enthalpy
     outgoing = out.electricity_generated + out.heat_loss + 20 * condenser.liquid_enthalpy
@@ -44,7 +44,7 @@ def test_closed_in_steam_enthalpies_and_condensate():
 
 def test_zero_flow_and_invalid_inlets():
     """Zero steam gives zero power; liquid, reverse flow or a low inlet pressure raise."""
-    out = turbine()(inlet=STEAM_FEED.with_(m_dot=0)).outputs
+    out = turbine()(fluid_in=STEAM_FEED.with_(m_dot=0)).outputs
     assert out.gross_power == out.electricity_generated == out.heat_loss == 0
     for inlet in (
         STEAM_FEED.with_(fluid=WATER),
@@ -52,7 +52,7 @@ def test_zero_flow_and_invalid_inlets():
         STEAM_FEED.with_(p=1e4),
     ):
         with pytest.raises(gm.errors.PhysicsError):
-            turbine()(inlet=inlet)
+            turbine()(fluid_in=inlet)
 
 
 class SingleFlash(Module):
@@ -73,7 +73,7 @@ class SingleFlash(Module):
         self.net_power = Output.of(self.turbine.electricity_generated)
 
         # Outlets
-        self.brine_out = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
         self.condensate_out = Outlet(Stream)
 
     def forward(self, inlets):
@@ -81,13 +81,13 @@ class SingleFlash(Module):
 
         # Modules
         separated = self.separator(inlets.geofluid_in, pressure_setpoint=6e5)
-        expanded = self.turbine(separated.outlets.gas)
+        expanded = self.turbine(separated.outlets.gas_out)
 
         # Outlets
-        brine_out = separated.outlets.liquid
-        condensate_out = expanded.outlets.outlet
+        fluid_out = separated.outlets.liquid_out
+        condensate_out = expanded.outlets.fluid_out
 
-        outlets = dict(brine_out=brine_out, condensate_out=condensate_out)
+        outlets = dict(fluid_out=fluid_out, condensate_out=condensate_out)
         return outlets
 
 
@@ -96,7 +96,7 @@ def test_single_flash_plant_closure():
     plant = SingleFlash()
     feed = Stream(m_dot=100, T=523.15, p=40e5)
     result = plant(geofluid_in=feed)
-    brine, condensate = result.outlets.brine_out, result.outlets.condensate_out
+    brine, condensate = result.outlets.fluid_out, result.outlets.condensate_out
     assert result.outputs.net_power == pytest.approx(9.53e6, rel=2e-3)
     assert brine.m_dot + condensate.m_dot == pytest.approx(100, rel=1e-15)
     incoming = 100 * _physics.liquid_enthalpy(feed.p, feed.T)
@@ -112,7 +112,7 @@ def test_single_flash_plant_closure():
 def test_traced_call_matches_one_call_per_row():
     """Several flows and inlet pressures trace and equal one call per row."""
     rows = [
-        dict(inlet=Stream(m_dot=m_dot, T=420.0, p=p, fluid=STEAM))
+        dict(fluid_in=Stream(m_dot=m_dot, T=420.0, p=p, fluid=STEAM))
         for m_dot, p in [(20.0, 6e5), (0.0, 6e5), (5.0, 2e6), (12.0, 2e5)]
     ]
     assert_module_matches(turbine(), rows)
@@ -122,8 +122,8 @@ def test_a_bad_expansion_rejects_the_call_without_outputs_too():
     """``forward`` uses no number of the expansion, but its error still fails the call."""
     module = turbine().update_params(condenser_pressure="7 bar")
     with pytest.raises(PhysicsError) as with_outputs:
-        module(inlet=STEAM_FEED)
+        module(fluid_in=STEAM_FEED)
     with gm.no_outputs():
         with pytest.raises(PhysicsError) as without_outputs:
-            module(inlet=STEAM_FEED)
+            module(fluid_in=STEAM_FEED)
     assert str(without_outputs.value) == str(with_outputs.value)

@@ -478,47 +478,47 @@
   },
   "connections": [
     {
-      "source": "producers.0.reservoir.sandface",
-      "target": "producers.0.well.bottom"
+      "source": "producers.0.reservoir.sandface_out",
+      "target": "producers.0.well.bottom_in"
     },
     {
-      "source": "producers.0.well.wellhead",
-      "target": "producers.0.esp.suction"
+      "source": "producers.0.well.wellhead_out",
+      "target": "producers.0.esp.fluid_in"
     },
     {
-      "source": "producers.0.esp.discharge",
-      "target": "producers.0.riser.bottom"
+      "source": "producers.0.esp.fluid_out",
+      "target": "producers.0.riser.bottom_in"
     },
     {
-      "source": "producers.1.reservoir.sandface",
-      "target": "producers.1.well.bottom"
+      "source": "producers.1.reservoir.sandface_out",
+      "target": "producers.1.well.bottom_in"
     },
     {
-      "source": "producers.1.well.wellhead",
-      "target": "producers.1.esp.suction"
+      "source": "producers.1.well.wellhead_out",
+      "target": "producers.1.esp.fluid_in"
     },
     {
-      "source": "producers.1.esp.discharge",
-      "target": "producers.1.riser.bottom"
+      "source": "producers.1.esp.fluid_out",
+      "target": "producers.1.riser.bottom_in"
     },
     {
-      "source": "producers.0.riser.wellhead",
-      "target": "mixers.0.first_in"
+      "source": "producers.0.riser.wellhead_out",
+      "target": "mixers.0.branch1_in"
     },
     {
-      "source": "producers.1.riser.wellhead",
-      "target": "mixers.0.second_in"
+      "source": "producers.1.riser.wellhead_out",
+      "target": "mixers.0.branch2_in"
     },
     {
-      "source": "injectors.0.well.bottom",
-      "target": "injectors.0.sink.sandface"
+      "source": "injectors.0.well.bottom_out",
+      "target": "injectors.0.sink.sandface_in"
     }
   ],
   "inlets": {
-    "return_in": "injectors.0.well.wellhead"
+    "return_in": "injectors.0.well.wellhead_in"
   },
   "outlets": {
-    "supply_out": "mixers.0.mixed_out"
+    "supply_out": "mixers.0.fluid_out"
   },
   "outputs": {
     "electricity": {
@@ -528,7 +528,7 @@
       "sum": "heat_loss"
     },
     "supply_out_T": {
-      "of": "mixers.0.mixed_out_T"
+      "of": "mixers.0.fluid_out_T"
     }
   },
   "fluids": {

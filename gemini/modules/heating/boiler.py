@@ -35,7 +35,7 @@ class _BoilerBody(Module):
         self.efficiency = Parameter(Efficiency)
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="hot_water")
+        self.fluid_in = Inlet(Stream, kind="hot_water")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -43,19 +43,19 @@ class _BoilerBody(Module):
         # Outputs
         self.duty = Output(Duty)
         self.fuel_or_power = Output(Power)
-        self.outlet_T = Output(Temperature)
+        self.fluid_out_T = Output(Temperature)
         self.is_capped = Output(bool)
         self.heat_loss = Output(HeatLoss)
 
         # Outlets
-        self.outlet = Outlet(Stream, stream="hot_water")
+        self.fluid_out = Outlet(Stream, kind="hot_water")
 
     def _requested_duty(self, inlet):
         """Return the duty [W] that reaches the setpoint, refusing reverse flow."""
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )
@@ -73,7 +73,7 @@ class _BoilerBody(Module):
         requested = self._requested_duty(inlet)
         self.duty = ops.minimum(requested, limit)
         self.fuel_or_power = energy.input_power(self.duty, self.efficiency)
-        self.outlet_T = outlet.T
+        self.fluid_out_T = outlet.T
         self.is_capped = requested > limit
         self.heat_loss = self.fuel_or_power - self.duty
 
@@ -99,7 +99,7 @@ class Boiler(_BoilerBody):
         super().__init__()
 
         # Inlets
-        self.fuel_in = Inlet(Stream, stream="gas")
+        self.fuel_in = Inlet(Stream, kind="gas")
 
         # Outputs
         self.fuel = Output(Fuel)
@@ -109,23 +109,23 @@ class Boiler(_BoilerBody):
         self.co2_emission = Output(MassFlow)
 
         # Outlets
-        self.gas_out = Outlet(Stream, stream="gas")
+        self.gas_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Heat the stream up to its setpoint and pass on the gas not burned."""
 
         # Outlets
-        inlet, fuel = inlets.inlet, inlets.fuel_in
+        inlet, fuel = inlets.fluid_in, inlets.fuel_in
         duty = ops.minimum(self._requested_duty(inlet), self._duty_limit(fuel))
         outlet = self._heated(inlet, duty)
         gas_out = burner.unburned_gas(energy.input_power(duty, self.efficiency), fuel)
 
-        outlets = dict(outlet=outlet, gas_out=gas_out)
+        outlets = dict(fluid_out=outlet, gas_out=gas_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         fuel = inlets.fuel_in
-        self._water_outputs(inlets.inlet, outlets.outlet, self._duty_limit(fuel))
+        self._water_outputs(inlets.fluid_in, outlets.fluid_out, self._duty_limit(fuel))
         self.fuel = self.fuel_or_power
         for name, value in burner.fuel_outputs(self.fuel_or_power, fuel).items():
             setattr(self, name, value)
@@ -156,12 +156,12 @@ class ElectricBoiler(_BoilerBody):
         """Heat the stream up to its setpoint."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         outlet = self._heated(inlet, ops.minimum(self._requested_duty(inlet), self.capacity))
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self._water_outputs(inlets.inlet, outlets.outlet, self.capacity)
+        self._water_outputs(inlets.fluid_in, outlets.fluid_out, self.capacity)
         self.electricity = self.fuel_or_power

@@ -29,7 +29,7 @@ class PressurizationTank(Module):
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Controls
         self.pressure_setpoint = Control(Pressure, gt=0)
@@ -38,16 +38,16 @@ class PressurizationTank(Module):
         self.pressure_correction = Output(PressureDifference)
 
         # Outlets
-        self.outlet = Outlet(Stream)
+        self.fluid_out = Outlet(Stream)
 
     def forward(self, inlets):
         """Set the circuit pressure to the setpoint."""
 
         # Outlets
-        outlet = inlets.inlet.with_(p=self.pressure_setpoint)
+        outlet = inlets.fluid_in.with_(p=self.pressure_setpoint)
 
-        outlets = dict(outlet=outlet)
+        outlets = dict(fluid_out=outlet)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.pressure_correction = outlets.outlet.p - inlets.inlet.p
+        self.pressure_correction = outlets.fluid_out.p - inlets.fluid_in.p

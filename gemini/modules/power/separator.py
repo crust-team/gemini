@@ -48,7 +48,7 @@ class Separator(Module):
         super().__init__()
 
         # Inlets
-        self.inlet = Inlet(Stream, stream="brine")
+        self.fluid_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.pressure_setpoint = Control(Pressure, gt=0)
@@ -59,14 +59,14 @@ class Separator(Module):
         self.saturation_temperature = Output(Temperature)
 
         # Outlets
-        self.liquid = Outlet(Stream, stream="brine")
-        self.gas = Outlet(Stream, stream="gas")
+        self.liquid_out = Outlet(Stream, kind="brine")
+        self.gas_out = Outlet(Stream, kind="gas")
 
     def forward(self, inlets):
         """Flash the inlet to the setpoint pressure and split it into brine and steam."""
 
         # Outlets
-        inlet = inlets.inlet
+        inlet = inlets.fluid_in
         state = self._flash(inlet)
 
         liquid = inlet.with_(
@@ -79,13 +79,13 @@ class Separator(Module):
             fluid=STEAM,
         )
 
-        outlets = dict(liquid=liquid, gas=gas)
+        outlets = dict(liquid_out=liquid, gas_out=gas)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        state = self._flash(inlets.inlet)
+        state = self._flash(inlets.fluid_in)
         self.steam_fraction = state.steam_fraction
-        self.steam_mass_flow = outlets.gas.m_dot
+        self.steam_mass_flow = outlets.gas_out.m_dot
         self.saturation_temperature = state.saturation_temperature
 
     def _flash(self, inlet):
@@ -93,7 +93,7 @@ class Separator(Module):
         ops.check(
             inlet.m_dot >= 0,
             PhysicsError,
-            "{path}: inlet.m_dot = {m_dot} kg/s; expected >= 0",
+            "{path}: fluid_in.m_dot = {m_dot} kg/s; expected >= 0",
             path=self.path,
             m_dot=inlet.m_dot,
         )

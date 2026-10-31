@@ -178,7 +178,7 @@ def _unmapped_properties(project, node_id, kind):
 
 
 def _bind(bindings, target, column, unit):
-    """Bind ``column`` to a dotted target such as ``inlets.suction.p`` or ``measured.head``."""
+    """Bind ``column`` to a dotted target such as ``inlets.fluid_in.p`` or ``measured.head``."""
     section, *keys = target.split(".")
     set_nested(getattr(bindings, section), keys, Binding(column=column, unit=unit))
 
@@ -186,7 +186,7 @@ def _bind(bindings, target, column, unit):
 def _supplements(kind, bound):
     """Return the dataset channels to bind for one node as ``(target, column, unit)``."""
     supplements = list(tables.SUPPLEMENTS.get(kind, []))
-    inlet_pressure = bound.inlets.get("inlet", {}).get("p")
+    inlet_pressure = bound.inlets.get("fluid_in", {}).get("p")
     if kind == "filter" and inlet_pressure is not None:
         column = inlet_pressure.column.replace("_Pin", "_PDrop")
         supplements.append(("measured.pressure_drop", column, "bar"))

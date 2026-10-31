@@ -26,7 +26,7 @@ class GasDisposal(Module):
         self.vent = Vent().update_params(mode="flare", co2_mass_fraction=0.9)
 
         # Inlets
-        self.inlet = Inlet(Stream)
+        self.fluid_in = Inlet(Stream)
 
         # Outlets
         self.liquid = Outlet(Stream)
@@ -35,11 +35,11 @@ class GasDisposal(Module):
         """Separate, then flare the gas."""
 
         # Modules
-        degassed = self.degasser(inlet=inlets.inlet)
-        self.vent(inlet=degassed.outlets.gas)
+        degassed = self.degasser(fluid_in=inlets.fluid_in)
+        self.vent(fluid_in=degassed.outlets.gas_out)
 
         # Outlets
-        liquid = degassed.outlets.liquid
+        liquid = degassed.outlets.liquid_out
 
         outlets = dict(liquid=liquid)
         return outlets
@@ -53,9 +53,9 @@ def vent(mode):
 def test_venting_releases_the_gas_unburnt():
     """Venting emits the gas's CO2 and methane and uses no fuel."""
     module = vent("vent")
-    result = module(inlet=GAS)
+    result = module(fluid_in=GAS)
     out = result.outputs
-    assert out.vented_mass_flow == 0.2 and result.outlets.outlet == GAS
+    assert out.vented_mass_flow == 0.2 and result.outlets.fluid_out == GAS
     assert out.co2_emission == pytest.approx(0.18)
     assert out.methane_emission == pytest.approx(0.01)
     assert out.fuel == out.heat_loss == 0
@@ -66,7 +66,7 @@ def test_venting_releases_the_gas_unburnt():
 def test_flaring_burns_methane_to_co2_and_heat():
     """Flaring at 98 % converts methane to CO2 and releases its heating value as heat loss."""
     module = vent("flare")
-    result = module(inlet=GAS)
+    result = module(fluid_in=GAS)
     out = result.outputs
     burnt = 0.98 * 0.01
     assert out.co2_emission == pytest.approx(0.18 + burnt * constants.CO2_MOLAR_MASS / 0.016043)
@@ -79,19 +79,19 @@ def test_flaring_burns_methane_to_co2_and_heat():
 def test_limits():
     """Zero flow emits nothing; reverse flow and an impossible composition raise."""
     module = vent("flare")
-    assert module(inlet=GAS.with_(m_dot=0)).outputs.co2_emission == 0
-    with pytest.raises(gm.errors.PhysicsError, match="inlet.m_dot"):
-        module(inlet=GAS.with_(m_dot=-0.1))
+    assert module(fluid_in=GAS.with_(m_dot=0)).outputs.co2_emission == 0
+    with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot"):
+        module(fluid_in=GAS.with_(m_dot=-0.1))
     module.update_params(methane_mass_fraction=0.2)
     with raises(gm.errors.ValidationError, "invalid_design", match="expected at most 1"):
-        module(inlet=GAS)
+        module(fluid_in=GAS)
 
 
 def test_degassed_gas_leaves_the_plant_through_the_vent():
     """Free gas separated by the degasser is flared; plant mass and energy close."""
     plant = GasDisposal()
     inlet = Stream(m_dot=10, T=350, p=1e6, fluid=Fluid(gas_mass_fraction=0.01))
-    result = plant(inlet=inlet)
+    result = plant(fluid_in=inlet)
     vented = result.children["vent"].outputs
     assert vented.vented_mass_flow == pytest.approx(0.09)
     assert vented.co2_emission == pytest.approx(0.081)
@@ -101,7 +101,7 @@ def test_degassed_gas_leaves_the_plant_through_the_vent():
 
 def test_vent_matches_traced():
     """Vent and flare emissions trace and equal one call per row."""
-    rows = [dict(inlet=Stream(m_dot=m_dot, T=330, p=1.2e5)) for m_dot in (0, 0.2, 1.5)]
+    rows = [dict(fluid_in=Stream(m_dot=m_dot, T=330, p=1.2e5)) for m_dot in (0, 0.2, 1.5)]
     for mode in ("vent", "flare"):
         assert_module_matches(
             Vent().update_params(mode=mode, co2_mass_fraction=0.9, methane_mass_fraction=0.05),

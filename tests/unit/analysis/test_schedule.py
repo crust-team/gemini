@@ -63,19 +63,19 @@ def plant_of_two():
 
 def wire(plant):
     """Connect the brine loop and the heating water, every port named."""
-    plant.connect("d0.supply_out", "production.first_in")
-    plant.connect("d1.supply_out", "production.second_in")
-    plant.connect("production.mixed_out", "degasser.inlet")
-    plant.connect("degasser.liquid", "hx.hot_in")
-    plant.connect("degasser.gas", "gas_out")
-    plant.connect("hx.hot_out", "injection.feed_in")
-    plant.connect("injection.first_out", "d0.return_in")
-    plant.connect("injection.second_out", "d1.return_in")
+    plant.connect("d0.supply_out", "production.branch1_in")
+    plant.connect("d1.supply_out", "production.branch2_in")
+    plant.connect("production.fluid_out", "degasser.fluid_in")
+    plant.connect("degasser.liquid_out", "hx.hot_in")
+    plant.connect("degasser.gas_out", "gas_out")
+    plant.connect("hx.hot_out", "injection.fluid_in")
+    plant.connect("injection.branch1_out", "d0.return_in")
+    plant.connect("injection.branch2_out", "d1.return_in")
     plant.connect("heating_return", "hx.cold_in")
-    plant.connect("hx.cold_out", "boiler.inlet")
-    plant.connect("grid.outlet", "boiler.fuel_in")
+    plant.connect("hx.cold_out", "boiler.fluid_in")
+    plant.connect("grid.fluid_out", "boiler.fuel_in")
     plant.connect("boiler.gas_out", "boiler_gas")
-    plant.connect("boiler.outlet", "users.supply_in")
+    plant.connect("boiler.fluid_out", "users.supply_in")
     plant.connect("users.return_out", "heating_out")
 
 

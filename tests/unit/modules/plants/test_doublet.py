@@ -23,9 +23,9 @@ def test_supply_is_the_riser_wellhead_and_return_reaches_the_sink(doublet):
     returned = Stream(m_dot=40, T=330, p=5e6, fluid=doublet.fluid)
     result = doublet(return_in=returned)
     leaves = result.leaves()
-    assert result.outlets.supply_out == leaves["riser"].outlets.wellhead
-    assert leaves["injector"].inlets.wellhead == returned
-    assert leaves["sink"].inlets.sandface == leaves["injector"].outlets.bottom
+    assert result.outlets.supply_out == leaves["riser"].outlets.wellhead_out
+    assert leaves["injector"].inlets.wellhead_in == returned
+    assert leaves["sink"].inlets.sandface_in == leaves["injector"].outlets.bottom_out
     electricity = sum(leaf.outputs.get("electricity", 0.0) for leaf in leaves.values())
     assert result.outputs.electricity == pytest.approx(electricity)
     heat_loss = sum(leaf.outputs.get("heat_loss", 0.0) for leaf in leaves.values())

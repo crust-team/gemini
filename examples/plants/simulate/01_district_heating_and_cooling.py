@@ -63,8 +63,8 @@ class DistrictEnergyPlant(gm.modules.Module):
 
         # Modules
         heated = self.heating(supply_in=inlets.heat_supply_in)
-        chilled = self.ates(building_in=inlets.cooling_return_in)
-        cooled = self.cooling(supply_in=chilled.outlets.building_out)
+        chilled = self.ates(return_in=inlets.cooling_return_in)
+        cooled = self.cooling(supply_in=chilled.outlets.supply_out)
 
         # Outlets
         heat_return_out = heated.outlets.return_out
@@ -189,7 +189,7 @@ def main():
         state, result = plant.step(state, HOUR, inlets)
         check_closure(plant, result)
         out = result.outputs
-        chilled = result.children["ates"].outlets.building_out.T - 273.15
+        chilled = result.children["ates"].outlets.supply_out.T - 273.15
         print(
             f"{hour:4d} {out.heat_supplied / 1e3:8.1f} {out.heat_absorbed / 1e3:8.1f} "
             f"{out.electricity / 1e3:15.2f} {out.stored_energy / 3.6e9:11.3f} {chilled:13.2f}"

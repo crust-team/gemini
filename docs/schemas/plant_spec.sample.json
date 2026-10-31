@@ -1,39 +1,39 @@
 {
   "bindings": {
     "": {
-      "secondary_in.T": "secondary_in.T",
-      "secondary_in.m_dot": {
+      "return_in.T": "secondary_in.T",
+      "return_in.m_dot": {
         "column": "secondary_in.m_dot",
         "unit": "m3/s"
       }
     },
     "degasser": {
-      "inlet.T": "degasser.inlet.T",
-      "inlet.m_dot": {
+      "fluid_in.T": "degasser.inlet.T",
+      "fluid_in.m_dot": {
         "column": "degasser.inlet.m_dot",
         "unit": "m3/s"
       },
-      "inlet.p": "degasser.inlet.p"
+      "fluid_in.p": "degasser.inlet.p"
     },
     "doublet.esp": {
       "discharge_pressure": "doublet.esp.discharge_pressure",
-      "frequency": "doublet.esp.frequency",
-      "head": "doublet.esp.head",
-      "power": "doublet.esp.power",
-      "suction.T": "doublet.esp.suction.T",
-      "suction.m_dot": {
+      "fluid_in.T": "doublet.esp.suction.T",
+      "fluid_in.m_dot": {
         "column": "doublet.esp.suction.m_dot",
         "unit": "m3/s"
       },
-      "suction.p": "doublet.esp.suction.p"
+      "fluid_in.p": "doublet.esp.suction.p",
+      "frequency": "doublet.esp.frequency",
+      "head": "doublet.esp.head",
+      "power": "doublet.esp.power"
     },
     "doublet.injector": {
-      "wellhead.T": "doublet.injector.wellhead.T",
-      "wellhead.m_dot": {
+      "wellhead_in.T": "doublet.injector.wellhead.T",
+      "wellhead_in.m_dot": {
         "column": "doublet.injector.wellhead.m_dot",
         "unit": "m3/s"
       },
-      "wellhead.p": "doublet.injector.wellhead.p"
+      "wellhead_in.p": "doublet.injector.wellhead.p"
     },
     "doublet.reservoir": {
       "production_rate": {
@@ -42,21 +42,21 @@
       }
     },
     "filters.cold": {
-      "inlet.T": "filters.cold.inlet.T",
-      "inlet.m_dot": {
+      "fluid_in.T": "filters.cold.inlet.T",
+      "fluid_in.m_dot": {
         "column": "filters.cold.inlet.m_dot",
         "unit": "m3/s"
       },
-      "inlet.p": "filters.cold.inlet.p",
+      "fluid_in.p": "filters.cold.inlet.p",
       "pressure_drop": "filters.cold.pressure_drop"
     },
     "filters.hot": {
-      "inlet.T": "filters.hot.inlet.T",
-      "inlet.m_dot": {
+      "fluid_in.T": "filters.hot.inlet.T",
+      "fluid_in.m_dot": {
         "column": "filters.hot.inlet.m_dot",
         "unit": "m3/s"
       },
-      "inlet.p": "filters.hot.inlet.p",
+      "fluid_in.p": "filters.hot.inlet.p",
       "pressure_drop": "filters.hot.pressure_drop"
     },
     "heat_exchanger": {
@@ -77,14 +77,14 @@
       "hot_pressure_drop": "heat_exchanger.dp_hot"
     },
     "injection_pump": {
-      "power": "injection_pump.power",
-      "pressure_setpoint": "injection_pump.pressure_setpoint",
-      "suction.T": "injection_pump.suction.T",
-      "suction.m_dot": {
+      "fluid_in.T": "injection_pump.suction.T",
+      "fluid_in.m_dot": {
         "column": "injection_pump.suction.m_dot",
         "unit": "m3/s"
       },
-      "suction.p": "injection_pump.suction.p"
+      "fluid_in.p": "injection_pump.suction.p",
+      "power": "injection_pump.power",
+      "pressure_setpoint": "injection_pump.pressure_setpoint"
     }
   },
   "boundary": {
@@ -101,7 +101,7 @@
         }
       },
       "root_inputs": {
-        "secondary_in": {
+        "return_in": {
           "T": 293.15,
           "fluid": {
             "co2_mass_fraction": 0.0,
@@ -135,26 +135,26 @@
   "connections": [
     {
       "source": "doublet.supply_out",
-      "target": "degasser.inlet"
+      "target": "degasser.fluid_in"
     },
     {
-      "source": "degasser.liquid",
-      "target": "filters.hot.inlet"
+      "source": "degasser.liquid_out",
+      "target": "filters.hot.fluid_in"
     },
     {
-      "source": "filters.hot.outlet",
+      "source": "filters.hot.fluid_out",
       "target": "heat_exchanger.hot_in"
     },
     {
       "source": "heat_exchanger.hot_out",
-      "target": "filters.cold.inlet"
+      "target": "filters.cold.fluid_in"
     },
     {
-      "source": "filters.cold.outlet",
-      "target": "injection_pump.suction"
+      "source": "filters.cold.fluid_out",
+      "target": "injection_pump.fluid_in"
     },
     {
-      "source": "injection_pump.discharge",
+      "source": "injection_pump.fluid_out",
       "target": "doublet.return_in"
     }
   ],
@@ -342,7 +342,7 @@
   },
   "format": 2,
   "inlets": {
-    "secondary_in": "heat_exchanger.cold_in"
+    "return_in": "heat_exchanger.cold_in"
   },
   "modules": {
     "degasser": {
@@ -598,8 +598,8 @@
   },
   "name": "DoubletHeatPlant",
   "outlets": {
-    "gas": "degasser.gas",
-    "secondary_out": "heat_exchanger.cold_out"
+    "gas_out": "degasser.gas_out",
+    "supply_out": "heat_exchanger.cold_out"
   },
   "outputs": {
     "cop": {

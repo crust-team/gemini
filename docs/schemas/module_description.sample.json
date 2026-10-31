@@ -11,28 +11,28 @@
   },
   "connections": [
     {
-      "kind": null,
-      "source": "injector.bottom",
-      "stream": "brine",
-      "target": "sink.sandface"
+      "kind": "brine",
+      "source": "injector.bottom_out",
+      "target": "sink.sandface_in",
+      "type": null
     },
     {
-      "kind": null,
-      "source": "reservoir.sandface",
-      "stream": "brine",
-      "target": "well.bottom"
+      "kind": "brine",
+      "source": "reservoir.sandface_out",
+      "target": "well.bottom_in",
+      "type": null
     },
     {
-      "kind": null,
-      "source": "well.wellhead",
-      "stream": "brine",
-      "target": "esp.suction"
+      "kind": "brine",
+      "source": "well.wellhead_out",
+      "target": "esp.fluid_in",
+      "type": null
     },
     {
-      "kind": null,
-      "source": "esp.discharge",
-      "stream": "brine",
-      "target": "riser.bottom"
+      "kind": "brine",
+      "source": "esp.fluid_out",
+      "target": "riser.bottom_in",
+      "type": null
     }
   ],
   "controls": {},
@@ -50,7 +50,7 @@
           "unit": "Pa"
         }
       },
-      "stream": "brine"
+      "kind": "brine"
     }
   },
   "measured": {
@@ -91,17 +91,17 @@
           "unit": "Pa"
         }
       },
-      "stream": "brine"
+      "kind": "brine"
     }
   },
   "outputs": {
     "electricity": {
-      "kind": "electricity",
+      "quantity": "electricity",
       "soft_sensor": false,
       "unit": "W"
     },
     "heat_loss": {
-      "kind": "heat_loss",
+      "quantity": "heat_loss",
       "soft_sensor": false,
       "unit": "W"
     }
