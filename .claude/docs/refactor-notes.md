@@ -204,7 +204,7 @@ ported into the refactored structure; only missing behaviour was added.
   minimum **outlet**): upstream re-solves with the source outlet fixed and lets the sink outlet
   drop, which is the duty reduction implemented here. It is optional (default `None`), so no
   existing number changes.
-- Nodal analysis (`plants/nodal.py`) walks the wells upward from the sandface, as the plant
+- Nodal analysis (`plants/_utils/nodal.py`) walks the wells upward from the sandface, as the plant
   does, where upstream walks downward from the wellhead; both match one balance. On the upstream
   doublet-A inputs the rate is 135.8666 m3/h against the reference 135.9258 m3/h (-0.059 m3/h,
   -0.044 %) and the ESP shaft power 174406.5 W against 174444.7 W (-0.022 %), within upstream's

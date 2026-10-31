@@ -202,9 +202,12 @@ The suite must remain safe under `pytest -n auto`:
 `tests/unit/test_code_quality.py` also enforces the [data layout](data.md#where-data-lives): no data
 file in `gemini/` outside `gemini/assets/`, no parameter value in a structure file, only the allowed
 keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the data
-folders outside `gemini/utils/paths.py`.
+folders outside `gemini/utils/paths.py`. It also enforces the layout of `gemini/modules/`
+([where a file goes](conventions.md#module-rules)): only `__init__.py`, `module.py`, `plant.py`,
+`container.py` and folders at its top, and a registered plant class in every public file of
+`plants/`.
 `test_every_example_equals_the_plant_of_its_former_file` in
-`tests/unit/modules/plants/test_catalogue.py` pins the hash of each example plant.
+`tests/unit/modules/plants/_utils/test_catalogue.py` pins the hash of each example plant.
 `tests/unit/test_mirror.py` enforces source mirroring: every `gemini/<path>/<name>.py` except
 `__init__.py`, including `gemini/utils/` and `gemini/errors/`, has a mirrored
 `tests/unit/<path>/test_<name>.py` that defines at least one test. Its `PLACEHOLDERS` set of

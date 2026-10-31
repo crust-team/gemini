@@ -1654,7 +1654,7 @@ Purpose: geothermal well field with N production limbs mixed into one supply and
 limbs fed from one return. A spec plant of variable size: `gm.plants.from_template("multi_well",
 {"producers": 3, "injectors": 2})` returns the plant of that size; the file
 `gemini/assets/plants/MultiWellPlant.json` is the default size (2 and 1) and equals the output of
-`multi_well_spec` in `plants/generators.py`.
+`multi_well_spec` in `plants/_utils/generators.py`.
 
 - Structure: `producers` (default 2) `ModuleList` of `ModuleDict(reservoir=ProductionReservoir,
   well=ProductionWell, esp=ESP, riser=ProductionWell)`; `mixers` (`producers - 1` `Mixer`s);
@@ -1794,7 +1794,7 @@ print(out.unmet_latent)  # 0.0
 Purpose: two-pipe district heating or cooling network with parallel substations. A spec plant of
 variable size: `gm.plants.from_template("district_network", {"consumers": 3, "service": "cooling"})`;
 the file `gemini/assets/plants/DistrictNetwork.json` is the default size (2 heating consumers) and equals
-`district_network_spec()` in `plants/generators.py`.
+`district_network_spec()` in `plants/_utils/generators.py`.
 
 - Structure: `pump` (`CentrifugalPump`, network circulation), `supply_pipe` (`Pipe`),
   `splitters` (`consumers - 1`), `substations` (`consumers` `HeatingSubstation`s for
@@ -1910,7 +1910,7 @@ print(result.outlets.supply_out.T)  # 313.15 K
 
 A composite with an internal closed circuit (the building loop of a substation) finds the
 circulated temperature first with `close_loop(update, start, path, lower, upper)` from
-`gemini/modules/plants/loops.py`: Wegstein's accelerated substitution (Wegstein 1958,
+`gemini/modules/plants/_utils/loops.py`: Wegstein's accelerated substitution (Wegstein 1958,
 "Accelerating convergence of iterative processes", Communications of the ACM 1(6), 9-13),
 tolerance 1e-9 K, at most 50 passes, then `PhysicsError`. Each trial pass evaluates the
 stateless children with `Module.trial_outlets(inlets)`, which no running call records, and the
@@ -1920,7 +1920,7 @@ with `Module.start_states()` (`AquiferStorage.production_temperature()` uses it)
 
 ### Nodal well analysis
 
-`gemini.modules.plants.nodal` (module import only, not in `gm.plants`) finds the operating
+`gemini.modules.plants._utils.nodal` (module import only, not in `gm.plants`) finds the operating
 point at which well and reservoir agree, ported from the upstream GEMINI simulator
 (`nodal_solver`, `well_flow`). Each function evaluates the plant's own modules with
 `ProductionReservoir.sandface_stream`, `InjectionReservoir.required_pressure` and
@@ -1962,7 +1962,7 @@ A run sets `esp.frequency`, `wellhead_pressure`, the `split_fraction`s and the s
 
 ```python
 from gemini.modules import ESP, ProductionReservoir, ProductionWell
-from gemini.modules.plants import nodal
+from gemini.modules.plants._utils import nodal
 from gemini.physics.geometry import build_path
 
 path = build_path([dict(MD=d, TVD=d, ID=0.15, roughness=0.01) for d in (0, 300, 400, 600, 2400)])
@@ -2031,7 +2031,7 @@ cooling spec whose units switch on and off. It is a plain template: no value shi
   with `plant.set_params` after `from_template`.
 - **Presets.** `heating_only` (boiler and heating consumer), `heating_absorption_cooling`,
   `heating_heat_pump_compression_cooling` and `heating_full_cooling` (all three chillers) are the
-  template filled with the switches off that name them (`tests/unit/modules/plants/
+  template filled with the switches off that name them (`tests/unit/modules/plants/_utils/
   test_templating.py` keeps them equal), as plain specs with the size parameters of what remains.
 - **Run check.** `tests/integration/test_heating_cooling.py` (slow tier) runs two simulate ticks
   of every preset and of the full template with units off, with the stated assumptions in

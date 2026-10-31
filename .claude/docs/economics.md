@@ -159,7 +159,7 @@ as a result column; that is a change to the engine, not to this package.
 
 | Name | Status | Notes |
 |---|---|---|
-| `nodal(plant, well, conditions)` | real, production wells | IPR, VLP and operating point from `plants/nodal.py`; the plant is not changed |
+| `nodal(plant, well, conditions)` | real, production wells | IPR, VLP and operating point from `plants/_utils/nodal.py`; the plant is not changed |
 | `pump_curve(plant, pump, measured=None)` | real | the polynomial head curve of the pump at 60 Hz (the private `_head_curve` of `gemini/analysis/wells.py`), theoretical head of measured points, `gm.analysis.fit_head_correction` |
 | `corrosion_forecast(model, until)` | real | `co2_corrosion_rate`, `wall_loss`, `time_to_minimum_wall` |
 | `injectivity(data, well)` | `NotImplementedYet` | Hall analysis not built |

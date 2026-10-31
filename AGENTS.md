@@ -8,7 +8,10 @@ Test with the development profile (`make test`); see
 [Testing: Test profiles](.claude/docs/testing.md#test-profiles).
 
 Physics lives in `gemini/physics/` or `gemini/modules/<category>/_physics.py`: a module declares and
-wires, and calls physics functions. Helpers of the module package live in `gemini/modules/_utils/`.
+wires, and calls physics functions. `gemini/modules/` holds `Module`, `Plant`, `ModuleList` and
+`ModuleDict`; machinery goes in an `_utils/` folder, code of one category in a private file of its
+folder, and `gemini/modules/plants/` holds only plant classes
+([where a file goes](.claude/docs/conventions.md#module-rules)).
 
 Learn the package from [examples/README.md](examples/README.md): quickstart, basics 01 to 06, any
 recipe, then the cases. Data has two homes, never `examples/`: `gemini/assets/` holds what a public
@@ -81,7 +84,8 @@ gemini/
 ├── graph/            # Node, Graph, Proxy, Tracer, Interpreter, cache and runner
 ├── physics/          # shared formulas: SI correlations and unit conversions
 ├── types/            # quantities, streams, fluids, declarations, profiles, bindings, costs, return shapes
-├── modules/          # Module base class, _utils/ helpers; one folder per category with its _physics.py
+├── modules/          # module.py, plant.py, container.py, _utils/; one folder per category with its _physics.py
+│   └── plants/       # plant classes only; _utils/ holds the plant tools
 ├── engine/           # Clock, run functions, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay
 ├── analysis/         # well performance and integrity, fits; kpi.py is the gm.kpi namespace

@@ -69,11 +69,20 @@ a new physics function only when nothing existing can do the job, and generalise
 rather than writing a second copy. Never write a formula inside a module, and never write the same
 formula twice.
 
-**Helpers live in `gemini/modules/_utils/`.** A file under `gemini/modules/` that is neither a module
-nor a category (`balance`, `burner`, `container`, `description`, `design`, `parameter`, `registry`,
-`serialization`, `sorption`, `wiring`) goes there; `module.py` and the category folders stay. A class
-in `_utils` belongs to no category, and the public names stay in `gm.modules`.
-Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
+**Where a file goes under `gemini/modules/`.** There are four homes:
+
+- A file that defines a core class users subclass or build goes directly in `gemini/modules/`:
+  `module.py` (`Module`), `plant.py` (`Plant`) and `container.py` (`ModuleList`, `ModuleDict`).
+- Machinery goes in an `_utils/` folder, even if some of its functions are exported publicly:
+  `gemini/modules/_utils/` (`balance`, `description`, `design`, `registry`, `serialization`,
+  `wiring`), and `gemini/modules/plants/_utils/` for the plant tools.
+- Code shared by the modules of one category goes in that category folder as a private file:
+  `heating/_burner.py`, `cooling/_sorption.py`.
+- `gemini/modules/plants/` holds only plant classes.
+
+`tests/unit/test_code_quality.py` checks the first and the last. A class in `_utils` belongs to no
+category, and the public names stay in `gm.modules`. Fitting and calibration belong in `gm.analysis`
+or `gm.optim`, not in modules.
 
 1. Assign declarations and children only in `__init__`, after `super().__init__()`.
 2. Constructor sections are `# Modules`, `# Parameters`, `# Inlets`, `# Controls`,
@@ -257,7 +266,8 @@ reason it is needed:
   because a module's declarations exist only once `__init__` has run.
 - `Module.category` is `_FolderCategory` in `gemini/modules/module.py`, a descriptor that reads
   the folder from the import path of the class, so the folder is the one source of a module's
-  category. A class from outside assigns `category` itself, which replaces the descriptor.
+  category. `Plant` alone reads `plants`: its file sits beside `module.py`, not in that folder. A
+  class from outside assigns `category` itself, which replaces the descriptor.
 - `class_path`/`import_class` in `gemini/modules/module.py` are the only import-by-string.
   Only checkpoints use them: a checkpoint names the plant class (`Plant`, or a handwritten root)
   whose `from_dict` rebuilds the tree from the spec it stores. A plant file names registry types.

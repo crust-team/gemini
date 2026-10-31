@@ -25,8 +25,8 @@ folder with `read_project`, fills `DoubletHeatPlant` (`gm.plants.get`) with `to_
 `to_spec()`. The folder holds `diagram.json`, one `.param` file per diagram node and any other file
 (the data CSV, `well_trajectory.csv`, `plant.conf`), which is read as-is and not converted; the data
 CSV is converted with `to_dataset`. On the example project the result equals
-`gm.plants.example("DoubletHeatPlant").to_dict()` exactly (`tests/unit/modules/plants/
-test_legacy_project.py`). The function lives in `modules/plants/legacy_project.py` and imports
+`gm.plants.example("DoubletHeatPlant").to_dict()` exactly (`tests/unit/modules/plants/_utils/
+test_legacy_project.py`). The function lives in `modules/plants/_utils/legacy_project.py` and imports
 `gemini.utils.legacy` inside the function, because `gemini.utils.legacy` sits above `gemini.modules`.
 
 The bridge maps exactly the example project: its ten old nodes (`tables.NODE_PATHS`), a project

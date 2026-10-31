@@ -284,6 +284,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | File layout of `gemini/modules/`: `plant.py` and `container.py` beside `module.py`, the plant tools in `plants/_utils/`, `heating/_burner.py`, `cooling/_sorption.py`. Private paths only: no change to a name of this page. |
 | 0.2.0, unreleased changes | | Data layout: `gemini/assets/` (installed: plant structures, templates) and `inputs/` (repository only: hackathon inputs, example values, measured data, legacy project); `datasets/` is gone. New code `inputs_missing`: `gm.profiles.get` and `gm.plants.example` raise it outside a source checkout. Templates `DistrictNetwork` and `MultiWellPlant` are now `district_network` and `multi_well`. `gm.plants.example("Doublet")` is the registered class, with the outputs of its structure file. No change to a name of this page. |
 | 0.2.0, unreleased changes | | Plants `NodalDoublet`, `ParallelExchangerPlant`, `BoilerChpPlant`, `DistrictEnergyPlant`, `HackathonPlant`: catalogue only, no change to a name of this page. |
 | 0.2.0, unreleased changes | | `gm.kpi.totals(plant, results)`: heat and cold delivered, electricity bought and sold, gas bought, emissions, waste, chemicals and losses, read from the ports of the edge modules. The hackathon example has all seven edge modules, a desander and inhibitor dosing. |

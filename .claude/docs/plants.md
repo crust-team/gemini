@@ -7,6 +7,10 @@ connection order and is traced like any other module. A plant has no run method 
 it with `results = gm.simulate(plant, profile)`. How it is computed is in
 [native-engine.md](native-engine.md#14-the-plant-builder-and-the-plant-spec).
 
+`Plant` is in `gemini/modules/plant.py`, beside `Module`. `gemini/modules/plants/` holds only plant
+classes, and every tool of the plants (the spec, its reader and writer, migration, the plan, ports,
+templates, the catalogue, `close_loop`, the nodal solves) is in `gemini/modules/plants/_utils/`.
+
 ## Level 1: the builder
 
 ```python
@@ -128,7 +132,7 @@ without changing numbers:
   [equipment.md](equipment.md#a-doublet-from-its-depth). Designed, it writes a file with `type` and
   flat `params`; without a design it writes the shipped wiring.
 - `HeatingSubstation`, `CoolingSubstation`: a closed building loop solved inside one call by
-  `loops.close_loop`, not a previous-step `state` connection.
+  `plants/_utils/loops.close_loop`, not a previous-step `state` connection.
 - `ATESPlant`: the storage's `mode` selects which children are called, and the plant reads the
   storage's start-of-step temperature.
 - `NodalDoublet`: each call solves a rate with `brentq`, see

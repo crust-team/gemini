@@ -74,8 +74,8 @@ engine treats it):
   shared; the tracer creates one graph input per constant.
 - Declared in modules by attribute assignment (`self.stages = gm.Parameter("50")`); `Module`
   registers them; `named_parameters`, `named_constants`, `named_states` list them.
-- Defined in `gemini/modules/_utils/parameter.py`, next to `Module`. Reuse and extend whatever
-  parameter mechanism already exists.
+- Defined in `gemini/types/declarations.py` (`Parameter`, `State`) and `gemini/ops` (`Constant`).
+  Reuse and extend whatever parameter mechanism already exists.
 
 ## 5. Units and types
 
@@ -174,8 +174,8 @@ gemini/
     base.py          Backend, register, settings
     python.py        scalar, math module
     numpy.py         arrays, NumPy and SciPy
-  modules/
-    parameter.py     Parameter, Constant, State
+  types/
+    declarations.py  Parameter, State
 native/              C++ sources and ops.yaml, later, outside the Python package
 ```
 
@@ -204,9 +204,9 @@ Implemented for one leaf module, the ESP, and everything its call needs:
   `describe()`), `Proxy`, `Tracer` (one leaf module), `Interpreter` (value pass, then error
   pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
   row on a graph break).
-- `modules/_utils/parameter.py` re-exports the roles; the ESP constants are `Constant`s; the
-  ESP is written with `ops.check`, `ops.where` and `ops.logical_and`; `Stream` is one
-  slots dataclass used on every path.
+- The roles are `Parameter` and `State` of `types/declarations.py` and `Constant` of `gemini/ops`;
+  the ESP constants are `Constant`s; the ESP is written with `ops.check`, `ops.where` and
+  `ops.logical_and`; `Stream` is one slots dataclass used on every path.
 - The traced ESP on NumPy equals the untraced ESP exactly on the July data (tolerance 1e-12,
   `tests/integration/test_graph_esp.py`) and is about 390 times faster
   (`scripts/benchmark_esp.py`).
@@ -282,7 +282,7 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Units** are recorded on graph inputs only; the unit-check pass is not implemented.
 - **Graph breaks** are stateful modules (no `scan` yet), modules with pre-hooks, float32 precision
   and any `TraceError` from Python control flow or conversions; section 13 says at which level.
-  The Python solves `close_loop` and `plants/nodal.py` break their whole composite.
+  The Python solves `close_loop` and `plants/_utils/nodal.py` break their whole composite.
 - **Common-subexpression elimination** (`gemini/graph/passes/cse.py`,
   `eliminate_common_subexpressions(graph)`, in place) runs once per trace in `GraphCache`;
   `GraphCache(optimize=False)` turns it off. It merges `elementwise`, `index` and `check` nodes
@@ -372,7 +372,8 @@ retrace. Named physical constants and module-level model constants are `Constant
 
 ## 14. The plant builder and the plant spec
 
-A plant is a normal composite `Module` built from data (`gemini/modules/plants/`). There is
+A plant is a normal composite `Module` built from data (`gemini/modules/plant.py`, with its tools
+in `gemini/modules/plants/_utils/`). There is
 one representation: the format 2 spec, which is also the stored plant file. `gm.plants.from_spec`
 and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one method.
 
@@ -382,8 +383,8 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   (`ModuleDict`, `ModuleList`) `{type, modules}`; `type` is a registry name, which may be a
   shipped plant (a nested spec). Fluids, boundary, bindings and history are keyed by dotted path
   from the root (`""`). A handwritten root writes its class as `type` and flat dotted `params`.
-- **Files.** `builder.py` (`Plant`: `add`, `connect`, `summary`, `validate`, `simulate`,
-  `to_spec`), `ports.py` (port lookup and the connection rules), `plan.py` (order and wiring of
+- **Files.** `modules/plant.py` (`Plant`: `add`, `connect`, `summary`, `validate`, `simulate`,
+  `to_spec`) and, in `plants/_utils/`, `ports.py` (port lookup and the connection rules), `plan.py` (order and wiring of
   the steps), `outputs.py` (sum, copy and ratio outputs), `reader.py` and `writer.py` (spec in and
   out), `spec.py`, `schema.py`, `migration.py`, `library.py` (shipped structure files in `gemini/assets/plants/`,
   registered with `registry.register_plant`), `factory.py` (a registry type or a group to a module).

@@ -22,6 +22,17 @@ rather than writing a second copy. Never write a formula inside a module, and ne
 formula twice.
 Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
 
+**Where a file goes under `gemini/modules/`.** There are four homes:
+
+- A file that defines a core class users subclass or build goes directly in `gemini/modules/`:
+  `module.py` (`Module`), `plant.py` (`Plant`) and `container.py` (`ModuleList`, `ModuleDict`).
+- Machinery goes in an `_utils/` folder, even if some of its functions are exported publicly:
+  `gemini/modules/_utils/` (`balance`, `description`, `design`, `registry`, `serialization`,
+  `wiring`), and `gemini/modules/plants/_utils/` for the plant tools.
+- Code shared by the modules of one category goes in that category folder as a private file:
+  `heating/_burner.py`, `cooling/_sorption.py`.
+- `gemini/modules/plants/` holds only plant classes.
+
 ## Construction and metadata
 
 Construct a module without arguments and set its values afterwards; `update_params` returns the
@@ -63,7 +74,8 @@ There is one classification: a shipped module's category is the name of the fold
 `registry.CATEGORIES` is the fixed list of those folders, one word each, in display order;
 [equipment.md](equipment.md#overview) lists the modules of each. `Module.category` reads the folder
 from the import path of the class, so a shipped class never declares it and the two cannot disagree
-(`tests/unit/modules/test_registry.py` checks the folders, the list and every class). A class
+(`tests/unit/modules/_utils/test_registry.py` checks the folders, the list and every class). `Plant`
+is the one class outside its folder: `gemini/modules/plant.py` reads `plants`. A class
 from outside (`register`, `load_file`) has no folder: it states the class attribute `category`, one
 of the list, and a subclass of a shipped class states its own.
 
@@ -353,7 +365,7 @@ A composite with a closed circuit inside one call (a substation's building loop)
 circulated temperature before its first child call. It iterates with trial passes:
 `child.trial_outlets(inlets)` returns the outlets of a call that no running call records, with
 outputs skipped and pre-hooks run, and refuses stateful modules. When the loop has converged
-(`close_loop` in `gemini/modules/plants/loops.py`), the composite calls every child once, so
+(`close_loop` in `gemini/modules/plants/_utils/loops.py`), the composite calls every child once, so
 formulas and balances see exactly one call each. `child.start_states()` returns the states a call
 of a stateful child would start from (its entry of the running step, else its initial states),
 for a loop through a stateful child whose outlet depends only on its state.
