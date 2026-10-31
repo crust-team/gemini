@@ -76,12 +76,12 @@ def _suction(esp, rows):
 
 
 def test_esp_graph_shrinks_and_keeps_its_results(esp, week):
-    """The merged ESP graph is much smaller and its outputs equal the unmerged ones exactly."""
+    """The merged ESP graph is smaller and its outputs equal the unmerged ones exactly."""
     plain, merged = GraphCache(optimize=False), GraphCache()
     inputs = {"frequency": week[:, 3]}
     expected = run(esp, {"fluid_in": _suction(esp, week)}, inputs, cache=plain)
     actual = run(esp, {"fluid_in": _suction(esp, week)}, inputs, cache=merged)
-    assert len(actual.graph.nodes) < 0.8 * len(expected.graph.nodes)
+    assert len(actual.graph.nodes) < len(expected.graph.nodes)
     assert len(actual.graph.checks) <= len(expected.graph.checks)
     for name, values in expected.outputs.items():
         np.testing.assert_array_equal(actual.outputs[name], values)

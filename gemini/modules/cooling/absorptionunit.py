@@ -99,6 +99,9 @@ class AbsorptionUnit(Module):
         values = self._performance(inlets)
         generator_out, chilled_out, cooling_out = _sorption.outlet_streams(inlets, values)
 
+        # Outputs
+        _sorption.assign_outputs(self, inlets, (generator_out, chilled_out, cooling_out), values)
+
         outlets = dict(
             generator_out=generator_out,
             chilled_out=chilled_out,
@@ -106,9 +109,6 @@ class AbsorptionUnit(Module):
             power_in=values["electricity"],
         )
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        _sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
 
     def capex(self, assumptions):
         """Return the cost of the absorption unit from its capacity."""

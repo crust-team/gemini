@@ -97,6 +97,9 @@ class AdsorptionChiller(Module):
         values = self._performance(inlets)
         generator_out, chilled_out, cooling_out = _sorption.outlet_streams(inlets, values)
 
+        # Outputs
+        _sorption.assign_outputs(self, inlets, (generator_out, chilled_out, cooling_out), values)
+
         outlets = dict(
             generator_out=generator_out,
             chilled_out=chilled_out,
@@ -104,9 +107,6 @@ class AdsorptionChiller(Module):
             power_in=values["electricity"],
         )
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        _sorption.assign_outputs(self, inlets, outlets, self._performance(inlets))
 
     def _performance(self, inlets):
         """Return the duties [W], COP and outlet temperatures [K] of one operating point."""

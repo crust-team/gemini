@@ -83,7 +83,8 @@ class GasCompressor(Module):
 
         # Outlets
         suction = inlets.fluid_in
-        stage_ratio = _physics.stage_pressure_ratio(self._pressure_ratio(suction), self.stage_count)
+        pressure_ratio = self._pressure_ratio(suction)
+        stage_ratio = _physics.stage_pressure_ratio(pressure_ratio, self.stage_count)
         fluid_out_T = _physics.stage_outlet_temperature(
             suction.T, stage_ratio, self.heat_capacity_ratio, self.isentropic_efficiency
         )
@@ -93,13 +94,12 @@ class GasCompressor(Module):
         power_in = energy.input_power(shaft_power, self.motor_efficiency)
         loss_out = _physics.heat_rejected(power_in, shaft_power, self.stage_count)
 
+        # Outputs
+        self.pressure_ratio = pressure_ratio
+        self.shaft_power = shaft_power
+
         outlets = dict(fluid_out=discharge, loss_out=loss_out, power_in=power_in)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        suction = inlets.fluid_in
-        self.pressure_ratio = self._pressure_ratio(suction)
-        self.shaft_power = self._shaft_power(suction)
 
     def _shaft_power(self, suction):
         """Return the shaft power [W] of the compression at the operating point."""

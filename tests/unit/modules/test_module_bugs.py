@@ -181,11 +181,9 @@ class Meter(Module):
         """Produce no stream."""
 
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.reading = None
         self.power = 2.0
+        return outlets
 
 
 class Share(Module):

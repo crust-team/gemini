@@ -46,8 +46,8 @@ class PressurizationTank(Module):
         # Outlets
         outlet = inlets.fluid_in.with_(p=self.pressure_setpoint)
 
+        # Outputs
+        self.pressure_correction = outlet.p - inlets.fluid_in.p
+
         outlets = dict(fluid_out=outlet)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.pressure_correction = outlets.fluid_out.p - inlets.fluid_in.p

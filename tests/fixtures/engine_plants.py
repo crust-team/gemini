@@ -66,13 +66,11 @@ class Booster(Module):
         )
         outlet = inlets.fluid_in.with_(p=inlets.fluid_in.p + self.level * self.gain)
         outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.rise = outlets.fluid_out.p - inlets.fluid_in.p
+        self.rise = outlets["fluid_out"].p - inlets.fluid_in.p
         self.power = self.rise * inlets.fluid_in.m_dot
         self.share = ops.where(self.level == 0, None, self.rise / ops.maximum(self.level, 1e-9))
         self.inverse = ops.truediv(1.0, self.level)
+        return outlets
 
     def health(self, result, measured):
         """Compare the rise with the measured one."""
@@ -104,10 +102,8 @@ class Reservoir(Module):
 
         # Outlets
         outlets = dict(fluid_out=inlets.fluid_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.content = self.total + inlets.fluid_in.m_dot
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         return dict(total=self.content)

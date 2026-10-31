@@ -28,10 +28,8 @@ class Precision(Module):
         """Expose no fluid outlets."""
 
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.float32 = float(runtime.get_precision() == "float32")
+        return outlets
 
 
 @pytest.fixture

@@ -39,11 +39,11 @@ class Orifice(gm.modules.Module):
         # Outlets
         fluid_out = inlets.fluid_in.with_(p=inlets.fluid_in.p - self.pressure_drop)
 
+        # Outputs
+        self.outlet_pressure = fluid_out.p
+
         outlets = dict(fluid_out=fluid_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.outlet_pressure = outlets.fluid_out.p
 
 
 def main():

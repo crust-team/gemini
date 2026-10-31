@@ -90,6 +90,10 @@ class CHP(Module):
         flue_out = _burner.flue_stream(values["fuel"], fuel)
         fuel_in = _burner.burned_stream(values["fuel"], fuel)
 
+        # Outputs
+        self.fuel = values["fuel"]
+        self.dumped_heat = values["dumped_heat"]
+
         outlets = dict(
             fluid_out=outlet,
             flue_out=flue_out,
@@ -98,11 +102,6 @@ class CHP(Module):
             fuel_in=fuel_in,
         )
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        values = self._performance(inlets.fluid_in, inlets.fuel_in)
-        self.fuel = values["fuel"]
-        self.dumped_heat = values["dumped_heat"]
 
     def capex(self, assumptions):
         """Return the cost of the engine from its electric capacity."""

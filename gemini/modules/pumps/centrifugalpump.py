@@ -94,15 +94,14 @@ class CentrifugalPump(Module):
         power_in = energy.input_power(performance["shaft_power"], self.motor_efficiency)
         loss_out = power_in - performance["shaft_power"]
 
-        outlets = dict(fluid_out=discharge, loss_out=loss_out, power_in=power_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        performance = self._performance(inlets.fluid_in)
+        # Outputs
         self.head = performance["head"]
         self.hydraulic_power = performance["hydraulic_power"]
         self.shaft_power = performance["shaft_power"]
         self.efficiency = performance["efficiency"]
+
+        outlets = dict(fluid_out=discharge, loss_out=loss_out, power_in=power_in)
+        return outlets
 
     def _performance(self, suction):
         """Return flow [m3/s], head [Pa], hydraulic and shaft power [W] and efficiency [-]."""

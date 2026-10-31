@@ -63,11 +63,11 @@ class Declared(Module):
         inlet = inlets.fluid_in
         outlet = inlet
 
+        # Outputs
+        self.value = self.command + self.weather
+
         outlets = dict(fluid_out=outlet)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.value = self.command + self.weather
 
 
 def _declared(**params):

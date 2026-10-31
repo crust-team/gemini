@@ -189,6 +189,19 @@ PACKAGE_FILES = [
 ]
 
 
+def test_no_module_defines_compute_outputs():
+    """A leaf computes once, in ``forward``: no class of ``gemini/modules/`` has a second step."""
+    found = [
+        f"{path.relative_to(ROOT)}:{node.name}"
+        for path in (ROOT / "gemini" / "modules").rglob("*.py")
+        for node in ast.walk(ast.parse(path.read_text()))
+        if isinstance(node, ast.ClassDef)
+        for item in node.body
+        if isinstance(item, ast.FunctionDef) and item.name == "_compute_outputs"
+    ]
+    assert not found
+
+
 @pytest.mark.parametrize("path", PYTHON_FILES)
 def test_only_section_headers_and_tool_directives_are_comments(path):
     """Explanations live in docstrings, never in comments inside code."""

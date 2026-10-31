@@ -74,16 +74,15 @@ class InjectionPump(Module):
         )
 
         discharge = suction.with_(p=suction.p + head)
+        power_in = self._power(suction, head)
 
-        outlets = dict(fluid_out=discharge, power_in=self._power(suction, head))
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        suction = inlets.fluid_in
-        discharge = outlets.fluid_out
+        # Outputs
         self.head = discharge.p - suction.p
-        self.power = inlets.power_in
+        self.power = power_in
         self.discharge_pressure = discharge.p
+
+        outlets = dict(fluid_out=discharge, power_in=power_in)
+        return outlets
 
     def _power(self, suction, head):
         """Return the pump power [W] from the power curve, else from the efficiency."""

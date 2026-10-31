@@ -67,12 +67,12 @@ class Flare(Module):
             inlet.m_dot, inlet.fluid.heating_value(), self.combustion_efficiency
         )
 
+        # Outputs
+        self.burned_mass_flow = inlets.gas_in.m_dot
+        self.fuel = loss_out
+
         outlets = dict(flue_out=flue_out, loss_out=loss_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.burned_mass_flow = inlets.gas_in.m_dot
-        self.fuel = outlets.loss_out
 
     def _released(self, inlet, mass_flow):
         """Return the CO2 and the methane [kg/s] that burning ``mass_flow`` of ``inlet`` leaves."""

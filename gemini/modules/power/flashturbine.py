@@ -78,20 +78,18 @@ class FlashTurbine(Module):
         condenser = _physics.saturation_properties(self.condenser_pressure)
 
         outlet = inlet.with_(T=condenser.temperature, p=self.condenser_pressure, fluid=WATER)
-        balance = self._balance(inlet, self._expansion(inlet))
+        expansion = self._expansion(inlet)
+        balance = self._balance(inlet, expansion)
+
+        # Outputs
+        self.gross_power = balance.gross_power
+        self.condenser_duty = balance.condenser_duty
+        self.exhaust_quality = expansion.outlet_quality
 
         outlets = dict(
             fluid_out=outlet, power_out=balance.electricity_generated, loss_out=balance.heat_loss
         )
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
-        expansion = self._expansion(inlet)
-        balance = self._balance(inlet, expansion)
-        self.gross_power = balance.gross_power
-        self.condenser_duty = balance.condenser_duty
-        self.exhaust_quality = expansion.outlet_quality
 
     def _balance(self, inlet, expansion):
         """Return the enthalpy balance of the turbine, generator and condenser."""

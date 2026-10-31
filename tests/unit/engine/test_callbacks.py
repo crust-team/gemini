@@ -31,12 +31,10 @@ class Gauge(Module):
         """Expose no fluid outlets."""
 
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         if self.level < 0:
             raise ValueError("negative level")
         self.value = self.level
+        return outlets
 
 
 def run(levels, *callbacks):

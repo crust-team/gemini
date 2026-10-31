@@ -72,8 +72,9 @@ def test_unassigned_outputs_fail_at_trace_time(gain):
     """``_check_outputs`` runs once during the trace."""
 
     class Forgetful(type(gain)):
-        def _compute_outputs(self, inlets, outlets):
+        def forward(self, inlets):
             self.rise = 0.0
+            return dict(fluid_out=inlets.fluid_in)
 
     module = Forgetful().update_params(scale=1.0)
     with pytest.raises(DefinitionError, match="boost"):
@@ -104,6 +105,8 @@ def test_a_stream_built_in_forward_traces_and_keeps_its_limits(gain):
         def forward(self, inlets):
             inlet = inlets.fluid_in
             drop = self.gain * 1e6
+            self.rise = -drop
+            self.boost = 0.0
             return {
                 "fluid_out": gm.Stream(
                     m_dot=inlet.m_dot, T=inlet.T, p=inlet.p - drop, fluid=inlet.fluid

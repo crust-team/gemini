@@ -110,16 +110,12 @@ class ThermalStorage(Module):
             self.heat_loss_conductance, self.temperature - inlets.air_in.T
         )
 
-        outlets = dict(charge_out=charge_out, discharge_out=discharge_out, loss_out=loss_out)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        charge = self._circuit_heat(inlets.charge_in, self.charge_effectiveness)
-        discharge = self._circuit_heat(inlets.discharge_in, self.discharge_effectiveness)
-        ambient = outlets.loss_out
+        # Outputs
+        charge = self._circuit_heat(charge_in, self.charge_effectiveness)
+        discharge = self._circuit_heat(discharge_in, self.discharge_effectiveness)
         reports = _physics.tank_service_report(
             self.service == "hot",
-            self._capacity(inlets.charge_in),
+            self._capacity(charge_in),
             self.temperature,
             self.reference_temperature,
             charge,
@@ -127,7 +123,10 @@ class ThermalStorage(Module):
         )
         self.tank_temperature = self.temperature
         self.stored_energy, self.charge_duty, self.discharge_duty = reports
-        self.heat_accumulation = charge + discharge - ambient
+        self.heat_accumulation = charge + discharge - loss_out
+
+        outlets = dict(charge_out=charge_out, discharge_out=discharge_out, loss_out=loss_out)
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         charge_in, discharge_in = inlets.charge_in, inlets.discharge_in

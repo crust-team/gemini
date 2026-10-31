@@ -2,7 +2,7 @@
 
 The module is a leaf or a composite: child calls are recorded by ``Trace`` into the same graph
 (see there). The trace runs ``Module._evaluate``, the one sequence of a call: ``forward``, then
-(unless ``no_outputs()`` is active) ``_compute_outputs``, formula outputs, forward hooks and
+(unless ``no_outputs()`` is active) the formula outputs, forward hooks and
 ``_check_outputs``, which runs once here; outlets of a trace are not validated. Inlet stream
 fields (a ``Stream`` of traced values whose ``Fluid`` is the concrete, static one), controls,
 boundaries, numeric parameters and the constants the physics uses become named graph inputs;
@@ -66,11 +66,11 @@ class Tracer:
         outlets, call = trace.run(module, inlets, {}, None)
         settled = module._settled_inlets(inlets, call)
         graph.result = ModuleResult.of(
-            module, call.outputs or {}, outlets, settled, call.inputs, call.call_records
+            module, call.kept_outputs(), outlets, settled, call.inputs, call.call_records
         )
         for port, value in outlets.items():
             _record_outlet(graph, port, value)
-        for name, value in (call.outputs or {}).items():
+        for name, value in call.kept_outputs().items():
             graph.output(f"outputs.{name}", value)
         certain(graph, trace.limit_checks + graph.unframed)
         return graph
@@ -112,7 +112,7 @@ class Trace:
             if reasons:
                 raise TraceError(f"{module.path}: {reasons[0]}")
             outlets, call = self.run(module, inlets, supplied, parent)
-            outputs, inputs, records = call.outputs or {}, call.inputs, call.call_records
+            outputs, inputs, records = call.kept_outputs(), call.inputs, call.call_records
             settled = module._settled_inlets(inlets, call)
         except TraceError as error:
             if not module.is_leaf:
@@ -131,7 +131,8 @@ class Trace:
         call = _Call(
             module=module,
             inputs=self._call_inputs(module, {}),
-            outputs=None,
+            outputs={},
+            recording=False,
             parent=parent,
             parameters=self._call_parameters(module),
             trace=self,
@@ -154,7 +155,8 @@ class Trace:
         call = _Call(
             module=module,
             inputs=self._call_inputs(module, supplied),
-            outputs={} if outputs_enabled() else None,
+            outputs={},
+            recording=outputs_enabled(),
             parent=parent,
             parameters=self._call_parameters(module),
             trace=self,

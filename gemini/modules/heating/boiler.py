@@ -94,10 +94,16 @@ class Boiler(_BoilerBody):
 
         # Outlets
         inlet, fuel = inlets.fluid_in, inlets.fuel_in
-        duty = ops.minimum(self._requested_duty(inlet), self._duty_limit(fuel))
+        requested = self._requested_duty(inlet)
+        limit = self._duty_limit(fuel)
+        duty = ops.minimum(requested, limit)
         outlet = self._heated(inlet, duty)
         need = energy.input_power(duty, self.efficiency)
         flue_out = _burner.flue_stream(need, fuel)
+
+        # Outputs
+        self.is_capped = requested > limit
+        self.fuel = need
 
         outlets = dict(
             fluid_out=outlet,
@@ -106,12 +112,6 @@ class Boiler(_BoilerBody):
             fuel_in=_burner.burned_stream(need, fuel),
         )
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        requested = self._requested_duty(inlets.fluid_in)
-        limit = self._duty_limit(inlets.fuel_in)
-        self.is_capped = requested > limit
-        self.fuel = energy.input_power(ops.minimum(requested, limit), self.efficiency)
 
     def capex(self, assumptions):
         """Return the cost of the boiler from its capacity."""
@@ -145,13 +145,14 @@ class ElectricBoiler(_BoilerBody):
 
         # Outlets
         inlet = inlets.fluid_in
-        duty = ops.minimum(self._requested_duty(inlet), self.capacity)
+        requested = self._requested_duty(inlet)
+        duty = ops.minimum(requested, self.capacity)
         outlet = self._heated(inlet, duty)
 
         power_in = energy.input_power(duty, self.efficiency)
 
+        # Outputs
+        self.is_capped = requested > self.capacity
+
         outlets = dict(fluid_out=outlet, loss_out=power_in - duty, power_in=power_in)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.is_capped = self._requested_duty(inlets.fluid_in) > self.capacity

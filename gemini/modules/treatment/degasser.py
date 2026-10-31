@@ -90,12 +90,11 @@ class Degasser(Module):
         )
         gas = liquid.with_(m_dot=gas_flow, fluid=inlet.fluid.free_gas())
 
+        # Outputs
+        self.pressure_drop = inlet.p - liquid.p
+
         outlets = dict(liquid_out=liquid, gas_out=gas)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
-        self.pressure_drop = inlet.p - outlets.liquid_out.p
 
     def capex(self, assumptions):
         """Return the cost of the degasser, a fixed item."""

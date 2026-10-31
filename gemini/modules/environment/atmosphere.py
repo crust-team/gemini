@@ -80,12 +80,12 @@ class Atmosphere(Module):
     def forward(self, inlets):
         """Take in what the plant releases; the air gives nothing but its offer."""
 
-        outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
+        # Outputs
         self.co2_emission = self._released(inlets.gas_in, "CO2")
         self.methane_emission = self._released(inlets.gas_in, "CH4")
+
+        outlets = dict()
+        return outlets
 
     @staticmethod
     def _released(streams, species):

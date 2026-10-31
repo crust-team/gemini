@@ -52,11 +52,11 @@ class Mixer(Module):
             p=ops.minimum(branch1_in.p, branch2_in.p),
         )
 
+        # Outputs
+        self.pressure_imbalance = ops.abs(inlets.branch1_in.p - inlets.branch2_in.p)
+
         outlets = dict(fluid_out=fluid_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.pressure_imbalance = ops.abs(inlets.branch1_in.p - inlets.branch2_in.p)
 
     def _check(self, branch1_in, branch2_in):
         """Reject reverse flow and streams of different fluids."""

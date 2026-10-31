@@ -83,15 +83,12 @@ class HeatExchanger(Module):
         hot_out = hot_in.with_(T=values["hot_out_T"], p=hot_in.p - values["hot_pressure_drop"])
         cold_out = cold_in.with_(T=values["cold_out_T"], p=cold_in.p - values["cold_pressure_drop"])
 
-        outlets = dict(hot_out=hot_out, cold_out=cold_out)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        hot_in = inlets.hot_in
-        cold_in = inlets.cold_in
-        values = self._performance(hot_in, cold_in)
+        # Outputs
         for name, value in values.items():
             setattr(self, name, value)
+
+        outlets = dict(hot_out=hot_out, cold_out=cold_out)
+        return outlets
 
     def capex(self, assumptions):
         """Return the cost of the exchanger from its thermal conductance."""

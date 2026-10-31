@@ -59,16 +59,14 @@ class InjectionWell(_Well):
             m_dot=wellhead.m_dot,
         )
 
-        outlets = dict(bottom_out=bottom, loss_out=self._loss(stream, bottom))
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        stream = self._traversal_stream(inlets.wellhead_in)
-        result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
+        # Outputs
         self.friction_pressure_drop = result.friction_pressure_drop
         self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
+
+        outlets = dict(bottom_out=bottom, loss_out=self._loss(stream, bottom))
+        return outlets
 
     def _loss(self, stream, bottom):
         """Return the heat [W] the well gives to the rock between its two ends."""

@@ -36,10 +36,8 @@ class Heater(Module):
         outlet = inlets.fluid_in.with_(T=inlets.fluid_in.T + _rise())
 
         outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.rise = _rise()
+        return outlets
 
 
 def _rise():

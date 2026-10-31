@@ -6,11 +6,10 @@ import io
 import textwrap
 import tokenize
 
-from gemini.modules.module import Module
 from gemini.types import Power, Stream
 
-FORWARD_SECTIONS = ("# Modules", "# Outlets")
-LIFECYCLE = ("__init__", "forward", "_compute_outputs", "_advance_states")
+FORWARD_SECTIONS = ("# Modules", "# Outlets", "# Outputs")
+LIFECYCLE = ("__init__", "forward", "_advance_states")
 INIT_SECTIONS = (
     "# Modules",
     "# Parameters",
@@ -128,19 +127,15 @@ def test_fixed_signatures_and_declared_port_accesses(module_class):
     """Every module lifecycle method receives fixed Ports and reads only declared names."""
     cls = module_class
     _assert_fixed_signature(cls, "forward", ["self", "inlets"])
-    _assert_fixed_signature(cls, "_compute_outputs", ["self", "inlets", "outlets"])
     if cls().stateful and "_advance_states" in cls.__dict__:
         _assert_fixed_signature(cls, "_advance_states", ["self", "inlets", "outlets", "dt"])
     module = cls()
     inlet_names = list(module.inlets()) + module._drawn_outlets()
-    outlet_names = list(module.outlets())
     _assert_declared_accesses(cls, "forward", "inlets", inlet_names)
-    _assert_declared_accesses(cls, "_compute_outputs", "inlets", inlet_names)
-    _assert_declared_accesses(cls, "_compute_outputs", "outlets", outlet_names)
 
 
 def test_registered_forward_structure(module_class):
-    """Forwards accept inlets, move only fluids and never assign module attributes."""
+    """Forwards accept inlets, move only fluids and assign only the outputs of the module."""
     cls = module_class
     if "forward" not in cls.__dict__:
         return
@@ -151,7 +146,8 @@ def test_registered_forward_structure(module_class):
     comments = {comment for comment, _ in _comments(source)}
     assert ("# Modules" in comments) == composite
     assert ("# Outlets" in comments) == bool(module._given_outlets() or module._drawn_inlets())
-    assert not _self_assignments(tree), f"{cls.__name__}: forward assigns to self"
+    assigned = set(_self_assignments(tree))
+    assert assigned <= set(module.outputs(recurse=False)), f"{cls.__name__}: forward assigns"
 
     declarations = list(module.inlets().values()) + list(module.outlets().values())
     assert all(
@@ -170,11 +166,8 @@ def test_leaf_and_composite_output_conventions(module_class):
     outputs = list(module.outputs(recurse=False).values())
     if module.is_leaf:
         assert all(output.formula is None for output in outputs)
-        if outputs:
-            assert type(module)._compute_outputs is not Module._compute_outputs
     else:
         assert all(output.formula is not None for output in outputs)
-        assert type(module)._compute_outputs is Module._compute_outputs
 
 
 def test_method_and_declaration_section_order(module_class):

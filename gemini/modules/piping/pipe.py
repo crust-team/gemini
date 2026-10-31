@@ -96,16 +96,12 @@ class Pipe(Module):
         outlet = inlet.with_(T=self._outlet_temperature(inlet, inlets.air_in), p=outlet_p)
         loss_out = heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - outlet.T)
 
+        # Outputs
+        self.pressure_drop = inlet.p - outlet.p
+        self.velocity = geometry.mean_velocity(inlet.m_dot, rho, self.inner_diameter)
+
         outlets = dict(fluid_out=outlet, loss_out=loss_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
-        outlet = outlets.fluid_out
-        loss, absorbed = heat_transfer.signed_parts(outlets.loss_out)
-        self.pressure_drop = inlet.p - outlet.p
-        properties = inlet.fluid.properties(inlet.p, inlet.T)
-        self.velocity = geometry.mean_velocity(inlet.m_dot, properties.rho_l, self.inner_diameter)
 
     def _check(self, inlet):
         """Reject a pipe shorter than its rise, reverse flow and free gas."""

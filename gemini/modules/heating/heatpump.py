@@ -108,15 +108,14 @@ class HeatPump(Module):
         source_out = inlets.source_in.with_(T=values["source_out_T"])
         sink_out = inlets.sink_in.with_(T=values["sink_out_T"])
 
-        outlets = dict(source_out=source_out, sink_out=sink_out, power_in=values["electricity"])
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        values = self._performance(inlets.source_in, inlets.sink_in)
+        # Outputs
         self.cop = values["cop"]
         self.temperature_lift = values["temperature_lift"]
         self.is_capped = values["is_capped"]
         self.is_running = values["is_running"]
+
+        outlets = dict(source_out=source_out, sink_out=sink_out, power_in=values["electricity"])
+        return outlets
 
     def capex(self, assumptions):
         """Return the cost of the heat pump from its capacity."""

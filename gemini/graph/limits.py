@@ -26,7 +26,7 @@ _COMPARISONS = {
 def check_declared_limits(module, call):
     """Check the bounds of the controls, boundaries and outputs recorded in ``call``."""
     declarations = module._controls | module._boundaries | module._outputs
-    for name, value in (call.inputs | (call.outputs or {})).items():
+    for name, value in (call.inputs | call.kept_outputs()).items():
         declaration = declarations[name]
         if declaration.limits():
             _check_value(declaration, value)

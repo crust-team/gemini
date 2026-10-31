@@ -54,8 +54,10 @@ class Broken(Booster):
 class Crashing(Booster):
     """A module whose output step fails."""
 
-    def _compute_outputs(self, inlets, outlets):
+    def forward(self, inlets):
+        """Fail on an output."""
         self.head = 1 / 0
+        return super().forward(inlets)
 
 
 def verdicts(report):

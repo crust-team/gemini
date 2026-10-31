@@ -87,23 +87,23 @@ class LineShaftPump(Module):
 
         # Outlets
         suction = inlets.fluid_in
-        head = self._head(suction.volumetric_flow())
+        flow = suction.volumetric_flow()
+        head = self._head(flow)
 
         discharge = suction.with_(p=suction.p + head)
-        shaft_power = sum(self._powers(suction.volumetric_flow()))
+        pump_power, friction = self._powers(flow)
+        shaft_power = pump_power + friction
         power_in = energy.input_power(shaft_power, self.motor_efficiency)
+
+        # Outputs
+        self.head = discharge.p - suction.p
+        self.pump_power = pump_power
+        self.shaft_friction_power = friction
+        self.shaft_power = shaft_power
+        self.efficiency = _physics.pump_efficiency(flow, self.head, pump_power)
 
         outlets = dict(fluid_out=discharge, power_in=power_in)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        flow = inlets.fluid_in.volumetric_flow()
-        pump_power, friction = self._powers(flow)
-        self.head = outlets.fluid_out.p - inlets.fluid_in.p
-        self.pump_power = pump_power
-        self.shaft_friction_power = friction
-        self.shaft_power = pump_power + friction
-        self.efficiency = _physics.pump_efficiency(flow, self.head, pump_power)
 
     def _powers(self, flow):
         """Return the pump power and the shaft friction power [W] at a volume flow [m3/s]."""

@@ -117,19 +117,19 @@ class IceStorage(Module):
             )
         )
 
-        outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
+        # Outputs
         self.stored_cold = _physics.ice_stored_cold(
             self.water_mass, self.latent_heat, self.ice_fraction
         )
-        inlet, outlet = inlets.fluid_in, outlets.fluid_out
+        inlet, outlet = inlets.fluid_in, outlet
         self.heat_accumulation = heat_transfer.heat_rate(
             inlet.heat_capacity_rate(), inlet.T - outlet.T
         )
         self.is_full = self.ice_fraction >= 1
         self.is_empty = self.ice_fraction <= 0
+
+        outlets = dict(fluid_out=outlet)
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.fluid_in

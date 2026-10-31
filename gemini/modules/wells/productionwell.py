@@ -59,18 +59,17 @@ class ProductionWell(_Well):
         # Outlets
         bottom = inlets.bottom_in
         start, end = self._segment_interval()
-        wellhead = self.corrected(bottom, self.traverse(bottom, start, end, "up"))
+        result = self.traverse(bottom, start, end, "up")
+        wellhead = self.corrected(bottom, result)
 
-        outlets = dict(wellhead_out=wellhead, loss_out=self._loss(bottom, wellhead))
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        start, end = self._segment_interval()
-        result = self.traverse(inlets.bottom_in, start, end, "up")
+        # Outputs
         self.friction_pressure_drop = result.friction_pressure_drop
         self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
+
+        outlets = dict(wellhead_out=wellhead, loss_out=self._loss(bottom, wellhead))
+        return outlets
 
     def _loss(self, bottom, wellhead):
         """Return the heat [W] the well gives to the rock between its two ends."""

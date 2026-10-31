@@ -3,8 +3,8 @@
 A module registers what ``__init__`` assigns: ``Parameter``, ``Inlet``, ``Control``, ``Boundary``,
 ``State``, ``Output`` and ``Outlet`` declarations go to ordered registries and ``Module`` values
 become children with dotted paths. Calling a module validates the inlets, applies controls and
-boundaries, runs the forward pre-hooks, ``forward``, the leaf ``_compute_outputs`` or composite
-output formulas and the forward hooks, then returns a ``ModuleResult``.
+boundaries, runs the forward pre-hooks, ``forward``, which assigns the outputs of a leaf, the
+composite output formulas and the forward hooks, then returns a ``ModuleResult``.
 
 The values of one call (resolved controls and boundaries, recorded outputs and the results of
 child calls) live in a ``_Call`` record held in the ``_current_call`` context variable while the
@@ -221,8 +221,10 @@ def _plain_outlet(value):
 class _Call:
     """Values of one module call in progress.
 
-    ``outputs`` is ``None`` when outputs are disabled. ``call_records`` collects the results of
-    every child call made during this call, in call order. ``parent`` is the enclosing call.
+    ``outputs`` holds what ``forward`` assigned, so it can read an output back. ``recording`` is
+    false when outputs are disabled: the values are not validated and the result drops them.
+    ``call_records`` collects the results of every child call made during this call, in call
+    order. ``parent`` is the enclosing call.
     ``states`` holds the module's own state values and ``step`` the running ``_Step``, if any.
     A traced call (``gemini.graph``) sets ``parameters`` to the traced parameter values that
     replace the stored ones, and records outputs without validating them. ``trace`` is the
@@ -233,8 +235,9 @@ class _Call:
 
     module: "Module"
     inputs: dict
-    outputs: dict | None
+    outputs: dict
     parent: "_Call | None"
+    recording: bool = True
     states: dict | None = None
     step: _Step | None = None
     call_records: list = field(default_factory=list)
@@ -242,6 +245,10 @@ class _Call:
     trace: object | None = None
     wrapping: bool = False
     drawn: dict = field(default_factory=dict)
+
+    def kept_outputs(self):
+        """Return the outputs the result of this call holds."""
+        return self.outputs if self.recording else {}
 
     def owned_by(self, module):
         """Return the innermost call of ``module`` in this chain, or ``None``."""
@@ -460,11 +467,9 @@ class Module:
 
     def _record_output(self, name, value):
         call = _active_call(self)
-        if call is None or call.outputs is None:
-            raise DefinitionError(
-                f"{self.path}.{name}: outputs may only be assigned while computing outputs"
-            )
-        if call.trace is not None:
+        if call is None:
+            raise DefinitionError(f"{self.path}.{name}: outputs may only be assigned in forward")
+        if call.trace is not None or not call.recording:
             call.outputs[name] = value
             return
         call.outputs[name] = self._outputs[name].validate(value)
@@ -522,7 +527,7 @@ class Module:
             return self._initial_states()[name]
         if name in registries.get("_outputs", {}):
             call = _active_call(self)
-            if call is not None and call.outputs is not None and name in call.outputs:
+            if call is not None and name in call.outputs:
                 return _read(call, call.outputs[name])
             return self._outputs[name]
         for registry in ("_inlets", "_outlets"):
@@ -822,9 +827,6 @@ class Module:
                 _current_call.reset(token)
         return {name: _plain_outlet(value) for name, value in offered.items()}
 
-    def _compute_outputs(self, inlets, outlets):
-        """Compute leaf outputs after ``forward``; overrides never call ``super()``."""
-
     def __call__(self, *args, **kwargs):
         """Apply controls and boundaries, run hooks and ``forward``, and validate outlets."""
         parent = _current_call.get()
@@ -851,7 +853,7 @@ class Module:
                 _current_call.reset(token)
         result = ModuleResult.of(
             self,
-            call.outputs or {},
+            call.kept_outputs(),
             outlets,
             self._settled_inlets(inlets, call),
             ops.scope.plain(dict(call.inputs)),
@@ -874,7 +876,8 @@ class Module:
         return _Call(
             module=self,
             inputs=inputs,
-            outputs={} if outputs_enabled() else None,
+            outputs={},
+            recording=outputs_enabled(),
             parent=parent,
             states=states,
             step=step,
@@ -891,9 +894,9 @@ class Module:
         return backends.WRAP
 
     def _evaluate(self, inlets, scoped, call):
-        """Run pre-hooks, ``forward``, output computation and forward hooks of one call.
+        """Run pre-hooks, ``forward``, the formula outputs and forward hooks of one call.
 
-        Hooks see the plain ``inlets``; ``forward`` and the outputs see ``scoped``.
+        Hooks see the plain ``inlets``; ``forward`` sees ``scoped``.
         """
         for hook in tuple(self._pre_hooks.values()):
             hook(self, inlets)
@@ -907,14 +910,9 @@ class Module:
         else:
             outlets = Ports({name: (given | taken)[name] for name in self._outlets}, path=self.path)
             call.drawn = {name: returned[name] for name in self._drawn_inlets()}
-        if call.outputs is not None:
-            self._output_step(self._received_inlets(scoped, call), inlets, outlets, call)
+        if call.recording:
+            self._output_step(inlets, outlets, call)
         return outlets
-
-    def _received_inlets(self, inlets, call):
-        """Return the inlets ``_compute_outputs`` reads: what arrived and the powers drawn."""
-        drawn = {name: call.drawn[name] for name, port in self._inlets.items() if port.gives}
-        return Ports._trusted({name: inlets[name] for name in inlets} | drawn, self.path)
 
     def _settled_inlets(self, inlets, call):
         """Return the declared inlets of a call, each drawn one with the value the module drew."""
@@ -948,13 +946,12 @@ class Module:
             for name in self._drawn_inlets()
         }
 
-    def _output_step(self, scoped, inlets, outlets, call):
-        """Compute the outputs after ``forward``, the one sequence of an eager and a traced call.
+    def _output_step(self, inlets, outlets, call):
+        """Finish the outputs after ``forward``, the one sequence of an eager and a traced call.
 
-        ``_compute_outputs`` and the formula outputs see ``scoped``; forward hooks see the plain
-        ``inlets``, in a trace through ``call.trace`` which tells whether they write an output.
+        Forward hooks see the plain ``inlets``, in a trace through ``call.trace`` which tells
+        whether they write an output.
         """
-        self._compute_outputs(scoped, outlets)
         self._compute_formula_outputs(call)
         for hook in tuple(self._hooks.values()):
             if call.trace is None:

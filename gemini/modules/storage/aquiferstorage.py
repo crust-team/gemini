@@ -139,15 +139,11 @@ class AquiferStorage(Module):
         self._volume_flow(injection_in)
         production_out = injection_in.with_(T=self.production_temperature())
 
-        loss_out = energy.total_power(self._store_losses(injection_in))
+        losses = self._store_losses(injection_in)
+        loss_out = energy.total_power(losses)
 
-        outlets = dict(production_out=production_out, loss_out=loss_out)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        injection = inlets.injection_in
-        water = self._fluid_heat_capacity(injection)
-        losses = self._store_losses(injection)
+        # Outputs
+        water = self._fluid_heat_capacity(injection_in)
         self.stored_energy = ground.aquifer_stored_energy(
             water,
             self.warm_volume,
@@ -159,12 +155,13 @@ class AquiferStorage(Module):
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
         self.heat_accumulation = (
-            heat_transfer.heat_rate(injection.heat_capacity_rate(), injection.T)
-            - heat_transfer.heat_rate(
-                outlets.production_out.heat_capacity_rate(), outlets.production_out.T
-            )
+            heat_transfer.heat_rate(injection_in.heat_capacity_rate(), injection_in.T)
+            - heat_transfer.heat_rate(production_out.heat_capacity_rate(), production_out.T)
             - sum(losses)
         )
+
+        outlets = dict(production_out=production_out, loss_out=loss_out)
+        return outlets
 
     def _store_losses(self, injection):
         """Return the conduction loss [W] of each store to the aquifer around it."""

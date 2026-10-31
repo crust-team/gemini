@@ -89,17 +89,17 @@ class ThermalDecline(Module):
 
         # Outlets
         inlet = inlets.fluid_in
-        outlet = inlet.with_(T=inlet.T - self._temperature_drop(inlet))
+        drop = self._temperature_drop(inlet)
+        outlet = inlet.with_(T=inlet.T - drop)
 
-        outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
+        # Outputs
         flow = self._liquid_flow(inlet)
         volume = self._breakthrough_volume(inlet)
         self.breakthrough_time = ground.doublet_breakthrough_time(volume, flow)
-        self.temperature_drop = self._temperature_drop(inlet)
+        self.temperature_drop = drop
+
+        outlets = dict(fluid_out=outlet)
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         flow = self._liquid_flow(inlets.fluid_in)

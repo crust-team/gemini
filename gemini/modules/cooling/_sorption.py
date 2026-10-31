@@ -40,13 +40,17 @@ def outlet_streams(inlets, values):
 
 
 def assign_outputs(module, inlets, outlets, values):
-    """Set the outputs of the machine: its COP, whether it is capped and the driving difference."""
+    """Set the outputs of the machine: its COP, whether it is capped and the driving difference.
+
+    ``outlets`` are the generator, chilled and cooling streams that leave the machine.
+    """
+    generator_out, chilled_out, cooling_out = outlets
     module.cop = values["cop"]
     module.is_capped = values["is_capped"]
     module.driving_temperature_difference = _physics.characteristic_temperature_difference(
-        heat_transfer.mean_temperature(inlets.generator_in.T, outlets.generator_out.T),
-        heat_transfer.mean_temperature(inlets.cooling_in.T, outlets.cooling_out.T),
-        heat_transfer.mean_temperature(inlets.chilled_in.T, outlets.chilled_out.T),
+        heat_transfer.mean_temperature(inlets.generator_in.T, generator_out.T),
+        heat_transfer.mean_temperature(inlets.cooling_in.T, cooling_out.T),
+        heat_transfer.mean_temperature(inlets.chilled_in.T, chilled_out.T),
         module.rejection_coefficient,
         module.evaporator_coefficient,
     )

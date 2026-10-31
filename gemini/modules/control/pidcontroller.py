@@ -84,14 +84,14 @@ class PIDController(Module):
 
     def forward(self, inlets):
         """Move no fluid; the command is an output."""
-        outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
+        # Outputs
         unclamped = self._unclamped_command()
         self.error = self._error()
         self.command = ops.minimum(self.maximum_output, ops.maximum(self.minimum_output, unclamped))
         self.is_saturated = self.command != unclamped
+
+        outlets = dict()
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         error = self._error()

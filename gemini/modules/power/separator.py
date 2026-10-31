@@ -77,13 +77,12 @@ class Separator(Module):
             fluid=STEAM,
         )
 
-        outlets = dict(liquid_out=liquid, gas_out=gas)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        state = self._flash(inlets.fluid_in)
+        # Outputs
         self.steam_fraction = state.steam_fraction
         self.saturation_temperature = state.saturation_temperature
+
+        outlets = dict(liquid_out=liquid, gas_out=gas)
+        return outlets
 
     def _flash(self, inlet):
         """Return the ``_physics.flash_state`` of the inlet at the setpoint pressure."""

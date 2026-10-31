@@ -93,22 +93,19 @@ class ORC(Module):
         fluid_out = fluid_in.with_(T=fluid_out_T)
         balance = self._balance(fluid_in, fluid_out, design)
 
-        outlets = dict(
-            fluid_out=fluid_out, power_out=balance.electricity_generated, loss_out=balance.heat_loss
-        )
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        fluid_in = inlets.fluid_in
-        fluid_out = outlets.fluid_out
-        design = self._design(fluid_in, inlets.air_in)
-        balance = self._balance(fluid_in, fluid_out, design)
+        # Outputs
+        fluid_out = fluid_out
         self.gross_power = balance.gross_power
         self.parasitic_power = balance.parasitic_power
         self.condenser_duty = balance.condenser_duty
         self.thermal_efficiency = balance.thermal_efficiency
         self.condensing_temperature = design.condensing_temperature
         self.is_capped = design.is_capped
+
+        outlets = dict(
+            fluid_out=fluid_out, power_out=balance.electricity_generated, loss_out=balance.heat_loss
+        )
+        return outlets
 
     def _heat_input(self, fluid_in, fluid_out):
         """Return the heat [W] the cycle takes from the brine."""

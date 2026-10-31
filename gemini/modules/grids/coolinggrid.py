@@ -99,31 +99,23 @@ class CoolingGrid(Module):
 
         # Outlets
         supply_in = inlets.supply_in
-        if self.return_temperature is not None:
+        if self.return_temperature is None:
+            sensible, latent = self._met_loads(supply_in)
+            return_out = supply_in.with_(T=self._warmed_temperature(supply_in, sensible + latent))
+        else:
             return_out = self._offer(inlets)["return_out"]
-            outlets = dict(return_out=return_out)
-            return outlets
-        sensible, latent = self._met_loads(supply_in)
-        absorbed = sensible + latent
-        warmed = ops.minimum(
-            self._return_limit(),
-            supply_in.T
-            + heat_transfer.temperature_change(absorbed, supply_in.heat_capacity_rate()),
-        )
-        return_T = ops.where(absorbed == 0, supply_in.T, warmed)
-        return_out = supply_in.with_(T=return_T)
+            sensible, latent = self._met_loads(supply_in, return_out)
 
-        outlets = dict(return_out=return_out)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        sensible, latent = self._met_loads(inlets.supply_in, outlets.return_out)
+        # Outputs
         self.unmet_sensible = self.sensible_cooling_demand - sensible
         self.unmet_latent = self.latent_cooling_demand - latent
         self.dew_point = psychrometrics.dew_point(
             self.indoor_temperature, self.indoor_relative_humidity
         )
         self.is_unmet = ops.logical_or(self.unmet_sensible > 0, self.unmet_latent > 0)
+
+        outlets = dict(return_out=return_out)
+        return outlets
 
     def _offer(self, inlets):
         """Offer the return water of a closed loop, at the fixed temperature and the given flow."""
@@ -137,6 +129,15 @@ class CoolingGrid(Module):
             m_dot=self.flow, T=self.return_temperature, p=self.return_pressure, fluid=self.fluid
         )
         return {"return_out": offered}
+
+    def _warmed_temperature(self, supply_in, absorbed):
+        """Return the return temperature [K] after the building gave ``absorbed`` [W] to it."""
+        warmed = ops.minimum(
+            self._return_limit(),
+            supply_in.T
+            + heat_transfer.temperature_change(absorbed, supply_in.heat_capacity_rate()),
+        )
+        return ops.where(absorbed == 0, supply_in.T, warmed)
 
     def _met_loads(self, supply_in, return_out=None):
         """Return the met sensible and latent loads [W]; the rise of the water on a closed loop."""

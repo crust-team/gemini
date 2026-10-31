@@ -45,10 +45,8 @@ class Accumulator(gm.modules.Module):
         """Expose a stateless rate observation."""
 
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.value = self.rate
+        return outlets
 
     def step(self, state, dt, inlets):
         """Integrate with explicit state."""
@@ -457,10 +455,8 @@ class NotANumber(gm.modules.Module):
         """Expose no fluid outlets."""
 
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.value = float("nan")
+        return outlets
 
 
 class Boom(Callback):

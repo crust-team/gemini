@@ -98,13 +98,12 @@ class BoreholeField(Module):
         fluid_out_T = inlet.T + heat_transfer.temperature_change(rate, capacity_rate)
         outlet = inlet.with_(T=fluid_out_T)
 
+        # Outputs
+        self.fluid_mean_temperature = heat_transfer.mean_temperature(inlet.T, outlet.T)
+        self.ground_temperature = self._ground_temperature()
+
         outlets = dict(fluid_out=outlet, loss_out=-rate)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
-        self.fluid_mean_temperature = heat_transfer.mean_temperature(inlet.T, outlets.fluid_out.T)
-        self.ground_temperature = self._ground_temperature()
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.fluid_in

@@ -51,13 +51,14 @@ class Filter(Module):
 
         # Outlets
         inlet = inlets.fluid_in
-        outlet = inlet.with_(p=inlet.p - self._pressure_drop(inlet))
+        drop = self._pressure_drop(inlet)
+        outlet = inlet.with_(p=inlet.p - drop)
+
+        # Outputs
+        self.pressure_drop = drop
 
         outlets = dict(fluid_out=outlet)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.pressure_drop = self._pressure_drop(inlets.fluid_in)
 
     def health(self, result, measured):
         """Alarm when measured filter pressure loss exceeds the clogging limit."""

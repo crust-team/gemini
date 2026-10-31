@@ -53,10 +53,8 @@ class Tank(Module):
         outlet = inlets.fluid_in.with_(T=self.temperature)
 
         outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.duty = self._duty(inlets.fluid_in)
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         return {
@@ -117,10 +115,8 @@ class Integrator(Module):
     def forward(self, inlets):
         """Move no fluid."""
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.value = self.total
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         return {"total": self.total + self.rate * dt}

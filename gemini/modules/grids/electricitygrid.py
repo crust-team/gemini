@@ -43,12 +43,9 @@ class ElectricityGrid(Module):
     def forward(self, inlets):
         """Exchange electricity only: what leaves is what the consumers drew."""
 
-        outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
+        # Outputs
         exchange = _physics.net_exchange(
-            energy.total_power(outlets.power_out),
+            energy.total_power(inlets.power_out),
             energy.total_power(inlets.power_in),
             self.import_limit,
             self.export_limit,
@@ -59,3 +56,6 @@ class ElectricityGrid(Module):
         self.curtailed_generation = exchange.curtailed_generation
         self.is_import_limited = self.unserved_consumption > 0
         self.is_export_limited = self.curtailed_generation > 0
+
+        outlets = dict()
+        return outlets

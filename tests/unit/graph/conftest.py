@@ -66,11 +66,9 @@ class Gain(Module):
         outlet = inlet.with_(p=inlet.p + self.gain * self.scale * REFERENCE)
 
         outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.rise = outlets.fluid_out.p - inlets.fluid_in.p
+        self.rise = outlets["fluid_out"].p - inlets.fluid_in.p
         self.boost = ops.where(self.rise > 0, ops.truediv(self.rise, self.gain), 0.0)
+        return outlets
 
 
 @pytest.fixture
@@ -144,10 +142,9 @@ class Source(Module):
 
         # Outlets
         outlet = Stream(m_dot=self.rate, T=300.0, p=1e5, fluid=self.fluid)
-        return dict(fluid_out=outlet)
-
-    def _compute_outputs(self, inlets, outlets):
-        self.double = 2 * outlets.fluid_out.m_dot
+        outlets = dict(fluid_out=outlet)
+        self.double = 2 * outlets["fluid_out"].m_dot
+        return outlets
 
 
 @pytest.fixture
@@ -183,10 +180,8 @@ class Meter(Module):
 
         # Outlets
         outlets = dict(fluid_out=inlets.fluid_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.electricity = self.draw * self.scale
+        return outlets
 
 
 class Line(Module):
@@ -261,10 +256,8 @@ class Tank(Module):
 
         # Outlets
         outlets = dict(fluid_out=inlets.fluid_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.content = self.level + inlets.fluid_in.m_dot
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         return dict(level=self.content)
@@ -366,6 +359,8 @@ class Stubborn(Gain):
         )
         outlet = inlets.fluid_in.with_(p=inlets.fluid_in.p + self.gain * float(inlets.fluid_in.T))
         outlets = dict(fluid_out=outlet)
+        self.rise = outlets["fluid_out"].p - inlets.fluid_in.p
+        self.boost = 0.0
         return outlets
 
 
@@ -428,10 +423,8 @@ class Switcher(Module):
                 m_dot=inlets.fluid_in.m_dot, T=inlets.fluid_in.T, p=inlets.fluid_in.p, fluid=fluid
             )
         )
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.seen = inlets.fluid_in.T
+        return outlets
 
     def _advance_states(self, inlets, outlets, dt):
         return dict(level=self.seen)
@@ -458,10 +451,8 @@ class Vectored(Module):
 
         # Outlets
         outlets = dict(fluid_out=inlets.fluid_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.profile = [inlets.fluid_in.p, inlets.fluid_in.p + 1.0]
+        return outlets
 
 
 class Bounded(Module):
@@ -493,12 +484,10 @@ class Bounded(Module):
 
         # Outlets
         outlets = dict(fluid_out=inlets.fluid_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.margin = inlets.fluid_in.p - self.setpoint
         self.profile = [self.setpoint, self.setpoint - 1.0]
         self.share = ops.where(self.ambient > 1000.0, None, self.setpoint / inlets.fluid_in.p)
+        return outlets
 
 
 @pytest.fixture
@@ -524,10 +513,8 @@ class Optional(Module):
         """Expose no fluid outlets."""
 
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.double = ops.where(ops.isnan(self.rate), -1.0, 2 * self.rate)
+        return outlets
 
 
 @pytest.fixture

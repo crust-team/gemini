@@ -99,11 +99,19 @@ class Cooler(Module):
 
         # Outlets
         inlet, air = inlets.fluid_in, inlets.air_in
-        duty, rate, _ = self._duty(inlet, air)
+        duty, rate, requested = self._duty(inlet, air)
         cooled = inlet.with_(T=inlet.T - heat_transfer.temperature_change(duty, rate))
         outlet = cooled if self.loop_pressure is None else self._offer(inlets)["fluid_out"]
         power_in = heat_transfer.fan_power(duty, self.specific_fan_power)
         air_in, air_out = self._air(air, cooled.T, duty + power_in)
+
+        # Outputs
+        self.evaporation_rate = (
+            psychrometrics.evaporation_rate(duty, self.latent_heat)
+            if self.cooler_type == "wet"
+            else 0.0
+        )
+        self.is_capped = requested > self.capacity
 
         outlets = dict(fluid_out=outlet, air_out=air_out, air_in=air_in, power_in=power_in)
         return outlets
@@ -118,15 +126,6 @@ class Cooler(Module):
         specific_heat = air.fluid.properties(air.p, air.T).cp_l
         flow = ops.where(heat > 0, dispatch.circuit_flow(heat, specific_heat, rise), 0.0)
         return air.with_(m_dot=flow), air.with_(m_dot=flow, T=air.T + rise)
-
-    def _compute_outputs(self, inlets, outlets):
-        duty, _, requested = self._duty(inlets.fluid_in, inlets.air_in)
-        self.evaporation_rate = (
-            psychrometrics.evaporation_rate(duty, self.latent_heat)
-            if self.cooler_type == "wet"
-            else 0.0
-        )
-        self.is_capped = requested > self.capacity
 
     def _duty(self, inlet, air):
         """Return the rejected duty [W], heat capacity rate [W/K] and uncapped request [W]."""

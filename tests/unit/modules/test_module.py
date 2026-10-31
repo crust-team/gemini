@@ -57,10 +57,8 @@ class PassThrough(Module):
         outlet = inlet
 
         outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.result = self.value * self.multiplier
+        return outlets
 
 
 def test_registration_construction_and_state():
@@ -256,10 +254,8 @@ class RequiredInputs(Module):
         outlet = inlet
 
         outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.total = self.frequency + self.grid_frequency
+        return outlets
 
 
 def test_input_resolution_units_bounds_and_metadata():
@@ -326,11 +322,9 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
             outlet = inlet
 
             outlets = dict(fluid_out=outlet)
-            return outlets
-
-        def _compute_outputs(self, inlets, outlets):
             self.frequency = 10
             self.total = self.frequency + self.grid_frequency
+            return outlets
 
     assigned = AssignInForward()
     assigned.set_inputs({"frequency": 50, "grid_frequency": 50})
@@ -432,10 +426,8 @@ def test_missing_output_and_named_hook_ordering():
 
         def forward(self, inlets):
             outlets = dict(fluid_out=inlets.fluid_in)
-            return outlets
-
-        def _compute_outputs(self, inlets, outlets):
             pass
+            return outlets
 
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = MissingOutput()
@@ -494,10 +486,8 @@ class EnergyLeaf(Module):
     def forward(self, inlets):
         """Return the inlet stream."""
         outlets = dict(fluid_out=inlets.fluid_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.electricity = 2
+        return outlets
 
 
 class FormulaParent(Module):
@@ -606,8 +596,9 @@ def test_composite_own_value_is_recorded():
     """A composite that records its own value keeps it."""
 
     class Own(RepeatedTotal):
-        def _compute_outputs(self, inlets, outlets):
+        def forward(self, inlets):
             self.electricity = 7
+            return super().forward(inlets)
 
     assert Own()().outputs.electricity == 7
 
@@ -638,10 +629,8 @@ class PowerUse(Module):
     def forward(self, inlets):
         """Produce no stream."""
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.use = 0
+        return outlets
 
 
 class MassUse(PowerUse):
@@ -652,8 +641,11 @@ class MassUse(PowerUse):
         Module.__init__(self)
         self.use = Output(MassFlow)
 
-    def _compute_outputs(self, inlets, outlets):
+    def forward(self, inlets):
+        """Produce no stream."""
+        outlets = dict()
         self.use = 1
+        return outlets
 
 
 class FormulaOf(Module):
@@ -842,13 +834,12 @@ class Quotient(Module):
         stream = inlets.fluid_in
         self.kinds = (type(stream.m_dot), type(self.numerator), type(self.divisor))
         self.quotient = stream.m_dot / self.divisor
-        return dict(fluid_out=stream.with_(p=stream.p + 1.0))
-
-    def _compute_outputs(self, inlets, outlets):
+        outlets = dict(fluid_out=stream.with_(p=stream.p + 1.0))
         self.ratio = self.numerator / self.divisor
         self.finite = self.ratio < 1e300
         self.seen = [coefficient / self.divisor for coefficient in self.coefficients]
         self.again = self.ratio / self.divisor
+        return outlets
 
 
 def test_an_eager_call_divides_silently_and_returns_plain_python_values():
@@ -879,10 +870,8 @@ def test_a_forced_numpy_backend_keeps_plain_division_silent():
 
         def forward(self, inlets):
             outlets = dict()
-            return outlets
-
-        def _compute_outputs(self, inlets, outlets):
             self.ratio = ops.where(self.gain > 2.0, self.gain / 0.0, ops.add(self.gain, 1.0))
+            return outlets
 
     with backends.settings(backend="numpy"):
         assert Divider()().outputs.ratio == 2.0

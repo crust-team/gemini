@@ -71,19 +71,18 @@ class Desander(Module):
 
         # Outlets
         inlet = inlets.fluid_in
-        removed = self._sand(inlet)[0]
-        outlet = inlet.with_(m_dot=inlet.m_dot - removed, p=inlet.p - self._pressure_drop(inlet))
+        removed, residual = self._sand(inlet)
+        drop = self._pressure_drop(inlet)
+        outlet = inlet.with_(m_dot=inlet.m_dot - removed, p=inlet.p - drop)
         waste_out = inlet.with_(m_dot=removed)
+
+        # Outputs
+        self.pressure_drop = drop
+        self.sand_removal_rate = removed
+        self.residual_sand_concentration = residual
 
         outlets = dict(fluid_out=outlet, waste_out=waste_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
-        sand = self._sand(inlet)
-        self.pressure_drop = self._pressure_drop(inlet)
-        self.sand_removal_rate = sand[0]
-        self.residual_sand_concentration = sand[1]
 
     def _sand(self, inlet):
         """Return the sand removal rate [kg/s] and the residual sand concentration [kg/m3]."""

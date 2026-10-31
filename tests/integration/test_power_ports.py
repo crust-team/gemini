@@ -43,10 +43,8 @@ class Consumer(Module):
         power_in = energy.total_power([self.rating * inlets.fluid_in.m_dot])
 
         outlets = dict(fluid_out=inlets.fluid_in, power_in=power_in)
+        self.drawn = power_in
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.drawn = inlets.power_in
 
 
 class Bus(Module):
@@ -71,10 +69,8 @@ class Bus(Module):
         """Nothing leaves but what its takers draw."""
 
         outlets = dict()
+        self.net = energy.total_power(inlets.power_out) - energy.total_power(inlets.power_in)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.net = energy.total_power(outlets.power_out) - energy.total_power(inlets.power_in)
 
 
 class Source(Module):
@@ -108,10 +104,8 @@ class Source(Module):
         fluid_out = self._offer(inlets)["fluid_out"]
 
         outlets = dict(fluid_out=fluid_out)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.back = inlets.fluid_in.m_dot
+        return outlets
 
 
 class Taker(Module):
@@ -161,10 +155,8 @@ class Offer(Module):
         """Nothing to give but the offer."""
 
         outlets = dict()
+        self.taken = inlets.fluid_out.m_dot
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.taken = outlets.fluid_out.m_dot
 
 
 def consumer(rating):

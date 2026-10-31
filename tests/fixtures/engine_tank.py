@@ -50,12 +50,10 @@ class Tank(Module):
         outlet = inlets.fluid_in
 
         outlets = dict(fluid_out=outlet)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         if self.m_dot < 0:
             raise ValueError("negative flow")
         self.flow = self.m_dot
+        return outlets
 
 
 class Valve(Module):
@@ -75,10 +73,8 @@ class Valve(Module):
         """Expose no fluid outlets."""
 
         outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.flow = self.m_dot
+        return outlets
 
 
 def tank(unit="kg/s"):

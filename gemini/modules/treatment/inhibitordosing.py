@@ -63,11 +63,11 @@ class InhibitorDosing(Module):
         outlet = inlet.with_(m_dot=inlet.m_dot + product)
         chemical_in = inlets.chemical_in.with_(m_dot=product, T=inlet.T)
 
-        outlets = dict(fluid_out=outlet, chemical_in=chemical_in)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
+        # Outputs
         product, active = _physics.dosing_flows(
             self.dose, inlets.fluid_in.m_dot, self.product_concentration
         )
         self.active_mass_flow = active
+
+        outlets = dict(fluid_out=outlet, chemical_in=chemical_in)
+        return outlets

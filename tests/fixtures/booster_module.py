@@ -32,10 +32,8 @@ class Booster(Module):
         discharge = inlets.fluid_in.with_(p=inlets.fluid_in.p + self.gain)
 
         outlets = dict(fluid_out=discharge)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
         self.head = self.gain
+        return outlets
 
 
 EXAMPLE = {"inlets": {"fluid_in": {"m_dot": "10 kg/s", "T": "50 degC", "p": "2 bar"}}}

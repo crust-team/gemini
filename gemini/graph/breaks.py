@@ -135,7 +135,12 @@ def _probe_fluids(module, inlets, inputs):
     """Run ``forward`` once on representative inlets and return the fluid of every outlet."""
     streams = {port: Stream(**PROBE, fluid=inlets[port].fluid) for port in module._fed_inlets()}
     call = _Call(
-        module=module, inputs=inputs, outputs=None, parent=None, states=module._call_states(None)
+        module=module,
+        inputs=inputs,
+        outputs={},
+        recording=False,
+        parent=None,
+        states=module._call_states(None),
     )
     token = _current_call.set(call)
     try:

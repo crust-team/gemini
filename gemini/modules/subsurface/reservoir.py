@@ -171,11 +171,8 @@ class ProductionReservoir(_Reservoir):
         # Outlets
         sandface = self.sandface_stream(self.production_rate)
 
-        outlets = dict(sandface_out=sandface)
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        sandface = outlets.sandface_out
+        # Outputs
+        sandface = sandface
         flow = sandface.volumetric_flow()
         for name, value in self._calculate_outputs(flow, sandface.p).items():
             setattr(self, name, value)
@@ -183,6 +180,9 @@ class ProductionReservoir(_Reservoir):
         self.liquid_flow = fluid_physics.liquid_volume_flow(
             sandface.m_dot, properties.gmf, properties.rho_l
         )
+
+        outlets = dict(sandface_out=sandface)
+        return outlets
 
     def sandface_stream(self, production_rate):
         """Return the sandface stream [SI] the linear IPR delivers at a production rate [kg/s].
@@ -219,17 +219,16 @@ class InjectionReservoir(_Reservoir):
             raise ValidationError(
                 f"{self.path}: injectivity_index is required", code="invalid_design"
             )
-        outlets = dict()
-        return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        """Calculate the bottomhole pressure the sandface flow requires."""
+        # Outputs
         sandface = inlets.sandface_in
         flow = fluid_physics.volume_flow(
             ops.abs(sandface.m_dot), self.fluid.properties(sandface.p, sandface.T).rho_l
         )
         for name, value in self._calculate_outputs(flow, self.required_pressure(sandface)).items():
             setattr(self, name, value)
+
+        outlets = dict()
+        return outlets
 
     def required_pressure(self, sandface):
         """Return the bottomhole pressure [Pa] the linear injectivity needs for a sandface stream.

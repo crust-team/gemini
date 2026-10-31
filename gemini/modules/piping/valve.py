@@ -87,12 +87,12 @@ class Valve(Module):
         )
         outlet = inlet.with_(p=inlet.p - drop)
 
+        # Outputs
+        self.pressure_drop = inlets.fluid_in.p - outlet.p
+        self.effective_flow_coefficient = self._effective_flow_coefficient()
+
         outlets = dict(fluid_out=outlet)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.pressure_drop = inlets.fluid_in.p - outlets.fluid_out.p
-        self.effective_flow_coefficient = self._effective_flow_coefficient()
 
     def _effective_flow_coefficient(self):
         """Return the flow coefficient [m3/s/Pa^0.5] at the commanded opening."""

@@ -84,26 +84,21 @@ class HeatingGrid(Module):
 
         # Outlets
         supply_in = inlets.supply_in
-        if self.return_temperature is not None:
+        if self.return_temperature is None:
+            delivered = self._delivered_heat(supply_in)
+            return_out = supply_in.with_(T=self._cooled_temperature(supply_in, delivered))
+        else:
             return_out = self._offer(inlets)["return_out"]
-            outlets = dict(return_out=return_out)
-            return outlets
-        delivered = self._delivered_heat(supply_in)
-        capacity_rate = supply_in.heat_capacity_rate()
-        cooled = ops.maximum(
-            self.minimum_return_temperature,
-            supply_in.T - heat_transfer.temperature_change(delivered, capacity_rate),
-        )
-        return_T = ops.where(delivered == 0, supply_in.T, cooled)
-        return_out = supply_in.with_(T=return_T)
+            delivered = heat_transfer.heat_rate(
+                supply_in.heat_capacity_rate(), supply_in.T - return_out.T
+            )
+
+        # Outputs
+        self.unmet_demand = ops.maximum(self.heat_demand - delivered, 0.0)
+        self.is_unmet = self.unmet_demand > 0
 
         outlets = dict(return_out=return_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        delivered = self._heat_supplied(inlets.supply_in, outlets.return_out)
-        self.unmet_demand = ops.maximum(self.heat_demand - delivered, 0.0)
-        self.is_unmet = self.unmet_demand > 0
 
     def _offer(self, inlets):
         """Offer the return water of a closed loop, at the fixed temperature and the given flow."""
@@ -118,11 +113,14 @@ class HeatingGrid(Module):
         )
         return {"return_out": offered}
 
-    def _heat_supplied(self, supply_in, return_out):
-        """Return the heat [W] the users take: the fall of the water, or the capped demand."""
-        if self.return_temperature is None:
-            return self._delivered_heat(supply_in)
-        return heat_transfer.heat_rate(supply_in.heat_capacity_rate(), supply_in.T - return_out.T)
+    def _cooled_temperature(self, supply_in, delivered):
+        """Return the return temperature [K] after the users took ``delivered`` [W]."""
+        capacity_rate = supply_in.heat_capacity_rate()
+        cooled = ops.maximum(
+            self.minimum_return_temperature,
+            supply_in.T - heat_transfer.temperature_change(delivered, capacity_rate),
+        )
+        return ops.where(delivered == 0, supply_in.T, cooled)
 
     def _delivered_heat(self, supply_in):
         """Return the delivered heat [W]: the demand, capped by the return-temperature floor."""
