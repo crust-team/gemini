@@ -47,4 +47,4 @@ def test_the_call_closes(run):
     plant, result = run
     assert gm.modules.mass_balance(plant, result)["residual"] == 0
     assert gm.modules.energy_balance(plant, result)["relative_thermal_residual"] < 1e-9
-    assert all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
+    assert all(check["passed"] for check in gm.evaluate.plant_balance(plant, None, result))

@@ -42,4 +42,4 @@ def test_the_injector_needs_no_pump(run):
 def test_the_call_closes(run):
     """Every balance of the plant closes."""
     plant, result = run
-    assert all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
+    assert all(check["passed"] for check in gm.evaluate.plant_balance(plant, None, result))

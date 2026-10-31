@@ -8,6 +8,7 @@ import pytest
 import gemini as gm
 from tests.fixtures.booster_module import EXAMPLE, Booster
 from tests.fixtures.costed_plants import day, heating_plant
+from tests.fixtures.result_tables import make_problem
 
 CASE = {"wellhead_pressure": "4.6 bar", "rates": [20, 45], "frequency": 55.484}
 CORROSION = {
@@ -39,23 +40,24 @@ def real_calls(example_run):
     """Return ``(name, result)`` of one call of every function that is built."""
     plant, replay = example_run
     costed, run = heating_plant(), day()
+    problem, priced = make_problem(), make_problem(assumptions=VALUES)
     return [
         ("analysis.nodal", gm.analysis.nodal(plant, "doublet", CASE)),
         ("analysis.pump_curve", gm.analysis.pump_curve(plant, "doublet.esp")),
         ("analysis.corrosion_forecast", gm.analysis.corrosion_forecast(CORROSION, "2026-01-01")),
-        ("kpi", gm.evaluate.totals(plant, replay)),
-        ("economics.capex", gm.evaluate.capex(costed)),
-        ("economics.opex", gm.evaluate.opex(costed, run, VALUES)),
-        ("economics.lcoh", gm.evaluate.lcoh(costed, run, 0.05, 20, VALUES)),
-        ("economics.lcoc", gm.evaluate.lcoc(costed, run, 0.05, 20, VALUES, on_error="record")),
-        ("economics.co2", gm.evaluate.co2(costed, run, VALUES)),
-        ("economics.npv", gm.evaluate.npv(costed, run, 0.05, 20, VALUES)),
-        ("economics.payback", gm.evaluate.payback(costed, run, VALUES)),
+        ("kpi", gm.evaluate.totals(plant, problem, replay)),
+        ("economics.capex", gm.evaluate.capex(costed, priced)),
+        ("economics.opex", gm.evaluate.opex(costed, priced, run)),
+        ("economics.lcoh", gm.evaluate.lcoh(costed, priced, run, 0.05, 20)),
+        ("economics.lcoc", gm.evaluate.lcoc(costed, priced, run, 0.05, 20, on_error="record")),
+        ("economics.co2", gm.evaluate.co2(costed, priced, run)),
+        ("economics.npv", gm.evaluate.npv(costed, priced, run, 0.05, 20)),
+        ("economics.payback", gm.evaluate.payback(costed, priced, run)),
         ("economics.Assumptions", VALUES.model_dump()),
-        ("checks.energy_balance", gm.evaluate.energy_balance(replay)),
-        ("checks.mass_balance", gm.evaluate.mass_balance(replay)),
-        ("checks.bounds", gm.evaluate.bounds(plant, replay)),
-        ("checks.run_all", gm.evaluate.run_all(plant, replay)),
+        ("checks.energy_balance", gm.evaluate.energy_balance(plant, problem, replay)),
+        ("checks.mass_balance", gm.evaluate.mass_balance(plant, problem, replay)),
+        ("checks.bounds", gm.evaluate.bounds(plant, problem, replay)),
+        ("checks.run_all", gm.evaluate.run_all(plant, problem, replay)),
         ("testing.check_module", gm.modules.check(Booster, EXAMPLE)),
     ]
 

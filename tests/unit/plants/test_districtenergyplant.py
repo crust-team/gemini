@@ -63,4 +63,4 @@ def test_every_step_closes(run):
     """Every balance of the plant closes on each step."""
     plant, first, second = run
     for result in (first, second):
-        assert all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
+        assert all(check["passed"] for check in gm.evaluate.plant_balance(plant, None, result))

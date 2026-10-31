@@ -64,7 +64,7 @@ def by_name(checks):
 def test_a_leak_fails_its_module_and_the_plant():
     """A tenth of the mass and of the enthalpy goes nowhere."""
     plant = Line(Leak())
-    found = by_name(gm.evaluate.plant_balance(plant, plant(fluid_in=HOT)))
+    found = by_name(gm.evaluate.plant_balance(plant, None, plant(fluid_in=HOT)))
     assert list(found) == ["child mass", "child energy", "plant mass", "plant energy"]
     assert found["child mass"]["passed"] is False
     assert found["child mass"]["value"]["value"] == pytest.approx(0.1)
@@ -92,7 +92,7 @@ def test_a_loss_that_reaches_no_edge_module_fails_the_plant_only():
         },
     )
     plant = Lost(pipe)
-    found = by_name(gm.evaluate.plant_balance(plant, plant(fluid_in=HOT)))
+    found = by_name(gm.evaluate.plant_balance(plant, None, plant(fluid_in=HOT)))
     assert found["child energy"]["passed"] is True
     assert found["plant mass"]["passed"] is True
     assert found["plant energy"]["passed"] is False
@@ -115,6 +115,6 @@ def test_a_finished_run_is_checked_under_any_backend(backend):
     """The columns of a run are arrays: a backend of scalars checks them the same."""
     plant = Line(Leak())
     run = plant(fluid_in=HOT)
-    expected = gm.evaluate.plant_balance(plant, run)
+    expected = gm.evaluate.plant_balance(plant, None, run)
     with settings(backend=backend):
-        assert gm.evaluate.plant_balance(plant, run) == expected
+        assert gm.evaluate.plant_balance(plant, None, run) == expected

@@ -30,6 +30,11 @@ def _results(plant):
     return gm.replay(plant, gm.Dataset.from_frame(frame, time_column="time"))
 
 
+def _problem():
+    """Return a problem on the made-up heating profile."""
+    return gm.Problem(gm.data.from_values(PROFILE_VALUES, "kW", "2030-01-01", "1 h", PROFILE))
+
+
 def _profile_sample():
     """Return a short heating profile of made-up values, in the document form of a profile."""
     frame = gm.data.from_values(PROFILE_VALUES, "kW", "2030-01-01", "1 h", PROFILE)
@@ -69,7 +74,7 @@ def documents():
         "profile.sample.json": _profile_sample(),
         "value.sample.json": results.summary()["heat_exchanger"]["duty"]["mean"],
         "problem.sample.json": _problem_sample(),
-        "check.sample.json": gm.evaluate.energy_balance(results),
+        "check.sample.json": gm.evaluate.energy_balance(plant, _problem(), results),
     }
 
 

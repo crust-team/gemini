@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
+import gemini as gm
 from gemini.engine.chunks import PathColumns, ResultChunk
 from gemini.run.results import Results
 
@@ -44,3 +45,15 @@ def make_results(columns, step=3600.0, units=None):
     results = Results(units)
     results.commit(ResultChunk(times, [step] * count, tables, [{}] * count))
     return results
+
+
+def make_problem(count=24, step=3600.0, **parts):
+    """Return a problem whose demand has ``count`` rows of ``step`` seconds, as ``make_results``.
+
+    ``parts`` are the other arguments of ``gm.Problem``: ``site``, ``constraints`` and
+    ``assumptions``.
+    """
+    demand = gm.data.from_values(
+        [1.0] * count, "W", START.isoformat(), f"{step} s", "heating_demand"
+    )
+    return gm.Problem(demand, **parts)

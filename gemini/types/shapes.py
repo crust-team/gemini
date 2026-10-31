@@ -73,7 +73,8 @@ CHECK_SCHEMA = {
     "title": "GEMINI check",
     "description": (
         "A judged quantity: {name, passed, value, limit}. value and limit are values. passed is "
-        "null, with a reason in value, when there is nothing to judge."
+        "null, with a reason in value, when there is nothing to judge. A constraint adds its path "
+        "and worst_step."
     ),
     "type": "object",
     "required": ["name", "passed", "value", "limit"],
@@ -83,6 +84,8 @@ CHECK_SCHEMA = {
         "passed": {"type": ["boolean", "null"]},
         "value": {"$ref": "#/$defs/value"},
         "limit": {"$ref": "#/$defs/value"},
+        "path": {"type": "string"},
+        "worst_step": {"type": ["string", "null"]},
     },
     "$defs": {"value": {k: v for k, v in VALUE_SCHEMA.items() if k != "$schema"}},
 }

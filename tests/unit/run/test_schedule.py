@@ -115,6 +115,12 @@ def plan_of(*heat, constraints=(), prices=None, plant=None, freq="D"):
     return gm.schedule(plant or plant_of_two(), problem)
 
 
+def _duration_checks(plant, problem, results):
+    """Return the checks of the duration constraint, one per doublet."""
+    checks = gm.evaluate.constraints(plant, problem, results)
+    return [item for item in checks if item["value"]["unit"] == "s"]
+
+
 def test_doublets_run_in_order_at_the_flow_of_the_need():
     """A small need runs the first; a large one fills it and starts the second."""
     plan = plan_of(0.5 * FULL, 1.5 * FULL)
@@ -308,8 +314,7 @@ def test_an_hourly_demand_is_planned_and_run():
     assert plan["d0.is_running"].sum() == plan["d1.is_running"].sum() == 90
     results = gm.simulate(plant, plan=plan)
     assert results.errors() == []
-    checks = gm.evaluate.operating_time(plant, results, "90 h")
-    assert [item["passed"] for item in checks] == [True, True]
+    assert [item["passed"] for item in _duration_checks(plant, problem, results)] == [True, True]
 
 
 def test_a_daily_demand_is_planned_and_run():
@@ -417,9 +422,10 @@ def test_a_finished_run_ran_the_time_of_the_constraint():
     """Two doublets, three days of four each: the plan, the run and the check agree."""
     plant = plant_of_two()
     frame = demand(0.5 * FULL, 1.5 * FULL, 2.5 * FULL, 3.0 * FULL)
-    results = gm.simulate(plant, problem_of(frame, [duration("3 d")]))
+    problem = problem_of(frame, [duration("3 d")])
+    results = gm.simulate(plant, problem)
     assert results.errors() == []
-    checks = gm.evaluate.operating_time(plant, results, "3 d")
+    checks = _duration_checks(plant, problem, results)
     assert [item["passed"] for item in checks] == [True, True]
     assert [item["value"]["value"] for item in checks] == [3 * 86400.0] * 2
 

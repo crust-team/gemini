@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from gemini.evaluate.series import (
+from gemini.evaluate._utils.series import (
     delivered_cold,
     delivered_heat,
     edge_total,
@@ -151,13 +151,15 @@ def _integral(series, seconds, unit):
     return value(energy(series, seconds), unit)
 
 
-def totals(plant, results):
+def totals(plant, problem, results):
     """Return what crossed the plant's edge over a run, read from the edge modules' ports.
 
     Parameters
     ----------
     plant : Module
         The plant that produced ``results``.
+    problem : Problem
+        The problem of the run; the totals do not read it.
     results : Results
         A finished ``simulate`` or ``replay``.
 

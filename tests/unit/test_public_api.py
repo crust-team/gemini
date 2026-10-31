@@ -98,12 +98,12 @@ def test_the_package_has_one_version():
     assert gm.__version__ == "0.2.0"
 
 
-def test_every_economics_function_takes_the_plant_and_the_results():
-    """``capex`` alone has no results; ``co2`` takes the plant too."""
+def test_every_economics_function_takes_the_plant_the_problem_and_the_results():
+    """``capex`` alone has no results; every function starts with the plant and the problem."""
     for name in ("opex", "lcoh", "lcoc", "lcts", "annualised_cost", "co2", "npv", "payback"):
         arguments = list(inspect.signature(getattr(gm.evaluate, name)).parameters)
-        assert arguments[:2] == ["plant", "results"], name
-    assert list(inspect.signature(gm.evaluate.capex).parameters)[0] == "plant"
+        assert arguments[:3] == ["plant", "problem", "results"], name
+    assert list(inspect.signature(gm.evaluate.capex).parameters)[:2] == ["plant", "problem"]
 
 
 def test_call_stays_beside_the_run_functions():

@@ -10,6 +10,7 @@ import gemini as gm
 from tests.fixtures import ROOT
 from tests.fixtures.costed_plants import cooling_plant, day, heating_plant
 from tests.fixtures.json_schema import check
+from tests.fixtures.result_tables import make_problem
 
 SCHEMAS = ROOT / "docs" / "schemas"
 PAGE = ROOT / ".claude" / "docs" / "api.md"
@@ -44,8 +45,15 @@ RETIRED = {"values", "units", "tolerance", "timestamp", "class", "type", "module
 """Keys of the former shapes; none is in a public return."""
 
 
-def _limits():
-    return gm.evaluate.Limits().add("heat_exchanger.duty", min="0 MW")
+def _constrained():
+    """Return a problem with a constraint on each way of reading a run."""
+    demand = gm.data.from_values([1.0], "W", "2024-07-01", "1 h", "heating_demand")
+    constraints = [
+        gm.Constraint("heat_exchanger.duty", min="0 MW"),
+        gm.Constraint("heat_exchanger.duty", max="1000 MW", over="mean", when="running"),
+        gm.Constraint("heat_exchanger.duty", min="1 h", over="duration", when="running"),
+    ]
+    return gm.Problem(demand, constraints=constraints)
 
 
 def _run_entries(plant, results):
@@ -97,34 +105,34 @@ def _analysis_entries(plant):
 def _economics_entries():
     costed, run = heating_plant(), day()
     cold, chilled = cooling_plant(), day(heat=None, cold=500.0)
+    priced = make_problem(assumptions=VALUES)
     return {
-        "capex": lambda: gm.evaluate.capex(costed),
-        "opex": lambda: gm.evaluate.opex(costed, run, VALUES),
-        "lcoh": lambda: gm.evaluate.lcoh(costed, run, 0.05, 20, VALUES),
-        "lcoc": lambda: gm.evaluate.lcoc(cold, chilled, 0.05, 20, VALUES),
-        "lcts": lambda: gm.evaluate.lcts(costed, run, 0.05, 20, VALUES),
-        "annualised_cost": lambda: gm.evaluate.annualised_cost(costed, run, 0.05, 20, VALUES),
-        "co2": lambda: gm.evaluate.co2(costed, run, VALUES),
-        "npv": lambda: gm.evaluate.npv(costed, run, 0.05, 20, VALUES),
-        "payback": lambda: gm.evaluate.payback(costed, run, VALUES),
+        "capex": lambda: gm.evaluate.capex(costed, priced),
+        "opex": lambda: gm.evaluate.opex(costed, priced, run),
+        "lcoh": lambda: gm.evaluate.lcoh(costed, priced, run, 0.05, 20),
+        "lcoc": lambda: gm.evaluate.lcoc(cold, priced, chilled, 0.05, 20),
+        "lcts": lambda: gm.evaluate.lcts(costed, priced, run, 0.05, 20),
+        "annualised_cost": lambda: gm.evaluate.annualised_cost(costed, priced, run, 0.05, 20),
+        "co2": lambda: gm.evaluate.co2(costed, priced, run),
+        "npv": lambda: gm.evaluate.npv(costed, priced, run, 0.05, 20),
+        "payback": lambda: gm.evaluate.payback(costed, priced, run),
         "economics.record": lambda: gm.evaluate.lcoh(
-            heating_plant(costed=False), run, 0.05, 20, VALUES, on_error="record"
+            heating_plant(costed=False), priced, run, 0.05, 20, on_error="record"
         ),
     }
 
 
 def _ledger_entries(plant, results):
+    problem = make_problem()
     return {
-        "compute": lambda: gm.evaluate.totals(plant, results),
-        "totals": lambda: gm.evaluate.totals(plant, results),
-        "energy_balance": lambda: gm.evaluate.energy_balance(results),
-        "mass_balance": lambda: gm.evaluate.mass_balance(results),
-        "bounds": lambda: gm.evaluate.bounds(plant, results),
-        "plant_balance": lambda: gm.evaluate.plant_balance(plant, results),
-        "limits": lambda: gm.evaluate.limits(plant, results, _limits()),
-        "run_all": lambda: gm.evaluate.run_all(plant, results),
-        "operating_time": lambda: gm.evaluate.operating_time(plant, results, "1 h"),
-        "Limits": lambda: _limits().to_dict(),
+        "compute": lambda: gm.evaluate.totals(plant, problem, results),
+        "totals": lambda: gm.evaluate.totals(plant, problem, results),
+        "energy_balance": lambda: gm.evaluate.energy_balance(plant, problem, results),
+        "mass_balance": lambda: gm.evaluate.mass_balance(plant, problem, results),
+        "bounds": lambda: gm.evaluate.bounds(plant, problem, results),
+        "plant_balance": lambda: gm.evaluate.plant_balance(plant, problem, results),
+        "constraints": lambda: gm.evaluate.constraints(plant, _constrained(), results),
+        "run_all": lambda: gm.evaluate.run_all(plant, problem, results),
     }
 
 

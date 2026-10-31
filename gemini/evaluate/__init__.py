@@ -1,26 +1,36 @@
-"""What a finished run gave: totals, balances, limits, costs, levelised costs and CO2."""
+"""What a finished run gave: totals, balances, constraints, costs, levelised costs and CO2."""
 
-from .balances import energy_balance, mass_balance, plant_balance
+from .annualised_cost import annualised_cost
 from .bounds import bounds
-from .cashflow import npv, payback
-from .costs import capex, opex
-from .emissions import co2
-from .levelised import annualised_cost, lcoc, lcoh, lcts
-from .limits import Limits, limits
-from .operating import operating_time
-from .suite import run_all
+from .capacities import capacities
+from .capex import capex
+from .co2 import co2
+from .compare import compare
+from .constraints import constraints
+from .energy_balance import energy_balance
+from .lcoc import lcoc
+from .lcoh import lcoh
+from .lcts import lcts
+from .mass_balance import mass_balance
+from .npv import npv
+from .opex import opex
+from .payback import payback
+from .plant_balance import plant_balance
+from .report import report
+from .run_all import run_all
 from .totals import totals
 
 __all__ = [
     "totals",
+    "capacities",
+    "report",
+    "compare",
     "energy_balance",
     "mass_balance",
     "plant_balance",
     "bounds",
     "run_all",
-    "Limits",
-    "limits",
-    "operating_time",
+    "constraints",
     "capex",
     "opex",
     "lcoh",
