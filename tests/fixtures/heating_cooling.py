@@ -58,8 +58,8 @@ PIPE_SIZE = {
 }
 PIPES = ("heating_return_pipe", "heating_supply_pipe", "cooling_return_pipe", "cooling_supply_pipe")
 INPUTS = {
-    "doublet.reservoir.production_rate": 42.36,
-    "doublet.esp.frequency": 55.484,
+    "d0.reservoir.production_rate": 42.36,
+    "d0.esp.frequency": 55.484,
     "injection_pump.pressure_setpoint": 4568500.0,
     "heat_pump.temperature_setpoint": 353.15,
     "peak_boiler.temperature_setpoint": 358.15,
@@ -87,7 +87,7 @@ COOLER_INPUTS = {
     for name, value in (("flow", flow), ("temperature_setpoint", temperature))
 }
 ROOT_STREAMS = {}
-BRINE_MODULES = ("doublet", "degasser", "heat_exchanger", "injection_pump")
+BRINE_MODULES = ("d0", "degasser", "heat_exchanger", "injection_pump")
 
 
 def filled_dict(name):

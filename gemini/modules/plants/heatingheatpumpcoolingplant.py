@@ -6,23 +6,21 @@ from gemini.modules.exchangers import Cooler, HeatExchanger
 from gemini.modules.grids import CoolingGrid, ElectricityGrid, GasGrid, HeatingGrid
 from gemini.modules.heating import Boiler, HeatPump
 from gemini.modules.piping import GasMakeup, Pipe
-from gemini.modules.plant import Plant
-from gemini.modules.plants.doublet import Doublet
+from gemini.modules.plants._utils.doublets import DoubletsPlant
 from gemini.modules.pumps import InjectionPump
 from gemini.modules.treatment import Degasser, Filter, Flare
 
 
-class HeatingHeatPumpCoolingPlant(Plant):
+class HeatingHeatPumpCoolingPlant(DoubletsPlant):
     """Heat pump heating with a peak boiler, and a compression chiller."""
 
     purpose = "both"
 
-    def __init__(self):
-        """Declare the modules, ports and connections."""
-        super().__init__()
+    def __init__(self, doublets=1):
+        """Declare the modules, ports and connections on ``doublets`` doublets."""
+        super().__init__(doublets)
 
         # Modules
-        self.doublet = Doublet()
         self.degasser = Degasser()
         self.filters = ModuleDict({"hot": Filter(), "cold": Filter()})
         self.heat_exchanger = HeatExchanger()
@@ -48,20 +46,20 @@ class HeatingHeatPumpCoolingPlant(Plant):
         self.connect("gas_grid.gas_out", "gas_makeup.grid_in")
         self.connect("gas_makeup.fuel_out", "peak_boiler.fuel_in")
         self.connect("gas_makeup.excess_out", "flare.gas_in")
-        self.connect("doublet.supply_out", "degasser.fluid_in")
+        self._connect_production("degasser.fluid_in")
         self.connect("degasser.liquid_out", "filters.hot.fluid_in")
         self.connect("filters.hot.fluid_out", "heat_exchanger.hot_in")
         self.connect("heat_exchanger.hot_out", "heat_pump.source_in")
         self.connect("heat_pump.source_out", "filters.cold.fluid_in")
         self.connect("filters.cold.fluid_out", "injection_pump.fluid_in")
-        self.connect("injection_pump.fluid_out", "doublet.return_in")
+        self._connect_injection("injection_pump.fluid_out")
         self.connect("heating_return_pipe.fluid_out", "heat_exchanger.cold_in")
         self.connect("heat_exchanger.cold_out", "heat_pump.sink_in")
         self.connect("heat_pump.sink_out", "peak_boiler.fluid_in")
         self.connect("heating_supply_pipe.fluid_out", "heating_consumer.supply_in")
         self.connect("compression_chiller.source_out", "cooling_supply_pipe.fluid_in")
         self.connect("cooling_supply_pipe.fluid_out", "cooling_consumer.supply_in")
-        self.connect("electricity_grid.power_out", "doublet.power_in")
+        self._connect_power("electricity_grid.power_out")
         self.connect("electricity_grid.power_out", "heat_pump.power_in")
         self.connect("electricity_grid.power_out", "injection_pump.power_in")
         self.connect("electricity_grid.power_out", "compression_chiller.power_in")

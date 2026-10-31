@@ -67,7 +67,8 @@ The sections are `# Modules`, `# Parameters`, `# Inlets`, `# Boundaries`, `# Out
 - A child assigned as an attribute is registered as `add` does. `super().__init__()` names the plant
   after its class.
 - A structural argument goes to `__init__` and into `self._size`, a dict of those arguments:
-  `DistrictNetwork(consumers=3, service="cooling")`, `MultiWellPlant(producers=3, injectors=2)`.
+  `DistrictNetwork(consumers=3, service="cooling")`, `MultiWellPlant(producers=3, injectors=2)`,
+  `HeatingCoolingPlant(doublets=2)`.
 - A plant class in `gemini/modules/plants/` is registered by its class name. `purpose` says what it
   serves (`heating`, `cooling`, `both`); a building block has none.
 - No subclass of `Plant` defines `forward` and no other `Module` holds children
@@ -277,9 +278,15 @@ values.
 | `Doublet`, `NodalDoublet`, `DoubletHeatPlant`, `HeatingSubstation`, `CoolingSubstation`, `ATESPlant` | building blocks | |
 | `MultiWellPlant` | both | `producers`, `injectors` |
 | `DistrictNetwork` | both | `consumers`, `service` |
-| `HeatingPlant` | heating | |
-| `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant`, `HeatingHeatPumpCoolingPlant` | both | |
+| `HeatingPlant` | heating | `doublets` |
+| `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant`, `HeatingHeatPumpCoolingPlant` | both | `doublets` |
 | `HackathonPlant`, `BoilerChpPlant`, `ParallelExchangerPlant`, `DistrictEnergyPlant` | cases | |
+
+The five template plants derive from `DoubletsPlant` (`plants/_utils/doublets.py`): `size={"doublets":
+n}`, 1 to 3 (`minimum_doublets`, `maximum_doublets` of the class, `invalid_design` outside), gives the
+doublets `d0` to `d{n-1}` in parallel through `production_mixers` and `injection_splitters`. A
+plant-level `depth` goes to every doublet, which derives its reservoir from it; a value stated on one
+doublet wins, now and later.
 
 Example values live in `inputs/plants/<Name>.json`, in a source checkout only:
 `{"plant": "<Name>", "params": {"<dotted path>": <value>, ...}}`, numbers as unit strings where the

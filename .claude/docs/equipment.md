@@ -1713,7 +1713,7 @@ plant.d0.fluid = gm.Fluid(density="1030 kg/m3", viscosity="0.4 mPa*s")
 
 | From | Derived |
 | --- | --- |
-| `depth`, `gradient`, `surface_temperature` | `temperature` of both reservoirs at the midpoint (`ground.geotherm_temperature`), hydrostatic `pressure` from the fluid density (`hydraulics.hydrostatic_pressure`), `soil_temperature` of the wells at half depth |
+| `depth`, `gradient` (default 30 K/km), `surface_temperature` (default 12 degC) | `temperature` of both reservoirs at the midpoint (`ground.geotherm_temperature`), hydrostatic `pressure` from the fluid density (`hydraulics.hydrostatic_pressure`), `soil_temperature` of the wells at half depth |
 | and `permeability`, `thickness`, `well_diameter` | `productivity_index`, `injectivity_index` (`hydraulics.radial_index`, with the fluid viscosity, `drainage_radius`, the wellbore radius and the reservoir's `skin`), `permeability`, `aquifer_thickness`, `top_depth`, `drainage_radius`, `wellbore_radius`, the vertical `pipe_path` of the wells (`geometry.vertical_path`, commercial steel) |
 | and `nominal_flow`, `pump_efficiency`, `nominal_wellhead_pressure` | `esp.setting_depth`, `esp_depth` and `segment` of `well` and `riser` (`hydraulics.pump_setting_depth`), and a one-stage ESP of constant head (`hydraulics.design_pump_head`, `pumps.constant_head_curves`) |
 
@@ -2107,9 +2107,9 @@ boundaries stay inputs of the run.
 `HeatingCoolingPlant` is the Challenge 2 plant: one integrated heating and cooling plant. The physics
 is that of the modules below; `inputs/plants/<Name>.json` holds example sizes.
 
-- **Wiring.** Brine: `doublet` (`Doublet`) -> `degasser` -> `filters.hot` -> `heat_exchanger` ->
-  [`heat_pump`, source side] -> `filters.cold` -> `injection_pump` -> back to the doublet (opened,
-  as in `DoubletHeatPlant`). Hot water, in series: `heating_return_pipe` -> `heat_exchanger` (cold
+- **Wiring.** Brine: `d0` to `d{n-1}` (`size={"doublets": n}`, joined by `production_mixers`) -> `degasser` -> `filters.hot` -> `heat_exchanger` ->
+  [`heat_pump`, source side] -> `filters.cold` -> `injection_pump` -> `injection_splitters` -> back to the doublets
+  (opened, as in `DoubletHeatPlant`). Hot water, in series: `heating_return_pipe` -> `heat_exchanger` (cold
   side) -> [`heat_pump`, sink side] -> [`peak_boiler`] -> [`absorption_chiller`, generator] ->
   [`adsorption_chiller`, generator] -> `heating_supply_pipe` -> `heating_consumer`. Chilled water,
   in series: `cooling_return_pipe` -> [`absorption_chiller`] -> [`adsorption_chiller`] ->

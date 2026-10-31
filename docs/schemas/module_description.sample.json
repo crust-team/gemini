@@ -55,7 +55,7 @@
     }
   ],
   "controls": {},
-  "doc": "Production and injection limbs, with the children's values derived from a design.\n\n    ``depth`` is the true vertical depth of the reservoir midpoint, ``thickness`` its gross\n    thickness and ``well_diameter`` the inner diameter of both vertical wells. ``set_params``\n    derives, through ``gemini/physics/doublet.py``:\n\n    - from ``depth``, ``gradient`` and ``surface_temperature``: the reservoir temperature at the\n      midpoint, the hydrostatic reservoir pressure from the fluid density, the top depth and the\n      soil temperature of the wells, the geotherm at half the depth;\n    - with ``permeability``, ``thickness`` and ``well_diameter``: the productivity and injectivity\n      indices of radial Darcy flow, with the fluid viscosity, ``drainage_radius``, the wellbore\n      radius and the ``skin`` of each reservoir, and the vertical pipe paths of the wells;\n    - with ``nominal_flow``, ``pump_efficiency`` and ``nominal_wellhead_pressure``: the pump setting\n      depth, the shallowest that keeps that pressure at the intake, and a one-stage ESP of constant\n      head that reaches the wellhead pressure at the nominal flow, with that hydraulic efficiency.\n\n    A group of values that is not complete derives nothing, and the old way, setting every child\n    value directly, works as it did. A child value in the same call wins over the derived one and\n    stays explicit. Setting ``fluid`` gives it to every child and derives again.",
+  "doc": "Production and injection limbs, with the children's values derived from a design.\n\n    ``depth`` is the true vertical depth of the reservoir midpoint, ``thickness`` its gross\n    thickness and ``well_diameter`` the inner diameter of both vertical wells. ``set_params``\n    derives, through ``gemini/physics/doublet.py``:\n\n    - from ``depth``, ``gradient`` and ``surface_temperature``, by default the challenge's 30 K/km\n      and 12 degC: the reservoir temperature at the midpoint, the hydrostatic reservoir pressure\n      from the fluid density, the top depth and the soil temperature of the wells, the geotherm at\n      half the depth;\n    - with ``permeability``, ``thickness`` and ``well_diameter``: the productivity and injectivity\n      indices of radial Darcy flow, with the fluid viscosity, ``drainage_radius``, the wellbore\n      radius and the ``skin`` of each reservoir, and the vertical pipe paths of the wells;\n    - with ``nominal_flow``, ``pump_efficiency`` and ``nominal_wellhead_pressure``: the pump setting\n      depth, the shallowest that keeps that pressure at the intake, and a one-stage ESP of constant\n      head that reaches the wellhead pressure at the nominal flow, with that hydraulic efficiency.\n\n    A group of values that is not complete derives nothing, and the old way, setting every child\n    value directly, works as it did. A child value in the same call wins over the derived one and\n    stays explicit. Setting ``fluid`` gives it to every child and derives again.",
   "inlets": {
     "power_in": {
       "fields": {
@@ -141,7 +141,7 @@
       "unit": "m"
     },
     "gradient": {
-      "default": null,
+      "default": 0.03,
       "description": null,
       "enum": null,
       "maximum": null,
@@ -196,7 +196,7 @@
       "unit": "-"
     },
     "surface_temperature": {
-      "default": null,
+      "default": 285.15,
       "description": null,
       "enum": null,
       "maximum": null,
@@ -269,7 +269,7 @@
       "esp.tubing": 0.1778,
       "formation.geothermal_gradient": null,
       "formation.surface_temperature": null,
-      "gradient": null,
+      "gradient": 0.03,
       "injector.correction_factors": [
         1.0,
         0.0
@@ -408,7 +408,7 @@
       "sink.temperature": 353.15,
       "sink.top_depth": 0.0,
       "sink.wellbore_radius": 0.0765,
-      "surface_temperature": null,
+      "surface_temperature": 285.15,
       "thickness": null,
       "well.correction_factors": [
         1.0,

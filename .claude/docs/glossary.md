@@ -35,7 +35,7 @@ into the vocabulary in the commit that first uses it, only if it is a full word 
 | bulk material around a well | `ground_conductivity`, `ground_diffusivity`, `ground_...` | |
 | solid matrix of a porous layer | `rock_volumetric_heat_capacity` | |
 | depth of a borehole | `borehole_depth` | a bare `depth` |
-| design of a doublet from its depth | `depth`, `thickness`, `gradient`, as the challenge states them, on `Doublet` only | |
+| design of a doublet from its depth | `depth`, `thickness`, `gradient`, as the challenge states them, on `Doublet` and, `depth` alone, on the plants of `DoubletsPlant` | |
 
 Four short forms stay because the full word would be longer and no clearer in this field: `T` (see
 above), `co2`, `cop` (coefficient of performance) and `esp` (electrical submersible pump).

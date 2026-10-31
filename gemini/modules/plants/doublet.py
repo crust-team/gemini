@@ -34,9 +34,10 @@ class Doublet(Plant):
     thickness and ``well_diameter`` the inner diameter of both vertical wells. ``set_params``
     derives, through ``gemini/physics/doublet.py``:
 
-    - from ``depth``, ``gradient`` and ``surface_temperature``: the reservoir temperature at the
-      midpoint, the hydrostatic reservoir pressure from the fluid density, the top depth and the
-      soil temperature of the wells, the geotherm at half the depth;
+    - from ``depth``, ``gradient`` and ``surface_temperature``, by default the challenge's 30 K/km
+      and 12 degC: the reservoir temperature at the midpoint, the hydrostatic reservoir pressure
+      from the fluid density, the top depth and the soil temperature of the wells, the geotherm at
+      half the depth;
     - with ``permeability``, ``thickness`` and ``well_diameter``: the productivity and injectivity
       indices of radial Darcy flow, with the fluid viscosity, ``drainage_radius``, the wellbore
       radius and the ``skin`` of each reservoir, and the vertical pipe paths of the wells;
@@ -64,8 +65,8 @@ class Doublet(Plant):
 
         # Parameters
         self.depth = Parameter(Length | None, default=None)
-        self.gradient = Parameter(TemperatureGradient | None, default=None)
-        self.surface_temperature = Parameter(Temperature | None, default=None)
+        self.gradient = Parameter(TemperatureGradient, default=ground.GEOTHERMAL_GRADIENT)
+        self.surface_temperature = Parameter(Temperature, default=ground.SURFACE_TEMPERATURE)
         self.permeability = Parameter(Permeability | None, default=None)
         self.thickness = Parameter(Length | None, default=None)
         self.well_diameter = Parameter(Length | None, default=None)

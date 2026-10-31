@@ -65,6 +65,12 @@ def aquifer_volumetric_heat_capacity(
     return porosity * fluid_heat_capacity + (1 - porosity) * rock_heat_capacity
 
 
+SURFACE_TEMPERATURE = 285.15
+"""Reference surface temperature [K] of a doublet design: 12 degC, the challenge value."""
+
+GEOTHERMAL_GRADIENT = 0.03
+"""Geothermal gradient [K/m] of a doublet design: 30 K/km, the challenge value."""
+
 DOUBLET_WELL_SPACING = 1000.0
 """Distance [m] between the wells of a doublet at reservoir level, as its drainage radius.
 

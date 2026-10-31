@@ -1,15 +1,15 @@
 {
   "plant": "HeatingFullCoolingPlant",
   "params": {
-    "doublet.reservoir.pressure": 22000000.0,
-    "doublet.reservoir.temperature": 353.15,
-    "doublet.reservoir.permeability": 9.869233e-12,
-    "doublet.reservoir.aquifer_thickness": 45.0,
-    "doublet.reservoir.drainage_radius": 1000.0,
-    "doublet.reservoir.top_depth": 1800.0,
-    "doublet.reservoir.productivity_index": 5.833333333333333e-08,
-    "doublet.reservoir.wellbore_radius": 0.0765,
-    "doublet.well.pipe_path": {
+    "d0.reservoir.pressure": 22000000.0,
+    "d0.reservoir.temperature": 353.15,
+    "d0.reservoir.permeability": 9.869233e-12,
+    "d0.reservoir.aquifer_thickness": 45.0,
+    "d0.reservoir.drainage_radius": 1000.0,
+    "d0.reservoir.top_depth": 1800.0,
+    "d0.reservoir.productivity_index": 5.833333333333333e-08,
+    "d0.reservoir.wellbore_radius": 0.0765,
+    "d0.well.pipe_path": {
       "sections": [
         {
           "length": 400.0,
@@ -79,11 +79,11 @@
         }
       ]
     },
-    "doublet.well.soil_temperature": 288.15,
-    "doublet.well.segment": "below_esp",
-    "doublet.well.esp_depth": 600.0,
-    "doublet.esp.stage_count": 15,
-    "doublet.esp.head_coefficients": [
+    "d0.well.soil_temperature": 288.15,
+    "d0.well.segment": "below_esp",
+    "d0.well.esp_depth": 600.0,
+    "d0.esp.stage_count": 15,
+    "d0.esp.head_coefficients": [
       125.518426,
       -0.0020852856,
       2.28955651e-07,
@@ -91,7 +91,7 @@
       2.37859645e-16,
       -1.18258356e-21
     ],
-    "doublet.esp.power_coefficients": [
+    "d0.esp.power_coefficients": [
       0.0,
       0.0,
       0.0,
@@ -99,13 +99,13 @@
       0.0,
       0.0
     ],
-    "doublet.esp.pump_type": "DEFAULT-PUMP",
-    "doublet.esp.setting_depth": 600.0,
-    "doublet.esp.minimum_flow": 0.02277777777777778,
-    "doublet.esp.maximum_flow": 0.049444444444444444,
-    "doublet.esp.best_efficiency_flow": 0.03610555555555555,
-    "doublet.esp.tubing": 0.1778,
-    "doublet.riser.pipe_path": {
+    "d0.esp.pump_type": "DEFAULT-PUMP",
+    "d0.esp.setting_depth": 600.0,
+    "d0.esp.minimum_flow": 0.02277777777777778,
+    "d0.esp.maximum_flow": 0.049444444444444444,
+    "d0.esp.best_efficiency_flow": 0.03610555555555555,
+    "d0.esp.tubing": 0.1778,
+    "d0.riser.pipe_path": {
       "sections": [
         {
           "length": 400.0,
@@ -175,10 +175,10 @@
         }
       ]
     },
-    "doublet.riser.soil_temperature": 288.15,
-    "doublet.riser.segment": "above_esp",
-    "doublet.riser.esp_depth": 600.0,
-    "doublet.injector.pipe_path": {
+    "d0.riser.soil_temperature": 288.15,
+    "d0.riser.segment": "above_esp",
+    "d0.riser.esp_depth": 600.0,
+    "d0.injector.pipe_path": {
       "sections": [
         {
           "length": 500.0,
@@ -200,15 +200,15 @@
         }
       ]
     },
-    "doublet.injector.soil_temperature": 288.15,
-    "doublet.sink.pressure": 22000000.0,
-    "doublet.sink.temperature": 353.15,
-    "doublet.sink.permeability": 9.869233e-12,
-    "doublet.sink.aquifer_thickness": 45.0,
-    "doublet.sink.drainage_radius": 0.0,
-    "doublet.sink.top_depth": 0.0,
-    "doublet.sink.injectivity_index": 5.5555555555555555e-08,
-    "doublet.sink.wellbore_radius": 0.0765,
+    "d0.injector.soil_temperature": 288.15,
+    "d0.sink.pressure": 22000000.0,
+    "d0.sink.temperature": 353.15,
+    "d0.sink.permeability": 9.869233e-12,
+    "d0.sink.aquifer_thickness": 45.0,
+    "d0.sink.drainage_radius": 0.0,
+    "d0.sink.top_depth": 0.0,
+    "d0.sink.injectivity_index": 5.5555555555555555e-08,
+    "d0.sink.wellbore_radius": 0.0765,
     "degasser.heat_transfer_coefficient": 100000.0,
     "heat_exchanger.thermal_conductance": 100000.0,
     "heat_exchanger.hot_nominal_pressure_drop": 0.0,
@@ -288,7 +288,7 @@
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
-    "doublet.reservoir": {
+    "d0.reservoir": {
       "kind": "brine",
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
@@ -303,7 +303,7 @@
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
-    "doublet.well": {
+    "d0.well": {
       "kind": "brine",
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
@@ -318,7 +318,7 @@
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
-    "doublet.esp": {
+    "d0.esp": {
       "kind": "brine",
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
@@ -333,7 +333,7 @@
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
-    "doublet.riser": {
+    "d0.riser": {
       "kind": "brine",
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
@@ -348,7 +348,7 @@
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
-    "doublet.injector": {
+    "d0.injector": {
       "kind": "brine",
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,
@@ -363,7 +363,7 @@
       "specific_heat": 4129.213483146067,
       "thermal_conductivity": null
     },
-    "doublet.sink": {
+    "d0.sink": {
       "kind": "brine",
       "salinity": 0.0,
       "co2_mass_fraction": 0.0,

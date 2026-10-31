@@ -51,11 +51,13 @@ TYPE_RENAMES = {
 NEW_PARAMS = {
     "degasser": {"separation_efficiency": 0.0},
     "doublet": {
+        "gradient": 0.03,
+        "surface_temperature": 285.15,
+    }
+    | {
         name: None
         for name in (
             "depth",
-            "gradient",
-            "surface_temperature",
             "permeability",
             "thickness",
             "well_diameter",
