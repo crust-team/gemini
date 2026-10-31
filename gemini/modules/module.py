@@ -384,7 +384,7 @@ class Module:
         kind, *references = formula
         if kind == "of":
             self._check_of_target(name, references[0])
-        if kind == "ratio":
+        if kind in ("ratio", "difference"):
             self._check_ratio_operands(name, references)
 
     def _check_of_target(self, name, target):
@@ -1010,7 +1010,7 @@ class Module:
     def _resolve_formula(self, formula):
         """Return the descendant path and access of ``Output.of``, or the ratio operand names."""
         kind, *references = formula
-        if kind == "ratio":
+        if kind in ("ratio", "difference"):
             return (kind, *(reference.name for reference in references))
         target = references[0]
         if isinstance(target, PortField):
@@ -1066,6 +1066,15 @@ class Module:
                 setattr(self, name, self._output_sum(calls, *arguments))
             elif kind == "ratio":
                 setattr(self, name, self._output_ratio(*arguments))
+            elif kind == "difference":
+                setattr(self, name, self._output_difference(*arguments))
+
+    def _output_difference(self, first, second):
+        """Return the difference of two recorded outputs, ``None`` when either is ``None``."""
+        minuend, subtrahend = getattr(self, first), getattr(self, second)
+        if minuend is None or subtrahend is None:
+            return None
+        return minuend - subtrahend
 
     def _output_of(self, name, calls, module_path, access):
         section, port, field_name = access

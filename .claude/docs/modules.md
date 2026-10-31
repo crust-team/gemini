@@ -209,6 +209,9 @@ record their own value for an additive output:
 - `Output.ratio(self.thermal_power, self.electricity)` divides two earlier outputs of the same
   module and records `None` when either value is `None` or the denominator is zero.
 
+- `Output.difference(self.first, self.second, kind)` subtracts two earlier outputs of the same
+  module, as `kind`, and records `None` when either value is `None`.
+
 Formulas take declaration references, not path strings. Children are assigned first
 (`# Modules`), so the references exist when the outputs are declared. Assigning a formula checks
 it while the class is built: an `Output.of` target outside the descendant tree (or a string), or a

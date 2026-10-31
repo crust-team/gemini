@@ -25,6 +25,7 @@ from gemini.types import (
     ProductivityIndex,
     Stream,
     Temperature,
+    VolumeFlow,
 )
 from gemini.types.results import NOT_ASSESSED
 
@@ -158,6 +159,9 @@ class ProductionReservoir(_Reservoir):
         # Controls
         self.production_rate = Control(MassFlow, ge=0)
 
+        # Outputs
+        self.liquid_flow = Output(VolumeFlow)
+
         # Outlets
         self.sandface = Outlet(Stream, stream="brine")
 
@@ -175,6 +179,10 @@ class ProductionReservoir(_Reservoir):
         flow = sandface.volumetric_flow()
         for name, value in self._calculate_outputs(flow, sandface.p).items():
             setattr(self, name, value)
+        properties = sandface.fluid.properties(sandface.p, sandface.T)
+        self.liquid_flow = fluid_physics.liquid_volume_flow(
+            sandface.m_dot, properties.gmf, properties.rho_l
+        )
 
     def sandface_stream(self, production_rate):
         """Return the sandface stream [SI] the linear IPR delivers at a production rate [kg/s].

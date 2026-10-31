@@ -417,6 +417,13 @@ class Output(Declaration):
         output.formula = ("ratio", numerator, denominator)
         return output
 
+    @classmethod
+    def difference(cls, first, second, kind, **kwargs):
+        """Declare ``first - second`` of two earlier outputs of the same module, as ``kind``."""
+        output = cls(kind, **kwargs)
+        output.formula = ("difference", first, second)
+        return output
+
 
 class Outlet(_StreamPort):
     """Outgoing fluid stream port."""

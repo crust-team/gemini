@@ -19,7 +19,11 @@
   "outlets": {"supply_out": "riser.wellhead"},
   "outputs": {
     "electricity": {"sum": "electricity"},
-    "heat_loss": {"sum": "heat_loss"}
+    "heat_loss": {"sum": "heat_loss"},
+    "flow": {"of": "reservoir.liquid_flow"},
+    "production_temperature": {"of": "riser.wellhead_temperature"},
+    "injection_temperature": {"of": "injector.wellhead_temperature"},
+    "brine_cooling": {"difference": ["production_temperature", "injection_temperature"]}
   },
   "bindings": {},
   "param_history": {}

@@ -62,6 +62,12 @@ def _output():
             "field": {"type": "string"},
             "sum": {"type": "string"},
             "ratio": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2},
+            "difference": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 2,
+                "maxItems": 2,
+            },
         },
     }
 

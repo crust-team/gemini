@@ -250,6 +250,8 @@ shipped plant has no value until modules declare `capex()`.
 | `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `{name: value}` of `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
 | `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)` | real, each a check; they are ledger checks, see [economics.md](economics.md) |
 | `gm.checks.run_all(plant, results)` | real: `{passed, checks: [check]}` |
+| `gm.checks.Limits()`, `add(target, min=None, max=None)`, `to_dict()`, `from_dict(data)` | real: limits of `"<path pattern>.<output>"`, built without a plant; a plain dictionary |
+| `gm.checks.limits(plant, results, limits)` | real: a list of checks, one per matched module and output, `value` the worst of the run; an unmatched pattern raises `ValidationError` code `unknown_name` |
 | `gm.testing.check_module(cls, example=None)` | real; for developers of a new module class only: a report, never raises |
 | `gm.optim.calibrate(plant, dataset, params, start=None, end=None, backend="numpy", apply=True)`, `CalibrationResult` | real |
 | `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100)` | later |

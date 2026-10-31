@@ -283,6 +283,20 @@
         "unit": "W",
         "value": 79803.2829099962
       }
+    },
+    "wellhead_temperature": {
+      "max": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "mean": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "min": {
+        "unit": "K",
+        "value": 295.438
+      }
     }
   },
   "doublet.reservoir": {
@@ -354,6 +368,20 @@
       "min": {
         "unit": "Pa",
         "value": 18858744.0
+      }
+    },
+    "liquid_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
       }
     },
     "overpressure": {

@@ -35,6 +35,7 @@ class InjectionWell(_Well):
         self.wellhead = Inlet(Stream, stream="brine")
 
         # Outputs
+        self.wellhead_temperature = Output(Temperature, soft_sensor=True)
         self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
         self.bottomhole_temperature = Output(Temperature)
         self.friction_pressure_drop = Output(PressureDifference)
@@ -69,6 +70,7 @@ class InjectionWell(_Well):
         bottom = outlets.bottom
         stream = self._traversal_stream(wellhead)
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
+        self.wellhead_temperature = wellhead.T
         self.bottomhole_pressure = bottom.p
         self.bottomhole_temperature = bottom.T
         self.friction_pressure_drop = result.friction_pressure_drop

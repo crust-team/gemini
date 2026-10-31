@@ -1647,6 +1647,9 @@ assert round(result.outlets.supply_out.T - 273.15, 2) == 72.54
 assert gm.modules.mass_balance(doublet, result)["residual"] == 0
 ```
 
+`flow` is the liquid volume flow of the production reservoir and `brine_cooling` the production
+minus the injection temperature, the outputs the limits of a doublet read.
+
 #### A doublet from its depth
 
 `gm.modules.get("Doublet")` is the class `gm.plants.Doublet`, the same spec with design parameters.

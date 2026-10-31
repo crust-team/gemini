@@ -80,7 +80,7 @@ assert plant.to_spec() == spec
 | `bindings` | yes | `{path: {name: column}}`, flat; see [bindings](#parameters-by-date-and-bindings) |
 | `param_history` | yes | `{path: [{valid_from, params}]}`; one undated entry is the same as `params` and is not written |
 | `inlets`, `outlets` | no | `{plant port: "path.port"}` |
-| `outputs` | no | `{name: {"of": "path.output", "field"?}, {"sum": name} or {"ratio": [a, b]}}` |
+| `outputs` | no | `{name: {"of": "path.output", "field"?}, {"sum": name}, {"ratio": [a, b]} or {"difference": [a, b]}}` |
 | `fluids`, `boundary` | no | `{path: {...}}`, the fluid and the stored assumptions of a module |
 | `type`, `params` | no | root of a handwritten module: its registry name and flat dotted values |
 

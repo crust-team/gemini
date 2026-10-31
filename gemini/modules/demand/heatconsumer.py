@@ -61,6 +61,7 @@ class HeatConsumer(Module):
         self.heat_demand = Boundary(Power, ge=0)
 
         # Outputs
+        self.supply_in_T = Output(Temperature)
         self.heat_supplied = Output(HeatSupplied)
         self.unmet_demand = Output(Power)
         self.return_out_T = Output(Temperature)
@@ -90,6 +91,7 @@ class HeatConsumer(Module):
     def _compute_outputs(self, inlets, outlets):
         supply_in = inlets.supply_in
         return_out = outlets.return_out
+        self.supply_in_T = supply_in.T
         self.heat_supplied = self._delivered_heat(supply_in)
         self.unmet_demand = self.heat_demand - self.heat_supplied
         self.return_out_T = return_out.T

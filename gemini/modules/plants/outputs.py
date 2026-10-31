@@ -3,10 +3,11 @@
 from gemini.errors import ValidationError
 from gemini.modules.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
 from gemini.types.declarations import Output
+from gemini.types.quantities import TemperatureDifference
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
 ENERGY = ENERGY_INPUTS + ENERGY_OUTPUTS
-KEYS = ("of", "sum", "ratio")
+KEYS = ("of", "sum", "ratio", "difference")
 
 
 def declare_automatic(plant):
@@ -67,8 +68,22 @@ def _ratio(plant, spec):
     return Output.ratio(*(plant._outputs[name] for name in names))
 
 
+def _difference(plant, spec):
+    names = spec["difference"]
+    for name in names:
+        if name not in plant._outputs:
+            raise _unknown("difference", name, plant._outputs)
+    return Output.difference(
+        *(plant._outputs[name] for name in names), TemperatureDifference | None
+    )
+
+
 def declare_output(plant, name, spec):
-    """Declare output ``name`` from ``{"of": path}``, ``{"sum": name}`` or ``{"ratio": [a, b]}``."""
+    """Declare output ``name`` from a spec entry.
+
+    The entry is ``{"of": path}``, ``{"sum": name}``, ``{"ratio": [a, b]}`` or
+    ``{"difference": [a, b]}``, the temperature difference of two outputs.
+    """
     given = [key for key in KEYS if key in spec]
     if len(given) != 1:
         raise ValidationError(
@@ -78,6 +93,7 @@ def declare_output(plant, name, spec):
         )
     builders = {"of": lambda: Output.of(_target(plant, spec)), "sum": lambda: _summed(plant, spec)}
     builders["ratio"] = lambda: _ratio(plant, spec)
+    builders["difference"] = lambda: _difference(plant, spec)
     if name in plant._children:
         raise ValidationError(f"{name}: an output cannot share the name of a module", path="")
     plant._register_declaration(name, builders[given[0]]())
@@ -88,7 +104,7 @@ def ordered(specs):
     result, waiting = [], []
 
     def ready(item):
-        operands = item[1].get("ratio", ())
+        operands = item[1].get("ratio", ()) or item[1].get("difference", ())
         return all(operand in {name for name, _ in result} for operand in operands)
 
     for item in specs.items():

@@ -46,6 +46,10 @@ RETIRED = {"values", "units", "tolerance", "timestamp", "class", "type", "module
 """Keys of the former shapes; none is in a public return."""
 
 
+def _limits():
+    return gm.checks.Limits().add("heat_exchanger.duty", min="0 MW")
+
+
 def _run_entries(plant, results):
     return {
         "evaluate": lambda: gm.evaluate(
@@ -115,7 +119,9 @@ def _ledger_entries(plant, results):
         "energy_balance": lambda: gm.checks.energy_balance(results),
         "mass_balance": lambda: gm.checks.mass_balance(results),
         "bounds": lambda: gm.checks.bounds(plant, results),
+        "limits": lambda: gm.checks.limits(plant, results, _limits()),
         "run_all": lambda: gm.checks.run_all(plant, results),
+        "Limits": lambda: _limits().to_dict(),
     }
 
 

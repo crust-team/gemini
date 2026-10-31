@@ -105,6 +105,26 @@ it, and the checks audit what the columns hold:
 | `bounds(plant, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
 | `run_all(plant, results)` | the three above | `{passed, checks}` |
 
+`gm.checks.Limits` holds limits a user sets, `(path pattern, output, min, max)`:
+
+```python
+limits = gm.checks.Limits()
+limits.add("d*.flow", min="50 m3/h", max="300 m3/h")
+limits.add("d*.brine_cooling", max="40 K")
+limits.add("heat_users.supply_in_T", min="100 degC")
+checks = gm.checks.limits(plant, results, limits)
+```
+
+`add` checks the units and needs no plant; `to_dict` and `from_dict` give a plain dictionary to store.
+`gm.checks.limits` matches each pattern against the module paths, name by name (`*` stays within one
+name, so `d*.flow` is not `d0.esp.flow`); a pattern or output that matches nothing raises
+`ValidationError`, code `unknown_name`, with suggestions. It returns one check per matched module and
+output, `value` the worst value of the run and `limit` the limit, `[min, max]` with both. Only ticks
+on which the module carried flow are judged: the minimum flow holds while a doublet runs. A violated
+limit is an answer. `Results` holds leaf columns, so an output of a composite is read through the
+leaves its formula names: `Doublet` declares `flow` (liquid volume, `reservoir.liquid_flow`) and
+`brine_cooling` (`production_temperature - injection_temperature`, `Output.difference`).
+
 A real closure check needs the engine to record each call's residual (`balance.energy_balance`)
 as a result column; that is a change to the engine, not to this package.
 
