@@ -105,8 +105,8 @@ Use dotted module paths consistently. Binding groups are `controls`, `boundaries
 skips only its measured twin; in simulation it skips the step. Never disguise a thermal-only
 audit as full first-law closure or tune against a holdout merely to meet a threshold.
 
-Examples live under `examples/<area>/<category>/NN_<name>.py`; the legacy bridge example
-`examples/legacy/00_gemini_project_bridge.py` is the one example without a category folder.
+Examples live in `examples/`: `quickstart.py`, numbered `basics/`, then `recipes/` and `cases/`
+([README](../../examples/README.md)).
 Data lives in `datasets/`, and generated output goes under ignored `runs/`.
 
 ## Naming

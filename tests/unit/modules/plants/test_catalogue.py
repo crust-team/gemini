@@ -17,6 +17,8 @@ def test_names_are_the_registered_plants():
         catalogue.names()
     )
     assert {"HeatingSubstation", "CoolingSubstation", "ATESPlant"} <= set(catalogue.names())
+    assert {"NodalDoublet", "ParallelExchangerPlant", "BoilerChpPlant"} <= set(catalogue.names())
+    assert {"DistrictEnergyPlant", "HackathonPlant"} <= set(catalogue.names())
     assert "ESP" not in catalogue.names()
 
 
@@ -66,6 +68,25 @@ def test_the_other_examples_carry_the_values_of_their_tests(plants):
     assert catalogue.example("CoolingSubstation").state_dict() == cooling.state_dict()
     network = plants["network"](catalogue.get("DistrictNetwork"), plants["heating_substation"])
     assert catalogue.example("DistrictNetwork").state_dict() == network.state_dict()
+
+
+def test_a_state_dictionary_fills_a_plant_without_values():
+    """A plant from ``get`` has no values and takes those of an example; groups stay groups."""
+    example = catalogue.example("DoubletHeatPlant")
+    assert isinstance(example.filters, gm.modules.ModuleDict)
+    fresh = catalogue.get("DoubletHeatPlant")
+    assert not fresh.is_initialized
+    fresh.load_state_dict(example.state_dict())
+    assert fresh.is_initialized
+
+
+def test_the_hackathon_plant_has_its_values_only_in_the_example():
+    """The registered spec is the wiring, and the example fills every module of it."""
+    empty, filled = catalogue.get("HackathonPlant"), catalogue.example("HackathonPlant")
+    assert not empty.is_initialized and filled.is_initialized
+    assert empty.to_spec()["connections"] == filled.to_spec()["connections"]
+    assert filled.d0.reservoir.temperature == filled.d1.reservoir.temperature
+    assert filled.heat_users.fluid == gm.WATER
 
 
 def test_a_registered_plant_without_values_names_itself(monkeypatch):

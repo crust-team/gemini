@@ -105,3 +105,38 @@ def test_traced_call_matches_one_call_per_row_on_every_backend():
         for m_dot, frequency in ((5, 60), (60, 60), (200, 50), (500, 60), (1e-3, 60), (60, 35))
     ]
     assert_module_matches(ESP().update_params(**ESP_PARAMS), rows)
+
+
+def _design():
+    """Return an ESP with the values of the example doublet."""
+    design = gm.plants.example("Doublet").esp
+    values = {name: parameter.value for name, parameter in design.named_parameters()}
+    return ESP().update_params(**values)
+
+
+def test_keyword_mapping_and_positional_calls_agree():
+    """Every way to pass the inlet gives one head, and a persisted command is that of the call."""
+    esp, stream = _design(), Stream(flow="150 m3/h", T="80 degC", p="20 bar")
+    head = esp(fluid_in=stream, frequency="50 Hz").outputs.head
+    assert head == esp({"fluid_in": stream}, frequency="50 Hz").outputs.head
+    assert head == esp(stream, frequency="50 Hz").outputs.head
+    esp.frequency = 50.0
+    assert head == esp(fluid_in=stream).outputs.head
+
+
+def test_no_outputs_keeps_the_outlet_of_a_full_call():
+    """Skipping the outputs leaves the outlet stream as it was."""
+    esp, stream = _design(), Stream(flow="150 m3/h", T="80 degC", p="20 bar")
+    full = esp(fluid_in=stream, frequency="50 Hz")
+    with gm.no_outputs():
+        fast = esp(fluid_in=stream, frequency="50 Hz")
+    assert dict(fast.outputs) == {}
+    assert fast.outlets.fluid_out == full.outlets.fluid_out
+
+
+def test_a_new_esp_names_what_it_misses():
+    """A new pump is not initialized and lists its parameters until they are assigned."""
+    esp = ESP()
+    assert not esp.is_initialized and "stage_count" in esp.missing_parameters()
+    esp.stage_count = 120
+    assert esp.stage_count == 120 and "stage_count" not in esp.missing_parameters()

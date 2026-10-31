@@ -94,6 +94,10 @@ Shared conventions, stated once here and not repeated per module:
 | Plants | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
 | Plants | `ATESPlant` | `return_in`, `power_in` -> `supply_out`, `loss_out` | child | ATES, pump, HX, heat pump |
 | Plants | `NodalDoublet` | `return_in`, `power_in` -> `supply_out` | no | doublet solved by nodal analysis |
+| Plants | `ParallelExchangerPlant` | `return_in` -> `supply_out` | no | nodal doublet, three parallel exchangers |
+| Plants | `BoilerChpPlant` | `return_in` -> `supply_out` | no | nodal doublet, exchanger, boiler, CHP |
+| Plants | `DistrictEnergyPlant` | `hot_in`, `cold_in`, `air_in` -> `hot_out`, `cold_out` | child | heating network, cooling network, ATES |
+| Plants | `HackathonPlant` | none | no | two doublets, exchanger, heat pump, boiler, chiller, every edge module |
 
 ## Pumps
 
@@ -1944,15 +1948,17 @@ the trial value or both residuals. On the upstream doublet-A configuration (2400
 `NodalDoublet` (`plants/nodaldoublet.py`, `gm.plants.get("NodalDoublet")`) wraps both solves in a
 handwritten doublet: `produce()` solves the rate for its `wellhead_pressure` boundary, `inject(stream)` sets
 the injection pump to the solved pressure, or to its suction pressure when the solve returns
-`None`. `examples/plants/simulate/02_parallel_heat_exchangers.py` uses it with three parallel
-exchangers (upstream `parallel_hex_plant`: 125.10 m3/h at 10 bar, the measured 125 m3/h the
+`None`. `ParallelExchangerPlant` (case `examples/cases/parallel_exchangers.py`) uses it with three
+parallel exchangers (upstream `parallel_hex_plant`: 125.10 m3/h at 10 bar, the measured 125 m3/h the
 upstream index was fitted to; injection 54.86 bar where upstream computes 44.47 bar, because
 upstream adds the injector's 5.20 bar friction instead of subtracting it, see
-[refactor-notes.md](refactor-notes.md#upstream-development-port)); the example therefore also
-recalibrates the injectivity to 2.8430 m3/h/bar, which restores 44.47 bar.
-`examples/plants/simulate/03_boiler_chp_secondary.py` (upstream `doublet_plant`) adds a boiler and
-a CHP on the secondary side and reports `emissions`; its 3100 m injector needs no pump, so the
-injection pump draws zero electricity.
+[refactor-notes.md](refactor-notes.md#upstream-development-port)); the case therefore also
+recalibrates the injectivity to 2.8430 m3/h/bar, which restores 44.47 bar. `BoilerChpPlant` (case
+`examples/cases/boiler_chp.py`, upstream `doublet_plant`) adds a boiler and a CHP on the secondary
+side and reports `emissions`; its 3100 m injector needs no pump, so the injection pump draws zero
+electricity. Both are handwritten `Module`s, because `produce()` and `inject()` are called with the
+surface equipment between them, and `gm.plants.example(name)` gives each with its upstream data.
+A run sets `esp.frequency`, `wellhead_pressure`, the `split_fraction`s and the setpoints as inputs.
 
 ```python
 from gemini.modules import ESP, ProductionReservoir, ProductionWell
@@ -1980,6 +1986,23 @@ rate = nodal.solve_production_rate(reservoir, well, 3e5, (5, 60), esp=esp, riser
 assert round(rate * 3.6, 4) == 135.8666
 reservoir.production_rate = rate
 ```
+
+### The plants of the cases
+
+`gm.plants.example(name)` gives each plant of `examples/cases/` with its design values; controls and
+boundaries stay inputs of the run.
+
+- `DistrictEnergyPlant` (`plants/districtenergyplant.py`): a `DistrictNetwork` of two heating
+  substations on `hot_in`, and an `ATESPlant` in charge mode chilling a `DistrictNetwork` of one
+  cooling substation. `Module.step` carries the storage; the caller feeds `cold_out` back to
+  `cold_in` at the next step. Its grid and air are children called in `forward`.
+- `HackathonPlant` (`specs/HackathonPlant.json`): the challenge plant as a spec, with no plant
+  ports. Two designed `Doublet`s, `Mixer`, `Degasser`, `Desander`, `InhibitorDosing`, `HeatExchanger`,
+  the source side of `HeatPump` and a `Splitter` back to the doublets; heating water from
+  `HeatingGrid` through exchanger, heat pump and `Boiler`, part of it to the generator of an
+  `AbsorptionUnit`; co-produced gas through `GasMakeup` to the boiler and a `Flare`; a dry `Cooler`
+  on the chiller; `ElectricityGrid`, `GasGrid`, `WasteGrid`, `ChemicalGrid` and `Atmosphere` at the
+  edge. The sizes in `specs/examples/HackathonPlant.json` are assumptions of the case.
 
 ### Heating and cooling template
 

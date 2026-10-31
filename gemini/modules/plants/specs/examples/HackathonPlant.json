@@ -1,0 +1,639 @@
+{
+  "format": 2,
+  "name": "HackathonPlant",
+  "modules": {
+    "d0": {
+      "type": "Doublet",
+      "params": {
+        "depth": "2500 m",
+        "gradient": "30 K/km",
+        "surface_temperature": "12 degC",
+        "permeability": "200 mD",
+        "thickness": "100 m",
+        "well_diameter": "0.244 m",
+        "nominal_flow": "300 m3/h",
+        "pump_efficiency": 0.7,
+        "nominal_wellhead_pressure": "10 bar"
+      }
+    },
+    "d1": {
+      "type": "Doublet",
+      "params": {
+        "depth": "2500 m",
+        "gradient": "30 K/km",
+        "surface_temperature": "12 degC",
+        "permeability": "200 mD",
+        "thickness": "100 m",
+        "well_diameter": "0.244 m",
+        "nominal_flow": "300 m3/h",
+        "pump_efficiency": 0.7,
+        "nominal_wellhead_pressure": "10 bar"
+      }
+    },
+    "production": {
+      "type": "Mixer",
+      "params": {}
+    },
+    "degasser": {
+      "type": "Degasser",
+      "params": {
+        "separation_efficiency": 1.0
+      }
+    },
+    "desander": {
+      "type": "Desander",
+      "params": {
+        "separation_efficiency": 0.9,
+        "nominal_pressure_drop": "0.2 bar",
+        "nominal_mass_flow": 170.0
+      }
+    },
+    "dosing": {
+      "type": "InhibitorDosing",
+      "params": {
+        "product_concentration": 0.3
+      }
+    },
+    "waste": {
+      "type": "WasteGrid",
+      "params": {}
+    },
+    "chemicals": {
+      "type": "ChemicalGrid",
+      "params": {}
+    },
+    "hx": {
+      "type": "HeatExchanger",
+      "params": {
+        "thermal_conductance": 1500000.0,
+        "hot_nominal_pressure_drop": 0,
+        "cold_nominal_pressure_drop": 0,
+        "hot_nominal_mass_flow": 171.7,
+        "cold_nominal_mass_flow": 178.0
+      }
+    },
+    "injection": {
+      "type": "Splitter",
+      "params": {}
+    },
+    "gas_grid": {
+      "type": "GasGrid",
+      "params": {}
+    },
+    "makeup": {
+      "type": "GasMakeup",
+      "params": {}
+    },
+    "boiler": {
+      "type": "Boiler",
+      "params": {
+        "capacity": "30 MW",
+        "efficiency": 0.9
+      }
+    },
+    "flare": {
+      "type": "Flare",
+      "params": {}
+    },
+    "grid": {
+      "type": "ElectricityGrid",
+      "params": {}
+    },
+    "air": {
+      "type": "Atmosphere",
+      "params": {}
+    },
+    "chiller_cooler": {
+      "type": "Cooler",
+      "params": {
+        "cooler_type": "dry",
+        "capacity": "40 MW",
+        "approach": 5.0,
+        "specific_fan_power": 0.02,
+        "loop_pressure": 300000.0
+      }
+    },
+    "heat_pump": {
+      "type": "HeatPump",
+      "params": {
+        "mode": "heating",
+        "capacity": "15 MW",
+        "minimum_source_outlet_temperature": "47 degC"
+      }
+    },
+    "loads": {
+      "type": "Splitter",
+      "params": {}
+    },
+    "heat_return": {
+      "type": "Mixer",
+      "params": {}
+    },
+    "heat_users": {
+      "type": "HeatingGrid",
+      "params": {
+        "return_temperature": 333.15,
+        "return_pressure": 600000.0
+      }
+    },
+    "chiller": {
+      "type": "AbsorptionUnit",
+      "params": {
+        "mode": "chiller",
+        "capacity": "10 MW",
+        "characteristic_slope": 700000.0,
+        "minimum_driving_difference": 10.0,
+        "rejection_coefficient": 2.2,
+        "evaporator_coefficient": 1.2,
+        "auxiliary_power_ratio": 0.01
+      }
+    },
+    "cool_users": {
+      "type": "CoolingGrid",
+      "params": {
+        "dew_point_margin": 1.0,
+        "return_temperature": 298.15,
+        "return_pressure": 400000.0
+      }
+    }
+  },
+  "connections": [
+    {
+      "source": "d0.supply_out",
+      "target": "production.branch1_in"
+    },
+    {
+      "source": "d1.supply_out",
+      "target": "production.branch2_in"
+    },
+    {
+      "source": "production.fluid_out",
+      "target": "degasser.fluid_in"
+    },
+    {
+      "source": "degasser.liquid_out",
+      "target": "desander.fluid_in"
+    },
+    {
+      "source": "desander.fluid_out",
+      "target": "dosing.fluid_in"
+    },
+    {
+      "source": "desander.waste_out",
+      "target": "waste.waste_in"
+    },
+    {
+      "source": "chemicals.chemical_out",
+      "target": "dosing.chemical_in"
+    },
+    {
+      "source": "dosing.fluid_out",
+      "target": "hx.hot_in"
+    },
+    {
+      "source": "hx.hot_out",
+      "target": "heat_pump.source_in"
+    },
+    {
+      "source": "heat_pump.source_out",
+      "target": "injection.fluid_in"
+    },
+    {
+      "source": "injection.branch1_out",
+      "target": "d0.return_in"
+    },
+    {
+      "source": "injection.branch2_out",
+      "target": "d1.return_in"
+    },
+    {
+      "source": "grid.power_out",
+      "target": "d0.power_in"
+    },
+    {
+      "source": "grid.power_out",
+      "target": "d1.power_in"
+    },
+    {
+      "source": "grid.power_out",
+      "target": "heat_pump.power_in"
+    },
+    {
+      "source": "grid.power_out",
+      "target": "chiller.power_in"
+    },
+    {
+      "source": "grid.power_out",
+      "target": "chiller_cooler.power_in"
+    },
+    {
+      "source": "degasser.gas_out",
+      "target": "makeup.gas_in"
+    },
+    {
+      "source": "gas_grid.gas_out",
+      "target": "makeup.grid_in"
+    },
+    {
+      "source": "makeup.fuel_out",
+      "target": "boiler.fuel_in"
+    },
+    {
+      "source": "makeup.excess_out",
+      "target": "flare.gas_in"
+    },
+    {
+      "source": "heat_users.return_out",
+      "target": "hx.cold_in"
+    },
+    {
+      "source": "hx.cold_out",
+      "target": "heat_pump.sink_in"
+    },
+    {
+      "source": "heat_pump.sink_out",
+      "target": "boiler.fluid_in"
+    },
+    {
+      "source": "boiler.fluid_out",
+      "target": "loads.fluid_in"
+    },
+    {
+      "source": "loads.branch1_out",
+      "target": "heat_return.branch1_in"
+    },
+    {
+      "source": "loads.branch2_out",
+      "target": "chiller.generator_in"
+    },
+    {
+      "source": "chiller.generator_out",
+      "target": "heat_return.branch2_in"
+    },
+    {
+      "source": "heat_return.fluid_out",
+      "target": "heat_users.supply_in"
+    },
+    {
+      "source": "cool_users.return_out",
+      "target": "chiller.chilled_in"
+    },
+    {
+      "source": "chiller.chilled_out",
+      "target": "cool_users.supply_in"
+    },
+    {
+      "source": "chiller.cooling_out",
+      "target": "chiller_cooler.fluid_in"
+    },
+    {
+      "source": "chiller_cooler.fluid_out",
+      "target": "chiller.cooling_in"
+    },
+    {
+      "source": "boiler.flue_out",
+      "target": "air.gas_in"
+    },
+    {
+      "source": "flare.flue_out",
+      "target": "air.gas_in"
+    },
+    {
+      "source": "flare.loss_out",
+      "target": "air.heat_in"
+    },
+    {
+      "source": "boiler.loss_out",
+      "target": "air.heat_in"
+    },
+    {
+      "source": "air.air_out",
+      "target": "chiller_cooler.air_in"
+    },
+    {
+      "source": "chiller_cooler.air_out",
+      "target": "air.air_in"
+    }
+  ],
+  "fluids": {
+    "d0": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d0.reservoir": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d0.well": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d0.esp": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d0.riser": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d0.injector": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d0.sink": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d0.formation": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1.reservoir": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1.well": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1.esp": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1.riser": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1.injector": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1.sink": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "d1.formation": {
+      "kind": "brine",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_liquid_ratio": 0.8,
+      "gas_composition": {
+        "CH4": 0.8,
+        "CO2": 0.2
+      },
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": 1030.0,
+      "viscosity": 0.0004,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "chiller_cooler": {
+      "kind": "water",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": null,
+      "viscosity": null,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "heat_users": {
+      "kind": "water",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": null,
+      "viscosity": null,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    },
+    "cool_users": {
+      "kind": "water",
+      "salinity": 0.0,
+      "co2_mass_fraction": 0.0,
+      "gas_mass_fraction": 0.0,
+      "gas_liquid_ratio": null,
+      "gas_composition": null,
+      "grid_composition": null,
+      "glycol_fraction": 0.0,
+      "property_model": "constant_stp",
+      "density": null,
+      "viscosity": null,
+      "specific_heat": null,
+      "thermal_conductivity": null
+    }
+  },
+  "bindings": {},
+  "param_history": {}
+}

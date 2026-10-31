@@ -77,7 +77,7 @@ plan = gm.schedule(plant, demand, rules)
 results = gm.simulate(plant, plan)
 ```
 
-`examples/plants/simulate/04_hackathon_plant.py` is that path for the whole challenge plant.
+`examples/cases/hackathon.py` is that path for the whole challenge plant.
 Everything in the energy flow is a module and everything that crosses between modules goes through
 a port. A plant starts at its edge modules: `ElectricityGrid`, `GasGrid`, `HeatingGrid`,
 `CoolingGrid`, `WasteGrid`, `ChemicalGrid`, `Atmosphere` and `Formation`. Totals are read from them

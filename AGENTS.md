@@ -85,7 +85,7 @@ gemini/
 └── profiles/         # demand profiles
 docs/schemas/         # JSON Schemas and samples of the exchanged documents
 datasets/             # committed data: doublet_heat/ (plant file and CSVs), legacy_project/
-examples/             # area/category/NN_name.py
+examples/             # quickstart.py, basics/, recipes/, cases/
 scripts/              # test_changed.py, write_schemas.py, migrate_plants.py
 tests/                # unit mirror, integration, e2e and immutable fixtures
 ```

@@ -284,6 +284,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | Plants `NodalDoublet`, `ParallelExchangerPlant`, `BoilerChpPlant`, `DistrictEnergyPlant`, `HackathonPlant`: catalogue only, no change to a name of this page. |
 | 0.2.0, unreleased changes | | `gm.kpi.totals(plant, results)`: heat and cold delivered, electricity bought and sold, gas bought, emissions, waste, chemicals and losses, read from the ports of the edge modules. The hackathon example has all seven edge modules, a desander and inhibitor dosing. |
 | 0.2.0, unreleased changes | | `gm.checks.plant_balance(plant, run)`: a `Check` of mass and of energy per module and for the plant, whose in and out are the ports of the grids and environment modules. `Flare` has `fuel` and `loss_out`. |
 | 0.2.0, unreleased changes | | Port quantities are in `Results`: `<port>.mass_flow`, `.volume_flow`, `.temperature`, `.pressure`, `.enthalpy_flow`, `.gas_flow`, `.co2_flow`, `.chemical_flow`, and a `Power` port under its name. Outputs a port shows are gone (`useful_duty`, `condenser_duty`, `electricity`, `electricity_generated`, `heat_loss`, `heat_supplied`, ...), and so are automatic sums, the `sum` key of a plant's `outputs` and the quantities `ElectricityGenerated`, `HeatLoss`, `HeatSupplied` and `HeatAbsorbed`. `gm.kpi` and `gm.economics` read the edge modules; `waste_disposal_price`, `chemical_price`. |
@@ -303,7 +304,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 | 0.2.0 | 2026-10-31 | `gm.schedule`; a root inlet field binds to a column named `port.field`. |
 | 0.2.0 | 2026-10-31 | `gm.checks.Limits` and `gm.checks.limits`; `Doublet.flow`, `Doublet.brine_cooling`, `HeatConsumer.supply_in_T`, `ProductionReservoir.liquid_flow`, `InjectionWell.wellhead_temperature`, `Output.difference`. |
 | 0.2.0 | 2026-10-31 | Costs: `capex(assumptions)` on equipment, cost factors in `Assumptions`, `heat_cost_share`. |
-| 0.2.0 | 2026-10-31 | Hackathon example `examples/plants/simulate/04_hackathon_plant.py`. |
+| 0.2.0 | 2026-10-31 | Hackathon example `examples/cases/hackathon.py`. |
 | 0.2.0 | 2026-10-31 | Version 0.2.0: a checkpoint written before 0.2.0 raises `old_format`; `gm.plants.migrate` converts its plant file. |
 | 0.1.0 | 2026-10-30 | First consistent API. |
 

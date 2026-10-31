@@ -132,7 +132,10 @@ without changing numbers:
 - `ATESPlant`: the storage's `mode` selects which children are called, and the plant reads the
   storage's start-of-step temperature.
 - `NodalDoublet`: each call solves a rate with `brentq`, see
-  [equipment.md](equipment.md#nodal-well-analysis).
+  [equipment.md](equipment.md#nodal-well-analysis). `ParallelExchangerPlant` and `BoilerChpPlant`
+  put surface equipment between its `produce()` and `inject()`.
+- `DistrictEnergyPlant`: two networks and an `ATESPlant` called side by side, with the return of one
+  network fed back by the caller.
 
 They are in the registry (`gm.plants.names()`), so a spec can use them as a `type`.
 

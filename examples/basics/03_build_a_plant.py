@@ -1,0 +1,60 @@
+"""Build plants from modules, validate them and fix an unconnected port.
+
+Shows ``gm.Plant``, ``add``, ``connect``, ``validate`` and ``summary``. A plant that buys what it
+needs from the grids has no plant ports; a building block for other plants names its ports.
+
+Run with ``python examples/basics/03_build_a_plant.py``.
+"""
+
+import gemini as gm
+
+FILTERS = 2
+
+
+def treatment_train():
+    """Return a building block of filters in series, with its two ports named."""
+    plant = gm.Plant("TreatmentTrain")
+    for index in range(FILTERS):
+        plant.add("Filter", f"filter_{index}")
+    for index in range(FILTERS - 1):
+        plant.connect(f"filter_{index}", f"filter_{index + 1}")
+    plant.connect("fluid_in", "filter_0.fluid_in")
+    plant.connect(f"filter_{FILTERS - 1}.fluid_out", "fluid_out")
+    return plant
+
+
+def boiler_plant():
+    """Return a boiler that heats a heating grid, with its heat loss still unconnected."""
+    plant = gm.Plant("BoilerPlant")
+    plant.add(
+        "HeatingGrid",
+        name="users",
+        params={"return_temperature": "60 degC", "return_pressure": "6 bar"},
+    )
+    plant.add("Boiler", name="boiler", params={"capacity": "1 MW", "efficiency": 0.9})
+    plant.add("GasGrid", name="gas")
+    plant.add("Atmosphere", name="air")
+    plant.connect("users.return_out", "boiler.fluid_in")
+    plant.connect("boiler.fluid_out", "users.supply_in")
+    plant.connect("gas.gas_out", "boiler.fuel_in")
+    plant.connect("boiler.flue_out", "air.gas_in")
+    return plant
+
+
+def main():
+    """Call the building block, then find and fix the missing connection of the boiler plant."""
+    train = treatment_train()
+    result = train(fluid_in=gm.Stream(flow="10 kg/s", T="60 degC", p="10 bar"))
+    outlet = result.outlets.fluid_out
+    print(f"After {FILTERS} filters:     {gm.units.convert(outlet.p, 'Pa', 'bar'):.4f} bar")
+
+    plant = boiler_plant()
+    for problem in plant.validate(on_error="record"):
+        print(f"Problem:             {problem['code']} at {problem['path']}")
+    plant.connect("boiler.loss_out", "air.heat_in")
+    print(f"After the fix:       {len(plant.validate(on_error='record'))} problems")
+    print(plant.summary())
+
+
+if __name__ == "__main__":
+    main()

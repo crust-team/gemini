@@ -14,7 +14,10 @@ from .heating import CHP, Boiler, ElectricBoiler, HeatPump
 from .module import Module
 from .piping import GasMakeup, Mixer, Pipe, PressurizationTank, Splitter, Valve
 from .plants import ATESPlant, CoolingSubstation, HeatingSubstation
+from .plants.boilerchpplant import BoilerChpPlant
+from .plants.districtenergyplant import DistrictEnergyPlant
 from .plants.nodaldoublet import NodalDoublet
+from .plants.parallelexchangerplant import ParallelExchangerPlant
 from .power import ORC, FlashTurbine, Separator
 from .pumps import ESP, CentrifugalPump, GasCompressor, InjectionPump, LineShaftPump
 from .storage import AquiferStorage, IceStorage, ThermalStorage
@@ -83,6 +86,9 @@ __all__ = [
     "CoolingSubstation",
     "ATESPlant",
     "NodalDoublet",
+    "ParallelExchangerPlant",
+    "BoilerChpPlant",
+    "DistrictEnergyPlant",
     "collect_flows",
     "emissions",
     "energy_balance",

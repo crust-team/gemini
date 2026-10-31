@@ -15,7 +15,7 @@ import pytest
 from tests.fixtures import ROOT
 
 pytestmark = pytest.mark.e2e
-EXAMPLES = sorted((ROOT / "examples").glob("**/[0-9][0-9]_*.py"))
+EXAMPLES = sorted((ROOT / "examples").rglob("*.py"))
 TIMEOUT_S = 900
 """Hang guard per example, not a speed limit: the full-year module API example takes 110-180 s
 on 4-vCPU CI runners beside the other release-profile workers, and that profile has no budget."""

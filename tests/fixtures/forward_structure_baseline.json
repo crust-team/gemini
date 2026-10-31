@@ -8,7 +8,7 @@
   "simulate_sha256": "0a14dc0f7a493e7e3b8ff15a5f16f8696c2bb37210efeb418dd2792b5a9cefc1",
   "golden": {
     "esp_head_first": 3705164.20243279,
-    "heat_exchanger_duty_first": 3924646.065419465
+    "heat_duty_first": 3924646.065419465
   },
   "metrics": {
     "coverage_min": 1.0,

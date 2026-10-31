@@ -92,7 +92,7 @@ finite engine, and then cleaned up. Old import paths are not retained.
   - demand `HeatConsumer`, `CoolingConsumer`.
 - Composite plants in `gm.plants`: `MultiWellPlant`, `HeatingSubstation`, `CoolingSubstation`,
   `DistrictNetwork` (heating or cooling) and `ATESPlant`, with the example
-  `examples/plants/simulate/01_district_heating_and_cooling.py`; `Module.trial_outlets` and
+  `examples/cases/district_heating_cooling.py`; `Module.trial_outlets` and
   `Module.start_states` for loops closed within one call.
 - Physics modules `compression`, `refrigeration`, `steam` (IAPWS-IF97), `ground` and
   `psychrometrics`.
