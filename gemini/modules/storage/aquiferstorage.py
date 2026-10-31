@@ -5,7 +5,7 @@ from typing import Literal
 from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
-from gemini.physics import fluid, ground, heat_transfer
+from gemini.physics import energy, fluid, ground, heat_transfer
 from gemini.types import (
     Control,
     Dimensionless,
@@ -20,6 +20,7 @@ from gemini.types import (
     Outlet,
     Output,
     Parameter,
+    Power,
     State,
     Stream,
     Temperature,
@@ -133,6 +134,7 @@ class AquiferStorage(Module):
 
         # Outlets
         self.production_out = Outlet(Stream, kind="brine")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Produce the injected mass flow from the source store of the current mode."""
@@ -142,27 +144,15 @@ class AquiferStorage(Module):
         self._volume_flow(injection_in)
         production_out = injection_in.with_(T=self.production_temperature())
 
-        outlets = dict(production_out=production_out)
+        loss_out = energy.total_power(self._store_losses(injection_in))
+
+        outlets = dict(production_out=production_out, loss_out=loss_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         injection = inlets.injection_in
         water = self._fluid_heat_capacity(injection)
-        losses = [
-            heat_transfer.heat_rate(
-                ground.store_conductance(
-                    self._volume(store),
-                    self.ground_conductivity,
-                    self.porosity,
-                    water,
-                    self.rock_volumetric_heat_capacity,
-                    self.aquifer_thickness,
-                    self.storage_period,
-                ),
-                self._change(store),
-            )
-            for store in STORES
-        ]
+        losses = self._store_losses(injection)
         self.stored_energy = ground.aquifer_stored_energy(
             water,
             self.warm_volume,
@@ -184,6 +174,25 @@ class AquiferStorage(Module):
             )
             - sum(losses)
         )
+
+    def _store_losses(self, injection):
+        """Return the conduction loss [W] of each store to the aquifer around it."""
+        water = self._fluid_heat_capacity(injection)
+        return [
+            heat_transfer.heat_rate(
+                ground.store_conductance(
+                    self._volume(store),
+                    self.ground_conductivity,
+                    self.porosity,
+                    water,
+                    self.rock_volumetric_heat_capacity,
+                    self.aquifer_thickness,
+                    self.storage_period,
+                ),
+                self._change(store),
+            )
+            for store in STORES
+        ]
 
     def _advance_states(self, inlets, outlets, dt):
         injection = inlets.injection_in

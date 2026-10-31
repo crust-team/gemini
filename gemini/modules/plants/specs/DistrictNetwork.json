@@ -85,7 +85,12 @@
     ]
   },
   "outlets": {
-    "return_out": "return_pipe.fluid_out"
+    "return_out": "return_pipe.fluid_out",
+    "loss_out": [
+      "pump.loss_out",
+      "supply_pipe.loss_out",
+      "return_pipe.loss_out"
+    ]
   },
   "outputs": {
     "heat_supplied": {

@@ -84,6 +84,7 @@ class ORC(Module):
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
         self.power_out = Outlet(Power, kind="electricity")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Cool the brine by the heat the cycle takes at the operating point."""
@@ -98,7 +99,9 @@ class ORC(Module):
         fluid_out = fluid_in.with_(T=fluid_out_T)
         balance = self._balance(fluid_in, fluid_out, design)
 
-        outlets = dict(fluid_out=fluid_out, power_out=balance.electricity_generated)
+        outlets = dict(
+            fluid_out=fluid_out, power_out=balance.electricity_generated, loss_out=balance.heat_loss
+        )
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

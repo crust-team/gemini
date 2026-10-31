@@ -82,6 +82,7 @@ class GasCompressor(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="gas")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Compress the gas to the pressure setpoint and heat it by the last stage."""
@@ -94,9 +95,11 @@ class GasCompressor(Module):
         )
 
         discharge = suction.with_(p=self.pressure_setpoint, T=fluid_out_T)
-        power_in = energy.input_power(self._shaft_power(suction), self.motor_efficiency)
+        shaft_power = self._shaft_power(suction)
+        power_in = energy.input_power(shaft_power, self.motor_efficiency)
+        loss_out = _physics.heat_rejected(power_in, shaft_power, self.stage_count)
 
-        outlets = dict(fluid_out=discharge, power_in=power_in)
+        outlets = dict(fluid_out=discharge, loss_out=loss_out, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

@@ -75,6 +75,7 @@ class DownholeHeatExchanger(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Return the fluid at the temperature it reaches at the bottom of the annulus."""
@@ -82,8 +83,9 @@ class DownholeHeatExchanger(Module):
         # Outlets
         inlet = inlets.fluid_in
         outlet = inlet.with_(T=self._outlet_temperature(inlet))
+        loss_out = heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - outlet.T)
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, loss_out=loss_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

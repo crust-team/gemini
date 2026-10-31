@@ -47,6 +47,18 @@
     {
       "source": "esp.fluid_out",
       "target": "riser.bottom_in"
+    },
+    {
+      "source": "well.loss_out",
+      "target": "formation.heat_in"
+    },
+    {
+      "source": "riser.loss_out",
+      "target": "formation.heat_in"
+    },
+    {
+      "source": "injector.loss_out",
+      "target": "formation.heat_in"
     }
   ],
   "inlets": {

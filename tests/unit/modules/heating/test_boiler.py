@@ -104,4 +104,4 @@ def test_without_a_grid_mark_the_gas_limits_the_duty():
 def test_an_electric_boiler_has_no_gas_ports():
     """Only the water side."""
     assert list(ElectricBoiler().inlets()) == ["fluid_in", "power_in"]
-    assert list(ElectricBoiler().outlets()) == ["fluid_out"]
+    assert list(ElectricBoiler().outlets()) == ["fluid_out", "loss_out"]

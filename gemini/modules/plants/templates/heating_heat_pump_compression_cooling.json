@@ -460,6 +460,26 @@
         "target": "compression_cooler.power_in"
       },
       {
+        "source": "heating_return_pipe.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
+        "source": "heating_supply_pipe.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
+        "source": "cooling_return_pipe.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
+        "source": "cooling_supply_pipe.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
+        "source": "peak_boiler.loss_out",
+        "target": "atmosphere.heat_in"
+      },
+      {
         "source": "peak_boiler.fluid_out",
         "target": "heating_supply_pipe.fluid_in"
       },

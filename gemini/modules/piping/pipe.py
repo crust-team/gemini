@@ -14,6 +14,7 @@ from gemini.types import (
     Outlet,
     Output,
     Parameter,
+    Power,
     PressureDifference,
     Speed,
     Stream,
@@ -78,6 +79,7 @@ class Pipe(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream)
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Apply friction, static head and heat exchange to the inlet stream."""
@@ -98,15 +100,15 @@ class Pipe(Module):
             inlet_p=inlet.p,
         )
         outlet = inlet.with_(T=self._outlet_temperature(inlet, inlets.air_in), p=outlet_p)
+        loss_out = heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - outlet.T)
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, loss_out=loss_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.fluid_in
         outlet = outlets.fluid_out
-        heat = heat_transfer.heat_rate(inlet.heat_capacity_rate(), inlet.T - outlet.T)
-        loss, absorbed = heat_transfer.signed_parts(heat)
+        loss, absorbed = heat_transfer.signed_parts(outlets.loss_out)
         self.pressure_drop = inlet.p - outlet.p
         properties = inlet.fluid.properties(inlet.p, inlet.T)
         self.velocity = geometry.mean_velocity(inlet.m_dot, properties.rho_l, self.inner_diameter)

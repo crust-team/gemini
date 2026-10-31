@@ -91,6 +91,7 @@ class ATESPlant(Module):
 
         # Outlets
         self.supply_out = Outlet(Stream)
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Produce, condition and reinject the groundwater; serve the building circuit."""
@@ -104,7 +105,7 @@ class ATESPlant(Module):
         )
         pumped = self.pump(fluid_in=production)
         groundwater = pumped.outlets.fluid_out
-        power = [pumped.inlets.power_in]
+        power, losses = [pumped.inlets.power_in], [pumped.outlets.loss_out]
         if self.storage.mode == "discharge":
             lifted = self.heat_pump(source_in=groundwater, sink_in=inlets.return_in)
             injected, building = lifted.outlets.source_out, lifted.outlets.sink_out
@@ -112,12 +113,15 @@ class ATESPlant(Module):
         else:
             cooled = self.heat_exchanger(hot_in=inlets.return_in, cold_in=groundwater)
             injected, building = cooled.outlets.cold_out, cooled.outlets.hot_out
-        self.storage(injection_in=injected.with_(p=self.groundwater_pressure))
+        stored = self.storage(injection_in=injected.with_(p=self.groundwater_pressure))
+        losses.append(stored.outlets.loss_out)
 
         # Outlets
         supply_out = building
 
         power_in = energy.total_power(power)
 
-        outlets = dict(supply_out=supply_out, power_in=power_in)
+        loss_out = energy.total_power(losses)
+
+        outlets = dict(supply_out=supply_out, loss_out=loss_out, power_in=power_in)
         return outlets

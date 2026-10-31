@@ -107,6 +107,7 @@ class Boiler(_BoilerBody):
 
         # Outlets
         self.flue_out = Outlet(Stream, kind="gas")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Heat the stream up to its setpoint and return the gas it burned."""
@@ -119,7 +120,10 @@ class Boiler(_BoilerBody):
         flue_out = burner.flue_stream(need, fuel)
 
         outlets = dict(
-            fluid_out=outlet, flue_out=flue_out, fuel_in=burner.burned_stream(need, fuel)
+            fluid_out=outlet,
+            flue_out=flue_out,
+            loss_out=need - duty,
+            fuel_in=burner.burned_stream(need, fuel),
         )
         return outlets
 
@@ -155,6 +159,9 @@ class ElectricBoiler(_BoilerBody):
         # Outputs
         self.electricity = Output(Electricity)
 
+        # Outlets
+        self.loss_out = Outlet(Power, kind="heat")
+
     def forward(self, inlets):
         """Heat the stream up to its setpoint."""
 
@@ -163,7 +170,9 @@ class ElectricBoiler(_BoilerBody):
         duty = ops.minimum(self._requested_duty(inlet), self.capacity)
         outlet = self._heated(inlet, duty)
 
-        outlets = dict(fluid_out=outlet, power_in=energy.input_power(duty, self.efficiency))
+        power_in = energy.input_power(duty, self.efficiency)
+
+        outlets = dict(fluid_out=outlet, loss_out=power_in - duty, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

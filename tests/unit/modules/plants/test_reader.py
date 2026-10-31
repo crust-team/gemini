@@ -26,6 +26,7 @@ def spec():
             "product": "filters.hot.fluid_out",
             "gas": "degasser.gas_out",
             "pipe_out": "pipe.fluid_out",
+            "pipe_loss": "pipe.loss_out",
         },
         "outputs": {"loss": {"sum": "heat_loss"}},
         "bindings": {},

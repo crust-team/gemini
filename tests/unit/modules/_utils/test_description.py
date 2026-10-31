@@ -151,7 +151,7 @@ def test_a_spec_plant_lists_its_connections():
         "sink",
         "formation",
     ]
-    assert len(description["connections"]) == 4
+    assert len(description["connections"]) == 7
     assert {item["source"] for item in description["connections"]} >= {"esp.fluid_out"}
     assert any("." in name for name in doublet.parameter_schema()["properties"])
 

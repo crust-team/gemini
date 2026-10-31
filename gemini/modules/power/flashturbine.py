@@ -72,6 +72,7 @@ class FlashTurbine(Module):
         # Outlets
         self.fluid_out = Outlet(Stream, kind="gas")
         self.power_out = Outlet(Power, kind="electricity")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Expand the steam and return the condensate at the condenser saturation state."""
@@ -81,9 +82,11 @@ class FlashTurbine(Module):
         condenser = _physics.saturation_properties(self.condenser_pressure)
 
         outlet = inlet.with_(T=condenser.temperature, p=self.condenser_pressure, fluid=WATER)
-        power_out = self._balance(inlet, self._expansion(inlet)).electricity_generated
+        balance = self._balance(inlet, self._expansion(inlet))
 
-        outlets = dict(fluid_out=outlet, power_out=power_out)
+        outlets = dict(
+            fluid_out=outlet, power_out=balance.electricity_generated, loss_out=balance.heat_loss
+        )
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

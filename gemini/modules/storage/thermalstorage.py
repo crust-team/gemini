@@ -100,6 +100,7 @@ class ThermalStorage(Module):
         # Outlets
         self.charge_out = Outlet(Stream, kind="hot_water")
         self.discharge_out = Outlet(Stream, kind="hot_water")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Return both circuits after exchanging heat with the start-of-step tank."""
@@ -111,15 +112,17 @@ class ThermalStorage(Module):
         charge_out = charge_in.with_(T=charge_T)
         discharge_out = discharge_in.with_(T=fluid_out_T)
 
-        outlets = dict(charge_out=charge_out, discharge_out=discharge_out)
+        loss_out = heat_transfer.heat_rate(
+            self.heat_loss_conductance, self.temperature - inlets.air_in.T
+        )
+
+        outlets = dict(charge_out=charge_out, discharge_out=discharge_out, loss_out=loss_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         charge = self._circuit_heat(inlets.charge_in, self.charge_effectiveness)
         discharge = self._circuit_heat(inlets.discharge_in, self.discharge_effectiveness)
-        ambient = heat_transfer.heat_rate(
-            self.heat_loss_conductance, self.temperature - inlets.air_in.T
-        )
+        ambient = outlets.loss_out
         reports = _physics.tank_service_report(
             self.service == "hot",
             self._capacity(inlets.charge_in),

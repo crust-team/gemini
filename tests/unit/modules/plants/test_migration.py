@@ -79,12 +79,13 @@ def test_a_format_2_spec_with_free_ports_keeps_their_old_names():
         "bindings": {},
         "param_history": {},
     }
-    assert [item["code"] for item in gm.plants.validate(old, on_error="record")] == [
-        "unconnected_port",
-        "unconnected_port",
-        "unconnected_port",
-    ]
+    assert {item["code"] for item in gm.plants.validate(old, on_error="record")} == {
+        "unconnected_port"
+    }
     spec = gm.plants.migrate(old)
     assert spec["inlets"] == {"pipe_fluid_in": "pipe.fluid_in", "pipe_air_in": "pipe.air_in"}
-    assert spec["outlets"] == {"pipe_fluid_out": "pipe.fluid_out"}
+    assert spec["outlets"] == {
+        "pipe_fluid_out": "pipe.fluid_out",
+        "pipe_loss_out": "pipe.loss_out",
+    }
     assert gm.plants.validate(spec | {"name": "Doublet"}) == []

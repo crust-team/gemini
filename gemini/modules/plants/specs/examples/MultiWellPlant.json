@@ -474,6 +474,10 @@
           }
         }
       }
+    },
+    "formation": {
+      "type": "Formation",
+      "params": {}
     }
   },
   "connections": [
@@ -512,6 +516,26 @@
     {
       "source": "injectors.0.well.bottom_out",
       "target": "injectors.0.sink.sandface_in"
+    },
+    {
+      "source": "producers.0.well.loss_out",
+      "target": "formation.heat_in"
+    },
+    {
+      "source": "producers.0.riser.loss_out",
+      "target": "formation.heat_in"
+    },
+    {
+      "source": "producers.1.well.loss_out",
+      "target": "formation.heat_in"
+    },
+    {
+      "source": "producers.1.riser.loss_out",
+      "target": "formation.heat_in"
+    },
+    {
+      "source": "injectors.0.well.loss_out",
+      "target": "formation.heat_in"
     }
   ],
   "inlets": {

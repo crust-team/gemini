@@ -36,7 +36,7 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
         },
         "connections": [{"source": "pipe.fluid_out", "target": "valve.fluid_in"}],
         "inlets": {"feed": "pipe.fluid_in", "air": "pipe.air_in"},
-        "outlets": {"product": "valve.fluid_out"},
+        "outlets": {"product": "valve.fluid_out", "loss": "pipe.loss_out"},
         "bindings": {"pipe": {"heat_loss": {"column": "q", "unit": "kW"}, "velocity": "v"}},
         "param_history": {
             "pipe": [
@@ -90,6 +90,7 @@ def test_params_set_since_and_validation_agree_with_the_builder():
     plant.connect("feed", "pipe.fluid_in")
     plant.connect("air", "pipe.air_in")
     plant.connect("pipe.fluid_out", "product")
+    plant.connect("pipe.loss_out", "loss")
     found = plant.validate(on_error="record")
     assert found == gm.plants.validate(plant.to_spec(), on_error="record")
     assert {item["code"] for item in found} == {"root_plant_port"}
@@ -105,7 +106,7 @@ def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
         "modules": {"a": {"type": "Boilr"}, "pipe": {"type": "Pipe", "params": {"length": -5.0}}},
         "connections": [],
         "inlets": {"feed": "pipe.fluid_in", "air": "pipe.air_in"},
-        "outlets": {"product": "pipe.fluid_out"},
+        "outlets": {"product": "pipe.fluid_out", "loss": "pipe.loss_out"},
         "bindings": {},
         "param_history": {},
     }
@@ -157,4 +158,5 @@ def test_a_broken_module_does_not_hide_the_other_end_of_a_connection():
         "pipe.fluid_in",
         "pipe.fluid_out",
         "pipe.air_in",
+        "pipe.loss_out",
     }

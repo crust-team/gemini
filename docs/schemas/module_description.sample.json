@@ -34,6 +34,24 @@
       "source": "esp.fluid_out",
       "target": "riser.bottom_in",
       "type": null
+    },
+    {
+      "kind": "heat",
+      "source": "well.loss_out",
+      "target": "formation.heat_in",
+      "type": null
+    },
+    {
+      "kind": "heat",
+      "source": "riser.loss_out",
+      "target": "formation.heat_in",
+      "type": null
+    },
+    {
+      "kind": "heat",
+      "source": "injector.loss_out",
+      "target": "formation.heat_in",
+      "type": null
     }
   ],
   "controls": {},

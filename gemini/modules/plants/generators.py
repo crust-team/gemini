@@ -99,6 +99,26 @@ def _check(**counts):
         raise ValidationError(f"{given}; expected >= 1", code="invalid_design")
 
 
+def _well_field_modules(producers, injectors):
+    """Return the modules of a well field: the limbs, the junctions and the rock."""
+    return {
+        "producers": _limbs(PRODUCTION_LIMB, producers),
+        "mixers": _numbered("Mixer", producers - 1),
+        "splitters": _numbered("Splitter", injectors - 1),
+        "injectors": _limbs(INJECTION_LIMB, injectors),
+        "formation": {"type": "Formation", "params": {}},
+    }
+
+
+def _well_losses(producers, injectors):
+    """Return the connections of every well's heat loss to the formation."""
+    wells = [
+        *(f"producers.{index}.{well}" for index in range(producers) for well in ("well", "riser")),
+        *(f"injectors.{index}.well" for index in range(injectors)),
+    ]
+    return [{"source": f"{well}.loss_out", "target": "formation.heat_in"} for well in wells]
+
+
 def _one_or_list(ends):
     """Return the ends of a plant port as the spec writes them: one end alone is not a list."""
     return ends[0] if len(ends) == 1 else ends
@@ -126,17 +146,13 @@ def multi_well_spec(producers=2, injectors=1):
     return {
         "format": 2,
         "name": "MultiWellPlant",
-        "modules": {
-            "producers": _limbs(PRODUCTION_LIMB, producers),
-            "mixers": _numbered("Mixer", producers - 1),
-            "splitters": _numbered("Splitter", injectors - 1),
-            "injectors": _limbs(INJECTION_LIMB, injectors),
-        },
+        "modules": _well_field_modules(producers, injectors),
         "connections": (
             _flow("producers", PRODUCTION_FLOW, producers)
             + mixing
             + _flow("injectors", INJECTION_FLOW, injectors)
             + splitting
+            + _well_losses(producers, injectors)
         ),
         "inlets": {
             "return_in": return_in,
@@ -197,7 +213,10 @@ def district_network_spec(consumers=2, service="heating"):
             "power_in": "pump.power_in",
             "air_in": ["supply_pipe.air_in", "return_pipe.air_in"],
         },
-        "outlets": {"return_out": "return_pipe.fluid_out"},
+        "outlets": {
+            "return_out": "return_pipe.fluid_out",
+            "loss_out": ["pump.loss_out", "supply_pipe.loss_out", "return_pipe.loss_out"],
+        },
         "outputs": _network_outputs(service),
         "bindings": {},
         "param_history": {},

@@ -86,6 +86,7 @@ class CentrifugalPump(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream)
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Raise the suction pressure by the head and heat the liquid by the pump losses."""
@@ -98,8 +99,9 @@ class CentrifugalPump(Module):
 
         discharge = suction.with_(p=suction.p + performance["head"], T=suction.T + rise)
         power_in = energy.input_power(performance["shaft_power"], self.motor_efficiency)
+        loss_out = power_in - performance["shaft_power"]
 
-        outlets = dict(fluid_out=discharge, power_in=power_in)
+        outlets = dict(fluid_out=discharge, loss_out=loss_out, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

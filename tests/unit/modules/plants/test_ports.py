@@ -48,6 +48,7 @@ def test_port_map_lists_only_named_ports(plant):
     assert plant._unconnected_ports() == [
         ("outlets", "filter", "fluid_out"),
         ("outlets", "pipe", "fluid_out"),
+        ("outlets", "pipe", "loss_out"),
         ("inlets", "pipe", "fluid_in"),
         ("inlets", "pipe", "air_in"),
     ]

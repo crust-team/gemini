@@ -8,6 +8,7 @@ from gemini.types import (
     Inlet,
     Outlet,
     Output,
+    Power,
     Pressure,
     PressureDifference,
     Stream,
@@ -46,6 +47,7 @@ class InjectionWell(_Well):
 
         # Outlets
         self.bottom_out = Outlet(Stream, kind="brine")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Traverse the injection path with the legacy negative flow convention."""
@@ -62,7 +64,7 @@ class InjectionWell(_Well):
             m_dot=wellhead.m_dot,
         )
 
-        outlets = dict(bottom_out=bottom)
+        outlets = dict(bottom_out=bottom, loss_out=self._loss(stream, bottom))
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -77,10 +79,14 @@ class InjectionWell(_Well):
         self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
+        self.heat_loss = outlets.loss_out
+
+    def _loss(self, stream, bottom):
+        """Return the heat [W] the well gives to the rock between its two ends."""
         capacity_rate = fluid.heat_capacity_rate(
             bottom.m_dot, stream.fluid.properties(stream.p, stream.T).cp_l
         )
-        self.heat_loss = heat_transfer.heat_rate(capacity_rate, stream.T - bottom.T)
+        return heat_transfer.heat_rate(capacity_rate, stream.T - bottom.T)
 
     def _traversal_stream(self, stream):
         """Return the stream with the negative flow the legacy injection DPDT expects."""

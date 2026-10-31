@@ -47,7 +47,8 @@ def test_a_well_field_produces_then_mixes_then_injects():
     expected = [f"producers.{index}.{name}" for index in range(3) for name in limb]
     expected += ["mixers.0", "mixers.1", "splitters.0", "injectors.0.well", "injectors.0.sink"]
     expected += ["injectors.1.well", "injectors.1.sink"]
-    assert _order(generators.multi_well_spec(3, 2)) == expected
+    order = _order(generators.multi_well_spec(3, 2))
+    assert [path for path in order if path != "formation"] == expected
 
 
 def test_a_network_splits_serves_in_order_and_mixes():

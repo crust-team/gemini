@@ -92,6 +92,7 @@ class BoreholeField(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Exchange heat between the loop fluid and the start-of-step ground temperature."""
@@ -103,7 +104,7 @@ class BoreholeField(Module):
         fluid_out_T = inlet.T + heat_transfer.temperature_change(rate, capacity_rate)
         outlet = inlet.with_(T=fluid_out_T)
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, loss_out=-rate)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

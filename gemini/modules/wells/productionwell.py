@@ -12,6 +12,7 @@ from gemini.types import (
     Outlet,
     Output,
     Parameter,
+    Power,
     Pressure,
     PressureDifference,
     Stream,
@@ -54,6 +55,7 @@ class ProductionWell(_Well):
 
         # Outlets
         self.wellhead_out = Outlet(Stream, kind="brine")
+        self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
         """Traverse the selected segment upward and apply the pressure correction."""
@@ -63,7 +65,7 @@ class ProductionWell(_Well):
         start, end = self._segment_interval()
         wellhead = self.corrected(bottom, self.traverse(bottom, start, end, "up"))
 
-        outlets = dict(wellhead_out=wellhead)
+        outlets = dict(wellhead_out=wellhead, loss_out=self._loss(bottom, wellhead))
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -77,10 +79,14 @@ class ProductionWell(_Well):
         self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
+        self.heat_loss = outlets.loss_out
+
+    def _loss(self, bottom, wellhead):
+        """Return the heat [W] the well gives to the rock between its two ends."""
         capacity_rate = fluid.heat_capacity_rate(
             wellhead.m_dot, bottom.fluid.properties(bottom.p, bottom.T).cp_l
         )
-        self.heat_loss = heat_transfer.heat_rate(capacity_rate, bottom.T - wellhead.T)
+        return heat_transfer.heat_rate(capacity_rate, bottom.T - wellhead.T)
 
     def intake_conditions(self, bottom_stream):
         """Traverse from the sandface to ESP intake, returning a stream in SI units."""
