@@ -1,5 +1,7 @@
 """``gm.Problem``: the one object of a demand, a site, constraints and assumptions."""
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -135,3 +137,50 @@ def test_a_site_path_that_matches_nothing_is_refused():
     """A misspelled parameter is no silent no-op."""
     with raises(ValidationError, "unknown_name", match="gradient2"):
         gm.Problem(demand(), {"gradient2": 1}).apply_site(sited_plant())
+
+
+def test_a_json_round_trip_keeps_every_part(tmp_path):
+    """``to_json`` writes ``problem.json`` and ``demand.csv``; ``from_json`` reads them back."""
+    problem().to_json(tmp_path / "problem.json")
+    assert (tmp_path / "demand.csv").is_file()
+    again = gm.Problem.from_json(tmp_path / "problem.json")
+    assert again.to_dict() == problem().to_dict()
+    pd.testing.assert_frame_equal(again.demand, problem().demand, check_freq=False)
+
+
+def test_another_file_name_names_its_demand_file(tmp_path):
+    """A file not called ``problem.json`` writes ``<stem>_demand.csv``."""
+    problem().to_json(tmp_path / "other.json")
+    assert (tmp_path / "other_demand.csv").is_file()
+    assert gm.Problem.from_json(tmp_path / "other.json").to_dict() == problem().to_dict()
+
+
+def test_a_json_demand_names_a_file_and_its_columns(tmp_path):
+    """The demand is the arguments of ``from_csv`` around a file next to the JSON."""
+    (tmp_path / "heat.csv").write_text("day,mw\n2027-01-01,2\n2027-01-02,3\n")
+    spec = {"file": "heat.csv", "columns": {"mw": "heating_demand"}, "unit": "MW"}
+    spec["time_column"] = "day"
+    (tmp_path / "problem.json").write_text(json.dumps({"demand": spec}))
+    found = gm.Problem.from_json(tmp_path / "problem.json")
+    assert found.demand["heating_demand"].tolist() == [2e6, 3e6]
+
+
+@pytest.mark.parametrize(
+    "text,code",
+    [
+        (None, "invalid_format"),
+        ("{", "invalid_format"),
+        ("[1]", "invalid_format"),
+        ("{}", "missing_value"),
+        ('{"demand": {"columns": {}, "unit": "W"}}', "missing_value"),
+        ('{"demand": {"file": "x.csv", "unit": "W"}}', "missing_value"),
+        ('{"demand": {"file": "gone.csv", "columns": {}, "unit": "W"}}', "invalid_format"),
+        ('{"demand": {"file": "x.csv", "columns": {}, "unit": "W"}, "sites": {}}', "unknown_name"),
+    ],
+)
+def test_a_missing_or_malformed_json_has_its_code(tmp_path, text, code):
+    """A file, a key or a demand file that is wrong is a ``ValidationError`` with a code."""
+    if text is not None:
+        (tmp_path / "problem.json").write_text(text)
+    with raises(ValidationError, code):
+        gm.Problem.from_json(tmp_path / "problem.json")

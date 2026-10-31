@@ -1,0 +1,53 @@
+{
+  "demand": {
+    "file": "demand.csv",
+    "columns": {
+      "heating_demand_MWth": "heating_demand",
+      "cooling_demand_MWcool": "cooling_demand"
+    },
+    "unit": "MW",
+    "time_column": "date"
+  },
+  "site": {
+    "d*.gradient": "30 K/km",
+    "d*.surface_temperature": "12 degC",
+    "d*.thickness": "100 m",
+    "d*.permeability": "200 mD"
+  },
+  "constraints": [
+    {
+      "path": "d*.reservoir.liquid_flow",
+      "min": "50 m3/h",
+      "max": "300 m3/h",
+      "when": "running"
+    },
+    {
+      "path": "d*.brine_cooling",
+      "max": "40 K",
+      "when": "running"
+    },
+    {
+      "path": "heat_users.supply_in.temperature",
+      "min": "100 degC",
+      "when": "running"
+    }
+  ],
+  "assumptions": {
+    "discount_rate": 0.05,
+    "lifetime_years": 25,
+    "electricity_emission_factor": 8.333333333333333e-08,
+    "pump_cost": 0.5,
+    "chiller_cost": 0.3,
+    "exchanger_cost": 0.5,
+    "flare_cost": 100000.0,
+    "makeup_cost": 50000.0,
+    "prices": {
+      "electricity": 2.7777777777777777e-08,
+      "gas": "40 EUR/MWh",
+      "heat": 1.6666666666666667e-08,
+      "cold": 1.6666666666666667e-08,
+      "waste_disposal": 0.2,
+      "chemical": 3.0
+    }
+  }
+}

@@ -1,7 +1,9 @@
 """One problem: the demand, the site, the constraints and the assumptions of a plant's run."""
 
+import json
 from copy import deepcopy
 from fnmatch import fnmatchcase
+from pathlib import Path
 
 import numpy as np
 
@@ -35,6 +37,20 @@ class Problem:
         ``invalid_value`` for an argument of another type or a price profile that is not on the
         demand index, ``invalid_unit`` for a site value with an unknown unit, and what
         ``gm.data.from_csv`` raises for a demand.
+
+    A problem lives in a folder as ``problem.json`` and a CSV of the demand next to it
+    (``from_json``, ``to_json``)::
+
+        {
+          "demand": {"file": "demand.csv", "columns": {"<file column>": "heating_demand"},
+                     "unit": "MW", "time_column": "date"},
+          "site": {"d*.gradient": "30 K/km"},
+          "constraints": [{"path": "d*.brine_cooling", "max": "40 K"}],
+          "assumptions": {"prices": {"electricity": "100 EUR/MWh"}}
+        }
+
+    ``demand`` holds the arguments of ``gm.data.from_csv`` around a file name; ``time_column`` is
+    optional, and ``site``, ``constraints`` and ``assumptions`` are the keys of ``to_dict``.
     """
 
     def __init__(self, demand, site=None, constraints=None, assumptions=None):
@@ -77,19 +93,69 @@ class Problem:
     @classmethod
     def from_dict(cls, data):
         """Return the problem of a dictionary of ``to_dict``."""
-        unknown = [name for name in data if name not in cls.schema()["properties"]]
-        if "demand" not in data or unknown:
-            raise ValidationError(
-                f"problem: keys = {sorted(data)}; expected demand, site, constraints, assumptions",
-                path="demand" if "demand" not in data else unknown[0],
-                code="missing_value" if "demand" not in data else "unknown_name",
-            )
+        _checked_keys(data)
+        return cls._with_demand(demand_frame.from_dict(data["demand"]), data)
+
+    @classmethod
+    def _with_demand(cls, demand, data):
+        """Return the problem of ``demand`` and the other keys of ``data``."""
         return cls(
-            demand_frame.from_dict(data["demand"]),
+            demand,
             data.get("site"),
             [Constraint.from_dict(item) for item in data.get("constraints", [])],
             Assumptions.from_dict(data.get("assumptions", {})),
         )
+
+    @classmethod
+    def from_json(cls, path):
+        """Return the problem of a ``problem.json``, its demand read from the CSV next to it.
+
+        Raises
+        ------
+        ValidationError
+            ``invalid_format`` for a file that is missing or no JSON object, or a demand file that
+            is missing; ``missing_value`` for a missing key (``demand``, ``demand.file``,
+            ``demand.columns``, ``demand.unit``); ``unknown_name`` for an unknown key; and what
+            ``gm.data.from_csv`` raises for the demand.
+        """
+        path = Path(path)
+        data = _read_json(path)
+        _checked_keys(data)
+        spec = data["demand"]
+        for key in ("file", "columns", "unit"):
+            if not isinstance(spec, dict) or key not in spec:
+                raise ValidationError(
+                    f"problem {path}: demand.{key} is missing; expected file, columns and unit",
+                    path=f"demand.{key}",
+                    code="missing_value",
+                )
+        file = path.parent / spec["file"]
+        if not file.is_file():
+            raise ValidationError(
+                f"problem {path}: demand file {str(file)!r} not found",
+                path="demand.file",
+                code="invalid_format",
+            )
+        frame = demand_frame.from_csv(file, spec["columns"], spec["unit"], spec.get("time_column"))
+        return cls._with_demand(frame, data)
+
+    def to_json(self, path):
+        """Write ``path`` and the demand next to it, so that ``from_json`` gives the same problem.
+
+        The demand goes to ``demand.csv`` when the file is named ``problem.json``, else to
+        ``<stem>_demand.csv``, in W with the time column ``time``.
+        """
+        path = Path(path)
+        name = "demand.csv" if path.stem == "problem" else f"{path.stem}_demand.csv"
+        self.demand.to_csv(path.parent / name, index_label="time")
+        data = self.to_dict()
+        data["demand"] = {
+            "file": name,
+            "columns": {column: column for column in self.demand},
+            "unit": "W",
+            "time_column": "time",
+        }
+        path.write_text(json.dumps(data, indent=2) + "\n")
 
     @classmethod
     def schema(cls):
@@ -122,6 +188,36 @@ class Problem:
                 "assumptions": Assumptions.schema(),
             },
         }
+
+
+def _read_json(path):
+    """Return the JSON object of ``path``, or raise ``invalid_format``."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise ValidationError(
+            f"problem: {str(path)!r} is not a readable JSON file ({error})",
+            path=str(path),
+            code="invalid_format",
+        ) from error
+    if not isinstance(data, dict):
+        raise ValidationError(
+            f"problem: {str(path)!r} holds a {type(data).__name__}; expected a JSON object",
+            path=str(path),
+            code="invalid_format",
+        )
+    return data
+
+
+def _checked_keys(data):
+    """Raise unless ``data`` has ``demand`` and no key beyond those of ``Problem.schema``."""
+    unknown = [name for name in data if name not in Problem.schema()["properties"]]
+    if "demand" not in data or unknown:
+        raise ValidationError(
+            f"problem: keys = {sorted(data)}; expected demand, site, constraints, assumptions",
+            path="demand" if "demand" not in data else unknown[0],
+            code="missing_value" if "demand" not in data else "unknown_name",
+        )
 
 
 def _checked_site(site):

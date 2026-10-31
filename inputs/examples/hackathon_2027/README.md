@@ -58,16 +58,65 @@ standard conditions.
 ## Files added for the examples
 
 These are not the organisers' files: they hold the requirements above, and the assumptions the
-requirements leave open, in the shapes of gemini.
+requirements leave open, in the shapes of gemini. The two organiser CSVs stay as released.
 
 | File | Holds | Read by |
 | --- | --- | --- |
-| `plant.json` | A plant dict of class `HeatingCoolingPlant` on two doublets | `examples/cases/challenge_year.py` |
-| `plant_with_treatment.json` | A plant dict in the structure form: two doublets, desander, inhibitor dosing, one absorption chiller | `examples/cases/hackathon.py` |
-| `rules.json` | The rules of `gm.schedule` | both |
-| `limits.json`, `limits_with_treatment.json` | The requirement checks of each design, a `gm.checks.Limits` dict | one each |
-| `assumptions.json` | Fields of `gm.economics.Assumptions`, in SI: placeholders, not data | both |
-| `templates/<Class>.json` | Plant dicts of the other template plants on these requirements | tests |
+| `demand.csv` | The two organiser demand files joined on `date`: `heating_demand_MWth` and `cooling_demand_MWcool`, values unchanged | both problems |
+| `problem.json` | The problem of `plant.json`: the demand, the site, the constraints (with the 330 day operating duration) and the assumptions with prices; `gm.Problem.from_json` | `examples/cases/challenge_year.py` |
+| `problem_with_treatment.json` | The problem of the treatment design: the same demand and prices, no duration constraint (no outages), the heating supply as its only supply limit | `examples/cases/hackathon.py` |
+| `plant.json` | A plant dict of class `HeatingCoolingPlant` on two doublets: design values only | `examples/cases/challenge_year.py` |
+| `plant_with_treatment.json` | A plant dict in the structure form: two doublets, desander, inhibitor dosing, one absorption chiller; design values only | `examples/cases/hackathon.py` |
+| `templates/<Class>.json` | Plant dicts of the other template plants on these requirements, design values only | tests |
 
-The prices are SI numbers, EUR/J for energy. Sizes of equipment, return temperatures, the air and the
-injection pressure are assumptions of the examples, which print them.
+Sizes of equipment, return temperatures, the air and the injection pressure are assumptions of the
+examples, which print them.
+
+## Site in `problem.json`
+
+The values of the ground and of the fluid's place are the `site`, applied to a plant with
+`problem.apply_site(plant)`; the plant keeps the design values (`depth`, `well_diameter`,
+`nominal_flow`, `pump_efficiency`, `nominal_wellhead_pressure` and the surface equipment).
+
+| Key | Value |
+| --- | --- |
+| `d*.gradient` | 30 K/km |
+| `d*.surface_temperature` | 12 degC |
+| `d*.thickness` | 100 m |
+| `d*.permeability` | 200 mD |
+| `d*.reservoir.pressure`, `d*.sink.pressure` | 250 barg (`problem.json` only: the treatment design takes the hydrostatic pressure of its depth) |
+
+The brine and its gas (`fluids`) are not a plant parameter, so they stay in the plant dict.
+
+## Constraints in `problem.json`
+
+| Path | Bound | Source |
+| --- | --- | --- |
+| `d*.reservoir.liquid_flow`, while running | 50 to 300 m3/h | stable minimum and hard cap |
+| `d*.reservoir.liquid_flow`, total time running | at most 330 d | annual operation of a doublet |
+| `d*.brine_cooling` | at most 40 K | maximum brine cooling |
+| `d*.pump_efficiency` | 0.7 | pump efficiency |
+| `d*.volume_imbalance` | within 1e-6 m3/s | equal liquid volumes |
+| `heating_consumer.supply_in.temperature` | at least 100 degC | heating supply |
+| `cooling_consumer.supply_in.temperature` | at most 20 degC | cooling supply |
+
+`problem_with_treatment.json` has the flow, brine cooling and `heat_users.supply_in.temperature`
+limits only. The pump efficiency and the volume balance are not limits of that design, and the
+duration constraint is left out: it is planned without outages.
+
+## Assumptions and prices
+
+The assumptions are placeholders of the examples. Their source is an `assumptions.json` written
+for the examples, now the `assumptions` key of both problem files: none comes from gemini code and
+none from the organisers, whose requirements give no price, rate or lifetime.
+
+| Value | Setting | Source |
+| --- | --- | --- |
+| `prices.electricity` | 100 EUR/MWh | placeholder of the examples |
+| `prices.gas` | 40 EUR/MWh | placeholder of the examples |
+| `prices.heat`, `prices.cold` | 60 EUR/MWh | placeholder of the examples |
+| `prices.waste_disposal` | 0.2 EUR/kg | placeholder of the examples |
+| `prices.chemical` | 3 EUR/kg | placeholder of the examples |
+| `discount_rate`, `lifetime_years` | 0.05, 25 years | placeholder of the examples |
+| `electricity_emission_factor` | 300 g CO2/kWh | placeholder of the examples |
+| `pump_cost`, `chiller_cost`, `exchanger_cost`, `flare_cost`, `makeup_cost` | as in the file | placeholder of the examples |

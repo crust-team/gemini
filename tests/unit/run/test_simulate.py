@@ -2,6 +2,7 @@
 
 import copy
 import json
+import sys
 
 import pandas as pd
 import pytest
@@ -293,3 +294,17 @@ def test_a_problem_schedules_when_there_is_no_plan():
     scheduled = gm.simulate(plant, problem)
     given = gm.simulate(plant, problem, gm.schedule(plant, problem))
     pd.testing.assert_frame_equal(scheduled.to_frame(), given.to_frame())
+
+
+def test_compile_false_reaches_the_engine(monkeypatch):
+    """``compile`` of ``simulate`` is the argument of the engine that runs it."""
+    seen = []
+
+    class Recording(gm.Engine):
+        def __init__(self, *arguments):
+            seen.append(arguments[-1])
+            super().__init__(*arguments)
+
+    monkeypatch.setattr(sys.modules["gemini.run.simulate"], "Engine", Recording)
+    gm.simulate(tank(), plan=_rows(), compile=False, on_error="record")
+    assert seen == [False]

@@ -6,10 +6,6 @@
       "type": "Doublet",
       "params": {
         "depth": 2500.0,
-        "gradient": 0.03,
-        "surface_temperature": 285.15,
-        "permeability": 1.9738466e-13,
-        "thickness": 100.0,
         "well_diameter": 0.244,
         "nominal_flow": 0.08333333333333333,
         "pump_efficiency": 0.7,
@@ -20,10 +16,6 @@
       "type": "Doublet",
       "params": {
         "depth": 2500.0,
-        "gradient": 0.03,
-        "surface_temperature": 285.15,
-        "permeability": 1.9738466e-13,
-        "thickness": 100.0,
         "well_diameter": 0.244,
         "nominal_flow": 0.08333333333333333,
         "pump_efficiency": 0.7,

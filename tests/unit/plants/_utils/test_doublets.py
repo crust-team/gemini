@@ -127,10 +127,9 @@ def test_a_plant_runs_one_day(stored):
     index = pd.date_range("2027-01-28", periods=1, freq="D", tz="UTC", name="time")
     demand = pd.DataFrame({"heating_demand": 8e6 * count}, index=index)
     clock = gm.engine.Clock.days(2027, 1, 28, step="24h")
-    results = gm.simulate(
-        built, gm.Problem(demand, constraints=LIMITS, assumptions=ASSUMPTIONS), clock=clock
-    )
-    delivered = gm.evaluate.totals(built, results)["heat_delivered"]["value"]
+    problem = gm.Problem(demand, constraints=LIMITS, assumptions=ASSUMPTIONS)
+    results = gm.simulate(built, problem, clock=clock)
+    delivered = gm.evaluate.totals(built, problem, results)["heat_delivered"]["value"]
     assert delivered == pytest.approx(8e6 * count * 86400, rel=2e-3)
 
 

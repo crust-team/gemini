@@ -5,15 +5,13 @@ colder doublet, a 65 °C network and other limits. Every value is invented for t
 measured data. Only `examples/` and `tests/` read this folder, and nothing under `gemini/` knows it.
 
 `examples/cases/shallow_district.py` runs it through the same general functions as any problem:
-`gm.profiles.from_csv`, `gm.plants.from_dict`, `gm.checks.Limits.from_dict`, `gm.schedule` and
-`gm.simulate`.
+`gm.Problem.from_json`, `gm.plants.from_dict`, `gm.schedule` and `gm.simulate`.
 
 | File | Holds |
 | --- | --- |
 | `demand.csv` | 504 hourly rows from 2026-01-12: `timestamp`, `heat_kw`, `cool_kw`, a daily cycle with a morning peak, lower at night and at the weekend; written once from a formula |
-| `plant.json` | A plant dict of class `HeatingHeatPumpCoolingPlant` on one doublet |
-| `rules.json` | The rules of `gm.schedule` |
-| `limits.json` | The checks of the run, a `gm.checks.Limits` dict |
+| `problem.json` | The problem: the demand (`demand.csv`, in kW), the site, the constraints and the assumptions with prices; `gm.Problem.from_json` |
+| `plant.json` | A plant dict of class `HeatingHeatPumpCoolingPlant` on one doublet: design values only |
 
 ## Values
 
@@ -38,14 +36,33 @@ measured data. Only `examples/` and `tests/` read this folder, and nothing under
 | Air | 6 °C | A cold season |
 | Pipes | 400 m, 0.2 m inside diameter | |
 
-## Rules and limits
+## Site
 
-| Rule or limit | Value |
+`problem.json` holds the ground: `d*.gradient` 36 K/km, `d*.surface_temperature` 9 degC,
+`d*.thickness` 60 m, `d*.permeability` 450 mD, `d*.reservoir.pressure` and `d*.sink.pressure`
+120 barg. The brine (`fluids`) is not a plant parameter, so it stays in `plant.json`.
+
+## Constraints
+
+| Path | Value |
 | --- | --- |
-| Doublet flow | 35 to 180 m³/h |
-| Brine cooling | at most 22 K |
-| Operating time | 450 h of 504: its 54 outage steps are the lowest-demand hours |
-| Pump efficiency | 0.6 to 0.68 |
-| Volume balance | within 1e-5 m³/s |
-| Heating supply | at least 65 °C |
-| Cooling supply | at most 16 °C |
+| `d*.reservoir.liquid_flow`, while running | 35 to 180 m3/h |
+| `d*.brine_cooling` | at most 22 K |
+| `d*.reservoir.liquid_flow`, total time running | at most 450 h of 504: its 54 outage steps are the lowest-demand hours |
+| `d*.pump_efficiency` | 0.6 to 0.68 |
+| `d*.volume_imbalance` | within 1e-5 m3/s |
+| `heating_consumer.supply_in.temperature` | at least 65 degC |
+| `cooling_consumer.supply_in.temperature` | at most 16 degC |
+
+## Assumptions and prices
+
+Like every value of this folder, the assumptions are invented for testing; none is a market price
+and none comes from gemini code or from a source. `gm.schedule` needs the electricity and gas
+prices, so they are stated.
+
+| Value | Setting | Source |
+| --- | --- | --- |
+| `prices.electricity` | 120 EUR/MWh | invented |
+| `prices.gas` | 55 EUR/MWh | invented |
+| `discount_rate`, `lifetime_years` | 0.04, 30 years | invented |
+| `electricity_emission_factor` | 360 g CO2/kWh | invented |

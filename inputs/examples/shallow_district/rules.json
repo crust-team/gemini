@@ -1,6 +1,0 @@
-{
-  "order": ["geothermal", "heat_pump", "boiler"],
-  "doublet_flow": {"min": "35 m3/h", "max": "180 m3/h"},
-  "max_brine_cooling": "22 K",
-  "operating_time": "450 h"
-}

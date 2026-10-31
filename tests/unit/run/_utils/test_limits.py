@@ -1,0 +1,42 @@
+"""The constraints a schedule enforces, found by their general form."""
+
+import pandas as pd
+import pytest
+
+import gemini as gm
+from gemini.run._utils import limits
+from tests.fixtures.errors import raises
+
+FLOW = gm.Constraint("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h", when="running")
+COOLING = gm.Constraint("d*.brine_cooling", max="40 K", when="running")
+DURATION = gm.Constraint("d*.reservoir.liquid_flow", max="330 d", over="duration", when="running")
+
+
+def test_a_doublet_gets_its_limits_in_si():
+    """The flow range, the cooling and the running time of every doublet that fits."""
+    found, check_only = limits.split([FLOW, COOLING, DURATION], ["d0"])
+    assert found["d0"].minimum_flow == pytest.approx(50 / 3600)
+    assert found["d0"].brine_cooling == 40
+    assert found["d0"].operating_time == pd.Timedelta(days=330)
+    assert check_only == []
+
+
+def test_what_the_schedule_cannot_enforce_is_check_only():
+    """Another field, or a duration with only a minimum, is left to the check of a run."""
+    other = gm.Constraint("users.supply_in.temperature", min="100 degC")
+    least = gm.Constraint("d*.reservoir.liquid_flow", min="1 d", over="duration", when="running")
+    found, check_only = limits.split([FLOW, COOLING, other, least], ["d0"])
+    assert check_only == [other.to_dict(), least.to_dict()] and found["d0"].operating_time is None
+
+
+@pytest.mark.parametrize("constraints,name", [([COOLING], "liquid_flow"), ([FLOW], "brine_cool")])
+def test_a_limit_the_schedule_needs_is_named(constraints, name):
+    """A flow range and a brine cooling are required, per doublet."""
+    with raises(gm.errors.ValidationError, "missing_value", match=name):
+        limits.split(constraints, ["d0"])
+
+
+def test_a_star_stays_within_a_name():
+    """``d*`` fits a doublet and not what lies below it."""
+    found, _ = limits.split([FLOW, COOLING], ["d0", "d1"])
+    assert set(found) == {"d0", "d1"}
