@@ -10,7 +10,7 @@ from tests.fixtures.equivalence import assert_module_matches
 
 def test_equipment_forward():
     """Equipment preserves mass and valid pressure/temperature."""
-    c = InjectionPump().update_params(stage_count=10, pump_type="DEFAULT-PUMP")
+    c = InjectionPump().set_params("", {"stage_count": 10, "pump_type": "DEFAULT-PUMP"})
     result = c(fluid_in=Stream(m_dot=1, T=300, p=1e6), pressure_setpoint=2e6)
     assert sum(s.m_dot for s in result.outlets.values() if isinstance(s, Stream)) == 1
     assert result.outlets["fluid_out"].T == 300
@@ -26,16 +26,19 @@ def _rows():
 
 def test_setpoint_matches_traced():
     """The setpoint branch traces and equals one call per row."""
-    module = InjectionPump().update_params(efficiency=0.65)
+    module = InjectionPump().set_params("", {"efficiency": 0.65})
     assert_module_matches(module, _rows())
 
 
 def test_curves_match_traced():
     """The head and power curve branch traces and equals one call per row."""
-    module = InjectionPump().update_params(
-        stage_count=10,
-        head_coefficients=[100, -0.01, 0, 0, 0, 0],
-        power_coefficients=[1, 0.001, 0, 0, 0, 0],
+    module = InjectionPump().set_params(
+        "",
+        {
+            "stage_count": 10,
+            "head_coefficients": [100, -0.01, 0, 0, 0, 0],
+            "power_coefficients": [1, 0.001, 0, 0, 0, 0],
+        },
     )
     rows = [{k: v for k, v in row.items() if k != "pressure_setpoint"} for row in _rows()]
     assert_module_matches(module, rows)

@@ -28,10 +28,16 @@ class Network(Module):
 
         # Modules
         self.splitter = Splitter()
-        self.pipe = Pipe().update_params(
-            length=200, inner_diameter=0.08, elevation_change=0, heat_transfer_coefficient=2.0
+        self.pipe = Pipe().set_params(
+            "",
+            {
+                "length": 200,
+                "inner_diameter": 0.08,
+                "elevation_change": 0,
+                "heat_transfer_coefficient": 2.0,
+            },
         )
-        self.valve = Valve().update_params(flow_coefficient="40 m3/h/bar^0.5")
+        self.valve = Valve().set_params("", {"flow_coefficient": "40 m3/h/bar^0.5"})
         self.mixer = Mixer()
         self.tank = PressurizationTank()
 

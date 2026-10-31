@@ -14,7 +14,7 @@ from tests.fixtures.reading import reading
 
 def grid(**changes):
     """Return a connection with ``changes``."""
-    return ElectricityGrid().update_params(**changes)
+    return ElectricityGrid().set_params("", changes)
 
 
 def test_import_and_export_within_unlimited_connection():
@@ -45,15 +45,18 @@ class GridPlant(Module):
         super().__init__()
 
         # Modules
-        self.orc = ORC().update_params(
-            minimum_brine_outlet_temperature=343.15,
-            pinch=5,
-            carnot_fraction=0.5,
-            condenser_approach=15,
-            parasitic_fraction=0.15,
-            capacity=5e6,
+        self.orc = ORC().set_params(
+            "",
+            {
+                "minimum_brine_outlet_temperature": 343.15,
+                "pinch": 5,
+                "carnot_fraction": 0.5,
+                "condenser_approach": 15,
+                "parasitic_fraction": 0.15,
+                "capacity": 5e6,
+            },
         )
-        self.boiler = ElectricBoiler().update_params(capacity=1e6, efficiency=0.99)
+        self.boiler = ElectricBoiler().set_params("", {"capacity": 1e6, "efficiency": 0.99})
         self.grid = grid(export_limit="10 MW")
 
         # Inlets

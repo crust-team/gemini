@@ -50,6 +50,7 @@ from gemini.utils.context import ContextSetting
 from gemini.utils.hooks import RemovableHandle, has_signature
 from gemini.utils.mappings import get_nested, set_nested
 from gemini.utils.strings import (
+    close_matches,
     did_you_mean,
     first_paragraph,
     join_names,
@@ -271,25 +272,6 @@ def _active_call(module):
     return current.owned_by(module) if current is not None else None
 
 
-class _ClassOrInstance:
-    """Method that runs on the instance, or on a new instance when called on the class.
-
-    ``on_class`` holds the keywords of a call on the class, where no values are stored.
-    """
-
-    def __init__(self, function, **on_class):
-        """Wrap ``function(module, ...)``."""
-        self.function = function
-        self.on_class = on_class
-        self.__doc__ = function.__doc__
-
-    def __get__(self, instance, owner):
-        """Bind to ``instance``, or to a new ``owner()``."""
-        if instance is not None:
-            return partial(self.function, instance)
-        return partial(self.function, owner(), **self.on_class)
-
-
 class _FolderCategory:
     """The ``category`` of a class: the folder of this package that holds its file.
 
@@ -323,9 +305,6 @@ class Module:
     offer_inlets = ()
     _derived_params = frozenset()
     category = _FolderCategory()
-    describe = _ClassOrInstance(description.describe, values=False)
-    parameter_schema = _ClassOrInstance(description.parameter_schema)
-    validate_params = _ClassOrInstance(description.validate_params)
 
     def __init__(self):
         """Create the ordered registries and the run-owned metadata."""
@@ -393,7 +372,7 @@ class Module:
         if isinstance(value, Declaration):
             self._register_declaration(name, value)
         elif isinstance(value, Module):
-            self.add_module(name, value)
+            self._add_module(name, value)
         else:
             self._assign_value(name, value)
 
@@ -449,7 +428,7 @@ class Module:
             _scalar_output(self._outputs[name], value)
         )
 
-    def add_module(self, name, module):
+    def _add_module(self, name, module):
         """Register an immediate child and reject ambiguous names or ownership cycles."""
         if not isinstance(module, Module):
             raise DefinitionError(f"{self.path}.{name}: child must be a Module")
@@ -571,8 +550,6 @@ class Module:
             )
         return module
 
-    get_module = get_submodule
-
     def _find_submodule(self, path):
         """Return the descendant at a dotted path, or ``None`` when there is none."""
         module = self
@@ -603,10 +580,6 @@ class Module:
     def named_parameters(self, recurse=True):
         """Iterate ``(dotted path, parameter)`` pairs relative to this module."""
         yield from self._named("_parameters", recurse)
-
-    def calibratable_parameters(self, recurse=True):
-        """Return only parameters explicitly marked calibratable."""
-        return [p for p in self.parameters(recurse) if p.calibratable]
 
     def controls(self, recurse=True):
         """Return controllable input declarations by dotted path relative to this module."""
@@ -640,31 +613,20 @@ class Module:
         """Return this module's own outlet declarations; a child's ports are internal wiring."""
         return dict(self._outlets)
 
-    def _get_declaration(self, path, registry_name, kind):
+    def get(self, path):
+        """Return the declaration at a dotted path, whatever its kind."""
         module_path, name = split_path(path)
-        module = self.get_submodule(module_path)
-        registry = getattr(module, registry_name)
-        if name not in registry:
+        declarations = self.get_submodule(module_path)._declarations()
+        if name not in declarations:
             raise ValidationError(
-                f"{self.path}: unknown {kind} {path!r}; valid: {join_names(registry)}"
-                f"{did_you_mean(name, registry)}",
+                f"{self.path}: unknown name {path!r}; valid: {join_names(declarations)}"
+                f"{did_you_mean(name, declarations)}",
+                suggestions=close_matches(name, declarations),
                 code="unknown_name",
             )
-        return registry[name]
+        return declarations[name]
 
-    def get_parameter(self, path):
-        """Return parameter metadata by local or dotted path."""
-        return self._get_declaration(path, "_parameters", "parameter")
-
-    def get_control(self, path):
-        """Return control metadata by local or dotted path."""
-        return self._get_declaration(path, "_controls", "control")
-
-    def get_boundary(self, path):
-        """Return boundary metadata by local or dotted path."""
-        return self._get_declaration(path, "_boundaries", "boundary")
-
-    def set_inputs(self, mapping):
+    def _set_inputs(self, mapping):
         """Persist validated controls and boundaries addressed by relative dotted path."""
         declarations = self.inputs()
         pending = []
@@ -698,14 +660,11 @@ class Module:
         """Whether every parameter in this module tree has a value."""
         return not self.missing_parameters()
 
-    def update_params(self, **changes):
-        """Set validated parameters, addressed by local or dotted path, as explicit overrides.
-
-        Returns the module, so ``ESP().update_params(stage_count=12)`` builds a configured module.
-        """
-        for name, value in changes.items():
-            parameter = self.get_parameter(name)
-            parameter.owner._set_parameter(parameter.name, value)
+    def _override_params(self, values):
+        """Set parameters by local or dotted path as overrides, which win over every date."""
+        for name, value in values.items():
+            declaration = self.get(name)
+            declaration.owner._set_parameter(declaration.name, value)
         return self
 
     def _set_parameter(self, name, value):
@@ -719,6 +678,18 @@ class Module:
         """Return whether this module derives its children's values; only a plant may."""
         return False
 
+    def describe(self):
+        """Return the plain description of this module: see ``modules.md``."""
+        return description.describe(self)
+
+    def parameter_schema(self):
+        """Return the JSON Schema of the parameters of this module."""
+        return description.parameter_schema(self)
+
+    def validate_params(self, params, on_error="raise"):
+        """Check ``params`` without changing the module: ``[]``, or every problem."""
+        return description.validate_params(self, params, on_error)
+
     def _params_at(self, at):
         """Return the complete validated parameter mapping active at an instant.
 
@@ -728,15 +699,11 @@ class Module:
         values = selected.params | self._param_overrides
         return {name: self._parameters[name].validate(value) for name, value in values.items()}
 
-    def clear_param_overrides(self):
-        """Forget explicit overrides, so values come from the dated snapshots alone."""
-        self._param_overrides = {}
-
-    def has_input_value(self, name):
+    def _has_input_value(self, name):
         """Return whether control or boundary ``name`` has a persisted value."""
         return name in self._input_values
 
-    def apply_params_at(self, at):
+    def _apply_params_at(self, at):
         """Apply dated parameter snapshots recursively while retaining explicit overrides."""
         for module in self.modules():
             for name, value in module._params_at(at).items():
@@ -754,11 +721,7 @@ class Module:
         """
         raise NotImplementedError(f"{type(self).__name__} offers nothing")
 
-    def offered_outlets(self):
-        """Return the outlets that exist before the other modules run."""
-        return {name: port for name, port in self._outlets.items() if port.offered}
-
-    def offer(self, inlets=None):
+    def _offered(self, inlets=None):
         """Return the values of the ``offered`` outlets, for a plant to pass on before they run."""
         self._prepare()
         parent = _current_call.get()
@@ -959,7 +922,9 @@ class Module:
         if len(empty) == len(optional):
             return empty
         fed = {name: (values or {})[name] for name in self.offer_inlets}
-        return empty | {name: value for name, value in self.offer(fed).items() if name in optional}
+        return empty | {
+            name: value for name, value in self._offered(fed).items() if name in optional
+        }
 
     def _with_optional_ports(self, values):
         """Return ``values`` with the optional ports the call left out."""
@@ -1258,8 +1223,7 @@ class Module:
         for path, entry in state.items():
             module = modules[path]
             values = {
-                name: module.get_parameter(name).validate(value)
-                for name, value in entry["params"].items()
+                name: module.get(name).validate(value) for name, value in entry["params"].items()
             }
             pending.append((module, values, Fluid.model_validate(entry["fluid"])))
         for module, values, fluid in pending:
@@ -1297,7 +1261,7 @@ class Module:
         """Replace the bindings of the module at ``path``; units are checked. Returns the module."""
         return design.set_bindings(self, path, bindings)
 
-    def extra_repr(self):
+    def _extra_repr(self):
         """Display up to four initialized scalar parameters."""
         parts = []
         for name in self.repr_fields or tuple(self._parameters):
@@ -1314,7 +1278,7 @@ class Module:
 
     def __repr__(self):
         """Render a compact recursive module tree."""
-        extra = self.extra_repr()
+        extra = self._extra_repr()
         if not self._children:
             return f"{self._type_label}({extra})"
         rows = [f"{self._type_label}({extra}"]

@@ -76,7 +76,7 @@ def test_unassigned_outputs_fail_at_trace_time(gain):
             self.rise = 0.0
             return dict(fluid_out=inlets.fluid_in)
 
-    module = Forgetful().update_params(scale=1.0)
+    module = Forgetful().set_params("", {"scale": 1.0})
     with pytest.raises(DefinitionError, match="boost"):
         Tracer().trace(module, {"fluid_in": module.fluid})
 
@@ -113,7 +113,7 @@ def test_a_stream_built_in_forward_traces_and_keeps_its_limits(gain):
                 )
             }
 
-    module = Drop().update_params(scale=1.0)
+    module = Drop().set_params("", {"scale": 1.0})
     graph = Tracer().trace(module, {"fluid_in": module.fluid})
     assert any(node.op == "check" for node in graph.nodes)
     stream = gm.Stream(m_dot=np.array([1.0, 1.0]), T=300.0, p=np.array([2e5, 1e5]))

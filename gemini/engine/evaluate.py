@@ -33,7 +33,7 @@ def evaluate(module, parameters, inlets, controls, on_error="raise", units=None)
     try:
         output = OutputUnits(units)
         instance = _instance(module)
-        instance.update_params(**(parameters or {}))
+        instance._override_params(parameters or {})
         result = instance(dict(inlets or {}), **(controls or {}))
     except GeminiError as error:
         return _failed(error, on_error)

@@ -21,7 +21,7 @@ class ModuleList(Module, MutableSequence):
             object.__delattr__(self, name)
         self._children.clear()
         for index, module in enumerate(modules):
-            self.add_module(str(index), module)
+            self._add_module(str(index), module)
 
     def __getitem__(self, index):
         """Return one child, or a plain list of children for a slice."""
@@ -63,6 +63,7 @@ class ModuleDict(Module, MutableMapping):
 
     __eq__ = object.__eq__
     __hash__ = object.__hash__
+    get = MutableMapping.get
 
     def __init__(self, modules=()):
         """Register modules from a mapping or iterable of pairs."""
@@ -75,7 +76,7 @@ class ModuleDict(Module, MutableMapping):
 
     def __setitem__(self, key, value):
         """Register or replace a child by key."""
-        self.add_module(key, value)
+        self._add_module(key, value)
 
     def __delitem__(self, key):
         """Remove a registered child."""

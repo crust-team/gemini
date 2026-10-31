@@ -165,7 +165,7 @@ def test_a_callback_that_changes_the_run_is_called_before_each_tick_is_evaluated
 
         def on_step_start(self, engine, sample):
             if len(engine.results) == 3:
-                engine.plant.first.update_params(gain=7.0)
+                engine.plant.first.set_params("", {"gain": 7.0})
 
     _, results, _ = _run("numpy", pair_frame(), callbacks=(Retune,))
     level = np.linspace(0.1, 1.3, len(TICKS)) * 1e5

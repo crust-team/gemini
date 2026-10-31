@@ -19,7 +19,7 @@ INPUTS = {
 def run():
     """Return the example plant and one call of it."""
     plant = gm.plants.example("BoilerChpPlant")
-    plant.set_inputs(INPUTS)
+    plant._set_inputs(INPUTS)
     return plant, plant(return_in=SECONDARY)
 
 

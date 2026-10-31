@@ -75,7 +75,7 @@ class Gain(Module):
 @pytest.fixture
 def gain():
     """Return a configured ``Gain`` module."""
-    return Gain().update_params(scale=3.0)
+    return Gain().set_params("", {"scale": 3.0})
 
 
 @pytest.fixture
@@ -194,7 +194,7 @@ class Line(Module):
 
         # Modules
         self.first = Meter()
-        self.gain = Gain().update_params(scale=3.0)
+        self.gain = Gain().set_params("", {"scale": 3.0})
         self.second = Meter()
 
         # Inlets
@@ -281,7 +281,7 @@ class Twice(Module):
         super().__init__()
 
         # Modules
-        self.gain = Gain().update_params(scale=3.0)
+        self.gain = Gain().set_params("", {"scale": 3.0})
 
         # Inlets
         self.fluid_in = Inlet(Stream)

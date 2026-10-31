@@ -37,22 +37,22 @@ class CostedCoolingGrid(CoolingGrid):
 
 def _with_grids(plant):
     """Add the electricity and gas grids the bills of a run read."""
-    plant.add_module("grid", ElectricityGrid())
-    plant.add_module("gas", GasGrid())
+    plant._add_module("grid", ElectricityGrid())
+    plant._add_module("gas", GasGrid())
     return plant
 
 
 def heating_plant(costed=True):
     """Return a plant with one heat consumer, costed or not."""
     plant = gm.Plant("Heating")
-    plant.add_module("heat", CostedHeatingGrid() if costed else HeatingGrid())
+    plant._add_module("heat", CostedHeatingGrid() if costed else HeatingGrid())
     return _with_grids(plant)
 
 
 def cooling_plant():
     """Return a plant with one costed cooling consumer."""
     plant = gm.Plant("Cooling")
-    plant.add_module("cool", CostedCoolingGrid())
+    plant._add_module("cool", CostedCoolingGrid())
     return _with_grids(plant)
 
 

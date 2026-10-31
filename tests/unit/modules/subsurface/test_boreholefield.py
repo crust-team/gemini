@@ -21,15 +21,18 @@ DAY = 86400.0
 
 def field():
     """Return a ten-borehole field of 150 m at 6 m spacing."""
-    return BoreholeField().update_params(
-        borehole_count=10,
-        borehole_depth=150,
-        borehole_radius=0.075,
-        borehole_spacing=6,
-        borehole_resistance=0.1,
-        ground_conductivity=2.0,
-        ground_volumetric_heat_capacity=2.2e6,
-        undisturbed_ground_temperature=283.15,
+    return BoreholeField().set_params(
+        "",
+        {
+            "borehole_count": 10,
+            "borehole_depth": 150,
+            "borehole_radius": 0.075,
+            "borehole_spacing": 6,
+            "borehole_resistance": 0.1,
+            "ground_conductivity": 2.0,
+            "ground_volumetric_heat_capacity": 2.2e6,
+            "undisturbed_ground_temperature": 283.15,
+        },
     )
 
 
@@ -56,7 +59,7 @@ class HeatPumpLoop(Module):
 
         # Modules
         self.field = field()
-        self.heater = ElectricBoiler().update_params(capacity=1e5, efficiency=0.9)
+        self.heater = ElectricBoiler().set_params("", {"capacity": 1e5, "efficiency": 0.9})
 
         # Inlets
         self.fluid_in = Inlet(Stream)
@@ -130,8 +133,8 @@ def test_invalid_flow_and_geometry():
     with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot = -1"):
         field()(fluid_in=BRINE.with_(m_dot=-1))
     with raises(gm.errors.ValidationError, "invalid_design", match="field geometry rejected"):
-        field().update_params(borehole_spacing=0.1)(fluid_in=BRINE)
-    shallow = field().update_params(borehole_count=400, borehole_depth=10)
+        field().set_params("", {"borehole_spacing": 0.1})(fluid_in=BRINE)
+    shallow = field().set_params("", {"borehole_count": 400, "borehole_depth": 10})
     with raises(gm.errors.ValidationError, "invalid_design", match="expected ln"):
         shallow.step(None, DAY, {"fluid_in": BRINE})
 
@@ -169,7 +172,7 @@ def test_field_arithmetic_matches_on_arrays():
 
 def test_zero_flow_does_not_evaluate_the_cell_geometry():
     """A cell no wider than the borehole is bad design data only where the loop flows."""
-    module = field().update_params(borehole_spacing=0.1)
+    module = field().set_params("", {"borehole_spacing": 0.1})
     conductance = ops.physics(module._effective_conductance)
     assert conductance(BRINE.with_(m_dot=0)) == 0
     with raises(gm.errors.ValidationError, "invalid_design", match="field geometry rejected"):

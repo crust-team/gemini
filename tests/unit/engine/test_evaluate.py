@@ -39,7 +39,7 @@ def test_evaluate_equals_a_direct_call_bit_for_bit():
     """The JSON call is the same call: a class, a name and a built module agree."""
     from gemini.modules.pumps import ESP
 
-    direct = ESP().update_params(**ESP_PARAMETERS)(
+    direct = ESP().set_params("", ESP_PARAMETERS)(
         gm.Stream(flow="150 m3/h", T="80 degC", p="20 bar"), frequency="50 Hz"
     )
     for module in ("ESP", ESP):

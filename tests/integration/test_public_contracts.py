@@ -27,9 +27,9 @@ CALLS = {
     "units.names": lambda plant, results: gm.units.names("pressure"),
     "units.parse": lambda plant, results: gm.units.parse("150 m3/h"),
     "describe": lambda plant, results: plant.describe(),
-    "class.describe": lambda plant, results: gm.modules.ESP.describe(),
-    "parameter_schema": lambda plant, results: gm.modules.ESP.parameter_schema(),
-    "validate_params": lambda plant, results: gm.modules.Valve.validate_params(
+    "class.describe": lambda plant, results: gm.modules.ESP().describe(),
+    "parameter_schema": lambda plant, results: gm.modules.ESP().parameter_schema(),
+    "validate_params": lambda plant, results: gm.modules.Valve().validate_params(
         {"nope": 1}, on_error="record"
     ),
     "plants.names": lambda plant, results: gm.plants.names(),

@@ -18,27 +18,27 @@ def atmosphere(**boundaries):
     """Return the air at 15 degC, or with the given boundaries."""
     air = Atmosphere()
     air.temperature = 288.15
-    air.set_inputs(boundaries)
+    air._set_inputs(boundaries)
     return air
 
 
 def test_the_air_is_offered_at_the_ambient_conditions_without_flow():
     """Every module that exchanges heat with the air reads the same stream."""
-    offered = atmosphere().offer()
+    offered = atmosphere()._offered()
     assert offered["air_out"].T == 288.15 and offered["air_out"].m_dot == 0
     assert offered["air_out"].p == pytest.approx(101325)
 
 
 def test_a_wet_cooler_reads_the_wet_bulb():
     """``wet_air_out`` carries the wet bulb; without one it is the dry bulb."""
-    assert atmosphere().offer()["wet_air_out"].T == 288.15
-    assert atmosphere(wet_bulb_temperature=280.0).offer()["wet_air_out"].T == 280.0
+    assert atmosphere()._offered()["wet_air_out"].T == 288.15
+    assert atmosphere(wet_bulb_temperature=280.0)._offered()["wet_air_out"].T == 280.0
 
 
 def test_a_wet_bulb_above_the_dry_bulb_is_refused():
     """It is outside the model."""
     with pytest.raises(PhysicsError, match="wet_bulb_temperature = 300"):
-        atmosphere(wet_bulb_temperature=300.0).offer()
+        atmosphere(wet_bulb_temperature=300.0)._offered()
 
 
 def test_the_emissions_come_from_what_arrives():

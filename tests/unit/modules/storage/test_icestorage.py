@@ -36,7 +36,7 @@ WARM = COLD.with_(T=285.15)
 
 def _store():
     """Return a 1 t store with a 2 kW/K coil."""
-    return IceStorage().update_params(water_mass=MASS, thermal_conductance=UA)
+    return IceStorage().set_params("", {"water_mass": MASS, "thermal_conductance": UA})
 
 
 def test_plain_call_charges_an_empty_store():

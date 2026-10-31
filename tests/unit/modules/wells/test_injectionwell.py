@@ -13,10 +13,11 @@ from tests.fixtures.reading import reading
 
 def test_injection_flow_sign_and_pressure():
     """Ports conserve mass while the internal DPDT correlation retains its negative sign."""
-    c = InjectionWell().update_params(
-        **mapping.injectionwell_params_from_gemini(
+    c = InjectionWell().set_params(
+        "",
+        mapping.injectionwell_params_from_gemini(
             mapping.read_property(OLD_PROJECT / "injection_well_a06b.param")
-        )
+        ),
     )
     result = c(wellhead_in=Stream(m_dot=40, T=300, p=5e6))
     out, streams = reading(result), result.outlets
@@ -27,10 +28,11 @@ def test_injection_flow_sign_and_pressure():
 
 def test_corrosion_profile_uses_injection_flow_sign():
     """Positive surface flow and negative downhole flow describe the same injection state."""
-    well = InjectionWell().update_params(
-        **mapping.injectionwell_params_from_gemini(
+    well = InjectionWell().set_params(
+        "",
+        mapping.injectionwell_params_from_gemini(
             mapping.read_property(OLD_PROJECT / "injection_well_a06b.param")
-        )
+        ),
     )
     stream = Stream(m_dot=40, T=300, p=5e6)
     chemistry = {"co2_fraction": 0.1}
@@ -40,10 +42,11 @@ def test_corrosion_profile_uses_injection_flow_sign():
 
 
 def _well():
-    return InjectionWell().update_params(
-        **mapping.injectionwell_params_from_gemini(
+    return InjectionWell().set_params(
+        "",
+        mapping.injectionwell_params_from_gemini(
             mapping.read_property(OLD_PROJECT / "injection_well_a06b.param")
-        )
+        ),
     )
 
 

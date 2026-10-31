@@ -7,7 +7,7 @@ warm well. The return of the cooling network is fed back to the ATES plant at th
 hourly step is checked for energy closure: the sensible-enthalpy audit closes except for the pumps'
 flow work.
 
-Shows ``gm.plants.example("DistrictEnergyPlant")``, ``set_inputs``, ``Module.step``,
+Shows ``gm.plants.example("DistrictEnergyPlant")``, ``get``, ``Module.step``,
 ``gm.modules.energy_balance``, ``gm.modules.collect_flows`` and ``gm.checks.plant_balance``.
 
 Run with ``python examples/cases/district_heating_cooling.py``.
@@ -44,12 +44,19 @@ INPUTS = {
 } | {f"cooling.substations.0.{name}": value for name, value in COOLING_BUILDING.items()}
 
 
+def command(plant, inputs):
+    """Set each control or boundary, named by its path, on its module."""
+    for path, value in inputs.items():
+        declaration = plant.get(path)
+        setattr(declaration.owner, declaration.name, value)
+
+
 def consumer_heat(plant, result, module_class):
     """Return the heat [W] the water gives up in the leaves of ``module_class``, by their ports."""
     consumers = [
         leaf
         for path, leaf in result.leaves().items()
-        if isinstance(plant.get_module(path), module_class)
+        if isinstance(plant.get_submodule(path), module_class)
     ]
     return sum(
         leaf.inlets.supply_in.quantities()["enthalpy_flow"]
@@ -70,7 +77,7 @@ def closes(plant, result):
 def main():
     """Step the plant for six hours and print one line per step."""
     plant = gm.plants.example("DistrictEnergyPlant")
-    plant.set_inputs(INPUTS)
+    command(plant, INPUTS)
     state, cooling_return = None, FIRST_COOLING_RETURN
     air = gm.modules.Atmosphere.ambient_air(AIR)
     print("Assumptions: 10 °C air, an 11 °C aquifer, 150 and 100 kW of heat, 150 kW of cold")

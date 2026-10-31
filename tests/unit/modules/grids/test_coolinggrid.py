@@ -17,7 +17,9 @@ AVAILABLE = 2 * CP * 9
 
 
 def _consumer():
-    return CoolingGrid().update_params(maximum_return_temperature="16 C", dew_point_margin=3)
+    return CoolingGrid().set_params(
+        "", {"maximum_return_temperature": "16 C", "dew_point_margin": 3}
+    )
 
 
 def _call(consumer, supply=SUPPLY, sensible=5e4, latent=1e4, **indoor):
@@ -102,7 +104,7 @@ def test_invalid_inputs_raise():
     with pytest.raises(ValidationError):
         _call(consumer, latent=-1)
     with pytest.raises(ValidationError):
-        consumer.update_params(dew_point_margin=-1)
+        consumer.set_params("", {"dew_point_margin": -1})
     with raises(ValidationError, "missing_value"):
         consumer(supply_in=SUPPLY, sensible_cooling_demand=1e4, latent_cooling_demand=0)
 

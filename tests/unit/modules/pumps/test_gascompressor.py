@@ -20,7 +20,7 @@ def compressor(**changes):
         gas_specific_heat=1005,
         motor_efficiency=0.95,
     )
-    return GasCompressor().update_params(**params | changes)
+    return GasCompressor().set_params("", params | changes)
 
 
 def test_single_stage_by_hand():

@@ -59,9 +59,7 @@ def assert_values(actual, expected):
 def configured(module_class, parameters):
     """Build a standalone module and set its parameters as explicit values."""
     module = module_class()
-    module.update_params(
-        **{RENAMED_NAMES.get(key, key): value for key, value in parameters.items()}
-    )
+    module.set_params("", {RENAMED_NAMES.get(key, key): value for key, value in parameters.items()})
     return module
 
 

@@ -21,7 +21,7 @@ def pipe(**changes):
     params = dict(
         length=1000, inner_diameter=0.1, elevation_change=5, heat_transfer_coefficient=1.0
     )
-    return Pipe().update_params(**(params | changes))
+    return Pipe().set_params("", params | changes)
 
 
 def test_turbulent_flow_matches_hand_calculation():

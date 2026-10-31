@@ -23,12 +23,15 @@ HOUR = 3600.0
 
 def storage(mode="charge"):
     """Return a configured well pair in ``mode``."""
-    module = AquiferStorage().update_params(
-        aquifer_temperature=284.15,
-        aquifer_thickness=30,
-        porosity=0.3,
-        rock_volumetric_heat_capacity=2.0e6,
-        ground_conductivity=2.5,
+    module = AquiferStorage().set_params(
+        "",
+        {
+            "aquifer_temperature": 284.15,
+            "aquifer_thickness": 30,
+            "porosity": 0.3,
+            "rock_volumetric_heat_capacity": 2.0e6,
+            "ground_conductivity": 2.5,
+        },
     )
     module.mode = mode
     return module
@@ -50,7 +53,7 @@ class Plant(Module):
         super().__init__()
 
         # Modules
-        self.heater = ElectricBoiler().update_params(capacity=1e7, efficiency=0.9)
+        self.heater = ElectricBoiler().set_params("", {"capacity": 1e7, "efficiency": 0.9})
         self.storage = storage()
 
         # Inlets
@@ -186,7 +189,7 @@ class Reader(Module):
         object.__setattr__(self, "seen", seen)
 
         # Modules
-        self.storage = storage("discharge").update_params(groundwater_pressure=3e5)
+        self.storage = storage("discharge").set_params("", {"groundwater_pressure": 3e5})
         self.storage.groundwater_flow = 30.0
 
         # Inlets
@@ -199,7 +202,7 @@ class Reader(Module):
         """Read the production temperature, then call the storage."""
 
         # Modules
-        self.seen.append(self.storage.offer()["production_out"].T)
+        self.seen.append(self.storage._offered()["production_out"].T)
         stored = self.storage(injection_in=inlets.supply_in)
 
         # Outlets

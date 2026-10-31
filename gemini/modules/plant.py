@@ -133,9 +133,9 @@ class Plant(PortResolver, Module):
         parameter = design.parameter(self, name)
         return parameter.name in parameter.owner._param_overrides
 
-    def add_module(self, name, module):
+    def _add_module(self, name, module):
         """Register a child assigned as an attribute, as ``add`` does."""
-        super().add_module(name, module)
+        super()._add_module(name, module)
         self._note_child(name, module)
 
     def _note_child(self, key, module):
@@ -168,13 +168,13 @@ class Plant(PortResolver, Module):
     def _attach(self, key, module, stated, baseline):
         """Register ``module`` under the (possibly dotted) ``key`` with the params as stated."""
         parent_path, _, local = key.rpartition(".")
-        parent = self.get_module(parent_path)
+        parent = self.get_submodule(parent_path)
         if parent is not self and not is_group(parent):
             raise ValidationError(f"{key}: {parent_path!r} is not a group", path="name")
         if isinstance(parent, ModuleList):
             parent.append(module)
         else:
-            parent.add_module(local, module)
+            parent._add_module(local, module)
         self._stated[key] = stated
         self._baselines[key] = baseline
         self._refresh()
@@ -259,7 +259,7 @@ class Plant(PortResolver, Module):
                 if name in self._declared:
                     continue
                 path, port = port_ends(ends)[0]
-                end = getattr(self.get_module(path), side)()[port]
+                end = getattr(self.get_submodule(path), side)()[port]
                 registry = getattr(self, f"_{side}")
                 registry.pop(name, None)
                 Module._register_declaration(self, name, declare(end.type, kind=end.kind))

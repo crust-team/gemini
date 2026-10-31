@@ -1,6 +1,6 @@
 """Change parameters by date, set controls and boundaries and bind data columns.
 
-Shows ``set_params`` with ``valid_from``, ``params_at``, ``param_history``, ``set_inputs``,
+Shows ``set_params`` with ``valid_from``, ``params_at``, ``param_history``, attribute assignment,
 ``bindable`` and ``set_bindings``.
 
 Run with ``python examples/basics/04_parameters.py``.
@@ -21,10 +21,10 @@ def inputs(plant):
     """List the controls and persist one command; a boundary is set in the same way."""
     print(f"Controls:              {', '.join(sorted(plant.controls()))}")
     print(f"Boundaries:            {len(plant.boundaries())}")
-    plant.set_inputs({"doublet.esp.frequency": "50 Hz"})
+    plant.doublet.esp.frequency = "50 Hz"
     print(f"Pump frequency:        {plant.doublet.esp.frequency:.0f} Hz")
     substation = gm.plants.example("HeatingSubstation")
-    substation.set_inputs({"consumer.heat_demand": "150 kW"})
+    substation.consumer.heat_demand = "150 kW"
     print(f"Heat demand boundary:  {substation.consumer.heat_demand / 1e3:.0f} kW")
 
 

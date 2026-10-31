@@ -63,7 +63,7 @@ class Runner:
         if started:
             self.engine._notify("on_step_start", self.aligned.sample(first))
         if opening:
-            self.engine.plant.apply_params_at(self.aligned.times[first])
+            self.engine.plant._apply_params_at(self.aligned.times[first])
         outcomes = self._evaluate(first, stop)
         failure = self._failure(outcomes)
         count = failure.tick if failure is not None else stop - first
@@ -206,7 +206,7 @@ class Runner:
             return False
         values = {name: float(array[tick]) for name, array in block.inputs.items()}
         try:
-            outcome.twin.module.set_inputs(values)
+            outcome.twin.module._set_inputs(values)
         except Exception:
             return False
         return True

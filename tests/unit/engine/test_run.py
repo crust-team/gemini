@@ -253,13 +253,12 @@ def test_two_calls_on_one_plant_trace_once_and_match_two_fresh_plants(shared_pla
     """A new numeric value needs no new trace; the numbers are those of two fresh plants."""
     data = fast_dataset.window(end=fast_dataset.start + pd.Timedelta(hours=2))
     plant, other = copy.deepcopy(shared_plant), copy.deepcopy(shared_plant)
-    gain = {"thermal_conductance": 5e6}
     first = gm.simulate(plant, data)
-    plant.get_module("heat_exchanger").update_params(**gain)
+    plant.heat_exchanger.thermal_conductance = 5e6
     second = gm.simulate(plant, data)
     assert graph_cache(plant).traces == 1
     _same(first, gm.simulate(other, data))
-    other.get_module("heat_exchanger").update_params(**gain)
+    other.heat_exchanger.thermal_conductance = 5e6
     _same(second, gm.simulate(copy.deepcopy(other), data))
     assert (
         first.to_frame()["heat_exchanger.duty"].ne(second.to_frame()["heat_exchanger.duty"]).any()

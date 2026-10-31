@@ -11,8 +11,8 @@ def connection_list(plant):
     result = []
     for item in plant._connections:
         (spath, sport), (tpath, tport) = split_end(item["source"]), split_end(item["target"])
-        first = plant.get_module(spath).outlets()[sport]
-        second = plant.get_module(tpath).inlets()[tport]
+        first = plant.get_submodule(spath).outlets()[sport]
+        second = plant.get_submodule(tpath).inlets()[tport]
         result.append(
             {
                 "source": item["source"],

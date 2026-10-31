@@ -26,7 +26,7 @@ def unit(mode="chiller", **params):
         evaporator_coefficient=1.2,
         auxiliary_power_ratio=0.01,
     )
-    return AbsorptionUnit().update_params(**(design | params))
+    return AbsorptionUnit().set_params("", design | params)
 
 
 def call(machine, setpoint, **streams):

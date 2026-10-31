@@ -372,7 +372,7 @@ def _add_root_ports(totals, plant, ends, read):
     """Add the plant ports of a building block run alone, read at the leaf ports they reach."""
     for side, section in (("in", "inlets"), ("out", "outlets")):
         for path, port in ends[section]:
-            declared = getattr(plant.get_module(path), f"_{section}")[port]
+            declared = getattr(plant.get_submodule(path), f"_{section}")[port]
             _add_port(totals, side, declared, port, partial(read, path))
 
 

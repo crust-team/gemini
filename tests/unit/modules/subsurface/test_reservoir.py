@@ -18,7 +18,7 @@ def test_example_production_and_decline():
         mapping.read_property(OLD_PROJECT / "reservoir_c1b5.param"),
         mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
     )
-    c = ProductionReservoir().update_params(**p)
+    c = ProductionReservoir().set_params("", p)
     c.fluid = mapping.reservoir_fluid(mapping.read_property(OLD_PROJECT / "reservoir_c1b5.param"))
     result = c(production_rate=40)
     out, flow = result.outputs, 40 / 1068
@@ -35,7 +35,7 @@ def test_injection_zero_radius_is_explicit():
         mapping.read_property(OLD_PROJECT / "injection_well_a06b.param"),
         "injection",
     )
-    c = InjectionReservoir().update_params(**p)
+    c = InjectionReservoir().set_params("", p)
     result = c(sandface_in=Stream(m_dot=-40, T=300, p=23e6))
     out = result.outputs
     assert out.bottomhole_pressure > c.pressure
@@ -55,15 +55,15 @@ def test_ipr_helpers_match_the_call_outputs():
         top_depth=2400,
         wellbore_radius=0.1,
     )
-    producer = ProductionReservoir().update_params(
-        pressure=250e5, productivity_index=10 / 3.6e8, **common
+    producer = ProductionReservoir().set_params(
+        "", {"pressure": 250e5, "productivity_index": 10 / 3.6e8, **common}
     )
     sandface = producer.sandface_stream(40)
     assert sandface.m_dot == 40 and sandface.T == 353.15
     assert sandface.p == producer(production_rate=40).outputs.bottomhole_pressure
     assert sandface.p == pytest.approx(250e5 - 40 / 1000 * 3.6e8 / 10)
-    sink = InjectionReservoir().update_params(
-        pressure=240e5, injectivity_index=10 / 3.6e8, **common
+    sink = InjectionReservoir().set_params(
+        "", {"pressure": 240e5, "injectivity_index": 10 / 3.6e8, **common}
     )
     arriving = Stream(m_dot=-40, T=300, p=230e5)
     assert (
@@ -96,7 +96,7 @@ def _producer(**changes):
         productivity_index=10 / 3.6e8,
         skin=2,
     )
-    return RowCarrier().update_params(**(design | changes))
+    return RowCarrier().set_params("", design | changes)
 
 
 def test_production_reservoir_matches_traced():
@@ -116,16 +116,19 @@ def test_reservoir_without_drainage_radius_matches_traced():
 
 def test_injection_reservoir_matches_traced():
     """Positive and negative sandface flows equal one call per row."""
-    sink = InjectionReservoir().update_params(
-        pressure=240e5,
-        temperature=353.15,
-        permeability=1e-12,
-        aquifer_thickness=100,
-        drainage_radius=1000,
-        top_depth=2400,
-        wellbore_radius=0.1,
-        injectivity_index=10 / 3.6e8,
-        skin=1,
+    sink = InjectionReservoir().set_params(
+        "",
+        {
+            "pressure": 240e5,
+            "temperature": 353.15,
+            "permeability": 1e-12,
+            "aquifer_thickness": 100,
+            "drainage_radius": 1000,
+            "top_depth": 2400,
+            "wellbore_radius": 0.1,
+            "injectivity_index": 10 / 3.6e8,
+            "skin": 1,
+        },
     )
     rows = [
         dict(sandface_in=Stream(m_dot=m_dot, T=300, p=230e5)) for m_dot in (-40.0, -5.0, 0.0, 20.0)
@@ -141,7 +144,7 @@ def test_the_fluid_owns_the_density_and_viscosity():
         0.01 / producer.productivity_index
     )
     with pytest.raises(ValidationError):
-        producer.update_params(liquid_density=990.0)
+        producer.set_params("", {"liquid_density": 990.0})
 
 
 def _health_rows(module, call):
@@ -174,16 +177,19 @@ def test_production_health_matches_on_arrays():
 
 def test_injection_health_matches_on_arrays():
     """The injectivity comparison agrees on arrays, including the unassessed row."""
-    sink = InjectionReservoir().update_params(
-        pressure=240e5,
-        temperature=353.15,
-        permeability=1e-12,
-        aquifer_thickness=100,
-        drainage_radius=1000,
-        top_depth=2400,
-        wellbore_radius=0.1,
-        injectivity_index=10 / 3.6e8,
-        decline_threshold=0.2,
+    sink = InjectionReservoir().set_params(
+        "",
+        {
+            "pressure": 240e5,
+            "temperature": 353.15,
+            "permeability": 1e-12,
+            "aquifer_thickness": 100,
+            "drainage_radius": 1000,
+            "top_depth": 2400,
+            "wellbore_radius": 0.1,
+            "injectivity_index": 10 / 3.6e8,
+            "decline_threshold": 0.2,
+        },
     )
     results, measured = _health_rows(sink, dict(sandface_in=Stream(m_dot=-5.0, T=300, p=230e5)))
     assert_health_matches(sink, results, measured)

@@ -62,7 +62,7 @@ def test_structural_parameter_decides_the_traced_shape(stepper, inlet):
     """A structural count unrolls the loop of the trace; the numeric increment stays an input."""
     cache = GraphCache()
     for steps, increment in ((2, 1.0), (3, 10.0)):
-        stepper.update_params(steps=steps, increment=increment)
+        stepper.set_params("", {"steps": steps, "increment": increment})
         result = run(stepper, {"fluid_in": inlet}, cache=cache)
         assert result.outlets["fluid_out"]["p"].tolist() == (inlet.p + steps * increment).tolist()
     assert cache.traces == 2
@@ -106,7 +106,7 @@ def _line_rows(line, inlet, boosts, draws):
 def test_composite_run_matches_untraced_calls(line, inlet):
     """Output.of, outlet fields, automatic sums, ratios and outlets equal the row-by-row calls."""
     boosts, draws = [1.0, 2.0, 3.0], np.array([2.0, 0.0, 5.0])
-    line.first.update_params(scale=0.0)
+    line.first.set_params("", {"scale": 0.0})
     result = run(line, {"fluid_in": inlet}, {"boost": np.array(boosts), "second.draw": draws})
     expected = _line_rows(line, inlet, boosts, draws)
     assert result.graph is not None and result.breaks == []
@@ -156,8 +156,8 @@ def chain_inlet():
 
 
 def _break_middles():
-    stubborn = Stubborn().update_params(scale=3.0)
-    hooked = Gain().update_params(scale=3.0)
+    stubborn = Stubborn().set_params("", {"scale": 3.0})
+    hooked = Gain().set_params("", {"scale": 3.0})
     hooked.register_forward_pre_hook(lambda module, inlets: None)
     return {"stateful": Tank(), "untraceable": stubborn, "pre-hooked": hooked}
 
@@ -181,7 +181,7 @@ def test_a_leaf_break_keeps_the_rest_in_the_graph(kind, chain_inlet):
 
 def test_a_failing_break_row_raises_its_own_exception(chain_inlet):
     """The exception of the first failing row of the child is raised as it was."""
-    chain = Chain(Stubborn().update_params(scale=3.0))
+    chain = Chain(Stubborn().set_params("", {"scale": 3.0}))
     with pytest.raises(PhysicsError, match="middle: gain = -2.0"):
         run(chain, {"fluid_in": chain_inlet}, {"drive": np.array([1.0, -2.0, -3.0])})
 
@@ -198,7 +198,7 @@ def test_a_break_node_runs_on_the_python_backend_too(chain_inlet):
 def test_a_pre_hook_of_a_break_runs_once_per_row(chain_inlet):
     """A pre-hooked child is called on the plain path for every row, hooks included."""
     calls = []
-    middle = Gain().update_params(scale=3.0)
+    middle = Gain().set_params("", {"scale": 3.0})
     middle.register_forward_pre_hook(lambda module, inlets: calls.append(1))
     run(Chain(middle), {"fluid_in": chain_inlet}, {"drive": 1.0})
     assert len(calls) == 3

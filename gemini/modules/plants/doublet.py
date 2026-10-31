@@ -105,7 +105,7 @@ class Doublet(Plant):
             self._own_values(params, valid_from),
             fluid.rho_l,
             fluid.mu_l,
-            {name: self.get_module(name).skin for name in doublet.RESERVOIRS},
+            {name: self.get_submodule(name).skin for name in doublet.RESERVOIRS},
             self._stated_pressure(params),
         )
         return super().set_params("", self._keep_derived(derived, params) | params, valid_from)
@@ -113,7 +113,7 @@ class Doublet(Plant):
     def _stated_pressure(self, params):
         """Return the reservoir pressure [Pa] stated by hand, in this call or earlier, or None."""
         if "reservoir.pressure" in params:
-            return self.get_parameter("reservoir.pressure").validate(params["reservoir.pressure"])
+            return self.get("reservoir.pressure").validate(params["reservoir.pressure"])
         return (
             self.reservoir.pressure if "reservoir.pressure" in self._stated_child_params else None
         )

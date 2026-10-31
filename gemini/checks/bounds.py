@@ -63,7 +63,7 @@ def bounds(plant, results):
     frame = results.to_frame()
     judged, violations = 0, 0
     for path, fields in results.names().items():
-        outputs = plant.get_module(path).outputs(recurse=False)
+        outputs = plant.get_submodule(path).outputs(recurse=False)
         for field in fields:
             column = frame[join_path(path, field)]
             limits = _limits(outputs, field)

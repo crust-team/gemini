@@ -55,7 +55,7 @@ class Run:
         """Call one step; a trial is recorded by no running call."""
         arguments = {port: self.value(source) for port, source in step.arguments.items()}
         if step.offer:
-            self.offers[step.path] = step.module.offer(arguments)
+            self.offers[step.path] = step.module._offered(arguments)
             return
         arguments |= self.overrides.get(step.path, {})
         call = step.module._trial if trial else step.module

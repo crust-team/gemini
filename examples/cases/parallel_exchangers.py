@@ -10,7 +10,7 @@ that adds the injector's friction instead of subtracting it. With the correct si
 54.86 bar, so the case recalibrates it from the same point and runs with both indices.
 
 Shows ``gm.plants.example("ParallelExchangerPlant")``, which holds a ``NodalDoublet``,
-``set_inputs``, a direct plant call, ``gm.modules.collect_flows`` and ``gm.checks.plant_balance``.
+``get``, a direct plant call, ``gm.modules.collect_flows`` and ``gm.checks.plant_balance``.
 
 Run with ``python examples/cases/parallel_exchangers.py``.
 """
@@ -29,6 +29,13 @@ INPUTS = {
     "secondary_splitters.0.split_fraction": 0.5,
     "secondary_splitters.1.split_fraction": 0.6,
 }
+
+
+def command(plant, inputs):
+    """Set each control or boundary, named by its path, on its module."""
+    for path, value in inputs.items():
+        declaration = plant.get(path)
+        setattr(declaration.owner, declaration.name, value)
 
 
 def recalibrated_injectivity(doublet):
@@ -64,11 +71,11 @@ def print_exchangers(result):
 def main():
     """Run the plant with the upstream and the recalibrated injectivity and print the second."""
     plant = gm.plants.example("ParallelExchangerPlant")
-    plant.set_inputs(INPUTS)
+    command(plant, INPUTS)
     upstream_index = plant.doublet.sink.injectivity_index
     upstream = plant(return_in=SECONDARY)
     injectivity = recalibrated_injectivity(plant.doublet)
-    plant.doublet.sink.update_params(injectivity_index=injectivity)
+    plant.doublet.sink.set_params("", {"injectivity_index": injectivity})
     result = plant(return_in=SECONDARY)
     rate = result.children["doublet.riser"].outlets.wellhead_out.m_dot
     flow = gm.units.convert(rate / 1000, "m3/s", "m3/h")

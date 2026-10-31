@@ -15,7 +15,7 @@ VOCABULARY = set(GLOSSARY.split("```text")[1].split("```")[0].split())
 
 def declared_names(name):
     """Return the module's own parameter, control, boundary, state, output and port names."""
-    described = gm.modules.get(name).describe()
+    described = gm.modules.get(name)().describe()
     return {key for section in SECTIONS for key in described[section] if "." not in key}
 
 
@@ -35,9 +35,9 @@ def test_every_declared_name_follows_the_glossary(name):
 @pytest.mark.parametrize("name", gm.modules.names())
 def test_a_port_temperature_names_a_port(name):
     """The suffix ``_T`` belongs to an output named after a port of the module or of a child."""
-    described = gm.modules.get(name).describe()
+    described = gm.modules.get(name)().describe()
     kinds = set(described["children"].values()) & set(gm.modules.names())
-    children = [gm.modules.get(kind).describe() for kind in kinds]
+    children = [gm.modules.get(kind)().describe() for kind in kinds]
     ports = {
         port
         for item in [described, *children]

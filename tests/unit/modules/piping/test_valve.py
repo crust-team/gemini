@@ -16,7 +16,7 @@ STREAM = Stream(flow="36 m3/h", T=353.15, p=20e5)
 
 def valve(**changes):
     """Return a Kv 100 equal-percentage valve."""
-    return Valve().update_params(**({"flow_coefficient": "100 m3/h/bar^0.5"} | changes))
+    return Valve().set_params("", {"flow_coefficient": "100 m3/h/bar^0.5"} | changes)
 
 
 def test_fully_open_valve_matches_the_catalogue_kv():

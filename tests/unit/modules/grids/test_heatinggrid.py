@@ -14,7 +14,7 @@ SUPPLY = Stream(m_dot=2.0, T=343.15, p=3e5)
 
 
 def _consumer():
-    return HeatingGrid().update_params(minimum_return_temperature="40 C")
+    return HeatingGrid().set_params("", {"minimum_return_temperature": "40 C"})
 
 
 def test_met_demand_sets_the_return_temperature():

@@ -42,7 +42,7 @@ def test_names_follow_the_type_and_plant_ports_exist_only_when_named(chain):
     assert list(chain.outlets()) == ["gas_out", "product"]
     assert chain.add("Filter").name == "filter"
     assert "filter_2" not in dict(chain.named_children())
-    assert chain.add("Filter") is chain.get_module("filter_2")
+    assert chain.add("Filter") is chain.get_submodule("filter_2")
     assert list(chain.inlets()) == ["feed"]
 
 

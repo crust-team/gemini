@@ -14,12 +14,12 @@ from tests.fixtures.reading import reading
 INLET = Stream(m_dot=50, T=340, p=8e5)
 
 
-PRODUCT = ChemicalGrid().offer()["chemical_out"]
+PRODUCT = ChemicalGrid()._offered()["chemical_out"]
 
 
 def test_hand_computed_dose_in_ppm():
     """A 20 ppm product dose on 50 kg/s at 40 % active strength."""
-    dosing = InhibitorDosing().update_params(product_concentration=0.4)
+    dosing = InhibitorDosing().set_params("", {"product_concentration": 0.4})
     result = dosing(fluid_in=INLET, chemical_in=PRODUCT, dose="20 ppm")
     assert reading(result).product_mass_flow == pytest.approx(1e-3)
     assert result.outputs.active_mass_flow == pytest.approx(4e-4)
@@ -30,7 +30,7 @@ def test_hand_computed_dose_in_ppm():
 
 def test_limits():
     """Zero flow doses nothing; reverse flow, a bad strength and a missing dose raise."""
-    dosing = InhibitorDosing().update_params(product_concentration=0.4)
+    dosing = InhibitorDosing().set_params("", {"product_concentration": 0.4})
     assert (
         reading(
             dosing(fluid_in=INLET.with_(m_dot=0), chemical_in=PRODUCT, dose=2e-5)
@@ -42,12 +42,12 @@ def test_limits():
     with raises(gm.errors.ValidationError, "missing_value"):
         dosing(fluid_in=INLET, chemical_in=PRODUCT)
     with pytest.raises(gm.errors.ValidationError):
-        InhibitorDosing().update_params(product_concentration=0)
+        InhibitorDosing().set_params("", {"product_concentration": 0})
 
 
 def test_inhibitordosing_matches_traced():
     """The dosing rates trace and equal one call per row."""
-    module = InhibitorDosing().update_params(product_concentration=0.4)
+    module = InhibitorDosing().set_params("", {"product_concentration": 0.4})
     rows = [
         dict(fluid_in=Stream(m_dot=m_dot, T=300, p=1e6), chemical_in=PRODUCT, dose=dose)
         for m_dot, dose in [(0, 1e-5), (10, 0), (50, 2e-5)]

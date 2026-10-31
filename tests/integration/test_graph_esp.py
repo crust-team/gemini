@@ -153,7 +153,7 @@ def test_retrace_happens_only_when_a_guard_changes(esp, week):
     cache = GraphCache()
     inlets, inputs = {"fluid_in": _suction(esp, week)}, {"frequency": week[:, 3]}
     before = run(esp, inlets, inputs, cache=cache).outputs["head"]
-    esp.update_params(stage_count=2 * esp.stage_count)
+    esp.set_params("", {"stage_count": 2 * esp.stage_count})
     after = run(esp, inlets, inputs, cache=cache).outputs["head"]
     assert cache.traces == 1
     np.testing.assert_allclose(after, 2 * before, rtol=RTOL)

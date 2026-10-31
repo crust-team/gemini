@@ -49,7 +49,7 @@ def test_a_composite_root_break_gives_real_trees(backend):
 
 def test_failed_rows_keep_their_exception_and_are_nan():
     """A row that raises is failed with its own exception; the others are unchanged."""
-    module = Gain().update_params(scale=3.0)
+    module = Gain().set_params("", {"scale": 3.0})
     module.register_forward_pre_hook(lambda module, inlets: None)
     _, evaluation = _evaluate(module, {"gain": np.array([1.0, -2.0, 3.0])}, 3)
     assert evaluation.failed.tolist() == [False, True, False]
@@ -61,7 +61,7 @@ def test_failed_rows_keep_their_exception_and_are_nan():
 
 def test_controls_are_applied_for_the_call_only():
     """Persisted inputs are put back: persisting is the caller's business."""
-    module = Gain().update_params(scale=3.0)
+    module = Gain().set_params("", {"scale": 3.0})
     module.gain = 1.0
     module.register_forward_pre_hook(lambda module, inlets: None)
     _evaluate(module, {"gain": np.array([2.0, 3.0])}, 2)
@@ -91,7 +91,7 @@ def test_an_unstepped_break_calls_a_stateful_module():
 
 def test_every_row_failing_gives_no_result():
     """Without an ok row there is no tree to stack."""
-    module = Gain().update_params(scale=3.0)
+    module = Gain().set_params("", {"scale": 3.0})
     module.register_forward_pre_hook(lambda module, inlets: None)
     _, evaluation = _evaluate(module, {"gain": np.array([-1.0, -2.0])}, 2)
     assert evaluation.failed.all() and evaluation.result is None

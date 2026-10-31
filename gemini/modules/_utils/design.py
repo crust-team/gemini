@@ -50,13 +50,13 @@ def snapshot_at(module, at):
 
 def params_at(module, path, time=None):
     """Return the parameter values of the module at ``path`` in force at ``time`` as plain JSON."""
-    values = module.get_module(path)._params_at(time)
+    values = module.get_submodule(path)._params_at(time)
     return to_plain(to_jsonable_python(values))
 
 
 def param_history(module, path):
     """Return the dated snapshots of the module at ``path`` as ``[{valid_from, params}]``."""
-    history = module.get_module(path)._param_history
+    history = module.get_submodule(path)._param_history
     return to_plain([item.model_dump(mode="json") for item in history])
 
 
@@ -120,7 +120,7 @@ def set_params(module, path, params, valid_from=None):
     module that overrides ``set_params`` goes through that method.
     """
     when = None if valid_from is None else to_utc(valid_from)
-    target = module.get_module(path)
+    target = module.get_submodule(path)
     changes = _validated_changes(target, params)
     routed = {}
     for name, value in params.items():
@@ -151,7 +151,7 @@ def derived_names(module):
 
 def bindable(module, path):
     """Return what the module at ``path`` accepts bindings for, by section."""
-    target = module.get_module(path)
+    target = module.get_submodule(path)
     return {
         "controls": list(target._controls),
         "boundaries": list(target._boundaries),
@@ -290,7 +290,7 @@ def set_bindings(module, path, bindings):
     ``bindings`` maps declaration names to columns (``sectioned``); a binding whose unit does not
     convert to the unit of its declaration is refused.
     """
-    parsed = sectioned(module.get_module(path), bindings)
+    parsed = sectioned(module.get_submodule(path), bindings)
     if parsed == ModuleBindings():
         module.bindings.pop(path, None)
     else:

@@ -147,7 +147,7 @@ def _converted(project, node_id, kinds, properties, at):
 def _json_params(kind, params):
     """Validate parameters on a fresh module and return them as plain JSON values."""
     module = tables.MODULE_CLASSES[kind]()
-    module.update_params(**params)
+    module._override_params(params)
     return module.state_dict()[""]["params"]
 
 

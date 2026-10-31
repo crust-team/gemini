@@ -20,13 +20,13 @@ CURVES = {
 def pump(**changes):
     """Return a 12-stage pump set at 300 m with 5 W/m of shaft friction at 60 Hz."""
     params = dict(CURVES, setting_depth=300, shaft_friction_loss=5, motor_efficiency=0.9)
-    return LineShaftPump().update_params(**params | changes)
+    return LineShaftPump().set_params("", params | changes)
 
 
 def test_pump_stages_match_the_esp_basis_and_friction_scales_with_speed():
     """Head and pump power equal the ESP curves; friction is loss * depth * f / 60 Hz."""
     suction = Stream(m_dot=units.m3h_to_m3s(200) * 1000, T=340, p=1e6)
-    esp = reading(ESP().update_params(**CURVES)(fluid_in=suction, frequency=50))
+    esp = reading(ESP().set_params("", CURVES)(fluid_in=suction, frequency=50))
     result = pump()(fluid_in=suction, frequency=50)
     out = reading(result)
     assert out.head == pytest.approx(esp.head)

@@ -26,7 +26,7 @@ def main():
     frame = pd.read_csv(DATA, parse_dates=["time"])
     data = gm.Dataset.from_frame(frame, time_column="time")
     end = frame.loc[7 * STEPS_PER_DAY - 1, "time"]
-    fit = gm.optim.calibrate(plant, data, params=[plant.get_parameter(CONDUCTANCE)], end=end)
+    fit = gm.optim.calibrate(plant, data, params=[plant.get(CONDUCTANCE)], end=end)
     before, after = [next(iter(values.values())) / 1e3 for values in (fit.initial, fit.fitted)]
     print(f"Conductance:    {before:.1f} -> {after:.3f} kW/K")
     print(f"Normalised RMS: {fit.rms_before:.6g} -> {fit.rms_after:.6g}")

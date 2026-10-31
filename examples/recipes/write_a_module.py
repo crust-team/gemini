@@ -52,7 +52,7 @@ def main():
     report = gm.testing.check_module(Orifice, example=example)
     print(f"Module checks passed: {report['passed']}")
 
-    alone = Orifice().update_params(pressure_drop="1 bar")(fluid_in=STREAM)
+    alone = Orifice().set_params("", {"pressure_drop": "1 bar"})(fluid_in=STREAM)
     print(f"Alone:                {alone.outputs.get('outlet_pressure', unit='bar'):.3f} bar")
 
     gm.modules.register(Orifice)

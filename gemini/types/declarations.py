@@ -11,7 +11,7 @@ import numbers
 from collections.abc import Mapping
 from copy import deepcopy
 from datetime import datetime
-from functools import partial
+from functools import lru_cache, partial
 from inspect import isclass
 from typing import Annotated, Any
 
@@ -134,9 +134,15 @@ def _failure_code(cause):
     return "invalid_value"
 
 
-def _adapter(kind, bounds):
-    """Return the Pydantic validator of ``kind`` with optional field bounds."""
-    return TypeAdapter(Annotated[kind, Field(**bounds)] if bounds else kind)
+@lru_cache(maxsize=None)
+def _built(kind, bounds):
+    """Return the Pydantic validator of ``kind`` with its bounds, and its JSON schema metadata.
+
+    A plant declares the same few kinds hundreds of times, and building one costs a millisecond.
+    """
+    limits = dict(bounds)
+    adapter = TypeAdapter(Annotated[kind, Field(**limits)] if limits else kind)
+    return (adapter, *_schema_metadata(adapter))
 
 
 _LIMIT_KEYS = {"minimum": "ge", "exclusiveMinimum": "gt", "maximum": "le", "exclusiveMaximum": "lt"}
@@ -183,9 +189,9 @@ class Declaration:
         self.bounds = dict(bounds)
         self.name = None
         self.owner = None
-        self._adapter = _adapter(type, bounds)
+        built = _built(type, tuple(sorted(bounds.items())))
+        self._adapter, self.schema, self.quantity, self.unit = built
         self._limits = None
-        self.schema, self.quantity, self.unit = _schema_metadata(self._adapter)
         self._quick = _quick_check(self.schema, self.limits())
 
     @property

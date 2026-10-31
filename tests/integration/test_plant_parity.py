@@ -26,13 +26,13 @@ def _add_modules(plant, modules):
 
 def _fill_sections(plant, spec):
     for path, value in spec["fluids"].items():
-        plant.get_module(path)._set_own_fluid(value)
+        plant.get_submodule(path)._set_own_fluid(value)
     for path, value in spec["boundary"].items():
-        plant.get_module(path).boundary = copy.deepcopy(value)
+        plant.get_submodule(path).boundary = copy.deepcopy(value)
     for path, value in spec["bindings"].items():
         plant.set_bindings(path, value)
     for path, history in spec["param_history"].items():
-        plant.get_module(path)._param_history = [DatedParams.model_validate(i) for i in history]
+        plant.get_submodule(path)._param_history = [DatedParams.model_validate(i) for i in history]
 
 
 def built_by_hand(spec):

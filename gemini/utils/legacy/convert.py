@@ -92,7 +92,7 @@ def _filled_module(plant, path, item):
         )
     module._param_history = [snapshot.model_copy(deep=True) for snapshot in item.params]
     values = module._params_at(None)
-    module.clear_param_overrides()
+    module._param_overrides = {}
     return {"params": values, "fluid": item.fluid.model_dump()}
 
 
@@ -249,7 +249,7 @@ def _traced_edges(plant):
             code="invalid_format",
         )
     trial = deepcopy(plant)
-    trial.set_inputs(tables.TRACE_CONTROLS)
+    trial._set_inputs(tables.TRACE_CONTROLS)
     return trace_wiring(trial, deepcopy(trial.boundary["root_inputs"]))
 
 

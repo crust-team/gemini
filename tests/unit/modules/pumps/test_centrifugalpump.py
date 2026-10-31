@@ -22,7 +22,7 @@ PARAMS = dict(
 
 def pump():
     """Return a pump with a 6 bar shutoff head and its best efficiency at 180 m3/h."""
-    return CentrifugalPump().update_params(**PARAMS)
+    return CentrifugalPump().set_params("", PARAMS)
 
 
 def test_best_efficiency_point_by_hand():
@@ -87,7 +87,7 @@ def test_off_curve_and_reverse_flow_raise():
     """Run-out beyond twice the best-efficiency flow, negative head and reverse flow raise."""
     with pytest.raises(PhysicsError, match="off its curve"):
         pump()(fluid_in=Stream(m_dot=100, T=330, p=3e5), frequency=50)
-    steep = pump().update_params(head_coefficients=[6e5, 0, -4e8])
+    steep = pump().set_params("", {"head_coefficients": [6e5, 0, -4e8]})
     with pytest.raises(PhysicsError, match="head = -"):
         steep(fluid_in=Stream(m_dot=60, T=330, p=3e5), frequency=50)
     with pytest.raises(PhysicsError, match="reverse flow"):

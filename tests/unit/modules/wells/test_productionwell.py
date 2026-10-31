@@ -13,11 +13,12 @@ from tests.fixtures.equivalence import assert_function_matches, assert_module_ma
 
 def test_split_esp_traversal():
     """Split at 600 m inside a section; pumping raises the resulting wellhead pressure."""
-    c = ProductionWell().update_params(
-        **mapping.productionwell_params_from_gemini(
+    c = ProductionWell().set_params(
+        "",
+        mapping.productionwell_params_from_gemini(
             mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
             esp_property=mapping.read_property(OLD_PROJECT / "esp_1ee3.param"),
-        )
+        ),
     )
     stream = Stream(m_dot=40, T=353.15, p=25e6)
     intake = c.intake_conditions(stream)
@@ -32,12 +33,13 @@ def test_split_esp_traversal():
 
 
 def _well(**changes):
-    return ProductionWell().update_params(
-        **mapping.productionwell_params_from_gemini(
+    return ProductionWell().set_params(
+        "",
+        mapping.productionwell_params_from_gemini(
             mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
             esp_property=mapping.read_property(OLD_PROJECT / "esp_1ee3.param"),
         )
-        | changes
+        | changes,
     )
 
 

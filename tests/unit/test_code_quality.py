@@ -445,7 +445,7 @@ def port_roles():
 @pytest.mark.parametrize("name", gm.modules.names())
 def test_every_port_follows_the_naming_rule(name):
     """Every port is ``<role>_in`` or ``<role>_out``, the role from the glossary."""
-    described = gm.modules.get(name).describe()
+    described = gm.modules.get(name)().describe()
     roles = port_roles()
     wrong = [
         port

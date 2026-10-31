@@ -43,26 +43,31 @@ def path_of(stations):
 def deviated():
     """Return the doublet of the parallel exchangers case: 18 stages, 2.3 m3/h/bar injector."""
     doublet = gm.plants.example("NodalDoublet")
-    doublet.reservoir.update_params(
-        pressure="216 bar", productivity_index=1.76 / 3.6e8, top_depth=1900, **RESERVOIR
+    doublet.reservoir.set_params(
+        "",
+        {"pressure": "216 bar", "productivity_index": 1.76 / 3.6e8, "top_depth": 1900, **RESERVOIR},
     )
     producer = dict(pipe_path=path_of(PRODUCER_SURVEY), soil_temperature="20 degC", esp_depth=550)
-    doublet.well.update_params(segment="below_esp", **producer)
-    doublet.riser.update_params(segment="above_esp", **producer)
-    doublet.esp.update_params(
-        stage_count=18,
-        head_coefficients=[
-            125.518426,
-            -0.0020852856,
-            2.28955651e-07,
-            -1.45640214e-11,
-            2.37859645e-16,
-            -1.18258356e-21,
-        ],
+    doublet.well.set_params("", {"segment": "below_esp", **producer})
+    doublet.riser.set_params("", {"segment": "above_esp", **producer})
+    doublet.esp.set_params(
+        "",
+        {
+            "stage_count": 18,
+            "head_coefficients": [
+                125.518426,
+                -0.0020852856,
+                2.28955651e-07,
+                -1.45640214e-11,
+                2.37859645e-16,
+                -1.18258356e-21,
+            ],
+        },
     )
-    doublet.injector.update_params(pipe_path=path_of(INJECTOR_SURVEY))
-    doublet.sink.update_params(
-        pressure="180 bar", injectivity_index=2.3 / 3.6e8, top_depth=1883, **RESERVOIR
+    doublet.injector.set_params("", {"pipe_path": path_of(INJECTOR_SURVEY)})
+    doublet.sink.set_params(
+        "",
+        {"pressure": "180 bar", "injectivity_index": 2.3 / 3.6e8, "top_depth": 1883, **RESERVOIR},
     )
     doublet.esp.frequency = "60 Hz"
     doublet.wellhead_pressure = "10 bar"

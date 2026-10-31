@@ -222,14 +222,17 @@ def test_composite_step_refuses_stateful_descendants():
 
 def test_injection_reservoir_without_injectivity_fails_in_forward():
     """E-modules-019: a missing injectivity index fails even when outputs are skipped."""
-    reservoir = gm.modules.InjectionReservoir().update_params(
-        pressure=2e7,
-        temperature=350,
-        permeability=1e-13,
-        aquifer_thickness=100,
-        drainage_radius=0,
-        top_depth=2000,
-        wellbore_radius=0.1,
+    reservoir = gm.modules.InjectionReservoir().set_params(
+        "",
+        {
+            "pressure": 2e7,
+            "temperature": 350,
+            "permeability": 1e-13,
+            "aquifer_thickness": 100,
+            "drainage_radius": 0,
+            "top_depth": 2000,
+            "wellbore_radius": 0.1,
+        },
     )
     with gm.no_outputs(), raises(gm.errors.ValidationError, "invalid_design", match="injectivity"):
         reservoir(sandface_in=STREAM)
@@ -238,5 +241,5 @@ def test_injection_reservoir_without_injectivity_fails_in_forward():
 def test_reservoir_health_without_design_index_is_not_assessed():
     """E-modules-011: a missing productivity index means not assessed, not a crash."""
     reservoir = ProductionReservoir()
-    reservoir.update_params(pressure=2e7, temperature=350)
+    reservoir.set_params("", {"pressure": 2e7, "temperature": 350})
     assert reservoir.health(None, {"flow": 0.04, "bottomhole_pressure": 1.9e7}) is None

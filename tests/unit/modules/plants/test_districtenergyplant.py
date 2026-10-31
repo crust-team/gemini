@@ -32,7 +32,7 @@ INPUTS = {
 def run():
     """Return the example plant and two hourly steps, the return fed back."""
     plant = gm.plants.example("DistrictEnergyPlant")
-    plant.set_inputs(INPUTS)
+    plant._set_inputs(INPUTS)
     inlets = {
         "hot_in": gm.Stream(flow="18 t/h", T="75 degC", p="6 bar"),
         "cold_in": gm.Stream(flow="36 t/h", T="17 degC", p="3 bar"),

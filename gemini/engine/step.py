@@ -242,7 +242,7 @@ def _simulation_inputs(plant, dataset):
         module = plant.get_submodule(module_path)
         binding = _input_binding(plant, dataset, input_path, module, declaration)
         if binding is None:
-            if declaration.default is UNSET and not module.has_input_value(name):
+            if declaration.default is UNSET and not module._has_input_value(name):
                 missing.append(input_path)
             continue
         bound = ModuleBindings()

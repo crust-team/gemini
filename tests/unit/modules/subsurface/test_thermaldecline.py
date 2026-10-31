@@ -20,8 +20,14 @@ BREAKTHROUGH = math.pi * 1000**2 * 50 * AQUIFER / (3 * WATER)
 
 def decline():
     """Return a configured decline model with a 313.15 K injection temperature."""
-    module = ThermalDecline().update_params(
-        well_spacing=1000, aquifer_thickness=50, porosity=0.2, rock_volumetric_heat_capacity=2.5e6
+    module = ThermalDecline().set_params(
+        "",
+        {
+            "well_spacing": 1000,
+            "aquifer_thickness": 50,
+            "porosity": 0.2,
+            "rock_volumetric_heat_capacity": 2.5e6,
+        },
     )
     module.injection_temperature = 313.15
     return module
@@ -36,7 +42,7 @@ class Producer(Module):
 
         # Modules
         self.decline = decline()
-        self.heater = ElectricBoiler().update_params(capacity=1e7, efficiency=0.9)
+        self.heater = ElectricBoiler().set_params("", {"capacity": 1e7, "efficiency": 0.9})
 
         # Inlets
         self.sandface = Inlet(Stream)
@@ -118,7 +124,7 @@ def test_zero_and_reverse_flow():
     with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot = -1"):
         module(fluid_in=STREAM.with_(m_dot=-1))
     with pytest.raises(gm.errors.ValidationError):
-        module.update_params(porosity=1)
+        module.set_params("", {"porosity": 1})
 
 
 def test_composite_step_advances_the_decline():

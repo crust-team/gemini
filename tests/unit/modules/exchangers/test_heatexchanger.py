@@ -55,7 +55,7 @@ def exchanger_for(row, measured, ua):
             m_dot=measured["m_dot_cold"], T=measured["cold_in_T"], p=1e6, fluid=WATER
         ),
     }
-    return HeatExchanger().update_params(**params), streams
+    return HeatExchanger().set_params("", params), streams
 
 
 def test_measured_heat_exchanger_performance():
@@ -89,7 +89,7 @@ def test_first_law_equal_capacity_and_limits(arrangement):
         hot_nominal_mass_flow=10,
         cold_nominal_mass_flow=10,
     )
-    c = HeatExchanger().update_params(**p)
+    c = HeatExchanger().set_params("", p)
     hot, cold = Stream(m_dot=10, T=350, p=1e6), Stream(m_dot=10, T=300, p=1e6)
     result = c(hot_in=hot, cold_in=cold)
     out, streams = result.outputs, result.outlets
@@ -99,7 +99,7 @@ def test_first_law_equal_capacity_and_limits(arrangement):
     assert streams["hot_out"].p == hot.p - 1000
     out = c(hot_in=hot.with_(m_dot=0), cold_in=cold).outputs
     assert out.duty == 0
-    c.update_params(thermal_conductance=0)
+    c.set_params("", {"thermal_conductance": 0})
     out = c(hot_in=hot, cold_in=cold).outputs
     assert out.duty == 0 and out.hot_out_T == hot.T
     out = c(hot_in=hot, cold_in=cold.with_(T=350)).outputs
@@ -114,12 +114,15 @@ def test_invalid_measurements():
 
 def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
     """E-modules-011/012: zero flow or zero design UA mean not assessed, not an error."""
-    exchanger = HeatExchanger().update_params(
-        thermal_conductance=100000,
-        hot_nominal_pressure_drop=1000,
-        cold_nominal_pressure_drop=1000,
-        hot_nominal_mass_flow=10,
-        cold_nominal_mass_flow=10,
+    exchanger = HeatExchanger().set_params(
+        "",
+        {
+            "thermal_conductance": 100000,
+            "hot_nominal_pressure_drop": 1000,
+            "cold_nominal_pressure_drop": 1000,
+            "hot_nominal_mass_flow": 10,
+            "cold_nominal_mass_flow": 10,
+        },
     )
     stopped = exchanger(
         hot_in=Stream(m_dot=0, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6)
@@ -130,7 +133,7 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
         hot_in=Stream(m_dot=10, T=350, p=1e6), cold_in=Stream(m_dot=10, T=300, p=1e6)
     )
     assert exchanger.health(running, measured) is not None
-    exchanger.update_params(thermal_conductance=0)
+    exchanger.set_params("", {"thermal_conductance": 0})
     assert exchanger.health(running, measured) is None
     with raises(gm.errors.ValidationError, "unknown_name", match="arrangement"):
         gm.analysis.estimate_conductance(350, 340, 300, 310, 10, 10, arrangement="cross")
@@ -139,13 +142,16 @@ def test_health_is_not_assessed_when_measurements_cannot_determine_ua():
 @pytest.mark.parametrize("arrangement", ["parallel", "counterflow"])
 def test_traced_call_matches_one_call_per_row(arrangement):
     """Unequal, equal, stopped and pinched rows trace and equal one call per row."""
-    exchanger = HeatExchanger().update_params(
-        thermal_conductance=100000,
-        arrangement=arrangement,
-        hot_nominal_pressure_drop=1000,
-        cold_nominal_pressure_drop=2000,
-        hot_nominal_mass_flow=10,
-        cold_nominal_mass_flow=10,
+    exchanger = HeatExchanger().set_params(
+        "",
+        {
+            "thermal_conductance": 100000,
+            "arrangement": arrangement,
+            "hot_nominal_pressure_drop": 1000,
+            "cold_nominal_pressure_drop": 2000,
+            "hot_nominal_mass_flow": 10,
+            "cold_nominal_mass_flow": 10,
+        },
     )
     rows = [
         dict(hot_in=Stream(m_dot=hot, T=hot_T, p=1e6), cold_in=Stream(m_dot=cold, T=300, p=1e6))
@@ -163,14 +169,17 @@ def test_traced_call_matches_one_call_per_row(arrangement):
 
 
 def _health_exchanger(arrangement):
-    return HeatExchanger().update_params(
-        thermal_conductance=100000,
-        arrangement=arrangement,
-        hot_nominal_pressure_drop=1000,
-        cold_nominal_pressure_drop=2000,
-        hot_nominal_mass_flow=10,
-        cold_nominal_mass_flow=10,
-        fouling_threshold=0.15,
+    return HeatExchanger().set_params(
+        "",
+        {
+            "thermal_conductance": 100000,
+            "arrangement": arrangement,
+            "hot_nominal_pressure_drop": 1000,
+            "cold_nominal_pressure_drop": 2000,
+            "hot_nominal_mass_flow": 10,
+            "cold_nominal_mass_flow": 10,
+            "fouling_threshold": 0.15,
+        },
     )
 
 

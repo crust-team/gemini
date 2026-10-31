@@ -64,7 +64,7 @@ class PortResolver:
     def _candidates(self, value, field, explicit):
         side = SIDE_OF[field]
         path, port = self._locate(value, field, explicit)
-        declared = getattr(self.get_module(path), side)()
+        declared = getattr(self.get_submodule(path), side)()
         if port is not None:
             return [self._checked(path, port, declared, side, field)]
         free = [

@@ -37,7 +37,7 @@ GEMINI_EXAMPLE_DATASET=inputs/doublet_heat/doublet_2024_15min.csv python example
 | [01_streams_and_fluids.py](basics/01_streams_and_fluids.py) | Streams, fluids and unit strings | `gm.Stream`, `gm.Fluid`, `gm.units` |
 | [02_modules.py](basics/02_modules.py) | Call one module and read its outlets, outputs and port quantities | `gm.modules.ESP`, `describe`, `Stream.quantities`, `gm.no_outputs` |
 | [03_build_a_plant.py](basics/03_build_a_plant.py) | Build plants, validate them and fix an `unconnected_port` | `gm.Plant`, `add`, `connect`, `validate` |
-| [04_parameters.py](basics/04_parameters.py) | Dated parameters, controls, boundaries and bindings | `set_params`, `params_at`, `set_inputs`, `set_bindings` |
+| [04_parameters.py](basics/04_parameters.py) | Dated parameters, controls, boundaries and bindings | `set_params`, `params_at`, attribute assignment, `set_bindings` |
 | [05_simulate_and_results.py](basics/05_simulate_and_results.py) | Simulate and read the results in your units | `gm.simulate`, `Results`, `units=`, `to_frame` |
 | [06_save_and_load.py](basics/06_save_and_load.py) | A plant as a dictionary and as a file | `to_dict`, `gm.plants.from_dict`, `save`, `gm.Plant.load` |
 

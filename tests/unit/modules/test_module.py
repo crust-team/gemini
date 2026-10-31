@@ -1,5 +1,6 @@
 """Registration, calls, state and output-recording contracts."""
 
+import inspect
 import math
 import pickle
 from concurrent.futures import ThreadPoolExecutor
@@ -61,10 +62,10 @@ class PassThrough(Module):
 
 def test_registration_construction_and_state():
     """Keyword values fill registered declarations and state reload is atomic."""
-    module = PassThrough().update_params(value=2)
+    module = PassThrough().set_params("", {"value": 2})
     assert module.value == 2
-    assert dict(module.named_parameters()) == {"value": module.get_parameter("value")}
-    assert module.calibratable_parameters() == [module.get_parameter("value")]
+    assert dict(module.named_parameters()) == {"value": module.get("value")}
+    assert [item for item in module.parameters() if item.calibratable] == [module.get("value")]
     module.value = 3
     assert module.value == 3
     state = module.state_dict()
@@ -78,7 +79,7 @@ def test_registration_construction_and_state():
 def test_call_output_and_signature_guards():
     """All supported inlet call forms resolve to the same fixed Ports shape."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    module = PassThrough().update_params(value=2)
+    module = PassThrough().set_params("", {"value": 2})
     results = [
         module(fluid_in=stream, multiplier=4),
         module({"fluid_in": stream}, multiplier=4),
@@ -95,7 +96,7 @@ def test_call_output_and_signature_guards():
 def test_a_wrong_call_names_the_inlets():
     """Missing, misspelled, mixed, invalid and repeated inlets each say what is valid."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    module = PassThrough().update_params(value=2)
+    module = PassThrough().set_params("", {"value": 2})
     with raises(
         gm.errors.ValidationError,
         "invalid_call",
@@ -131,7 +132,7 @@ def test_a_wrong_call_names_the_inlets():
 def test_outlet_dict_names_and_flow_types_are_checked(monkeypatch):
     """Forward returns exactly one declared, correctly typed outlet dictionary."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    module = PassThrough().update_params(value=2)
+    module = PassThrough().set_params("", {"value": 2})
 
     def scalar_forward(inlets):
         return inlets.fluid_in
@@ -161,7 +162,7 @@ class NestedParent(Module):
         super().__init__()
 
         # Modules
-        self.children_by_name = ModuleDict({"child": PassThrough().update_params(value=3)})
+        self.children_by_name = ModuleDict({"child": PassThrough().set_params("", {"value": 3})})
 
         # Inlets
         self.fluid_in = Inlet(Stream)
@@ -191,7 +192,7 @@ class NestedParent(Module):
 def test_output_records_are_thread_local():
     """Concurrent evaluations never share output records."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    module = PassThrough().update_params(value=2)
+    module = PassThrough().set_params("", {"value": 2})
     with ThreadPoolExecutor(max_workers=4) as pool:
         values = list(
             pool.map(lambda value: module(fluid_in=stream, multiplier=value), range(1, 9))
@@ -265,8 +266,8 @@ def test_input_resolution_units_bounds_and_metadata():
     module = RequiredInputs()
     module.frequency = "40 Hz"
     module.grid_frequency = 50
-    assert module.get_control("frequency").unit == "Hz"
-    assert module.get_boundary("grid_frequency").unit == "Hz"
+    assert module.get("frequency").unit == "Hz"
+    assert module.get("grid_frequency").unit == "Hz"
     assert module(fluid_in=stream).outputs.total == 90
     assert module(fluid_in=stream, frequency="45 Hz").outputs.total == 95
     assert module.frequency == 40
@@ -297,7 +298,7 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
     """Context-local values survive nesting and pre-hook changes last for one call only."""
     stream = Stream(m_dot=1, T=300, p=1e5)
     module = RequiredInputs()
-    module.set_inputs({"frequency": 50, "grid_frequency": 50})
+    module._set_inputs({"frequency": 50, "grid_frequency": 50})
     seen = []
 
     def clamp(module, inlets):
@@ -328,7 +329,7 @@ def test_call_inputs_and_hook_assignments_do_not_leak():
             return outlets
 
     assigned = AssignInForward()
-    assigned.set_inputs({"frequency": 50, "grid_frequency": 50})
+    assigned._set_inputs({"frequency": 50, "grid_frequency": 50})
     assert assigned(fluid_in=stream).outputs.total == 60
     assert assigned.frequency == 50
 
@@ -337,7 +338,7 @@ def test_hooks_are_ordered_removable_and_observe_named_ports():
     """Hooks use named ports, preserve outlets and ignore their return value."""
     stream = Stream(m_dot=1, T=300, p=1e5)
     replacement = stream.with_(p=2e5)
-    module = PassThrough().update_params(value=2)
+    module = PassThrough().set_params("", {"value": 2})
     calls = []
 
     def first_hook(module, inlets):
@@ -362,7 +363,7 @@ def test_hooks_are_ordered_removable_and_observe_named_ports():
     first.remove()
     assert module(fluid_in=stream).outlets.fluid_out is stream
     state = module.state_dict()
-    restored = PassThrough().update_params(value=1).load_state_dict(state)
+    restored = PassThrough().set_params("", {"value": 1}).load_state_dict(state)
     assert not restored._pre_hooks and not restored._hooks
 
 
@@ -391,15 +392,15 @@ def test_set_inputs_uses_recursive_paths_and_suggests_mistakes():
             return outlets
 
     parent = ParentInputs()
-    parent.set_inputs({"child.frequency": "50 Hz", "child.grid_frequency": 50})
+    parent._set_inputs({"child.frequency": "50 Hz", "child.grid_frequency": 50})
     assert parent().children["child"].outputs.total == 100
     with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'child.frequency'"):
-        parent.set_inputs({"child.frequncy": 40})
+        parent._set_inputs({"child.frequncy": 40})
 
 
 def test_hooks_require_the_fixed_signatures():
     """Hook registration rejects old by-name, variadic and defaulted signatures."""
-    module = PassThrough().update_params(value=1)
+    module = PassThrough().set_params("", {"value": 1})
 
     with pytest.raises(gm.errors.DefinitionError, match="forward hook.*module, inlets, outlets"):
         module.register_forward_hook(lambda module, inlet, outlet: None)
@@ -435,7 +436,7 @@ def test_missing_output_and_named_hook_ordering():
     with pytest.raises(gm.errors.DefinitionError, match="missing_output.*value"):
         module(fluid_in=stream)
 
-    good = PassThrough().update_params(value=3)
+    good = PassThrough().set_params("", {"value": 3})
     seen = []
 
     def observe(module, inlets, outlets):
@@ -449,7 +450,7 @@ def test_missing_output_and_named_hook_ordering():
 def test_no_outputs_is_nested_thread_local_context_and_decorator():
     """The fast path skips output callbacks, formulas, hooks and output checks."""
     stream = Stream(m_dot=1, T=300, p=1e5)
-    module = PassThrough().update_params(value=2)
+    module = PassThrough().set_params("", {"value": 2})
     calls = []
 
     def observe(module, inlets, outlets):
@@ -653,3 +654,52 @@ def test_a_forced_numpy_backend_keeps_plain_division_silent():
 
     with backends.settings(backend="numpy"):
         assert Divider()().outputs.ratio == 2.0
+
+
+PUBLIC_METHODS = {
+    "named_modules",
+    "modules",
+    "children",
+    "named_children",
+    "get_submodule",
+    "named_parameters",
+    "parameters",
+    "controls",
+    "boundaries",
+    "states",
+    "inputs",
+    "outputs",
+    "inlets",
+    "outlets",
+    "soft_sensors",
+    "set_params",
+    "params_at",
+    "param_history",
+    "set_bindings",
+    "bindable",
+    "missing_parameters",
+    "get",
+    "forward",
+    "register_forward_pre_hook",
+    "register_forward_hook",
+    "state_dict",
+    "load_state_dict",
+    "health",
+    "describe",
+    "parameter_schema",
+    "validate_params",
+    "help",
+    "initial_state",
+    "step",
+}
+"""The public methods of ``Module``; a plant adds what it needs to connect."""
+
+
+def test_the_public_methods_of_a_module_are_the_listed_ones():
+    """A leaf has these methods and no others; a plant adds what it needs to connect."""
+    public = {
+        name
+        for name, value in inspect.getmembers(Module)
+        if not name.startswith("_") and callable(value)
+    }
+    assert public == PUBLIC_METHODS

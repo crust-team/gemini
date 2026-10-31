@@ -32,7 +32,7 @@ def _leaves(result):
 
 def test_python_backend_matches_numpy_on_a_composite(line):
     """Outputs, outlets and children of every module agree within 1e-12; ratios keep NaN."""
-    line.first.update_params(scale=0.0)
+    line.first.set_params("", {"scale": 0.0})
     inputs = {"boost": np.array([1.0, 2.0, 3.0]), "second.draw": np.array([2.0, 0.0, 5.0])}
     fast = _evaluation(line, inputs, 3).result
     slow = _evaluation(line, inputs, 3, "python").result
@@ -78,7 +78,7 @@ def test_declared_limits_use_the_wording_of_declaration_validate(bounded, backen
     evaluation = _evaluation(bounded, inputs, 2, backend)
     expected = None
     try:
-        bounded.get_control("setpoint").validate(-5.0)
+        bounded.get("setpoint").validate(-5.0)
     except ValidationError as error:
         expected = str(error)
     assert evaluation.failed.tolist() == [False, True]

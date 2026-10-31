@@ -16,7 +16,7 @@ from tests.fixtures.reading import reading
 def doublet(fresh_plant):
     """Return the example doublet with its production controls set."""
     module = fresh_plant.doublet
-    module.set_inputs({"reservoir.production_rate": 40.0, "esp.frequency": 50.0})
+    module._set_inputs({"reservoir.production_rate": 40.0, "esp.frequency": 50.0})
     return module
 
 
@@ -119,7 +119,7 @@ def test_the_pump_is_sized_at_its_nominal_flow():
     """The pump keeps the wellhead pressure at the nominal flow, with its efficiency."""
     plant, doublet = designed(**PUMP)
     flow = 300 / 3600
-    plant.set_inputs(
+    plant._set_inputs(
         {
             "d0.reservoir.production_rate": flow * 1030,
             "d0.esp.frequency": constants.ESP_REFERENCE_FREQUENCY,

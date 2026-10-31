@@ -36,7 +36,7 @@ def plant_of_two():
     plant = gm.Plant("Two")
     for name in ("d0", "d1"):
         plant.add("Doublet", name=name, params=DESIGN)
-        plant.get_module(name).fluid = BRINE
+        plant.get_submodule(name).fluid = BRINE
     plant.add("Mixer", name="production")
     plant.add("Degasser", name="degasser")
     plant.add(
@@ -58,7 +58,7 @@ def plant_of_two():
         name="users",
         params={"return_temperature": "60 degC", "return_pressure": "6 bar"},
     )
-    plant.get_module("users").fluid = gm.WATER
+    plant.get_submodule("users").fluid = gm.WATER
     wire(plant)
     plant.boiler.temperature_setpoint = "100 degC"
     return plant

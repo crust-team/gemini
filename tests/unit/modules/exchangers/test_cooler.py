@@ -18,7 +18,7 @@ HOT = Stream(m_dot=20, T=313.15, p=3e5)
 def cooler(cooler_type, **params):
     """Return a 2 MW cooler with a 5 K approach and 2 % specific fan power."""
     design = dict(cooler_type=cooler_type, capacity=2e6, approach=5, specific_fan_power=0.02)
-    return Cooler().update_params(**(design | params))
+    return Cooler().set_params("", design | params)
 
 
 def test_dry_cooler_approach_limit_and_closure():
@@ -76,7 +76,7 @@ def test_invalid_inputs_raise():
     unit = cooler("dry")
     unit.temperature_setpoint = 290
     with raises(ValidationError, "invalid_design", match="loop_pressure"):
-        unit.offer()
+        unit._offered()
 
 
 def test_a_closed_loop_offers_the_water_at_the_setpoint():
@@ -84,7 +84,7 @@ def test_a_closed_loop_offers_the_water_at_the_setpoint():
     unit = cooler("dry", loop_pressure=3e5)
     unit.flow = 20.0
     unit.temperature_setpoint = 303.15
-    offered = unit.offer()["fluid_out"]
+    offered = unit._offered()["fluid_out"]
     assert (offered.m_dot, offered.T, offered.p) == (20.0, 303.15, 3e5)
     assert unit(fluid_in=HOT, air_in=air(288.15)).outlets.fluid_out == offered
 

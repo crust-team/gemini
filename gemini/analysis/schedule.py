@@ -93,7 +93,7 @@ def _single(plant, kind):
 
 def _setpoint(path, module):
     """Return the persisted ``temperature_setpoint`` of a design module, or raise saying so."""
-    if not module.has_input_value("temperature_setpoint"):
+    if not module._has_input_value("temperature_setpoint"):
         raise ValidationError(
             f"schedule: {path}.temperature_setpoint has no value; expected the supply setpoint "
             "of the design",
@@ -138,7 +138,7 @@ def _brine_splits(plant, flows):
 
 def _load_below(plant, path):
     """Return the module at ``path``, or the module its mixer feeds when it is a ``Mixer``."""
-    if path is not None and isinstance(plant.get_module(path), Mixer):
+    if path is not None and isinstance(plant.get_submodule(path), Mixer):
         return _target(plant, path, "fluid_out")
     return path
 

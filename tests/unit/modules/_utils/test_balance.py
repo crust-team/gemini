@@ -19,7 +19,7 @@ from gemini.types.results import ModuleResult, Values
 from tests.fixtures.equivalence import STREAM_FIELDS, assert_close
 from tests.fixtures.reading import reading
 
-GRID_GAS = GasGrid().offer()["gas_out"]
+GRID_GAS = GasGrid()._offered()["gas_out"]
 
 
 class Radiator(Module):
@@ -51,8 +51,8 @@ class Radiator(Module):
 def boiler_of(fuel):
     """Return a boiler of ``fuel`` and the extra inlets a call of it takes."""
     if fuel == "electric":
-        return ElectricBoiler().update_params(capacity=1e6, efficiency=0.9), {}
-    return Boiler().update_params(capacity=1e6, efficiency=0.9), {"fuel_in": GRID_GAS}
+        return ElectricBoiler().set_params("", {"capacity": 1e6, "efficiency": 0.9}), {}
+    return Boiler().set_params("", {"capacity": 1e6, "efficiency": 0.9}), {"fuel_in": GRID_GAS}
 
 
 @pytest.mark.parametrize("fuel", ["electric", "gas"])
@@ -67,7 +67,7 @@ def test_boiler_balance(fuel):
 
 def test_unresolved_pump_work():
     """Isothermal pump electricity remains explicit unresolved work."""
-    pump = InjectionPump().update_params(efficiency=0.8)
+    pump = InjectionPump().set_params("", {"efficiency": 0.8})
     result = pump(fluid_in=Stream(m_dot=10, T=300, p=1e6), pressure_setpoint=2e6)
     balance = energy_balance(pump, result)
     assert balance["unresolved_power"] == pytest.approx(result.outputs.power)
@@ -76,10 +76,13 @@ def test_unresolved_pump_work():
 
 def test_esp_motor_efficiency_does_not_change_shaft_power():
     """Motor efficiency changes grid draw while shaft prediction stays fixed."""
-    pump = ESP().update_params(
-        stage_count=10,
-        head_coefficients=[10, 0, 0, 0, 0, 0],
-        power_coefficients=[1, 0, 0, 0, 0, 0],
+    pump = ESP().set_params(
+        "",
+        {
+            "stage_count": 10,
+            "head_coefficients": [10, 0, 0, 0, 0, 0],
+            "power_coefficients": [1, 0, 0, 0, 0, 0],
+        },
     )
     inlet = Stream(m_dot=30, T=300, p=1e6)
     first = pump(frequency=60, fluid_in=inlet)
@@ -113,14 +116,17 @@ class GasHeatedInjection(Module):
         super().__init__()
 
         # Modules
-        self.chp = CHP().update_params(
-            electric_capacity=1e5,
-            electric_efficiency=0.4,
-            thermal_efficiency=0.45,
-            maximum_outlet_temperature=363.15,
+        self.chp = CHP().set_params(
+            "",
+            {
+                "electric_capacity": 1e5,
+                "electric_efficiency": 0.4,
+                "thermal_efficiency": 0.45,
+                "maximum_outlet_temperature": 363.15,
+            },
         )
-        self.boiler = Boiler().update_params(capacity=1e6, efficiency=0.9)
-        self.pump = InjectionPump().update_params(efficiency=0.8)
+        self.boiler = Boiler().set_params("", {"capacity": 1e6, "efficiency": 0.9})
+        self.pump = InjectionPump().set_params("", {"efficiency": 0.8})
 
         # Inlets
         self.return_in = Inlet(Stream)
@@ -147,7 +153,7 @@ class GasHeatedInjection(Module):
 def test_emissions_charge_fuel_and_net_grid_electricity(load):
     """Fuel is charged in full; CHP electricity offsets the 60 kW pump before the grid."""
     plant = GasHeatedInjection()
-    plant.set_inputs(
+    plant._set_inputs(
         {
             "chp.load_fraction": load,
             "boiler.temperature_setpoint": 343.15,
@@ -166,7 +172,7 @@ def test_emissions_charge_fuel_and_net_grid_electricity(load):
 
 def test_emissions_without_energy_outputs_are_zero():
     """A leaf that burns and draws nothing emits nothing."""
-    result = Boiler().update_params(capacity=1e6, efficiency=0.9)(
+    result = Boiler().set_params("", {"capacity": 1e6, "efficiency": 0.9})(
         fluid_in=Stream(m_dot=10, T=350, p=2e5), fuel_in=GRID_GAS, temperature_setpoint=340
     )
     assert emissions(result, GAS_FACTOR, GRID_FACTOR) == 0

@@ -8,35 +8,43 @@ CP = 4217.4
 
 def configure_heating_substation(substation, demand=1.5e5):
     """Fill a heating substation: 3 kg/s building loop, 20 kW/K exchanger, 30 degC floor."""
-    substation.pump.update_params(flow=3.0, pressure_rise=5e4, loop_pressure=3e5)
-    substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
+    substation.pump.set_params("", {"flow": 3.0, "pressure_rise": 5e4, "loop_pressure": 3e5})
+    substation.valve.set_params("", {"flow_coefficient": "20 m3/h/bar^0.5"})
     substation.valve.opening = 0.8
-    substation.heat_exchanger.update_params(
-        thermal_conductance=2e4,
-        hot_nominal_pressure_drop=2e4,
-        cold_nominal_pressure_drop=2e4,
-        hot_nominal_mass_flow=2,
-        cold_nominal_mass_flow=3,
+    substation.heat_exchanger.set_params(
+        "",
+        {
+            "thermal_conductance": 2e4,
+            "hot_nominal_pressure_drop": 2e4,
+            "cold_nominal_pressure_drop": 2e4,
+            "hot_nominal_mass_flow": 2,
+            "cold_nominal_mass_flow": 3,
+        },
     )
-    substation.consumer.update_params(minimum_return_temperature=303.15)
+    substation.consumer.set_params("", {"minimum_return_temperature": 303.15})
     substation.consumer.heat_demand = demand
     return substation
 
 
 def configure_cooling_substation(substation, sensible=6e4, latent=1e4):
     """Fill a cooling substation: 4 kg/s building loop, 30 kW/K exchanger, 18 degC return limit."""
-    substation.pump.update_params(flow=4.0, pressure_rise=5e4, loop_pressure=3e5)
-    substation.valve.update_params(flow_coefficient="20 m3/h/bar^0.5")
+    substation.pump.set_params("", {"flow": 4.0, "pressure_rise": 5e4, "loop_pressure": 3e5})
+    substation.valve.set_params("", {"flow_coefficient": "20 m3/h/bar^0.5"})
     substation.valve.opening = 1.0
-    substation.heat_exchanger.update_params(
-        thermal_conductance=3e4,
-        hot_nominal_pressure_drop=2e4,
-        cold_nominal_pressure_drop=2e4,
-        hot_nominal_mass_flow=4,
-        cold_nominal_mass_flow=3,
+    substation.heat_exchanger.set_params(
+        "",
+        {
+            "thermal_conductance": 3e4,
+            "hot_nominal_pressure_drop": 2e4,
+            "cold_nominal_pressure_drop": 2e4,
+            "hot_nominal_mass_flow": 4,
+            "cold_nominal_mass_flow": 3,
+        },
     )
-    substation.consumer.update_params(maximum_return_temperature=291.15, dew_point_margin=1.0)
-    substation.set_inputs(
+    substation.consumer.set_params(
+        "", {"maximum_return_temperature": 291.15, "dew_point_margin": 1.0}
+    )
+    substation._set_inputs(
         {
             "consumer.sensible_cooling_demand": sensible,
             "consumer.latent_cooling_demand": latent,
@@ -49,12 +57,15 @@ def configure_cooling_substation(substation, sensible=6e4, latent=1e4):
 
 def configure_circulation_pump(pump):
     """Fill a circulation pump: 4 bar shut-off head, 75 % efficiency at 4 l/s, 90 % motor."""
-    pump.update_params(
-        head_coefficients=[4e5, 0.0, -1e9],
-        rated_frequency=50,
-        best_efficiency=0.75,
-        best_efficiency_flow=0.004,
-        motor_efficiency=0.9,
+    pump.set_params(
+        "",
+        {
+            "head_coefficients": [4e5, 0.0, -1e9],
+            "rated_frequency": 50,
+            "best_efficiency": 0.75,
+            "best_efficiency_flow": 0.004,
+            "motor_efficiency": 0.9,
+        },
     )
     pump.frequency = 50
     return pump
@@ -62,8 +73,14 @@ def configure_circulation_pump(pump):
 
 def configure_pipe(pipe):
     """Fill a 500 m DN100 pipe with U = 1 W/m2/K in 10 degC ground."""
-    pipe.update_params(
-        length=500, inner_diameter=0.1, elevation_change=0, heat_transfer_coefficient=1.0
+    pipe.set_params(
+        "",
+        {
+            "length": 500,
+            "inner_diameter": 0.1,
+            "elevation_change": 0,
+            "heat_transfer_coefficient": 1.0,
+        },
     )
     return pipe
 

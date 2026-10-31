@@ -34,7 +34,7 @@ def test_legacy_bridge(tmp_path):
     legacy.write_project(converted, tmp_path / "project")
     reread = legacy.read_project(tmp_path / "project")
     assert reread.params == project.params
-    plant.heat_exchanger.update_params(thermal_conductance=123456.0)
+    plant.heat_exchanger.thermal_conductance = 123456.0
     updated = legacy.from_plant(plant, project)
     legacy.write_project(updated, tmp_path / "updated")
     reread = legacy.read_project(tmp_path / "updated")

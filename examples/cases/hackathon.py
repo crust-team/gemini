@@ -58,6 +58,13 @@ ASSUMPTIONS = """Assumptions of this case, not of the challenge:
   discount rate, lifetime, every price and the cost factors without a source"""
 
 
+def command(plant, inputs):
+    """Set each control or boundary, named by its path, on its module."""
+    for path, value in inputs.items():
+        declaration = plant.get(path)
+        setattr(declaration.owner, declaration.name, value)
+
+
 def hackathon_limits():
     """Return the hard limits of the challenge."""
     limits = gm.checks.Limits()
@@ -149,7 +156,7 @@ def print_economics(plant, results):
 def main():
     """Plan and simulate the year, then print what it delivered and what it costs."""
     plant = gm.plants.example("HackathonPlant")
-    plant.set_inputs(INPUTS)
+    command(plant, INPUTS)
     profiles = [gm.profiles.get("heating_demand"), gm.profiles.get("cooling_demand")]
     print(ASSUMPTIONS)
     results = gm.simulate(plant, gm.schedule(plant, pd.concat(profiles, axis=1), RULES))

@@ -11,14 +11,14 @@ from tests.fixtures.errors import raises
 def test_parameters_must_be_one_calibratable_set_of_the_plant(fresh_plant, reference_dataset):
     """Empty, uncalibratable, mixed, duplicate and foreign parameters are rejected."""
     plant, data = fresh_plant, reference_dataset
-    ua = plant.get_parameter("heat_exchanger.thermal_conductance")
-    head = plant.get_parameter("doublet.esp.head_coefficients")
+    ua = plant.get("heat_exchanger.thermal_conductance")
+    head = plant.get("doublet.esp.head_coefficients")
     with pytest.raises(ValueError, match="at least one"):
         gm.optim.calibrate(plant, data, [])
     with raises(
         ValidationError, "invalid_design", match="heat_exchanger.arrangement.*calibratable"
     ):
-        gm.optim.calibrate(plant, data, [plant.get_parameter("heat_exchanger.arrangement")])
+        gm.optim.calibrate(plant, data, [plant.get("heat_exchanger.arrangement")])
     with raises(ValidationError, "invalid_design", match="doublet.esp, heat_exchanger"):
         gm.optim.calibrate(plant, data, [ua, head])
     with raises(
@@ -27,7 +27,7 @@ def test_parameters_must_be_one_calibratable_set_of_the_plant(fresh_plant, refer
         gm.optim.calibrate(plant, data, [ua, ua])
     foreign = gm.modules.exchangers.HeatExchanger()
     with raises(ValidationError, "invalid_design", match="supplied plant"):
-        gm.optim.calibrate(plant, data, [foreign.get_parameter("thermal_conductance")])
+        gm.optim.calibrate(plant, data, [foreign.get("thermal_conductance")])
 
 
 def test_modules_without_measured_bindings_cannot_be_fitted(fresh_plant, reference_dataset):
@@ -36,7 +36,7 @@ def test_modules_without_measured_bindings_cannot_be_fitted(fresh_plant, referen
     plant.bindings["heat_exchanger"].measured.clear()
     with raises(ValidationError, "invalid_binding", match="heat_exchanger: measured"):
         gm.optim.calibrate(
-            plant, reference_dataset, [plant.get_parameter("heat_exchanger.thermal_conductance")]
+            plant, reference_dataset, [plant.get("heat_exchanger.thermal_conductance")]
         )
 
 

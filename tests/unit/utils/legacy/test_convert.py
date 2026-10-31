@@ -104,7 +104,7 @@ def test_results_to_frame_uses_old_columns_and_units(project, converted, fast_da
 def test_from_plant_writes_changed_values_and_keeps_the_rest(project):
     """Changed parameters are exported in old units; unchanged raw values are kept."""
     plant = legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
-    plant.doublet.reservoir.update_params(pressure=2.3e7)
+    plant.doublet.reservoir.pressure = 2.3e7
     exported = legacy.from_plant(plant, project)
     production = _node_id_named(project, "reservoir_c1b5")
     assert exported.params[production]["reservoir_pressure"].values == [230.0]
@@ -135,7 +135,7 @@ def test_check_wiring_reports_mismatches_and_raises_on_errors(project, converted
 def test_round_trip_through_from_plant_converts_the_edited_project(project):
     """A project exported by from_plant converts from memory, not from its source folder."""
     plant = legacy.to_plant(project, gm.plants.get("DoubletHeatPlant"))
-    plant.heat_exchanger.update_params(thermal_conductance=123456.0)
+    plant.heat_exchanger.thermal_conductance = 123456.0
     reconverted = legacy.to_plant(
         legacy.from_plant(plant, project), gm.plants.get("DoubletHeatPlant")
     )

@@ -14,8 +14,8 @@ INLET = Stream(m_dot=20, T=350, p=1e6)
 
 def desander():
     """Return a desander rated 1 bar at 40 kg/s that removes 90 % of the sand."""
-    return Desander().update_params(
-        separation_efficiency=0.9, nominal_pressure_drop=1e5, nominal_mass_flow=40
+    return Desander().set_params(
+        "", {"separation_efficiency": 0.9, "nominal_pressure_drop": 1e5, "nominal_mass_flow": 40}
     )
 
 

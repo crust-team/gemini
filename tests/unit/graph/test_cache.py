@@ -14,9 +14,9 @@ def test_numeric_parameter_values_do_not_retrace_but_guards_do(gain):
     cache = GraphCache()
     fluids = {"fluid_in": gain.fluid}
     first = cache.graph(gain, fluids)
-    gain.update_params(scale=7.0)
+    gain.set_params("", {"scale": 7.0})
     assert cache.graph(gain, fluids) is first and cache.traces == 1
-    gain.update_params(label="y")
+    gain.set_params("", {"label": "y"})
     assert cache.graph(gain, fluids) is not first and cache.traces == 2
     handle = gain.register_forward_hook(lambda module, inlets, outlets: None)
     cache.graph(gain, fluids)
@@ -52,9 +52,9 @@ def test_structural_parameter_values_are_guards(stepper):
     fluids = {"fluid_in": module.fluid}
     first = cache.graph(module, fluids)
     assert "steps" not in first.inputs and "increment" in first.inputs
-    module.update_params(increment=5.0)
+    module.set_params("", {"increment": 5.0})
     assert cache.graph(module, fluids) is first and cache.traces == 1
-    module.update_params(steps=3)
+    module.set_params("", {"steps": 3})
     assert cache.graph(module, fluids) is not first and cache.traces == 2
 
 
@@ -63,10 +63,10 @@ def test_a_change_deep_in_the_tree_retraces(line):
     cache = GraphCache()
     fluids = {"fluid_in": line.fluid}
     first = cache.graph(line, fluids)
-    line.gain.update_params(scale=9.0)
-    line.second.update_params(scale=9.0)
+    line.gain.set_params("", {"scale": 9.0})
+    line.second.set_params("", {"scale": 9.0})
     assert cache.graph(line, fluids) is first and cache.traces == 1
-    line.gain.update_params(label="y")
+    line.gain.set_params("", {"label": "y"})
     assert cache.graph(line, fluids) is not first and cache.traces == 2
     line.first.fluid = gm.WATER
     cache.graph(line, fluids)

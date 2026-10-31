@@ -161,7 +161,7 @@ class Offer(Module):
 
 def consumer(rating):
     """Return a consumer of ``rating`` W per kg/s."""
-    return Consumer().update_params(rating=rating)
+    return Consumer().set_params("", {"rating": rating})
 
 
 def wired():

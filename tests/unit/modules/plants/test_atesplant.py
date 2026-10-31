@@ -27,31 +27,40 @@ def _plant(mode="charge"):
     """Return a 30 kg/s ATES plant with a 1 MW/K exchanger and a 2 MW heat pump."""
     plant = ATESPlant()
     plant.storage.groundwater_flow = 30.0
-    plant.storage.update_params(
-        groundwater_pressure=3e5,
-        aquifer_temperature=284.15,
-        aquifer_thickness=30,
-        porosity=0.3,
-        rock_volumetric_heat_capacity=2.0e6,
-        ground_conductivity=2.5,
+    plant.storage.set_params(
+        "",
+        {
+            "groundwater_pressure": 3e5,
+            "aquifer_temperature": 284.15,
+            "aquifer_thickness": 30,
+            "porosity": 0.3,
+            "rock_volumetric_heat_capacity": 2.0e6,
+            "ground_conductivity": 2.5,
+        },
     )
     _season(plant, mode)
-    plant.pump.update_params(
-        head_coefficients=[3e5, 0.0, -1e8],
-        rated_frequency=50,
-        best_efficiency=0.7,
-        best_efficiency_flow=0.03,
-        motor_efficiency=0.9,
+    plant.pump.set_params(
+        "",
+        {
+            "head_coefficients": [3e5, 0.0, -1e8],
+            "rated_frequency": 50,
+            "best_efficiency": 0.7,
+            "best_efficiency_flow": 0.03,
+            "motor_efficiency": 0.9,
+        },
     )
     plant.pump.frequency = 50
-    plant.heat_exchanger.update_params(
-        thermal_conductance=1e6,
-        hot_nominal_pressure_drop=3e4,
-        cold_nominal_pressure_drop=3e4,
-        hot_nominal_mass_flow=40,
-        cold_nominal_mass_flow=30,
+    plant.heat_exchanger.set_params(
+        "",
+        {
+            "thermal_conductance": 1e6,
+            "hot_nominal_pressure_drop": 3e4,
+            "cold_nominal_pressure_drop": 3e4,
+            "hot_nominal_mass_flow": 40,
+            "cold_nominal_mass_flow": 30,
+        },
     )
-    plant.heat_pump.update_params(mode="heating", capacity=2e6)
+    plant.heat_pump.set_params("", {"mode": "heating", "capacity": 2e6})
     plant.heat_pump.temperature_setpoint = 313.15
     return plant
 

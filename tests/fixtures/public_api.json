@@ -39,10 +39,11 @@
    "bindable": [
     "path"
    ],
-   "describe": [
-    "values"
+   "describe": [],
+   "get": [
+    "path"
    ],
-   "get_module": [
+   "get_submodule": [
     "path"
    ],
    "help": [],

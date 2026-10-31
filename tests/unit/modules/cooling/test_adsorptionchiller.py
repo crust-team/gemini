@@ -26,7 +26,7 @@ def chiller(**params):
         evaporator_coefficient=1.0,
         auxiliary_power_ratio=0.02,
     )
-    return AdsorptionChiller().update_params(**(design | params))
+    return AdsorptionChiller().set_params("", design | params)
 
 
 def call(machine, setpoint, **streams):

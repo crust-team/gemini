@@ -15,7 +15,7 @@ from tests.fixtures.reading import reading
 
 CP = 4217.4
 WATER = Stream(m_dot=20, T=333.15, p=3e5)
-GRID_GAS = GasGrid().offer()["gas_out"]
+GRID_GAS = GasGrid()._offered()["gas_out"]
 
 
 def engine(**params):
@@ -26,7 +26,7 @@ def engine(**params):
         thermal_efficiency=0.45,
         maximum_outlet_temperature=363.15,
     )
-    return CHP().update_params(**(design | params))
+    return CHP().set_params("", design | params)
 
 
 def test_full_load_hand_value_and_closure():

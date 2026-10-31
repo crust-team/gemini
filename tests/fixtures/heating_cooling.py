@@ -103,10 +103,10 @@ def configure(plant):
         "adsorption_chiller": ADSORPTION_FIT,
     }.items():
         if path in modules:
-            modules[path].update_params(**fit)
+            modules[path].set_params("", fit)
     declared = plant.inputs()
     inputs = INPUTS | COOLER_INPUTS
-    plant.set_inputs({path: value for path, value in inputs.items() if path in declared})
+    plant._set_inputs({path: value for path, value in inputs.items() if path in declared})
     plant.boundary = {"root_inputs": _root_streams(plant)}
     return plant
 

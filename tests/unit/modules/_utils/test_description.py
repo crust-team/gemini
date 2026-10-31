@@ -7,6 +7,7 @@ import pytest
 import gemini as gm
 
 DESCRIPTION_KEYS = {
+    "values",
     "name",
     "type",
     "category",
@@ -92,8 +93,8 @@ def assert_valid_schema(schema):
 
 def test_leaf_description_shape():
     """A leaf has the documented keys, entries, ports and outputs."""
-    description = gm.modules.ESP.describe()
-    assert set(description) - {"values"} == DESCRIPTION_KEYS
+    description = gm.modules.ESP().describe()
+    assert set(description) == DESCRIPTION_KEYS
     assert description["name"] == "esp" and description["type"] == "ESP"
     assert description["category"] == "pumps"
     assert description["summary"] == description["doc"].split("\n\n")[0]
@@ -116,9 +117,9 @@ def test_leaf_description_shape():
 def test_instance_values_follow_the_module():
     """An instance reports current values and omits uninitialised ones."""
     esp = gm.modules.ESP()
-    esp.update_params(stage_count=12)
+    esp.set_params("", {"stage_count": 12})
     assert "frequency" not in esp.describe()["values"]["controls"]
-    esp.set_inputs({"frequency": 50.0})
+    esp._set_inputs({"frequency": 50.0})
     values = esp.describe()["values"]
     assert values["parameters"]["stage_count"] == 12
     assert "head_coefficients" not in values["parameters"]
@@ -157,7 +158,7 @@ def test_a_spec_plant_lists_its_connections():
 
 def test_description_does_not_mutate():
     """Describing and validating leave the module as it was."""
-    esp = gm.modules.ESP().update_params(stage_count=3)
+    esp = gm.modules.ESP().set_params("", {"stage_count": 3})
     before = esp.state_dict()
     esp.describe()
     esp.parameter_schema()
@@ -167,10 +168,10 @@ def test_description_does_not_mutate():
 
 def test_every_module_serialises_and_has_a_valid_schema(module_class):
     """Each shipped module describes itself as plain JSON with a valid schema."""
-    description = module_class.describe()
+    description = module_class().describe()
     assert set(description) == DESCRIPTION_KEYS
     assert_plain_json(description)
-    schema = module_class.parameter_schema()
+    schema = module_class().parameter_schema()
     assert_plain_json(schema)
     assert_valid_schema(schema)
     for section in ("parameters", "controls", "boundaries", "measured", "state"):
@@ -179,31 +180,31 @@ def test_every_module_serialises_and_has_a_valid_schema(module_class):
 
 def test_schema_accepts_unit_strings_and_keeps_units():
     """A number with a unit is a number or a string; the unit stays on the property."""
-    properties = gm.modules.ESP.parameter_schema()["properties"]
+    properties = gm.modules.ESP().parameter_schema()["properties"]
     depth = properties["setting_depth"]
     assert depth["unit"] == "m" and depth["quantity"] == "length"
     assert [variant["type"] for variant in depth["anyOf"]] == ["number", "string"]
     assert depth["anyOf"][0]["minimum"] == 0
-    assert "stage_count" in gm.modules.ESP.parameter_schema()["required"]
+    assert "stage_count" in gm.modules.ESP().parameter_schema()["required"]
 
 
 def test_validate_params_raises_every_problem_by_default():
     """The default is to raise; the error carries the list ``on_error="record"`` returns."""
     params = {"stage_coun": 3, "motor_efficiency": 1.5}
-    recorded = gm.modules.ESP.validate_params(params, on_error="record")
+    recorded = gm.modules.ESP().validate_params(params, on_error="record")
     with pytest.raises(gm.errors.ValidationError) as caught:
-        gm.modules.ESP.validate_params(params)
+        gm.modules.ESP().validate_params(params)
     assert caught.value.problems == recorded and len(recorded) == 2
 
 
 def test_validate_params_accepts_valid_values_and_unit_strings():
     """Numbers and unit strings in the right dimension raise nothing."""
-    assert gm.modules.ESP.validate_params({"stage_count": 12, "setting_depth": "1000 ft"}) == []
+    assert gm.modules.ESP().validate_params({"stage_count": 12, "setting_depth": "1000 ft"}) == []
 
 
 def test_validate_params_reports_every_problem():
     """Unknown names, units and bounds are all reported at once."""
-    problems = gm.modules.ESP.validate_params(
+    problems = gm.modules.ESP().validate_params(
         {"stage_coun": 3, "setting_depth": "5 bar", "motor_efficiency": 1.5, "tubing": "x"},
         on_error="record",
     )
@@ -225,7 +226,8 @@ def test_the_example_plant_describes_itself_with_its_values(shared_plant):
     assert "doublet.esp.stage_count" in description["values"]["parameters"]
 
 
-def test_values_are_only_on_an_instance():
-    """A class stores no values; an instance does."""
-    assert "values" not in gm.modules.Valve.describe()
+def test_a_class_is_described_by_a_new_instance():
+    """``describe`` is an instance method: a class gives a new instance first."""
     assert "values" in gm.modules.Valve().describe()
+    with pytest.raises(TypeError):
+        gm.modules.Valve.describe()

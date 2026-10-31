@@ -34,7 +34,7 @@ class _Chain:
 
 def _chain(plant, well):
     """Return the production chain below the plant path ``well``."""
-    module = plant.get_module(well)
+    module = plant.get_submodule(well)
     inside = list(module.modules())
     reservoirs = [item for item in inside if isinstance(item, ProductionReservoir)]
     if not reservoirs:
@@ -313,7 +313,7 @@ def pump_curve(plant, pump, measured=None, units=None):
         diagnosis, not a parameter to set.
     """
     output = OutputUnits(units)
-    module = plant.get_module(pump)
+    module = plant.get_submodule(pump)
     if not isinstance(module, ESP):
         raise ValidationError(
             f"pump_curve: pump = {pump!r}; expected the path of an ESP", path=pump

@@ -176,7 +176,7 @@ def _coordinates(module, path, fields):
         values = np.atleast_1d(np.asarray(value, dtype=float))
         sizes[field] = (len(values), isinstance(value, (list, tuple)))
         field_scale = np.where(values == 0, 1.0, np.maximum(np.abs(values), 1e-30))
-        low, high = _bounds(module.get_parameter(field).bounds)
+        low, high = _bounds(module.get(field).bounds)
         scale.extend(field_scale)
         initial.extend(values / field_scale)
         lower.extend(np.full(len(values), low) / field_scale)
@@ -266,7 +266,7 @@ def _predictor(engine, trial, dataset, index, path, targets, coordinates):
     columns = [join_path(path, name) for name in targets]
 
     def predict(x):
-        target.update_params(**coordinates.unpack(x))
+        target._override_params(coordinates.unpack(x))
         results = engine.replay(dataset, only=[path])
         if path not in results.names():
             raise PhysicsError(
@@ -342,7 +342,7 @@ def calibrate(plant, dataset, params, start=None, end=None, backend="numpy", app
     _check_single_snapshot(original, path, data.index)
     trial = deepcopy(plant)
     target = trial.get_submodule(path)
-    target.update_params(**original._params_at(data.index[0]))
+    target._override_params(original._params_at(data.index[0]))
     observed = _Observed(dataset, data, plant.bindings[path])
     targets = _fit_targets(original, path, observed.bindings.measured, fields)
     measured = {name: observed.values(observed.bindings.measured[name]) for name in targets}
@@ -366,5 +366,5 @@ def calibrate(plant, dataset, params, start=None, end=None, backend="numpy", app
     values = coordinates.unpack(fitted.x)
     applied = bool(apply and fitted.success)
     if applied:
-        original.update_params(**values)
+        original._override_params(values)
     return _result(fitted, values, initial, targets, errors_before, errors_after, applied)

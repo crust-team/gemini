@@ -24,7 +24,7 @@ def _controller(**changes):
         maximum_output=1.0,
         direction="reverse",
     )
-    return PIDController().update_params(**(params | changes))
+    return PIDController().set_params("", params | changes)
 
 
 def _step(pid, state, dt, measurement):
@@ -105,8 +105,14 @@ class ControlledTank(Module):
 
         # Modules
         self.controller = _controller(proportional_gain=0.1, integral_time=600.0)
-        self.storage = ThermalStorage().update_params(
-            service="hot", volume=1.0, heat_loss_conductance=0, reference_temperature=313.15
+        self.storage = ThermalStorage().set_params(
+            "",
+            {
+                "service": "hot",
+                "volume": 1.0,
+                "heat_loss_conductance": 0,
+                "reference_temperature": 313.15,
+            },
         )
 
         # Inlets
@@ -150,7 +156,7 @@ class ControlledTank(Module):
 
 def test_controller_steps_inside_a_composite():
     """The parent passes measurement= and uses the command; both children advance per step."""
-    plant = ControlledTank().set_inputs(
+    plant = ControlledTank()._set_inputs(
         {"temperature_setpoint": 343.15, "measured_temperature": 333.15}
     )
     streams = {

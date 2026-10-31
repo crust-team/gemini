@@ -4,7 +4,7 @@ import gemini as gm
 from gemini.modules import ChemicalGrid, InhibitorDosing
 from tests.fixtures.equivalence import assert_module_matches
 
-OFFER = ChemicalGrid().offer()["chemical_out"]
+OFFER = ChemicalGrid()._offered()["chemical_out"]
 
 
 def test_the_grid_offers_the_product_without_flow():

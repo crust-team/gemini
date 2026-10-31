@@ -15,7 +15,7 @@ def configured_esp():
     """Return a standalone ESP with the pump design of the doublet heat plant."""
     design = gm.plants.example("DoubletHeatPlant").doublet.esp
     values = {name: parameter.value for name, parameter in design.named_parameters()}
-    return gm.modules.ESP().update_params(**values)
+    return gm.modules.ESP().set_params("", values)
 
 
 def print_call(esp):

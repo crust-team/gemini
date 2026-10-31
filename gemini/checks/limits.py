@@ -121,7 +121,7 @@ def _matched(plant, entry):
 
 def _fields(plant, path):
     """Return the ``(unit, quantity)`` of what a limit may judge: outputs and port quantities."""
-    module = plant.get_module(path)
+    module = plant.get_submodule(path)
     outputs = {
         name: (declaration.unit or "-", declaration.quantity)
         for name, declaration in module.outputs(recurse=False).items()
@@ -149,7 +149,7 @@ def _series(plant, frame, path, name):
     """
     if join_path(path, name) in frame:
         return _column(frame, path, name)
-    module = plant.get_module(path)
+    module = plant.get_submodule(path)
     key, *paths = module.outputs(recurse=False)[name].formula or (None,)
     if key is None:
         raise ValidationError(

@@ -20,15 +20,18 @@ CP = 4217.4
 
 def exchanger():
     """Return a 2.5 km exchanger after one year of operation."""
-    return DownholeHeatExchanger().update_params(
-        borehole_depth="2500 m",
-        surface_temperature="10 degC",
-        geothermal_gradient="30 K/km",
-        ground_conductivity=2.5,
-        ground_diffusivity=1e-6,
-        borehole_radius=0.1,
-        borehole_resistance=0.05,
-        operating_time=3.15e7,
+    return DownholeHeatExchanger().set_params(
+        "",
+        {
+            "borehole_depth": "2500 m",
+            "surface_temperature": "10 degC",
+            "geothermal_gradient": "30 K/km",
+            "ground_conductivity": 2.5,
+            "ground_diffusivity": 1e-6,
+            "borehole_radius": 0.1,
+            "borehole_resistance": 0.05,
+            "operating_time": 3.15e7,
+        },
     )
 
 
@@ -78,7 +81,7 @@ def test_hot_inlet_heats_the_rock():
 
 def test_short_operating_time_is_bad_design_data():
     """Ramey's long-time function needs alpha t / r**2 >= 25."""
-    module = exchanger().update_params(operating_time=3600)
+    module = exchanger().set_params("", {"operating_time": 3600})
     with raises(gm.errors.ValidationError, "invalid_design", match="operating_time rejected"):
         module(fluid_in=INLET)
 
@@ -94,13 +97,13 @@ def test_exchanger_matches_traced():
 
 def test_early_operating_time_is_not_evaluated_at_zero_flow():
     """A stopped exchanger needs no rock resistance, so a short operating time does not raise."""
-    module = exchanger().update_params(operating_time=3600)
+    module = exchanger().set_params("", {"operating_time": 3600})
     assert reading(module(fluid_in=INLET.with_(m_dot=0))).heat_extraction_rate == 0
 
 
 def test_traced_early_operating_time_raises_only_for_flowing_rows():
     """In a traced call the configuration error belongs to the rows that flow."""
-    module = exchanger().update_params(operating_time=3600)
+    module = exchanger().set_params("", {"operating_time": 3600})
     stopped = Stream(m_dot=np.zeros(2), T=np.full(2, 303.15), p=np.full(2, 3e5))
     assert run(module, {"fluid_in": stopped}).outlets["loss_out"]["power"].tolist() == [0, 0]
     mixed = Stream(m_dot=np.array([0.0, 5.0]), T=np.full(2, 303.15), p=np.full(2, 3e5))

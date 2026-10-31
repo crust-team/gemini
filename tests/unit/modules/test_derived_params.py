@@ -37,7 +37,7 @@ def test_values_may_arrive_one_call_at_a_time():
     """A value still missing derives nothing; the last one completes the derivation."""
     column = Column()
     column.set_params("", {"height": HEIGHT})
-    assert not column.reservoir.get_parameter("pressure").initialized
+    assert not column.reservoir.get("pressure").initialized
     column.set_params("", {"density": DENSITY})
     assert column.reservoir.pressure == PRESSURE
 
@@ -45,7 +45,7 @@ def test_values_may_arrive_one_call_at_a_time():
 @pytest.mark.parametrize(
     "assign",
     [
-        lambda column: column.update_params(height=HEIGHT * 2),
+        lambda column: column.set_params("", {"height": HEIGHT * 2}),
         lambda column: setattr(column, "height", HEIGHT * 2),
     ],
     ids=["update_params", "attribute"],
@@ -103,7 +103,7 @@ def test_a_child_override_survives_a_later_derivation():
     """``update_params`` on a child is an explicit override."""
     column = Column()
     column.set_params("", GIVEN)
-    column.update_params(**{"reservoir.pressure": 3e7})
+    column.set_params("", {"reservoir.pressure": 3e7})
     column.set_params("", {"height": 1000.0})
     assert column.reservoir.pressure == 3e7
 

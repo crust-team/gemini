@@ -38,7 +38,8 @@ METHODS = {
         "param_history",
         "bindable",
         "set_bindings",
-        "get_module",
+        "get",
+        "get_submodule",
         "named_modules",
     ),
     "Plant": (

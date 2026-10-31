@@ -9,12 +9,12 @@ from tests.fixtures.equivalence import assert_module_matches
 
 FLUID = gm.Fluid(kind="gas", gas_composition={"CH4": 0.8, "CO2": 0.2})
 GAS = gm.Stream(m_dot=0.05, T=330, p=2e5, fluid=FLUID)
-GRID = GasGrid().offer()["gas_out"]
+GRID = GasGrid()._offered()["gas_out"]
 
 
 def test_the_makeup_marks_the_offer_and_moves_no_gas():
     """Mass, temperature, pressure and composition stay in what it offers the burner."""
-    outlet = GasMakeup().offer({"gas_in": GAS, "grid_in": GRID})["fuel_out"]
+    outlet = GasMakeup()._offered({"gas_in": GAS, "grid_in": GRID})["fuel_out"]
     assert (outlet.m_dot, outlet.T, outlet.p) == (GAS.m_dot, GAS.T, GAS.p)
     assert outlet.fluid.gas_composition == FLUID.gas_composition
     assert outlet.fluid.grid_composition == gas.GRID_COMPOSITION

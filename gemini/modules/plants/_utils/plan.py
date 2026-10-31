@@ -100,7 +100,7 @@ def inner_ends(module, path, side, port):
 def leaf_ends(root, end, side):
     """Follow plant ports down from ``end`` to the ports of modules that are not plants."""
     path, port = end
-    module = root.get_module(path)
+    module = root.get_submodule(path)
     if not is_plant(module):
         return [end]
     return [
@@ -112,7 +112,7 @@ def leaf_ends(root, end, side):
 
 def declaration(root, end, side):
     """Return the port declaration at ``end``, an outlet or an inlet by ``side``."""
-    return getattr(root.get_module(end[0]), side)()[end[1]]
+    return getattr(root.get_submodule(end[0]), side)()[end[1]]
 
 
 def order_of(root, source, target):
@@ -173,7 +173,7 @@ def node_ends(root, end, side, nodes):
     """Follow plant ports of opened plants from ``end`` until they are ports of steps."""
     if end[0] in nodes:
         return [end]
-    inner = inner_ends(root.get_module(end[0]), end[0], side, end[1])
+    inner = inner_ends(root.get_submodule(end[0]), end[0], side, end[1])
     return [item for item in inner for item in node_ends(root, item, side, nodes)]
 
 
@@ -364,7 +364,7 @@ def _constraints(root, opened):
     """Return the constraints of ``root`` and of the plants it opened, with paths from the root."""
     found = list(root._constraints)
     for path in opened:
-        found += [item.below(path) for item in root.get_module(path)._constraints]
+        found += [item.below(path) for item in root.get_submodule(path)._constraints]
     return found
 
 

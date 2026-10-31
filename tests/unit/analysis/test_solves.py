@@ -48,20 +48,39 @@ def vertical_path(depth):
 @pytest.fixture(scope="module")
 def producer():
     """Return reservoir, lower well, ESP and riser of the upstream producer."""
-    reservoir = ProductionReservoir().update_params(
-        pressure=250e5, productivity_index=INDEX, top_depth=2400, **RESERVOIR
+    reservoir = ProductionReservoir().set_params(
+        "", {"pressure": 250e5, "productivity_index": INDEX, "top_depth": 2400, **RESERVOIR}
     )
     path = vertical_path(2400)
-    well = ProductionWell().update_params(
-        pipe_path=path, soil_temperature=293.15, segment="below_esp", esp_depth=650
+    well = ProductionWell().set_params(
+        "",
+        {"pipe_path": path, "soil_temperature": 293.15, "segment": "below_esp", "esp_depth": 650},
     )
-    riser = ProductionWell().update_params(
-        pipe_path=path, soil_temperature=293.15, segment="above_esp", esp_depth=650
+    riser = ProductionWell().set_params(
+        "",
+        {"pipe_path": path, "soil_temperature": 293.15, "segment": "above_esp", "esp_depth": 650},
     )
-    esp = ESP().update_params(
-        stage_count=10,
-        head_coefficients=[83.08389282, -0.000460444, -1.19e-07, 1.69e-11, -6.36e-16, 6.69e-21],
-        power_coefficients=[10.02089977, -0.000160233, 6.52e-08, -2.13e-12, 1.71e-17, 1.38e-23],
+    esp = ESP().set_params(
+        "",
+        {
+            "stage_count": 10,
+            "head_coefficients": [
+                83.08389282,
+                -0.000460444,
+                -1.19e-07,
+                1.69e-11,
+                -6.36e-16,
+                6.69e-21,
+            ],
+            "power_coefficients": [
+                10.02089977,
+                -0.000160233,
+                6.52e-08,
+                -2.13e-12,
+                1.71e-17,
+                1.38e-23,
+            ],
+        },
     )
     return reservoir, well, esp, riser
 
@@ -69,9 +88,11 @@ def producer():
 @pytest.fixture(scope="module")
 def injector():
     """Return the upstream injection well and receiving aquifer."""
-    well = InjectionWell().update_params(pipe_path=vertical_path(3100), soil_temperature=293.15)
-    sink = InjectionReservoir().update_params(
-        pressure=240e5, injectivity_index=INDEX, top_depth=3100, **RESERVOIR
+    well = InjectionWell().set_params(
+        "", {"pipe_path": vertical_path(3100), "soil_temperature": 293.15}
+    )
+    sink = InjectionReservoir().set_params(
+        "", {"pressure": 240e5, "injectivity_index": INDEX, "top_depth": 3100, **RESERVOIR}
     )
     return well, sink
 
@@ -111,10 +132,12 @@ def test_production_rate_and_esp_power_match_the_upstream_reference(producer):
 
 def test_production_rate_without_esp():
     """A free-flowing well solves the same balance through one full-length segment."""
-    reservoir = ProductionReservoir().update_params(
-        pressure=250e5, productivity_index=INDEX, top_depth=2400, **RESERVOIR
+    reservoir = ProductionReservoir().set_params(
+        "", {"pressure": 250e5, "productivity_index": INDEX, "top_depth": 2400, **RESERVOIR}
     )
-    well = ProductionWell().update_params(pipe_path=vertical_path(2400), soil_temperature=293.15)
+    well = ProductionWell().set_params(
+        "", {"pipe_path": vertical_path(2400), "soil_temperature": 293.15}
+    )
     rate = nodal.solve_production_rate(reservoir, well, 3e5, (1, 60))
     arrived = well(bottom_in=reservoir.sandface_stream(rate)).outlets.wellhead_out
     assert arrived.p == pytest.approx(3e5, abs=1e-3)
@@ -131,9 +154,11 @@ def test_injection_rate_balances_well_and_aquifer(injector):
 
 def test_injection_pressure_balances_a_shallow_injector():
     """A 2000 m injector into a 230 bar aquifer needs a pump; the solved pressure balances."""
-    well = InjectionWell().update_params(pipe_path=vertical_path(2000), soil_temperature=293.15)
-    sink = InjectionReservoir().update_params(
-        pressure=230e5, injectivity_index=INDEX, top_depth=2000, **RESERVOIR
+    well = InjectionWell().set_params(
+        "", {"pipe_path": vertical_path(2000), "soil_temperature": 293.15}
+    )
+    sink = InjectionReservoir().set_params(
+        "", {"pressure": 230e5, "injectivity_index": INDEX, "top_depth": 2000, **RESERVOIR}
     )
     wellhead = Stream(flow="129.02 m3/h", T=293.15, p=2e5)
     pressure = nodal.solve_injection_pressure(well, sink, wellhead, (2e5, 1e8))
@@ -193,9 +218,11 @@ def test_injection_pressure_gap_to_upstream_is_the_friction_sign():
         (2327, 1883, 0.0995668),
     ]
     rows = [dict(MD=md, TVD=tvd, ID=bore, roughness=2e-5) for md, tvd, bore in stations]
-    well = InjectionWell().update_params(pipe_path=build_path(rows), soil_temperature=293.15)
-    sink = InjectionReservoir().update_params(
-        pressure=180e5, injectivity_index=2.3 / 3.6e8, top_depth=1883, **RESERVOIR
+    well = InjectionWell().set_params(
+        "", {"pipe_path": build_path(rows), "soil_temperature": 293.15}
+    )
+    sink = InjectionReservoir().set_params(
+        "", {"pressure": 180e5, "injectivity_index": 2.3 / 3.6e8, "top_depth": 1883, **RESERVOIR}
     )
     wellhead = Stream(flow="125.1 m3/h", T=343.15, p=1e5)
     pressure = nodal.solve_injection_pressure(well, sink, wellhead, (1e5, 1e8))

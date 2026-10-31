@@ -26,7 +26,7 @@ def orc(**changes):
         parasitic_fraction=0.15,
         capacity="5 MW",
     )
-    return ORC().update_params(**(params | changes))
+    return ORC().set_params("", params | changes)
 
 
 def test_hand_calculated_lorenz_power():

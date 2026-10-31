@@ -27,10 +27,10 @@ def test_the_operating_point_reproduces_the_wellhead_pressure_in_the_plant_call(
 ):
     """Commanding the solved rate and frequency, the doublet delivers the 4.6 bar asked for."""
     point = doublet_curves["cases"][0]["operating_point"]
-    doublet = copy.deepcopy(shared_plant).get_module("doublet")
-    doublet.get_module("esp").frequency = CASE["frequency"]
-    doublet.get_module("reservoir").production_rate = point["rate"]["value"]
-    fluid = doublet.get_module("reservoir").fluid
+    doublet = copy.deepcopy(shared_plant).get_submodule("doublet")
+    doublet.get_submodule("esp").frequency = CASE["frequency"]
+    doublet.get_submodule("reservoir").production_rate = point["rate"]["value"]
+    fluid = doublet.get_submodule("reservoir").fluid
     supply = doublet(
         return_in=Stream(m_dot=point["rate"]["value"], T=300.0, p=1e6, fluid=fluid)
     ).outlets
@@ -48,7 +48,7 @@ def test_the_lift_curve_falls_with_rate_and_the_inflow_curve_too(doublet_curves)
 
 def test_the_inflow_curve_follows_the_linear_productivity_index(shared_plant, doublet_curves):
     """At the first rate, the sandface pressure is reservoir pressure minus flow over index."""
-    reservoir = shared_plant.get_module("doublet.reservoir")
+    reservoir = shared_plant.get_submodule("doublet.reservoir")
     rate = doublet_curves["cases"][0]["ipr"]["rate"]["value"][0]
     density = reservoir.fluid.properties(reservoir.pressure, reservoir.temperature).rho_l
     expected = reservoir.pressure - rate / density / reservoir.productivity_index
@@ -66,7 +66,7 @@ def test_a_higher_frequency_lifts_more(doublet_curves):
 def test_the_plant_is_not_changed(shared_plant, doublet_curves):
     """The ESP frequency of a case is set on a copy: the plant's control stays unset."""
     with raises(gm.errors.ValidationError, "missing_value"):
-        shared_plant.get_module("doublet.esp").frequency
+        shared_plant.get_submodule("doublet.esp").frequency
 
 
 def test_a_bracket_outside_the_well_model_fails_that_case_only():
@@ -100,7 +100,7 @@ def test_an_injection_chain_is_not_solved_yet(shared_plant):
 
 def test_pump_curve_starts_at_the_shut_in_head_of_the_polynomial(shared_plant):
     """At zero flow and 60 Hz the head is the first coefficient times the stages, in Pa."""
-    pump = shared_plant.get_module("doublet.esp")
+    pump = shared_plant.get_submodule("doublet.esp")
     curve = wells.pump_curve(shared_plant, "doublet.esp")
     expected = units.ft_head_to_pa(pump.head_coefficients[0] * pump.stage_count)
     assert curve["curve"]["flow"]["value"][0] == 0.0
@@ -111,7 +111,7 @@ def test_pump_curve_starts_at_the_shut_in_head_of_the_polynomial(shared_plant):
 
 def test_pump_curve_recovers_a_known_correction(shared_plant):
     """Points measured at 0.9 times the model head plus 1 kPa give the inverse line back."""
-    pump = shared_plant.get_module("doublet.esp")
+    pump = shared_plant.get_submodule("doublet.esp")
     points = [
         {"flow": flow, "frequency": 55.0, "head": 0.9 * pump.head_function(flow, 55.0) + 1000}
         for flow in (0.02, 0.03, 0.04)

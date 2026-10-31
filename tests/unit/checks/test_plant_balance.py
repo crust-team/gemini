@@ -81,8 +81,14 @@ def test_a_loss_that_reaches_no_edge_module_fails_the_plant_only():
             outlets = dict(fluid_out=passed.outlets.fluid_out)
             return outlets
 
-    pipe = Pipe().update_params(
-        length=500, inner_diameter=0.1, elevation_change=0, heat_transfer_coefficient=5.0
+    pipe = Pipe().set_params(
+        "",
+        {
+            "length": 500,
+            "inner_diameter": 0.1,
+            "elevation_change": 0,
+            "heat_transfer_coefficient": 5.0,
+        },
     )
     plant = Lost(pipe)
     found = by_name(gm.checks.plant_balance(plant, plant(fluid_in=HOT)))

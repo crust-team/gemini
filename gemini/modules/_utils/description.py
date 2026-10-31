@@ -146,12 +146,12 @@ def _values(module):
     }
 
 
-def describe(module, values=True):
+def describe(module):
     """Return the description of a module as plain JSON.
 
     The keys are ``name``, ``type``, ``category``, ``summary`` (first paragraph of the docstring),
     ``doc``, ``parameters``, ``controls``, ``boundaries``, ``measured``, ``state``, ``inlets``,
-    ``outlets``, ``outputs``, ``children`` and ``connections``, and ``values`` on an instance.
+    ``outlets``, ``outputs``, ``children``, ``connections`` and ``values``.
     Each entry of the first five has ``type``, ``unit``, ``quantity``, ``default``, ``minimum``,
     ``maximum``, ``enum``, ``description`` and ``section``.
 
@@ -162,8 +162,7 @@ def describe(module, values=True):
     - ``quantity`` of an output is its quantity name, else ``None``.
     - ``children`` maps a child name to its type; ``connections`` lists
       ``{source, target, kind, type}`` for a plant and is empty for a handwritten composite.
-    - ``values`` holds the current parameter, control and boundary values. It is only on an
-      instance: a class stores no values.
+    - ``values`` holds the current parameter, control and boundary values.
     """
     doc = type(module).__doc__ or ""
     outputs = module.outputs(recurse=False)
@@ -184,8 +183,7 @@ def describe(module, values=True):
         "children": {name: _type_name(child) for name, child in module.named_children()},
         "connections": _connections(module),
     }
-    if values:
-        description["values"] = _values(module)
+    description["values"] = _values(module)
     return description
 
 

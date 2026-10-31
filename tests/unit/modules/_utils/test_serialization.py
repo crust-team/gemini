@@ -14,7 +14,7 @@ from tests.fixtures.errors import raises
 
 def test_a_tree_that_is_no_plant_stores_flat_params():
     """What a checkpoint keeps of a root that is no plant reads back to itself."""
-    exchanger = gm.modules.HeatExchanger().update_params(hot_nominal_pressure_drop="2 bar")
+    exchanger = gm.modules.HeatExchanger().set_params("", {"hot_nominal_pressure_drop": "2 bar"})
     data = serialization.tree_dict(exchanger)
     assert data["format"] == 2 and data["params"]["hot_nominal_pressure_drop"] == 2e5
     assert json.dumps(data, allow_nan=False)
@@ -24,7 +24,7 @@ def test_a_tree_that_is_no_plant_stores_flat_params():
 
 def test_fluids_bindings_and_history_round_trip():
     """Non-default sections are written and read back."""
-    exchanger = gm.modules.HeatExchanger().update_params(thermal_conductance=1.0)
+    exchanger = gm.modules.HeatExchanger().set_params("", {"thermal_conductance": 1.0})
     exchanger.fluid = gm.WATER
     exchanger.set_bindings("", {"duty": {"column": "d", "unit": "kW"}})
     exchanger.set_params("", {"thermal_conductance": 2.0}, valid_from="2020-01-01")

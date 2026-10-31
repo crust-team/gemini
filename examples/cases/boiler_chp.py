@@ -7,7 +7,7 @@ split in two: one half is heated by the exchanger and topped up by a gas boiler,
 gas-engine CHP. Well, reservoir and ESP data are the upstream example's. The boiler and CHP design
 values are this case's own, because upstream drives both by a gas flow.
 
-Shows ``gm.plants.example("BoilerChpPlant")``, which holds a ``NodalDoublet``, ``set_inputs``,
+Shows ``gm.plants.example("BoilerChpPlant")``, which holds a ``NodalDoublet``, ``get``,
 ``gm.modules.collect_flows``, ``gm.modules.emissions`` and ``gm.checks.plant_balance``.
 
 Run with ``python examples/cases/boiler_chp.py``.
@@ -32,10 +32,17 @@ INPUTS = {
 }
 
 
+def command(plant, inputs):
+    """Set each control or boundary, named by its path, on its module."""
+    for path, value in inputs.items():
+        declaration = plant.get(path)
+        setattr(declaration.owner, declaration.name, value)
+
+
 def main():
     """Run the plant once and print its energy flows and emissions."""
     plant = gm.plants.example("BoilerChpPlant")
-    plant.set_inputs(INPUTS)
+    command(plant, INPUTS)
     result = plant(return_in=SECONDARY)
     flows = gm.modules.collect_flows(result)
     rate = result.children["doublet.riser"].outlets.wellhead_out.m_dot

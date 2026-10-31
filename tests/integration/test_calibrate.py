@@ -36,14 +36,14 @@ def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
     fit = gm.optim.calibrate(
         plant,
         dataset,
-        params=[plant.get_parameter("heat_exchanger.thermal_conductance")],
+        params=[plant.get("heat_exchanger.thermal_conductance")],
         apply=False,
     )
     assert fit.success and fit.rms_after < fit.rms_before / 100
     assert plant.state_dict() == before and not fit.applied
     count = len(plant.heat_exchanger._param_history)
     fitted = gm.optim.calibrate(
-        plant, dataset, params=[plant.get_parameter("heat_exchanger.thermal_conductance")]
+        plant, dataset, params=[plant.get("heat_exchanger.thermal_conductance")]
     )
     gm.replay(plant, dataset)
     assert plant.heat_exchanger.thermal_conductance == fitted.fitted["thermal_conductance"]
@@ -58,8 +58,8 @@ def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
             plant,
             dataset,
             params=[
-                plant.get_parameter("heat_exchanger.thermal_conductance"),
-                plant.get_parameter("heat_exchanger.arrangement"),
+                plant.get("heat_exchanger.thermal_conductance"),
+                plant.get("heat_exchanger.arrangement"),
             ],
         )
 
@@ -85,7 +85,7 @@ def test_esp_head_coefficients(fresh_plant, fast_dataset):
         pd.DataFrame(rows, index=pd.date_range(source.start, periods=16, freq="15min"))
     )
     fit = gm.optim.calibrate(
-        plant, data, params=[plant.get_parameter("doublet.esp.head_coefficients")], apply=False
+        plant, data, params=[plant.get("doublet.esp.head_coefficients")], apply=False
     )
     assert fit.success and fit.rms_after < 1e-8
     assert pump.head_coefficients == original
@@ -118,7 +118,7 @@ def test_hx_guess_ignores_rows_without_measured_duty(fresh_plant, reference_data
     frame = reference_dataset.window(end="2024-06-07T02:45Z").to_frame()
     frame.loc[frame.index[3], "heat_exchanger.duty"] = np.nan
     data = gm.Dataset(frame, reference_dataset.columns)
-    ua = fresh_plant.get_parameter("heat_exchanger.thermal_conductance")
+    ua = fresh_plant.get("heat_exchanger.thermal_conductance")
     fit = gm.optim.calibrate(fresh_plant, data, params=[ua], apply=False)
     assert fit.success and fit.observations == len(frame) - 1
 
@@ -131,7 +131,7 @@ def test_esp_head_guess_converts_any_mass_flow_unit(fresh_plant, fast_dataset):
         suction = plant.bindings["doublet.esp"].inlets["fluid_in"]
         suction["m_dot"] = Binding(column=suction["m_dot"].column, unit=unit)
         data = _head_rows(plant, fast_dataset, np.linspace(25, 45, 16), column_scale)
-        head = plant.get_parameter("doublet.esp.head_coefficients")
+        head = plant.get("doublet.esp.head_coefficients")
         fits[unit] = gm.optim.calibrate(plant, data, params=[head], apply=False)
     assert fits["t/h"].success and fits["t/h"].rms_after < 1e-8
     assert fits["t/h"].evaluations == fits["kg/s"].evaluations
@@ -140,7 +140,7 @@ def test_esp_head_guess_converts_any_mass_flow_unit(fresh_plant, fast_dataset):
 def test_esp_head_guess_names_too_few_flows(fresh_plant, fast_dataset):
     """Steady flow cannot seed the six-coefficient head guess; the error says so."""
     data = _head_rows(fresh_plant, fast_dataset, [0.03] * 8)
-    head = fresh_plant.get_parameter("doublet.esp.head_coefficients")
+    head = fresh_plant.get("doublet.esp.head_coefficients")
     with raises(PhysicsError, "too_little_data", match="doublet.esp.head_coefficients.*distinct"):
         gm.optim.calibrate(fresh_plant, data, params=[head], apply=False)
 
@@ -151,6 +151,6 @@ def test_window_before_the_first_snapshot_is_rejected(fresh_plant, reference_dat
     fresh_plant.heat_exchanger._param_history = [
         history[0].model_copy(update={"valid_from": pd.Timestamp("2024-06-07T01:00Z")})
     ]
-    ua = fresh_plant.get_parameter("heat_exchanger.thermal_conductance")
+    ua = fresh_plant.get("heat_exchanger.thermal_conductance")
     with raises(ValidationError, "invalid_design", match="2024-06-07 01:00"):
         gm.optim.calibrate(fresh_plant, reference_dataset.window(end="2024-06-07T02:45Z"), [ua])

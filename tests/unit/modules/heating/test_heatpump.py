@@ -19,7 +19,7 @@ CP = 4217.4
 
 def heat_pump(mode, **params):
     """Return a configured heat pump."""
-    return HeatPump().update_params(**({"mode": mode, "capacity": 2e6} | params))
+    return HeatPump().set_params("", {"mode": mode, "capacity": 2e6} | params)
 
 
 def test_heating_hand_value_and_closure():

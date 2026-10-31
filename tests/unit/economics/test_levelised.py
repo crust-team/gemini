@@ -60,7 +60,7 @@ def test_null_with_a_reason_when_the_cost_or_the_heat_is_missing():
     idle = gm.economics.lcoh(heating_plant(), day(heat=0.0), 0.05, 20, PRICES, on_error="record")
     assert idle["reason"] == "the run delivers no heat"
     plant = heating_plant()
-    plant.add_module("cool", CoolingGrid())
+    plant._add_module("cool", CoolingGrid())
     both = gm.economics.lcoh(plant, day(cold=100.0), 0.05, 20, PRICES, on_error="record")
     assert both["value"] is None and "split of its cost" in both["reason"]
     with raises(gm.errors.ValidationError, "no_value", match="split of its cost"):
@@ -70,7 +70,7 @@ def test_null_with_a_reason_when_the_cost_or_the_heat_is_missing():
 def test_a_share_splits_the_cost_of_a_plant_with_two_products():
     """``heat_cost_share`` charges that part of the cost to heat and the rest to cold."""
     plant = heating_plant()
-    plant.add_module("cool", CoolingGrid())
+    plant._add_module("cool", CoolingGrid())
     run = day(cold=100.0)
     values = PRICES.model_copy(update={"heat_cost_share": 0.8})
     heat = gm.economics.lcoh(plant, run, 0.05, 20, values)

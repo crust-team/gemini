@@ -36,10 +36,10 @@ def build():
 
 def module_balance():
     """Call one boiler and audit that call."""
-    boiler = gm.modules.Boiler().update_params(capacity="1 MW", efficiency=0.9)
+    boiler = gm.modules.Boiler().set_params("", {"capacity": "1 MW", "efficiency": 0.9})
     result = boiler(
         fluid_in=gm.Stream(flow="10 kg/s", T="60 degC", p="3 bar"),
-        fuel_in=gm.modules.GasGrid().offer()["gas_out"],
+        fuel_in=gm.modules.GasGrid()._offered()["gas_out"],
         temperature_setpoint="80 degC",
     )
     audit = gm.modules.energy_balance(boiler, result)

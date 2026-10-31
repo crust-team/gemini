@@ -35,7 +35,7 @@ def _tank(service="hot", **changes):
     params = dict(
         service=service, volume=2.0, heat_loss_conductance=10.0, reference_temperature=313.15
     )
-    return ThermalStorage().update_params(**(params | changes))
+    return ThermalStorage().set_params("", params | changes)
 
 
 def _inlets(charge=CHARGE, discharge=DISCHARGE, ambient=293.15):
@@ -136,7 +136,7 @@ def test_invalid_inputs_raise():
     with raises(gm.errors.ValidationError, "invalid_call"):
         tank(charge_in=CHARGE, discharge_in=DISCHARGE)
     with pytest.raises(gm.errors.ValidationError):
-        tank.update_params(charge_effectiveness=1.2)
+        tank.set_params("", {"charge_effectiveness": 1.2})
 
 
 class BoilerCharging(Module):
@@ -147,7 +147,7 @@ class BoilerCharging(Module):
         super().__init__()
 
         # Modules
-        self.boiler = ElectricBoiler().update_params(capacity=2e5, efficiency=0.9)
+        self.boiler = ElectricBoiler().set_params("", {"capacity": 2e5, "efficiency": 0.9})
         self.storage = _tank()
 
         # Inlets

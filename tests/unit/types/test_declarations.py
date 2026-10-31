@@ -73,7 +73,7 @@ class Declared(Module):
 def _declared(**params):
     """Return the fixture module with parameters set as explicit overrides."""
     module = Declared()
-    module.update_params(**params)
+    module.set_params("", params)
     return module
 
 
@@ -81,7 +81,7 @@ def test_parameter_units_shape_and_metadata():
     """Parameters validate units and vector shape once assigned."""
     module = _declared(length="1200 m", coefficients=[1, 2])
     assert module.length == 1200
-    assert module.get_parameter("length").unit == "m"
+    assert module.get("length").unit == "m"
     with pytest.raises(ValidationError, match="shape"):
         _declared(length=1, coefficients=[1])
     with pytest.raises(ValidationError, match="expected m"):
@@ -98,7 +98,7 @@ def test_parameter_history_projects_module_snapshots():
             DatedParams(valid_from=changed, params={"length": 2, "coefficients": [3, 4]}),
         ]
     )
-    assert module.get_parameter("length").history == [(None, 1.0), (changed, 2.0)]
+    assert module.get("length").history == [(None, 1.0), (changed, 2.0)]
 
 
 def test_all_sections_list_own_declarations():
