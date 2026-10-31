@@ -49,17 +49,18 @@ plan = gm.schedule(plant, demand, rules={
     "order": ["geothermal", "heat_pump", "boiler"],
     "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
     "max_brine_cooling": "40 K",
-    "operating_days": None,
+    "operating_time": "330 d",
     "cooling_order": ["absorption", "adsorption", "compression"]})
 results = gm.simulate(plant, plan)
 ```
 
-`gm.challenge_rules()` returns the rules of the challenge in this form, and `gm.profiles.demand()` its
-demand.
+`doublet_flow` and `max_brine_cooling` have no default: a missing one raises `ValidationError` code
+`missing_value` naming it. `order` and `cooling_order` have the default orders below, and without
+`operating_time` no doublet has an outage.
 
 `gm.schedule` (`gemini/analysis/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
-of each day of `demand` from a daily energy balance on the plant's design values, with no simulation
-inside. It reads the `Doublet` children, the grids and the units by **role, from the wiring**
+of each step of `demand`, at any constant step (hourly, daily, ...) and any length, from an energy
+balance on the plant's design values, with no simulation inside. It reads the `Doublet` children, the grids and the units by **role, from the wiring**
 (`gemini/analysis/roles.py`, on `plant.feeds`): a unit whose useful outlet feeds the `HeatingGrid` is
 a heating unit and one that feeds the `CoolingGrid` a cooling unit, directly or through mixers,
 splitters and other units. A `HeatPump` is either: on the cooling grid it is the compression chiller,
@@ -77,6 +78,17 @@ heat at `max_brine_cooling`, clipped to `doublet_flow`, below the minimum at the
 cooling. The heat pump and boiler take the `temperature_setpoint` set on them, the design's supply
 temperatures, and cover what is left in the run. Unmet demand is no error: the run reports
 `unmet_demand`.
+
+`rules["operating_time"]` takes doublets out of service, in whole steps. A duration (`"330 d"`,
+`"7920 h"`) or a fraction of the period (a number in [0, 1]) runs each doublet that long, to the
+nearest whole step: its outages are the steps of lowest total demand, the first doublet taking the
+lowest and the next the lowest left, so at most one doublet is off on a step; the steps of equal
+demand go earliest first. It needs at least two rows at a constant step. A list of outages takes every
+doublet off in each: a date is that whole UTC day and `{"start": ..., "end": ...}` an interval up to,
+not including, its end. On an outage a doublet has no flow and its heat goes to the next sources; a
+heat pump fed only by doublets that are off stops. Under a rule a doublet runs every other step, at
+the minimum flow when no need is left for it. `attrs["outages"]` lists the steps, and
+`gm.checks.operating_time(plant, results, duration)` counts the time each doublet carried flow.
 
 A heat-driven chiller on a bypass (a `Splitter` whose branches reach the users and the generator) has
 the drive water pass the users: the plan sets the split from the balance, the heat the users take

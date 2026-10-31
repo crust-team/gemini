@@ -289,7 +289,7 @@ values.
 | `DistrictNetwork` | both | `consumers`, `service` |
 | `HeatingPlant` | heating | `doublets` |
 | `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant`, `HeatingHeatPumpCoolingPlant` | both | `doublets` |
-| `HackathonPlant`, `BoilerChpPlant`, `ParallelExchangerPlant`, `DistrictEnergyPlant` | cases | |
+| `BoilerChpPlant`, `ParallelExchangerPlant`, `DistrictEnergyPlant` | cases | |
 
 The five template plants derive from `DoubletsPlant` (`plants/_utils/doublets.py`): `size={"doublets":
 n}`, 1 to 3 (`minimum_doublets`, `maximum_doublets` of the class, `invalid_design` outside), gives the
@@ -300,9 +300,9 @@ doublet wins, now and later.
 **Schedulable or a building block.** `gm.schedule` plans a plant that has `Doublet` children and a
 grid, and its setpoints as `inputs`:
 
-| `gm.plants.example(name)` plus `gm.schedule` | Status |
+| A plant with values plus `gm.schedule` | Status |
 | --- | --- |
-| `HeatingPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant`, `HeatingHeatPumpCoolingPlant`, `HackathonPlant` | schedulable: the whole challenge year runs with no failed day |
+| `HeatingPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant`, `HeatingHeatPumpCoolingPlant`, and a plant dict of the same units | schedulable: a design is a plant dict, and `inputs/examples/` holds two that run with no failed step |
 | `DoubletHeatPlant` | schedulable up to 165 m3/h: the measured ESP curve, which the replay goldens hold, has no head at 60 Hz for more, so `doublet_flow` must stop there |
 | `Doublet`, `NodalDoublet`, `HeatingSubstation`, `CoolingSubstation`, `DistrictNetwork`, `MultiWellPlant`, `ATESPlant` | building blocks: a run sets their controls and boundaries |
 | `DistrictEnergyPlant`, `BoilerChpPlant`, `ParallelExchangerPlant` | cases: their examples set their inputs |
@@ -312,7 +312,7 @@ Example values live in `inputs/plants/<Name>.json`, in a source checkout only:
 strings where the text parses to the same float, plus `fluids`, `boundary`, `bindings`,
 `param_history` and `inputs` under the names of the plant dict. `example(name)` builds the plant of
 that `size`, then `set_params` with `params` and these sections, and `to_dict()` writes the values in
-SI. The five template plants carry the challenge's values on two doublets. A plant with no file raises `NotImplementedYet`
+SI. The five template plants have no values of their own: a design is its plant dict. A plant with no file raises `NotImplementedYet`
 and a missing `inputs/` raises `inputs_missing`.
 
 `ATESPlant` has one wiring for both seasons: the `split_fraction` of `source_valve` and `load_valve`

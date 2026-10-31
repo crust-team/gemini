@@ -277,7 +277,7 @@ decisions outlast the move.
   that arrives, not `groundwater_pressure`; `production_out` still does.
 - A plant with a loop or a constraint is a root break, as `close_loop` and the nodal solves were:
   not one node of a graph, the same row by row on every backend.
-- A year on a plant with a loop runs row by row, 59 module calls a day on `HackathonPlant`: 6 s, and
+- A year on a plant with a loop runs row by row, 59 module calls a step on the sample plant with treatment: 6 s, and
   9 s on `HeatingCoolingPlant`, on the same profile as any eager call, with no one hot spot. A trial
   of `gm.optim` therefore takes 6 to 9 s on a plant with a heat-driven chiller, not the 1 s asked for,
   and 0.4 s on one without. Reading the run

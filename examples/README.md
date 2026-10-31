@@ -11,9 +11,8 @@ python examples/recipes/calibrate.py
 ```
 
 Each file runs alone from any folder, with `gemini` installed (`pip install -e .`); it needs no
-`PYTHONPATH`. It finds its data through its own path, in `inputs/`, or through `gm.plants.example` and
-`gm.profiles`, and writes
-nothing to the repository.
+`PYTHONPATH`. It finds its data through its own path, in `inputs/`, or through `gm.plants.example`, and writes nothing to
+the repository.
 
 ## The dataset
 
@@ -60,12 +59,14 @@ One task each, in any order.
 
 ## Cases
 
-Whole plants. Each takes a registered plant with its design values from `gm.plants.example`.
+Whole plants. A case takes a registered plant with its design values from `gm.plants.example`, or a
+sample problem of `inputs/examples/`: a plant dict, rules, limits and a demand.
 
 | File | What it shows | Main names |
 | --- | --- | --- |
 | [parallel_exchangers.py](cases/parallel_exchangers.py) | A nodal-solved doublet on three parallel exchangers | `ParallelExchangerPlant`, `NodalDoublet` |
 | [boiler_chp.py](cases/boiler_chp.py) | A nodal-solved doublet with a boiler and a CHP | `BoilerChpPlant`, `NodalDoublet`, `gm.modules.emissions` |
 | [district_heating_cooling.py](cases/district_heating_cooling.py) | Heating and cooling networks on an aquifer store, stepped by the hour | `DistrictEnergyPlant`, `Module.step` |
-| [hackathon.py](cases/hackathon.py) | The challenge plant from schedule to economics | `HackathonPlant`, `gm.schedule`, `gm.kpi`, `gm.economics` |
-| [challenge_year.py](cases/challenge_year.py) | The demand year on an example plant, every requirement checked | `HeatingCoolingPlant`, `gm.challenge_rules`, `gm.profiles.demand`, `gm.checks.limits`, `gm.economics.lcts` |
+| [hackathon.py](cases/hackathon.py) | A sample problem from schedule to economics | `gm.profiles.from_csv`, `gm.plants.from_dict`, `gm.schedule`, `gm.kpi`, `gm.economics` |
+| [challenge_year.py](cases/challenge_year.py) | The demand year of a sample problem, every requirement checked | `gm.profiles.from_csv`, `gm.plants.from_dict`, `gm.checks.Limits.from_dict`, `gm.economics.lcts` |
+| [shallow_district.py](cases/shallow_district.py) | An hourly demand on one shallow doublet, a different sample problem | `gm.profiles.from_csv`, `gm.schedule`, `gm.checks.operating_time` |

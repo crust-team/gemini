@@ -65,14 +65,14 @@ children, ports and connections, and `gm.Plant(name)` builds one with `add` and 
 `gm.plants.names()` lists the plant classes, `gm.plants.example(name)` returns one with real values,
 and `gm.plants.convert_legacy(folder)` turns an old project folder into a plant dict, the JSON form
 agents read and write: `plant.to_dict()`, `gm.plants.from_dict`, `gm.plants.schema()`. `gm.profiles`
-holds the 2027 demand of the heating and cooling challenge, read from the organisers' files.
+reads your demand, from a CSV file (`gm.profiles.from_csv`) or from values (`from_values`).
 
-gemini holds no data file. `gm.plants.example` and `gm.profiles.get` read `inputs/`, which is in a
-source checkout and not installed, and outside one they raise `inputs_missing`:
+gemini holds no data file. `gm.plants.example` reads `inputs/`, which is in a
+source checkout and not installed, and outside one it raises `inputs_missing`:
 
 ```text
 inputs/             # repository only
-  hackathon/        # the organisers' demand files and requirements, with a README
+  examples/         # sample problems: plant dict, rules, limits, demand; examples and tests only
   plants/           # example values of plants
   doublet_heat/     # measured data
   legacy_project/   # an old project folder
@@ -90,9 +90,9 @@ plan = gm.schedule(plant, demand, rules)
 results = gm.simulate(plant, plan)
 ```
 
-`examples/cases/hackathon.py` is that path for the whole challenge plant, and
-`examples/cases/challenge_year.py` runs `gm.plants.example("HeatingCoolingPlant")` through the year
-with `gm.challenge_rules()` and checks every requirement. A stored design keeps its setpoints:
+`examples/cases/challenge_year.py` and `examples/cases/hackathon.py` run that path on the sample
+problem of `inputs/examples/hackathon_2027/`, and `examples/cases/shallow_district.py` on a different
+one, an hourly demand on one shallow doublet, each with its own limits. A stored design keeps its setpoints:
 `plant.set_inputs({"peak_boiler.temperature_setpoint": "100 degC"})` is part of `plant.to_dict()`, and
 a template plant takes its size, `gm.plants.HeatingCoolingPlant(doublets=2)`.
 

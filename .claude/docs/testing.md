@@ -199,7 +199,8 @@ The suite must remain safe under `pytest -n auto`:
 
 ## Structure and quality tests
 
-`tests/unit/test_code_quality.py` also enforces the [data layout](data.md#where-data-lives): no data
+`tests/unit/test_code_quality.py` also enforces the [data layout](data.md#where-data-lives): no file
+under `gemini/` names a sample problem or `inputs/examples/`, no data
 file in `gemini/`, only the allowed keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the data
 folders outside `gemini/utils/paths.py`. It also enforces the layout of `gemini/modules/`
 ([where a file goes](conventions.md#module-rules)): only `__init__.py`, `module.py`, `plant.py`,
@@ -237,11 +238,28 @@ and its runtime dependencies installed from the repository, about 640 MB, and a 
 `sandbox`. `docker/sandbox.Dockerfile.dockerignore` lets only `pyproject.toml`, `README.md`, `LICENSE`
 and `gemini/` into the build. Nothing in the image needs a network at run time: it runs under
 `--read-only --network none`, the flags of `DockerSandbox`. `inputs/` is not in the image, so
-`gm.plants.example` and `gm.profiles.get` raise `inputs_missing` there, as in any installed package.
+`gm.plants.example` raises `inputs_missing` there, as in any installed package.
 
 The image lives on the machine that built it. Publishing it needs a registry name, such as
 `ghcr.io/<organisation>/gemini-sandbox:<version>`, a `docker login` with a token that may write
 packages, and `docker buildx build --platform linux/amd64,linux/arm64` for both architectures.
+
+## What a problem needs
+
+`tests/e2e/test_problem_needs.py` has one test per need of a heating and cooling problem, in general
+terms, so a sample problem is never the only proof that gemini can do it:
+
+- heating and cooling demand from a CSV file, under the file's names and unit;
+- a plant on one to three doublets;
+- a chosen depth, which sets the reservoir from the geotherm;
+- co-produced gas that reaches the boiler before the gas grid;
+- limits of each kind: the flow range per doublet, the brine cooling, the operating time, a parameter,
+  the volume balance, the supply temperatures;
+- a levelised cost of heat and cold together (LCTS).
+
+`inputs/examples/hackathon_2027/` and `inputs/examples/shallow_district/` run through these same
+general functions in `examples/cases/`. Tests read a sample problem through
+`tests/fixtures/sample_problems.py`.
 
 ## Old formats, examples and e2e coverage
 

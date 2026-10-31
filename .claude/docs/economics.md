@@ -139,8 +139,8 @@ it, and the checks audit what the columns hold:
 | `plant_balance(plant, run)` | mass and energy in = out + losses + change of stored energy, per module (1e-9) and for the root (1e-6) | a list of checks, the worst relative residual of each |
 | `mass_balance(results)` | the leaf outputs whose unit in `results.units` is kg/s: finite or missing, not negative | smallest flow [kg/s], 1e-12 kg/s |
 | `bounds(plant, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
-| `operating_days(plant, results, days)` | the days each doublet ran: the UTC days on which `<doublet>.reservoir.liquid_flow`, the column behind `Doublet.flow`, is above zero on a tick | a list of checks, one per doublet, exact: days run, `days`, both in `day` |
-| `run_all(plant, results, days=None)` | the first three above, and `operating_days` when `days` is given | `{passed, checks}` |
+| `operating_time(plant, results, duration)` | the time each doublet ran: the sum of the steps in which `<doublet>.reservoir.liquid_flow`, the column behind `Doublet.flow`, is above zero; `duration` is a text or seconds, and it passes within half a step, the rounding of a plan | one check per doublet |
+| `run_all(plant, results, duration=None)` | the first three above, and `operating_time` when `duration` is given | `{passed, checks}` |
 
 `gm.checks.Limits` holds limits a user sets, `(path pattern, output, min, max)`:
 
@@ -205,17 +205,17 @@ the pressure. A rate the column of brine injects alone has no pressure to give: 
 [modules.md](modules.md#registry-categories-and-streams).
 
 `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *,
-assumptions=None)` searches design values. Each trial copies the plant, sets the variables with
+rules=None, assumptions=None)` searches design values. Each trial copies the plant, sets the variables with
 `set_params`, plans a demand on that design, simulates and reads the metric, so the plant is not
-changed. `profile=None` is the demand year of the challenge; it and a demand frame are planned with
-`gm.schedule` and `gm.challenge_rules()` for each trial, and a plan stays fixed. A trial reads a
+changed. A demand frame is planned with `gm.schedule` and `rules` for each trial and a plan stays
+fixed; `profile=None`, or a demand without `rules`, raises `missing_value`. A trial reads a
 finished run in about 0.15 s; simulating the year takes 0.3 s on a plant without a loop and 6 to 9 s
 on one with the drive-water loop of a heat-driven chiller, which runs row by row. The search is `scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
 with five candidates per variable: the population times the generations is the number of
 simulations, so `evaluations` is a hard limit and a smaller budget than one population raises
 `ValidationError`. A trial that fails, has no value or breaks a constraint is in `history` with its
 `reason` and is never `best`. `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0,
-*, assumptions=None)` draws `normal`, `uniform` and `triangular` parameters with
+*, rules=None, assumptions=None)` draws `normal`, `uniform` and `triangular` parameters with
 `numpy.random.default_rng(seed)`, one simulation each, and summarises each metric as `mean`, `p5`,
 `p50`, `p95`; a draw whose run failed has its `reason` and stays out of the summary.
 

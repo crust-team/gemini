@@ -21,7 +21,7 @@ from their topic module, for example `from gemini.utils.strings import did_you_m
 - `files.py`: `read_json`, `write_json` and the lossless JSON-cell tables (`encode_cell`,
   `encode_cells`, `decode_cells`) used by the rows a checkpoint keeps.
 - `paths.py`: where the data folder is, and the only code that knows ([data.md](data.md#where-data-lives)):
-  `hackathon(name)`, `plant_values(name)`,
+  `plant_values(name)`,
   `doublet_heat(name)` and `legacy_project()` below `inputs/`, which raise `inputs_missing` when it
   is absent.
 - `version.py`: `package_version`, read from `pyproject.toml` or the package metadata, and

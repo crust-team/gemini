@@ -38,8 +38,8 @@ types, NaN and infinity are `null` (`gemini.utils.jsonable.to_plain`), and
 A number always travels with its unit in the same dict: there is no separate `units` map. Counts of
 skips by reason (`skip_counts`, `reasons`) and the state trees of `end_state` are the input of a next
 call or plain tallies, not values. Public returns are plain dicts: a DataFrame comes only from a
-method named `to_frame`, the one exception being run input (`gm.profiles.get`), because the run-input
-format is a DataFrame. Text comes only from `help()` and `summary()` of a plant, meant for people.
+method named `to_frame`, the one exception being run input (`gm.profiles.from_csv`, `from_values`
+and `gm.schedule`), because the run-input format is a DataFrame. Text comes only from `help()` and `summary()` of a plant, meant for people.
 
 ## Output units
 
@@ -138,7 +138,7 @@ plant dict is the JSON form agents use, and `gm.plants.schema()` is its schema.
 | `gm.plants.schema()` | JSON Schema of the plant dict, generated from the code | real |
 | `gm.plants.names(category=None)` | plant names; `category` is `heating`, `cooling` or `both`, what a plant serves | real |
 | `gm.plants.get(name)` | a new plant without values | real |
-| `gm.plants.example(name)` | a plant with real values, from `inputs/plants/`; `RunError` (code `inputs_missing`) outside a source checkout | real |
+| `gm.plants.example(name)` | a plant with real values, from `inputs/plants/`; `RunError` (code `inputs_missing`) outside a source checkout; `NotImplementedYet` for a plant without values, as the five template plants: a design of one is its plant dict | real |
 | `gm.plants.convert_legacy(folder)` | plant dict; expected files in [legacy.md](legacy.md) | real |
 | `gm.plants.<Plant class>` | the plant classes, see [plants.md](plants.md#registered-plants). The five template plants take `doublets=n`, `size={"doublets": n}` in a plant dict, and a plant-level `depth` | real |
 
@@ -186,8 +186,7 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.schedule(plant, demand, rules)` | run input, a UTC DataFrame: the demand and one column per scheduled control, named after its dotted path; `attrs["units"]` states the unit of each driven column and `attrs["outage_days"]` is `{doublet path: [ISO date]}`; `rules` take `order`, `cooling_order`, `doublet_flow`, `max_brine_cooling` and `operating_days`; see [engine.md](engine.md#schedule) | real |
-| `gm.challenge_rules()` | a new dict of the rules of the challenge for `gm.schedule`: `doublet_flow` 50 to 300 m3/h, `max_brine_cooling` 40 K, `operating_days` 330; the source is `inputs/hackathon/` | real |
+| `gm.schedule(plant, demand, rules)` | run input, a UTC DataFrame: the demand and one column per scheduled control, named after its dotted path; `attrs["units"]` states the unit of each driven column and `attrs["outages"]` is `{doublet path: [ISO time of each outage step]}`; `demand` has any constant step; `rules` take `doublet_flow` and `max_brine_cooling`, required (`ValidationError` code `missing_value`), `order`, `cooling_order` and `operating_time`; see [engine.md](engine.md#schedule) | real |
 | `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` | real |
 | `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results`; `results.end_state` is the `state=` of the next call | real |
 | `gm.live(plant, source, checkpoint, step=None, now=None, sink=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` of the new rows; `checkpoint` is a required path | real |
@@ -219,10 +218,11 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.profiles.names()` | `heating_demand`, `cooling_demand` | real |
-| `gm.profiles.get(name)` | run input, a UTC daily DataFrame of 365 rows in W, with `units`, `quantities`, `description` and the `source` file in `attrs`, the one DataFrame outside `to_frame` | real |
-| `gm.profiles.demand()` | both profiles in one frame, the `demand` of `gm.schedule`, with `units` and `quantities` in `attrs` | real |
-| `gm.profiles.profile_schema()` | JSON Schema of what `get` returns, as a document | real |
+| `gm.profiles.from_csv(path, columns, unit, time_column=None)` | run input read from a CSV file: a UTC DataFrame at any constant step, `heating_demand` and `cooling_demand` in W, `units` and `quantities` in `attrs`; `columns` is `{file column: quantity}`, `time_column` by default the first column. Problems: `unknown_name`, `invalid_unit`, `missing_column`, `missing_value`, `out_of_bounds`, and `RunError` code `invalid_data` for an index that is not monotonic or has gaps, repeats or a changing step | real |
+| `gm.profiles.from_values(values, unit, start, step, quantity)` | the same frame with one column; `quantity` is `heating_demand` or `cooling_demand`, `step` a duration or seconds | real |
+| `gm.profiles.profile_schema()` | JSON Schema of that frame as a document | real |
+
+gemini ships no profile: a demand is the caller's.
 
 ## Analysis
 
@@ -267,19 +267,19 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.kpi.compute(plant, results)`, `gm.kpi.names()` | real: `{name: value}` of `heating_coverage`, `cooling_coverage`, `cop`, `peak_heat`, `peak_cold` |
 | `gm.checks.plant_balance(plant, run)` | real, a list of checks: mass and energy of every module within 1e-9 and of the root within 1e-6; `run` is `Results` or a `ModuleResult`. The root's in and out are the ports of the grids and environment modules, the aquifers and the plant ports of a building block run alone; a replay does not close at the root. |
 | `gm.checks.energy_balance(results)`, `mass_balance(results)`, `bounds(plant, results)` | real, each a check; they are ledger checks, see [economics.md](economics.md) |
-| `gm.checks.operating_days(plant, results, days)` | real: a list of checks, one per doublet: the days it carried flow against `days` |
-| `gm.checks.run_all(plant, results, days=None)` | real: `{passed, checks: [check]}`; `days` adds `operating_days` |
+| `gm.checks.operating_time(plant, results, duration)` | real: a list of checks, one per doublet: the time it carried flow against `duration`, a duration text or seconds, in `s`; it passes within half a step |
+| `gm.checks.run_all(plant, results, duration=None)` | real: `{passed, checks: [check]}`; `duration` adds `operating_time` |
 | `gm.checks.Limits()`, `add(target, min=None, max=None)`, `to_dict()`, `from_dict(data)` | real: limits of `"<path pattern>.<output>"` or `"<path pattern>.<parameter>"`, built without a plant; a plain dictionary |
 | `gm.checks.limits(plant, results, limits)` | real: a list of checks, one per matched module and output or parameter, `value` the worst of the run; a run with no value of it gives `passed: null` and a reason `no_value`; an unmatched pattern raises `ValidationError` code `unknown_name` |
 | `gm.testing.check_module(cls, example=None)` | real; for developers of a new module class only: a report, never raises |
 | `gm.optim.calibrate(plant, dataset, params, start=None, end=None, backend="numpy", apply=True)`, `CalibrationResult` | real |
-| `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *, assumptions=None)` | real: `{best: {parameters, value, unit}, history, evaluations}`, `parameters` in SI as `{"path.parameter": value}` for `set_params`; a failed trial has a `reason` and is never `best` |
-| `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0, *, assumptions=None)` | real: `{samples, summary}`, `summary` per metric `{mean, p5, p50, p95, unit}` |
+| `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *, rules=None, assumptions=None)` | real: `{best: {parameters, value, unit}, history, evaluations}`, `parameters` in SI as `{"path.parameter": value}` for `set_params`; a failed trial has a `reason` and is never `best` |
+| `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0, *, rules=None, assumptions=None)` | real: `{samples, summary}`, `summary` per metric `{mean, p5, p50, p95, unit}` |
 
-`profile` of `gm.optim.minimize` and `sample` is required and may be `None`, the demand year of the
-challenge. `None`, or a demand frame with a column `heating_demand`, is planned for each trial with
-`gm.schedule` and `gm.challenge_rules()` on the design of that trial, so a variable that changes the
-design changes the plan; a plan or another run input stays fixed. `assumptions=None` takes the
+`profile` of `gm.optim.minimize` and `sample` is a demand or a plan; `None` raises `ValidationError`
+code `missing_value`. A demand, a frame with a column `heating_demand`, is planned for each trial with
+`gm.schedule` and `rules` on the design of that trial, so a variable that changes the design changes
+the plan; a demand without `rules` raises `missing_value`. A plan or another run input stays fixed. `assumptions=None` takes the
 defaults of `Assumptions`, so an economic metric that needs a price gives a reason, not a value.
 
 `gm.optim.calibrate` fits only through replay and returns a `CalibrationResult`. With `apply=True` a
@@ -304,6 +304,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | gemini knows no sample problem. Removed: `gm.challenge_rules`, `HackathonPlant`, `gm.profiles.demand`, `gm.profiles.get`, `gm.profiles.names`, `gm.checks.operating_days`, `rules["operating_days"]`, `attrs["outage_days"]`, and `inputs/hackathon/`, now `inputs/examples/hackathon_2027/`. New: `gm.profiles.from_csv`, `gm.profiles.from_values`, `gm.checks.operating_time`, `rules["operating_time"]`, `attrs["outages"]`, `rules` on `gm.optim.minimize` and `sample`, where `profile=None` now raises. `gm.schedule` has no default for `doublet_flow` or `max_brine_cooling`, and works on any constant step. `gm.plants.example` of the five template plants raises `NotImplementedYet`. `Doublet.gradient` and `surface_temperature` have no default: a `depth` without them raises `missing_value`. `gm.checks.run_all` takes `duration`. `normal_density` takes its reference conditions. `profile_schema` describes columns, time and values only. |
 | 0.2.0, unreleased changes | | `make sandbox-image` builds `gemini-sandbox:<version>`, the image of geomind's module sandbox, from `docker/sandbox.Dockerfile`. |
 | 0.2.0, unreleased changes | | `gm.analysis.nodal` solves injection wells: the wellhead pressure of a rate, or the rate of a wellhead pressure. |
 | 0.2.0, unreleased changes | | `gm.challenge_rules()` and `gm.profiles.demand()`. `profile=None` in `gm.optim.minimize` and `sample` is the demand year under the challenge rules, and a demand frame is planned for each trial. Reading a finished run no longer builds the JSON of every column. |
@@ -318,7 +319,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 | 0.2.0, unreleased changes | | `gm.optim.minimize` and `gm.optim.sample` are built, on the metrics of `gm.kpi` and `gm.economics`; each takes `assumptions`. |
 | 0.2.0, unreleased changes | | `gm.evaluate`: a volume unit on `m_dot` names `flow` in its message, `path` and `suggestions`; the code stays `invalid_call`. |
 | 0.2.0, unreleased changes | | `gm.economics.annualised_cost` and `gm.economics.lcts`, the levelised cost of heat and cold together. |
-| 0.2.0, unreleased changes | | `rules["operating_days"]` of `gm.schedule` is built: a count or a list of outage dates, `attrs["outage_days"]`, the column `<heat pump>.is_running`. New `gm.checks.operating_days(plant, results, days)`; `gm.checks.run_all` takes `days`. |
+| 0.2.0, unreleased changes | | `rules["operating_days"]` of `gm.schedule` is built: a count or a list of outage dates, `attrs["outage_days"]`, the column `<heat pump>.is_running`. New `gm.checks.operating_days`, since replaced; `gm.checks.run_all` takes `days`. |
 | 0.2.0, unreleased changes | | File layout of `gemini/modules/`: `plant.py` and `container.py` beside `module.py`, the plant tools in `plants/_utils/`, `heating/_burner.py`, `cooling/_sorption.py`. Private paths only: no change to a name of this page. |
 | 0.2.0, unreleased changes | | Data layout: `gemini/assets/` (installed: plant structures, templates) and `inputs/` (repository only: hackathon inputs, example values, measured data, legacy project); `datasets/` is gone. New code `inputs_missing`: `gm.profiles.get` and `gm.plants.example` raise it outside a source checkout. Templates `DistrictNetwork` and `MultiWellPlant` are now `district_network` and `multi_well`. `gm.plants.example("Doublet")` is the registered class, with the outputs of its structure file. No change to a name of this page. |
 | 0.2.0, unreleased changes | | Plants `NodalDoublet`, `ParallelExchangerPlant`, `BoilerChpPlant`, `DistrictEnergyPlant`, `HackathonPlant`: catalogue only, no change to a name of this page. |
@@ -367,6 +368,12 @@ Names removed or renamed in the unreleased changes of 0.2.0:
 | `offered_outlets`, `start_states`, `trial_outlets`, `calibratable_parameters` | gone |
 | `describe`, `parameter_schema`, `validate_params` on a class | on an instance, `gm.modules.ESP().describe()` |
 | `docs/schemas/plant_spec.*` | `docs/schemas/plant_dict.*` |
+| `gm.challenge_rules` | a `rules` dict of the caller |
+| `HackathonPlant` | a plant dict, as `plant_with_treatment.json` of `inputs/examples/hackathon_2027/` |
+| `gm.profiles.demand`, `gm.profiles.get`, `gm.profiles.names` | `gm.profiles.from_csv`, `gm.profiles.from_values` |
+| `gm.checks.operating_days`, `rules["operating_days"]`, `days` of `run_all` | `gm.checks.operating_time`, `rules["operating_time"]`, `duration` |
+| `attrs["outage_days"]` of a plan | `attrs["outages"]` |
+| `profile=None` of `gm.optim.minimize`, `sample` | the caller's demand and `rules` |
 
 Before 0.1.0 the API counted integer versions 1 to 5: the first frozen list, `category` as the
 folder of a module, `gm.legacy` moved behind `gm.plants.convert_legacy`, the fits moved to

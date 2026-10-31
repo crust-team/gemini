@@ -66,16 +66,16 @@ convert in-memory raw values to SI. Profiles combined into a dataset must share 
 
 ## Demand profiles
 
-`gm.profiles` holds the two demand profiles of the challenge. `names()` lists them
-(`heating_demand`, `cooling_demand`). `demand()` both in one frame, `get(name)` returns a DataFrame in the run-input format: 365
-UTC days of 2027, a `DatetimeIndex` called `time`, one column named after the profile in W, and
-`frame.attrs` with `units`, `quantities`, `description` and `source`, which names the organiser
-file. The two files in `inputs/hackathon/` are the organisers' CSV files, unchanged; their
-name, unit and description live in Python in `PROFILES` of `profiles/library.py`, and `get` raises
-`inputs_missing` outside a source checkout. `profile_schema()`
-is the JSON Schema of the same frame as a document: `name`, `description`, `source`, `columns` (unit
-and quantity), `time` and `values`. A profile column becomes a run input when a plant binding names
-it as its `column`.
+`gm.profiles` ships no profile: a demand is the caller's. `from_csv(path, columns, unit,
+time_column=None)` reads a file, and `columns` maps its columns to the quantities of gemini, so a
+file adapts to gemini and gemini takes no name or unit from it. `from_values(values, unit, start,
+step, quantity)` takes numbers. A quantity is `heating_demand` or `cooling_demand`. Both return a
+DataFrame in the run-input format, the `demand` of `gm.schedule`: a UTC `DatetimeIndex` called `time`
+at any constant step and of any length, one column per quantity in W, and `frame.attrs` with `units`
+and `quantities`. Both validate through one check: a monotonic index with no gaps or repeats, a
+constant step, no negative or missing value, a known quantity. `profile_schema()` is the JSON Schema
+of the same frame as a document: `columns` (unit and quantity), `time` and `values`. A profile column
+becomes a run input when a plant binding names it as its `column`.
 
 The committed CSVs under `inputs/doublet_heat/` are immutable source data. Two
 of their naming choices predate the naming rule and stay: columns named `*.m_dot` hold volumetric
@@ -88,12 +88,18 @@ flow in m3/s (their bindings declare `"unit": "m3/s"`), and the unbound status c
 There is one data folder, and no data file inside `gemini/`: a plant is a class.
 
 `inputs/` is at the repository root, next to `gemini/`, and is not installed. It holds everything
-that code reads: `hackathon/` (the organisers' files, with a README), `plants/` (example values: a
-`size`, `params`, `fluids`, `boundary`, `bindings`, `param_history` and `inputs`, those of the five
-template plants the challenge's, with sizes the example assumes),
+that code reads: `examples/` (sample problems), `plants/` (example values: a `size`, `params`,
+`fluids`, `boundary`, `bindings`, `param_history` and `inputs`; the template plants have none),
 `doublet_heat/` (measured data) and `legacy_project/`. A function that needs it raises `RunError`
 with code `inputs_missing` when it is absent, as in an installed wheel, and the message names the
 file. Nothing fails at import time, and `gm.plants.get` works without it.
+
+`inputs/examples/<problem>/` holds one folder per sample problem, a whole problem in the shapes of
+gemini: its source files with a README, `plant.json` (a plant dict), `rules.json` (the rules of
+`gm.schedule`), `limits.json` (a `gm.checks.Limits` dict) and `assumptions.json` when it uses prices.
+`hackathon_2027/` and `shallow_district/` are the two today. **Only `examples/` and `tests/` read this
+folder**: nothing under `gemini/` names it, or a problem, and `tests/unit/test_code_quality.py` checks
+that. A problem is a test of the code, never the source of a default, a name or a structure.
 
 `docs/schemas/` is generated documentation, not data. `tests/fixtures/` holds goldens and
 `tests/e2e/expected/` example outputs. `gemini/utils/paths.py` is the one place that knows where the

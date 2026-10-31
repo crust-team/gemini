@@ -345,10 +345,10 @@
    "mass_balance": [
     "results"
    ],
-   "operating_days": [
+   "operating_time": [
     "plant",
     "results",
-    "days"
+    "duration"
    ],
    "plant_balance": [
     "plant",
@@ -357,7 +357,7 @@
    "run_all": [
     "plant",
     "results",
-    "days"
+    "duration"
    ]
   },
   "economics": {
@@ -455,6 +455,7 @@
     "objective",
     "constraints",
     "evaluations",
+    "rules",
     "assumptions"
    ],
    "sample": [
@@ -464,6 +465,7 @@
     "metrics",
     "count",
     "seed",
+    "rules",
     "assumptions"
    ]
   },
@@ -473,7 +475,6 @@
    "DistrictNetwork": "class",
    "Doublet": "class",
    "DoubletHeatPlant": "class",
-   "HackathonPlant": "class",
    "HeatingAbsorptionCoolingPlant": "class",
    "HeatingCoolingPlant": "class",
    "HeatingFullCoolingPlant": "class",
@@ -504,11 +505,19 @@
    ]
   },
   "profiles": {
-   "demand": [],
-   "get": [
-    "name"
+   "from_csv": [
+    "path",
+    "columns",
+    "unit",
+    "time_column"
    ],
-   "names": [],
+   "from_values": [
+    "values",
+    "unit",
+    "start",
+    "step",
+    "quantity"
+   ],
    "profile_schema": []
   },
   "runtime": {
@@ -612,9 +621,9 @@
  "schemas": {
   "check.schema.json": "8a57d8429749d44399831d8dcedf4288c77070665171246949e55476f138c3b3",
   "module_description.schema.json": "f40388d592d69073cba6a90dc83a23e69e7b3a8c7f9e88d48fdd3e19c6d1779e",
-  "plant_dict.schema.json": "9e52104081233e990f443e73c11588d16cb1427a807875d7dd6db65bdbcd3b6e",
+  "plant_dict.schema.json": "805fcf66162f3690ab37a8764cb7b916070b2c72f2cf6144fa358756a2b4813f",
   "problem.schema.json": "98fbbd71c3cdb8b5c55b3cca2d2829999ab8665e4eb7dd1062fcc77d970383b4",
-  "profile.schema.json": "1d516189feaf3a16f2ef7090defeebcde7adfa7b0b509e50fdb577db138531ce",
+  "profile.schema.json": "a6a417ba35af581a0b082bbf9fc560785303c51dde6bb2466770f499f7440805",
   "results_summary.schema.json": "733213574165c3f2dc0176924aeb6eb350c38a75864b9dd1d146353fa442edf8",
   "value.schema.json": "99da0d9dff87ea775bbd0ebeec60c185376587064f605f9647d7537020d40cc6"
  },
@@ -645,7 +654,6 @@
   "WATER",
   "__version__",
   "analysis",
-  "challenge_rules",
   "checks",
   "economics",
   "errors",

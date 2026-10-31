@@ -6,6 +6,13 @@ kg/s, m, W, J and s. Record an intentional physical or numerical decision as a `
 sentence in the docstring of the function, class or test that makes it, with its explanation and
 regression evidence, and list lasting decisions in [refactor-notes.md](refactor-notes.md).
 
+## General package
+
+gemini is a general geothermal heating and cooling package: a sample problem is only a test, never
+the basis of an implementation, a default, a name or a structure, and nothing in `gemini/` knows one.
+gemini's shapes are the best general form and inputs adapt to them, in the sample folder or a short
+loader in `examples/`, never the other way round.
+
 ## Dependencies
 
 A package may import only the packages to its left:

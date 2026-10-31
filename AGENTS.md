@@ -25,11 +25,14 @@ plant dict agents use (`gm.plants.from_dict`, `plant.to_dict`, `gm.plants.schema
 
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
-`gm.schedule` plans the run input of a design from its demand, with outage days from
-`operating_days` and the role of each unit read from the wiring
-([schedule](.claude/docs/engine.md#schedule)). `gm.challenge_rules()` and `gm.profiles.demand()` are
-the challenge's, and `gm.plants.example("HeatingCoolingPlant")` runs that year with every requirement
-checked (`examples/cases/challenge_year.py`).
+`gm.schedule` plans the run input of a design from its demand, at any constant step, with outages
+from `operating_time` and the role of each unit read from the wiring
+([schedule](.claude/docs/engine.md#schedule)). A demand comes from `gm.profiles.from_csv` or
+`from_values`; gemini ships none.
+
+gemini is a general package and knows no problem: `inputs/examples/` holds sample problems, each a
+plant dict, rules, limits and a demand, and only `examples/` and `tests/` read them
+([conventions](.claude/docs/conventions.md#general-package)).
 
 Everything in the plant's energy and mass flow is a module, everything that crosses between modules
 goes through a port, and a plant total is read from the ports of the modules at the plant's edge
@@ -103,7 +106,7 @@ gemini/
 ├── testing/          # check_module for a new module class
 └── profiles/         # demand profiles
 docs/schemas/         # generated JSON Schemas and samples of the exchanged documents
-inputs/               # not installed: hackathon/, plants/ (example values), doublet_heat/, legacy_project/
+inputs/               # not installed: examples/ (sample problems), plants/ (example values), doublet_heat/, legacy_project/
 examples/             # quickstart.py, basics/, recipes/, cases/, scripts only
 scripts/              # test_changed.py, write_schemas.py
 docker/               # sandbox.Dockerfile, the image of a module sandbox (make sandbox-image)

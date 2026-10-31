@@ -98,7 +98,6 @@ Shared conventions, stated once here and not repeated per module:
 | Plants | `ParallelExchangerPlant` | `return_in` -> `supply_out` | no | nodal doublet, three parallel exchangers |
 | Plants | `BoilerChpPlant` | `return_in` -> `supply_out` | no | nodal doublet, exchanger, boiler, CHP |
 | Plants | `DistrictEnergyPlant` | `hot_in`, `cold_in`, `air_in` -> `hot_out`, `cold_out` | child | heating network, cooling network, ATES |
-| Plants | `HackathonPlant` | none | no | two doublets, exchanger, heat pump, boiler, chiller, every edge module |
 
 ## Pumps
 
@@ -2099,17 +2098,11 @@ boundaries stay inputs of the run.
   substations on `hot_in`, and an `ATESPlant` in charge mode chilling a `DistrictNetwork` of one
   cooling substation. `Module.step` carries the storage; the caller feeds `cold_out` back to
   `cold_in` at the next step.
-- `HackathonPlant`: the challenge plant, with no plant ports. Two designed `Doublet`s, `Mixer`, `Degasser`, `Desander`, `InhibitorDosing`, `HeatExchanger`,
-  the source side of `HeatPump` and a `Splitter` back to the doublets; heating water from
-  `HeatingGrid` through exchanger, heat pump and `Boiler`, and the `Splitter` `loads` sends what the
-  generator of an `AbsorptionUnit` needs past the users, back through the `Mixer` `heat_return`; co-produced gas through `GasMakeup` to the boiler and a `Flare`; a dry `Cooler`
-  on the chiller; `ElectricityGrid`, `GasGrid`, `WasteGrid`, `ChemicalGrid` and `Atmosphere` at the
-  edge. The sizes in `inputs/plants/HackathonPlant.json` are assumptions of the case.
 
 ### Heating and cooling plants
 
-`HeatingCoolingPlant` is the Challenge 2 plant: one integrated heating and cooling plant. The physics
-is that of the modules below; `inputs/plants/<Name>.json` holds example sizes.
+`HeatingCoolingPlant` is one integrated heating and cooling plant. The physics is that of the modules
+below; a design is its plant dict.
 
 - **Wiring.** Brine: `d0` to `d{n-1}` (`size={"doublets": n}`, joined by `production_mixers`) -> `degasser` -> `filters.hot` -> `heat_exchanger` ->
   [`heat_pump`, source side] -> `filters.cold` -> `injection_pump` -> `injection_splitters` -> back to the doublets
@@ -2128,10 +2121,9 @@ is that of the modules below; `inputs/plants/<Name>.json` holds example sizes.
   with fewer units. An agent removes a unit by editing `to_dict(structure=True)`.
 - **Doublets and depth.** `size={"doublets": n}`, 1 to 3, and a plant-level `depth`
   ([plants.md](plants.md#registered-plants)).
-- **Run check.** `gm.plants.example(name)` holds the challenge's reservoir, brine and supply
-  temperatures on two doublets, and sizes that are assumptions of the example. With `gm.schedule` and
-  `gm.challenge_rules()` each runs the demand year with no failed day
-  (`examples/cases/challenge_year.py`). `tests/integration/test_heating_cooling.py` (slow tier) runs
+- **Run check.** The sample problems of `inputs/examples/` hold plant dicts of these classes, and
+  each runs its demand with no failed step (`examples/cases/challenge_year.py`,
+  `examples/cases/shallow_district.py`). `tests/integration/test_heating_cooling.py` (slow tier) runs
   two days of every plant and of one with a unit removed from its dict. `adsorption_chiller` keeps
   its 90 degC limit: behind the absorption chiller its drive water has already cooled, and a circuit
   that stands still has no driving temperature.
