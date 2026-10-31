@@ -11,14 +11,13 @@ from gemini.modules import Module, energy_balance, mass_balance
 from gemini.modules.storage import IceStorage
 from gemini.types import (
     GLYCOL_30,
-    Duty,
     Inlet,
     Outlet,
-    Output,
     Stream,
 )
 from tests.fixtures.equivalence import assert_function_matches, assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 MASS = 1000.0
 UA = 2000.0
@@ -44,12 +43,12 @@ def test_plain_call_charges_an_empty_store():
     """The initial store is all water at 0 degC; cold glycol is warmed by e (T_f - T_in)."""
     store = _store()
     result = store(fluid_in=COLD)
-    out = result.outputs
+    out = reading(result)
     assert out.fluid_out_T == pytest.approx(268.15 + EFFECTIVENESS * 5)
-    assert out.duty == pytest.approx(-CONDUCTANCE * 5)
+    assert out.signed_duty == pytest.approx(-CONDUCTANCE * 5)
     assert out.stored_cold == 0 and out.is_empty and not out.is_full
     assert result.outlets.fluid_out.m_dot == COLD.m_dot and result.outlets.fluid_out.p == COLD.p
-    assert out.heat_accumulation == out.duty
+    assert out.heat_accumulation == pytest.approx(out.signed_duty)
     assert energy_balance(store, result)["relative_residual"] < 1e-12
     assert mass_balance(store, result)["residual"] == 0
 
@@ -64,7 +63,7 @@ def test_latent_steps_freeze_at_constant_duty():
     first = 0.5 + CONDUCTANCE * 5 * 3600 / LATENT
     assert state == {"ice_fraction": pytest.approx(first, rel=1e-14), "temperature": FREEZING}
     state, result = store.step(state, 3600, {"fluid_in": COLD})
-    assert result.outputs.duty == pytest.approx(-CONDUCTANCE * 5)
+    assert reading(result).signed_duty == pytest.approx(-CONDUCTANCE * 5)
     assert state["ice_fraction"] == pytest.approx(first + CONDUCTANCE * 5 * 3600 / LATENT)
 
 
@@ -104,7 +103,7 @@ def test_stopped_glycol_leaves_the_store_unchanged():
     store = _store()
     start = {"ice_fraction": 0.3, "temperature": FREEZING}
     state, result = store.step(start, 3600, {"fluid_in": COLD.with_(m_dot=0)})
-    assert state == start and result.outputs.duty == 0
+    assert state == start and reading(result).signed_duty == 0
     assert result.outlets.fluid_out.T == COLD.T
 
 
@@ -137,9 +136,6 @@ class StoreLine(Module):
         # Inlets
         self.fluid_in = Inlet(Stream)
 
-        # Outputs
-        self.duty = Output(Duty)
-
         # Outlets
         self.fluid_out = Outlet(Stream)
 
@@ -157,6 +153,11 @@ class StoreLine(Module):
         return outlets
 
 
+def _stream_gain(result):
+    """Return the heat [W] the glycol takes from the stores of ``result``, negative when cooled."""
+    return sum(reading(leaf).signed_duty for leaf in result.leaves().values())
+
+
 def test_composite_step_freezes_both_stores():
     """A composite steps both stores; the upstream store sees colder glycol and freezes faster."""
     line = StoreLine()
@@ -165,7 +166,7 @@ def test_composite_step_freezes_both_stores():
     assert state["first"]["ice_fraction"] > state["second"]["ice_fraction"] > 0
     audit = energy_balance(line, result)
     assert audit["relative_residual"] < 1e-12
-    assert audit["heat_accumulation"] == pytest.approx(result.outputs.duty, rel=1e-14)
+    assert audit["heat_accumulation"] == pytest.approx(_stream_gain(result), rel=1e-12)
     assert mass_balance(line, result)["residual"] == 0
 
 

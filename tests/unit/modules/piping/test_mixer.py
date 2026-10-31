@@ -8,6 +8,7 @@ from gemini.modules.piping import Mixer
 from gemini.types import WATER, Fluid, Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 HOT = Stream(m_dot=6, T=363.15, p=5e5)
 COLD = Stream(m_dot=2, T=323.15, p=4e5)
@@ -19,7 +20,7 @@ def test_mixing_matches_hand_calculation():
     mixed = result.outlets.fluid_out
     assert mixed.m_dot == 8 and mixed.p == 4e5
     assert mixed.T == pytest.approx(353.15, rel=1e-14)
-    assert result.outputs.fluid_out_T == mixed.T
+    assert reading(result).fluid_out_T == mixed.T
     assert result.outputs.pressure_imbalance == 1e5
     assert energy_balance(Mixer(), result)["relative_residual"] < 1e-12
     assert mass_balance(Mixer(), result)["residual"] == 0

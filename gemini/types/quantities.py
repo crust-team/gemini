@@ -7,14 +7,10 @@ from pydantic import Field
 from gemini.physics import units
 
 
-def quantity(name: str, unit: str, *, additive: bool = False, **bounds) -> Any:
-    """Return Pydantic metadata describing a physical quantity and its bounds.
-
-    An ``additive`` quantity is summed over descendant leaf calls by a composite that declares
-    an output of it without a formula (see ``Module``).
-    """
+def quantity(name: str, unit: str, **bounds) -> Any:
+    """Return Pydantic metadata describing a physical quantity and its bounds."""
     units.define_quantity(name, unit)
-    extra = {"quantity": name, "unit": unit} | ({"additive": True} if additive else {})
+    extra = {"quantity": name, "unit": unit}
     return Field(json_schema_extra=extra, **bounds)
 
 
@@ -22,18 +18,14 @@ Pressure = Annotated[float, quantity("pressure", "Pa", ge=0)]
 PressureDifference = Annotated[float, quantity("pressure_difference", "Pa")]
 Temperature = Annotated[float, quantity("temperature", "K", gt=0)]
 TemperatureDifference = Annotated[float, quantity("temperature_difference", "K")]
-MassFlow = Annotated[float, quantity("mass_flow", "kg/s", additive=True)]
+MassFlow = Annotated[float, quantity("mass_flow", "kg/s")]
 VolumeFlow = Annotated[float, quantity("volume_flow", "m3/s")]
 Power = Annotated[float, quantity("power", "W")]
-Electricity = Annotated[float, quantity("electricity", "W", additive=True)]
-ElectricityGenerated = Annotated[float, quantity("electricity_generated", "W", additive=True)]
-Fuel = Annotated[float, quantity("fuel", "W", additive=True)]
-HeatLoss = Annotated[float, quantity("heat_loss", "W", additive=True)]
-HeatSupplied = Annotated[float, quantity("heat_supplied", "W", additive=True)]
-HeatAbsorbed = Annotated[float, quantity("heat_absorbed", "W", additive=True)]
-HeatAccumulation = Annotated[float, quantity("heat_accumulation", "W", additive=True)]
-Duty = Annotated[float, quantity("duty", "W", additive=True)]
-HydraulicPower = Annotated[float, quantity("hydraulic_power", "W", additive=True)]
+Electricity = Annotated[float, quantity("electricity", "W")]
+Fuel = Annotated[float, quantity("fuel", "W")]
+HeatAccumulation = Annotated[float, quantity("heat_accumulation", "W")]
+Duty = Annotated[float, quantity("duty", "W")]
+HydraulicPower = Annotated[float, quantity("hydraulic_power", "W")]
 Energy = Annotated[float, quantity("energy", "J")]
 Length = Annotated[float, quantity("length", "m", ge=0)]
 Elevation = Annotated[float, quantity("elevation", "m")]

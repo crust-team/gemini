@@ -10,7 +10,9 @@ from tests.fixtures.result_tables import make_results
 
 def test_run_all_lists_the_three_checks():
     """The ledgers and the bounds, in order, and a passing verdict."""
-    results = make_results({"heat": {"heat_supplied": [1.0], "return_out_T": [300.0]}})
+    results = make_results(
+        {"grid": {"power_out": [1.0]}, "heat": {"return_out.temperature": [300.0]}}
+    )
     report = gm.checks.run_all(heating_plant(), results)
     assert [item["name"] for item in report["checks"]] == [
         "energy_balance",
@@ -22,8 +24,8 @@ def test_run_all_lists_the_three_checks():
 
 
 def test_one_failure_fails_the_run():
-    """A negative heat loss fails the energy ledger and the whole report."""
-    results = make_results({"heat": {"heat_loss": [-1.0], "return_out_T": [300.0]}})
+    """A negative fuel power fails the energy ledger and the whole report."""
+    results = make_results({"heat": {"fuel": [-1.0], "return_out.temperature": [300.0]}})
     assert gm.checks.run_all(heating_plant(), results)["passed"] is False
 
 

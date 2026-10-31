@@ -6,13 +6,10 @@ from gemini.modules.module import Module
 from gemini.physics import ground, heat_transfer
 from gemini.types import (
     Duration,
-    HeatAbsorbed,
-    HeatLoss,
     Inlet,
     Length,
     LinearThermalResistance,
     Outlet,
-    Output,
     Parameter,
     Power,
     Stream,
@@ -67,12 +64,6 @@ class DownholeHeatExchanger(Module):
         # Inlets
         self.fluid_in = Inlet(Stream, kind="hot_water")
 
-        # Outputs
-        self.heat_extraction_rate = Output(Power)
-        self.fluid_out_T = Output(Temperature)
-        self.heat_absorbed = Output(HeatAbsorbed)
-        self.heat_loss = Output(HeatLoss)
-
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
         self.loss_out = Outlet(Power, kind="heat")
@@ -87,14 +78,6 @@ class DownholeHeatExchanger(Module):
 
         outlets = dict(fluid_out=outlet, loss_out=loss_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
-        outlet = outlets.fluid_out
-        rate = heat_transfer.heat_rate(inlet.heat_capacity_rate(), outlet.T - inlet.T)
-        self.heat_extraction_rate = rate
-        self.fluid_out_T = outlet.T
-        self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 
     def _outlet_temperature(self, inlet):
         """Return the bottom-hole fluid temperature [K] from Ramey's profile.

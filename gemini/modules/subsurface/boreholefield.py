@@ -6,8 +6,6 @@ from gemini.modules.module import Module
 from gemini.physics import ground, heat_transfer
 from gemini.types import (
     Count,
-    HeatAbsorbed,
-    HeatLoss,
     Inlet,
     Length,
     LinearThermalResistance,
@@ -83,12 +81,8 @@ class BoreholeField(Module):
         self.ground_temperature_change = State(TemperatureDifference, default=0)
 
         # Outputs
-        self.heat_extraction_rate = Output(Power)
         self.fluid_mean_temperature = Output(Temperature)
         self.ground_temperature = Output(Temperature)
-        self.fluid_out_T = Output(Temperature)
-        self.heat_absorbed = Output(HeatAbsorbed)
-        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
@@ -109,12 +103,8 @@ class BoreholeField(Module):
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.fluid_in
-        rate = self._extraction_rate(inlet)
-        self.heat_extraction_rate = rate
         self.fluid_mean_temperature = heat_transfer.mean_temperature(inlet.T, outlets.fluid_out.T)
         self.ground_temperature = self._ground_temperature()
-        self.fluid_out_T = outlets.fluid_out.T
-        self.heat_absorbed, self.heat_loss = heat_transfer.signed_parts(rate)
 
     def _advance_states(self, inlets, outlets, dt):
         inlet = inlets.fluid_in

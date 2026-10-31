@@ -43,7 +43,7 @@ constructors. Output types may be quantity aliases or Python types; inlet and ou
 holds design data; `Control` and `Boundary` take `kind`, `default`, `description` and bounds;
 `State(kind, default=)` declares a stepped value (see [modules.md](modules.md#state-and-health));
 `Output(kind, soft_sensor=, description=)`, the formulas `Output.of` and `Output.ratio` and the
-automatic sums of additive outputs are described in
+formula outputs are described in
 [modules.md](modules.md#composite-modules). `UNSET` denotes an uninitialized parameter and stays
 the same object under copy, deep copy and pickling. `shape=` checks fixed vectors; bounds can
 tighten quantity defaults.
@@ -190,25 +190,38 @@ include salting-out. Explicit measured gas chemistry remains supported and takes
 Zero dissolved CO2 with no supplied gas chemistry returns zero CO2-corrosion rates; it does not
 claim absence of other corrosion mechanisms.
 
-## Energy outputs and balances
+## Port quantities
 
-Energy that crosses a leaf other than in its streams is reported as outputs with fixed names,
-each declared with its own additive quantity in W (`Electricity`, `Fuel`, `HeatAbsorbed`,
-`HeatLoss`, `HeatSupplied`, `ElectricityGenerated`, `HeatAccumulation`); they are not flow
-ports. Six are nonnegative: the inflows `electricity` and `fuel` consumed
-and `heat_absorbed` from outside the plant (ambient air, the ground, a cooled building), and the
-outflows `heat_loss` to the environment, `heat_supplied` to a consumer and `electricity_generated`.
-`ENERGY_INPUTS` and `ENERGY_OUTPUTS` in `modules/_utils/balance.py` list them. The seventh,
-`heat_accumulation`, is signed: the rate of increase of the heat a storage leaf holds
+What crosses a port is read from the port, by one function: `Stream.quantities()`, over
+`gemini.physics.fluid.stream_quantities`. A fluid port shows `mass_flow` [kg/s], `volume_flow`
+[m3/s], `temperature` [K], `pressure` [Pa], `enthalpy_flow` [W], `gas_flow` and `co2_flow` [kg/s]
+and `chemical_flow` [W]. `enthalpy_flow` is `m_dot * cp * T` with its reference at 0 K, the sensible
+value the balances use: only a difference of two ports means anything. `chemical_flow` is the lower
+heating value of the gas. A `Power` port shows its value in W under the port's name. A `many` port
+shows the flows that add up: the sum over its connections.
+
+An `Output` holds only what is on no port: a state, internal physics (well pressure drop, velocity,
+pump head, COP, corrosion and erosion rates, `is_running`, `is_capped`) or a design value. A value
+that one port shows, or that is the difference of two ports, is not an output. A parent never sums
+its children: an `Output` it declares is a formula over them or its own value, and a total of the
+plant is read from the ports of the modules at its edge.
+
+## Energy on ports and balances
+
+Energy that crosses a leaf other than in its streams is on a port or in the one output below.
+`power_in` and `power_out` carry electricity and `loss_out` heat to the surroundings, signed.
+`fuel` [W] is the chemical power a burner burns: the gas of `fuel_in` may be a mixture, so no port
+shows it. `heat_accumulation` is signed: the rate of increase of the heat a storage leaf holds
 (`ThermalStorage`, `IceStorage`, `AquiferStorage`), counted with the outflows, so a charging store
-(positive) and a discharging one (negative) both close. Declare only the outputs a module has. Fluid
-heat transferred between equipment remains in `Stream` states. `collect_flows(result)` sums these
-leaf outputs once, ignoring composite aggregates. `ModuleResult` captures incoming streams, controls
-and children at evaluation time; later evaluations do not replace these audit inputs.
+(positive) and a discharging one (negative) both close. `collect_flows(result)` reads them from
+every leaf once, under the names of `ENERGY_INPUTS` and `ENERGY_OUTPUTS` in
+`modules/_utils/balance.py`. Fluid heat transferred between equipment remains in `Stream` states.
+`ModuleResult` captures incoming streams, controls and children at evaluation time; later
+evaluations do not replace these audit inputs.
 
 `mass_balance(module, result)` includes aquifer withdrawal/deposition boundaries.
-`energy_balance(module, result)` audits sensible enthalpy (`m_dot * cp_l * T`) and these seven
-energy outputs. Internal stream transfers cancel once; reported plant totals are boundary
+`energy_balance(module, result)` audits sensible enthalpy (`m_dot * cp_l * T`) and these energy
+flows. Internal stream transfers cancel once; reported plant totals are boundary
 fluxes. Pressure, kinetic and gravitational energy are outside the thermal model.
 `residual` is always sum(in) minus sum(out). `thermal_residual` separately excludes
 **unresolved pump power**. The legacy isothermal pumps do not allocate electricity to work or

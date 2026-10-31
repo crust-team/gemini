@@ -7,10 +7,8 @@ from gemini.physics import energy, heat_transfer, pumps
 from gemini.types import (
     Control,
     Efficiency,
-    Electricity,
     Fraction,
     Frequency,
-    HeatLoss,
     HydraulicPower,
     Inlet,
     Outlet,
@@ -19,7 +17,6 @@ from gemini.types import (
     Power,
     PressureDifference,
     Stream,
-    Temperature,
     VolumeFlow,
 )
 
@@ -75,14 +72,10 @@ class CentrifugalPump(Module):
         self.frequency = Control(Frequency)
 
         # Outputs
-        self.flow = Output(VolumeFlow)
         self.head = Output(PressureDifference, soft_sensor=True)
         self.hydraulic_power = Output(HydraulicPower)
         self.shaft_power = Output(Power, soft_sensor=True)
         self.efficiency = Output(Fraction)
-        self.electricity = Output(Electricity)
-        self.heat_loss = Output(HeatLoss)
-        self.fluid_out_T = Output(Temperature)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -106,11 +99,10 @@ class CentrifugalPump(Module):
 
     def _compute_outputs(self, inlets, outlets):
         performance = self._performance(inlets.fluid_in)
-        for name, value in performance.items():
-            setattr(self, name, value)
-        self.electricity = inlets.power_in
-        self.heat_loss = self.electricity - performance["shaft_power"]
-        self.fluid_out_T = outlets.fluid_out.T
+        self.head = performance["head"]
+        self.hydraulic_power = performance["hydraulic_power"]
+        self.shaft_power = performance["shaft_power"]
+        self.efficiency = performance["efficiency"]
 
     def _performance(self, suction):
         """Return flow [m3/s], head [Pa], hydraulic and shaft power [W] and efficiency [-]."""

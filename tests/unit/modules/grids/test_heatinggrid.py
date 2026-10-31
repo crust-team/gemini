@@ -7,6 +7,7 @@ from gemini.modules import HeatingGrid, energy_balance, mass_balance
 from gemini.types import Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 CP = 4217.4
 SUPPLY = Stream(m_dot=2.0, T=343.15, p=3e5)
@@ -20,14 +21,14 @@ def test_met_demand_sets_the_return_temperature():
     """A demand below the available heat is met and cools the stream by Q / (m_dot cp)."""
     consumer = _consumer()
     result = consumer(supply_in=SUPPLY, heat_demand="100 kW")
-    out, return_out = result.outputs, result.outlets.return_out
-    assert out.heat_supplied == 100e3 and out.unmet_demand == 0 and not out.is_unmet
+    out, return_out = reading(result), result.outlets.return_out
+    assert out.heat_supplied == pytest.approx(100e3)
+    assert out.unmet_demand == 0 and not out.is_unmet
     assert out.return_out_T == pytest.approx(343.15 - 100e3 / (2 * CP))
     assert out.temperature_difference == pytest.approx(100e3 / (2 * CP))
     assert return_out.m_dot == SUPPLY.m_dot and return_out.p == SUPPLY.p
     assert return_out.T == out.return_out_T
     assert energy_balance(consumer, result)["relative_residual"] < 1e-12
-    assert energy_balance(consumer, result)["heat_supplied"] == 100e3
     assert mass_balance(consumer, result)["residual"] == 0
 
 
@@ -35,7 +36,7 @@ def test_return_floor_caps_the_delivered_heat():
     """Demand beyond m_dot cp (T_supply - T_min) is unmet and the return sits at the floor."""
     consumer = _consumer()
     result = consumer(supply_in=SUPPLY, heat_demand=1e6)
-    out = result.outputs
+    out = reading(result)
     assert out.heat_supplied == pytest.approx(2 * CP * 30)
     assert out.unmet_demand == pytest.approx(1e6 - 2 * CP * 30) and out.is_unmet
     assert out.return_out_T == 313.15 and out.temperature_difference == pytest.approx(30)
@@ -47,10 +48,10 @@ def test_zero_flow_cold_supply_and_zero_demand_deliver_nothing():
     consumer = _consumer()
     for supply, demand in [(SUPPLY.with_(m_dot=0), 5e4), (SUPPLY.with_(T=303.15), 5e4)]:
         result = consumer(supply_in=supply, heat_demand=demand)
-        assert result.outputs.heat_supplied == 0 and result.outputs.unmet_demand == demand
+        assert reading(result).heat_supplied == 0 and result.outputs.unmet_demand == demand
         assert result.outputs.is_unmet and result.outlets.return_out.T == supply.T
         assert energy_balance(consumer, result)["relative_residual"] < 1e-12
-    out = consumer(supply_in=SUPPLY, heat_demand=0).outputs
+    out = reading(consumer(supply_in=SUPPLY, heat_demand=0))
     assert out.heat_supplied == 0 and not out.is_unmet and out.temperature_difference == 0
 
 

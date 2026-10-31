@@ -1118,15 +1118,12 @@ class Module:
         }
 
     def _resolve_formula_outputs(self):
-        """Resolve every formula and automatic-sum output once and remember how to compute it."""
+        """Resolve every formula output once and remember how to compute it."""
         for name, output in self._outputs.items():
             if output._resolved_formula is not None:
                 continue
             if output.formula is not None:
                 output._resolved_formula = self._resolve_formula(output.formula)
-            elif output.additive and not self.is_leaf:
-                self._check_summed(name, output)
-                output._resolved_formula = ("sum", name)
 
     def _resolve_formula(self, formula):
         """Return the descendant path and access of ``Output.of``, or the ratio operand names."""
@@ -1135,34 +1132,9 @@ class Module:
             return (kind, *(reference.name for reference in references))
         target = references[0]
         if isinstance(target, PortField):
-            access = ("outlet", target.port.name, target.name)
+            access = (target.port.section, target.port.name, target.name)
             return kind, self._descendant_path(target.port.owner), access
         return kind, self._descendant_path(target.owner), ("output", target.name, None)
-
-    def _descendant_leaves(self):
-        """Return every leaf module below this one."""
-        return [module for path, module in self.named_modules() if path and module.is_leaf]
-
-    def _check_summed(self, name, output):
-        """Check that descendant leaves declare ``name`` with the quantity and unit of ``output``.
-
-        A composite's additive output without a formula is the sum of the descendant leaf
-        outputs of the same name; every one must have the same quantity and unit.
-        """
-        leaves = self._descendant_leaves()
-        declarations = [leaf._outputs[name] for leaf in leaves if name in leaf._outputs]
-        if not declarations:
-            names = sorted({output for leaf in leaves for output in leaf._outputs})
-            raise DefinitionError(
-                f"{self.path}.{name}: no descendant leaf declares output {name!r} to sum"
-                f"{did_you_mean(name, names)}"
-            )
-        for declaration in declarations:
-            if (declaration.quantity, declaration.unit) != (output.quantity, output.unit):
-                raise DefinitionError(
-                    f"{self.path}.{name}: {declaration.path} = {declaration.quantity} "
-                    f"[{declaration.unit}]; expected {output.quantity} [{output.unit}] to sum it"
-                )
 
     @staticmethod
     def _recorded_calls(call_records, prefix=""):
@@ -1172,10 +1144,7 @@ class Module:
             yield from Module._recorded_calls(result.call_records, full_path)
 
     def _compute_formula_outputs(self, call):
-        """Record formula outputs and automatic sums in declaration order.
-
-        An automatic sum is skipped when the module already recorded its own value.
-        """
+        """Record formula outputs in declaration order."""
         calls = list(self._recorded_calls(call.call_records))
         for name, output in self._outputs.items():
             if output._resolved_formula is None:
@@ -1183,8 +1152,6 @@ class Module:
             kind, *arguments = output._resolved_formula
             if kind == "of":
                 setattr(self, name, self._output_of(name, calls, *arguments))
-            elif kind == "sum" and name not in call.outputs:
-                setattr(self, name, self._output_sum(calls, *arguments))
             elif kind == "ratio":
                 setattr(self, name, self._output_ratio(*arguments))
             elif kind == "difference":
@@ -1205,17 +1172,9 @@ class Module:
                 f"{self.path}.{name}: descendant {module_path!r} was called "
                 f"{len(matches)} times; expected exactly once"
             )
-        values = matches[0].outputs if section == "output" else matches[0].outlets
+        values = getattr(matches[0], f"{section}s")
         value = values[port]
         return getattr(value, field_name) if field_name is not None else value
-
-    @staticmethod
-    def _output_sum(calls, target):
-        return sum(
-            result.outputs[target]
-            for _, result in calls
-            if result.is_leaf and target in result.outputs
-        )
 
     def _output_ratio(self, numerator, denominator):
         """Divide two earlier outputs; ``None`` when either is ``None`` or the divisor is zero."""

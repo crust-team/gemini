@@ -9,6 +9,7 @@ from gemini.modules.power import ORC
 from gemini.types import Control, Inlet, Outlet, Output, Power, Stream
 from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.reading import reading
 
 
 def grid(**changes):
@@ -18,21 +19,21 @@ def grid(**changes):
 
 def test_import_and_export_within_unlimited_connection():
     """Net consumption is imported; surplus is exported."""
-    out = grid()(power_out=[2e6, 1e6], power_in=[1e6]).outputs
+    out = reading(grid()(power_out=[2e6, 1e6], power_in=[1e6]))
     assert out.net_import == 2e6 and out.net_export == 0
     assert not out.is_import_limited and out.unserved_consumption == 0
-    out = grid()(power_out=[1e6], power_in=[4e6]).outputs
+    out = reading(grid()(power_out=[1e6], power_in=[4e6]))
     assert out.net_export == 3e6 and out.net_import == 0
 
 
 def test_connection_limits():
     """Imports above the limit go unserved; exports above it are curtailed."""
     connection = grid(import_limit="1 MW", export_limit="0.5 MW")
-    out = connection(power_out=[3e6], power_in=[1e6]).outputs
+    out = reading(connection(power_out=[3e6], power_in=[1e6]))
     assert out.net_import == 1e6 and out.unserved_consumption == 1e6 and out.is_import_limited
-    out = connection(power_out=[], power_in=[2e6]).outputs
+    out = reading(connection(power_out=[], power_in=[2e6]))
     assert out.net_export == 5e5 and out.curtailed_generation == 1.5e6 and out.is_export_limited
-    out = grid(export_limit=0)().outputs
+    out = reading(grid(export_limit=0)())
     assert out.net_export == 0 and not out.is_export_limited
 
 
@@ -88,7 +89,7 @@ def test_grid_is_not_counted_in_the_energy_audit():
     result = plant(
         fluid_in=Stream(m_dot=100, T=423.15, p=10e5), water_in=Stream(m_dot=5, T=313.15, p=3e5)
     )
-    orc, boiler = result.children["orc"].outputs, result.children["boiler"].outputs
+    orc, boiler = reading(result.children["orc"]), reading(result.children["boiler"])
     flows = collect_flows(result)
     assert flows["electricity_generated"] == orc.electricity_generated
     assert flows["electricity"] == boiler.electricity

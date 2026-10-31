@@ -8,6 +8,7 @@ import gemini as gm
 from gemini.modules._utils.balance import collect_flows, energy_balance, mass_balance
 from gemini.modules._utils.wiring import trace_wiring
 from gemini.utils import legacy
+from tests.fixtures.reading import reading
 
 ROOT = Path(__file__).parents[2]
 OLD = ROOT / "examples/legacy/gemini_project_bridge/old_project"
@@ -47,14 +48,11 @@ def test_handwritten_wiring_and_split_helpers(example):
     assert (
         well.wellhead_from_discharge(discharge) == leaves["doublet.riser"].outlets["wellhead_out"]
     )
-    assert result.outputs.electricity == collect_flows(result)["electricity"]
-    assert result.outputs.cop == pytest.approx(
-        result.outputs.thermal_power / result.outputs.electricity
-    )
+    assert reading(result).electricity == collect_flows(result)["electricity"]
     assert mass_balance(plant, result)["relative_residual"] < 1e-12
     balance = energy_balance(plant, result)
     assert balance["relative_thermal_residual"] < 1e-12
-    assert balance["residual"] == pytest.approx(result.outputs.electricity)
+    assert balance["residual"] == pytest.approx(reading(result).electricity)
 
 
 def test_trace_hooks_are_removed_after_failure(example):

@@ -5,7 +5,6 @@ from gemini.modules.treatment import _physics
 from gemini.types import (
     Fraction,
     Inlet,
-    MassFlow,
     Outlet,
     Output,
     Parameter,
@@ -67,7 +66,6 @@ class Degasser(Module):
         self.fluid_in = Inlet(Stream, kind="brine")
 
         # Outputs
-        self.gas_mass_flow = Output(MassFlow, soft_sensor=True)
         self.pressure_drop = Output(PressureDifference, soft_sensor=True)
 
         # Outlets
@@ -97,10 +95,7 @@ class Degasser(Module):
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.fluid_in
-        liquid = outlets.liquid_out
-        gas = outlets.gas_out
-        self.gas_mass_flow = gas.m_dot
-        self.pressure_drop = inlet.p - liquid.p
+        self.pressure_drop = inlet.p - outlets.liquid_out.p
 
     def capex(self, assumptions):
         """Return the cost of the degasser, a fixed item."""

@@ -110,7 +110,7 @@ def test_composite_run_matches_untraced_calls(line, inlet):
     result = run(line, {"fluid_in": inlet}, {"boost": np.array(boosts), "second.draw": draws})
     expected = _line_rows(line, inlet, boosts, draws)
     assert result.graph is not None and result.breaks == []
-    for name in ("rise", "pressure", "electricity"):
+    for name in ("rise", "pressure"):
         assert result.outputs[name].tolist() == [row.outputs[name] for row in expected]
     ratios = [row.outputs.efficiency for row in expected]
     assert ratios[1] is None
@@ -125,7 +125,7 @@ def test_composite_child_inputs_come_from_the_tree(line, inlet):
     """A child control not supplied by the root is fed from the child's persisted value."""
     line.second.draw = 4.0
     result = run(line, {"fluid_in": inlet}, {"boost": 1.0})
-    assert result.outputs["electricity"].tolist() == [10.0] * 3
+    assert result.outputs["electricity"].tolist() == [8.0] * 3
 
 
 def test_composite_errors_raise_the_child_error(line, inlet):
@@ -172,7 +172,7 @@ def test_a_leaf_break_keeps_the_rest_in_the_graph(kind, chain_inlet):
     assert result.graph is not None and result.breaks == []
     assert [path for path, _ in result.graph.breaks] == ["middle"]
     assert result.graph.nodes[0].op != "break" and "break(" in result.graph.describe()
-    for name in ("value", "pressure", "electricity"):
+    for name in ("value", "pressure"):
         assert result.outputs[name].tolist() == [row.outputs[name] for row in expected]
     assert result.outlets["fluid_out"]["p"].tolist() == [
         row.outlets.fluid_out.p for row in expected

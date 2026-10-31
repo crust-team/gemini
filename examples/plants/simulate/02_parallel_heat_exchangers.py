@@ -25,12 +25,17 @@ PYTHONPATH=. python examples/plants/simulate/02_parallel_heat_exchangers.py
 
 import gemini as gm
 from examples.shared.nodal_doublet import NodalDoublet
-from gemini.modules import HeatExchanger, Mixer, ModuleList, Splitter, energy_balance
+from gemini.modules import (
+    HeatExchanger,
+    Mixer,
+    ModuleList,
+    Splitter,
+    collect_flows,
+    energy_balance,
+)
 from gemini.modules.treatment import Degasser, Filter
 from gemini.physics.geometry import build_path
 from gemini.types import (
-    Duty,
-    Electricity,
     Inlet,
     Outlet,
     Output,
@@ -98,10 +103,10 @@ class ParallelExchangerPlant(gm.modules.Module):
         # Outputs
         self.production_rate = Output.of(self.doublet.riser.wellhead_out.field("m_dot"))
         self.injection_pressure = Output.of(self.doublet.injection_pump.discharge_pressure)
-        self.injection_pump_electricity = Output.of(self.doublet.injection_pump.electricity)
-        self.duty = Output(Duty)
-        self.electricity = Output(Electricity)
-        self.secondary_out_T = Output.of(self.secondary_mixers[len(SHARES) - 2].fluid_out_T)
+        self.injection_pump_power = Output.of(self.doublet.injection_pump.power)
+        self.secondary_out_T = Output.of(
+            self.secondary_mixers[len(SHARES) - 2].fluid_out.field("T")
+        )
 
         # Outlets
         self.supply_out = Outlet(Stream)
@@ -241,7 +246,7 @@ for label, index, run in (
     print(
         f"Injectivity {label:<12}     {index * 3.6e8:.4f} m3/h/bar: injection "
         f"{run.get('injection_pressure', unit='bar'):.2f} bar, pump "
-        f"{run.get('injection_pump_electricity', unit='kW'):.1f} kW"
+        f"{run.get('injection_pump_power', unit='kW'):.1f} kW"
     )
 for index in range(len(SHARES)):
     exchanger = result.children[f"heat_exchangers.{index}"].outputs
@@ -249,9 +254,10 @@ for index in range(len(SHARES)):
         f"Exchanger {index + 1}:                 {exchanger.get('duty', unit='kW'):.1f} kW, "
         f"secondary out {exchanger.get('cold_out_T', unit='degC'):.2f} degC"
     )
-print(f"Total duty:                  {out.get('duty', unit='kW'):.1f} kW")
+duties = [result.children[f"heat_exchangers.{index}"].outputs.duty for index in range(len(SHARES))]
+print(f"Total duty:                  {sum(duties) / 1e3:.1f} kW")
 print(f"Secondary outlet:            {out.get('secondary_out_T', unit='degC'):.2f} degC")
-print(f"Electricity (ESP and pump):  {out.get('electricity', unit='MW'):.4f} MW")
+print(f"Electricity (ESP and pump):  {collect_flows(result)['electricity'] / 1e6:.4f} MW")
 print(f"Mass residual:               {gm.modules.mass_balance(plant, result)['residual']} kg/s")
 assert energy_balance(plant, result)["relative_thermal_residual"] < 1e-9
 assert abs(out.get("injection_pressure", unit="bar") - 44.47) < 0.05

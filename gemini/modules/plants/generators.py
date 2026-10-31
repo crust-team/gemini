@@ -130,19 +130,18 @@ def multi_well_spec(producers=2, injectors=1):
     Each production limb is a ``ModuleDict`` of ``reservoir``, ``well``, ``esp`` and ``riser``
     and each injection limb of ``well`` and ``sink``, in the lists ``producers`` and
     ``injectors``. The risers join through ``producers - 1`` mixers and the return divides over
-    ``injectors - 1`` splitters. Ports: ``return_in``, ``power_in``, ``supply_out``. Outputs:
-    ``electricity``, ``heat_loss`` and ``supply_out_T``.
+    ``injectors - 1`` splitters. Ports: ``return_in``, ``power_in``, ``supply_out``. Output:
+    ``supply_out_T``.
     """
     _check(producers=producers, injectors=injectors)
     mixing, supply = _mix("mixers", [f"producers.{i}.riser.wellhead_out" for i in range(producers)])
     splitting, return_in = _split(
         "splitters", [f"injectors.{index}.well.wellhead_in" for index in range(injectors)]
     )
-    temperature = (
-        "producers.0.riser.wellhead_temperature"
-        if producers == 1
-        else f"mixers.{producers - 2}.fluid_out_T"
+    joined = (
+        "producers.0.riser.wellhead_out" if producers == 1 else f"mixers.{producers - 2}.fluid_out"
     )
+    temperature = {"of": joined, "field": "T"}
     return {
         "format": 2,
         "name": "MultiWellPlant",
@@ -162,12 +161,22 @@ def multi_well_spec(producers=2, injectors=1):
         },
         "outlets": {"supply_out": supply},
         "outputs": {
-            "electricity": {"sum": "electricity"},
-            "heat_loss": {"sum": "heat_loss"},
-            "supply_out_T": {"of": temperature},
+            "supply_out_T": temperature,
         },
         "bindings": {},
         "param_history": {},
+    }
+
+
+def _network_modules(consumers, service):
+    """Return the modules of a network: the pump, the pipes and the substations with junctions."""
+    return {
+        "pump": _module("CentrifugalPump"),
+        "supply_pipe": _module("Pipe"),
+        "splitters": _numbered("Splitter", consumers - 1),
+        "substations": _numbered(SUBSTATIONS[service], consumers),
+        "mixers": _numbered("Mixer", consumers - 1),
+        "return_pipe": _module("Pipe"),
     }
 
 
@@ -194,14 +203,7 @@ def district_network_spec(consumers=2, service="heating"):
     return {
         "format": 2,
         "name": "DistrictNetwork",
-        "modules": {
-            "pump": _module("CentrifugalPump"),
-            "supply_pipe": _module("Pipe"),
-            "splitters": _numbered("Splitter", consumers - 1),
-            "substations": _numbered(SUBSTATIONS[service], consumers),
-            "mixers": _numbered("Mixer", consumers - 1),
-            "return_pipe": _module("Pipe"),
-        },
+        "modules": _network_modules(consumers, service),
         "connections": (
             [_link("pump.fluid_out", "supply_pipe.fluid_in"), _link("supply_pipe.fluid_out", feed)]
             + splitting
@@ -224,6 +226,4 @@ def district_network_spec(consumers=2, service="heating"):
 
 
 def _network_outputs(service):
-    sums = ["heat_supplied"] if service == "heating" else []
-    outputs = {name: {"sum": name} for name in (*sums, "heat_absorbed", "heat_loss", "electricity")}
-    return outputs | {"return_out_T": {"of": "return_pipe.fluid_out_T"}}
+    return {"return_out_T": {"of": "return_pipe.fluid_out", "field": "T"}}

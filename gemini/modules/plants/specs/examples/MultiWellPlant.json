@@ -549,14 +549,9 @@
     "supply_out": "mixers.0.fluid_out"
   },
   "outputs": {
-    "electricity": {
-      "sum": "electricity"
-    },
-    "heat_loss": {
-      "sum": "heat_loss"
-    },
     "supply_out_T": {
-      "of": "mixers.0.fluid_out_T"
+      "of": "mixers.0.fluid_out",
+      "field": "T"
     }
   },
   "fluids": {

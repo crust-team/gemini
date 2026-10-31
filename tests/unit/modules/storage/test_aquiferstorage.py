@@ -12,6 +12,7 @@ from gemini.modules.storage import AquiferStorage
 from gemini.physics import ground
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.reading import reading
 
 WARM = Stream(m_dot=30, T=291.15, p=3e5)
 COLD = WARM.with_(T=279.15)
@@ -79,7 +80,7 @@ def test_plain_call_uses_the_empty_initial_stores():
     """Empty stores produce native groundwater and hold no energy."""
     module = storage()
     result = module(injection_in=WARM)
-    out = result.outputs
+    out = reading(result)
     assert module.initial_state()["warm_volume"] == 0
     assert result.outlets.production_out == WARM.with_(T=284.15)
     assert out.stored_energy == 0 and out.heat_loss == 0 == out.heat_absorbed
@@ -100,8 +101,8 @@ def test_two_charge_steps_fill_and_mix_the_warm_store():
     mixed = (first + 7) / 2
     decay = math.exp(-HOUR * conductance(2 * volume) / (WATER * 2 * volume))
     assert state["warm_temperature_change"] == pytest.approx(mixed * decay, rel=1e-12)
-    assert result.outputs.heat_loss == pytest.approx(conductance(volume) * first, rel=1e-12)
-    assert result.outputs.production_out_T == 284.15
+    assert reading(result).heat_loss == pytest.approx(conductance(volume) * first, rel=1e-12)
+    assert reading(result).production_out_T == 284.15
 
 
 def test_heat_accumulation_is_the_rate_of_change_of_stored_energy():
@@ -117,9 +118,8 @@ def test_heat_accumulation_is_the_rate_of_change_of_stored_energy():
     }
     state, result = module.step(start, 1.0, {"injection_in": COLD})
     assert mass_balance(module, result)["residual"] == 0
-    out = result.outputs
-    assert out.heat_loss == pytest.approx(conductance(2e5) * 5)
-    assert out.heat_absorbed == pytest.approx(conductance(1e5) * 3)
+    out = reading(result)
+    assert result.outlets.loss_out == pytest.approx(conductance(2e5) * 5 - conductance(1e5) * 3)
     _, after = module.step(state, 1.0, {"injection_in": COLD})
     rate = after.outputs.stored_energy - out.stored_energy
     assert out.heat_accumulation == pytest.approx(rate, rel=1e-6)
@@ -156,10 +156,10 @@ def test_overdrawn_store_empties_to_native_groundwater():
     module = storage("discharge")
     start = storage().initial_state() | {"warm_volume": 10.0, "warm_temperature_change": 5.0}
     state, result = module.step(start, HOUR, {"injection_in": COLD})
-    assert result.outputs.production_out_T == 289.15
+    assert reading(result).production_out_T == 289.15
     assert state["warm_volume"] == 0 and state["warm_temperature_change"] == 0
     _, result = module.step(state, HOUR, {"injection_in": COLD})
-    assert result.outputs.production_out_T == 284.15
+    assert reading(result).production_out_T == 284.15
 
 
 def test_composite_step_charges_through_the_plant():

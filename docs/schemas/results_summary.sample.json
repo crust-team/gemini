@@ -1,6 +1,20 @@
 {
   "degasser": {
-    "gas_mass_flow": {
+    "fluid_in.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "fluid_in.co2_flow": {
       "max": {
         "unit": "kg/s",
         "value": 0.0
@@ -11,6 +25,202 @@
       },
       "min": {
         "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "fluid_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 964500.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 964500.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 964500.0
+      }
+    },
+    "fluid_in.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "fluid_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
+    "gas_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "gas_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "gas_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "gas_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "gas_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "gas_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 949600.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 949600.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 949600.0
+      }
+    },
+    "gas_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "gas_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "m3/s",
         "value": 0.0
       }
     },
@@ -26,6 +236,118 @@
       "min": {
         "unit": "-",
         "value": 1.0
+      }
+    },
+    "liquid_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "liquid_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "liquid_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "liquid_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "liquid_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "liquid_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 949600.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 949600.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 949600.0
+      }
+    },
+    "liquid_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "liquid_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
       }
     },
     "pressure_drop": {
@@ -86,7 +408,7 @@
         "value": 0.0
       }
     },
-    "electricity": {
+    "fluid_in.chemical_flow": {
       "max": {
         "unit": "W",
         "value": 0.0
@@ -100,7 +422,203 @@
         "value": 0.0
       }
     },
-    "flow": {
+    "fluid_in.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "fluid_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 6202500.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 6202500.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 6202500.0
+      }
+    },
+    "fluid_in.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "fluid_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
+    "fluid_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "fluid_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "fluid_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 9534870.010093313
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 9534870.010093313
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 9534870.010093313
+      }
+    },
+    "fluid_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "fluid_out.volume_flow": {
       "max": {
         "unit": "m3/s",
         "value": 0.039663055555555556
@@ -197,10 +715,94 @@
         "unit": "W",
         "value": 0.0
       }
+    },
+    "power_in": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
     }
   },
   "doublet.injector": {
-    "bottomhole_pressure": {
+    "bottom_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "bottom_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "bottom_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 51596461.206939995
+      },
+      "mean": {
+        "unit": "W",
+        "value": 51596461.206939995
+      },
+      "min": {
+        "unit": "W",
+        "value": 51596461.206939995
+      }
+    },
+    "bottom_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "bottom_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "bottom_out.pressure": {
       "max": {
         "unit": "Pa",
         "value": 25296950.68807395
@@ -214,7 +816,7 @@
         "value": 25296950.68807395
       }
     },
-    "bottomhole_temperature": {
+    "bottom_out.temperature": {
       "max": {
         "unit": "K",
         "value": 294.9817572253119
@@ -226,6 +828,20 @@
       "min": {
         "unit": "K",
         "value": 294.9817572253119
+      }
+    },
+    "bottom_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
       }
     },
     "friction_pressure_drop": {
@@ -270,7 +886,7 @@
         "value": 1.0
       }
     },
-    "heat_loss": {
+    "loss_out": {
       "max": {
         "unit": "W",
         "value": 79803.2829099962
@@ -284,7 +900,91 @@
         "value": 79803.2829099962
       }
     },
-    "wellhead_temperature": {
+    "wellhead_in.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "wellhead_in.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "wellhead_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "min": {
+        "unit": "W",
+        "value": 51676264.48984999
+      }
+    },
+    "wellhead_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "wellhead_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "wellhead_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 4568500.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 4568500.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 4568500.0
+      }
+    },
+    "wellhead_in.temperature": {
       "max": {
         "unit": "K",
         "value": 295.438
@@ -296,6 +996,20 @@
       "min": {
         "unit": "K",
         "value": 295.438
+      }
+    },
+    "wellhead_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
       }
     }
   },
@@ -412,6 +1126,118 @@
         "value": 22087569.02557011
       }
     },
+    "sandface_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "sandface_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "sandface_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "sandface_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "sandface_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "sandface_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 21320061.904761903
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 21320061.904761903
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 21320061.904761903
+      }
+    },
+    "sandface_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "sandface_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
     "skin_pressure_drop": {
       "max": {
         "unit": "Pa",
@@ -428,6 +1254,230 @@
     }
   },
   "filters.cold": {
+    "fluid_in.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "fluid_in.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "min": {
+        "unit": "W",
+        "value": 51676264.48984999
+      }
+    },
+    "fluid_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 934500.0000000001
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 934500.0000000001
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 934500.0000000001
+      }
+    },
+    "fluid_in.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "mean": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "min": {
+        "unit": "K",
+        "value": 295.438
+      }
+    },
+    "fluid_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
+    "fluid_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "fluid_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "min": {
+        "unit": "W",
+        "value": 51676264.48984999
+      }
+    },
+    "fluid_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 933030.6516017118
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 933030.6516017118
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 933030.6516017118
+      }
+    },
+    "fluid_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "mean": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "min": {
+        "unit": "K",
+        "value": 295.438
+      }
+    },
+    "fluid_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
     "health_metric_pressure_drop": {
       "max": {
         "unit": "-",
@@ -472,6 +1522,230 @@
     }
   },
   "filters.hot": {
+    "fluid_in.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "fluid_in.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "fluid_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 950300.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 950300.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 950300.0
+      }
+    },
+    "fluid_in.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "fluid_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
+    "fluid_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "fluid_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "fluid_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 948830.6516017116
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 948830.6516017116
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 948830.6516017116
+      }
+    },
+    "fluid_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "fluid_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
     "health_metric_pressure_drop": {
       "max": {
         "unit": "-",
@@ -528,6 +1802,230 @@
       "min": {
         "unit": "K",
         "value": 36.563707186841214
+      }
+    },
+    "cold_in.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "cold_in.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "cold_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 59597971.124999985
+      },
+      "mean": {
+        "unit": "W",
+        "value": 59597971.124999985
+      },
+      "min": {
+        "unit": "W",
+        "value": 59597971.124999985
+      }
+    },
+    "cold_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "cold_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 48.949999999999996
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 48.949999999999996
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 48.949999999999996
+      }
+    },
+    "cold_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 500000.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 500000.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 500000.0
+      }
+    },
+    "cold_in.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 294.85699999999997
+      },
+      "mean": {
+        "unit": "K",
+        "value": 294.85699999999997
+      },
+      "min": {
+        "unit": "K",
+        "value": 294.85699999999997
+      }
+    },
+    "cold_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.04583333333333333
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.04583333333333333
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.04583333333333333
+      }
+    },
+    "cold_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "cold_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "cold_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 63398730.27781779
+      },
+      "mean": {
+        "unit": "W",
+        "value": 63398730.27781779
+      },
+      "min": {
+        "unit": "W",
+        "value": 63398730.27781779
+      }
+    },
+    "cold_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "cold_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 48.949999999999996
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 48.949999999999996
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 48.949999999999996
+      }
+    },
+    "cold_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 500000.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 500000.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 500000.0
+      }
+    },
+    "cold_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 313.6610032297727
+      },
+      "mean": {
+        "unit": "K",
+        "value": 313.6610032297727
+      },
+      "min": {
+        "unit": "K",
+        "value": 313.6610032297727
+      }
+    },
+    "cold_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.04583333333333333
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.04583333333333333
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.04583333333333333
       }
     },
     "cold_out_T": {
@@ -628,6 +2126,230 @@
         "value": 1.0
       }
     },
+    "hot_in.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "hot_in.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "hot_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 61770905.58624999
+      },
+      "min": {
+        "unit": "W",
+        "value": 61770905.58624999
+      }
+    },
+    "hot_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "hot_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "hot_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 948700.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 948700.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 948700.0
+      }
+    },
+    "hot_in.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "mean": {
+        "unit": "K",
+        "value": 353.15
+      },
+      "min": {
+        "unit": "K",
+        "value": 353.15
+      }
+    },
+    "hot_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
+    "hot_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "hot_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "hot_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 57970146.43343217
+      },
+      "mean": {
+        "unit": "W",
+        "value": 57970146.43343217
+      },
+      "min": {
+        "unit": "W",
+        "value": 57970146.43343217
+      }
+    },
+    "hot_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "hot_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "hot_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 948700.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 948700.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 948700.0
+      }
+    },
+    "hot_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 331.4207071868412
+      },
+      "mean": {
+        "unit": "K",
+        "value": 331.4207071868412
+      },
+      "min": {
+        "unit": "K",
+        "value": 331.4207071868412
+      }
+    },
+    "hot_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
     "hot_out_T": {
       "max": {
         "unit": "K",
@@ -700,18 +2422,228 @@
         "value": 4568500.0
       }
     },
-    "electricity": {
+    "fluid_in.chemical_flow": {
       "max": {
         "unit": "W",
-        "value": 180248.7559722222
+        "value": 0.0
       },
       "mean": {
         "unit": "W",
-        "value": 180248.7559722222
+        "value": 0.0
       },
       "min": {
         "unit": "W",
-        "value": 180248.7559722222
+        "value": 0.0
+      }
+    },
+    "fluid_in.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "min": {
+        "unit": "W",
+        "value": 51676264.48984999
+      }
+    },
+    "fluid_in.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_in.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_in.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 932900.0000000001
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 932900.0000000001
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 932900.0000000001
+      }
+    },
+    "fluid_in.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "mean": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "min": {
+        "unit": "K",
+        "value": 295.438
+      }
+    },
+    "fluid_in.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      }
+    },
+    "fluid_out.chemical_flow": {
+      "max": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "W",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "W",
+        "value": 0.0
+      }
+    },
+    "fluid_out.co2_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.enthalpy_flow": {
+      "max": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "mean": {
+        "unit": "W",
+        "value": 51676264.48984999
+      },
+      "min": {
+        "unit": "W",
+        "value": 51676264.48984999
+      }
+    },
+    "fluid_out.gas_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 0.0
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 0.0
+      }
+    },
+    "fluid_out.mass_flow": {
+      "max": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "mean": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      },
+      "min": {
+        "unit": "kg/s",
+        "value": 42.36014333333333
+      }
+    },
+    "fluid_out.pressure": {
+      "max": {
+        "unit": "Pa",
+        "value": 4568500.0
+      },
+      "mean": {
+        "unit": "Pa",
+        "value": 4568500.0
+      },
+      "min": {
+        "unit": "Pa",
+        "value": 4568500.0
+      }
+    },
+    "fluid_out.temperature": {
+      "max": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "mean": {
+        "unit": "K",
+        "value": 295.438
+      },
+      "min": {
+        "unit": "K",
+        "value": 295.438
+      }
+    },
+    "fluid_out.volume_flow": {
+      "max": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "mean": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
+      },
+      "min": {
+        "unit": "m3/s",
+        "value": 0.039663055555555556
       }
     },
     "head": {
@@ -743,6 +2675,20 @@
       }
     },
     "power": {
+      "max": {
+        "unit": "W",
+        "value": 180248.7559722222
+      },
+      "mean": {
+        "unit": "W",
+        "value": 180248.7559722222
+      },
+      "min": {
+        "unit": "W",
+        "value": 180248.7559722222
+      }
+    },
+    "power_in": {
       "max": {
         "unit": "W",
         "value": 180248.7559722222

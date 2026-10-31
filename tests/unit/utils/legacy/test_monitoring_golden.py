@@ -21,6 +21,7 @@ from gemini.types.flows import Stream
 from gemini.utils.legacy import tables
 from tests.fixtures import FIXTURES, OLD_PROJECT
 from tests.fixtures.evaluate import assert_values, configured
+from tests.fixtures.reading import reading
 
 
 def _old_property(name):
@@ -32,14 +33,16 @@ def _esp_theoretical_values(row, esp_property):
     """Evaluate the ESP curve in float32, as the old runtime did, and report bar."""
     pump = configured(ESP, tables.esp_params_from_gemini(esp_property))
     with gm.runtime.settings(precision="float32"):
-        outputs = pump(
-            frequency=row.ESP_freq,
-            fluid_in=Stream(
-                m_dot=units.m3h_to_m3s(row.Qp) * 1000,
-                T=300,
-                p=units.bar_to_pa(row.ESP_Pin),
-            ),
-        ).outputs
+        outputs = reading(
+            pump(
+                frequency=row.ESP_freq,
+                fluid_in=Stream(
+                    m_dot=units.m3h_to_m3s(row.Qp) * 1000,
+                    T=300,
+                    p=units.bar_to_pa(row.ESP_Pin),
+                ),
+            )
+        )
     head = float(units.pa_to_bar(np.float32(outputs.head)))
     return {
         "esp_1ee3:esp_theoretical_head.calculated": [head],
@@ -129,7 +132,7 @@ def _injection_values(row):
         T=temperature,
         fluid=well.fluid,
     )
-    outputs = well(wellhead_in=wellhead).outputs
+    outputs = reading(well(wellhead_in=wellhead))
     injectivity = reservoir.injectivity_from_measurements(
         units.m3h_to_m3s(row.Qp), outputs.bottomhole_pressure
     )

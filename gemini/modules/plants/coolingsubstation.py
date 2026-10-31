@@ -6,7 +6,6 @@ from gemini.modules.module import Module
 from gemini.modules.piping import Valve
 from gemini.modules.plants import loops
 from gemini.types import (
-    HeatAbsorbed,
     Inlet,
     MassFlow,
     Outlet,
@@ -71,14 +70,12 @@ class CoolingSubstation(Module):
 
         # Outputs
         self.duty = Output.of(self.heat_exchanger.duty)
-        self.heat_absorbed = Output(HeatAbsorbed)
         self.unmet_sensible = Output.of(self.consumer.unmet_sensible)
         self.unmet_latent = Output.of(self.consumer.unmet_latent)
         self.is_unmet = Output.of(self.consumer.is_unmet)
         self.dew_point = Output.of(self.consumer.dew_point)
         self.building_supply_temperature = Output.of(self.heat_exchanger.hot_out_T)
-        self.building_return_temperature = Output.of(self.consumer.return_out_T)
-        self.return_out_T = Output.of(self.heat_exchanger.cold_out_T)
+        self.building_return_temperature = Output.of(self.consumer.return_out.field("T"))
         self.valve_pressure_drop = Output.of(self.valve.pressure_drop)
 
         # Outlets

@@ -1,46 +1,12 @@
 """CO2 emitted by a finished run, and the fuel and grid energy it draws."""
 
-from types import SimpleNamespace
-
 import numpy as np
 
-from gemini import backends
-from gemini.analysis.series import results_total, window_seconds
+from gemini.analysis.series import edge_total, energy, results_total, window_seconds
 from gemini.economics.assumptions import require, resolve
 from gemini.economics.outcome import reported
-from gemini.modules._utils.balance import emissions
+from gemini.modules.grids import ElectricityGrid
 from gemini.types.shapes import value
-
-_LEDGER = ("electricity", "fuel", "electricity_generated")
-
-
-def _weighted_energy(results, fuel_weight, grid_weight):
-    """Return the sum over ticks of ``emissions`` with the given weights, times the tick length.
-
-    ``emissions`` is ``fuel * fuel_weight + max(0, electricity - electricity_generated) *
-    grid_weight`` over the leaf totals; weights of 1 and 0 give the fuel energy [J] and of 0 and
-    1 the grid electricity energy [J]. A tick without a value adds nothing. The columns are arrays
-    of a finished run, whatever backend is set around the call.
-    """
-    frame = results.to_frame()
-    columns = {
-        field: total.to_numpy(dtype=float)
-        for field in _LEDGER
-        if (total := results_total(results, frame, field)) is not None
-    }
-    total = SimpleNamespace(children={}, outputs=columns)
-    with backends.settings(backend="numpy"):
-        rate = emissions({"": total}, fuel_weight, grid_weight)
-    return float(np.nansum(rate * window_seconds(results)))
-
-
-def source_energies(results):
-    """Return the fuel energy and the grid electricity energy [J] drawn over the run.
-
-    Grid electricity is the consumption not covered by on-site generation, tick by tick, as
-    ``gemini.modules._utils.balance.emissions`` counts it.
-    """
-    return _weighted_energy(results, 1.0, 0.0), _weighted_energy(results, 0.0, 1.0)
 
 
 def co2(plant, results, assumptions=None, on_error="raise"):
@@ -73,21 +39,29 @@ def co2(plant, results, assumptions=None, on_error="raise"):
         in J and ``window`` in s, each a value. Grid electricity drawn without
         ``electricity_emission_factor`` raises ``ValidationError`` (code ``missing_assumption``).
     """
-    return reported(on_error, "kg", lambda: _co2(results, assumptions))
+    return reported(on_error, "kg", lambda: _co2(plant, results, assumptions))
 
 
 def released(results, field):
-    """Return the mass [kg] of leaf column ``field`` over the run; a run without it gives zero."""
+    """Return the time integral of leaf column ``field`` over the run; without it, zero."""
     total = results_total(results, results.to_frame(), field)
     if total is None:
         return 0.0
     return float(np.nansum(total.to_numpy(dtype=float) * window_seconds(results)))
 
 
-def _co2(results, assumptions):
+def _ledger(plant, results, module_class, field):
+    """Return the energy [J] of column ``field`` of the leaves of ``module_class`` over a run."""
+    frame = results.to_frame()
+    total = edge_total(plant, frame, field, module_class)
+    return 0.0 if total is None else energy(total, window_seconds(results))
+
+
+def _co2(plant, results, assumptions):
     """Return the CO2-equivalent of a run."""
     assumptions = resolve(assumptions)
-    fuel, grid = source_energies(results)
+    fuel = released(results, "fuel")
+    grid = _ledger(plant, results, ElectricityGrid, "net_import")
     direct = released(results, "co2_emission")
     methane = released(results, "methane_emission")
     electricity = 0.0

@@ -8,6 +8,7 @@ import pytest
 import gemini as gm
 from gemini.physics import constants, units
 from gemini.types import Stream
+from tests.fixtures.reading import reading
 
 
 @pytest.fixture
@@ -26,10 +27,11 @@ def test_supply_is_the_riser_wellhead_and_return_reaches_the_sink(doublet):
     assert result.outlets.supply_out == leaves["riser"].outlets.wellhead_out
     assert leaves["injector"].inlets.wellhead_in == returned
     assert leaves["sink"].inlets.sandface_in == leaves["injector"].outlets.bottom_out
-    electricity = sum(leaf.outputs.get("electricity", 0.0) for leaf in leaves.values())
-    assert result.outputs.electricity == pytest.approx(electricity)
-    heat_loss = sum(leaf.outputs.get("heat_loss", 0.0) for leaf in leaves.values())
-    assert result.outputs.heat_loss == pytest.approx(heat_loss)
+    electricity = sum(reading(leaf).get("electricity", 0.0) for leaf in leaves.values())
+    assert reading(result).electricity == pytest.approx(electricity)
+    lossy = [leaf for leaf in leaves.values() if "loss_out" in leaf.outlets]
+    heat_loss = sum(leaf.outlets.loss_out for leaf in lossy)
+    assert sum(leaves["formation"].inlets.heat_in) == pytest.approx(heat_loss)
 
 
 DESIGN = {
@@ -124,7 +126,7 @@ def test_the_pump_is_sized_at_its_nominal_flow():
     returned = gm.Stream(m_dot=flow * 1030, T=320, p=5e6, fluid=BRINE)
     result = plant(return_in=returned)
     assert result.outlets.supply_out.p == pytest.approx(10e5, rel=2e-2)
-    esp = result.leaves()["d0.esp"].outputs
+    esp = reading(result.leaves()["d0.esp"])
     hydraulic = esp.flow * esp.head
     assert esp.electricity == pytest.approx(hydraulic / 0.7, rel=1e-6)
     assert doublet.esp.setting_depth == doublet.well.esp_depth == doublet.riser.esp_depth

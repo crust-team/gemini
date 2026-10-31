@@ -10,6 +10,7 @@ from gemini.types.flows import Stream
 from gemini.types.fluid import Fluid
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 CP = 4217.4
 
@@ -24,7 +25,7 @@ def test_heating_hand_value_and_closure():
     pump = heat_pump("heating")
     source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
     result = pump(source_in=source, sink_in=sink, temperature_setpoint=340)
-    out = result.outputs
+    out = reading(result)
     assert out.useful_duty == out.condenser_duty == pytest.approx(10 * CP * 20)
     assert out.sink_out_T == 340
     assert out.source_out_T == pytest.approx(310 / (1 + 10 / 170))
@@ -44,9 +45,9 @@ def test_cooling_mode_is_an_electric_chiller():
     chiller = heat_pump("cooling")
     source, sink = Stream(m_dot=20, T=285, p=3e5), Stream(m_dot=30, T=300, p=3e5)
     result = chiller(source_in=source, sink_in=sink, temperature_setpoint=280)
-    out = result.outputs
+    out = reading(result)
     load = 20 * CP * 5 / (30 * CP)
-    assert out.useful_duty == out.evaporator_duty == pytest.approx(20 * CP * 5)
+    assert out.evaporator_duty == pytest.approx(20 * CP * 5)
     assert out.source_out_T == 280
     assert out.sink_out_T == pytest.approx((300 - load) / (1 - load / 140))
     assert out.cop == pytest.approx(0.5 * 280 / (out.sink_out_T - 280))
@@ -59,20 +60,22 @@ def test_capacity_cap_and_lift_floor():
     """The useful duty stops at capacity; a small lift uses the floor in the COP."""
     pump = heat_pump("heating", capacity=5e5)
     source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
-    out = pump(source_in=source, sink_in=sink, temperature_setpoint=340).outputs
-    assert out.is_capped and out.useful_duty == 5e5
+    out = reading(pump(source_in=source, sink_in=sink, temperature_setpoint=340))
+    assert out.is_capped and out.useful_duty == pytest.approx(5e5)
     assert out.sink_out_T == pytest.approx(320 + 5e5 / (10 * CP)) and out.sink_out_T < 340
     warm = Stream(m_dot=40, T=330, p=3e5)
     result = pump(source_in=warm, sink_in=sink, temperature_setpoint=330)
-    out = result.outputs
+    out = reading(result)
     assert out.temperature_lift < 10
     assert out.cop == pytest.approx(0.5 * 330 / 10)
     assert energy_balance(pump, result)["relative_residual"] < 1e-12
-    cooled = heat_pump("cooling")(
-        source_in=Stream(m_dot=20, T=300, p=3e5),
-        sink_in=Stream(m_dot=200, T=290, p=3e5),
-        temperature_setpoint=295,
-    ).outputs
+    cooled = reading(
+        heat_pump("cooling")(
+            source_in=Stream(m_dot=20, T=300, p=3e5),
+            sink_in=Stream(m_dot=200, T=290, p=3e5),
+            temperature_setpoint=295,
+        )
+    )
     assert cooled.cop == pytest.approx(0.5 * 295 / 10)
 
 
@@ -88,7 +91,7 @@ def test_machine_off_without_demand_flow_or_part_load():
     ]
     for case in cases:
         result = pump(**case)
-        out = result.outputs
+        out = reading(result)
         assert out.cop is None and not out.is_running and not out.is_capped
         assert out.useful_duty == out.electricity == out.evaporator_duty == 0
         assert result.outlets.source_out.T == case["source_in"].T
@@ -126,7 +129,7 @@ def test_lorenz_heating_reproduces_the_upstream_gemini_case():
     source = Stream(flow="20 m3/h", T="40 C", p=3e5, fluid=water)
     sink = Stream(flow="10 m3/h", T="30 C", p=3e5, fluid=water)
     result = pump(source_in=source, sink_in=sink, temperature_setpoint="80 C")
-    out = result.outputs
+    out = reading(result)
     assert out.cop == pytest.approx(6.5310, abs=1e-4)
     assert out.source_out_T - 273.15 == pytest.approx(18.8279, abs=1e-4)
     assert out.useful_duty == pytest.approx(580694.44, abs=0.01)
@@ -162,7 +165,7 @@ def test_minimum_source_outlet_caps_the_heating_duty(cop_model):
     pump = heat_pump("heating", cop_model=cop_model, minimum_source_outlet_temperature=295)
     source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
     result = pump(source_in=source, sink_in=sink, temperature_setpoint=340)
-    out = result.outputs
+    out = reading(result)
     assert out.source_out_T == 295 and result.outlets.source_out.T == 295
     assert 320 < out.sink_out_T < 340 and out.is_capped and out.is_running
     assert out.evaporator_duty == pytest.approx(20 * CP * 5, rel=1e-10)
@@ -171,14 +174,14 @@ def test_minimum_source_outlet_caps_the_heating_duty(cop_model):
     unconstrained = heat_pump("heating", cop_model=cop_model)(
         source_in=source, sink_in=sink, temperature_setpoint=340
     )
-    assert unconstrained.outputs.source_out_T < 295
+    assert reading(unconstrained).source_out_T < 295
 
 
 def test_minimum_source_outlet_switches_off_or_raises_a_cooling_setpoint():
     """A source inlet at the minimum leaves no heating duty; a colder chiller setpoint is raised."""
     source, sink = Stream(m_dot=20, T=300, p=3e5), Stream(m_dot=10, T=320, p=3e5)
     pump = heat_pump("heating", minimum_source_outlet_temperature=300)
-    out = pump(source_in=source, sink_in=sink, temperature_setpoint=340).outputs
+    out = reading(pump(source_in=source, sink_in=sink, temperature_setpoint=340))
     assert not out.is_running and out.useful_duty == 0 and out.sink_out_T == 320
     chiller = heat_pump("cooling", minimum_source_outlet_temperature=283)
     result = chiller(
@@ -186,9 +189,9 @@ def test_minimum_source_outlet_switches_off_or_raises_a_cooling_setpoint():
         sink_in=Stream(m_dot=30, T=300, p=3e5),
         temperature_setpoint=280,
     )
-    assert result.outputs.source_out_T == pytest.approx(283)
+    assert reading(result).source_out_T == pytest.approx(283)
     assert result.outputs.is_capped
-    assert result.outputs.useful_duty == pytest.approx(20 * CP * 2)
+    assert reading(result).evaporator_duty == pytest.approx(20 * CP * 2)
     assert energy_balance(chiller, result)["relative_residual"] < 1e-12
 
 

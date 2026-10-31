@@ -37,7 +37,7 @@ def test_python_backend_matches_numpy_on_a_composite(line):
     fast = _evaluation(line, inputs, 3).result
     slow = _evaluation(line, inputs, 3, "python").result
     assert fast.children.keys() == slow.children.keys() == {"first", "gain", "second"}
-    for name in ("rise", "pressure", "electricity"):
+    for name in ("rise", "pressure"):
         assert slow.outputs[name] == pytest.approx(fast.outputs[name], rel=1e-12)
     assert np.isnan(slow.outputs["efficiency"][1]) and np.isnan(fast.outputs["efficiency"][1])
     for path, child in _leaves(fast).items():

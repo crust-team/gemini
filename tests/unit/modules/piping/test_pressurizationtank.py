@@ -6,7 +6,6 @@ import gemini as gm
 from gemini.modules import Module, energy_balance, mass_balance
 from gemini.modules.piping import Mixer, Pipe, PressurizationTank, Splitter, Valve
 from gemini.types import (
-    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -15,6 +14,7 @@ from gemini.types import (
 from tests.fixtures.air import air
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 RETURN = Stream(m_dot=10, T=323.15, p=1.2e5)
 
@@ -42,7 +42,6 @@ class Network(Module):
         # Boundaries
 
         # Outputs
-        self.heat_loss = Output(HeatLoss)
         self.pressure_correction = Output.of(self.tank.pressure_correction)
 
         # Outlets
@@ -73,7 +72,7 @@ def test_outlet_leaves_at_the_setpoint():
     outlet = result.outlets.fluid_out
     assert outlet.p == 2e5 and (outlet.m_dot, outlet.T) == (10, 323.15)
     assert result.outputs.pressure_correction == pytest.approx(0.8e5)
-    relieved = PressurizationTank()(fluid_in=RETURN, pressure_setpoint="1 bar").outputs
+    relieved = reading(PressurizationTank()(fluid_in=RETURN, pressure_setpoint="1 bar"))
     assert relieved.pressure_correction == pytest.approx(-0.2e5)
     reverse = PressurizationTank()(fluid_in=RETURN.with_(m_dot=-1), pressure_setpoint=2e5)
     assert reverse.outlets.fluid_out.m_dot == -1
@@ -95,7 +94,7 @@ def test_piping_network_closes_mass_and_energy():
     result = network(fluid_in=RETURN.with_(p=4e5), air_in=air(283.15))
     outlet = result.outlets.fluid_out
     assert outlet.m_dot == pytest.approx(10, rel=1e-15) and outlet.p == 3e5
-    assert outlet.T < RETURN.T and result.outputs.heat_loss > 0
+    assert outlet.T < RETURN.T and reading(result.children["pipe"]).heat_loss > 0
     pipe_out = result.children["pipe"].outlets.fluid_out.p
     valve_out = result.children["valve"].outlets.fluid_out.p
     assert result.children["mixer"].outputs.pressure_imbalance == pytest.approx(

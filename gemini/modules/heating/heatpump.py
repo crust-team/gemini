@@ -10,7 +10,6 @@ from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
     Control,
     Efficiency,
-    Electricity,
     Fraction,
     Inlet,
     Outlet,
@@ -93,15 +92,9 @@ class HeatPump(Module):
 
         # Outputs
         self.cop = Output(Ratio | None)
-        self.useful_duty = Output(Power)
-        self.evaporator_duty = Output(Power)
-        self.condenser_duty = Output(Power)
-        self.electricity = Output(Electricity)
         self.temperature_lift = Output(TemperatureDifference)
         self.is_capped = Output(bool)
         self.is_running = Output(bool)
-        self.source_out_T = Output(Temperature)
-        self.sink_out_T = Output(Temperature)
 
         # Outlets
         self.source_out = Outlet(Stream)
@@ -120,8 +113,10 @@ class HeatPump(Module):
 
     def _compute_outputs(self, inlets, outlets):
         values = self._performance(inlets.source_in, inlets.sink_in)
-        for name, value in values.items():
-            setattr(self, name, value)
+        self.cop = values["cop"]
+        self.temperature_lift = values["temperature_lift"]
+        self.is_capped = values["is_capped"]
+        self.is_running = values["is_running"]
 
     def capex(self, assumptions):
         """Return the cost of the heat pump from its capacity."""

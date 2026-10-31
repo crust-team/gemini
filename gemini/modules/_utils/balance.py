@@ -1,42 +1,56 @@
 """Mass and sensible-energy audits over retained evaluation trees.
 
-A leaf exchanges energy outside its streams only through these ``Power`` outputs, named the
-same in every module and nonnegative except the storage term below: ``electricity`` and
-``fuel`` consumed, ``heat_absorbed`` taken in from outside the plant (ambient air, a cooled
-building), ``heat_loss`` lost to the environment, ``heat_supplied`` delivered to a consumer and
-``electricity_generated`` produced. Storage is the one signed energy output:
-``heat_accumulation`` is the rate of increase of the energy a leaf stores (positive while
-charging, negative while discharging), counted as an outflow, so a storage leaf that reports it
-closes like any other leaf. The legacy isothermal pumps do not allocate electricity to fluid
-enthalpy, mechanical work or environmental loss. Report that unresolved energy explicitly;
-never manufacture heat loss to force a first-law residual to zero.
+A leaf exchanges energy outside its streams through its ports: ``power_in`` and ``power_out`` carry
+electricity and ``loss_out`` heat to the surroundings, signed. ``fuel`` is the one energy on no port
+of a leaf, and ``heat_accumulation`` the rate of increase of the energy a leaf stores, counted as
+an outflow. The legacy isothermal pumps do not allocate electricity to fluid enthalpy, mechanical
+work or environmental loss. Report that unresolved energy explicitly; never manufacture heat loss
+to force a first-law residual to zero.
 """
 
 from gemini import ops
-from gemini.modules.grids import ChemicalGrid, GasGrid, WasteGrid
 from gemini.modules.pumps import ESP, InjectionPump, LineShaftPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.physics import combustion, diagnostics, heat_transfer
 from gemini.types.flows import Stream
 
 ENERGY_INPUTS = ("electricity", "fuel", "heat_absorbed")
-"""Leaf outputs [W] that bring energy into a leaf from outside its streams."""
+"""Energy [W] that enters a leaf from outside its streams, as ``collect_flows`` names it."""
 
-ENERGY_OUTPUTS = ("heat_loss", "heat_supplied", "electricity_generated", "heat_accumulation")
-"""Leaf outputs [W] that take energy out of a leaf other than through its streams.
+ENERGY_OUTPUTS = ("heat_loss", "electricity_generated", "heat_accumulation")
+"""Energy [W] that leaves a leaf other than through its streams.
 
 All are nonnegative except ``heat_accumulation``, the signed rate of change of stored energy.
 """
 
 
+def _port_power(ports, name):
+    """Return the power of port ``name`` of a leaf; a grid's list is not the leaf's own energy."""
+    power = ports[name] if name in ports else 0.0
+    return 0.0 if isinstance(power, list) else power
+
+
+def _leaf_flows(result):
+    """Return the energy flows of one leaf call, read from its ports."""
+    loss, absorbed = heat_transfer.signed_parts(_port_power(result.outlets, "loss_out"))
+    return {
+        "electricity": _port_power(result.inlets, "power_in"),
+        "fuel": result.outputs.get("fuel", 0.0),
+        "heat_absorbed": absorbed,
+        "heat_loss": loss,
+        "electricity_generated": _port_power(result.outlets, "power_out"),
+        "heat_accumulation": result.outputs.get("heat_accumulation", 0.0),
+    }
+
+
 def collect_flows(result_tree):
-    """Sum leaf energy outputs once, ignoring composite aggregate outputs [W]."""
+    """Sum the energy flows of the leaves once, read from their ports [W]."""
     if isinstance(result_tree, dict):
         totals = [collect_flows(child) for child in result_tree.values()]
         return {key: sum(t[key] for t in totals) for key in ENERGY_INPUTS + ENERGY_OUTPUTS}
     if result_tree.children:
         return collect_flows(result_tree.children)
-    return {key: result_tree.outputs.get(key, 0.0) for key in ENERGY_INPUTS + ENERGY_OUTPUTS}
+    return _leaf_flows(result_tree)
 
 
 def emissions(result_tree, fuel_factor, electricity_factor):
@@ -118,7 +132,7 @@ def mass_balance(module, result):
 
 def _is_edge(module):
     """Return whether ``module`` is at the plant's edge: what enters it left the plant."""
-    return isinstance(module, (ChemicalGrid, GasGrid, WasteGrid))
+    return module.category in ("grids", "environment")
 
 
 def _leaf_mass(module, result):

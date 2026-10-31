@@ -1,22 +1,11 @@
-"""The outputs of a built plant: sums, copies of one module's value and ratios, from the spec."""
+"""The outputs of a built plant: copies of one module's value and ratios, from the spec."""
 
 from gemini.errors import ValidationError
-from gemini.modules._utils.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
 from gemini.types.declarations import Output
 from gemini.types.quantities import TemperatureDifference
 from gemini.utils.strings import close_matches, did_you_mean, join_names
 
-ENERGY = ENERGY_INPUTS + ENERGY_OUTPUTS
-KEYS = ("of", "sum", "ratio", "difference")
-
-
-def declare_automatic(plant):
-    """Declare the sum of each energy output that some descendant leaf declares."""
-    leaves = plant._descendant_leaves()
-    for name in ENERGY:
-        kinds = [leaf._outputs[name].type for leaf in leaves if name in leaf._outputs]
-        if kinds:
-            plant._register_declaration(name, Output(kinds[0]))
+KEYS = ("of", "ratio", "difference")
 
 
 def _unknown(subject, name, valid):
@@ -39,25 +28,13 @@ def _target(plant, spec):
             code="unknown_name",
         )
     if "field" in spec:
-        if local not in module._outlets:
-            raise _unknown("of", local, module._outlets)
-        return module._outlets[local].field(spec["field"])
+        ports = module._inlets | module._outlets
+        if local not in ports:
+            raise _unknown("of", local, ports)
+        return ports[local].field(spec["field"])
     if local not in module._outputs:
         raise _unknown("of", local, module._outputs)
     return module._outputs[local]
-
-
-def _summed(plant, spec):
-    name = spec["sum"]
-    declarations = [
-        leaf._outputs[name] for leaf in plant._descendant_leaves() if name in leaf._outputs
-    ]
-    if not declarations:
-        names = sorted({n for leaf in plant._descendant_leaves() for n in leaf._outputs})
-        raise _unknown("sum", name, names)
-    if not declarations[0].additive:
-        raise ValidationError(f"sum = {name!r}: not an additive output", path="sum")
-    return Output(declarations[0].type)
 
 
 def _ratio(plant, spec):
@@ -81,7 +58,7 @@ def _difference(plant, spec):
 def declare_output(plant, name, spec):
     """Declare output ``name`` from a spec entry.
 
-    The entry is ``{"of": path}``, ``{"sum": name}``, ``{"ratio": [a, b]}`` or
+    The entry is ``{"of": path}``, ``{"ratio": [a, b]}`` or
     ``{"difference": [a, b]}``, the temperature difference of two outputs.
     """
     given = [key for key in KEYS if key in spec]
@@ -91,7 +68,7 @@ def declare_output(plant, name, spec):
             path="",
             code="invalid_format",
         )
-    builders = {"of": lambda: Output.of(_target(plant, spec)), "sum": lambda: _summed(plant, spec)}
+    builders = {"of": lambda: Output.of(_target(plant, spec))}
     builders["ratio"] = lambda: _ratio(plant, spec)
     builders["difference"] = lambda: _difference(plant, spec)
     if name in plant._children:

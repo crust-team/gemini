@@ -6,7 +6,6 @@ from gemini.modules.module import Module
 from gemini.modules.storage import _physics
 from gemini.physics import heat_transfer, units
 from gemini.types import (
-    Duty,
     Energy,
     Fraction,
     HeatAccumulation,
@@ -99,9 +98,7 @@ class IceStorage(Module):
 
         # Outputs
         self.stored_cold = Output(Energy)
-        self.duty = Output(Duty)
         self.heat_accumulation = Output(HeatAccumulation)
-        self.fluid_out_T = Output(Temperature)
         self.is_full = Output(bool)
         self.is_empty = Output(bool)
 
@@ -124,13 +121,13 @@ class IceStorage(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        inlet = inlets.fluid_in
         self.stored_cold = _physics.ice_stored_cold(
             self.water_mass, self.latent_heat, self.ice_fraction
         )
-        self.duty = heat_transfer.heat_rate(self._conductance(inlet), inlet.T - self.temperature)
-        self.heat_accumulation = self.duty
-        self.fluid_out_T = outlets.fluid_out.T
+        inlet, outlet = inlets.fluid_in, outlets.fluid_out
+        self.heat_accumulation = heat_transfer.heat_rate(
+            inlet.heat_capacity_rate(), inlet.T - outlet.T
+        )
         self.is_full = self.ice_fraction >= 1
         self.is_empty = self.ice_fraction <= 0
 

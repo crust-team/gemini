@@ -8,7 +8,6 @@ from gemini.types import (
     Boundary,
     Control,
     Fraction,
-    HeatAbsorbed,
     Inlet,
     MassFlow,
     Outlet,
@@ -87,11 +86,9 @@ class CoolingGrid(Module):
         self.indoor_relative_humidity = Boundary(Fraction, gt=0)
 
         # Outputs
-        self.heat_absorbed = Output(HeatAbsorbed)
         self.unmet_sensible = Output(Power)
         self.unmet_latent = Output(Power)
         self.dew_point = Output(Temperature)
-        self.return_out_T = Output(Temperature)
         self.is_unmet = Output(bool)
 
         # Outlets
@@ -121,13 +118,11 @@ class CoolingGrid(Module):
 
     def _compute_outputs(self, inlets, outlets):
         sensible, latent = self._met_loads(inlets.supply_in, outlets.return_out)
-        self.heat_absorbed = sensible + latent
         self.unmet_sensible = self.sensible_cooling_demand - sensible
         self.unmet_latent = self.latent_cooling_demand - latent
         self.dew_point = psychrometrics.dew_point(
             self.indoor_temperature, self.indoor_relative_humidity
         )
-        self.return_out_T = outlets.return_out.T
         self.is_unmet = ops.logical_or(self.unmet_sensible > 0, self.unmet_latent > 0)
 
     def _offer(self, inlets):

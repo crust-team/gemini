@@ -172,7 +172,8 @@ def reference_rows():
 def test_a_tick_by_tick_build_equals_the_former_row_dict_storage():
     """One-tick commits give the frame of the former row-dict storage."""
     frame = path_frame(build_by_rows())
-    pd.testing.assert_frame_equal(frame, reference_frame(reference_rows(), TIMES))
+    reference = reference_frame(reference_rows(), TIMES)
+    pd.testing.assert_frame_equal(frame[reference.columns], reference)
     assert frame[("pump", "flag")].dtype == object
     assert frame[("pump", "count")].dtype == np.float64
     assert frame[("pump", "maybe")].dtype == np.float64

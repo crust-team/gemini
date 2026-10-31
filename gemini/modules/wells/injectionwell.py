@@ -4,7 +4,6 @@ from gemini import ops
 from gemini.modules.wells.well import _Well
 from gemini.physics import fluid, heat_transfer, hydraulics
 from gemini.types import (
-    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -36,14 +35,10 @@ class InjectionWell(_Well):
         self.wellhead_in = Inlet(Stream, kind="brine")
 
         # Outputs
-        self.wellhead_temperature = Output(Temperature, soft_sensor=True)
-        self.bottomhole_pressure = Output(Pressure, soft_sensor=True)
-        self.bottomhole_temperature = Output(Temperature)
         self.friction_pressure_drop = Output(PressureDifference)
         self.gravity_pressure_drop = Output(PressureDifference)
         self.section_pressure = Output(list[Pressure])
         self.section_temperature = Output(list[Temperature])
-        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.bottom_out = Outlet(Stream, kind="brine")
@@ -68,18 +63,12 @@ class InjectionWell(_Well):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        wellhead = inlets.wellhead_in
-        bottom = outlets.bottom_out
-        stream = self._traversal_stream(wellhead)
+        stream = self._traversal_stream(inlets.wellhead_in)
         result = self.traverse(stream, 0, self.pipe_path.total_length, "down")
-        self.wellhead_temperature = wellhead.T
-        self.bottomhole_pressure = bottom.p
-        self.bottomhole_temperature = bottom.T
         self.friction_pressure_drop = result.friction_pressure_drop
         self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
-        self.heat_loss = outlets.loss_out
 
     def _loss(self, stream, bottom):
         """Return the heat [W] the well gives to the rock between its two ends."""

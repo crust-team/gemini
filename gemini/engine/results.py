@@ -22,7 +22,7 @@ from gemini.utils.jsonable import to_plain
 from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
 from gemini.utils.time import to_utc
 
-ENERGY_FIELDS = ("electricity", "fuel", "heat_loss")
+ENERGY_FIELDS = ("power_in", "fuel", "loss_out")
 """Leaf outputs integrated over time into energy totals."""
 
 SERIES_UNITS = {
@@ -104,6 +104,14 @@ def _add_skips(skip_counts, skips):
         target = skip_counts.setdefault(path, {})
         for reason, count in reasons.items():
             target[reason] = target.get(reason, 0) + count
+
+
+class _ColumnUnits(dict):
+    """The unit of each column of a frame; pandas copies ``attrs`` at every step, this it shares."""
+
+    def __deepcopy__(self, memo):
+        """Return this mapping: its copies would all be equal."""
+        return self
 
 
 class Results:
@@ -206,7 +214,7 @@ class Results:
             if units:
                 frame[key] = column
         frame.columns = list(stated)
-        frame.attrs["units"] = stated
+        frame.attrs["units"] = _ColumnUnits(stated)
         return frame
 
     def _column(self, column, path, field, output):
@@ -507,23 +515,53 @@ class Results:
         return result
 
 
+PORT_QUANTITIES = {
+    "mass_flow": ("kg/s", "mass_flow"),
+    "volume_flow": ("m3/s", "volume_flow"),
+    "temperature": ("K", "temperature"),
+    "pressure": ("Pa", "pressure"),
+    "enthalpy_flow": ("W", "power"),
+    "gas_flow": ("kg/s", "mass_flow"),
+    "co2_flow": ("kg/s", "mass_flow"),
+    "chemical_flow": ("W", "power"),
+}
+"""Unit and quantity of each field of a fluid port, named ``<port>.<quantity>`` in the results."""
+
+
+def port_fields(module):
+    """Return ``{field: (unit, quantity)}`` of the ports of ``module``."""
+    fields = {}
+    for name, port in (module.inlets() | module.outlets()).items():
+        if not port.carries_stream:
+            fields[name] = ("W", "power")
+            continue
+        fields |= {f"{name}.{key}": item for key, item in PORT_QUANTITIES.items()}
+    return fields
+
+
 def declared_units(plant):
-    """Return ``{path: {field: unit}}``: the SI unit each module of a plant declares per output."""
+    """Return ``{path: {field: unit}}``: the SI unit of each output and port field of a plant."""
     return {
         path: {
-            name: declaration.unit or "-"
-            for name, declaration in module.outputs(recurse=False).items()
+            **{
+                name: declaration.unit or "-"
+                for name, declaration in module.outputs(recurse=False).items()
+            },
+            **{name: item[0] for name, item in port_fields(module).items()},
         }
         for path, module in plant.named_modules()
     }
 
 
 def declared_quantities(plant):
-    """Return ``{path: {field: quantity}}``: the quantity each module declares per output."""
+    """Return ``{path: {field: quantity}}``: the quantity of each output and port field."""
     return {
         path: {
-            name: declaration.quantity
-            for name, declaration in module.outputs(recurse=False).items()
+            **{
+                name: declaration.quantity
+                for name, declaration in module.outputs(recurse=False).items()
+            },
+            **{name: item[1] for name, item in port_fields(module).items()},
         }
         for path, module in plant.named_modules()
     }

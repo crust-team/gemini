@@ -8,6 +8,7 @@ from gemini.modules.pumps import CentrifugalPump
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 CP = 4217.4
 PARAMS = dict(
@@ -27,7 +28,7 @@ def pump():
 def test_best_efficiency_point_by_hand():
     """At the rated speed and the best-efficiency flow every output follows by hand."""
     result = pump()(fluid_in=Stream(m_dot=50, T=330, p=3e5), frequency=50)
-    out = result.outputs
+    out = reading(result)
     assert out.flow == pytest.approx(0.05)
     assert out.head == pytest.approx(6e5 - 4e7 * 0.05**2)
     assert out.efficiency == pytest.approx(0.8)
@@ -43,15 +44,15 @@ def test_best_efficiency_point_by_hand():
 
 def test_part_load_efficiency_curve():
     """Half the best-efficiency flow gives three quarters of the best efficiency."""
-    out = pump()(fluid_in=Stream(m_dot=25, T=330, p=3e5), frequency=50).outputs
+    out = reading(pump()(fluid_in=Stream(m_dot=25, T=330, p=3e5), frequency=50))
     assert out.efficiency == pytest.approx(0.8 * 0.5 * 1.5)
     assert out.shaft_power == pytest.approx(0.025 * (6e5 - 4e7 * 0.025**2) / 0.6)
 
 
 def test_affinity_laws_scale_flow_head_and_power():
     """At speed ratio s, flow s*Q gives s^2 times the head and s^3 times the shaft power."""
-    rated = pump()(fluid_in=Stream(m_dot=40, T=330, p=3e5), frequency=50).outputs
-    slow = pump()(fluid_in=Stream(m_dot=32, T=330, p=3e5), frequency=40).outputs
+    rated = reading(pump()(fluid_in=Stream(m_dot=40, T=330, p=3e5), frequency=50))
+    slow = reading(pump()(fluid_in=Stream(m_dot=32, T=330, p=3e5), frequency=40))
     assert slow.head == pytest.approx(0.8**2 * rated.head)
     assert slow.shaft_power == pytest.approx(0.8**3 * rated.shaft_power)
     assert slow.efficiency == pytest.approx(rated.efficiency)
@@ -62,7 +63,7 @@ def test_first_law_closure_with_flow_work():
     machine = pump()
     suction = Stream(m_dot=45, T=330, p=3e5)
     result = machine(fluid_in=suction, frequency=47)
-    out, discharge = result.outputs, result.outlets.fluid_out
+    out, discharge = reading(result), result.outlets.fluid_out
     sensible = suction.m_dot * CP * (discharge.T - suction.T)
     flow_work = out.flow * (discharge.p - suction.p)
     assert out.electricity == pytest.approx(sensible + flow_work + out.heat_loss, rel=1e-12)
@@ -77,8 +78,9 @@ def test_zero_flow_is_a_stopped_pump():
     suction = Stream(m_dot=0, T=330, p=3e5)
     result = pump()(fluid_in=suction, frequency=50)
     assert result.outlets.fluid_out == suction
-    assert all(result.outputs[name] == 0 for name in ("head", "shaft_power", "electricity"))
-    assert result.outputs.fluid_out_T == 330
+    assert all(result.outputs[name] == 0 for name in ("head", "shaft_power"))
+    assert result.inlets.power_in == 0
+    assert reading(result).fluid_out_T == 330
 
 
 def test_off_curve_and_reverse_flow_raise():

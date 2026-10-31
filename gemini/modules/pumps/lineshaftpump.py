@@ -10,7 +10,6 @@ from gemini.types import (
     Count,
     Dimensionless,
     Efficiency,
-    Electricity,
     Frequency,
     Inlet,
     Length,
@@ -21,7 +20,6 @@ from gemini.types import (
     Power,
     PressureDifference,
     Stream,
-    VolumeFlow,
 )
 
 
@@ -75,13 +73,11 @@ class LineShaftPump(Module):
         self.frequency = Control(Frequency)
 
         # Outputs
-        self.flow = Output(VolumeFlow)
         self.head = Output(PressureDifference, soft_sensor=True)
         self.pump_power = Output(Power)
         self.shaft_friction_power = Output(Power)
         self.shaft_power = Output(Power, soft_sensor=True)
         self.efficiency = Output(Dimensionless)
-        self.electricity = Output(Electricity)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
@@ -103,13 +99,11 @@ class LineShaftPump(Module):
     def _compute_outputs(self, inlets, outlets):
         flow = inlets.fluid_in.volumetric_flow()
         pump_power, friction = self._powers(flow)
-        self.flow = flow
         self.head = outlets.fluid_out.p - inlets.fluid_in.p
         self.pump_power = pump_power
         self.shaft_friction_power = friction
         self.shaft_power = pump_power + friction
         self.efficiency = _physics.pump_efficiency(flow, self.head, pump_power)
-        self.electricity = inlets.power_in
 
     def _powers(self, flow):
         """Return the pump power and the shaft friction power [W] at a volume flow [m3/s]."""

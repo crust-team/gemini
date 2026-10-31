@@ -80,30 +80,7 @@
       "kind": "brine"
     }
   },
-  "measured": {
-    "electricity": {
-      "default": null,
-      "description": null,
-      "enum": null,
-      "maximum": null,
-      "minimum": null,
-      "quantity": "electricity",
-      "section": "output",
-      "type": "number",
-      "unit": "W"
-    },
-    "heat_loss": {
-      "default": null,
-      "description": null,
-      "enum": null,
-      "maximum": null,
-      "minimum": null,
-      "quantity": "heat_loss",
-      "section": "output",
-      "type": "number",
-      "unit": "W"
-    }
-  },
+  "measured": {},
   "name": "doublet",
   "outlets": {
     "supply_out": {
@@ -121,18 +98,7 @@
       "kind": "brine"
     }
   },
-  "outputs": {
-    "electricity": {
-      "quantity": "electricity",
-      "soft_sensor": false,
-      "unit": "W"
-    },
-    "heat_loss": {
-      "quantity": "heat_loss",
-      "soft_sensor": false,
-      "unit": "W"
-    }
-  },
+  "outputs": {},
   "parameters": {},
   "state": {},
   "summary": "A plant built from named modules and connections, a normal composite ``Module``.",

@@ -7,6 +7,7 @@ from gemini.modules import mass_balance
 from gemini.modules.power import Separator, _physics
 from gemini.types import STEAM, Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.reading import reading
 
 GEOFLUID = Stream(m_dot=100, T=523.15, p=40e5)
 """Liquid at 250 degC and 40 bar, a typical liquid-dominated wellhead feed."""
@@ -15,7 +16,7 @@ GEOFLUID = Stream(m_dot=100, T=523.15, p=40e5)
 def test_flash_split_matches_steam_tables():
     """250 degC liquid flashed to 6 bar: x = (1085.8 - 670.4) / 2085.9 = 0.199 (steam tables)."""
     result = Separator()(fluid_in=GEOFLUID, pressure_setpoint="6 bar")
-    out, liquid, gas = result.outputs, result.outlets.liquid_out, result.outlets.gas_out
+    out, liquid, gas = reading(result), result.outlets.liquid_out, result.outlets.gas_out
     assert out.steam_fraction == pytest.approx((1085.8 - 670.4) / 2085.9, abs=2e-4)
     assert out.saturation_temperature == pytest.approx(431.98, abs=0.01)
     assert out.steam_mass_flow == gas.m_dot == pytest.approx(100 * out.steam_fraction)
@@ -52,7 +53,7 @@ def test_subcooled_and_zero_flow():
     assert result.outputs.steam_fraction == 0 and result.outlets.gas_out.m_dot == 0
     assert result.outlets.liquid_out.T == 393.15 and result.outlets.liquid_out.m_dot == 50
     stopped = Separator()(fluid_in=GEOFLUID.with_(m_dot=0), pressure_setpoint=6e5)
-    assert stopped.outputs.steam_mass_flow == 0 and stopped.outlets.liquid_out.m_dot == 0
+    assert reading(stopped).steam_mass_flow == 0 and stopped.outlets.liquid_out.m_dot == 0
     assert stopped.outputs.steam_fraction > 0
 
 

@@ -16,7 +16,7 @@ from gemini.modules.plants.migration import RENAMED_NAMES
 from gemini.types import Control, Output
 from gemini.types.bindings import Binding, DatedParams, ModuleBindings
 from tests.fixtures.errors import raises
-from tests.fixtures.frames import path_frame
+from tests.fixtures.frames import on_ports, path_frame
 
 ROOT = Path(__file__).parents[2]
 REFERENCE = ROOT / "tests/fixtures/engine_reference"
@@ -68,7 +68,7 @@ def _reference(name, actual):
     """
     old = pd.read_pickle(REFERENCE / name)
     old = old.rename(columns={"filter_hot": "filters.hot", "filter_return": "filters.cold"})
-    old = old.rename(columns=RENAMED_NAMES)
+    old = on_ports(old.rename(columns=RENAMED_NAMES))
     for column in old:
         old[column] = old[column].astype(actual[column].dtype)
     if isinstance(old.index, pd.DatetimeIndex):

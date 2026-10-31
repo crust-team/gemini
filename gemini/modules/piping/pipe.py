@@ -6,8 +6,6 @@ from gemini.modules.module import Module
 from gemini.physics import geometry, heat_transfer, hydraulics
 from gemini.types import (
     Elevation,
-    HeatAbsorbed,
-    HeatLoss,
     HeatTransferCoefficient,
     Inlet,
     Length,
@@ -18,7 +16,6 @@ from gemini.types import (
     PressureDifference,
     Speed,
     Stream,
-    Temperature,
 )
 
 
@@ -73,9 +70,6 @@ class Pipe(Module):
         # Outputs
         self.pressure_drop = Output(PressureDifference)
         self.velocity = Output(Speed)
-        self.fluid_out_T = Output(Temperature)
-        self.heat_loss = Output(HeatLoss)
-        self.heat_absorbed = Output(HeatAbsorbed)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -112,9 +106,6 @@ class Pipe(Module):
         self.pressure_drop = inlet.p - outlet.p
         properties = inlet.fluid.properties(inlet.p, inlet.T)
         self.velocity = geometry.mean_velocity(inlet.m_dot, properties.rho_l, self.inner_diameter)
-        self.fluid_out_T = outlet.T
-        self.heat_loss = loss
-        self.heat_absorbed = absorbed
 
     def _check(self, inlet):
         """Reject a pipe shorter than its rise, reverse flow and free gas."""

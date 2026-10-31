@@ -105,7 +105,7 @@ On a class or an instance of `Module` (and on what `gm.modules.get` returns):
  values: {parameters, controls, boundaries}}     on an instance only
 ```
 
-`kind` is `null` for a port that takes any stream; an output's `quantity` is an additive quantity or `null`;
+`kind` is `null` for a port that takes any stream; an output's `quantity` is the quantity or `null`;
 `measured` is every output of the module, which is what a `measured` binding may name. `minimum`
 and `maximum` are the closest limit, strict or not. `values` are keyed by dotted path.
 
@@ -282,6 +282,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | Port quantities are in `Results`: `<port>.mass_flow`, `.volume_flow`, `.temperature`, `.pressure`, `.enthalpy_flow`, `.gas_flow`, `.co2_flow`, `.chemical_flow`, and a `Power` port under its name. Outputs a port shows are gone (`useful_duty`, `condenser_duty`, `electricity`, `electricity_generated`, `heat_loss`, `heat_supplied`, ...), and so are automatic sums, the `sum` key of a plant's `outputs` and the quantities `ElectricityGenerated`, `HeatLoss`, `HeatSupplied` and `HeatAbsorbed`. `gm.kpi` and `gm.economics` read the edge modules; `waste_disposal_price`, `chemical_price`. |
 | 0.2.0, unreleased changes | | Port names follow `<role>_in` and `<role>_out` (`gm.plants.migrate` converts stored specs). `Inlet(Stream, kind=...)` replaces `stream=`, the first argument of a declaration is `type`, `p.add(type, ...)`, `p.connect(source, target, type=None)`, a connection's `type: "state"`; `describe()` gives ports `{kind, fields}`, outputs `{unit, quantity, soft_sensor}`, connections `{source, target, kind, type}`. |
 | 0.2.0, unreleased changes | | Losses are ports: wells, pipes, storage, boilers, `CHP`, `ORC`, `FlashTurbine`, `CentrifugalPump`, `GasCompressor`, `BoreholeField` and `DownholeHeatExchanger` have `loss_out`, signed, to `Atmosphere.heat_in` or `Formation.heat_in`; `DistrictNetwork` and `ATESPlant` expose one `loss_out`. |
 | 0.2.0, unreleased changes | | Category `environment`: `Atmosphere` holds the ambient conditions and computes `co2_emission` and `methane_emission`; `Formation` is created by `Doublet`. `Vent` is gone: its inlet connects to `Atmosphere.gas_in`. `Boiler`, `CHP` and `Flare` have `flue_out`; `Pipe`, `Cooler`, `ThermalStorage` and `ORC` have `air_in` instead of `ambient_temperature`; `Cooler` has `air_out` and may close a water loop (`loop_pressure`, `flow`). |

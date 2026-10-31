@@ -174,8 +174,8 @@ def test_opex_needs_the_price_of_an_energy_the_run_draws():
 def test_gas_price_buys_purchased_gas_only():
     """Co-produced gas costs nothing; a price per MWh prices what was purchased."""
     columns = {
-        "pump": {"electricity": [0.0] * HOURS},
-        "boiler": {"fuel": [3e6] * HOURS, "fuel_purchased": [1e6] * HOURS},
+        "grid": {"net_import": [0.0] * HOURS},
+        "gas": {"gas_out.chemical_flow": [1e6] * HOURS},
     }
     values = gm.economics.Assumptions(gas_price=40.0)
     annual = costs.annual_energies(heating_plant(), make_results(columns))

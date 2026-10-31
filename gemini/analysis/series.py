@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from gemini.modules.grids import CoolingGrid, HeatingGrid
 from gemini.modules.module import Module
 from gemini.utils.strings import join_path
 
@@ -12,7 +13,7 @@ def window_seconds(results):
 
 
 def leaf_total(plant, frame, field, module_class=Module):
-    """Return the sum of output ``field`` over the leaves of ``module_class`` as a series.
+    """Return the sum of declared output ``field`` over the leaves of ``module_class``.
 
     Parameters
     ----------
@@ -45,6 +46,46 @@ def leaf_total(plant, frame, field, module_class=Module):
     if not columns:
         return None
     return frame[columns].sum(axis=1, min_count=1)
+
+
+def port_difference(plant, frame, module_class, first, second):
+    """Return the sum over leaves of ``module_class`` of port field ``first`` less ``second``.
+
+    Fields are ``<port>.<quantity>``: what a grid delivers is what its water loses between its
+    ports. ``None`` when no such leaf ran. A tick where a column has no value is NaN.
+    """
+    paths = [
+        path
+        for path, module in plant.named_modules()
+        if module.is_leaf and isinstance(module, module_class) and join_path(path, first) in frame
+    ]
+    if not paths:
+        return None
+    return sum(frame[join_path(path, first)] - frame[join_path(path, second)] for path in paths)
+
+
+def delivered_heat(plant, frame):
+    """Return the heat delivered [W]: what the water loses across the ``HeatingGrid`` leaves."""
+    return port_difference(
+        plant, frame, HeatingGrid, "supply_in.enthalpy_flow", "return_out.enthalpy_flow"
+    )
+
+
+def delivered_cold(plant, frame):
+    """Return the cold delivered [W]: what the water gains across the ``CoolingGrid`` leaves."""
+    return port_difference(
+        plant, frame, CoolingGrid, "return_out.enthalpy_flow", "supply_in.enthalpy_flow"
+    )
+
+
+def edge_total(plant, frame, field, module_class):
+    """Return the sum of column ``field`` over the leaves of ``module_class``, or ``None``."""
+    columns = [
+        join_path(path, field)
+        for path, module in plant.named_modules()
+        if module.is_leaf and isinstance(module, module_class) and join_path(path, field) in frame
+    ]
+    return frame[columns].sum(axis=1, min_count=1) if columns else None
 
 
 def results_total(results, frame, field):

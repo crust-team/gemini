@@ -105,6 +105,21 @@ class Stream:
             self.m_dot, self.fluid.properties(self.p, self.T).cp_l
         )
 
+    def quantities(self):
+        """Return the quantities of this stream as a port shows them (``stream_quantities``)."""
+        fluid = self.fluid
+        properties = fluid.properties(self.p, self.T)
+        return fluid_physics.stream_quantities(
+            self.m_dot,
+            self.T,
+            self.p,
+            fluid.density_at(self.p, self.T),
+            properties.cp_l,
+            fluid.gas_share(),
+            fluid.co2_in_gas(),
+            fluid.heating_value(),
+        )
+
     def with_(self, **changes) -> "Stream":
         """Return a copy with updated SI stream fields.
 

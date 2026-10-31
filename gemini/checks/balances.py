@@ -2,7 +2,6 @@
 
 import numpy as np
 
-from gemini.modules._utils.balance import ENERGY_INPUTS, ENERGY_OUTPUTS
 from gemini.types.shapes import check, value
 from gemini.utils.strings import join_path
 
@@ -12,10 +11,8 @@ ENERGY_TOLERANCE = 1e-9
 MASS_TOLERANCE = 1e-12
 """Smallest negative mass flow [kg/s] still read as zero."""
 
-_NONNEGATIVE_ENERGY = tuple(
-    name for name in ENERGY_INPUTS + ENERGY_OUTPUTS if name != "heat_accumulation"
-)
-"""The energy outputs that are nonnegative; ``heat_accumulation`` is signed."""
+_NONNEGATIVE_ENERGY = ("fuel", "power_in", "power_out")
+"""The energy columns that are nonnegative; ``loss_out`` and ``heat_accumulation`` are signed."""
 
 
 def _columns(results, wanted):

@@ -42,7 +42,6 @@ class InhibitorDosing(Module):
         self.dose = Control(Fraction)
 
         # Outputs
-        self.product_mass_flow = Output(MassFlow)
         self.active_mass_flow = Output(MassFlow)
 
         # Outlets
@@ -71,5 +70,4 @@ class InhibitorDosing(Module):
         product, active = _physics.dosing_flows(
             self.dose, inlets.fluid_in.m_dot, self.product_concentration
         )
-        self.product_mass_flow = product
         self.active_mass_flow = active

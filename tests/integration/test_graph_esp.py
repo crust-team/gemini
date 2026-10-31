@@ -51,11 +51,11 @@ def _untraced(esp, week):
 
 
 def _motor_loss(module, inlets, outlets):
-    module.electricity = module.power / 0.9
+    module.power = module.power / 0.9
 
 
 def _untraceable(module, inlets, outlets):
-    module.electricity = float(module.power) / 0.9
+    module.power = float(module.power) / 0.9
 
 
 def _untraced_with_hook(shared_plant, week, hook):
@@ -205,7 +205,7 @@ def test_hooks_on_the_traced_esp(esp, week, plain_week, motor_loss_week, untrace
 
     writer = esp.register_forward_hook(_motor_loss)
     traced = run(esp, inlets, inputs)
-    assert traced.graph.outputs["outputs.electricity"].op == "truediv"
+    assert traced.graph.outputs["outputs.power"].op == "truediv"
     _assert_equal(traced, motor_loss_week)
     writer.remove()
 

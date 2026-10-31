@@ -6,6 +6,7 @@ import gemini as gm
 from gemini.modules import Module, energy_balance, mass_balance
 from gemini.modules.plants import ATESPlant
 from gemini.types import Inlet, Outlet, Output, Stream
+from tests.fixtures.reading import reading
 
 CP = 4217.4
 HOUR = 3600.0
@@ -57,7 +58,7 @@ def test_charge_cools_the_building_with_native_groundwater():
     """Empty stores produce at the aquifer temperature; the exchanger cools the building."""
     plant = _plant()
     result = plant(return_in=SUMMER)
-    out = result.outputs
+    out = reading(result)
     exchanger = result.children["heat_exchanger"]
     groundwater = exchanger.inlets.cold_in
     assert out.production_out_T == 284.15 and groundwater.T > 284.15
@@ -97,7 +98,7 @@ def test_discharge_feeds_the_heat_pump_from_the_warm_store():
     warm = 284.15 + state["storage"]["warm_temperature_change"]
     plant.storage.mode = "discharge"
     state, result = plant.step(state, HOUR, {"return_in": WINTER})
-    out = result.outputs
+    out = reading(result)
     lifted = result.children["heat_pump"]
     assert out.production_out_T == pytest.approx(warm, rel=1e-14)
     assert result.children["pump"].inlets.fluid_in.T == out.production_out_T
@@ -106,7 +107,7 @@ def test_discharge_feeds_the_heat_pump_from_the_warm_store():
     assert result.children["storage"].inlets.injection_in.T == lifted.outlets.source_out.T < warm
     assert "heat_exchanger" not in result.children
     assert out.electricity == pytest.approx(
-        lifted.outputs.electricity + result.children["pump"].outputs.electricity, rel=1e-14
+        reading(lifted).electricity + reading(result.children["pump"]).electricity, rel=1e-14
     )
     assert state["storage"]["cold_volume"] == pytest.approx(30 / 1000 * HOUR)
     _check_balances(plant, result)
@@ -118,7 +119,7 @@ def test_idle_moves_no_groundwater_and_flow_is_required_to_stop():
     plant.groundwater_flow = 0.0
     result = plant(return_in=SUMMER)
     assert result.outlets.supply_out.T == SUMMER.T
-    assert result.outputs.electricity == 0
+    assert reading(result).electricity == 0
     plant.groundwater_flow = 30.0
     with pytest.raises(gm.errors.PhysicsError, match="idle"):
         plant(return_in=SUMMER)

@@ -34,7 +34,7 @@ def test_a_network_spec_is_valid_and_round_trips(consumers, service):
     assert gm.plants.from_spec(spec).to_spec() == spec
     kinds = {item["type"] for item in spec["modules"]["substations"]["modules"].values()}
     assert kinds == {generators.SUBSTATIONS[service]}
-    assert ("heat_supplied" in spec["outputs"]) == (service == "heating")
+    assert "heat_supplied" not in spec["outputs"]
 
 
 def _order(spec):

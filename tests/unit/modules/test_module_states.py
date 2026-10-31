@@ -19,6 +19,7 @@ from gemini.types import (
 )
 from gemini.types.bindings import Binding, ModuleBindings
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 STREAM = Stream(m_dot=1, T=350, p=1e6)
 
@@ -79,9 +80,6 @@ class Line(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream)
-
-        # Outputs
-        self.duty = Output(Duty)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -157,7 +155,7 @@ def test_composite_step_advances_every_descendant():
     assert state["first"]["temperature"] > state["second"]["temperature"] > 300
     assert result.outlets.fluid_out.T == 300
     first, second = 350 - 305, 305 - 300
-    assert result.outputs.duty == pytest.approx(STREAM.m_dot * 4217.4 * (first + second))
+    assert reading(result).duty == pytest.approx(STREAM.m_dot * 4217.4 * (first + second))
 
 
 def test_state_errors():

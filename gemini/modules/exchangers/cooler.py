@@ -8,8 +8,6 @@ from gemini.modules.module import Module
 from gemini.physics import dispatch, heat_transfer, psychrometrics
 from gemini.types import (
     Control,
-    Duty,
-    Electricity,
     Inlet,
     MassFlow,
     Outlet,
@@ -76,9 +74,6 @@ class Cooler(Module):
         self.flow = Control(MassFlow | None, default=None, ge=0)
 
         # Outputs
-        self.duty = Output(Duty)
-        self.fluid_out_T = Output(Temperature)
-        self.electricity = Output(Electricity)
         self.evaporation_rate = Output(MassFlow)
         self.is_capped = Output(bool)
 
@@ -126,9 +121,6 @@ class Cooler(Module):
 
     def _compute_outputs(self, inlets, outlets):
         duty, _, requested = self._duty(inlets.fluid_in, inlets.air_in)
-        self.duty = duty
-        self.fluid_out_T = outlets.fluid_out.T
-        self.electricity = inlets.power_in
         self.evaporation_rate = (
             psychrometrics.evaporation_rate(duty, self.latent_heat)
             if self.cooler_type == "wet"

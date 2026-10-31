@@ -27,7 +27,7 @@ def call_forms(esp, stream):
     esp.frequency = 50.0
     persistent = esp(fluid_in=stream)
     assert a.outputs.head == persistent.outputs.head
-    print(a.outputs.head, a.outlets.fluid_out.p, a.outputs.electricity)
+    print(a.outputs.head, a.outlets.fluid_out.p, a.inlets.power_in)
     print(a.outputs.get("head", unit="bar"))
     return persistent
 

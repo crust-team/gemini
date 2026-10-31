@@ -9,6 +9,7 @@ from gemini.modules.wells import InjectionWell
 from gemini.types.flows import Stream
 from gemini.utils.legacy import tables as mapping
 from tests.fixtures.equivalence import assert_function_matches, assert_module_matches
+from tests.fixtures.reading import reading
 
 
 def test_injection_flow_sign_and_pressure():
@@ -20,7 +21,7 @@ def test_injection_flow_sign_and_pressure():
         )
     )
     result = c(wellhead_in=Stream(m_dot=40, T=300, p=5e6))
-    out, streams = result.outputs, result.outlets
+    out, streams = reading(result), result.outlets
     assert out.friction_pressure_drop < 0 and out.gravity_pressure_drop > 0
     assert streams["bottom_out"].m_dot == 40
     assert out.bottomhole_pressure > 5e6

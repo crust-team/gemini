@@ -80,7 +80,6 @@ class ThermalDecline(Module):
         # Outputs
         self.breakthrough_time = Output(Duration | None)
         self.temperature_drop = Output(TemperatureDifference)
-        self.fluid_out_T = Output(Temperature)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
@@ -101,7 +100,6 @@ class ThermalDecline(Module):
         volume = self._breakthrough_volume(inlet)
         self.breakthrough_time = ground.doublet_breakthrough_time(volume, flow)
         self.temperature_drop = self._temperature_drop(inlet)
-        self.fluid_out_T = outlets.fluid_out.T
 
     def _advance_states(self, inlets, outlets, dt):
         flow = self._liquid_flow(inlets.fluid_in)

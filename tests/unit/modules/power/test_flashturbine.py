@@ -6,8 +6,9 @@ import gemini as gm
 from gemini.errors import PhysicsError
 from gemini.modules import Module, mass_balance
 from gemini.modules.power import FlashTurbine, Separator, _physics
-from gemini.types import STEAM, WATER, Inlet, Outlet, Output, Stream
+from gemini.types import STEAM, WATER, Inlet, Outlet, Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.reading import reading
 
 STEAM_FEED = Stream(m_dot=20, T=431.98, p=6e5, fluid=STEAM)
 
@@ -22,7 +23,7 @@ def test_power_matches_dipippo_hand_calculation():
 
     Steam-table values: h_g(6 bar) = 2756.1, h_f(0.1 bar) = 191.8, h_fg = 2392.8 kJ/kg.
     """
-    out = turbine()(fluid_in=STEAM_FEED).outputs
+    out = reading(turbine()(fluid_in=STEAM_FEED))
     assert out.exhaust_quality == pytest.approx(0.868, abs=1e-3)
     assert out.gross_power / 20 == pytest.approx(2756.1e3 - (191.8e3 + 0.8677 * 2392.8e3), rel=2e-3)
     assert out.electricity_generated == pytest.approx(0.98 * out.gross_power, rel=1e-12)
@@ -32,7 +33,7 @@ def test_closed_in_steam_enthalpies_and_condensate():
     """Closure: m h_g(p_in) = electricity + heat_loss + m h_f(p_cond); condensate is saturated."""
     module = turbine()
     result = module(fluid_in=STEAM_FEED)
-    out, outlet = result.outputs, result.outlets.fluid_out
+    out, outlet = reading(result), result.outlets.fluid_out
     condenser = _physics.saturation_properties(1e4)
     incoming = 20 * _physics.saturation_properties(6e5).vapour_enthalpy
     outgoing = out.electricity_generated + out.heat_loss + 20 * condenser.liquid_enthalpy
@@ -44,7 +45,7 @@ def test_closed_in_steam_enthalpies_and_condensate():
 
 def test_zero_flow_and_invalid_inlets():
     """Zero steam gives zero power; liquid, reverse flow or a low inlet pressure raise."""
-    out = turbine()(fluid_in=STEAM_FEED.with_(m_dot=0)).outputs
+    out = reading(turbine()(fluid_in=STEAM_FEED.with_(m_dot=0)))
     assert out.gross_power == out.electricity_generated == out.heat_loss == 0
     for inlet in (
         STEAM_FEED.with_(fluid=WATER),
@@ -68,9 +69,6 @@ class SingleFlash(Module):
 
         # Inlets
         self.geofluid_in = Inlet(Stream)
-
-        # Outputs
-        self.net_power = Output.of(self.turbine.electricity_generated)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -97,12 +95,13 @@ def test_single_flash_plant_closure():
     feed = Stream(m_dot=100, T=523.15, p=40e5)
     result = plant(geofluid_in=feed)
     brine, condensate = result.outlets.fluid_out, result.outlets.condensate_out
-    assert result.outputs.net_power == pytest.approx(9.53e6, rel=2e-3)
+    net_power = result.children["turbine"].outlets.power_out
+    assert net_power == pytest.approx(9.53e6, rel=2e-3)
     assert brine.m_dot + condensate.m_dot == pytest.approx(100, rel=1e-15)
     incoming = 100 * _physics.liquid_enthalpy(feed.p, feed.T)
     outgoing = (
-        result.outputs.net_power
-        + result.children["turbine"].outputs.heat_loss
+        net_power
+        + reading(result.children["turbine"]).heat_loss
         + brine.m_dot * _physics.saturation_properties(6e5).liquid_enthalpy
         + condensate.m_dot * _physics.saturation_properties(1e4).liquid_enthalpy
     )

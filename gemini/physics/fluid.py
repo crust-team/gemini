@@ -186,3 +186,51 @@ def heat_capacity_rate(mass_flow: float, heat_capacity: float) -> float:
     positive rate, a negative one only marks a reversed stream. No division occurs.
     """
     return mass_flow * heat_capacity
+
+
+def stream_quantities(
+    mass_flow,
+    temperature,
+    pressure,
+    density,
+    specific_heat,
+    gas_fraction,
+    co2_fraction,
+    heating_value,
+):
+    """Return the quantities of a fluid port, the one definition every reader of a port shares.
+
+    Parameters
+    ----------
+    mass_flow, temperature, pressure : float
+        The stream [kg/s, K, Pa].
+    density, specific_heat : float
+        Of the stream [kg/m3, J/kg/K].
+    gas_fraction : float
+        Mass fraction of gas in the stream [-], one for a gas stream.
+    co2_fraction, heating_value : float
+        Mass fraction of CO2 in that gas [-] and its lower heating value [J/kg].
+
+    Returns
+    -------
+    dict
+        ``mass_flow`` [kg/s], ``volume_flow`` [m3/s], ``temperature`` [K], ``pressure`` [Pa],
+        ``enthalpy_flow`` [W], ``m cp T`` with its reference at 0 K, the sensible value the
+        balances use, ``gas_flow`` and ``co2_flow`` [kg/s] and ``chemical_flow`` [W], the lower
+        heating value of the gas.
+
+    Notes
+    -----
+    Source: definitions; no published source is needed.
+    """
+    gas_flow = mass_flow * gas_fraction
+    return {
+        "mass_flow": mass_flow,
+        "volume_flow": mass_flow / density,
+        "temperature": temperature,
+        "pressure": pressure,
+        "enthalpy_flow": mass_flow * specific_heat * temperature,
+        "gas_flow": gas_flow,
+        "co2_flow": gas_flow * co2_fraction,
+        "chemical_flow": gas_flow * heating_value,
+    }

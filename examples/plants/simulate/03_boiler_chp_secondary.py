@@ -20,13 +20,19 @@ PYTHONPATH=. python examples/plants/simulate/03_boiler_chp_secondary.py
 
 import gemini as gm
 from examples.shared.nodal_doublet import NodalDoublet
-from gemini.modules import CHP, Boiler, GasGrid, HeatExchanger, Mixer, Splitter, emissions
+from gemini.modules import (
+    CHP,
+    Boiler,
+    GasGrid,
+    HeatExchanger,
+    Mixer,
+    Splitter,
+    collect_flows,
+    emissions,
+)
 from gemini.modules.treatment import Degasser, Filter
 from gemini.physics.geometry import build_path
 from gemini.types import (
-    Electricity,
-    ElectricityGenerated,
-    Fuel,
     Inlet,
     Outlet,
     Output,
@@ -70,11 +76,8 @@ class BoilerChpPlant(gm.modules.Module):
         # Outputs
         self.production_rate = Output.of(self.doublet.riser.wellhead_out.field("m_dot"))
         self.exchanger_duty = Output.of(self.heat_exchanger.duty)
-        self.injection_pump_electricity = Output.of(self.doublet.injection_pump.electricity)
-        self.electricity = Output(Electricity)
-        self.electricity_generated = Output(ElectricityGenerated)
-        self.fuel = Output(Fuel)
-        self.secondary_out_T = Output.of(self.mixer.fluid_out_T)
+        self.injection_pump_power = Output.of(self.doublet.injection_pump.power)
+        self.secondary_out_T = Output.of(self.mixer.fluid_out.field("T"))
 
         # Outlets
         self.supply_out = Outlet(Stream)
@@ -167,13 +170,13 @@ configure_surface(plant)
 secondary = gm.Stream(flow="140 m3/h", T="20 degC", p="3 bar", fluid=gm.Fluid(kind="water"))
 result = plant(return_in=secondary)
 out = result.outputs
-pump_power = out.injection_pump_electricity
+pump_power, flows = out.injection_pump_power, collect_flows(result)
 print(f"Primary flow (nodal solve):  {out.production_rate / 1000 * 3600:.2f} m3/h")
 print(f"Exchanger duty:              {out.get('exchanger_duty', unit='MW'):.3f} MW")
 print(f"Secondary outlet:            {out.get('secondary_out_T', unit='degC'):.2f} degC")
-print(f"Gas burnt:                   {out.get('fuel', unit='MW'):.3f} MW")
-print(f"CHP electricity:             {out.get('electricity_generated', unit='MW'):.3f} MW")
-print(f"Electricity used:            {out.get('electricity', unit='MW'):.3f} MW")
+print(f"Gas burnt:                   {flows['fuel'] / 1e6:.3f} MW")
+print(f"CHP electricity:             {flows['electricity_generated'] / 1e6:.3f} MW")
+print(f"Electricity used:            {flows['electricity'] / 1e6:.3f} MW")
 print(f"Injection pump:              {pump_power:.1f} W (no pump needed)")
 print(
     f"CO2 emissions:               {emissions(result, GAS_FACTOR, GRID_FACTOR) * 86400:.0f} kg/day"

@@ -12,9 +12,7 @@ from gemini.types import (
     Duration,
     Energy,
     Fraction,
-    HeatAbsorbed,
     HeatAccumulation,
-    HeatLoss,
     Inlet,
     Length,
     Outlet,
@@ -124,12 +122,9 @@ class AquiferStorage(Module):
 
         # Outputs
         self.stored_energy = Output(Energy)
-        self.production_out_T = Output(Temperature)
         self.recovery_efficiency = Output(Dimensionless | None)
         self.warm_temperature = Output(Temperature)
         self.cold_temperature = Output(Temperature)
-        self.heat_loss = Output(HeatLoss)
-        self.heat_absorbed = Output(HeatAbsorbed)
         self.heat_accumulation = Output(HeatAccumulation)
 
         # Outlets
@@ -160,13 +155,9 @@ class AquiferStorage(Module):
             self.cold_volume,
             self.cold_temperature_change,
         )
-        self.production_out_T = outlets.production_out.T
         self.recovery_efficiency = ground.thermal_recovery(self.recovered_heat, self.charged_heat)
         self.warm_temperature = self.aquifer_temperature + self.warm_temperature_change
         self.cold_temperature = self.aquifer_temperature + self.cold_temperature_change
-        parts = [heat_transfer.signed_parts(loss) for loss in losses]
-        self.heat_loss = sum(loss for loss, _ in parts)
-        self.heat_absorbed = sum(absorbed for _, absorbed in parts)
         self.heat_accumulation = (
             heat_transfer.heat_rate(injection.heat_capacity_rate(), injection.T)
             - heat_transfer.heat_rate(

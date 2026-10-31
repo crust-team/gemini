@@ -12,12 +12,8 @@ PYTHONPATH=. python examples/plants/simulate/01_district_heating_and_cooling.py
 """
 
 import gemini as gm
-from gemini.modules import ATESPlant, energy_balance
+from gemini.modules import ATESPlant, CoolingGrid, HeatingGrid, collect_flows, energy_balance
 from gemini.types import (
-    Electricity,
-    HeatAbsorbed,
-    HeatSupplied,
-    HydraulicPower,
     Inlet,
     Outlet,
     Output,
@@ -49,10 +45,6 @@ class DistrictEnergyPlant(gm.modules.Module):
         self.air_in = Inlet(Stream, kind="air")
 
         # Outputs
-        self.heat_supplied = Output(HeatSupplied)
-        self.heat_absorbed = Output(HeatAbsorbed)
-        self.electricity = Output(Electricity)
-        self.hydraulic_power = Output(HydraulicPower)
         self.stored_energy = Output.of(self.ates.stored_energy)
 
         # Outlets
@@ -171,12 +163,32 @@ def build_plant():
     return plant
 
 
+def hydraulic_power(result):
+    """Return the flow work [W] of every pump of ``result``."""
+    leaves = result.leaves().values()
+    return sum(leaf.outputs.get("hydraulic_power", 0.0) for leaf in leaves)
+
+
 def check_closure(plant, result):
     """Assert that the audit residual is the pumps' flow work, within rounding."""
     audit = energy_balance(plant, result)
-    unexplained = audit["residual"] - result.outputs.hydraulic_power
+    unexplained = audit["residual"] - hydraulic_power(result)
     assert abs(unexplained) <= 1e-9 * audit["in"], unexplained
     return audit
+
+
+def consumer_heat(plant, result, module_class):
+    """Return the heat [W] the water gives up in the leaves of ``module_class``, by their ports."""
+    consumers = [
+        leaf
+        for path, leaf in result.leaves().items()
+        if isinstance(plant.get_submodule(path), module_class)
+    ]
+    return sum(
+        leaf.inlets.supply_in.quantities()["enthalpy_flow"]
+        - leaf.outlets.return_out.quantities()["enthalpy_flow"]
+        for leaf in consumers
+    )
 
 
 def main():
@@ -192,11 +204,13 @@ def main():
         }
         state, result = plant.step(state, HOUR, inlets)
         check_closure(plant, result)
-        out = result.outputs
+        out, flows = result.outputs, collect_flows(result)
+        heat = consumer_heat(plant, result, HeatingGrid)
+        cold = flows["heat_absorbed"] - consumer_heat(plant, result, CoolingGrid)
         chilled = result.children["ates"].outlets.supply_out.T - 273.15
         print(
-            f"{hour:4d} {out.heat_supplied / 1e3:8.1f} {out.heat_absorbed / 1e3:8.1f} "
-            f"{out.electricity / 1e3:15.2f} {out.stored_energy / 3.6e9:11.3f} {chilled:13.2f}"
+            f"{hour:4d} {heat / 1e3:8.1f} {cold / 1e3:8.1f} "
+            f"{flows['electricity'] / 1e3:15.2f} {out.stored_energy / 3.6e9:11.3f} {chilled:13.2f}"
         )
         cooling_return = result.outlets.cooling_return_out
 

@@ -68,7 +68,7 @@ def test_profiles_drive_scenario():
         on_error="raise",
     )
     assert len(result) == 3
-    assert result.to_frame()["fluid_out_T"].tolist() == [320] * 3
+    assert result.to_frame()["fluid_out.temperature"].tolist() == [320] * 3
 
 
 def test_units_come_from_the_unit_table():

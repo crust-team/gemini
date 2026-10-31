@@ -144,9 +144,8 @@ def test_the_plan_runs_without_a_binding_and_leaves_the_plant_alone():
     assert plant.to_dict() == before and plant.bindings == {}
     results = gm.simulate(plant, plan)
     frame = results.to_frame()
-    assert frame["users.heat_supplied"].to_numpy() == pytest.approx(
-        [1.2 * FULL, 0.4 * FULL], rel=1e-6
-    )
+    delivered = frame["users.supply_in.enthalpy_flow"] - frame["users.return_out.enthalpy_flow"]
+    assert delivered.to_numpy() == pytest.approx([1.2 * FULL, 0.4 * FULL], rel=1e-6)
     assert frame["users.unmet_demand"].to_numpy() == pytest.approx([0, 0], abs=1e-3)
 
 

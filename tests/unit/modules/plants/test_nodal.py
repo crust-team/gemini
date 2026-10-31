@@ -15,6 +15,7 @@ from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.physics.geometry import build_path
 from gemini.types.flows import Stream
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 DENSITY = 1000.0
 """Density [kg/m3] of the default constant-property brine."""
@@ -152,7 +153,7 @@ def test_deep_injector_needs_no_pump_and_draws_no_power(injector):
     assert nodal.solve_injection_pressure(well, sink, wellhead, (1e3, 1e8)) is None
     pump = InjectionPump()
     result = pump(fluid_in=wellhead, pressure_setpoint=wellhead.p)
-    assert result.outputs.head == 0 and result.outputs.electricity == 0
+    assert result.outputs.head == 0 and reading(result).electricity == 0
 
 
 def test_invalid_requests_raise(producer):
@@ -198,7 +199,7 @@ def test_injection_pressure_gap_to_upstream_is_the_friction_sign():
     )
     wellhead = Stream(flow="125.1 m3/h", T=343.15, p=1e5)
     pressure = nodal.solve_injection_pressure(well, sink, wellhead, (1e5, 1e8))
-    out = well(wellhead_in=wellhead.with_(p=pressure)).outputs
+    out = reading(well(wellhead_in=wellhead.with_(p=pressure)))
     assert out.friction_pressure_drop == pytest.approx(-5.197358519692272e5, rel=1e-9)
     assert out.gravity_pressure_drop - UPSTREAM_GRAVITY == pytest.approx(0.0085e5, abs=10)
     gap = -2 * out.friction_pressure_drop - (out.gravity_pressure_drop - UPSTREAM_GRAVITY)

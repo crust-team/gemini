@@ -9,7 +9,6 @@ from gemini.types import (
     Control,
     Fraction,
     Inlet,
-    MassFlow,
     Outlet,
     Output,
     Pressure,
@@ -55,7 +54,6 @@ class Separator(Module):
 
         # Outputs
         self.steam_fraction = Output(Fraction)
-        self.steam_mass_flow = Output(MassFlow)
         self.saturation_temperature = Output(Temperature)
 
         # Outlets
@@ -85,7 +83,6 @@ class Separator(Module):
     def _compute_outputs(self, inlets, outlets):
         state = self._flash(inlets.fluid_in)
         self.steam_fraction = state.steam_fraction
-        self.steam_mass_flow = outlets.gas_out.m_dot
         self.saturation_temperature = state.saturation_temperature
 
     def _flash(self, inlet):

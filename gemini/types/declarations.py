@@ -58,7 +58,6 @@ _PLAIN_KEYS = {
     "exclusiveMaximum",
     "quantity",
     "unit",
-    "additive",
 }
 
 
@@ -158,7 +157,7 @@ def _schema_metadata(adapter):
     schema = adapter.json_schema()
     value_schema = _value_schema(schema)
     quantity = value_schema.get("quantity")
-    return schema, quantity, value_schema.get("unit"), value_schema.get("additive", False)
+    return schema, quantity, value_schema.get("unit")
 
 
 _IMMUTABLE = (float, int, bool, str, type(None))
@@ -180,7 +179,7 @@ class Declaration:
         self.owner = None
         self._adapter = _adapter(type, bounds)
         self._limits = None
-        self.schema, self.quantity, self.unit, self.additive = _schema_metadata(self._adapter)
+        self.schema, self.quantity, self.unit = _schema_metadata(self._adapter)
         self._quick = _quick_check(self.schema, self.limits())
 
     @property
@@ -348,7 +347,7 @@ class _Port(Declaration):
         self.name = None
         self.owner = None
         self._limits = None
-        self.schema, self.quantity, self.unit, self.additive = {}, None, None, False
+        self.schema, self.quantity, self.unit = {}, None, None
         if not self.carries_stream:
             self.quantity, self.unit = "power", "W"
 
@@ -357,6 +356,16 @@ class _Port(Declaration):
         if self.many:
             return [self._item(item) for item in value]
         return self._item(value)
+
+    def field(self, name):
+        """Return a reference to one ``Stream`` field of this port for ``Output.of``."""
+        names = [field.name for field in fields(self.type)]
+        if name not in names:
+            raise DefinitionError(
+                f"{self.path}.{name}: unknown stream field; valid: "
+                f"{join_names(names)}{did_you_mean(name, names)}"
+            )
+        return PortField(self, name)
 
     def _item(self, value):
         """Return a stream of ``type``, or a number: a mapping of fields builds a stream."""
@@ -484,16 +493,6 @@ class Outlet(_Port):
         """Declare an outgoing port."""
         super().__init__(type, kind=kind, many=many, drawn=drawn or many, description=description)
         self.offered = offered
-
-    def field(self, name):
-        """Return a reference to one ``Stream`` field of this outlet for ``Output.of``."""
-        names = [field.name for field in fields(self.type)]
-        if name not in names:
-            raise DefinitionError(
-                f"{self.path}.{name}: unknown stream field; valid: "
-                f"{join_names(names)}{did_you_mean(name, names)}"
-            )
-        return PortField(self, name)
 
 
 @dataclass(frozen=True, eq=False)

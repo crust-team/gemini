@@ -95,7 +95,7 @@ def _outputs(declarations):
     return {
         name: {
             "unit": declaration.unit,
-            "quantity": declaration.quantity if declaration.additive else None,
+            "quantity": declaration.quantity,
             "soft_sensor": declaration.soft_sensor,
         }
         for name, declaration in declarations.items()
@@ -159,7 +159,7 @@ def describe(module, values=True):
       any of them and compares it with the output of the same name.
     - ``minimum`` and ``maximum`` are the closest limit, strict (``gt``, ``lt``) or not.
     - ``kind`` of a port is ``None`` for a port that takes any stream.
-    - ``quantity`` of an output is its additive quantity name, else ``None``.
+    - ``quantity`` of an output is its quantity name, else ``None``.
     - ``children`` maps a child name to its type; ``connections`` lists
       ``{source, target, kind, type}`` for a plant and is empty for a handwritten composite.
     - ``values`` holds the current parameter, control and boundary values. It is only on an

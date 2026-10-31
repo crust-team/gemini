@@ -9,8 +9,6 @@ from gemini.types import (
     Control,
     Count,
     Efficiency,
-    Electricity,
-    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -20,7 +18,6 @@ from gemini.types import (
     Ratio,
     SpecificHeat,
     Stream,
-    Temperature,
 )
 
 
@@ -76,9 +73,6 @@ class GasCompressor(Module):
         # Outputs
         self.pressure_ratio = Output(Ratio)
         self.shaft_power = Output(Power, soft_sensor=True)
-        self.electricity = Output(Electricity)
-        self.fluid_out_T = Output(Temperature, soft_sensor=True)
-        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="gas")
@@ -104,14 +98,8 @@ class GasCompressor(Module):
 
     def _compute_outputs(self, inlets, outlets):
         suction = inlets.fluid_in
-        discharge = outlets.fluid_out
         self.pressure_ratio = self._pressure_ratio(suction)
         self.shaft_power = self._shaft_power(suction)
-        self.electricity = inlets.power_in
-        self.fluid_out_T = discharge.T
-        self.heat_loss = _physics.heat_rejected(
-            self.electricity, self.shaft_power, self.stage_count
-        )
 
     def _shaft_power(self, suction):
         """Return the shaft power [W] of the compression at the operating point."""

@@ -41,22 +41,16 @@ def test_every_quantity_unit_is_a_known_si_unit():
             assert units.si_unit(unit) == unit, name
 
 
-def test_energy_output_quantities_are_additive_watts():
-    """Each energy output has its own additive quantity in W; plain Power and MassFlow differ."""
+def test_energy_output_quantities_are_watts():
+    """Each energy output has its own quantity in W."""
     names = {
         "Electricity": "electricity",
-        "ElectricityGenerated": "electricity_generated",
         "Fuel": "fuel",
-        "HeatLoss": "heat_loss",
-        "HeatSupplied": "heat_supplied",
-        "HeatAbsorbed": "heat_absorbed",
         "HeatAccumulation": "heat_accumulation",
         "Duty": "duty",
         "HydraulicPower": "hydraulic_power",
     }
     for alias, quantity in names.items():
         output = Output(getattr(quantities, alias))
-        assert (output.quantity, output.unit, output.additive) == (quantity, "W", True)
+        assert (output.quantity, output.unit) == (quantity, "W")
         assert output.validate(-5.0) == -5.0
-    assert not Output(quantities.Power).additive
-    assert Output(quantities.MassFlow).additive

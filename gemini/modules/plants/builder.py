@@ -149,10 +149,7 @@ class Plant(PortResolver, Module):
                 path, port = port_ends(ends)[0]
                 end = getattr(self.get_module(path), side)()[port]
                 self._register_declaration(name, declare(end.type, kind=end.kind))
-        if self._output_specs is None:
-            outputs.declare_automatic(self)
-            return
-        for name, spec in self._output_specs.items():
+        for name, spec in (self._output_specs or {}).items():
             outputs.declare_output(self, name, spec)
 
     def _connection_list(self):

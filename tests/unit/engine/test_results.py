@@ -40,7 +40,7 @@ def results():
             rows,
             time,
             "pump",
-            dict(head=2e5, electricity=power),
+            dict(head=2e5, power_in=power),
             health,
             3600.0,
             {"pump": {"pump.fluid_in.p": 1}},
@@ -65,13 +65,13 @@ def test_access_conversion_and_suggestions():
     with raises(gm.errors.ValidationError, "unknown_name", match="did you mean 'head'"):
         rows["pump"].heads
     with pytest.raises(ValueError, match="for unit conversion"):
-        rows["pump"].get("electricity", unit="kW")
+        rows["pump"].get("power_in", unit="kW")
 
 
 def test_summary_integrates_energy_and_counts_alarms_and_skips():
     """Energy is power times dt; alarms and skip reasons are counted per module."""
     summary = results().to_frame(table="energy")
-    row = summary.loc[("pump", "electricity")]
+    row = summary.loc[("pump", "power_in")]
     assert row["energy_J"] == 4000.0 * 3600
     assert row["peak_W"] == 3000.0 and row["alarms"] == 2 and row["skipped"] == 2
     assert row["reasons"] == {"pump.fluid_in.p": 2}
@@ -82,13 +82,13 @@ def test_the_energy_report_is_the_table_as_plain_values():
     rows = results()
     report = rows.energy_report()
     json.dumps(report, allow_nan=False)
-    entry = report["pump"]["electricity"]
+    entry = report["pump"]["power_in"]
     assert entry["energy"] == {"value": 4000.0 * 3600, "unit": "J"}
     assert entry["peak"] == {"value": 3000.0, "unit": "W"}
     assert entry["alarms"] == {"value": 2, "unit": "-"}
     assert entry["skipped"] == {"value": 2, "unit": "-"}
     assert entry["reasons"] == {"pump.fluid_in.p": 2}
-    table = rows.to_frame(table="energy").loc[("pump", "electricity")]
+    table = rows.to_frame(table="energy").loc[("pump", "power_in")]
     assert entry["hours"] == {"value": table["hours"], "unit": "h"}
 
 
@@ -112,21 +112,21 @@ def test_slice_and_lossless_files(tmp_path):
 def with_units():
     """Return the two-row pump results with the units a plant would declare."""
     rows = results()
-    rows.units = {"pump": {"head": "Pa", "electricity": "W"}}
+    rows.units = {"pump": {"head": "Pa", "power_in": "W"}}
     return rows
 
 
 def test_names_lists_every_readable_field_by_path():
     """names() maps each path to its fields, in column order."""
     names = with_units().names()
-    assert list(names) == ["pump"] and names["pump"][:2] == ["head", "electricity"]
+    assert list(names) == ["pump"] and names["pump"][:2] == ["head", "power_in"]
     assert "health_score" in names["pump"] and Results().names() == {}
 
 
 def test_get_returns_time_values_and_unit_as_json():
     """get() gives ISO times, plain values and the SI unit; windows are inclusive."""
     rows = with_units()
-    series = rows.get("pump", "electricity")
+    series = rows.get("pump", "power_in")
     assert series == {
         "time": ["2024-01-01T00:00:00+00:00", "2024-01-01T01:00:00+00:00"],
         "value": [1000.0, 3000.0],
@@ -150,14 +150,14 @@ def test_summary_reports_min_max_mean_and_unit_per_numeric_field():
     """summary() covers numeric fields only, for one path and for a window."""
     rows = with_units()
     summary = rows.summary()
-    assert summary["pump"]["electricity"] == {
+    assert summary["pump"]["power_in"] == {
         "min": {"value": 1000.0, "unit": "W"},
         "max": {"value": 3000.0, "unit": "W"},
         "mean": {"value": 2000.0, "unit": "W"},
     }
     assert "operating" not in summary["pump"] and "health_message" not in summary["pump"]
     late = rows.summary("pump", start="2024-01-01T01:00:00Z")
-    assert late["pump"]["electricity"]["min"]["value"] == 3000.0
+    assert late["pump"]["power_in"]["min"]["value"] == 3000.0
     json.dumps(summary, allow_nan=False)
     with raises(gm.errors.ValidationError, "unknown_name"):
         rows.summary("pumps")
@@ -245,7 +245,7 @@ def test_slices_keep_units_and_end_state():
 def with_quantities():
     """Return the two-row pump results with the quantities a plant would declare."""
     rows = with_units()
-    rows.quantities = {"pump": {"head": "pressure_difference", "electricity": "electricity"}}
+    rows.quantities = {"pump": {"head": "pressure_difference", "power_in": "power"}}
     return rows
 
 
@@ -255,45 +255,45 @@ UNITS = {"power": "kW", "pressure": "bar"}
 def test_get_converts_on_the_way_out_and_says_the_unit():
     """A map from quantity to unit reaches the field through its family."""
     rows = with_quantities()
-    assert rows.get("pump", "electricity", units=UNITS)["value"] == [1.0, 3.0]
-    assert rows.get("pump", "electricity", units=UNITS)["unit"] == "kW"
+    assert rows.get("pump", "power_in", units=UNITS)["value"] == [1.0, 3.0]
+    assert rows.get("pump", "power_in", units=UNITS)["unit"] == "kW"
     assert rows.get("pump", "head", units=UNITS) == {
         "time": rows.get("pump", "head")["time"],
         "value": [2.0, 2.0],
         "unit": "bar",
     }
     assert rows.get("pump", "health_score", units=UNITS)["unit"] == "-"
-    assert rows.get("pump", "electricity")["value"] == [1000.0, 3000.0]
+    assert rows.get("pump", "power_in")["value"] == [1000.0, 3000.0]
 
 
 def test_summary_and_to_dict_convert_too():
     """Statistics and series name the unit used; nothing stored changes."""
     rows = with_quantities()
-    electricity = rows.summary(units=UNITS)["pump"]["electricity"]
+    electricity = rows.summary(units=UNITS)["pump"]["power_in"]
     assert electricity["mean"] == {"value": 2.0, "unit": "kW"}
     series = rows.to_dict(units={**UNITS, "duration": "h"})
     assert series["series"]["pump"]["head"] == {"value": [2.0, 2.0], "unit": "bar"}
     assert series["duration"] == {"value": [1.0, 1.0], "unit": "h"}
-    assert rows.summary()["pump"]["electricity"]["mean"] == {"value": 2000.0, "unit": "W"}
+    assert rows.summary()["pump"]["power_in"]["mean"] == {"value": 2000.0, "unit": "W"}
 
 
 def test_to_frame_converts_and_lists_the_units():
     """Column names stay; ``attrs["units"]`` says the unit of each column."""
     rows = with_quantities()
     frame = rows.to_frame(units=UNITS)
-    assert frame["pump.electricity"].tolist() == [1.0, 3.0]
-    assert frame.attrs["units"]["pump.electricity"] == "kW"
+    assert frame["pump.power_in"].tolist() == [1.0, 3.0]
+    assert frame.attrs["units"]["pump.power_in"] == "kW"
     assert frame.attrs["units"]["pump.head"] == "bar"
     plain = rows.to_frame()
-    assert plain["pump.electricity"].tolist() == [1000.0, 3000.0]
-    assert plain.attrs["units"]["pump.electricity"] == "W"
+    assert plain["pump.power_in"].tolist() == [1000.0, 3000.0]
+    assert plain.attrs["units"]["pump.power_in"] == "W"
     pd.testing.assert_index_equal(frame.columns, plain.columns)
 
 
 def test_the_energy_report_converts_too():
     """The dict takes ``units``; the table has fixed columns and refuses them."""
     rows = with_quantities()
-    entry = rows.energy_report(units={"energy": "kWh", "power": "kW"})["pump"]["electricity"]
+    entry = rows.energy_report(units={"energy": "kWh", "power": "kW"})["pump"]["power_in"]
     assert entry["energy"] == {"value": 4.0, "unit": "kWh"}
     assert entry["peak"] == {"value": 3.0, "unit": "kW"}
     with pytest.raises(gm.errors.ValidationError, match="without units"):

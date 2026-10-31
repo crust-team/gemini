@@ -136,7 +136,8 @@ def _chain(plant, dataset, data):
     frame = path_frame(chain)
     errors = {
         "chain_wellhead": abs(
-            frame["doublet.riser", "wellhead_pressure"] / data["production_wellhead_pressure"] - 1
+            frame["doublet.riser.wellhead_out", "pressure"] / data["production_wellhead_pressure"]
+            - 1
         ),
         "chain_hx_duty": abs(frame["heat_exchanger", "duty"] / data["heat_exchanger.duty"] - 1),
     }
@@ -144,8 +145,8 @@ def _chain(plant, dataset, data):
 
 
 def _total_electricity(frame):
-    """Sum leaf electricity per row in result order, as the plant's summed output does."""
-    electricity = frame.xs("electricity", axis=1, level="field")
+    """Sum the electricity of the leaves' ``power_in`` ports per row in result order."""
+    electricity = frame.xs("power_in", axis=1, level="field")
     return np.array([sum(row) for row in electricity.itertuples(index=False)])
 
 

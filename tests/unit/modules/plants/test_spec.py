@@ -37,7 +37,7 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
         "connections": [{"source": "pipe.fluid_out", "target": "valve.fluid_in"}],
         "inlets": {"feed": "pipe.fluid_in", "air": "pipe.air_in"},
         "outlets": {"product": "valve.fluid_out", "loss": "pipe.loss_out"},
-        "bindings": {"pipe": {"heat_loss": {"column": "q", "unit": "kW"}, "velocity": "v"}},
+        "bindings": {"pipe": {"pressure_drop": {"column": "q", "unit": "bar"}, "velocity": "v"}},
         "param_history": {
             "pipe": [
                 {"valid_from": "2020-01-01T00:00:00Z", "params": {"length": 30.48}},

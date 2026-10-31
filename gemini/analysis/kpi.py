@@ -1,7 +1,7 @@
 """The plant KPIs under fixed names: ``gm.kpi.compute`` and ``gm.kpi.names``.
 
-Every KPI is read from the leaf columns of a finished run (``results.to_frame()``) through the
-declared outputs of the plant's leaves, so it needs no extra recording. A tick where a needed
+Every KPI is read from the columns of a finished run (``results.to_frame()``): the totals come from
+the ports of the edge modules, so nothing is summed over the plant. A tick where a needed
 column has no value (a skipped or failed row) is left out of that KPI's sums and peaks.
 """
 
@@ -10,8 +10,15 @@ from typing import Any
 
 import numpy as np
 
-from gemini.analysis.series import energy, leaf_total, results_total, window_seconds
-from gemini.modules.grids import CoolingGrid, HeatingGrid
+from gemini.analysis.series import (
+    delivered_cold,
+    delivered_heat,
+    edge_total,
+    energy,
+    leaf_total,
+    window_seconds,
+)
+from gemini.modules.grids import CoolingGrid, ElectricityGrid, HeatingGrid
 from gemini.types.shapes import value
 
 
@@ -34,11 +41,11 @@ def _read(plant, results):
     latent = leaf_total(plant, frame, "unmet_latent", CoolingGrid)
     return _Series(
         seconds=window_seconds(results),
-        heat=leaf_total(plant, frame, "heat_supplied", HeatingGrid),
+        heat=delivered_heat(plant, frame),
         heat_unmet=leaf_total(plant, frame, "unmet_demand", HeatingGrid),
-        cold=leaf_total(plant, frame, "heat_absorbed", CoolingGrid),
+        cold=delivered_cold(plant, frame),
         cold_unmet=None if sensible is None or latent is None else sensible + latent,
-        electricity=results_total(results, frame, "electricity"),
+        electricity=edge_total(plant, frame, "power_out", ElectricityGrid),
     )
 
 
@@ -82,7 +89,7 @@ def _cop(series):
     if series.heat is None:
         return None, "the plant has no HeatingGrid"
     if series.electricity is None:
-        return None, "no leaf declares an electricity output"
+        return None, "the plant has no ElectricityGrid"
     consumed = energy(series.electricity.where(series.heat.notna()), series.seconds)
     if consumed <= 0:
         return None, "no electricity is consumed over the window"
@@ -127,8 +134,8 @@ def compute(plant, results):
           over the plant's ``HeatingGrid`` leaves: the share of the demanded heat delivered.
         - ``cooling_coverage`` [-] = E(heat_absorbed) / E(heat_absorbed + unmet_sensible +
           unmet_latent) over the ``CoolingGrid`` leaves.
-        - ``cop`` [-] = E(heat_supplied of the HeatingGrid leaves) / E(electricity of every
-          leaf): heat delivered per unit of electricity consumed. Cooling is not counted.
+        - ``cop`` [-] = E(heat delivered) / E(``ElectricityGrid.power_out``): heat delivered per
+          unit of electricity consumed. Cooling is not counted.
         - ``peak_heat`` [W] = the largest tick sum of ``heat_supplied`` over the
           ``HeatingGrid`` leaves (delivered power, not the demand peak).
         - ``peak_cold`` [W] = the largest tick sum of ``heat_absorbed`` over the

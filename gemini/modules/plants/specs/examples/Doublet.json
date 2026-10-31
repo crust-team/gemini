@@ -282,14 +282,6 @@
   "outlets": {
     "supply_out": "riser.wellhead_out"
   },
-  "outputs": {
-    "electricity": {
-      "sum": "electricity"
-    },
-    "heat_loss": {
-      "sum": "heat_loss"
-    }
-  },
   "bindings": {
     "esp": {
       "frequency": "doublet.esp.frequency",

@@ -606,18 +606,6 @@
     "supply_out": "heat_exchanger.cold_out"
   },
   "outputs": {
-    "cop": {
-      "ratio": [
-        "thermal_power",
-        "electricity"
-      ]
-    },
-    "electricity": {
-      "sum": "electricity"
-    },
-    "heat_loss": {
-      "sum": "heat_loss"
-    },
     "thermal_power": {
       "of": "heat_exchanger.duty"
     }

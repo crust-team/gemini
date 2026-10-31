@@ -41,12 +41,6 @@ def _grid_factor(fuel):
     return gas.emission_per_energy(fuel.fluid.grid_composition) if has_grid(fuel) else 0
 
 
-def fuel_outputs(need, fuel):
-    """Return the outputs a burner with fuel need ``need`` [W] reports."""
-    coproduced, purchased, burnt = fuel_split(need, fuel)
-    return {"fuel_coproduced": coproduced, "fuel_purchased": purchased, "burned_mass_flow": burnt}
-
-
 def flue_stream(need, fuel):
     """Return the flue of a burner: the CO2 of everything burned, formed and carried in the gas."""
     coproduced, purchased, _ = fuel_split(need, fuel)

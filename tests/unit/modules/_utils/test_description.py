@@ -52,7 +52,6 @@ SCHEMA_KEYWORDS = {
     "minItems",
     "maxItems",
     "title",
-    "additive",
 }
 SCHEMA_TYPES = {"number", "integer", "string", "boolean", "array", "null", "object"}
 
@@ -104,10 +103,10 @@ def test_leaf_description_shape():
     assert description["parameters"]["stage_count"]["default"] is None
     assert description["inlets"]["fluid_in"]["kind"] == "brine"
     assert description["inlets"]["fluid_in"]["fields"]["T"] == {"unit": "K"}
-    assert description["outputs"]["electricity"] == {
+    assert description["outputs"]["power"] == {
         "unit": "W",
-        "quantity": "electricity",
-        "soft_sensor": False,
+        "quantity": "power",
+        "soft_sensor": True,
     }
     assert description["outputs"]["head"]["soft_sensor"] is True
     assert description["children"] == {} and description["connections"] == []

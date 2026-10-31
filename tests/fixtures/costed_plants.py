@@ -4,7 +4,7 @@ The consumers join the plant with ``add_module``, so the test classes stay out o
 """
 
 import gemini as gm
-from gemini.modules import CoolingGrid, HeatingGrid
+from gemini.modules import CoolingGrid, ElectricityGrid, GasGrid, HeatingGrid
 from gemini.types.cost import Cost
 from tests.fixtures.result_tables import make_results
 
@@ -35,29 +35,49 @@ class CostedCoolingGrid(CoolingGrid):
         return Cost(capex=2000.0, currency="EUR", price_year=2024, source="test fixture")
 
 
+def _with_grids(plant):
+    """Add the electricity and gas grids the bills of a run read."""
+    plant.add_module("grid", ElectricityGrid())
+    plant.add_module("gas", GasGrid())
+    return plant
+
+
 def heating_plant(costed=True):
     """Return a plant with one heat consumer, costed or not."""
     plant = gm.Plant("Heating")
     plant.add_module("heat", CostedHeatingGrid() if costed else HeatingGrid())
-    return plant
+    return _with_grids(plant)
 
 
 def cooling_plant():
     """Return a plant with one costed cooling consumer."""
     plant = gm.Plant("Cooling")
     plant.add_module("cool", CostedCoolingGrid())
-    return plant
+    return _with_grids(plant)
 
 
 def day(heat=1000.0, cold=None, electricity=100.0, generated=None, fuel=None):
-    """Return a day of hourly constant powers [W] of the named leaves."""
-    columns = {"pump": {"electricity": [electricity] * HOURS}}
+    """Return a day of hourly constant powers [W] at the edge modules."""
+    sold = generated or 0.0
+    columns = {
+        "grid": {
+            "power_out": [electricity] * HOURS,
+            "power_in": [sold] * HOURS,
+            "net_import": [max(electricity - sold, 0.0)] * HOURS,
+            "net_export": [max(sold - electricity, 0.0)] * HOURS,
+        }
+    }
     if heat is not None:
-        columns["heat"] = {"heat_supplied": [heat] * HOURS, "unmet_demand": [0.0] * HOURS}
+        columns["heat"] = {
+            "supply_in.enthalpy_flow": [heat] * HOURS,
+            "return_out.enthalpy_flow": [0.0] * HOURS,
+            "unmet_demand": [0.0] * HOURS,
+        }
     if cold is not None:
-        columns["cool"] = {"heat_absorbed": [cold] * HOURS}
-    if generated is not None:
-        columns["chp"] = {"electricity_generated": [generated] * HOURS}
+        columns["cool"] = {
+            "supply_in.enthalpy_flow": [0.0] * HOURS,
+            "return_out.enthalpy_flow": [cold] * HOURS,
+        }
     if fuel is not None:
-        columns["boiler"] = {"fuel": [fuel] * HOURS}
+        columns["gas"] = {"gas_out.chemical_flow": [fuel] * HOURS}
     return make_results(columns)

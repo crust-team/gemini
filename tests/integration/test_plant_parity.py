@@ -123,11 +123,13 @@ CLASS_BASED_ROOT = {
 
 @pytest.mark.parametrize("way", ["builder", "spec", "file"])
 def test_root_outputs_equal_the_handwritten_class_to_the_last_bit(runs, way):
-    """Call order decides the bits of the sums: they equal the class-based plant's exactly."""
-    outputs = runs[BACKENDS[0]][way][1].steps[3]["trees"][""]["outputs"]
-    expected = (
-        CLASS_BASED_ROOT
-        if way != "builder"
-        else {name: CLASS_BASED_ROOT[name] for name in ("electricity", "heat_loss")}
-    )
+    """The root keeps ``thermal_power``; the former sums are the same on the leaves' ports."""
+    run = runs[BACKENDS[0]][way][1]
+    outputs = run.steps[3]["trees"][""]["outputs"]
+    expected = {} if way == "builder" else {"thermal_power": CLASS_BASED_ROOT["thermal_power"]}
     assert outputs == expected
+    row = run.frame.iloc[3]
+    electricity = row[[name for name in row.index if name.endswith(".power_in")]]
+    losses = row[[name for name in row.index if name.endswith(".loss_out")]]
+    assert electricity.sum() == pytest.approx(CLASS_BASED_ROOT["electricity"], rel=1e-12)
+    assert losses[losses > 0].sum() == pytest.approx(CLASS_BASED_ROOT["heat_loss"], rel=1e-12)

@@ -4,7 +4,6 @@ import pytest
 
 import gemini as gm
 from gemini.backends import settings
-from gemini.economics import emissions as module
 from tests.fixtures.costed_plants import HOURS, day, heating_plant
 from tests.fixtures.parity import BACKENDS
 from tests.fixtures.result_tables import make_results
@@ -12,15 +11,17 @@ from tests.fixtures.result_tables import make_results
 DAY = HOURS * 3600.0
 """Seconds of the runs below."""
 
+ELECTRICITY = gm.economics.Assumptions(electricity_emission_factor=1e-7)
+"""A grid emission factor [kg/J] for runs that draw electricity."""
+
 
 def test_co2_sums_the_emission_outputs_and_grid_electricity():
     """1 kg/s of CO2, 0.1 kg/s of methane and 60 W of grid electricity for a day."""
     values = gm.economics.Assumptions(electricity_emission_factor=1e-7)
     run = make_results(
         {
-            "boiler": {"co2_emission": [1.0] * HOURS, "electricity": [100.0] * HOURS},
-            "chp": {"electricity_generated": [40.0] * HOURS},
-            "vent": {"methane_emission": [0.1] * HOURS},
+            "air": {"co2_emission": [1.0] * HOURS, "methane_emission": [0.1] * HOURS},
+            "grid": {"net_import": [60.0] * HOURS},
         }
     )
     result = gm.economics.co2(heating_plant(), run, values)
@@ -35,7 +36,7 @@ def test_co2_sums_the_emission_outputs_and_grid_electricity():
 
 def test_the_methane_factor_is_an_assumption():
     """``methane_gwp`` scales the methane released."""
-    run = make_results({"vent": {"methane_emission": [1.0]}})
+    run = make_results({"air": {"methane_emission": [1.0]}})
     values = gm.economics.Assumptions(methane_gwp=10.0)
     assert gm.economics.co2(heating_plant(), run, values)["value"] == pytest.approx(36000.0)
 
@@ -50,10 +51,10 @@ def test_fuel_alone_emits_nothing_of_its_own():
 def test_the_energies_of_a_run_do_not_depend_on_the_backend():
     """Economics reads the arrays of a finished run under any backend."""
     run = day(electricity=100.0, generated=40.0, fuel=1000.0)
-    expected = module.source_energies(run)
+    expected = gm.economics.co2(heating_plant(), run, ELECTRICITY)
     for backend in BACKENDS:
         with settings(backend=backend):
-            assert module.source_energies(run) == expected
+            assert gm.economics.co2(heating_plant(), run, ELECTRICITY) == expected
 
 
 def test_a_surplus_of_generation_earns_no_credit():
@@ -70,7 +71,8 @@ def test_grid_electricity_without_a_factor_is_refused():
     assert error.value.code == "missing_assumption"
 
 
-def test_source_energies_of_a_run_without_fuel_or_electricity_is_zero():
+def test_a_run_without_fuel_or_electricity_emits_nothing():
     """A run without those columns draws nothing."""
-    quiet = make_results({"heat": {"heat_supplied": [1.0, 2.0]}})
-    assert module.source_energies(quiet) == (0.0, 0.0)
+    quiet = make_results({"heat": {"unmet_demand": [1.0, 2.0]}})
+    result = gm.economics.co2(heating_plant(), quiet)
+    assert result["fuel_energy"]["value"] == 0.0 and result["grid_energy"]["value"] == 0.0

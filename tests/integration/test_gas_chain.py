@@ -51,19 +51,24 @@ def run(setpoint):
 def test_a_boiler_with_enough_gas_buys_nothing_and_the_surplus_reaches_the_flare():
     """The gas of 300 m3/h of brine covers a small duty; the rest is burned at the flare."""
     _, result = run("65 degC")
-    boiler, flare = result.leaves()["boiler"].outputs, result.leaves()["flare"].outputs
-    assert boiler.fuel_purchased == 0 and boiler.fuel_coproduced == pytest.approx(boiler.fuel)
-    gas_flow = result.leaves()["degasser"].outputs.gas_mass_flow
-    assert flare.burned_mass_flow == pytest.approx(gas_flow - boiler.burned_mass_flow)
-    assert flare.burned_mass_flow > 0
+    leaves = result.leaves()
+    burned = leaves["flare"].outputs.burned_mass_flow
+    assert leaves["makeup"].inlets.grid_in.m_dot == 0
+    gas_flow = leaves["degasser"].outlets.gas_out.m_dot
+    assert burned == pytest.approx(gas_flow - leaves["boiler"].inlets.fuel_in.m_dot)
+    assert burned > 0
 
 
 def test_a_boiler_short_of_gas_buys_the_rest_and_nothing_reaches_the_flare():
     """A large duty burns all the gas and buys what is left."""
     _, result = run("95 degC")
-    boiler, flare = result.leaves()["boiler"].outputs, result.leaves()["flare"].outputs
-    assert boiler.fuel_purchased > 0 and flare.burned_mass_flow == pytest.approx(0, abs=1e-12)
-    assert boiler.fuel_coproduced + boiler.fuel_purchased == pytest.approx(boiler.fuel)
+    leaves = result.leaves()
+    gas_in, grid_in = leaves["makeup"].inlets.gas_in, leaves["makeup"].inlets.grid_in
+    assert grid_in.m_dot > 0
+    assert leaves["flare"].outputs.burned_mass_flow == pytest.approx(0, abs=1e-12)
+    bought = grid_in.m_dot * gas.lower_heating_value(gas.GRID_COMPOSITION)
+    coproduced = gas_in.m_dot * gas_in.fluid.heating_value()
+    assert coproduced + bought == pytest.approx(leaves["boiler"].outputs.fuel)
 
 
 def test_without_co_produced_gas_the_grid_covers_everything():
@@ -81,7 +86,8 @@ def test_without_co_produced_gas_the_grid_covers_everything():
     plant.air.temperature = "15 degC"
     leaves = plant(water_in=WATER).leaves()
     outputs = leaves["boiler"].outputs
-    assert outputs.fuel_coproduced == 0 and outputs.fuel_purchased == pytest.approx(outputs.fuel)
+    bought = leaves["grid"].outlets.gas_out.m_dot
+    assert bought * gas.lower_heating_value(gas.GRID_COMPOSITION) == pytest.approx(outputs.fuel)
     assert leaves["air"].outputs.co2_emission == pytest.approx(
         outputs.fuel * gas.emission_per_energy(gas.GRID_COMPOSITION)
     )
@@ -98,9 +104,9 @@ def test_the_chain_closes_its_mass_and_energy_balance(setpoint):
 def test_the_chain_conserves_the_carbon_it_reports():
     """The CO2 of boiler and flare is what the gas gives, with the flare's efficiency."""
     _, result = run("65 degC")
-    gas_flow = result.leaves()["degasser"].outputs.gas_mass_flow
+    gas_flow = result.leaves()["degasser"].outlets.gas_out.m_dot
     composition = BRINE.gas_composition
-    boiler_burnt = result.leaves()["boiler"].outputs.burned_mass_flow
+    boiler_burnt = result.leaves()["boiler"].inlets.fuel_in.m_dot
     flared = gas_flow - boiler_burnt
     formed = gas.combustion_co2(composition)
     carried = gas.mass_fraction(composition, "CO2")

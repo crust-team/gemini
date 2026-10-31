@@ -7,7 +7,6 @@ from gemini.physics import heat_transfer
 from gemini.types import (
     Boundary,
     Control,
-    HeatSupplied,
     Inlet,
     MassFlow,
     Outlet,
@@ -17,7 +16,6 @@ from gemini.types import (
     Pressure,
     Stream,
     Temperature,
-    TemperatureDifference,
 )
 
 
@@ -75,11 +73,7 @@ class HeatingGrid(Module):
         self.heat_demand = Boundary(Power, ge=0)
 
         # Outputs
-        self.supply_in_T = Output(Temperature)
-        self.heat_supplied = Output(HeatSupplied)
         self.unmet_demand = Output(Power)
-        self.return_out_T = Output(Temperature)
-        self.temperature_difference = Output(TemperatureDifference)
         self.is_unmet = Output(bool)
 
         # Outlets
@@ -107,13 +101,8 @@ class HeatingGrid(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        supply_in = inlets.supply_in
-        return_out = outlets.return_out
-        self.supply_in_T = supply_in.T
-        self.heat_supplied = self._heat_supplied(supply_in, return_out)
-        self.unmet_demand = ops.maximum(self.heat_demand - self.heat_supplied, 0.0)
-        self.return_out_T = return_out.T
-        self.temperature_difference = supply_in.T - return_out.T
+        delivered = self._heat_supplied(inlets.supply_in, outlets.return_out)
+        self.unmet_demand = ops.maximum(self.heat_demand - delivered, 0.0)
         self.is_unmet = self.unmet_demand > 0
 
     def _offer(self, inlets):

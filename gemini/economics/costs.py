@@ -2,12 +2,17 @@
 
 from dataclasses import dataclass
 
-from gemini.analysis.series import energy, leaf_total, results_total, window_seconds
+from gemini.analysis.series import (
+    delivered_cold,
+    delivered_heat,
+    edge_total,
+    energy,
+    window_seconds,
+)
 from gemini.economics.assumptions import require, resolve
-from gemini.economics.emissions import source_energies
 from gemini.economics.outcome import currency_of, reported, unavailable
 from gemini.errors import ValidationError
-from gemini.modules.grids import CoolingGrid, HeatingGrid
+from gemini.modules.grids import ChemicalGrid, ElectricityGrid, GasGrid, WasteGrid
 from gemini.physics import units
 from gemini.physics.units import SECONDS_PER_YEAR
 from gemini.types.cost import total_cost
@@ -28,29 +33,29 @@ class Annual:
     cold: float
     fuel: float
     grid: float
+    waste: float
+    chemical: float
 
 
 def annual_energies(plant, results):
     """Return the heat and cold delivered and the gas and electricity bought per year.
 
     The run is taken as representative of a year: each energy over the window of the results is
-    scaled by one year over that window. The heat is the ``heat_supplied`` of the plant's
-    ``HeatingGrid`` leaves and the cold the ``heat_absorbed`` of its ``CoolingGrid`` leaves;
-    a plant without such a leaf delivers none. A tick without a value adds no energy.
+    scaled by one year over that window. Everything is read from the ports of the edge modules; a
+    plant without such a module has none of it. A tick without a value adds no energy.
     """
     frame = results.to_frame()
     seconds = window_seconds(results)
     scale = SECONDS_PER_YEAR / seconds.sum()
-    heat = leaf_total(plant, frame, "heat_supplied", HeatingGrid)
-    cold = leaf_total(plant, frame, "heat_absorbed", CoolingGrid)
-    _, grid = source_energies(results)
-    fuel = results_total(results, frame, "fuel_purchased")
-    return Annual(
-        heat=0.0 if heat is None else energy(heat, seconds) * scale,
-        cold=0.0 if cold is None else energy(cold, seconds) * scale,
-        fuel=0.0 if fuel is None else energy(fuel, seconds) * scale,
-        grid=grid * scale,
+    totals = (
+        delivered_heat(plant, frame),
+        delivered_cold(plant, frame),
+        edge_total(plant, frame, "gas_out.chemical_flow", GasGrid),
+        edge_total(plant, frame, "net_import", ElectricityGrid),
+        edge_total(plant, frame, "waste_in.mass_flow", WasteGrid),
+        edge_total(plant, frame, "chemical_out.mass_flow", ChemicalGrid),
     )
+    return Annual(*(0.0 if total is None else energy(total, seconds) * scale for total in totals))
 
 
 def capex(plant, assumptions=None, on_error="raise"):
@@ -90,14 +95,19 @@ def capex(plant, assumptions=None, on_error="raise"):
 
 
 def _bill(assumptions, annual):
-    """Return the yearly cost of the grid electricity and the fuel; a needed price must be given."""
+    """Return the yearly bills of what the plant buys and discards; a needed price must be given."""
     electricity = fuel = 0.0
     if annual.grid > 0:
         electricity = annual.grid * require(assumptions, "electricity_price")
     if annual.fuel > 0:
         price = require(assumptions, "gas_price")
         fuel = annual.fuel * units.convert(price, "currency/MWh", "currency/J")
-    return {"electricity": electricity, "fuel": fuel}
+    waste = chemical = 0.0
+    if annual.waste > 0:
+        waste = annual.waste * require(assumptions, "waste_disposal_price")
+    if annual.chemical > 0:
+        chemical = annual.chemical * require(assumptions, "chemical_price")
+    return {"electricity": electricity, "fuel": fuel, "waste": waste, "chemical": chemical}
 
 
 def _components(amounts, unit):

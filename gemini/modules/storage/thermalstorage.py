@@ -10,9 +10,7 @@ from gemini.physics import heat_transfer
 from gemini.types import (
     Energy,
     Fraction,
-    HeatAbsorbed,
     HeatAccumulation,
-    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -91,11 +89,7 @@ class ThermalStorage(Module):
         # Outputs
         self.tank_temperature = Output(Temperature)
         self.stored_energy = Output(Energy)
-        self.charge_duty = Output(Power)
-        self.discharge_duty = Output(Power)
         self.heat_accumulation = Output(HeatAccumulation)
-        self.heat_loss = Output(HeatLoss)
-        self.heat_absorbed = Output(HeatAbsorbed)
 
         # Outlets
         self.charge_out = Outlet(Stream, kind="hot_water")
@@ -134,7 +128,6 @@ class ThermalStorage(Module):
         self.tank_temperature = self.temperature
         self.stored_energy, self.charge_duty, self.discharge_duty = reports
         self.heat_accumulation = charge + discharge - ambient
-        self.heat_loss, self.heat_absorbed = heat_transfer.signed_parts(ambient)
 
     def _advance_states(self, inlets, outlets, dt):
         charge_in, discharge_in = inlets.charge_in, inlets.discharge_in

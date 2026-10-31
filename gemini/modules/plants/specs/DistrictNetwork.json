@@ -93,20 +93,9 @@
     ]
   },
   "outputs": {
-    "heat_supplied": {
-      "sum": "heat_supplied"
-    },
-    "heat_absorbed": {
-      "sum": "heat_absorbed"
-    },
-    "heat_loss": {
-      "sum": "heat_loss"
-    },
-    "electricity": {
-      "sum": "electricity"
-    },
     "return_out_T": {
-      "of": "return_pipe.fluid_out_T"
+      "of": "return_pipe.fluid_out",
+      "field": "T"
     }
   },
   "bindings": {},

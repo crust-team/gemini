@@ -7,7 +7,7 @@ import pytest
 import gemini as gm
 from gemini.analysis import series
 from gemini.modules import CoolingGrid, HeatingGrid
-from tests.fixtures.result_tables import make_results
+from tests.fixtures.result_tables import cold_ports, heat_ports, make_results
 
 
 @pytest.fixture(scope="module")
@@ -19,10 +19,10 @@ def consumers():
     plant.add("CoolingGrid", "cool_b")
     results = make_results(
         {
-            "heat": {"heat_supplied": [1.0, 2.0, math.nan]},
-            "cool_a": {"heat_absorbed": [10.0, 20.0, math.nan]},
-            "cool_b": {"heat_absorbed": [1.0, math.nan, math.nan]},
-            "pump": {"electricity": [5.0, 5.0, 5.0]},
+            "heat": heat_ports([1.0, 2.0, math.nan]),
+            "cool_a": cold_ports([10.0, 20.0, math.nan]) | {"unmet_latent": [1.0, 2.0, math.nan]},
+            "cool_b": cold_ports([1.0, math.nan, math.nan]) | {"unmet_latent": [1.0, 0.0, 0.0]},
+            "pump": {"power_in": [5.0, 5.0, 5.0]},
         },
         step=1800.0,
     )
@@ -35,27 +35,33 @@ def test_window_seconds_are_the_tick_durations(consumers):
 
 
 def test_leaf_total_sums_the_leaves_of_one_class(consumers):
-    """Cooling consumers add up, a heat consumer is not among them, a missing tick is NaN."""
+    """Outputs of cooling consumers add up, a heat consumer has none, a missing tick is NaN."""
     plant, results = consumers
     frame = results.to_frame()
-    cold = series.leaf_total(plant, frame, "heat_absorbed", CoolingGrid)
-    assert cold.iloc[0] == 11.0
-    assert cold.iloc[1] == 20.0
-    assert math.isnan(cold.iloc[2])
-    heat = series.leaf_total(plant, frame, "heat_supplied", HeatingGrid)
-    assert heat.iloc[:2].tolist() == [1.0, 2.0]
+    unmet = series.leaf_total(plant, frame, "unmet_latent", CoolingGrid)
+    assert unmet.iloc[:2].tolist() == [2.0, 2.0]
+    assert series.leaf_total(plant, frame, "unmet_latent", HeatingGrid) is None
+
+
+def test_edge_totals_read_the_ports_of_the_edge_modules(consumers):
+    """Delivered heat and cold are port differences; a missing tick is NaN."""
+    plant, results = consumers
+    frame = results.to_frame()
+    assert series.delivered_heat(plant, frame).iloc[:2].tolist() == [1.0, 2.0]
+    assert series.delivered_cold(plant, frame).iloc[0] == 11.0
+    assert math.isnan(series.delivered_cold(plant, frame).iloc[1])
 
 
 def test_leaf_total_is_none_without_a_declaring_leaf(consumers):
     """A field no leaf of the class declares gives no series."""
     plant, results = consumers
-    assert series.leaf_total(plant, results.to_frame(), "heat_supplied", CoolingGrid) is None
+    assert series.leaf_total(plant, results.to_frame(), "unmet_demand", CoolingGrid) is None
 
 
 def test_results_total_sums_by_field_name(consumers):
-    """The electricity column is found without the plant."""
+    """The power column is found without the plant."""
     _, results = consumers
-    total = series.results_total(results, results.to_frame(), "electricity")
+    total = series.results_total(results, results.to_frame(), "power_in")
     assert total.tolist() == [5.0, 5.0, 5.0]
     assert series.results_total(results, results.to_frame(), "fuel") is None
 
@@ -63,5 +69,5 @@ def test_results_total_sums_by_field_name(consumers):
 def test_energy_integrates_power_and_skips_missing_ticks(consumers):
     """Energy is power times duration, over the ticks that have a value."""
     plant, results = consumers
-    heat = series.leaf_total(plant, results.to_frame(), "heat_supplied", HeatingGrid)
+    heat = series.delivered_heat(plant, results.to_frame())
     assert series.energy(heat, series.window_seconds(results)) == (1.0 + 2.0) * 1800.0

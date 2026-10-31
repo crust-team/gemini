@@ -7,9 +7,7 @@ from gemini.modules.power import _physics
 from gemini.physics import heat_transfer
 from gemini.types import (
     Efficiency,
-    ElectricityGenerated,
     Fraction,
-    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -70,15 +68,11 @@ class ORC(Module):
         self.air_in = Inlet(Stream, kind="air")
 
         # Outputs
-        self.heat_input = Output(Power)
         self.gross_power = Output(Power)
         self.parasitic_power = Output(Power)
-        self.electricity_generated = Output(ElectricityGenerated)
         self.condenser_duty = Output(Power)
-        self.heat_loss = Output(HeatLoss)
         self.thermal_efficiency = Output(Fraction | None)
         self.condensing_temperature = Output(Temperature)
-        self.fluid_out_T = Output(Temperature)
         self.is_capped = Output(bool)
 
         # Outlets
@@ -108,16 +102,12 @@ class ORC(Module):
         fluid_in = inlets.fluid_in
         fluid_out = outlets.fluid_out
         design = self._design(fluid_in, inlets.air_in)
-        self.heat_input = self._heat_input(fluid_in, fluid_out)
         balance = self._balance(fluid_in, fluid_out, design)
         self.gross_power = balance.gross_power
         self.parasitic_power = balance.parasitic_power
-        self.electricity_generated = balance.electricity_generated
         self.condenser_duty = balance.condenser_duty
-        self.heat_loss = balance.heat_loss
         self.thermal_efficiency = balance.thermal_efficiency
         self.condensing_temperature = design.condensing_temperature
-        self.fluid_out_T = fluid_out.T
         self.is_capped = design.is_capped
 
     def _heat_input(self, fluid_in, fluid_out):

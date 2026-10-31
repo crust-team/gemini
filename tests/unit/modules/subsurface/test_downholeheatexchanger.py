@@ -12,6 +12,7 @@ from gemini.modules.subsurface import DownholeHeatExchanger
 from gemini.types import Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 INLET = Stream(m_dot=5, T=303.15, p=3e5)
 CP = 4217.4
@@ -45,7 +46,7 @@ def test_outlet_follows_ramey_and_the_balance_closes():
     module = exchanger()
     assert module.geothermal_gradient == pytest.approx(0.03)
     result = module(fluid_in=INLET)
-    out = result.outputs
+    out = reading(result)
     assert out.fluid_out_T == pytest.approx(hand_outlet(5, 303.15), rel=1e-12)
     assert out.heat_extraction_rate == pytest.approx(5 * CP * (out.fluid_out_T - 303.15))
     assert out.heat_absorbed == out.heat_extraction_rate > 0 and out.heat_loss == 0
@@ -57,11 +58,11 @@ def test_outlet_follows_ramey_and_the_balance_closes():
 def test_flow_limits():
     """Slow flow approaches the bottom-hole rock temperature; zero flow passes unchanged."""
     module = exchanger()
-    slow = module(fluid_in=INLET.with_(m_dot=0.01)).outputs.fluid_out_T
+    slow = reading(module(fluid_in=INLET.with_(m_dot=0.01))).fluid_out_T
     assert slow == pytest.approx(hand_outlet(0.01, 303.15)) and 0 < 283.15 + 75 - slow < 0.5
     still = module(fluid_in=INLET.with_(m_dot=0))
     assert still.outlets.fluid_out == INLET.with_(m_dot=0)
-    assert still.outputs.heat_extraction_rate == 0
+    assert reading(still).heat_extraction_rate == 0
     with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot = -1"):
         module(fluid_in=INLET.with_(m_dot=-1))
 
@@ -70,8 +71,8 @@ def test_hot_inlet_heats_the_rock():
     """An inlet hotter than the rock everywhere loses heat to it as heat_loss."""
     module = exchanger()
     result = module(fluid_in=INLET.with_(T=400))
-    assert result.outputs.heat_extraction_rate < 0 and result.outputs.heat_absorbed == 0
-    assert result.outputs.heat_loss == -result.outputs.heat_extraction_rate
+    assert reading(result).heat_extraction_rate < 0 and reading(result).heat_absorbed == 0
+    assert reading(result).heat_loss == -reading(result).heat_extraction_rate
     assert energy_balance(module, result)["relative_residual"] < 1e-12
 
 
@@ -94,14 +95,14 @@ def test_exchanger_matches_traced():
 def test_early_operating_time_is_not_evaluated_at_zero_flow():
     """A stopped exchanger needs no rock resistance, so a short operating time does not raise."""
     module = exchanger().update_params(operating_time=3600)
-    assert module(fluid_in=INLET.with_(m_dot=0)).outputs.heat_extraction_rate == 0
+    assert reading(module(fluid_in=INLET.with_(m_dot=0))).heat_extraction_rate == 0
 
 
 def test_traced_early_operating_time_raises_only_for_flowing_rows():
     """In a traced call the configuration error belongs to the rows that flow."""
     module = exchanger().update_params(operating_time=3600)
     stopped = Stream(m_dot=np.zeros(2), T=np.full(2, 303.15), p=np.full(2, 3e5))
-    assert run(module, {"fluid_in": stopped}).outputs["heat_extraction_rate"].tolist() == [0, 0]
+    assert run(module, {"fluid_in": stopped}).outlets["loss_out"]["power"].tolist() == [0, 0]
     mixed = Stream(m_dot=np.array([0.0, 5.0]), T=np.full(2, 303.15), p=np.full(2, 3e5))
     with raises(gm.errors.ValidationError, "invalid_design", match="operating_time rejected"):
         run(module, {"fluid_in": mixed})

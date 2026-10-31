@@ -8,10 +8,6 @@ from gemini.modules.storage import AquiferStorage
 from gemini.physics import energy
 from gemini.types import (
     Control,
-    Electricity,
-    HeatAbsorbed,
-    HeatAccumulation,
-    HeatLoss,
     Inlet,
     MassFlow,
     Outlet,
@@ -81,12 +77,9 @@ class ATESPlant(Module):
         self.groundwater_flow = Control(MassFlow, ge=0)
 
         # Outputs
-        self.electricity = Output(Electricity)
-        self.heat_loss = Output(HeatLoss)
-        self.heat_absorbed = Output(HeatAbsorbed)
-        self.heat_accumulation = Output(HeatAccumulation)
+        self.heat_accumulation = Output.of(self.storage.heat_accumulation)
         self.stored_energy = Output.of(self.storage.stored_energy)
-        self.production_out_T = Output.of(self.storage.production_out_T)
+        self.production_out_T = Output.of(self.storage.production_out.field("T"))
         self.recovery_efficiency = Output.of(self.storage.recovery_efficiency)
 
         # Outlets

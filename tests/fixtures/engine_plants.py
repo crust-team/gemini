@@ -210,7 +210,7 @@ class Duo(Module):
 
         # Outputs
         self.rise = Output.of(self.back.rise)
-        self.power = Output(Electricity)
+        self.power = Output.of(self.back.power)
 
         # Outlets
         self.fluid_out = Outlet(Stream)

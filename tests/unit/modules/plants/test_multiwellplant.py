@@ -7,6 +7,7 @@ from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import generators
 from gemini.types import Stream
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 LIMB = ("reservoir", "well", "esp", "riser")
 
@@ -42,11 +43,11 @@ def test_two_producers_mix_into_the_supply(fresh_plant):
     assert result.outputs.supply_out_T == supply.T
     assert result.children["injectors.0.well"].inlets.wellhead_in == returned
     leaves = result.leaves().values()
-    assert result.outputs.electricity == pytest.approx(
-        sum(leaf.outputs.get("electricity", 0.0) for leaf in leaves)
+    assert reading(result).electricity == pytest.approx(
+        sum(reading(leaf).get("electricity", 0.0) for leaf in leaves)
     )
-    assert result.outputs.heat_loss == pytest.approx(
-        sum(leaf.outputs.get("heat_loss", 0.0) for leaf in leaves)
+    assert sum(result.children["formation"].inlets.heat_in) == pytest.approx(
+        sum(leaf.outlets.loss_out for leaf in leaves if "loss_out" in leaf.outlets)
     )
     audit = energy_balance(field, result)
     assert audit["relative_thermal_residual"] < 1e-12
@@ -63,7 +64,7 @@ def test_splitters_share_the_return_over_three_injectors(fresh_plant):
     flows = [result.children[f"injectors.{i}.well"].inlets.wellhead_in.m_dot for i in range(3)]
     assert flows == pytest.approx([20.0, 8.0, 12.0], rel=1e-14)
     riser = result.children["producers.0.riser"]
-    assert result.outputs.supply_out_T == riser.outputs.wellhead_temperature
+    assert result.outputs.supply_out_T == reading(riser).wellhead_temperature
     assert len(field.mixers) == 0
     assert mass_balance(field, result)["relative_residual"] < 1e-12
 

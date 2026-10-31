@@ -8,12 +8,9 @@ from gemini.modules.wells import InjectionWell, ProductionWell
 from gemini.physics import energy
 from gemini.types import (
     Boundary,
-    Electricity,
-    HeatLoss,
     Inlet,
     MassFlow,
     Outlet,
-    Output,
     Parameter,
     Power,
     Pressure,
@@ -61,10 +58,6 @@ class NodalDoublet(Module):
 
         # Boundaries
         self.wellhead_pressure = Boundary(Pressure)
-
-        # Outputs
-        self.electricity = Output(Electricity)
-        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.supply_out = Outlet(Stream)

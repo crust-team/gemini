@@ -8,6 +8,7 @@ from gemini.modules.treatment import Blowdown
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 FEED = Stream(m_dot=8, T=330, p=3e5)
 
@@ -18,8 +19,8 @@ def test_bleed_split_conserves_mass_and_energy():
     result = blowdown(fluid_in=FEED, blowdown_fraction=0.25)
     retained, drained = result.outlets.fluid_out, result.outlets.waste_out
     assert drained == FEED.with_(m_dot=2) and retained == FEED.with_(m_dot=6)
-    assert result.outputs.blowdown_mass_flow == 2
-    assert "modelled" not in result.outputs and "heat_loss" not in result.outputs
+    assert reading(result).blowdown_mass_flow == 2
+    assert "modelled" not in result.outputs and "heat_loss" not in reading(result)
     assert mass_balance(blowdown, result)["residual"] == 0
     assert energy_balance(blowdown, result)["relative_residual"] < 1e-12
 
@@ -30,7 +31,7 @@ def test_limits():
     assert blowdown(fluid_in=FEED, blowdown_fraction=0).outlets.waste_out.m_dot == 0
     assert blowdown(fluid_in=FEED, blowdown_fraction=1).outlets.fluid_out.m_dot == 0
     stopped = blowdown(fluid_in=FEED.with_(m_dot=0), blowdown_fraction=0.1)
-    assert stopped.outputs.blowdown_mass_flow == 0
+    assert reading(stopped).blowdown_mass_flow == 0
     with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot"):
         blowdown(fluid_in=FEED.with_(m_dot=-1), blowdown_fraction=0.1)
     with raises(gm.errors.ValidationError, "missing_value"):

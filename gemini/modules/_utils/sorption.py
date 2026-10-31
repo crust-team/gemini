@@ -40,9 +40,9 @@ def outlet_streams(inlets, values):
 
 
 def assign_outputs(module, inlets, outlets, values):
-    """Set the performance ``values`` as outputs and the driving temperature difference."""
-    for name, value in values.items():
-        setattr(module, name, value)
+    """Set the outputs of the machine: its COP, whether it is capped and the driving difference."""
+    module.cop = values["cop"]
+    module.is_capped = values["is_capped"]
     module.driving_temperature_difference = _physics.characteristic_temperature_difference(
         heat_transfer.mean_temperature(inlets.generator_in.T, outlets.generator_out.T),
         heat_transfer.mean_temperature(inlets.cooling_in.T, outlets.cooling_out.T),

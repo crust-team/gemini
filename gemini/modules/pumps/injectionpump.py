@@ -9,7 +9,6 @@ from gemini.types import (
     Control,
     Count,
     Efficiency,
-    Electricity,
     Frequency,
     Inlet,
     Outlet,
@@ -56,7 +55,6 @@ class InjectionPump(Module):
         self.head = Output(PressureDifference, soft_sensor=True)
         self.power = Output(Power, soft_sensor=True)
         self.discharge_pressure = Output(Pressure, soft_sensor=True)
-        self.electricity = Output(Electricity)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
@@ -86,7 +84,6 @@ class InjectionPump(Module):
         self.head = discharge.p - suction.p
         self.power = inlets.power_in
         self.discharge_pressure = discharge.p
-        self.electricity = inlets.power_in
 
     def _power(self, suction, head):
         """Return the pump power [W] from the power curve, else from the efficiency."""

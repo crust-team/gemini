@@ -7,6 +7,7 @@ from gemini.modules.treatment import Degasser
 from gemini.types import Fluid
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.reading import reading
 
 GASSY = Fluid(gas_mass_fraction=0.02)
 
@@ -26,7 +27,7 @@ def test_default_reproduces_the_liquid_only_model_for_any_fluid():
     result = Degasser()(fluid_in=inlet)
     assert result.outlets.liquid_out == inlet.with_(p=1e6 - 14900)
     assert result.outlets.gas_out == inlet.with_(p=1e6 - 14900, m_dot=0)
-    assert result.outputs.gas_mass_flow == 0
+    assert reading(result).gas_mass_flow == 0
     assert result.outputs.pressure_drop == 14900
 
 
@@ -41,7 +42,7 @@ def test_separation_conserves_gas_mass_and_energy():
     assert liquid.fluid.gas_mass_fraction == pytest.approx(0.005 / 0.985)
     assert liquid.m_dot * liquid.fluid.gas_mass_fraction == pytest.approx(0.25 * 0.02 * 10)
     assert liquid.p == gas.p == 2e5 and liquid.T == gas.T == 350
-    assert result.outputs.gas_mass_flow == gas.m_dot
+    assert reading(result).gas_mass_flow == gas.m_dot
     assert result.outputs.pressure_drop == 8e5
     assert mass_balance(degasser, result)["residual"] == 0
     assert energy_balance(degasser, result)["relative_residual"] < 1e-12

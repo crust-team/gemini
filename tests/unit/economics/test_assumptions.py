@@ -20,6 +20,8 @@ def test_only_the_sourced_defaults_are_set():
         "lifetime_years",
         "electricity_price",
         "gas_price",
+        "waste_disposal_price",
+        "chemical_price",
         "heat_price",
         "cold_price",
         "electricity_emission_factor",

@@ -10,6 +10,7 @@ from gemini.modules.plants import CoolingSubstation, HeatingSubstation, generato
 from gemini.types import Stream
 from tests.fixtures.air import air
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 CP = 4217.4
 HOT = Stream(m_dot=4.0, T=348.15, p=6e5)
@@ -23,19 +24,19 @@ def _network(**parameters):
 
 def _leaf_sum(result, name):
     """Return the sum of one output over every leaf call [W]."""
-    return sum(leaf.outputs.get(name, 0.0) for leaf in result.leaves().values())
+    return sum(reading(leaf).get(name, 0.0) for leaf in result.leaves().values())
 
 
 def test_heating_network_serves_both_substations(plants):
     """Equal shares feed identical substations; totals and the stream audit add up."""
     network = plants["network"](_network(), plants["heating_substation"])
     result = network(supply_in=HOT, air_in=air(283.15))
-    out = result.outputs
+    out = reading(result)
     children = result.children
     feeds = [children[f"substations.{index}"].inlets.supply_in.m_dot for index in range(2)]
     assert feeds == [2.0, 2.0]
-    assert out.heat_supplied == pytest.approx(3e5, rel=1e-12)
-    assert out.electricity == children["pump"].outputs.electricity > 0
+    assert _leaf_sum(result, "heat_supplied") == pytest.approx(3e5, rel=1e-12)
+    assert out.electricity == reading(children["pump"]).electricity > 0
     assert out.heat_loss == pytest.approx(_leaf_sum(result, "heat_loss"), rel=1e-14)
     assert out.heat_absorbed == 0
     mixed = children["mixers.0"].outlets.fluid_out
@@ -51,16 +52,15 @@ def test_heating_network_serves_both_substations(plants):
     assert mass_balance(network, result)["residual"] == 0
 
 
-def test_network_sums_leaf_outputs_by_type_through_nested_substations(plants):
-    """The network sums the consumers inside its substations once, not the substation sums."""
+def test_nested_substations_show_what_their_consumers_take(plants):
+    """The consumers inside the substations are read once, on their ports, not by the network."""
     network = plants["network"](_network(consumers=3), plants["heating_substation"])
     result = network(supply_in=HOT.with_(m_dot=4.5), air_in=air(283.15))
     substation_sums = [
-        result.children[f"substations.{index}"].outputs.heat_supplied for index in range(3)
+        reading(result.children[f"substations.{index}"]).heat_supplied for index in range(3)
     ]
-    assert network.outputs(recurse=False)["heat_supplied"].quantity == "heat_supplied"
-    assert result.outputs.heat_supplied == pytest.approx(sum(substation_sums), rel=1e-15)
-    assert result.outputs.heat_supplied == _leaf_sum(result, "heat_supplied")
+    assert "heat_supplied" not in network.outputs(recurse=False)
+    assert _leaf_sum(result, "heat_supplied") == pytest.approx(sum(substation_sums), rel=1e-12)
 
 
 def test_three_way_split_and_mix(plants):
@@ -80,9 +80,7 @@ def test_cooling_network_absorbs_building_and_ground_heat(plants):
     assert isinstance(network.substations[0], CoolingSubstation)
     assert "heat_supplied" not in network.outputs(recurse=False)
     result = network(supply_in=CHILLED, air_in=air(283.15))
-    out = result.outputs
-    assert out.heat_absorbed == pytest.approx(_leaf_sum(result, "heat_absorbed"), rel=1e-14)
-    assert out.heat_absorbed > 1.4e5
+    assert _leaf_sum(result, "heat_absorbed") > 1.4e5
     audit = energy_balance(network, result)
     hydraulic = result.children["pump"].outputs.hydraulic_power
     assert abs(audit["residual"] - hydraulic) / audit["in"] < 1e-12
@@ -93,7 +91,7 @@ def test_single_consumer_and_invalid_structure(plants):
     network = plants["network"](_network(consumers=1), plants["heating_substation"])
     assert isinstance(network.substations[0], HeatingSubstation)
     result = network(supply_in=HOT.with_(m_dot=2.0), air_in=air(283.15))
-    assert result.outputs.heat_supplied == pytest.approx(1.5e5, rel=1e-12)
+    assert _leaf_sum(result, "heat_supplied") == pytest.approx(1.5e5, rel=1e-12)
     with raises(gm.errors.ValidationError, "invalid_design", match="service"):
         generators.district_network_spec(service="steam")
     with raises(gm.errors.ValidationError, "invalid_design", match="consumers"):

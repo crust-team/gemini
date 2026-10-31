@@ -157,10 +157,10 @@ def source():
 
 
 class Meter(Module):
-    """Pass the stream on and draw ``draw * scale`` watts; a leaf with an additive output."""
+    """Pass the stream on and draw ``draw * scale`` watts; a leaf with an output."""
 
     def __init__(self):
-        """Declare a parameter, a control, an inlet, an additive output and an outlet."""
+        """Declare a parameter, a control, an inlet, an output and an outlet."""
         super().__init__()
 
         # Parameters
@@ -210,7 +210,7 @@ class Line(Module):
         # Outputs
         self.rise = Output.of(self.gain.rise)
         self.pressure = Output.of(self.gain.fluid_out.field("p"))
-        self.electricity = Output(Electricity)
+        self.electricity = Output.of(self.second.electricity)
         self.efficiency = Output.ratio(self.rise, self.electricity)
 
         # Outlets
@@ -332,7 +332,6 @@ class Chain(Module):
         # Outputs
         self.value = Output.of(getattr(self.middle, next(iter(middle._outputs))))
         self.pressure = Output.of(self.last.fluid_out.field("p"))
-        self.electricity = Output(Electricity)
 
         # Outlets
         self.fluid_out = Outlet(Stream)
@@ -384,7 +383,7 @@ class Opaque(Module):
         self.fluid_in = Inlet(Stream)
 
         # Outputs
-        self.electricity = Output(Electricity)
+        self.electricity = Output.of(self.meter.electricity)
 
         # Outlets
         self.fluid_out = Outlet(Stream)

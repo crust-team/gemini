@@ -6,7 +6,6 @@ from gemini.errors import ValidationError
 from gemini.modules.wells.well import _Well
 from gemini.physics import fluid, heat_transfer
 from gemini.types import (
-    HeatLoss,
     Inlet,
     Length,
     Outlet,
@@ -45,13 +44,10 @@ class ProductionWell(_Well):
         self.bottom_in = Inlet(Stream, kind="brine")
 
         # Outputs
-        self.wellhead_pressure = Output(Pressure, soft_sensor=True)
-        self.wellhead_temperature = Output(Temperature, soft_sensor=True)
         self.friction_pressure_drop = Output(PressureDifference)
         self.gravity_pressure_drop = Output(PressureDifference)
         self.section_pressure = Output(list[Pressure])
         self.section_temperature = Output(list[Temperature])
-        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.wellhead_out = Outlet(Stream, kind="brine")
@@ -69,17 +65,12 @@ class ProductionWell(_Well):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        bottom = inlets.bottom_in
-        wellhead = outlets.wellhead_out
         start, end = self._segment_interval()
-        result = self.traverse(bottom, start, end, "up")
-        self.wellhead_pressure = wellhead.p
-        self.wellhead_temperature = wellhead.T
+        result = self.traverse(inlets.bottom_in, start, end, "up")
         self.friction_pressure_drop = result.friction_pressure_drop
         self.gravity_pressure_drop = result.gravity_pressure_drop
         self.section_pressure = result.section_pressure
         self.section_temperature = result.section_temperature
-        self.heat_loss = outlets.loss_out
 
     def _loss(self, bottom, wellhead):
         """Return the heat [W] the well gives to the rock between its two ends."""

@@ -4,14 +4,27 @@ from fnmatch import fnmatchcase
 
 import numpy as np
 
+from gemini.engine.results import PORT_QUANTITIES, port_fields
 from gemini.errors import ValidationError
 from gemini.physics import units
 from gemini.types.declarations import PortField
 from gemini.types.shapes import check, value
 from gemini.utils.strings import close_matches, did_you_mean, join_path
 
+_PORT_COLUMNS = {"m_dot": "mass_flow", "T": "temperature", "p": "pressure"}
+"""The results column of each stream field."""
+
 TOLERANCE = 1e-9
 """Relative margin of a limit: a value on the limit passes through its rounding; numerical."""
+
+
+def _split_target(target):
+    """Return ``(path pattern, field)``: a port quantity is ``<port>.<quantity>``."""
+    head, _, last = target.rpartition(".")
+    if last in PORT_QUANTITIES:
+        pattern, _, port = head.rpartition(".")
+        return pattern, f"{port}.{last}"
+    return head, last
 
 
 class Limits:
@@ -28,8 +41,11 @@ class Limits:
         self.entries = []
 
     def add(self, target, min=None, max=None):
-        """Add a limit on ``"<path pattern>.<output>"``; give ``min``, ``max`` or both."""
-        pattern, _, output = target.rpartition(".")
+        """Add a limit on ``"<path pattern>.<output>"``; give ``min``, ``max`` or both.
+
+        ``<output>`` is an output or a port quantity (``boiler.fluid_out.temperature``).
+        """
+        pattern, output = _split_target(target)
         if not pattern or not output:
             raise ValidationError(
                 f"limits: target = {target!r}; expected '<path pattern>.<output>'",
@@ -91,9 +107,9 @@ def _matched(plant, entry):
             code="unknown_name",
             suggestions=close_matches(entry["pattern"], paths),
         )
-    declared = [path for path in matching if entry["output"] in _outputs(plant, path)]
+    declared = [path for path in matching if entry["output"] in _fields(plant, path)]
     if not declared:
-        names = sorted({name for path in matching for name in _outputs(plant, path)})
+        names = sorted({name for path in matching for name in _fields(plant, path)})
         raise ValidationError(
             f"limits: {entry['pattern']}: no output {entry['output']!r}"
             f"{did_you_mean(entry['output'], names)}",
@@ -104,12 +120,24 @@ def _matched(plant, entry):
     return declared
 
 
-def _outputs(plant, path):
-    return plant.get_module(path).outputs(recurse=False)
+def _fields(plant, path):
+    """Return the ``(unit, quantity)`` of what a limit may judge: outputs and port quantities."""
+    module = plant.get_module(path)
+    outputs = {
+        name: (declaration.unit or "-", declaration.quantity)
+        for name, declaration in module.outputs(recurse=False).items()
+    }
+    return outputs | port_fields(module)
+
+
+def _port_series(frame, path, module, field):
+    """Return the column of a stream field of a descendant's port, and whether it carried flow."""
+    owner = join_path(path, module._descendant_path(field.port.owner))
+    return _column(frame, owner, f"{field.port.name}.{_PORT_COLUMNS[field.name]}")
 
 
 def _column(frame, path, name):
-    """Return a leaf output over the run and whether its module carried flow, tick by tick."""
+    """Return a leaf column over the run and whether its module carried flow, tick by tick."""
     values = frame[join_path(path, name)].to_numpy(dtype=float)
     active = frame[join_path(path, "operating")].to_numpy(dtype=bool)
     return values, active
@@ -125,7 +153,9 @@ def _series(plant, frame, path, name):
         return _column(frame, path, name)
     module = plant.get_module(path)
     kind, *operands = module.outputs(recurse=False)[name].formula or (None,)
-    if kind == "of" and not isinstance(operands[0], PortField):
+    if kind == "of" and isinstance(operands[0], PortField):
+        return _port_series(frame, path, module, operands[0])
+    if kind == "of":
         target = join_path(path, module._descendant_path(operands[0].owner))
         return _series(plant, frame, target, operands[0].name)
     if kind in ("difference", "ratio"):
@@ -166,8 +196,7 @@ def _limit_value(lower, upper, unit):
 def _check(plant, frame, path, entry):
     """Return the check of one matched module and output."""
     name = entry["output"]
-    declaration = _outputs(plant, path)[name]
-    unit, quantity = declaration.unit or "-", declaration.quantity
+    unit, quantity = _fields(plant, path)[name]
     lower = _in_unit(entry["min"], unit, quantity)
     upper = _in_unit(entry["max"], unit, quantity)
     values, active = _series(plant, frame, path, name)

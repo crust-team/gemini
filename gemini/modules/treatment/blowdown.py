@@ -4,7 +4,7 @@ from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.module import Module
 from gemini.physics import separation
-from gemini.types import Control, Fraction, Inlet, MassFlow, Outlet, Output, Stream
+from gemini.types import Control, Fraction, Inlet, Outlet, Stream
 
 
 class Blowdown(Module):
@@ -38,9 +38,6 @@ class Blowdown(Module):
         # Controls
         self.blowdown_fraction = Control(Fraction)
 
-        # Outputs
-        self.blowdown_mass_flow = Output(MassFlow)
-
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
         self.waste_out = Outlet(Stream, kind="waste")
@@ -63,6 +60,3 @@ class Blowdown(Module):
 
         outlets = dict(fluid_out=fluid_out, waste_out=waste_out)
         return outlets
-
-    def _compute_outputs(self, inlets, outlets):
-        self.blowdown_mass_flow = outlets.waste_out.m_dot

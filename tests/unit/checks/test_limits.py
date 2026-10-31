@@ -56,7 +56,7 @@ def test_a_violated_limit_is_an_answer(run):
 def test_a_leaf_output_and_a_temperature_limit(run):
     """A limit in degrees converts to the unit of the output."""
     plant, results = run
-    limits = Limits().add("users.supply_in_T", min="100 degC")
+    limits = Limits().add("users.supply_in.temperature", min="100 degC")
     (found,) = gm.checks.limits(plant, results, limits)
     assert found["limit"] == {"value": pytest.approx(373.15), "unit": "K"}
     assert found["passed"] is True
@@ -73,12 +73,12 @@ def test_a_pattern_that_matches_nothing_suggests():
     """An unmatched pattern or output is ``unknown_name``, with what exists."""
     plant = plant_of_two()
     with raises(gm.errors.ValidationError, "unknown_name") as caught:
-        limits = Limits().add("usrs.heat_supplied", max=1.0)
+        limits = Limits().add("usrs.unmet_demand", max=1.0)
         gm.checks.limits(plant, _empty_results(), limits)
     assert "users" in caught.value.suggestions
     with raises(gm.errors.ValidationError, "unknown_name") as caught:
-        gm.checks.limits(plant, _empty_results(), Limits().add("users.heat_suplied", max=1.0))
-    assert "heat_supplied" in caught.value.suggestions
+        gm.checks.limits(plant, _empty_results(), Limits().add("users.unmet_demnd", max=1.0))
+    assert "unmet_demand" in caught.value.suggestions
 
 
 def _empty_results():
@@ -104,7 +104,7 @@ def test_limits_round_trip_through_a_plain_dictionary(run):
     """Stored as JSON and read back, they give the same checks."""
     plant, results = run
     limits = Limits().add("d*.flow", min="50 m3/h", max="300 m3/h")
-    limits.add("users.supply_in_T", min="100 degC")
+    limits.add("users.supply_in.temperature", min="100 degC")
     stored = json.loads(json.dumps(limits.to_dict()))
     assert Limits.from_dict(stored).to_dict() == limits.to_dict()
     assert gm.checks.limits(plant, results, Limits.from_dict(stored)) == gm.checks.limits(

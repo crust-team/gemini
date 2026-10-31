@@ -9,9 +9,10 @@ from gemini import ops
 from gemini.modules import Module, energy_balance, mass_balance
 from gemini.modules.heating import ElectricBoiler
 from gemini.modules.subsurface import BoreholeField
-from gemini.types import Inlet, Outlet, Output, Stream
+from gemini.types import Inlet, Outlet, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 BRINE = Stream(m_dot=3, T=273.15, p=3e5)
 CP = 4217.4
@@ -60,9 +61,6 @@ class HeatPumpLoop(Module):
         # Inlets
         self.fluid_in = Inlet(Stream)
 
-        # Outputs
-        self.heat_extraction_rate = Output.of(self.field.heat_extraction_rate)
-
         # Outlets
         self.fluid_out = Outlet(Stream)
 
@@ -84,7 +82,7 @@ def test_plain_call_extracts_with_the_loop_effectiveness():
     """At the undisturbed ground temperature Q = eps m_dot cp (T_u - T_in)."""
     module = field()
     result = module(fluid_in=BRINE)
-    out = result.outputs
+    out = reading(result)
     rate = hand_effectiveness(3) * 3 * CP * 10
     assert module.initial_state() == {"ground_temperature_change": 0}
     assert out.heat_extraction_rate == pytest.approx(rate, rel=1e-12)
@@ -117,14 +115,14 @@ def test_heat_rejection_recovery_and_zero_flow():
     """Warm inlets reject heat as heat_loss; without flow the ground recovers on its own."""
     module = field()
     result = module(fluid_in=BRINE.with_(T=303.15))
-    assert result.outputs.heat_extraction_rate < 0 and result.outputs.heat_absorbed == 0
-    assert result.outputs.heat_loss == -result.outputs.heat_extraction_rate
+    assert reading(result).heat_extraction_rate < 0 and reading(result).heat_absorbed == 0
+    assert reading(result).heat_loss == -reading(result).heat_extraction_rate
     assert energy_balance(module, result)["relative_residual"] < 1e-12
     still = BRINE.with_(m_dot=0)
     state, result = module.step({"ground_temperature_change": -2.0}, 365 * DAY, {"fluid_in": still})
     decay = math.exp(-surroundings() * 365 * DAY / (2.2e6 * 360 * 150))
     assert state["ground_temperature_change"] == pytest.approx(-2.0 * decay)
-    assert result.outlets.fluid_out.T == still.T and result.outputs.heat_extraction_rate == 0
+    assert result.outlets.fluid_out.T == still.T and reading(result).heat_extraction_rate == 0
 
 
 def test_invalid_flow_and_geometry():
@@ -144,7 +142,11 @@ def test_composite_step_advances_the_ground():
     state, _ = loop.step(None, 7 * DAY, {"fluid_in": BRINE})
     state, result = loop.step(state, 7 * DAY, {"fluid_in": BRINE})
     assert state["field"]["ground_temperature_change"] < 0
-    assert 0 < result.outputs.heat_extraction_rate < hand_effectiveness(3) * 3 * CP * 10
+    assert (
+        0
+        < reading(result.children["field"]).heat_extraction_rate
+        < hand_effectiveness(3) * 3 * CP * 10
+    )
 
 
 def test_field_arithmetic_matches_on_arrays():

@@ -9,7 +9,6 @@ from gemini.physics import heat_transfer, refrigeration
 from gemini.types import (
     Control,
     Dimensionless,
-    Electricity,
     Inlet,
     Outlet,
     Output,
@@ -84,15 +83,8 @@ class AdsorptionChiller(Module):
 
         # Outputs
         self.cop = Output(Ratio | None)
-        self.generator_duty = Output(Power)
-        self.evaporator_duty = Output(Power)
-        self.adsorber_condenser_duty = Output(Power)
-        self.electricity = Output(Electricity)
         self.driving_temperature_difference = Output(TemperatureDifference)
         self.is_capped = Output(bool)
-        self.generator_out_T = Output(Temperature)
-        self.chilled_out_T = Output(Temperature)
-        self.cooling_out_T = Output(Temperature)
 
         # Outlets
         self.generator_out = Outlet(Stream, kind="hot_water")

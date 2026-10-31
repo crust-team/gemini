@@ -8,12 +8,9 @@ from gemini.physics import combustion, heat_transfer
 from gemini.types import (
     Control,
     Efficiency,
-    ElectricityGenerated,
     Fraction,
     Fuel,
-    HeatLoss,
     Inlet,
-    MassFlow,
     Outlet,
     Output,
     Parameter,
@@ -75,14 +72,7 @@ class CHP(Module):
 
         # Outputs
         self.fuel = Output(Fuel)
-        self.fuel_coproduced = Output(Fuel)
-        self.fuel_purchased = Output(Fuel)
-        self.burned_mass_flow = Output(MassFlow)
-        self.electricity_generated = Output(ElectricityGenerated)
-        self.heat_recovered = Output(Power)
         self.dumped_heat = Output(Power)
-        self.heat_loss = Output(HeatLoss)
-        self.fluid_out_T = Output(Temperature)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
@@ -111,9 +101,8 @@ class CHP(Module):
 
     def _compute_outputs(self, inlets, outlets):
         values = self._performance(inlets.fluid_in, inlets.fuel_in)
-        values |= burner.fuel_outputs(values["fuel"], inlets.fuel_in)
-        for name, value in values.items():
-            setattr(self, name, value)
+        self.fuel = values["fuel"]
+        self.dumped_heat = values["dumped_heat"]
 
     def capex(self, assumptions):
         """Return the cost of the engine from its electric capacity."""

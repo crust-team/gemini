@@ -218,7 +218,7 @@ def hackathon_limits():
     limits = gm.checks.Limits()
     limits.add("d*.flow", min="50 m3/h", max="300 m3/h")
     limits.add("d*.brine_cooling", max="40 K")
-    limits.add("boiler.fluid_out_T", min="100 degC")
+    limits.add("boiler.fluid_out.temperature", min="100 degC")
     return limits
 
 
@@ -231,21 +231,32 @@ def print_assumptions():
     print("  discount rate, lifetime, every price and the cost factors without a source")
 
 
+def gain(frame, path, first, second):
+    """Return what the enthalpy flow [W] of ``path`` rises by from port ``first`` to ``second``."""
+    return frame[f"{path}.{second}.enthalpy_flow"] - frame[f"{path}.{first}.enthalpy_flow"]
+
+
 def print_run(results):
     """Print the delivered energy and what remained unmet."""
     frame = results.to_frame()
     hours = 24.0
     gwh = hours / 1e9
+    purchased = frame["gas_grid.gas_out.chemical_flow"]
     print("\nThe year, in daily steps:")
-    print(f"  heat delivered    {frame['heat_users.heat_supplied'].sum() * gwh:8.2f} GWh")
+    heat = -gain(frame, "heat_users", "supply_in", "return_out")
+    print(f"  heat delivered    {heat.sum() * gwh:8.2f} GWh")
     print(f"  heat unmet        {frame['heat_users.unmet_demand'].sum() * gwh:8.2f} GWh")
-    print(f"  cold delivered    {frame['cool_users.heat_absorbed'].sum() * gwh:8.2f} GWh")
+    cold = gain(frame, "cool_users", "supply_in", "return_out")
+    print(f"  cold delivered    {cold.sum() * gwh:8.2f} GWh")
     print(f"  cold unmet        {frame['cool_users.unmet_sensible'].sum() * gwh:8.2f} GWh")
-    print(f"  boiler, peak      {frame['boiler.duty'].max() / 1e6:8.2f} MW")
-    print(f"  heat pump, peak   {frame['heat_pump.useful_duty'].max() / 1e6:8.2f} MW")
-    print(f"  gas co-produced   {frame['boiler.fuel_coproduced'].sum() * gwh:8.2f} GWh burnt")
-    print(f"  gas purchased     {frame['boiler.fuel_purchased'].sum() * gwh:8.2f} GWh")
-    print(f"  supply, lowest    {frame['boiler.fluid_out_T'].min() - 273.15:8.2f} degC")
+    boiler = gain(frame, "boiler", "fluid_in", "fluid_out")
+    heat_pump = gain(frame, "heat_pump", "sink_in", "sink_out")
+    print(f"  boiler, peak      {boiler.max() / 1e6:8.2f} MW")
+    print(f"  heat pump, peak   {heat_pump.max() / 1e6:8.2f} MW")
+    coproduced = frame["boiler.fuel"] - purchased
+    print(f"  gas co-produced   {coproduced.sum() * gwh:8.2f} GWh burnt")
+    print(f"  gas purchased     {purchased.sum() * gwh:8.2f} GWh")
+    print(f"  supply, lowest    {frame['boiler.fluid_out.temperature'].min() - 273.15:8.2f} degC")
 
 
 def print_limits(checks):
@@ -300,6 +311,6 @@ print_run(results)
 print_limits(gm.checks.limits(plant, results, hackathon_limits()))
 print_kpis(gm.kpi.compute(plant, results))
 frame = results.to_frame()
-heat = frame["heat_users.heat_supplied"].sum()
-share = heat / (heat + frame["cool_users.heat_absorbed"].sum())
+heat = -gain(frame, "heat_users", "supply_in", "return_out").sum()
+share = heat / (heat + gain(frame, "cool_users", "supply_in", "return_out").sum())
 print_economics(plant, results, gm.economics.Assumptions(heat_cost_share=share, **ASSUMPTIONS))

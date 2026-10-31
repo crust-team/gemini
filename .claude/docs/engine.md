@@ -259,6 +259,11 @@ column (booleans or integers with an absent tick, lists, strings, `None`) is rea
 a column of row values with NaN for absent ones. Energy fields and `operating` are computed from
 the columns.
 
+The ports of a leaf are columns too, by `Stream.quantities()`: `<port>.<quantity>` for a fluid
+(`results.get("hp", "hot_out.enthalpy_flow")`) and the port's name for a `Power`
+(`results.get("grid", "power_out")`); the quantities are listed in [types.md](types.md). A limit
+of `gm.checks.Limits` may name one, and `gm.kpi`, `gm.economics` and the energy report read them.
+
 `Results[path]` returns the series of one module path; `Results[path].field` is a pandas Series
 and an unknown path or field raises `ValidationError`. Only leaf results are stored: twins in
 replay and the leaves of the plant call in simulation, not root or composite formula outputs.

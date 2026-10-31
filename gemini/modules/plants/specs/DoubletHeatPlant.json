@@ -72,18 +72,6 @@
   "outputs": {
     "thermal_power": {
       "of": "heat_exchanger.duty"
-    },
-    "electricity": {
-      "sum": "electricity"
-    },
-    "cop": {
-      "ratio": [
-        "thermal_power",
-        "electricity"
-      ]
-    },
-    "heat_loss": {
-      "sum": "heat_loss"
     }
   },
   "bindings": {},

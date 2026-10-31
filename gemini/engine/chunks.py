@@ -13,6 +13,9 @@ import pandas as pd
 from gemini.errors import ValidationError
 from gemini.types.flows import Stream
 
+ADDED_QUANTITIES = ("mass_flow", "volume_flow", "enthalpy_flow", "gas_flow", "co2_flow")
+"""The quantities of a fluid port that add up over the streams of a ``many`` port."""
+
 MISSING = float("nan")
 """What a row without a path holds in an object column, as an absent key of a row dict did."""
 
@@ -94,6 +97,8 @@ def _result_columns(result, health, length):
         for name, value in result.outputs.items()
     }
     columns["operating"] = _operating(result, length)
+    for name, port in (*result.inlets.items(), *result.outlets.items()):
+        columns.update(_port_columns(name, port, length))
     if health is None:
         return columns
     columns["health_assessed"] = _column(health.assessed, length)
@@ -103,6 +108,28 @@ def _result_columns(result, health, length):
     for name, value in health.metrics.items():
         columns["health_metric_" + name] = _column(_number(value), length)
     return columns
+
+
+def _port_columns(name, value, length):
+    """Return the columns of one port: its power, or the quantities of its stream.
+
+    A ``many`` port holds a list: its flows add up, and it has no one temperature or pressure.
+    """
+    items = value if isinstance(value, list) else [value]
+    if not items or not isinstance(items[0], Stream):
+        return {name: _broadcast(sum(items, start=0.0), length)}
+    quantities = [item.quantities() for item in items]
+    if isinstance(value, list):
+        return {
+            f"{name}.{key}": _broadcast(sum(item[key] for item in quantities), length)
+            for key in ADDED_QUANTITIES
+        }
+    return {f"{name}.{key}": _broadcast(item, length) for key, item in quantities[0].items()}
+
+
+def _broadcast(value, length):
+    """Return a port value as a float array of ``length`` ticks."""
+    return np.broadcast_to(np.asarray(value, dtype=float), (length,))
 
 
 def _number(value):

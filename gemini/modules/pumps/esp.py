@@ -13,7 +13,6 @@ from gemini.types import (
     Count,
     Dimensionless,
     Efficiency,
-    Electricity,
     Fraction,
     Frequency,
     Health,
@@ -84,10 +83,8 @@ class ESP(Module):
         self.power = Output(Power, soft_sensor=True)
         self.efficiency = Output(Dimensionless, soft_sensor=True)
         self.discharge_pressure = Output(Pressure, soft_sensor=True)
-        self.flow = Output(VolumeFlow)
         self.is_in_operating_window = Output(bool)
         self.best_efficiency_ratio = Output(Ratio)
-        self.electricity = Output(Electricity)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
@@ -126,21 +123,19 @@ class ESP(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        suction = inlets.fluid_in
         discharge = outlets.fluid_out
-        self.flow = suction.volumetric_flow()
-        self.head = self.head_function(self.flow, self.frequency)
-        self.power = self.power_function(self.flow, self.frequency)
-        self.efficiency = _physics.esp_efficiency(self.flow, self.head, self.power)
+        flow = inlets.fluid_in.volumetric_flow()
+        self.head = self.head_function(flow, self.frequency)
+        self.power = self.power_function(flow, self.frequency)
+        self.efficiency = _physics.esp_efficiency(flow, self.head, self.power)
         scale = pumps.speed_ratio(self.frequency, constants.ESP_REFERENCE_FREQUENCY)
         self.discharge_pressure = discharge.p
         self.is_in_operating_window = pumps.is_in_operating_window(
-            self.flow, self.minimum_flow, self.maximum_flow, scale
+            flow, self.minimum_flow, self.maximum_flow, scale
         )
         self.best_efficiency_ratio = pumps.best_efficiency_ratio(
-            self.flow, scale, self.best_efficiency_flow
+            flow, scale, self.best_efficiency_flow
         )
-        self.electricity = inlets.power_in
 
     def head_function(self, flow: float, frequency: float) -> float:
         """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""

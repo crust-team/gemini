@@ -5,7 +5,7 @@ import math
 import gemini as gm
 from tests.fixtures.result_tables import make_results
 
-ENERGY = {"electricity": [10.0, 5.0], "heat_loss": [1.0, 0.5], "heat_accumulation": [-3.0, 2.0]}
+ENERGY = {"power_in": [10.0, 5.0], "fuel": [1.0, 0.5], "heat_accumulation": [-3.0, 2.0]}
 
 
 def test_energy_ledger_passes_and_reports_the_smallest_power():
@@ -20,8 +20,8 @@ def test_energy_ledger_passes_and_reports_the_smallest_power():
 
 
 def test_a_negative_nonnegative_output_fails():
-    """A heat loss of -2 W breaks the sign convention."""
-    result = gm.checks.energy_balance(make_results({"leaf": {"heat_loss": [1.0, -2.0]}}))
+    """A fuel power of -2 W breaks the sign convention."""
+    result = gm.checks.energy_balance(make_results({"leaf": {"fuel": [1.0, -2.0]}}))
     assert result["passed"] is False and result["value"]["value"] == -2.0
 
 

@@ -7,13 +7,9 @@ from gemini.modules.module import Module
 from gemini.physics import energy, heat_transfer
 from gemini.types import (
     Control,
-    Duty,
     Efficiency,
-    Electricity,
     Fuel,
-    HeatLoss,
     Inlet,
-    MassFlow,
     Outlet,
     Output,
     Parameter,
@@ -41,11 +37,7 @@ class _BoilerBody(Module):
         self.temperature_setpoint = Control(Temperature)
 
         # Outputs
-        self.duty = Output(Duty)
-        self.fuel_or_power = Output(Power)
-        self.fluid_out_T = Output(Temperature)
         self.is_capped = Output(bool)
-        self.heat_loss = Output(HeatLoss)
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
@@ -68,15 +60,6 @@ class _BoilerBody(Module):
         rate = inlet.heat_capacity_rate()
         return inlet.with_(T=inlet.T + heat_transfer.temperature_change(duty, rate))
 
-    def _water_outputs(self, inlet, outlet, limit):
-        """Record the outputs of the water side at the duty limit ``limit`` [W]."""
-        requested = self._requested_duty(inlet)
-        self.duty = ops.minimum(requested, limit)
-        self.fuel_or_power = energy.input_power(self.duty, self.efficiency)
-        self.fluid_out_T = outlet.T
-        self.is_capped = requested > limit
-        self.heat_loss = self.fuel_or_power - self.duty
-
 
 class Boiler(_BoilerBody):
     """Auxiliary gas boiler with a thermal capacity limit, burning co-produced gas first.
@@ -87,9 +70,9 @@ class Boiler(_BoilerBody):
     ``fuel_in`` comes from a ``GasMakeup`` or a ``GasGrid``, which mark the stream with the grid
     composition; without that mark the fuel energy of the stream limits the duty.
 
-    ``fuel`` is the total, ``fuel_coproduced`` and ``fuel_purchased`` its parts [W] and
-    ``burned_mass_flow`` the co-produced gas burned [kg/s]. ``flue_out`` carries the CO2 of
-    everything burned, formed and carried in the gas, to ``Atmosphere.gas_in``.
+    ``fuel`` is the fuel power [W], on no port because the gas of ``fuel_in`` may be a mixture.
+    ``flue_out`` carries the CO2 of everything burned, formed and carried in the gas, to
+    ``Atmosphere.gas_in``.
     """
 
     def __init__(self):
@@ -101,9 +84,6 @@ class Boiler(_BoilerBody):
 
         # Outputs
         self.fuel = Output(Fuel)
-        self.fuel_coproduced = Output(Fuel)
-        self.fuel_purchased = Output(Fuel)
-        self.burned_mass_flow = Output(MassFlow)
 
         # Outlets
         self.flue_out = Outlet(Stream, kind="gas")
@@ -128,11 +108,10 @@ class Boiler(_BoilerBody):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        fuel = inlets.fuel_in
-        self._water_outputs(inlets.fluid_in, outlets.fluid_out, self._duty_limit(fuel))
-        self.fuel = self.fuel_or_power
-        for name, value in burner.fuel_outputs(self.fuel_or_power, fuel).items():
-            setattr(self, name, value)
+        requested = self._requested_duty(inlets.fluid_in)
+        limit = self._duty_limit(inlets.fuel_in)
+        self.is_capped = requested > limit
+        self.fuel = energy.input_power(ops.minimum(requested, limit), self.efficiency)
 
     def capex(self, assumptions):
         """Return the cost of the boiler from its capacity."""
@@ -157,7 +136,6 @@ class ElectricBoiler(_BoilerBody):
         self.power_in = Inlet(Power, kind="electricity")
 
         # Outputs
-        self.electricity = Output(Electricity)
 
         # Outlets
         self.loss_out = Outlet(Power, kind="heat")
@@ -176,5 +154,4 @@ class ElectricBoiler(_BoilerBody):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self._water_outputs(inlets.fluid_in, outlets.fluid_out, self.capacity)
-        self.electricity = self.fuel_or_power
+        self.is_capped = self._requested_duty(inlets.fluid_in) > self.capacity

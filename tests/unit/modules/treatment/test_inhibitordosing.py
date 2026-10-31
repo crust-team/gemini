@@ -9,6 +9,7 @@ from gemini.modules.treatment import InhibitorDosing
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 INLET = Stream(m_dot=50, T=340, p=8e5)
 
@@ -20,7 +21,7 @@ def test_hand_computed_dose_in_ppm():
     """A 20 ppm product dose on 50 kg/s at 40 % active strength."""
     dosing = InhibitorDosing().update_params(product_concentration=0.4)
     result = dosing(fluid_in=INLET, chemical_in=PRODUCT, dose="20 ppm")
-    assert result.outputs.product_mass_flow == pytest.approx(1e-3)
+    assert reading(result).product_mass_flow == pytest.approx(1e-3)
     assert result.outputs.active_mass_flow == pytest.approx(4e-4)
     assert result.outlets.fluid_out == INLET.with_(m_dot=INLET.m_dot + 1e-3)
     assert mass_balance(dosing, result)["residual"] == 0
@@ -31,9 +32,9 @@ def test_limits():
     """Zero flow doses nothing; reverse flow, a bad strength and a missing dose raise."""
     dosing = InhibitorDosing().update_params(product_concentration=0.4)
     assert (
-        dosing(
-            fluid_in=INLET.with_(m_dot=0), chemical_in=PRODUCT, dose=2e-5
-        ).outputs.product_mass_flow
+        reading(
+            dosing(fluid_in=INLET.with_(m_dot=0), chemical_in=PRODUCT, dose=2e-5)
+        ).product_mass_flow
         == 0
     )
     with pytest.raises(gm.errors.PhysicsError, match="fluid_in.m_dot"):

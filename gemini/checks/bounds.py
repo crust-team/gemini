@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 
+from gemini.types.declarations import Output
+from gemini.types.quantities import Temperature
 from gemini.types.shapes import check, value
 from gemini.utils.strings import join_path
 
@@ -15,6 +17,10 @@ _OUTSIDE = {
 """For each limit of ``Declaration.limits``, the comparison that a violating value satisfies."""
 
 
+_TEMPERATURE = Output(Temperature)
+"""The declaration whose limits judge the temperature of a port."""
+
+
 def _outside(values, limits):
     """Return how many values violate any of the ``limits``; a missing value never does."""
     array = values.to_numpy(dtype=float)
@@ -22,6 +28,13 @@ def _outside(values, limits):
     for key, limit in limits.items():
         violated |= _OUTSIDE[key](array, limit)
     return int(violated.sum())
+
+
+def _limits(outputs, field):
+    """Return the limits of a column: an output's, or those of a port's absolute temperature."""
+    if field in outputs:
+        return outputs[field].limits()
+    return _TEMPERATURE.limits() if field.endswith(".temperature") else {}
 
 
 def bounds(plant, results):
@@ -53,7 +66,7 @@ def bounds(plant, results):
         outputs = plant.get_module(path).outputs(recurse=False)
         for field in fields:
             column = frame[join_path(path, field)]
-            limits = outputs[field].limits() if field in outputs else {}
+            limits = _limits(outputs, field)
             if limits and pd.api.types.is_numeric_dtype(column) and column.dtype != bool:
                 judged += 1
                 violations += _outside(column, limits)

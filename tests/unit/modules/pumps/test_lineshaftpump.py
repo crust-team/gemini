@@ -8,6 +8,7 @@ from gemini.modules.pumps import ESP, LineShaftPump
 from gemini.physics import units
 from gemini.types.flows import Stream
 from tests.fixtures.equivalence import assert_module_matches
+from tests.fixtures.reading import reading
 
 CURVES = {
     "stage_count": 12,
@@ -25,9 +26,9 @@ def pump(**changes):
 def test_pump_stages_match_the_esp_basis_and_friction_scales_with_speed():
     """Head and pump power equal the ESP curves; friction is loss * depth * f / 60 Hz."""
     suction = Stream(m_dot=units.m3h_to_m3s(200) * 1000, T=340, p=1e6)
-    esp = ESP().update_params(**CURVES)(fluid_in=suction, frequency=50).outputs
+    esp = reading(ESP().update_params(**CURVES)(fluid_in=suction, frequency=50))
     result = pump()(fluid_in=suction, frequency=50)
-    out = result.outputs
+    out = reading(result)
     assert out.head == pytest.approx(esp.head)
     assert out.pump_power == pytest.approx(esp.power)
     assert out.shaft_friction_power == pytest.approx(5 * 300 * 50 / 60)
@@ -43,14 +44,14 @@ def test_isothermal_electricity_is_unresolved_pump_power():
     machine = pump()
     result = machine(fluid_in=Stream(m_dot=40, T=340, p=1e6), frequency=55)
     balance = energy_balance(machine, result)
-    assert balance["unresolved_power"] == result.outputs.electricity
+    assert balance["unresolved_power"] == reading(result).electricity
     assert balance["relative_thermal_residual"] < 1e-12
     assert mass_balance(machine, result)["residual"] == 0
 
 
 def test_zero_flow_runs_at_shutoff():
     """At zero flow the pump holds its shutoff head and draws the shutoff power."""
-    out = pump(shaft_friction_loss=0)(fluid_in=Stream(m_dot=0, T=340, p=1e6), frequency=60).outputs
+    out = reading(pump(shaft_friction_loss=0)(fluid_in=Stream(m_dot=0, T=340, p=1e6), frequency=60))
     assert out.head == pytest.approx(units.ft_head_to_pa(12 * 83.08389282))
     assert out.pump_power == pytest.approx(units.bhp_to_w(12 * 10.02089977))
     assert out.efficiency == 0

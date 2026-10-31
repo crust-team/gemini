@@ -17,40 +17,38 @@ def plant():
     return result
 
 
-def test_automatic_sums_cover_the_energy_outputs_leaves_declare(plant):
-    """Without an ``outputs`` key the plant sums each energy output some leaf declares."""
-    assert list(plant.outputs(recurse=False)) == ["heat_absorbed", "heat_loss"]
+def test_a_plant_declares_no_total_of_its_own(plant):
+    """Without an ``outputs`` key the plant declares nothing: totals are read from ports."""
+    assert list(plant.outputs(recurse=False)) == []
 
 
 def test_each_kind_declares_one_output(plant):
-    """``of``, ``sum`` and ``ratio`` declare outputs; ratios come after their operands."""
+    """``of`` and ``ratio`` declare outputs; ratios come after their operands."""
     plant._output_specs = {}
     plant._refresh()
     specs = {
-        "ratio": {"ratio": ["duty", "heat_loss"]},
+        "ratio": {"ratio": ["duty", "drop"]},
         "duty": {"of": "exchanger.duty"},
-        "heat_loss": {"sum": "heat_loss"},
+        "drop": {"of": "pipe.pressure_drop"},
         "flow": {"of": "exchanger.cold_out", "field": "m_dot"},
     }
     ordered = [name for name, _ in outputs.ordered(specs)]
-    assert ordered == ["duty", "heat_loss", "ratio", "flow"]
+    assert ordered == ["duty", "drop", "ratio", "flow"]
     for name, spec in outputs.ordered(specs):
         outputs.declare_output(plant, name, spec)
     assert list(plant.outputs(recurse=False)) == ordered
 
 
 def test_bad_outputs_name_the_problem(plant):
-    """Missing keys, unknown modules and outputs, non-additive sums and clashes are refused."""
+    """Two keys, unknown modules and outputs, the removed ``sum`` and clashes are refused."""
     with pytest.raises(ValidationError):
-        outputs.declare_output(plant, "x", {"of": "exchanger.duty", "sum": "heat_loss"})
+        outputs.declare_output(plant, "x", {"of": "exchanger.duty", "ratio": ["a", "b"]})
     with raises(ValidationError, "unknown_name"):
         outputs.declare_output(plant, "x", {"of": "exchangr.duty"})
     with raises(ValidationError, "unknown_name") as caught:
         outputs.declare_output(plant, "x", {"of": "exchanger.dutty"})
     assert caught.value.suggestions == ("duty",)
-    with raises(ValidationError, "unknown_name"):
-        outputs.declare_output(plant, "x", {"sum": "nothing"})
+    with raises(ValidationError, "invalid_format"):
+        outputs.declare_output(plant, "x", {"sum": "heat_loss"})
     with pytest.raises(ValidationError):
-        outputs.declare_output(plant, "x", {"sum": "effectiveness"})
-    with pytest.raises(ValidationError):
-        outputs.declare_output(plant, "pipe", {"sum": "heat_loss"})
+        outputs.declare_output(plant, "pipe", {"of": "pipe.pressure_drop"})

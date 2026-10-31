@@ -10,6 +10,7 @@ from gemini.modules.heating import ElectricBoiler
 from gemini.modules.subsurface import ThermalDecline
 from gemini.types import Inlet, Outlet, Output, Stream
 from tests.fixtures.equivalence import assert_function_matches, assert_same_error
+from tests.fixtures.reading import reading
 
 STREAM = Stream(m_dot=50, T=353.15, p=2e7)
 WATER = 1000 * 4217.4
@@ -78,7 +79,7 @@ def test_two_steps_accumulate_the_produced_volume():
     assert state == {"injected_volume": pytest.approx(50 / 1000 * 3600)}
     state, result = module.step(state, 3600, {"fluid_in": STREAM})
     assert state["injected_volume"] == pytest.approx(2 * 50 / 1000 * 3600)
-    assert result.outputs.fluid_out_T == STREAM.T
+    assert reading(result).fluid_out_T == STREAM.T
 
 
 def test_decline_after_breakthrough_is_the_dipole_cold_share():

@@ -28,7 +28,7 @@ def spec():
             "pipe_out": "pipe.fluid_out",
             "pipe_loss": "pipe.loss_out",
         },
-        "outputs": {"loss": {"sum": "heat_loss"}},
+        "outputs": {"loss": {"of": "pipe.pressure_drop"}},
         "bindings": {},
         "param_history": {},
     }

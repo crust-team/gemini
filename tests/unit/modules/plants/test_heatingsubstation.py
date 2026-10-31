@@ -9,6 +9,7 @@ from gemini.modules import energy_balance, mass_balance
 from gemini.modules.plants import HeatingSubstation
 from gemini.types import Stream
 from tests.fixtures.errors import raises
+from tests.fixtures.reading import reading
 
 CP = 4217.4
 NETWORK = Stream(m_dot=2.0, T=348.15, p=6e5)
@@ -25,7 +26,7 @@ def test_met_demand_closes_the_building_loop(plants):
     """With the demand met the return follows from e C_min (T_network - T_return) = Q."""
     substation = plants["heating_substation"](HeatingSubstation())
     result = substation(supply_in=NETWORK)
-    out = result.outputs
+    out = reading(result)
     effectiveness = counterflow_effectiveness(2e4, 2 * CP, 3 * CP)
     assert out.heat_supplied == pytest.approx(1.5e5, rel=1e-12)
     assert out.duty == pytest.approx(1.5e5, rel=1e-9)
@@ -47,7 +48,7 @@ def test_met_demand_closes_the_building_loop(plants):
 def test_large_demand_is_capped_at_the_return_floor(plants):
     """Beyond the exchanger's reach the return sits at the floor and the rest is unmet."""
     substation = plants["heating_substation"](HeatingSubstation(), demand=5e5)
-    out = substation(supply_in=NETWORK).outputs
+    out = reading(substation(supply_in=NETWORK))
     effectiveness = counterflow_effectiveness(2e4, 2 * CP, 3 * CP)
     available = effectiveness * 2 * CP * (348.15 - 303.15)
     assert out.building_return_temperature == pytest.approx(303.15, abs=1e-8)
@@ -58,10 +59,10 @@ def test_large_demand_is_capped_at_the_return_floor(plants):
 def test_stopped_or_cold_network_delivers_nothing(plants):
     """No network flow, or a supply below the return floor, leaves the demand unmet."""
     substation = plants["heating_substation"](HeatingSubstation())
-    stopped = substation(supply_in=NETWORK.with_(m_dot=0.0)).outputs
+    stopped = reading(substation(supply_in=NETWORK.with_(m_dot=0.0)))
     assert stopped.heat_supplied == 0 and stopped.unmet_demand == 1.5e5
     assert stopped.valve_pressure_drop == 0 and stopped.return_out_T == 348.15
-    cold = substation(supply_in=NETWORK.with_(T=300.15)).outputs
+    cold = reading(substation(supply_in=NETWORK.with_(T=300.15)))
     assert cold.heat_supplied == 0 and cold.building_return_temperature == 300.15
 
 

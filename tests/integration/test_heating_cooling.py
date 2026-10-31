@@ -34,7 +34,10 @@ def test_every_preset_runs_one_simulate(name):
     assert gm.plants.validate(spec) == []
     plant, results = _run(spec)
     assert results.errors() == []
-    assert results.get("heating_consumer", "heat_supplied")["values"] == [1e5, 1e5]
+    frame = results.to_frame()
+    delivered = frame["heating_consumer.supply_in.enthalpy_flow"]
+    delivered = delivered - frame["heating_consumer.return_out.enthalpy_flow"]
+    assert delivered.tolist() == pytest.approx([1e5, 1e5])
 
 
 @pytest.mark.parametrize("flags", FLAGS.values(), ids=FLAGS)

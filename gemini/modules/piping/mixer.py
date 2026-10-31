@@ -4,7 +4,7 @@ from gemini import ops
 from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import heat_transfer
-from gemini.types import Inlet, Outlet, Output, PressureDifference, Stream, Temperature
+from gemini.types import Inlet, Outlet, Output, PressureDifference, Stream
 
 
 class Mixer(Module):
@@ -34,7 +34,6 @@ class Mixer(Module):
         self.branch2_in = Inlet(Stream)
 
         # Outputs
-        self.fluid_out_T = Output(Temperature)
         self.pressure_imbalance = Output(PressureDifference)
 
         # Outlets
@@ -57,7 +56,6 @@ class Mixer(Module):
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
-        self.fluid_out_T = outlets.fluid_out.T
         self.pressure_imbalance = ops.abs(inlets.branch1_in.p - inlets.branch2_in.p)
 
     def _check(self, branch1_in, branch2_in):

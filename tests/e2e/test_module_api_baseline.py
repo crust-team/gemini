@@ -28,7 +28,7 @@ import gemini as gm
 from gemini.modules.plants import migration
 from gemini.modules.plants.migration import FLUID_NAMES, RENAMED_NAMES
 from tests.fixtures import FIXTURES
-from tests.fixtures.frames import path_frame
+from tests.fixtures.frames import on_ports, path_frame
 
 pytestmark = pytest.mark.e2e
 BASELINE = FIXTURES / "module_api_baseline"
@@ -72,7 +72,7 @@ NEW_PARAMS = {
 
 def _baseline_frame(directory, name):
     """Read one captured result frame and apply the documented path and field renames."""
-    return (
+    return on_ports(
         pd.read_csv(directory / name, header=[0, 1], index_col=0, parse_dates=True)
         .rename(columns=PATH_RENAMES, level=0)
         .rename(columns=FIELD_RENAMES, level=1)

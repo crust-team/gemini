@@ -58,6 +58,9 @@ class Assumptions(BaseModel):
         Price of purchased gas [currency/MWh of fuel energy]; co-produced gas costs nothing.
     heat_price, cold_price : float or None
         Revenue per joule of heat or cold delivered [currency/J].
+    waste_disposal_price, chemical_price : float or None
+        Cost of disposing of a kilogram at a ``WasteGrid`` and of a kilogram of product from a
+        ``ChemicalGrid`` [currency/kg]; ``None`` until the user gives it: both depend on the site.
     electricity_emission_factor : float or None
         CO2 emitted per joule of grid electricity drawn [kg/J]; it depends on the grid and the
         year, so there is no default.
@@ -87,6 +90,8 @@ class Assumptions(BaseModel):
     lifetime_years: int | None = Field(None, ge=1)
     electricity_price: float | None = Field(None, ge=0)
     gas_price: float | None = Field(None, ge=0)
+    waste_disposal_price: float | None = Field(None, ge=0)
+    chemical_price: float | None = Field(None, ge=0)
     heat_price: float | None = Field(None, ge=0)
     cold_price: float | None = Field(None, ge=0)
     electricity_emission_factor: float | None = Field(None, ge=0)

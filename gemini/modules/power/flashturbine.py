@@ -7,9 +7,7 @@ from gemini.modules.power import _physics
 from gemini.types import (
     WATER,
     Efficiency,
-    ElectricityGenerated,
     Fraction,
-    HeatLoss,
     Inlet,
     Outlet,
     Output,
@@ -64,9 +62,7 @@ class FlashTurbine(Module):
 
         # Outputs
         self.gross_power = Output(Power)
-        self.electricity_generated = Output(ElectricityGenerated)
         self.condenser_duty = Output(Power)
-        self.heat_loss = Output(HeatLoss)
         self.exhaust_quality = Output(Fraction)
 
         # Outlets
@@ -94,9 +90,7 @@ class FlashTurbine(Module):
         expansion = self._expansion(inlet)
         balance = self._balance(inlet, expansion)
         self.gross_power = balance.gross_power
-        self.electricity_generated = balance.electricity_generated
         self.condenser_duty = balance.condenser_duty
-        self.heat_loss = balance.heat_loss
         self.exhaust_quality = expansion.outlet_quality
 
     def _balance(self, inlet, expansion):

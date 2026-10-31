@@ -157,6 +157,16 @@ class Fluid(BaseModel):
             return 0.0
         return gas.lower_heating_value(self.gas_composition)
 
+    def gas_share(self):
+        """Return the mass fraction of gas in a stream of this fluid [-]."""
+        return 1.0 if self.kind == "gas" else self.gas_mass_fraction
+
+    def co2_in_gas(self):
+        """Return the mass fraction of CO2 in the gas of this fluid [-]; zero without one."""
+        if self.gas_composition is None:
+            return 0.0
+        return gas.mass_fraction(self.gas_composition, "CO2")
+
     def emission_factor(self):
         """Return the CO2 [kg/J] of burning the gas; zero when it does not burn."""
         if self.heating_value() == 0:
