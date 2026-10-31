@@ -330,17 +330,31 @@
    "mass_balance": [
     "results"
    ],
+   "operating_days": [
+    "plant",
+    "results",
+    "days"
+   ],
    "plant_balance": [
     "plant",
     "run"
    ],
    "run_all": [
     "plant",
-    "results"
+    "results",
+    "days"
    ]
   },
   "economics": {
    "Assumptions": "class",
+   "annualised_cost": [
+    "plant",
+    "results",
+    "discount_rate",
+    "lifetime",
+    "assumptions",
+    "on_error"
+   ],
    "capex": [
     "plant",
     "assumptions",
@@ -361,6 +375,14 @@
     "on_error"
    ],
    "lcoh": [
+    "plant",
+    "results",
+    "discount_rate",
+    "lifetime",
+    "assumptions",
+    "on_error"
+   ],
+   "lcts": [
     "plant",
     "results",
     "discount_rate",
@@ -417,7 +439,8 @@
     "variables",
     "objective",
     "constraints",
-    "evaluations"
+    "evaluations",
+    "assumptions"
    ],
    "sample": [
     "plant",
@@ -425,7 +448,8 @@
     "distributions",
     "metrics",
     "count",
-    "seed"
+    "seed",
+    "assumptions"
    ]
   },
   "plants": {

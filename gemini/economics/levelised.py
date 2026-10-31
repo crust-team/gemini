@@ -1,4 +1,4 @@
-"""Levelised cost of heat and of cold."""
+"""Annualised system cost and the levelised cost of heat, of cold and of both."""
 
 from gemini.economics.assumptions import discounting, resolve
 from gemini.economics.costs import annual_energies, capex, opex
@@ -11,6 +11,15 @@ def annuity(rate, years):
     if rate == 0:
         return float(years)
     return (1 - (1 + rate) ** -years) / rate
+
+
+def lifetime_cost(investment, yearly, factor):
+    """Return the discounted cost of a lifetime: ``capex + opex * A``.
+
+    Over ``A`` it is the annualised cost ``capex / A + opex``; ``lcoh`` and ``lcoc`` divide it by
+    ``energy * A`` in one step, so their numbers stay those of that order of operations.
+    """
+    return investment + yearly * factor
 
 
 def _levelised(plant, results, product, rate, years, assumptions, on_error):
@@ -45,7 +54,7 @@ def _cost_of(plant, results, product, rate, years, assumptions, on_error):
         share = heat_share if product == "heat" else 1 - heat_share
     yearly = opex(plant, results, assumptions, "raise")["value"]
     factor = annuity(rate, years)
-    cost = investment["value"] + yearly * factor
+    cost = lifetime_cost(investment["value"], yearly, factor)
     return value(
         share * cost / (delivered * factor),
         unit,
@@ -100,3 +109,99 @@ def lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None, on
     ``heat_cost_share`` leaves. The parameters and the return shape are those of ``lcoh``.
     """
     return _levelised(plant, results, "cold", discount_rate, lifetime, assumptions, on_error)
+
+
+def annualised_cost(
+    plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise"
+):
+    """Return the annualised system cost [currency/year]: ``capex / A + opex``.
+
+    ``A`` is the annuity factor of ``lcoh``, the sum over the lifetime years of
+    ``1 / (1 + discount_rate) ** t``; ``capex`` and ``opex`` are those of this package, with the
+    yearly cost as scaled from the run, constant over the lifetime.
+
+    Parameters
+    ----------
+    plant, results : Module, Results
+        A plant and its finished run.
+    discount_rate : float, optional
+        Real discount rate per year [-]; ``assumptions.discount_rate`` when ``None``.
+    lifetime : int, optional
+        Years of operation; ``assumptions.lifetime_years`` when ``None``.
+    assumptions : Assumptions, optional
+        Prices and, when not given above, the rate and lifetime.
+    on_error : {"raise", "record"}, optional
+        A value the inputs cannot give raises; ``"record"`` makes it ``None`` with a ``reason``.
+
+    Returns
+    -------
+    dict
+        ``{value, unit, capex, opex, annuity_factor, discount_rate, lifetime_years}``, the last
+        five each a value. A plant that declares no cost has no value.
+    """
+    return reported(
+        on_error,
+        f"{currency_of(assumptions)}/year",
+        lambda: _annualised(plant, results, discount_rate, lifetime, assumptions, on_error),
+    )
+
+
+def _annualised(plant, results, rate, years, assumptions, on_error):
+    """Return the annualised cost; ``on_error`` applies to a plant without a cost."""
+    assumptions = resolve(assumptions)
+    rate, years = discounting(assumptions, rate, years)
+    investment = capex(plant, assumptions, on_error)
+    unit = f"{investment['unit']}/year"
+    if investment["value"] is None:
+        return unavailable(unit, investment["reason"], on_error)
+    yearly = opex(plant, results, assumptions, "raise")["value"]
+    factor = annuity(rate, years)
+    return value(
+        lifetime_cost(investment["value"], yearly, factor) / factor,
+        unit,
+        capex=value(investment["value"], investment["unit"]),
+        opex=value(yearly, unit),
+        annuity_factor=value(factor, "year"),
+        discount_rate=value(rate, "-"),
+        lifetime_years=value(years, "year"),
+    )
+
+
+def lcts(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise"):
+    """Return the levelised cost of thermal supply [currency/J].
+
+    ``annualised_cost / (heat + cold)``, the heat and the cold delivered per year as scaled from
+    the run (``annual_energies``). One cost over both products, so it needs no ``heat_cost_share``.
+    The parameters are those of ``annualised_cost``.
+
+    Returns
+    -------
+    dict
+        ``{value, unit, annualised_cost, heat, cold}``, the last three each a value, ``heat`` and
+        ``cold`` in J/year; ``value`` in currency/J (multiply by 3.6e9 for currency/MWh). A plant
+        that declares no cost, or a run that delivers neither heat nor cold, has no value.
+    """
+    return reported(
+        on_error,
+        f"{currency_of(assumptions)}/J",
+        lambda: _lcts(plant, results, discount_rate, lifetime, assumptions, on_error),
+    )
+
+
+def _lcts(plant, results, rate, years, assumptions, on_error):
+    """Return the cost per joule of heat and cold; ``on_error`` applies to a missing value."""
+    unit = f"{currency_of(assumptions)}/J"
+    annual = annual_energies(plant, results)
+    delivered = annual.heat + annual.cold
+    if delivered <= 0:
+        return unavailable(unit, "the run delivers neither heat nor cold", on_error)
+    cost = annualised_cost(plant, results, rate, years, assumptions, on_error)
+    if cost["value"] is None:
+        return unavailable(unit, cost["reason"], on_error)
+    return value(
+        cost["value"] / delivered,
+        unit,
+        annualised_cost=value(cost["value"], cost["unit"]),
+        heat=value(annual.heat, "J/year"),
+        cold=value(annual.cold, "J/year"),
+    )

@@ -264,6 +264,22 @@ class Plant(PortResolver, Module):
                 registry.pop(name, None)
                 Module._register_declaration(self, name, declare(end.type, kind=end.kind))
 
+    def target_of(self, source):
+        """Return the ``"path.port"`` that the outlet ``source`` feeds, or ``None``.
+
+        ``None`` is an outlet that leaves the plant or feeds no connection of this plant.
+        """
+        found = [item["target"] for item in self._connections if item["source"] == source]
+        return found[0] if found else None
+
+    def source_of(self, target):
+        """Return the ``"path.port"`` that feeds the inlet ``target``, or ``None``.
+
+        ``None`` is an inlet fed by a plant port, or by no connection of this plant.
+        """
+        found = [item["source"] for item in self._connections if item["target"] == target]
+        return found[0] if found else None
+
     def _connection_list(self):
         """Return the plant's connections as ``[{source, target, kind, type}]``.
 

@@ -1,4 +1,4 @@
-"""Fit model parameters through the public engine API."""
+"""Fit, search and sample plant parameters through the public engine API."""
 
 from .calibrate import CalibrationResult, calibrate
 from .search import minimize, sample

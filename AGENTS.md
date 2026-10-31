@@ -25,8 +25,8 @@ plant dict agents use (`gm.plants.from_dict`, `plant.to_dict`, `gm.plants.schema
 
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
-`gm.schedule` plans the run input of a design from its demand
-([schedule](.claude/docs/engine.md#schedule)).
+`gm.schedule` plans the run input of a design from its demand, with outage days from
+`operating_days` ([schedule](.claude/docs/engine.md#schedule)).
 
 Everything in the plant's energy and mass flow is a module, everything that crosses between modules
 goes through a port, and a plant total is read from the ports of the modules at the plant's edge
@@ -92,9 +92,9 @@ gemini/
 ├── modules/          # module.py, plant.py, container.py, _utils/; one folder per category with its _physics.py
 │   └── plants/       # plant classes only; _utils/ holds the plant tools
 ├── engine/           # Clock, run functions, Engine, steps, Results, callbacks, checkpoints
-├── optim/            # calibration through Engine.replay
+├── optim/            # calibration through Engine.replay, minimize and sample through gm.simulate
 ├── analysis/         # well performance and integrity, fits; kpi.py is the gm.kpi namespace
-├── economics/        # capex, opex, levelised cost, CO2, cash flow
+├── economics/        # capex, opex, annualised and levelised cost, LCTS, CO2, cash flow
 ├── checks/           # balances and bounds over a finished run
 ├── testing/          # check_module for a new module class
 └── profiles/         # demand profiles

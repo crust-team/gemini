@@ -1,8 +1,9 @@
-"""Energy, mass and bounds checks over a finished run."""
+"""Energy, mass, bounds, limits and operating-days checks over a finished run."""
 
 from gemini.checks.balances import energy_balance, mass_balance, plant_balance
 from gemini.checks.bounds import bounds
 from gemini.checks.limits import Limits, limits
+from gemini.checks.operating import operating_days
 from gemini.checks.suite import run_all
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "run_all",
     "Limits",
     "limits",
+    "operating_days",
 ]

@@ -30,7 +30,8 @@ its heat and cold KPIs and levelised costs are `null` with that reason.
 ## `gm.economics`
 
 Every function returns a value with the parts of its result as more keys, each a value or a text;
-`unit` is the currency (`EUR`), `EUR/year`, `EUR/J`, `year` or `kg`. Every function takes
+`unit` is the currency (`EUR`), `EUR/year`, `EUR/J`, `year` or `kg`. `A` is the annuity factor, the
+sum over the lifetime years of `1 / (1 + discount_rate) ** t`, in years. Every function takes
 `on_error="raise"`: a value the inputs cannot give raises `ValidationError`, code `no_value`, or
 `missing_assumption`, naming it, for an assumption nobody gave. With `on_error="record"` nothing is raised and it is
 `{value: null, unit, reason}`.
@@ -42,6 +43,8 @@ Every function returns a value with the parts of its result as more keys, each a
 | `opex(plant, results, assumptions=None)` | fixed + variable cost per year + yearly bill of grid electricity and purchased gas (`fuel_purchased` at `gas_price`; co-produced gas costs nothing); `components` lists the parts |
 | `lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `(capex + opex A) / (heat A)` in currency/J, `A` the annuity factor |
 | `lcoc(...)` | the same with the cold delivered |
+| `annualised_cost(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `capex / A + opex` in currency/year, with `capex`, `opex`, `annuity_factor`, `discount_rate`, `lifetime_years` |
+| `lcts(...)` | levelised cost of thermal supply, the team's design metric: `annualised_cost / (heat + cold)` in currency/J, heat and cold delivered per year, with `annualised_cost`, `heat`, `cold`; it needs no `heat_cost_share` |
 | `co2(plant, results, assumptions=None)` | kg of CO2-equivalent over the window: the leaf `co2_emission`, `methane_emission` times `methane_gwp`, grid electricity times `electricity_emission_factor` |
 | `npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `-capex + (revenue - opex) A` |
 | `payback(plant, results, assumptions=None)` | `capex / (revenue - opex)` in years, undiscounted |
@@ -64,7 +67,11 @@ assumptions in another currency than the costs raise `ValidationError`.
 
 `lcoh` charges the whole plant cost to the heat. A plant that also delivers cold has no value ("the
 split of its cost is not defined") unless `heat_cost_share` gives the part charged to heat; `lcoc`
-gets the rest. Levelised cost, `npv` and `payback` assume constant yearly energy and cost over the
+gets the rest. `lcts` needs no share: with a `heat_cost_share` of 1, `lcts` is `lcoh` times its
+energy over `heat + cold`. It has no value when the run delivers neither. `lcoh` and `lcoc` keep the
+one expression `(capex + opex A) / (energy A)`: `annualised_cost` and they share `lifetime_cost`
+(`capex + opex A`) and not the division, which would move the last bits of their numbers. Levelised
+cost, `npv` and `payback` assume constant yearly energy and cost over the
 lifetime, with no degradation, tax, replacement or residual value.
 
 Missing user inputs raise `ValidationError` with code `missing_assumption` and the path
@@ -130,7 +137,8 @@ it, and the checks audit what the columns hold:
 | `plant_balance(plant, run)` | mass and energy in = out + losses + change of stored energy, per module (1e-9) and for the root (1e-6) | a list of checks, the worst relative residual of each |
 | `mass_balance(results)` | the leaf outputs whose unit in `results.units` is kg/s: finite or missing, not negative | smallest flow [kg/s], 1e-12 kg/s |
 | `bounds(plant, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
-| `run_all(plant, results)` | the three above | `{passed, checks}` |
+| `operating_days(plant, results, days)` | the days each doublet ran: the UTC days on which `<doublet>.reservoir.liquid_flow`, the column behind `Doublet.flow`, is above zero on a tick | a list of checks, one per doublet, exact: days run, `days`, both in `day` |
+| `run_all(plant, results, days=None)` | the first three above, and `operating_days` when `days` is given | `{passed, checks}` |
 
 `gm.checks.Limits` holds limits a user sets, `(path pattern, output, min, max)`:
 
@@ -180,5 +188,22 @@ deliver at each rate; the operating point is where it falls to the wellhead pres
 ## `gm.testing` and `gm.optim`
 
 `gm.testing.check_module` and `gm.modules.load_file` are described in
-[modules.md](modules.md#registry-categories-and-streams). `gm.optim.minimize` and `gm.optim.sample`
-(uncertainty sampling) have their final signatures and raise `NotImplementedYet`.
+[modules.md](modules.md#registry-categories-and-streams).
+
+`gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *,
+assumptions=None)` searches design values on a fixed run input. Each trial copies the plant, sets
+the variables with `set_params`, simulates `profile` and reads the metric, so the plant is not
+changed. The search is `scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
+with five candidates per variable: the population times the generations is the number of
+simulations, so `evaluations` is a hard limit and a smaller budget than one population raises
+`ValidationError`. A trial that fails, has no value or breaks a constraint is in `history` with its
+`reason` and is never `best`. `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0,
+*, assumptions=None)` draws `normal`, `uniform` and `triangular` parameters with
+`numpy.random.default_rng(seed)`, one simulation each, and summarises each metric as `mean`, `p5`,
+`p50`, `p95`; a draw whose run failed has its `reason` and stays out of the summary.
+
+A metric is a name of `gm.kpi.names()` or `lcoh`, `lcoc`, `lcts`, `annualised_cost`, `co2`; these
+read `assumptions`. `profile` is required: the run input of a design comes from `gm.schedule`, which
+needs the rules `doublet_flow` and `max_brine_cooling`, and it stays fixed over the trials, so a
+plan made for one design is what every trial runs. `parameters` in `best`, `history` and `samples`
+are numbers in SI, the input of the next `set_params`.

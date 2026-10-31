@@ -1,9 +1,13 @@
 """``gm.schedule``: the daily controls of a plant from its demand, and a run of them."""
 
+from datetime import date
+
+import numpy as np
 import pandas as pd
 import pytest
 
 import gemini as gm
+from gemini.analysis import schedule
 from gemini.backends import settings
 from gemini.physics import constants
 from tests.fixtures.errors import raises
@@ -167,11 +171,134 @@ def test_unmet_demand_is_no_error():
     assert results.errors() == [] and results.to_frame()["users.unmet_demand"].iloc[0] > 0
 
 
-@pytest.mark.parametrize("days", [330, ["2027-07-01"]], ids=["count", "outages"])
-def test_operating_days_wait_for_a_decision(days):
-    """The name is final; what 330 daily steps mean is not decided."""
-    with pytest.raises(gm.errors.NotImplementedYet, match="330"):
-        gm.schedule(plant_of_two(), demand(FULL), RULES | {"operating_days": days})
+def test_outage_days_are_the_lowest_demand_days_and_never_overlap():
+    """The first doublet takes the lowest days, the next the lowest left; heat and cold add up."""
+    frame = demand(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+    frame["cooling_demand"] = [9.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    plan = gm.schedule(plant_of_two(), frame, RULES | {"operating_days": 4})
+    assert plan.attrs["outage_days"] == {
+        "d0": ["2027-01-02", "2027-01-03"],
+        "d1": ["2027-01-04", "2027-01-05"],
+    }
+
+
+def test_an_outage_moves_the_heat_to_the_next_doublet_and_the_boiler():
+    """No flow on the outage day; every other day each doublet runs."""
+    frame = demand(0.5 * FULL, 1.5 * FULL, 2.5 * FULL, 3.0 * FULL)
+    plan = gm.schedule(plant_of_two(), frame, RULES | {"operating_days": 3})
+    assert plan["d0.flow"].iloc[0] == 0 and not plan["d0.is_running"].iloc[0]
+    assert plan["d1.flow"].iloc[0] == pytest.approx(150 / 3600)
+    assert plan["d1.flow"].iloc[1] == 0 and plan["d0.flow"].iloc[1] == pytest.approx(300 / 3600)
+    assert plan["boiler_duty"].iloc[1] == pytest.approx(0.5 * FULL)
+    assert plan["injection.split_fraction"].iloc[0] == pytest.approx(1.0)
+
+
+def test_a_doublet_without_a_need_still_runs_its_days():
+    """Each doublet runs exactly its days: at the minimum flow when the need is covered."""
+    plan = gm.schedule(plant_of_two(), demand(FULL, FULL, FULL), RULES | {"operating_days": 2})
+    assert plan.attrs["outage_days"] == {"d0": ["2027-01-01"], "d1": ["2027-01-02"]}
+    assert plan["d1.flow"].iloc[2] == pytest.approx(50 / 3600)
+    assert plan["d0.is_running"].sum() == plan["d1.is_running"].sum() == 2
+
+
+def test_a_list_of_dates_takes_every_doublet_off():
+    """A plant without doublets running leaves its demand to the boiler, and the run says so."""
+    plant = plant_of_two()
+    dates = ["2027-01-02", pd.Timestamp("2027-01-02", tz="UTC"), date(2027, 1, 2)]
+    rules = RULES | {"operating_days": dates}
+    plan = gm.schedule(plant, demand(FULL, FULL), rules)
+    assert plan.attrs["outage_days"] == {"d0": ["2027-01-02"], "d1": ["2027-01-02"]}
+    assert plan["d0.flow"].iloc[1] == plan["d1.flow"].iloc[1] == 0
+    assert plan["boiler_duty"].iloc[1] == pytest.approx(FULL)
+    results = gm.simulate(plant, plan)
+    assert results.errors() == []
+    assert results.to_frame()["users.unmet_demand"].to_numpy() == pytest.approx([0, 0], abs=1e-3)
+
+
+def test_no_rule_gives_no_outage():
+    """The outages are there to read, also without any."""
+    plan = gm.schedule(plant_of_two(), demand(FULL), RULES)
+    assert plan.attrs["outage_days"] == {"d0": [], "d1": []}
+
+
+@pytest.mark.parametrize(
+    ("days", "message"),
+    [
+        (0, "more than the 3 days"),
+        (1, "more than the 3 days"),
+        (4, "expected 0 to 3"),
+        (-1, "expected 0 to 3"),
+        (["2028-01-01"], "2028-01-01"),
+        (["soon"], "soon"),
+        ("2027-01-01", "a list of dates"),
+        (True, "a list of dates"),
+        (1.5, "a list of dates"),
+    ],
+)
+def test_operating_days_that_do_not_fit_are_refused(days, message):
+    """Too many outage days, a date outside the demand, or what is no rule."""
+    with raises(gm.errors.ValidationError, "invalid_value", match=message):
+        gm.schedule(plant_of_two(), demand(FULL, FULL, FULL), RULES | {"operating_days": days})
+
+
+def split_sources():
+    """Return ``d0`` feeding only a heat pump and ``d1`` only an exchanger, on one water loop."""
+    plant = plant_of_two()
+    spec = plant.to_dict()
+    drop = ("production", "degasser", "injection")
+    spec["modules"] = {name: item for name, item in spec["modules"].items() if name not in drop}
+    spec["modules"]["heat_pump"] = {
+        "type": "HeatPump",
+        "params": {"mode": "heating", "capacity": "10 MW"},
+    }
+    spec.pop("outlets", None)
+    spec["inlets"] = {"power_in": ["d0.power_in", "d1.power_in", "heat_pump.power_in"]}
+    spec["outlets"] = {"flue": "boiler.flue_out", "loss": "boiler.loss_out"}
+    spec["connections"] = [
+        {"source": "d0.supply_out", "target": "heat_pump.source_in"},
+        {"source": "heat_pump.source_out", "target": "d0.return_in"},
+        {"source": "d1.supply_out", "target": "hx.hot_in"},
+        {"source": "hx.hot_out", "target": "d1.return_in"},
+        {"source": "users.return_out", "target": "hx.cold_in"},
+        {"source": "hx.cold_out", "target": "heat_pump.sink_in"},
+        {"source": "heat_pump.sink_out", "target": "boiler.fluid_in"},
+        {"source": "grid.gas_out", "target": "boiler.fuel_in"},
+        {"source": "boiler.fluid_out", "target": "users.supply_in"},
+    ]
+    built = gm.plants.from_dict(spec)
+    built.boiler.temperature_setpoint = "100 degC"
+    built.heat_pump.temperature_setpoint = "100 degC"
+    return built
+
+
+@pytest.fixture(scope="module")
+def split_run():
+    """Return the plan and the run of ``split_sources``: ``d0`` off first, then ``d1``."""
+    plant = split_sources()
+    plan = gm.schedule(plant, demand(0.5 * FULL, FULL, 2 * FULL), RULES | {"operating_days": 2})
+    return plan, gm.simulate(plant, plan).to_frame()
+
+
+def test_a_heat_pump_on_the_brine_of_one_doublet_stops_with_it(split_run):
+    """The wiring decides: ``d0`` off stops the heat pump, ``d1`` off does not."""
+    plan, frame = split_run
+    assert plan["heat_pump.is_running"].tolist() == [False, True, True]
+    assert frame["heat_pump.is_running"].iloc[0] == 0 and frame["heat_pump.is_running"].iloc[1] == 1
+
+
+def test_a_stopped_heat_pump_covers_nothing_before_geothermal():
+    """Ordered first, its capacity counts only on the days it runs."""
+    rules = RULES | {"order": ["heat_pump", "geothermal", "boiler"], "operating_days": 2}
+    plan = gm.schedule(split_sources(), demand(10e6 + 0.5 * FULL, 10e6 + 0.75 * FULL, 25e6), rules)
+    assert plan["d1.flow"].iloc[0] == pytest.approx(300 / 3600)
+    assert plan["d0.flow"].iloc[1] == pytest.approx(225 / 3600)
+
+
+def test_a_heat_pump_on_the_mixed_brine_keeps_running():
+    """One doublet of two still feeds it; only both off stop it."""
+    plant = plant_of_two()
+    off = {"d0": np.array([True, True]), "d1": np.array([False, True])}
+    assert schedule._doublets_above(plant, "hx", "hot_in", off, set()) == {"d0", "d1"}
 
 
 def test_a_rule_that_does_not_fit_is_refused():
@@ -195,3 +322,14 @@ def test_the_demand_needs_its_heating_column():
     """Without it there is nothing to schedule."""
     with raises(gm.errors.ValidationError, "missing_column"):
         gm.schedule(plant_of_two(), demand(FULL).rename(columns={"heating_demand": "x"}), RULES)
+
+
+def test_a_finished_run_ran_the_days_of_the_rule():
+    """Two doublets, three days of four each: the plan, the run and the check agree."""
+    plant = plant_of_two()
+    frame = demand(0.5 * FULL, 1.5 * FULL, 2.5 * FULL, 3.0 * FULL)
+    results = gm.simulate(plant, gm.schedule(plant, frame, RULES | {"operating_days": 3}))
+    assert results.errors() == []
+    checks = gm.checks.operating_days(plant, results, 3)
+    assert [item["passed"] for item in checks] == [True, True]
+    assert [item["value"]["value"] for item in checks] == [3, 3]

@@ -104,6 +104,8 @@ def _economics_entries():
         "opex": lambda: gm.economics.opex(costed, run, VALUES),
         "lcoh": lambda: gm.economics.lcoh(costed, run, 0.05, 20, VALUES),
         "lcoc": lambda: gm.economics.lcoc(cold, chilled, 0.05, 20, VALUES),
+        "lcts": lambda: gm.economics.lcts(costed, run, 0.05, 20, VALUES),
+        "annualised_cost": lambda: gm.economics.annualised_cost(costed, run, 0.05, 20, VALUES),
         "co2": lambda: gm.economics.co2(costed, run, VALUES),
         "npv": lambda: gm.economics.npv(costed, run, 0.05, 20, VALUES),
         "payback": lambda: gm.economics.payback(costed, run, VALUES),
@@ -123,6 +125,7 @@ def _ledger_entries(plant, results):
         "plant_balance": lambda: gm.checks.plant_balance(plant, results),
         "limits": lambda: gm.checks.limits(plant, results, _limits()),
         "run_all": lambda: gm.checks.run_all(plant, results),
+        "operating_days": lambda: gm.checks.operating_days(plant, results, 1),
         "Limits": lambda: _limits().to_dict(),
     }
 
