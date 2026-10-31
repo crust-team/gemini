@@ -262,8 +262,8 @@ its design values and the cost factors of `Assumptions`, see [economics.md](econ
 | `gm.checks.limits(plant, results, limits)` | real: a list of checks, one per matched module and output, `value` the worst of the run; an unmatched pattern raises `ValidationError` code `unknown_name` |
 | `gm.testing.check_module(cls, example=None)` | real; for developers of a new module class only: a report, never raises |
 | `gm.optim.calibrate(plant, dataset, params, start=None, end=None, backend="numpy", apply=True)`, `CalibrationResult` | real |
-| `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100)` | later |
-| `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0)` | later |
+| `gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *, assumptions=None)` | real: `{best: {parameters, value, unit}, history, evaluations}`, `parameters` in SI as `{"path.parameter": value}` for `set_params`; a failed trial has a `reason` and is never `best` |
+| `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0, *, assumptions=None)` | real: `{samples, summary}`, `summary` per metric `{mean, p5, p50, p95, unit}` |
 
 `gm.optim.calibrate` fits only through replay and returns a `CalibrationResult`. With `apply=True` a
 successful fit replaces the current parameter as an explicit override and adds no dated snapshot.
@@ -287,6 +287,7 @@ error, `CODES` is the fixed `code` list and `ROW_CODES` the row codes with their
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.2.0, unreleased changes | | `gm.optim.minimize` and `gm.optim.sample` are built, on the metrics of `gm.kpi` and `gm.economics`; each takes `assumptions`. |
 | 0.2.0, unreleased changes | | `gm.evaluate`: a volume unit on `m_dot` names `flow` in its message, `path` and `suggestions`; the code stays `invalid_call`. |
 | 0.2.0, unreleased changes | | `gm.economics.annualised_cost` and `gm.economics.lcts`, the levelised cost of heat and cold together. |
 | 0.2.0, unreleased changes | | `rules["operating_days"]` of `gm.schedule` is built: a count or a list of outage dates, `attrs["outage_days"]`, the column `<heat pump>.is_running`. New `gm.checks.operating_days(plant, results, days)`; `gm.checks.run_all` takes `days`. |

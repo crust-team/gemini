@@ -271,13 +271,19 @@ def split_sources():
     return built
 
 
-def test_a_heat_pump_on_the_brine_of_one_doublet_stops_with_it():
-    """The wiring decides: ``d0`` off stops the heat pump, ``d1`` off does not."""
-    frame = demand(0.5 * FULL, FULL, 2 * FULL)
+@pytest.fixture(scope="module")
+def split_run():
+    """Return the plan and the run of ``split_sources``: ``d0`` off first, then ``d1``."""
     plant = split_sources()
-    plan = gm.schedule(plant, frame, RULES | {"operating_days": 2})
+    plan = gm.schedule(plant, demand(0.5 * FULL, FULL, 2 * FULL), RULES | {"operating_days": 2})
+    return plan, gm.simulate(plant, plan).to_frame()
+
+
+def test_a_heat_pump_on_the_brine_of_one_doublet_stops_with_it(split_run):
+    """The wiring decides: ``d0`` off stops the heat pump, ``d1`` off does not."""
+    plan, frame = split_run
     assert plan["heat_pump.is_running"].tolist() == [False, True, True]
-    assert gm.simulate(plant, plan).to_frame()["heat_pump.is_running"].iloc[0] == 0
+    assert frame["heat_pump.is_running"].iloc[0] == 0 and frame["heat_pump.is_running"].iloc[1] == 1
 
 
 def test_a_stopped_heat_pump_covers_nothing_before_geothermal():

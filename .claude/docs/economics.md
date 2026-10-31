@@ -187,5 +187,22 @@ deliver at each rate; the operating point is where it falls to the wellhead pres
 ## `gm.testing` and `gm.optim`
 
 `gm.testing.check_module` and `gm.modules.load_file` are described in
-[modules.md](modules.md#registry-categories-and-streams). `gm.optim.minimize` and `gm.optim.sample`
-(uncertainty sampling) have their final signatures and raise `NotImplementedYet`.
+[modules.md](modules.md#registry-categories-and-streams).
+
+`gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *,
+assumptions=None)` searches design values on a fixed run input. Each trial copies the plant, sets
+the variables with `set_params`, simulates `profile` and reads the metric, so the plant is not
+changed. The search is `scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
+with five candidates per variable: the population times the generations is the number of
+simulations, so `evaluations` is a hard limit and a smaller budget than one population raises
+`ValidationError`. A trial that fails, has no value or breaks a constraint is in `history` with its
+`reason` and is never `best`. `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0,
+*, assumptions=None)` draws `normal`, `uniform` and `triangular` parameters with
+`numpy.random.default_rng(seed)`, one simulation each, and summarises each metric as `mean`, `p5`,
+`p50`, `p95`; a draw whose run failed has its `reason` and stays out of the summary.
+
+A metric is a name of `gm.kpi.names()` or `lcoh`, `lcoc`, `lcts`, `annualised_cost`, `co2`; these
+read `assumptions`. `profile` is required: the run input of a design comes from `gm.schedule`, which
+needs the rules `doublet_flow` and `max_brine_cooling`, and it stays fixed over the trials, so a
+plan made for one design is what every trial runs. `parameters` in `best`, `history` and `samples`
+are numbers in SI, the input of the next `set_params`.
