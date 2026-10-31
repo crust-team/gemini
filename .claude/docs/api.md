@@ -140,7 +140,7 @@ plant dict is the JSON form agents use, and `gm.plants.schema()` is its schema.
 | `gm.plants.get(name)` | a new plant without values | real |
 | `gm.plants.example(name)` | a plant with real values, from `inputs/plants/`; `RunError` (code `inputs_missing`) outside a source checkout | real |
 | `gm.plants.convert_legacy(folder)` | plant dict; expected files in [legacy.md](legacy.md) | real |
-| `gm.plants.<Plant class>` | the plant classes, see [plants.md](plants.md#registered-plants) | real |
+| `gm.plants.<Plant class>` | the plant classes, see [plants.md](plants.md#registered-plants). The five template plants take `doublets=n`, `size={"doublets": n}` in a plant dict, and a plant-level `depth` | real |
 
 On any plant, `path` being a dotted module path (`""` is the root):
 
@@ -160,6 +160,9 @@ On any plant, `path` being a dotted module path (`""` is the root):
 | `gm.units.parse(text)` | `(value, unit)` | real |
 | `gm.units.convert(value, from_unit, to_unit, quantity=None)` | number | real |
 | `gm.units.fits(unit, quantity)` | bool; an unknown unit is false, an unknown quantity raises | real |
+
+A `Doublet` has `volume_imbalance`, a `HeatingGrid` and a `CoolingGrid` have `surplus`: see
+[equipment.md](equipment.md).
 
 ## Running
 
@@ -183,7 +186,7 @@ a manual checkpoint. Each function builds an `Engine`, calls the matching method
 
 | Name | Returns | Status |
 | --- | --- | --- |
-| `gm.schedule(plant, demand, rules)` | run input, a UTC DataFrame: the demand and one column per scheduled control, named after its dotted path; `attrs["outage_days"]` is `{doublet path: [ISO date]}`; see [engine.md](engine.md#schedule) | real |
+| `gm.schedule(plant, demand, rules)` | run input, a UTC DataFrame: the demand and one column per scheduled control, named after its dotted path; `attrs["units"]` states the unit of each driven column and `attrs["outage_days"]` is `{doublet path: [ISO date]}`; `rules` take `order`, `cooling_order`, `doublet_flow`, `max_brine_cooling` and `operating_days`; see [engine.md](engine.md#schedule) | real |
 | `gm.challenge_rules()` | a new dict of the rules of the challenge for `gm.schedule`: `doublet_flow` 50 to 300 m3/h, `max_brine_cooling` 40 K, `operating_days` 330; the source is `inputs/hackathon/` | real |
 | `gm.simulate(plant, profile, clock=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results` | real |
 | `gm.replay(plant, data, start=None, end=None, state=None, clock=None, only=None, checkpoint=None, checkpoint_every=None, backend="numpy", callbacks=None, on_error="raise")` | `Results`; `results.end_state` is the `state=` of the next call | real |

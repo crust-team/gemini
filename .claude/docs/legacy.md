@@ -11,7 +11,8 @@ JSON whitespace normalisation, keeping each `.param` file's tag-name order; auxi
 copied byte-for-byte. Malformed or unconvertible files raise `gm.errors.ValidationError`.
 
 `to_plant(project, plant)` fills an existing plant with converted SI parameters,
-dated histories, fluids, bindings and explicit assumptions (`plant.boundary`), and returns it.
+dated histories, fluids, bindings, explicit assumptions (`plant.boundary`) and the scenario inputs
+and plant inlet streams (`plant.set_inputs`), and returns it.
 Old fields it cannot map are listed in one `GeminiWarning`. `to_dataset(project, frame)` renames
 tag columns and converts values to SI; old timestamps are taken as UTC wall time.
 `from_plant(plant, template)` writes through an old template without inventing fields.

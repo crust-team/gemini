@@ -528,7 +528,8 @@ Electricity exchange of a plant with a grid connection of limited capacity.
 ### `dispatch.py`
 
 The daily energy balance of `gm.schedule`, on arrays over the days: `doublet_flow(heat_need,
-heat_per_flow, minimum_flow, maximum_flow)`, `circuit_flow(heat, specific_heat,
+heat_per_flow, minimum_flow, maximum_flow)`, `units_taken(demand, capacities)`, what each unit
+takes in order, `temperature_after(start, end, share)`, `circuit_flow(heat, specific_heat,
 temperature_difference)` and `flow_share(first, second)`.
 
 ### `energy.py`
@@ -986,7 +987,7 @@ modules that use them. The positive and negative parts of a signed duty are
 ## Psychrometrics
 
 `psychrometrics.py` holds moist-air relations in SI (K, fraction, Pa) for an ideal mixture of
-dry air and water vapour without the enhancement factor, used by `CoolingConsumer`:
+dry air and water vapour without the enhancement factor, used by `CoolingGrid`:
 
 - `saturation_pressure(T)`: Hyland and Wexler (1983), ASHRAE Handbook - Fundamentals (2017),
   chapter 1, equations 5 (over ice, -100 to 0 degC) and 6 (over water, 0 to 200 degC); within
@@ -1035,7 +1036,7 @@ or a size distribution.
 
 ## Combustion
 
-`combustion.py` holds the fuel side of `CHP`, `Boiler` and `Vent`. Boiler fuel is
+`combustion.py` holds the fuel side of `CHP`, `Boiler` and `Flare`. Boiler fuel is
 `energy.input_power`.
 
 - `willans_fuel_input(L, P_el, eta_el, f0)` = `F_full (f0 + (1 - f0) L)` [W] with `F_full = P_el /
@@ -1110,7 +1111,7 @@ source cooled from `T_in` to `T_out` and rejected at the condensing temperature 
 ## Electricity
 
 `electricity.py` holds net metering at one connection point with one tariff per direction, for
-`GridConnection`, without reactive power, losses or demand charges.
+`ElectricityGrid`, without reactive power, losses or demand charges.
 
 - `net_exchange(C, G, import_limit, export_limit, import_price, export_price)` returns `net_import`
   `min(max(0, C - G), limit)` and `net_export` `min(max(0, G - C), limit)` [W], the parts above the

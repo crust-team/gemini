@@ -26,14 +26,18 @@ plant dict agents use (`gm.plants.from_dict`, `plant.to_dict`, `gm.plants.schema
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
 `gm.schedule` plans the run input of a design from its demand, with outage days from
-`operating_days` ([schedule](.claude/docs/engine.md#schedule)).
+`operating_days` and the role of each unit read from the wiring
+([schedule](.claude/docs/engine.md#schedule)). `gm.challenge_rules()` and `gm.profiles.demand()` are
+the challenge's, and `gm.plants.example("HeatingCoolingPlant")` runs that year with every requirement
+checked (`examples/cases/challenge_year.py`).
 
 Everything in the plant's energy and mass flow is a module, everything that crosses between modules
 goes through a port, and a plant total is read from the ports of the modules at the plant's edge
 ([energy flow](.claude/docs/modules.md#energy-flow)). Check a run with `gm.checks.plant_balance`.
 
 Every port of a module is connected or named as a plant port; there are no automatic plant ports
-([plants](.claude/docs/plants.md#the-builder)). A plant may derive its children's values by
+([plants](.claude/docs/plants.md#the-builder)). What a design holds beside its parameters, such as a
+setpoint, is set with `plant.set_inputs` and stored in the plant dict under `inputs`. A plant may derive its children's values by
 overriding `set_params`
 ([modules](.claude/docs/modules.md#a-plant-that-sets-its-childrens-values)).
 
@@ -93,7 +97,7 @@ gemini/
 │   └── plants/       # plant classes only; _utils/ holds the plant tools
 ├── engine/           # Clock, run functions, Engine, steps, Results, callbacks, checkpoints
 ├── optim/            # calibration through Engine.replay, minimize and sample through gm.simulate
-├── analysis/         # well performance and integrity, fits; kpi.py is the gm.kpi namespace
+├── analysis/         # well performance and integrity, fits, schedule, roles; kpi.py is gm.kpi
 ├── economics/        # capex, opex, annualised and levelised cost, LCTS, CO2, cash flow
 ├── checks/           # balances and bounds over a finished run
 ├── testing/          # check_module for a new module class

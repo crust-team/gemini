@@ -88,7 +88,9 @@ flow in m3/s (their bindings declare `"unit": "m3/s"`), and the unbound status c
 There is one data folder, and no data file inside `gemini/`: a plant is a class.
 
 `inputs/` is at the repository root, next to `gemini/`, and is not installed. It holds everything
-that code reads: `hackathon/` (the organisers' files, with a README), `plants/` (example values),
+that code reads: `hackathon/` (the organisers' files, with a README), `plants/` (example values: a
+`size`, `params`, `fluids`, `boundary`, `bindings`, `param_history` and `inputs`, those of the five
+template plants the challenge's, with sizes the example assumes),
 `doublet_heat/` (measured data) and `legacy_project/`. A function that needs it raises `RunError`
 with code `inputs_missing` when it is absent, as in an installed wheel, and the message names the
 file. Nothing fails at import time, and `gm.plants.get` works without it.

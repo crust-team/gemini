@@ -1,9 +1,10 @@
 """The daily controls of a plant from its demand: an energy balance on design values.
 
 ``gm.schedule`` runs no simulation. It returns run input whose columns are named after what they
-drive, the dotted path of a control or boundary or ``port.field`` of a plant inlet, so
-``gm.simulate(plant, plan)`` binds them by the rule of a run: nothing is stored on the plant and no
-caller writes a binding.
+drive, the dotted path of a control or boundary or ``port.field`` of a plant inlet, in the SI units
+``attrs["units"]`` states, so ``gm.simulate(plant, plan)`` binds them by the rule of a run: nothing
+is stored on the plant and no caller writes a binding. The role of each unit comes from the wiring,
+``gemini/analysis/roles.py``.
 """
 
 from copy import deepcopy

@@ -277,6 +277,15 @@ decisions outlast the move.
   that arrives, not `groundwater_pressure`; `production_out` still does.
 - A plant with a loop or a constraint is a root break, as `close_loop` and the nodal solves were:
   not one node of a graph, the same row by row on every backend.
+- A year on a plant with a loop runs row by row, 59 module calls a day on `HackathonPlant`: 6 s, and
+  9 s on `HeatingCoolingPlant`, on the same profile as any eager call, with no one hot spot. A trial
+  of `gm.optim` therefore takes 6 to 9 s on a plant with a heat-driven chiller, not the 1 s asked for,
+  and 0.4 s on one without. Reading the run
+  takes 0.15 s of it, down from 3.9 s. Tracing a loop into the graph is what would close the gap.
+- `DoubletHeatPlant` keeps its measured values, which `tests/fixtures/module_api_baseline` and
+  `convert_legacy` hold. Its ESP curve at 60 Hz gives 37 bar at 149 m3/h, 17 bar at 200 m3/h and -34
+  bar at 300 m3/h, so it runs a schedule up to 165 m3/h. A sized pump needs a decision on those
+  goldens, or a dated `param_history` entry after the measured data.
 - Errors of a root plant reach its leaves: such a plant has no outlet, and a row only failed when an
   error reached a graph output, so on a traced plant a failing check passed unnoticed. Every value of
   its result tree is now an output of the graph, as a root break already behaved. Nothing in the

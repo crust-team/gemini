@@ -90,7 +90,12 @@ plan = gm.schedule(plant, demand, rules)
 results = gm.simulate(plant, plan)
 ```
 
-`examples/cases/hackathon.py` is that path for the whole challenge plant.
+`examples/cases/hackathon.py` is that path for the whole challenge plant, and
+`examples/cases/challenge_year.py` runs `gm.plants.example("HeatingCoolingPlant")` through the year
+with `gm.challenge_rules()` and checks every requirement. A stored design keeps its setpoints:
+`plant.set_inputs({"peak_boiler.temperature_setpoint": "100 degC"})` is part of `plant.to_dict()`, and
+a template plant takes its size, `gm.plants.HeatingCoolingPlant(doublets=2)`.
+
 Everything in the energy flow is a module and everything that crosses between modules goes through
 a port. A plant starts at its edge modules: `ElectricityGrid`, `GasGrid`, `HeatingGrid`,
 `CoolingGrid`, `WasteGrid`, `ChemicalGrid`, `Atmosphere` and `Formation`. Totals are read from them

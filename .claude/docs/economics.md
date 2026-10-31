@@ -209,7 +209,7 @@ assumptions=None)` searches design values. Each trial copies the plant, sets the
 `set_params`, plans a demand on that design, simulates and reads the metric, so the plant is not
 changed. `profile=None` is the demand year of the challenge; it and a demand frame are planned with
 `gm.schedule` and `gm.challenge_rules()` for each trial, and a plan stays fixed. A trial reads a
-finished run in about 0.1 s; simulating the year takes 0.3 s on a plant without a loop and about 6 s
+finished run in about 0.15 s; simulating the year takes 0.3 s on a plant without a loop and 6 to 9 s
 on one with the drive-water loop of a heat-driven chiller, which runs row by row. The search is `scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
 with five candidates per variable: the population times the generations is the number of
 simulations, so `evaluations` is a hard limit and a smaller budget than one population raises

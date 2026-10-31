@@ -9,7 +9,7 @@ it: for each row it builds the inlet streams, applies the controls and boundarie
 tree, the ``_Step`` record and "called twice" stay in ``Module.step``, the one implementation.
 A row that raises is a failed row with that exception; the states carry over the failed row
 unchanged. The rows are real ``ModuleResult`` trees, so children and
-``Output.of`` are exact; ``stacked`` joins them into one tree of arrays.
+the combinations of a plant are exact; ``stacked`` joins them into one tree of arrays.
 """
 
 from contextlib import contextmanager

@@ -78,8 +78,14 @@ cooling. The heat pump and boiler take the `temperature_setpoint` set on them, t
 temperatures, and cover what is left in the run. Unmet demand is no error: the run reports
 `unmet_demand`.
 
+A heat-driven chiller on a bypass (a `Splitter` whose branches reach the users and the generator) has
+the drive water pass the users: the plan sets the split from the balance, the heat the users take
+against the heat the generators draw, and the `flow` of the heating grid carries the users' heat
+alone. Without a bypass all the water passes the users, so it carries both.
+
 The plan needs no bindings and changes nothing on the plant: **its columns are named after what they
-drive**, so `gm.simulate(plant, plan)` binds them by the rule of a run, below. Leaf controls and
+drive**, in the SI units `attrs["units"]` states, so `gm.simulate(plant, plan)` binds them by the rule
+of a run, below, and a binding in another unit does not misread them. Leaf controls and
 boundaries have a column named after their dotted path (`d0.reservoir.production_rate`,
 `injection.split_fraction`), and a plant inlet field a column named `port.field`
 (`heating_return.m_dot`); ports `heating_return` and `cooling_return` take their temperature from

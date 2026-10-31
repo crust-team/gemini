@@ -262,7 +262,8 @@ def test_a_plan_is_not_planned_again(monkeypatch):
     rules = {"doublet_flow": gm.challenge_rules()["doublet_flow"], "max_brine_cooling": "40 K"}
     plan = gm.schedule(scheduled_plant(), two_days(), rules)
     calls.clear()
-    gm.optim.minimize(scheduled_plant(), plan, [FLOW], "peak_heat", evaluations=5)
+    uncertain = {"d0.well_diameter": {"kind": "uniform", "lower": 0.2, "upper": 0.3}}
+    gm.optim.sample(scheduled_plant(), plan, uncertain, ["peak_heat"], count=2)
     assert calls == []
 
 

@@ -111,6 +111,11 @@ error with code `unconnected_port` and the port path: `p.validate()`, `gm.plants
 `from_dict` report it, and a plant with one does not run. While you build, `add` and `connect` do
 not check it.
 
+A plant answers what its wiring is: `p.target_of("hx.cold_out")` and `p.source_of("hx.cold_in")` give
+the other end of a connection, and `p.feeds("boiler.fluid_out")` the modules an outlet reaches along
+its circuit, through mixers, splitters and the units on it, ending at a grid. `gm.schedule` reads the
+role of a unit from it.
+
 ## The plant dict
 
 The plant dict is the input of an agent's plant-building tool (`gm.plants.schema()` is its schema)

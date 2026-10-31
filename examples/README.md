@@ -68,3 +68,4 @@ Whole plants. Each takes a registered plant with its design values from `gm.plan
 | [boiler_chp.py](cases/boiler_chp.py) | A nodal-solved doublet with a boiler and a CHP | `BoilerChpPlant`, `NodalDoublet`, `gm.modules.emissions` |
 | [district_heating_cooling.py](cases/district_heating_cooling.py) | Heating and cooling networks on an aquifer store, stepped by the hour | `DistrictEnergyPlant`, `Module.step` |
 | [hackathon.py](cases/hackathon.py) | The challenge plant from schedule to economics | `HackathonPlant`, `gm.schedule`, `gm.kpi`, `gm.economics` |
+| [challenge_year.py](cases/challenge_year.py) | The demand year on an example plant, every requirement checked | `HeatingCoolingPlant`, `gm.challenge_rules`, `gm.profiles.demand`, `gm.checks.limits`, `gm.economics.lcts` |

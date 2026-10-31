@@ -2121,21 +2121,21 @@ is that of the modules below; `inputs/plants/<Name>.json` holds example sizes.
   in series: `cooling_return_pipe` -> [`absorption_chiller`] -> [`adsorption_chiller`] ->
   [`compression_chiller`, a `HeatPump` in cooling mode] -> `cooling_supply_pipe` ->
   `cooling_consumer`. Brackets are the units that the other plants leave out.
-- **Ports.** Plant inlets: `heating_return_in`, `cooling_return_in` and the heat-rejection circuits
-  `absorption_cooling_in`, `adsorption_cooling_in`, `compression_rejection_in` (each goes with its
-  chiller). Plant outlets: `heating_return_out`, `cooling_return_out`, `gas` and the three
-  rejection outlets. Totals are read from the edge modules (`gm.kpi.totals`).
+- **Ports.** None: a root plant has no plant port. Totals are read from the edge modules
+  (`gm.kpi.totals`).
 - **Other plants.** `HeatingPlant` (boiler and heating consumer), `HeatingAbsorptionCoolingPlant`,
   `HeatingHeatPumpCoolingPlant` and `HeatingFullCoolingPlant` (all three chillers) are the same plant
   with fewer units. An agent removes a unit by editing `to_dict(structure=True)`.
-- **Run check.** `tests/integration/test_heating_cooling.py` (slow tier) runs two simulate ticks
-  of every plant and of one with a unit removed from its dict, with the stated assumptions in
-  `tests/fixtures/heating_cooling.py`: the `doublet_heat` example values for the brine side, the
-  examples of this document for the other modules, 48.95 kg/s of 21.7 degC heating return, boiler
-  setpoint 85 degC. The sorption chillers need a driving temperature of at least 80 degC
-  (absorption) and at most 90 degC (adsorption) in this series order.
-- **Left out.** Hot and cold storage (`ThermalStorage`, `IceStorage`) and every closed return loop
-  need a `type: "state"` connection (the tank couples its charge and discharge circuits through its
-  state, so a tank on both circuits of one chain is a loop), and running such a plant raises
-  `NotImplementedYet` until scan exists. Heat-rejection loops through a `Cooler` are loops too, so
-  they are plant ports here. `CHP` is not wired; it would sit beside `peak_boiler`.
+- **Doublets and depth.** `size={"doublets": n}`, 1 to 3, and a plant-level `depth`
+  ([plants.md](plants.md#registered-plants)).
+- **Run check.** `gm.plants.example(name)` holds the challenge's reservoir, brine and supply
+  temperatures on two doublets, and sizes that are assumptions of the example. With `gm.schedule` and
+  `gm.challenge_rules()` each runs the demand year with no failed day
+  (`examples/cases/challenge_year.py`). `tests/integration/test_heating_cooling.py` (slow tier) runs
+  two days of every plant and of one with a unit removed from its dict. `adsorption_chiller` keeps
+  its 90 degC limit: behind the absorption chiller its drive water has already cooled, and a circuit
+  that stands still has no driving temperature.
+- **Left out.** Hot and cold storage (`ThermalStorage`, `IceStorage`) need a `type: "state"`
+  connection (the tank couples its charge and discharge circuits through its state, so a tank on both
+  circuits of one chain is a loop), and running such a plant raises `NotImplementedYet` until scan
+  exists. `CHP` is not wired; it would sit beside `peak_boiler`.
