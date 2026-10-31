@@ -13,6 +13,9 @@ import tokenize
 import pytest
 
 import gemini as gm
+from gemini.modules._utils.serialization import SECTIONS
+from gemini.utils import paths
+from gemini.utils.files import read_json
 from tests.fixtures import ROOT
 
 PYTHON_FOLDERS = ("gemini", "examples", "tests", "scripts")
@@ -66,6 +69,7 @@ BUILDS_NO_DATA_PATH = {
     "tests/unit/test_code_quality.py",
 }
 """Files allowed to name the data folders; the first is the one that knows where they are."""
+VALUE_KEYS = {"plant", "params", *SECTIONS}
 FRAMEWORK = re.compile("py" + "tor" + "ch|\\b" + "tor" + "ch\\b", re.IGNORECASE)
 FRAMEWORK_STEM = "tor" + "ch"
 """Lowercase text that every ``FRAMEWORK`` match contains, checked before the slower regex."""
@@ -553,6 +557,52 @@ def test_only_the_paths_module_builds_a_path_to_the_data_folders():
         for path in code
         if path not in BUILDS_NO_DATA_PATH and DATA_FOLDER.search((ROOT / path).read_text())
     ] == []
+
+
+def test_the_package_holds_data_only_in_its_assets():
+    """Every file of ``gemini/`` is Python, except in ``gemini/assets/``."""
+    assets = paths.ASSET_PLANTS.parent.relative_to(ROOT).as_posix()
+    assert [
+        path
+        for path in tracked_files()
+        if path.startswith("gemini/")
+        and not path.endswith(".py")
+        and not path.startswith(f"{assets}/")
+    ] == []
+
+
+def module_entries(modules):
+    """Yield every module entry of a plant file, those inside a group too."""
+    for entry in modules.values():
+        yield entry
+        yield from module_entries(entry.get("modules", {}))
+
+
+@pytest.mark.parametrize(
+    "path", sorted(paths.ASSET_PLANTS.glob("*.json")), ids=lambda path: path.stem
+)
+def test_a_structure_file_holds_no_parameter_values(path):
+    """A file of ``gemini/assets/plants/`` is wiring: no value of a module or of a section."""
+    spec = read_json(path)
+    assert [entry for entry in module_entries(spec["modules"]) if entry.get("params")] == []
+    assert not any(spec.get(key) for key in ("params", *SECTIONS))
+
+
+def test_a_file_of_example_values_has_only_the_allowed_keys_and_names_a_registered_plant():
+    """``inputs/plants/`` holds the values of plants that exist, under the keys of a plant file."""
+    files = sorted(paths.INPUTS.glob("plants/*.json"))
+    assert files
+    for path in files:
+        values = read_json(path)
+        assert set(values) <= VALUE_KEYS, path.name
+        assert values["plant"] == path.stem and path.stem in gm.plants.names(), path.name
+        assert isinstance(values["params"], dict), path.name
+
+
+def test_the_repository_has_no_datasets_folder():
+    """Data lives in ``gemini/assets/`` or ``inputs/``."""
+    assert not (ROOT / "datasets").exists()
+    assert [path for path in tracked_files() if path.startswith("datasets/")] == []
 
 
 def test_no_framework_names_in_tracked_text_files():
