@@ -123,7 +123,7 @@ measured, state, inlets, outlets, outputs, children, connections, values}`:
   binding for any output name and compares it with that output; no narrower rule exists.
 - `inlets` and `outlets` map a port to `{kind, fields: {m_dot: {unit: "kg/s"}, T: {unit: "K"},
   p: {unit: "Pa"}}}`; `kind` is `null` for a port that takes any stream.
-- `outputs` maps a name to `{unit, quantity, soft_sensor}`; `quantity` is the additive quantity name
+- `outputs` maps a name to `{unit, quantity, soft_sensor}`; `quantity` is the quantity name
   (one of the nine) or `null`.
 - `children` is `{name: type}` and `connections` is `[{source, target, kind, type}]`, both empty
   for a leaf. A plant exposes its wiring through `_connection_list()`; a handwritten composite has
@@ -226,23 +226,14 @@ output-enabled call.
 
 ## Composite modules
 
-Composites declare formula outputs in declaration order and override `_compute_outputs` only to
-record their own value for an additive output:
+Composites declare formula outputs in declaration order; a parent never sums its children:
 
 - `Output.of(self.child.output)` copies one descendant output from this call, for example
   `Output.of(self.heat_exchanger.duty)` or
   `Output.of(self.producers[0].riser.wellhead_temperature)`. An outlet field is referenced with
   `Outlet.field(name)`: `Output.of(self.degasser.gas_out.field("m_dot"))`. The descendant must be
   called exactly once, and the output adopts the target's kind.
-- An output of an additive quantity declared without a formula, such as
-  `self.electricity = Output(Electricity)`, is the automatic sum of the descendant leaf outputs
-  with the same name over this call. A leaf called twice contributes twice; the sums of nested
-  composites are not counted again. Every descendant leaf output of that name must have the same
-  quantity and unit, and at least one must exist; otherwise the first call raises `DefinitionError`
-  (with a close-match suggestion for a name no leaf declares). A composite that records its own
-  value for the output in `_compute_outputs` replaces the sum. The additive quantities are listed
-  in [types.md](types.md#quantities-and-declarations).
-- `Output.ratio(self.thermal_power, self.electricity)` divides two earlier outputs of the same
+- `Output.ratio(self.thermal_power, self.head)` divides two earlier outputs of the same
   module and records `None` when either value is `None` or the denominator is zero.
 
 - `Output.difference(self.first, self.second, kind)` subtracts two earlier outputs of the same
@@ -278,8 +269,6 @@ class HeatPlant(Module):
 
         # Outputs
         self.thermal_power = Output.of(self.heat_exchanger.duty)
-        self.electricity = Output(Electricity)
-        self.cop = Output.ratio(self.thermal_power, self.electricity)
 
         # Outlets
         self.supply_out = Outlet(Stream)
@@ -432,7 +421,7 @@ One call performs these steps:
 2. run forward pre-hooks;
 3. run `forward` and validate its fluid outlet dictionary;
 4. run `_compute_outputs`;
-5. evaluate composite formula outputs and automatic sums in declaration order;
+5. evaluate composite formula outputs in declaration order;
 6. run forward hooks;
 7. verify every output was assigned and build `ModuleResult`.
 
@@ -482,7 +471,7 @@ child call made inside it, from `forward` or from a helper method such as the `p
 is recorded in the graph by `Trace.child` instead of evaluated: the child's controls, boundaries
 and numeric parameters become graph inputs named `<path below the root>.<name>`, supplied keyword
 values win without validation, and the `ModuleResult` of traced values joins the parent's call
-records, so `Output.of`, automatic sums, `Output.ratio` and `ModuleResult.leaves()` work
+records, so `Output.of`, `Output.ratio` and `ModuleResult.leaves()` work
 unchanged. `Output.ratio` is `where(bottom == 0, None, top / bottom)` with the division written as
 `ops.truediv`, which gives today's `None` on plain floats. A leaf child that is stateful,
 has a pre-hook, has a read-only hook or raises `TraceError` becomes one **break node**:
@@ -600,6 +589,37 @@ call's `ModuleResult` and the measured outputs of that tick and returns a `Healt
 as `assessed=False`. A module that declares its own cost defines `capex(assumptions)` returning a `Cost`;
 see [types.md](types.md#profiles-and-costs).
 
+## Energy flow
+
+Everything in the plant's energy and mass flow is a module; everything that crosses between modules
+goes through a port.
+
+```text
+ ElectricityGrid --power_out--> power_in  ......................
+ GasGrid --gas_out--> GasMakeup --fuel_out--> Boiler ---flue_out--> Atmosphere.gas_in
+ ChemicalGrid --chemical_out--> InhibitorDosing    |
+ Atmosphere --air_out--> air_in (Pipe, Cooler)     +---loss_out--> Atmosphere.heat_in
+                                                           wells --> Formation.heat_in
+ reservoir --> wells --> treatment --> exchangers --> wells --> reservoir
+                             |
+                             +---waste_out--> WasteGrid
+ HeatingGrid.return_out --> heat pump, boiler --> HeatingGrid.supply_in
+ CoolingGrid.return_out --> chiller           --> CoolingGrid.supply_in
+```
+
+- **Edge rule.** The grids (`ElectricityGrid`, `GasGrid`, `HeatingGrid`, `CoolingGrid`, `WasteGrid`,
+  `ChemicalGrid`) and the environment (`Atmosphere`, `Formation`) are the plant's edge. A plant
+  total is read from their ports (`gm.kpi.totals`), never summed by a parent;
+  `gm.checks.plant_balance` closes the root on them. The aquifers are the one other open boundary.
+- **Supply rule.** A root plant has no plant port (`root_plant_port`): what it buys comes from a
+  grid, and an unconnected inlet is `unconnected_port`. A registered plant is a building block and
+  has plant ports. Nothing supplies itself: there is no default fuel, power or air.
+- **Port rule.** A port's name is `<role>_in` or `<role>_out`; its `kind` labels what it carries. A
+  value that travels back to its source goes by who decides it: a single `Power` inlet is drawn, a
+  `drawn=True` inlet shows what the module took of what was offered, and an `offered=True` outlet
+  exists before the modules around it run. A `many` port takes the list of what is connected.
+- **Output rule.** An output holds only what is on no port ([types.md](types.md#port-quantities)).
+
 ## Structure
 
 Constructor sections are ordered `Modules`, `Parameters`, `Inlets`, `Controls`, `Boundaries`,
@@ -611,8 +631,7 @@ helpers. Signatures are always
 `forward(self, inlets)` and `_compute_outputs(self, inlets, outlets)`, including modules with no
 ports; parameters have no defaults or variadic forms.
 
-Inlets and outlets accept a `Stream` or a `Power`. Fuel use and heat exchanged with the
-environment or a consumer are additive outputs with the fixed names and quantities of
-[types.md](types.md#energy-outputs-and-balances). Results keep the same dotted
+Inlets and outlets accept a `Stream` or a `Power`. What crosses a port is shown by the port, see
+[types.md](types.md#port-quantities). Results keep the same dotted
 `<module path>.<name>` addressing scheme. Port, control and output names follow the naming rule
 in [conventions.md](conventions.md#naming).

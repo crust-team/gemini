@@ -84,10 +84,10 @@ class Trace:
     ``<path relative to the root>.<name>`` (the root's own have no prefix, so a leaf keeps its
     plain names, and a child called twice reuses its inputs), its ``forward``, output step and
     forward hooks are recorded in the same fixed order as a call, and its ``ModuleResult`` holds
-    traced values in the parent's call records, so ``Output.of``, automatic sums, ratios and
+    traced values in the parent's call records, so ``Output.of``, ratios and
     helper methods that call children outside ``forward`` work unchanged. A child that cannot
     be recorded raises ``TraceError``, which makes the whole root a graph break: its leaves'
-    call records are read by the parent's automatic sums and ``Output.of``, so a composite
+    call records are read by the parent's ``Output.of``, so a composite
     child cannot be replaced by an opaque node.
     """
 

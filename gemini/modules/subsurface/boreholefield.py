@@ -36,7 +36,7 @@ class BoreholeField(Module):
     fluid_out_T = T_in + eps (T_g - T_in); ``fluid_mean_temperature`` is the arithmetic mean of
     inlet
     and outlet, the usual design convention. A positive Q is heat taken from the ground
-    (``heat_absorbed``), a negative Q heat rejected into it (``heat_loss``; the ground is the
+    (``loss_out`` negative), a negative Q heat rejected into it (``loss_out``; the ground is the
     plant's environment), so the stream audit closes.
 
     The field volume, of heat capacity C = (rho c)_g V, also exchanges heat with the

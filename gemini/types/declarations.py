@@ -317,7 +317,7 @@ class _Port(Declaration):
     """Port declaration; ``type`` is a ``Stream`` type or the quantity ``Power``.
 
     A stream port has no JSON schema, quantity or unit: ``schema`` is empty, ``quantity`` and
-    ``unit`` are ``None`` and ``additive`` is false. Stream dataclasses do not go through Pydantic.
+    ``unit`` are ``None``. Stream dataclasses do not go through Pydantic.
     A ``Power`` port has the unit of its quantity. ``kind`` is the label of the connection, one of
     ``streams.NAMES``, or ``None`` for a port that takes whatever flows through it (a pipe, a
     valve, either side of a heat exchanger). ``many`` lets several ports connect: the value of the

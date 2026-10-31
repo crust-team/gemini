@@ -95,7 +95,7 @@ def lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None, on
 def lcoc(plant, results, discount_rate=None, lifetime=None, assumptions=None, on_error="raise"):
     """Return the levelised cost of cold [currency/J]; the cooling twin of ``lcoh``.
 
-    The same formula with the cold delivered (``heat_absorbed`` of the ``CoolingGrid``
+    The same formula with the cold delivered (what the water gains across the ``CoolingGrid``
     leaves) in place of the heat, and for a plant that also delivers heat the share of the cost
     ``heat_cost_share`` leaves. The parameters and the return shape are those of ``lcoh``.
     """

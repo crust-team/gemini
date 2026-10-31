@@ -54,13 +54,9 @@ def _nonnegative(name, values, tolerance, unit, absent):
 def energy_balance(results):
     """Check the energy ledger of a finished run: the energy outputs have their sign.
 
-    Results store the leaf output columns, not the streams that cross the leaves, so the
-    enthalpy closure of ``gemini.modules._utils.balance.energy_balance`` (sum in minus sum out
-    per call) cannot be recomputed from them. This check covers the ledger of
-    ``ENERGY_INPUTS`` and ``ENERGY_OUTPUTS`` of that module: it reads every leaf column named
-    ``electricity``, ``fuel``, ``heat_absorbed``, ``heat_loss``, ``heat_supplied`` or
-    ``electricity_generated`` and checks that each value is finite or missing and not negative
-    beyond the tolerance (``heat_accumulation`` is signed and is not judged).
+    It reads every leaf column named ``power_in``, ``power_out`` or ``fuel`` and checks that each
+    value is finite or missing and not negative beyond the tolerance (``loss_out`` and
+    ``heat_accumulation`` are signed and are not judged). ``plant_balance`` checks the closure.
 
     Parameters
     ----------
@@ -84,11 +80,9 @@ def energy_balance(results):
 def mass_balance(results):
     """Check the mass-flow ledger of a finished run: no mass flow is negative or infinite.
 
-    Results store leaf output columns, not the streams that cross the leaves, so the mass
-    closure of ``gemini.modules._utils.balance.mass_balance`` (inflow minus outflow per call)
-    cannot be recomputed from them. This check covers the leaf outputs whose unit in
-    ``results.units`` is kg/s (for example a degasser's ``gas_mass_flow``): each value must be
-    finite or missing and not negative beyond the tolerance.
+    It covers the columns whose unit in ``results.units`` is kg/s (for example
+    ``degasser.gas_out.mass_flow``): each value must be finite or missing and not negative beyond
+    the tolerance. ``plant_balance`` checks the closure.
 
     Parameters
     ----------

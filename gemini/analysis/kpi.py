@@ -138,15 +138,15 @@ def compute(plant, results):
         with the ``reason`` text when the run cannot give it (never a guess). The definitions,
         with E(x) = sum over ticks of x * tick duration [J]:
 
-        - ``heating_coverage`` [-] = E(heat_supplied) / E(heat_supplied + unmet_demand) summed
+        - ``heating_coverage`` [-] = E(heat delivered) / E(heat delivered + unmet_demand) summed
           over the plant's ``HeatingGrid`` leaves: the share of the demanded heat delivered.
-        - ``cooling_coverage`` [-] = E(heat_absorbed) / E(heat_absorbed + unmet_sensible +
+        - ``cooling_coverage`` [-] = E(cold delivered) / E(cold delivered + unmet_sensible +
           unmet_latent) over the ``CoolingGrid`` leaves.
         - ``cop`` [-] = E(heat delivered) / E(``ElectricityGrid.power_out``): heat delivered per
           unit of electricity consumed. Cooling is not counted.
-        - ``peak_heat`` [W] = the largest tick sum of ``heat_supplied`` over the
+        - ``peak_heat`` [W] = the largest tick sum of heat delivered over the
           ``HeatingGrid`` leaves (delivered power, not the demand peak).
-        - ``peak_cold`` [W] = the largest tick sum of ``heat_absorbed`` over the
+        - ``peak_cold`` [W] = the largest tick sum of cold delivered over the
           ``CoolingGrid`` leaves.
 
     A plant without a consumer leaf, for example the doublet heat plant, gives ``None`` for the

@@ -85,9 +85,8 @@ Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
 5. `forward` sections are `# Modules` and `# Outlets`, in that order with empty sections omitted.
    Only composites use `# Modules`; `forward` never assigns an attribute on `self`.
 6. Leaves assign every plain output in `_compute_outputs(self, inlets, outlets)`. Composites use
-   `Output.of` and `Output.ratio` declarations with direct references and additive outputs
-   without a formula, which sum their descendant leaves; they override `_compute_outputs` only
-   to record their own value for such an additive output.
+   `Output.of` and `Output.ratio` declarations with direct references; a parent never sums its
+   children, a total is read from the ports of the modules at the plant's edge.
 7. End every `forward` with `outlets = dict(...)`, the outlets in declaration order and then the
    drawn inlets, then `return outlets`.
    Zero- and one-outlet modules use the same dictionary shape.

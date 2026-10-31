@@ -34,8 +34,8 @@ class DownholeHeatExchanger(Module):
     m_dot cp dT/dz = (T_rock(z) - T) / R gives Ramey's exact profile with the relaxation
     length A = m_dot cp R (``ground.ramey_fluid_temperature``), and the fluid leaves at the
     bottom-hole temperature: fluid_out_T = T(depth). ``heat_extraction_rate`` is
-    m_dot cp (fluid_out_T - T_in); heat taken from the rock is ``heat_absorbed`` and heat given to
-    it (an inlet warmer than the rock) ``heat_loss``, so the stream audit closes.
+    m_dot cp (fluid_out.T - T_in); heat taken from the rock is a negative ``loss_out``, heat given
+    to it (an inlet warmer than the rock) a positive one, so the stream audit closes.
 
     Assumptions: steady state at a fixed operating time (no load history; the rock
     resistance applies a constant, uniform heat flux along the depth); a perfectly insulated

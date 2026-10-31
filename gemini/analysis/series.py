@@ -23,7 +23,7 @@ def leaf_total(plant, frame, field, module_class=Module):
         ``results.to_frame()``: one ``path.field`` column per leaf output, in the unit the leaf
         declares.
     field : str
-        Output name, such as ``"heat_supplied"``.
+        Output name, such as ``"unmet_demand"``.
     module_class : type, optional
         Only leaves that are instances of this class count; every leaf by default.
 
@@ -32,8 +32,7 @@ def leaf_total(plant, frame, field, module_class=Module):
     pandas.Series or None
         The sum on the result time index, in the unit of the field. A tick where no summed
         column has a value is NaN. ``None`` when no leaf of the class declares the field or
-        none of them ran. The sum adds the descendant leaves' same-named outputs, the rule of a
-        plant's automatic sum outputs.
+        none of them ran.
     """
     columns = [
         join_path(path, field)

@@ -15,6 +15,10 @@ Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.r
 `gm.schedule` plans the run input of a design from its demand
 ([schedule](.claude/docs/engine.md#schedule)).
 
+Everything in the plant's energy and mass flow is a module, everything that crosses between modules
+goes through a port, and a plant total is read from the ports of the modules at the plant's edge
+([energy flow](.claude/docs/modules.md#energy-flow)). Check a run with `gm.checks.plant_balance`.
+
 Every port of a module is connected or named as a plant port; there are no automatic plant ports
 ([plants](.claude/docs/plants.md#level-1-the-builder)). A composite may derive its children's values
 by overriding `set_params`

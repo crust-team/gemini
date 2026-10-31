@@ -21,7 +21,7 @@ class Blowdown(Module):
 
     Both outlets keep the feed temperature, pressure and fluid: the valve pressure loss and any
     flash of the drained water are not modelled. The drained stream carries its own enthalpy, so
-    there is no ``heat_loss`` output: when ``waste_out`` leaves the plant, the stream audit
+    there is no ``loss_out`` output: when ``waste_out`` leaves the plant, the stream audit
     counts it as an outflow, and mass and sensible energy close exactly. The fraction is a
     control because operators and controllers adjust it to the measured concentration (for a
     make-up stream ``M`` and ``C`` cycles of concentration the bleed is ``M / C``). Reverse

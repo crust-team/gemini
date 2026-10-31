@@ -465,6 +465,7 @@ Fuel-fired heat and power: fuel input of a boiler or engine, flare emissions.
   and the electric output of a combined heat and power unit.
 - `flare_emissions(gas_flow, co2_fraction, methane_fraction, combustion_efficiency, heating_value)`:
   CO2 and methane emissions and the fuel power of a flared gas.
+- `released_heat(gas_flow, heating_value, combustion_efficiency)`: heat a flare releases.
 
 ### `modules/storage/_physics.py`
 
@@ -1041,6 +1042,8 @@ or a size distribution.
   `x_CO2 m + m_b M_CO2 / M_CH4`, the methane emission `x_CH4 m - m_b` [kg/s] and the fuel
   `m_b H` [W]. `eta_c` = 0 is a vent. Defaults: `FLARE_EFFICIENCY` = 0.98, `METHANE_HEATING_VALUE` =
   50e6 J/kg.
+
+- `released_heat(m, H, eta_c)` = `m H eta_c` [W]: the heat a flare gives to `loss_out`.
 
 ## Storage
 

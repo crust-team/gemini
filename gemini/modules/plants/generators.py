@@ -186,8 +186,7 @@ def district_network_spec(consumers=2, service="heating"):
     Flow order: ``pump`` -> ``supply_pipe`` -> ``splitters`` -> ``substations`` -> ``mixers`` ->
     ``return_pipe``. ``service`` is ``"heating"`` (``HeatingSubstation`` children) or
     ``"cooling"`` (``CoolingSubstation`` children). Ports: ``supply_in``, ``return_out``.
-    Outputs: ``heat_supplied`` (heating only), ``heat_absorbed``, ``heat_loss``,
-    ``electricity`` and ``return_out_T``.
+    Output: ``return_out_T``; ``power_in`` and ``loss_out`` are plant ports.
     """
     if service not in SUBSTATIONS:
         raise ValidationError(

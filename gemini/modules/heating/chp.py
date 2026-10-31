@@ -40,10 +40,10 @@ class CHP(Module):
     so the model is first-law closed.
 
     ``fuel_in`` brings the co-produced gas: the engine burns it first, up to its need, and takes
-    the rest from the grid; ``gas_out`` carries the gas it did not burn. It may draw grid gas when
+    the rest from the grid. It may draw grid gas when
     ``fuel_in`` comes from a ``GasMakeup`` or a ``GasGrid``; without that mark the fuel energy of
-    the stream limits the load. ``fuel_coproduced``, ``fuel_purchased``, ``burned_mass_flow`` and
-    ``co2_emission`` are those of ``Boiler``.
+    the stream limits the load. ``fuel_in`` shows what it took and ``flue_out`` what burning left,
+    as on ``Boiler``.
 
     Assumptions: steady operation at a constant thermal efficiency on the fuel basis, no
     minimum stable load or start-up losses, no pressure loss, constant liquid heat capacity.

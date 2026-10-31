@@ -23,8 +23,8 @@ def co2(plant, results, assumptions=None, on_error="raise"):
     plant : Module
         The plant of the run, as for every economics function; the columns alone give the value.
     results : Results
-        A finished run; its leaf emission columns and ``electricity`` and
-        ``electricity_generated`` columns are summed.
+        A finished run; the emissions of ``Atmosphere`` and ``net_import`` of the
+        ``ElectricityGrid`` are integrated, and the ``fuel`` of the burners.
     assumptions : Assumptions, optional
         ``methane_gwp`` and ``electricity_emission_factor`` [kg/J].
     on_error : {"raise", "record"}, optional

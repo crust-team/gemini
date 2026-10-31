@@ -46,7 +46,7 @@ class CoolingGrid(Module):
 
     When the available capacity is short, the sensible load is served first: room thermostats
     control the dry-bulb temperature and humidity drifts. The latent heat (condensation of the
-    removed vapour) enters the water like the sensible heat, so ``heat_absorbed`` is their sum;
+    removed vapour) enters the water like the sensible heat, so the heat on its ports is their sum;
     the condensate drains on the air side and the water mass flow is unchanged.
 
     On a closed loop ``return_temperature``, ``return_pressure`` and the control ``flow`` set the
@@ -58,7 +58,7 @@ class CoolingGrid(Module):
     Simplifications: steady state, constant fluid properties (the inlet ``cp``), no pressure
     drop, no coil characteristic beyond the return limit and the dew-point test, and loads
     given as boundaries instead of computed from the air side. The model conserves mass and is
-    first-law closed: the sensible enthalpy rise of the stream equals ``heat_absorbed``. Valid
+    first-law closed: the sensible enthalpy rise of the stream equals the heat on its ports. Valid
     for chilled water or glycol with nonnegative flow and indoor air from 173.15 K to 473.15 K
     with a relative humidity in (0, 1].
     """

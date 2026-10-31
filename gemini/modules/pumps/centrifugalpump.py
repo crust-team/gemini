@@ -35,7 +35,7 @@ class CentrifugalPump(Module):
 
     Hydraulic power is ``Q H``, shaft power ``Q H / eta`` and electricity the shaft power over
     ``motor_efficiency``. The pump losses ``P_shaft - P_hydraulic`` heat the liquid,
-    ``dT = (P_shaft - P_hydraulic) / (m_dot cp)``, and the motor losses leave as ``heat_loss``,
+    ``dT = (P_shaft - P_hydraulic) / (m_dot cp)``, and the motor losses leave as ``loss_out``,
     so the model is first-law closed when the flow work ``Q H`` is counted. NOTE(refactor): the
     sensible-enthalpy audit of ``energy_balance`` excludes pressure energy, so its residual for
     this pump equals ``hydraulic_power``; the unit tests check that and the full closure.

@@ -56,7 +56,7 @@ results = gm.simulate(plant, plan)
 `gm.schedule` (`gemini/analysis/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
 of each day of `demand` from a daily energy balance on the plant's design values, with no simulation
 inside. It reads the `Doublet` children and at most one `HeatPump`, `Boiler`, `AbsorptionUnit`,
-`HeatConsumer` and `CoolingConsumer`. The chiller's heat is the cooling demand over its
+`HeatingGrid` and `CoolingGrid`. The chiller's heat is the cooling demand over its
 `thermal_cop`. Sources follow `order`: each doublet, in plant order, runs at the flow that gives the
 heat at `max_brine_cooling`, clipped to `doublet_flow`, below the minimum at the minimum with less
 cooling. The heat pump and boiler take the `temperature_setpoint` set on them, the design's supply

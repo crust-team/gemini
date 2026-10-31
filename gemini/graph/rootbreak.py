@@ -8,7 +8,7 @@ it: for each row it builds the inlet streams, applies the controls and boundarie
 ``module(streams)``, or ``module.step(state, dt, streams)`` for a stepped break, so the state
 tree, the ``_Step`` record and "called twice" stay in ``Module.step``, the one implementation.
 A row that raises is a failed row with that exception; the states carry over the failed row
-unchanged. The rows are real ``ModuleResult`` trees, so children, automatic sums and
+unchanged. The rows are real ``ModuleResult`` trees, so children and
 ``Output.of`` are exact; ``stacked`` joins them into one tree of arrays.
 """
 

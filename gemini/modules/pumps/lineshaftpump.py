@@ -40,7 +40,7 @@ class LineShaftPump(Module):
 
     NOTE(refactor): like ``ESP`` the pump is isothermal: the empirical polynomials do not
     guarantee ``P_pump >= Q H`` (the retained ESP efficiency can exceed one), so no pump or
-    shaft loss is allocated to the fluid and no motor loss is reported as ``heat_loss``. The
+    shaft loss is allocated to the fluid and no motor loss is reported as ``loss_out``. The
     electricity is listed as unresolved pump power by ``energy_balance``. Thrust-bearing
     losses, shaft stretch and the column pipe friction (part of the well model) are not
     modelled. Reverse flow, a negative head or a negative pump power (running off the

@@ -39,7 +39,7 @@ class Pipe(Module):
     exchanger with an infinite-capacity ambient (``C_r = 0``). The legacy explicit increment
     ``heat_transfer.pipe_temperature_change`` is its first-order expansion and is not reused
     because it overshoots past ambient when ``NTU > 1``. The heat exchanged leaves as
-    ``heat_loss`` (fluid warmer than ambient) or enters as ``heat_absorbed`` (fluid colder), so
+    ``loss_out`` (fluid warmer than ambient) or enters as ``loss_out`` (negative) (fluid colder), so
     the stream energy audit closes exactly.
 
     Simplifications: steady state (no fluid or wall heat capacity, no transit time), constant

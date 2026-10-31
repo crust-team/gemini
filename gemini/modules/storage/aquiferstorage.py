@@ -57,8 +57,8 @@ class AquiferStorage(Module):
     each store relaxes towards the aquifer temperature with the time constant
     (rho c)_w V / UA and the losses scale with the area-to-volume ratio, as observed for ATES
     (Bloemendal and Hartog 2018, Geothermics 71, 306-319). A store above the aquifer
-    temperature reports its loss as ``heat_loss``, one below it its gain as
-    ``heat_absorbed``. The default ``storage_period`` is half a year, the charge or discharge
+    temperature reports its loss as ``loss_out``, one below it its gain as
+    ``loss_out`` (negative). The default ``storage_period`` is half a year, the charge or discharge
     season of seasonal ATES.
 
     Each step first applies the injected volume Q dt (mixing) and the withdrawn volume

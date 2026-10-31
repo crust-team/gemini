@@ -60,11 +60,7 @@ default once and hands out a fresh copy of mutable values. Each declaration expo
 optional kind describes its non-null variant and a list describes its items.
 
 Use `Annotated[float, quantity(...)]` aliases for physical numeric declarations, including list
-items. `quantity(name, unit, additive=True)` marks a quantity that composites sum over their
-descendant leaf calls; the additive quantities are `MassFlow`, the seven energy outputs below,
-`Duty` (a heat-transfer rate such as a heat exchanger's) and `HydraulicPower`, all in W except
-mass flow, and each has its own quantity name. Plain `Power` is not additive. A declaration's
-`additive` attribute reads the flag. Integer stage counts use `Count`. Every quantity's unit is its own SI unit in the unit
+items. Each has its own quantity name. Integer stage counts use `Count`. Every quantity's unit is its own SI unit in the unit
 table of `physics/units.py` (`test_every_quantity_unit_is_a_known_si_unit`); add the unit
 there together with a new quantity. Use signed pressure/temperature *differences* separately
 from nonnegative absolute pressure and strictly positive absolute temperature. A difference
@@ -78,7 +74,6 @@ The equipment catalogue ([equipment.md](equipment.md)) added these quantities an
 | --- | --- | --- | --- |
 | `Elevation` | `m`, signed (positive upwards) | `ft` | `Pipe.elevation_change` |
 | `MassConcentration` | `kg/m3`, >= 0 | `g/m3`, `mg/l` | `Desander.sand_concentration` |
-| `MoneyRate` | `currency/s` | `currency/h` | `GridConnection.cost_rate` |
 | `LinearThermalResistance` | `m.K/W`, > 0 | | borehole resistances |
 | `TemperatureGradient` | `K/m`, signed | `K/km` | `DownholeHeatExchanger` |
 

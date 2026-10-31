@@ -158,7 +158,7 @@ def emissions(result_tree, fuel_factor, electricity_factor):
     ``fuel * fuel_factor + max(0, electricity - electricity_generated) * electricity_factor``
     over the leaf totals of ``collect_flows``, for any plant topology. Factors are SI [kg/J]:
     divide kg/GJ by 1e9 and kg/kWh by 3.6e6. All on-site generation (``CHP``, ``ORC``, any
-    ``electricity_generated``) offsets the electricity of all consumers (ESP, pumps,
+    ``power_out``) offsets the electricity of all consumers (ESP, pumps,
     compressors, heat pumps) before grid electricity is charged, and a surplus earns no credit.
     The upstream GEMINI KPI offset only the ESP's electricity by the CHP and charged the
     injection pump in full. Fuel is

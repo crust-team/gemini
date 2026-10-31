@@ -42,9 +42,9 @@ class ORC(Module):
     unchanged.
 
     The parasitic loads (feed pump, condenser fans, controls) take ``parasitic_fraction`` of the
-    gross power and are supplied from it, so ``electricity_generated`` is the net power and
-    ``parasitic_power`` is reported separately, not as ``electricity`` (which would count it
-    twice in plant totals). The parasitic power ends as heat in the air: ``heat_loss`` is the
+    gross power and are supplied from it, so ``power_out`` is the net power and
+    ``parasitic_power`` is reported separately, not as ``power_in`` (which would count it
+    twice in plant totals). The parasitic power ends as heat in the air: ``loss_out`` is the
     condenser duty plus the parasitic power. First law: heat_input = gross_power +
     condenser_duty and heat_input = electricity_generated + heat_loss, so ``energy_balance``
     closes with the brine's constant ``cp_l``. ``thermal_efficiency`` is net power over heat

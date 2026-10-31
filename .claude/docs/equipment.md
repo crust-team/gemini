@@ -20,9 +20,10 @@ Shared conventions, stated once here and not repeated per module:
 - Bad design data found at call time (inconsistent parameters, a geometry outside a relation's
   range) raises `ValidationError`; inputs outside a model's domain raise
   `PhysicsError`.
-- Energy that leaves or enters a leaf outside its streams uses the fixed additive outputs of
-  [types.md](types.md#energy-outputs-and-balances): `electricity`, `fuel`, `heat_absorbed`,
-  `heat_loss`, `heat_supplied`, `electricity_generated` and the signed `heat_accumulation`.
+- Energy that leaves or enters a leaf outside its streams is on a port or in one output
+  ([types.md](types.md#energy-on-ports-and-balances)): `power_in`, `power_out`, `loss_out` (signed,
+  heat to the surroundings), the output `fuel` and the signed output `heat_accumulation`. A value
+  a port shows is read from the port, under `<port>.<quantity>` in the results.
 - **Energy audit** below states what `energy_balance(module, result)` shows for one call.
   *Closed* means `relative_residual < 1e-12` and `mass_balance(...)["residual"] == 0` are
   tested. Otherwise the documented residual is named; it is never hidden by an invented loss.
@@ -42,53 +43,56 @@ Shared conventions, stated once here and not repeated per module:
 | Subsurface | `ProductionReservoir` | none -> `sandface_out` | no | linear IPR, radial diagnostics |
 | Subsurface | `InjectionReservoir` | `sandface_in` -> none | no | linear injectivity |
 | Subsurface | `ThermalDecline` | `fluid_in` -> `fluid_out` | yes | Gringarten–Sauty breakthrough |
-| Subsurface | `BoreholeField` | `fluid_in` -> `fluid_out` | yes | lumped ground, steady-flux cell |
-| Subsurface | `DownholeHeatExchanger` | `fluid_in` -> `fluid_out` | no | Ramey profile, coaxial |
-| Wells | `ProductionWell` | `bottom_in` -> `wellhead_out` | no | DPDT path traversal upward |
-| Wells | `InjectionWell` | `wellhead_in` -> `bottom_out` | no | DPDT path traversal downward |
-| Pumps | `ESP` | `fluid_in` -> `fluid_out` | no | TNO polynomial head and power, isothermal |
-| Pumps | `InjectionPump` | `fluid_in` -> `fluid_out` | no | setpoint or curve head, `Q dp / eta` |
-| Pumps | `CentrifugalPump` | `fluid_in` -> `fluid_out` | no | quadratic head, affinity laws |
-| Pumps | `LineShaftPump` | `fluid_in` -> `fluid_out` | no | ESP curves plus shaft friction |
-| Pumps | `GasCompressor` | `fluid_in` -> `fluid_out` | no | ideal-gas intercooled stages |
+| Subsurface | `BoreholeField` | `fluid_in` -> `fluid_out`, `loss_out` | yes | lumped ground, steady-flux cell |
+| Subsurface | `DownholeHeatExchanger` | `fluid_in` -> `fluid_out`, `loss_out` | no | Ramey profile, coaxial |
+| Wells | `ProductionWell` | `bottom_in` -> `wellhead_out`, `loss_out` | no | DPDT path traversal upward |
+| Wells | `InjectionWell` | `wellhead_in` -> `bottom_out`, `loss_out` | no | DPDT path traversal downward |
+| Pumps | `ESP` | `fluid_in`, `power_in` -> `fluid_out` | no | TNO polynomial head and power, isothermal |
+| Pumps | `InjectionPump` | `fluid_in`, `power_in` -> `fluid_out` | no | setpoint or curve head, `Q dp / eta` |
+| Pumps | `CentrifugalPump` | `fluid_in`, `power_in` -> `fluid_out`, `loss_out` | no | quadratic head, affinity laws |
+| Pumps | `LineShaftPump` | `fluid_in`, `power_in` -> `fluid_out` | no | ESP curves plus shaft friction |
+| Pumps | `GasCompressor` | `fluid_in`, `power_in` -> `fluid_out`, `loss_out` | no | ideal-gas intercooled stages |
 | Treatment | `Filter` | `fluid_in` -> `fluid_out` | no | quadratic clean loss, clogging health |
 | Treatment | `Degasser` | `fluid_in` -> `liquid_out`, `gas_out` | no | free-gas split and vessel pressure |
 | Treatment | `Blowdown` | `fluid_in` -> `fluid_out`, `waste_out` | no | commanded bleed |
-| Treatment | `Desander` | `fluid_in` -> `fluid_out` | no | constant removal share, quadratic loss |
-| Treatment | `InhibitorDosing` | `fluid_in` -> `fluid_out` | no | dose proportional to flow |
-| Treatment | `Vent` | `fluid_in` -> `fluid_out` | no | vent or flare emissions |
-| Treatment | `Flare` | `gas_in` -> none | no | burns its gas, emissions from the composition |
+| Treatment | `Desander` | `fluid_in` -> `fluid_out`, `waste_out` | no | constant removal share, quadratic loss |
+| Treatment | `InhibitorDosing` | `fluid_in`, `chemical_in` -> `fluid_out` | no | dose proportional to flow |
+| Treatment | `Flare` | `gas_in` -> `flue_out`, `loss_out` | no | burns its gas, emissions from the composition |
 | Exchangers | `HeatExchanger` | `hot_in`, `cold_in` -> `hot_out`, `cold_out` | no | effectiveness-NTU |
-| Exchangers | `Cooler` | `fluid_in` -> `fluid_out` | no | dry or wet approach, fan power |
-| Heating | `Boiler` | `fluid_in`, `fuel_in` -> `fluid_out`, `gas_out` | no | setpoint duty, co-produced gas first |
-| Heating | `ElectricBoiler` | `fluid_in` -> `fluid_out` | no | setpoint duty, capacity, efficiency |
-| Heating | `HeatPump` | `source_in`, `sink_in` -> `source_out`, `sink_out` | no | Carnot or Lorenz COP |
-| Heating | `CHP` | `fluid_in`, `fuel_in` -> `fluid_out`, `gas_out` | no | Willans line, dump cooler |
-| Cooling | `AbsorptionUnit` | three `*_in` -> `*_out` circuits | no | characteristic equation |
-| Cooling | `AdsorptionChiller` | three `*_in` -> `*_out` circuits | no | characteristic equation |
-| Power | `ORC` | `fluid_in` -> `fluid_out` | no | Lorenz-cycle fraction, bypass cap |
+| Exchangers | `Cooler` | `fluid_in`, `air_in`, `power_in` -> `fluid_out`, `air_out` | no | dry or wet approach, fan power |
+| Heating | `Boiler` | `fluid_in`, `fuel_in` -> `fluid_out`, `flue_out`, `loss_out` | no | setpoint duty, co-produced gas first |
+| Heating | `ElectricBoiler` | `fluid_in`, `power_in` -> `fluid_out`, `loss_out` | no | setpoint duty, capacity, efficiency |
+| Heating | `HeatPump` | `source_in`, `sink_in`, `power_in` -> `source_out`, `sink_out` | no | Carnot or Lorenz COP |
+| Heating | `CHP` | `fluid_in`, `fuel_in` -> `fluid_out`, `flue_out`, `power_out`, `loss_out` | no | Willans line, dump cooler |
+| Cooling | `AbsorptionUnit` | `generator_in`, `chilled_in`, `cooling_in`, `power_in` -> `generator_out`, `chilled_out`, `cooling_out` | no | characteristic equation |
+| Cooling | `AdsorptionChiller` | `generator_in`, `chilled_in`, `cooling_in`, `power_in` -> `generator_out`, `chilled_out`, `cooling_out` | no | characteristic equation |
+| Power | `ORC` | `fluid_in`, `air_in` -> `fluid_out`, `power_out`, `loss_out` | no | Lorenz-cycle fraction, bypass cap |
 | Power | `Separator` | `fluid_in` -> `liquid_out`, `gas_out` | no | IF97 flash |
-| Power | `FlashTurbine` | `fluid_in` -> `fluid_out` | no | Baumann wet expansion, condenser |
-| Power | `GridConnection` | none | no | net import/export, limits, tariff |
-| Storage | `AquiferStorage` | `injection_in` -> `production_out` | yes | warm and cold stores |
-| Storage | `ThermalStorage` | `charge_*`, `discharge_*` | yes | fully mixed tank |
+| Power | `FlashTurbine` | `fluid_in` -> `fluid_out`, `power_out`, `loss_out` | no | Baumann wet expansion, condenser |
+| Storage | `AquiferStorage` | `injection_in` -> `production_out`, `loss_out` | yes | warm and cold stores |
+| Storage | `ThermalStorage` | `charge_in`, `discharge_in`, `air_in` -> `charge_out`, `discharge_out`, `loss_out` | yes | fully mixed tank |
 | Storage | `IceStorage` | `fluid_in` -> `fluid_out` | yes | lumped ice store, piecewise exact |
-| Piping | `Pipe` | `fluid_in` -> `fluid_out` | no | Darcy–Weisbach, static head, exponential loss |
-| Piping | `GasGrid` | none -> `gas_out` | no | a fuel source without flow, marks grid gas |
-| Piping | `GasMakeup` | `fluid_in` -> `fluid_out` | no | marks that a burner may draw grid gas |
+| Piping | `Pipe` | `fluid_in`, `air_in` -> `fluid_out`, `loss_out` | no | Darcy–Weisbach, static head, exponential loss |
+| Piping | `GasMakeup` | `gas_in`, `grid_in` -> `fuel_out`, `excess_out` | no | marks that a burner may draw grid gas |
 | Piping | `Valve` | `fluid_in` -> `fluid_out` | no | IEC 60534 liquid sizing, inherent curve |
 | Piping | `Splitter` | `fluid_in` -> `branch1_out`, `branch2_out` | no | commanded mass split |
 | Piping | `Mixer` | `branch1_in`, `branch2_in` -> `fluid_out` | no | adiabatic, lower pressure |
 | Piping | `PressurizationTank` | `fluid_in` -> `fluid_out` | no | outlet at the pressure setpoint |
-| Demand | `HeatConsumer` | `supply_in` -> `return_out` | no | demand capped by return floor |
-| Demand | `CoolingConsumer` | `supply_in` -> `return_out` | no | sensible, latent, dew point |
-| Control | `PIDController` | none | yes | discrete PID, clamping anti-windup |
+| Grids | `ElectricityGrid` | `power_in` -> `power_out` | no | net import/export, limits |
+| Grids | `GasGrid` | none -> `gas_out` | no | purchased gas, marks grid gas |
+| Grids | `HeatingGrid` | `supply_in` -> `return_out` | no | demand capped by return floor |
+| Grids | `CoolingGrid` | `supply_in` -> `return_out` | no | sensible, latent, dew point |
+| Grids | `WasteGrid` | `waste_in` -> none | no | where waste goes |
+| Grids | `ChemicalGrid` | none -> `chemical_out` | no | where chemicals come from |
+| Environment | `Atmosphere` | `air_in`, `heat_in`, `gas_in` -> `air_out`, `wet_air_out` | no | ambient air, emissions |
+| Environment | `Formation` | `heat_in` -> none | no | rock around the wells |
+| Control | `PIDController` | none -> none | yes | discrete PID, clamping anti-windup |
 | Plants | `Doublet` | `return_in` -> `supply_out` | no | reservoir, wells, ESP, injector, sink |
 | Plants | `MultiWellPlant` | `return_in` -> `supply_out` | no | N producers, M injectors |
 | Plants | `HeatingSubstation` | `supply_in` -> `return_out` | no | valve, HX, heat consumer |
 | Plants | `CoolingSubstation` | `supply_in` -> `return_out` | no | valve, HX, cooler |
 | Plants | `DistrictNetwork` | `supply_in` -> `return_out` | no | pump, pipes, substations |
-| Plants | `ATESPlant` | `return_in` -> `supply_out` | child | ATES, pump, HX, heat pump |
+| Plants | `ATESPlant` | `return_in`, `power_in` -> `supply_out`, `loss_out` | child | ATES, pump, HX, heat pump |
 
 ## Pumps
 
@@ -97,7 +101,7 @@ Shared conventions, stated once here and not repeated per module:
 Electrical submersible pump inside a production well, on the retained TNO R11363 polynomial
 basis (`gemini.physics.pumps`).
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in`, `power_in` (power) -> `fluid_out`.
 - **Parameters**:
   - `stage_count` (`Count`, required).
   - `head_coefficients`, `power_coefficients` (`list[float]`, shape 6, calibratable, required): ft of head
@@ -112,12 +116,11 @@ basis (`gemini.physics.pumps`).
     (`Length | None`, default `None`): read only by the legacy import and export.
   - `drift_threshold` (`Fraction`, default 0.10): health alarm limit on relative drift.
 - **Controls**: `frequency` (`Frequency`, required). **Boundaries, states**: none.
-- **Outputs**: `head`, `power` (shaft), `efficiency` (`Dimensionless`, may exceed one),
-  `discharge_pressure` (all soft sensors), `flow`, `is_in_operating_window`, `best_efficiency_ratio`,
-  `electricity`.
+- **Outputs**: `head` (soft sensor), `power` (soft sensor), `efficiency` (soft sensor),
+  `discharge_pressure` (soft sensor), `is_in_operating_window`, `best_efficiency_ratio`.
 - **Model**: `H = pumps.head(Q, f, N, head_coefficients)` with `H ~ (f/60)^2`,
   `P = pumps.power(Q, f, N, power_coefficients)` with `P ~ (f/60)^3`, `discharge.p = suction.p + H`,
-  `electricity = P / motor_efficiency`. Efficiency is the retained hydraulic-efficiency
+  `power_in = P / motor_efficiency`. Efficiency is the retained hydraulic-efficiency
   formula, zero below 0.1 W shaft power. Under `runtime.set_precision("float32")` the
   coefficients use NumPy float32 for golden parity.
 - **Physics**: `diagnostics.relative_drift`, `diagnostics.remaining_margin`, `energy.input_power`,
@@ -153,7 +156,7 @@ assert energy_balance(esp, result)["unresolved_power"] == result.outputs.electri
 
 Injection (booster) pump that raises the brine to a discharge pressure.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in`, `power_in` (power) -> `fluid_out`.
 - **Parameters**: `stage_count` (`Count | None`, default `None`), `pump_type` (default
   `"unspecified"`, read only by the legacy import and export), `efficiency` (`Efficiency`,
   default 0.7, calibratable; the example plant selects 0.8, see
@@ -161,10 +164,10 @@ Injection (booster) pump that raises the brine to a discharge pressure.
   (`list[float] | None`, shape 6, default `None`, ESP basis).
 - **Controls**: `pressure_setpoint` (`Pressure | None`, default `None`), `frequency`
   (`Frequency`, default 60 Hz, used with curves).
-- **Outputs**: `head`, `power`, `discharge_pressure` (soft sensors), `electricity`.
+- **Outputs**: `head` (soft sensor), `power` (soft sensor), `discharge_pressure` (soft sensor).
 - **Model**: with `head_coefficients` (and `stage_count`) the head is the ESP polynomial; otherwise
   `head = pressure_setpoint - suction.p`. Power is `pumps.power` when both curves are given,
-  else `Q head / efficiency`; `electricity = power`.
+  else `Q head / efficiency`; `power_in = power`.
 - **Physics**: `energy.input_power`, `pumps.head`, `pumps.hydraulic_power`, `pumps.power`
 - **Validity**: a negative head (setpoint below suction) and reverse flow raise
   `PhysicsError`; neither a setpoint nor a head curve raises `ValidationError`.
@@ -185,7 +188,7 @@ assert round(result.outputs.electricity, 1) == 242187.5
 Variable-speed booster or circulation pump (surface centrifugal pump on a drive) with a
 quadratic head curve and affinity-law speed scaling. It replaces the former `BoosterPump`.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in`, `power_in` (power) -> `fluid_out`, `loss_out` (power).
 - **Parameters** (all required; curves and efficiencies are pump-specific datasheet values):
   - `head_coefficients` (`list[float]`, shape 3, calibratable): `c0` [Pa], `c1` [Pa s/m3],
     `c2` [Pa s2/m6] of `H(Q)` at the rated speed.
@@ -194,14 +197,13 @@ quadratic head curve and affinity-law speed scaling. It replaces the former `Boo
     hydraulic efficiency and flow at the best-efficiency point (BEP) at rated speed.
   - `motor_efficiency` (`Efficiency`): wire to shaft.
 - **Controls**: `frequency` (`Frequency`). **Boundaries, states**: none.
-- **Outputs**: `flow`, `head` (soft sensor), `hydraulic_power`, `shaft_power` (soft sensor),
-  `efficiency` (`Fraction`, hydraulic), `electricity`, `heat_loss`, `fluid_out_T`.
+- **Outputs**: `head` (soft sensor), `hydraulic_power`, `shaft_power` (soft sensor), `efficiency`.
 - **Model**: with `s = frequency / rated_frequency` and the suction volume flow `Q`:
   - `H = c0 s^2 + c1 s Q + c2 Q^2`;
   - `x = Q / (s Q_bep)`, `eta = eta_bep x (2 - x)` (Ulanicki, Kahler and Coulbeck 2008, J. Water
     Resour. Plann. Manage. 134(1), 88-93);
-  - `P_hydraulic = Q H`, `P_shaft = P_hydraulic / eta`, `electricity = P_shaft / eta_motor`,
-    `heat_loss = electricity - P_shaft`;
+  - `P_hydraulic = Q H`, `P_shaft = P_hydraulic / eta`, `power_in = P_shaft / eta_motor`,
+    `loss_out = electricity - P_shaft`;
   - `discharge.p = suction.p + H`, `discharge.T = suction.T + (P_shaft - P_hydraulic) / (m_dot
     cp)`: pump losses heat the liquid, motor losses go to the room.
 - **Physics**: `energy.input_power`, `heat_transfer.temperature_change`,
@@ -234,18 +236,17 @@ assert round(result.outputs.electricity) == 22963
 
 Downhole multistage (vertical turbine) pump driven by a surface motor through a line shaft.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in`, `power_in` (power) -> `fluid_out`.
 - **Parameters** (all required): `stage_count` (`Count`), `head_coefficients`, `power_coefficients`
   (`list[float]`, shape 6, calibratable, ESP basis), `setting_depth` (`Length`, the shaft
   length), `shaft_friction_loss` (`LinearPower`, >= 0, friction power per metre at 60 Hz),
   `motor_efficiency` (`Efficiency`).
 - **Controls**: `frequency` (`Frequency`). **Boundaries, states**: none.
-- **Outputs**: `flow`, `head` (soft sensor), `pump_power`, `shaft_friction_power`,
-  `shaft_power` (soft sensor), `efficiency` (`Dimensionless`, `Q H / P_pump`, zero below 0.1 W,
-  not bounded by one), `electricity`.
+- **Outputs**: `head` (soft sensor), `pump_power`, `shaft_friction_power`, `shaft_power` (soft
+  sensor), `efficiency`.
 - **Model**: `H` and `P_pump` as `ESP`; `P_friction = shaft_friction_loss * setting_depth * f /
   60 Hz` (constant bearing friction torque, the form of manufacturer line-shaft friction
-  tables; ANSI/HI 2.3); `P_shaft = P_pump + P_friction`, `electricity = P_shaft /
+  tables; ANSI/HI 2.3); `P_shaft = P_pump + P_friction`, `power_in = P_shaft /
   motor_efficiency`; `discharge.T = suction.T`.
 - **Physics**: `energy.input_power`, `pumps.head`, `pumps.line_shaft_friction_power`, `pumps.power`,
   `pumps.pump_efficiency`, `pumps.speed_ratio`
@@ -275,19 +276,17 @@ assert out.shaft_friction_power == 1250.0 and round(out.electricity) == 119635
 Electric compressor for the non-condensable gas from a `Degasser` or `Separator`, with equal
 intercooled stages.
 
-- **Ports**: `fluid_in` -> `fluid_out`. `m_dot` is the gas mass flow; the stream's `fluid` is
-  passed through and its liquid property model is not used.
+- **Ports**: `fluid_in`, `power_in` (power) -> `fluid_out`, `loss_out` (power).
 - **Parameters**: `isentropic_efficiency` (`Efficiency`, calibratable, required; typically
   0.7 to 0.85), `heat_capacity_ratio` (`Ratio`, > 1, required), `gas_specific_heat`
   (`SpecificHeat`, required; CO2 about 846 J/kg/K at 300 K), `stage_count` (`Count`, default
   1), `motor_efficiency` (`Efficiency`, required).
 - **Controls**: `pressure_setpoint` (`Pressure`, the discharge pressure).
-- **Outputs**: `pressure_ratio`, `shaft_power` (soft sensor), `electricity`, `fluid_out_T`
-  (soft sensor), `heat_loss`.
+- **Outputs**: `pressure_ratio`, `shaft_power` (soft sensor).
 - **Model** (`modules/pumps/_physics.py`; GPSA Engineering Data Book, 14th ed., Section 13, Z = 1):
   `r = pressure_setpoint / p_s`, stage ratio `r^(1/N)`,
   `T_2 = T_1 + T_1 (r^((k-1)/(k N)) - 1) / eta_s`, `P_shaft = m_dot N cp (T_2 - T_1)`,
-  `electricity = P_shaft / eta_motor`, `heat_loss = electricity - P_shaft / N` (intercooler
+  `power_in = P_shaft / eta_motor`, `loss_out = electricity - P_shaft / N` (intercooler
   duty plus motor loss). The gas leaves the last stage at `T_2` (no aftercooler).
 - **Physics**: `compression.heat_rejected`, `compression.overall_pressure_ratio`,
   `compression.shaft_power`, `compression.specific_compression_work`,
@@ -295,7 +294,7 @@ intercooled stages.
 - **Assumptions and validity**: ideal gas with constant `k` and `cp`, perfect intercooling to
   the suction temperature without pressure loss; stage ratios up to about 4. A setpoint below
   the suction pressure or reverse flow raises `PhysicsError`; zero flow draws no power.
-- **Energy audit**: closed in gas enthalpy, `electricity = m_dot cp (T_2 - T_1) + heat_loss`
+- **Energy audit**: closed in gas enthalpy, `power_in = m_dot cp (T_2 - T_1) + loss_out`
   (tested). `energy_balance` values streams with the liquid `cp_l`, so its residual
   `m_dot (T_2 - T_1) (cp - cp_l)` is not meaningful here.
 
@@ -324,7 +323,7 @@ The pipe and the valve model a single-phase liquid in the forward direction: a f
 Surface pipeline with wall friction, an elevation change and heat exchange with its
 surroundings.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in`, `air_in` -> `fluid_out`, `loss_out` (power).
 - **Parameters**:
   - `length` (`Length`, > 0, required), including the equivalent length of fittings.
   - `inner_diameter` (`Length`, > 0, required).
@@ -332,10 +331,8 @@ surroundings.
   - `elevation_change` (`Elevation`, signed, required): outlet minus inlet height.
   - `heat_transfer_coefficient` (`HeatTransferCoefficient`, required): overall coefficient on the inner wall
     area `pi d L`, the convention of the well path model.
-- **Boundaries**: `ambient_temperature` (`Temperature`, required).
-- **Outputs**: `pressure_drop` (friction plus static head; negative for a descending pipe at
-  low flow), `velocity`, `fluid_out_T`, `heat_loss`, `heat_absorbed` (nonnegative; the one that
-  applies is nonzero).
+- **Boundaries**: none; the air comes through `air_in`.
+- **Outputs**: `pressure_drop`, `velocity`.
 - **Model**:
   - `v = m_dot / (rho pi d^2 / 4)`, `Re = rho v d / mu`;
   - friction `f L/d rho v^2 / 2`: laminar `f = 64/Re` up to Re = 2300, Swamee–Jain (1976) from
@@ -364,9 +361,9 @@ pipe = Pipe().update_params(
     length="1500 m", inner_diameter="0.125 m", elevation_change="12 m", heat_transfer_coefficient="0.8 W/m2/K"
 )
 supply = gm.Stream(flow="40 m3/h", T="80 C", p="6 bar")
-result = pipe(fluid_in=supply, ambient_temperature="10 C")
+result = pipe(fluid_in=supply, air_in=gm.modules.Atmosphere.ambient_air("10 degC"))
 assert round(result.outputs.get("pressure_drop", unit="bar"), 3) == 2.134
-assert round(result.outputs.heat_loss) == 32821
+assert round(result.outlets.loss_out) == 32821
 assert energy_balance(pipe, result)["relative_residual"] < 1e-12
 ```
 
@@ -381,7 +378,7 @@ Control valve; isenthalpic, so the temperature is unchanged.
   (`Ratio`, > 1, default 50), both typical for globe control valves (Emerson, Control Valve
   Handbook, 5th ed., 2017).
 - **Controls**: `opening` (`Fraction`).
-- **Outputs**: `pressure_drop`, `effective_flow_coefficient` (0 when closed).
+- **Outputs**: `pressure_drop`, `effective_flow_coefficient`.
 - **Model**: IEC 60534-2-1:2011 non-choked turbulent liquid flow, `dp = (rho / 1000) (q /
   Kv_eff)^2` with `q = m_dot / rho`; inherent characteristic (IEC 60534-2-4) with `Phi_0 = 1/R`:
   linear `Phi_0 + (1 - Phi_0) h`, equal percentage `R^(h - 1)`; `Kv_eff = Phi(h) Kv` for
@@ -433,7 +430,7 @@ assert branches.outlets.branch2_out.m_dot == 3.0 and branches.outlets.branch1_ou
 Adiabatic junction mixing two streams of the same fluid.
 
 - **Ports**: `branch1_in`, `branch2_in` -> `fluid_out`.
-- **Outputs**: `fluid_out_T`, `pressure_imbalance` (`|p_1 - p_2|`, the pressure discarded).
+- **Outputs**: `pressure_imbalance`.
 - **Model**: `m = m_1 + m_2`, `T = (m_1 cp_1 T_1 + m_2 cp_2 T_2) / (m_1 cp_1 + m_2 cp_2)`,
   `p = min(p_1, p_2)`. A junction has one pressure: in the real network the higher branch is
   throttled by its own resistance, which a sequential model cannot represent, and the lower
@@ -452,20 +449,9 @@ from gemini.modules import Mixer
 hot = gm.Stream(flow="40 m3/h", T="80 C", p="6 bar")
 cold = gm.Stream(flow="10 m3/h", T="40 C", p="5.5 bar")
 mixed = Mixer()(branch1_in=hot, branch2_in=cold)
-assert round(mixed.outputs.mixed_out_T - 273.15, 6) == 72.0
+assert round(mixed.outlets.fluid_out.T - 273.15, 6) == 72.0
 assert mixed.outlets.fluid_out.p == 5.5e5 and mixed.outputs.pressure_imbalance == 5e4
 ```
-
-### GasGrid
-
-Fuel source of a burner without co-produced gas: `grid.fluid_out` to `boiler.fuel_in`.
-
-- **Ports**: `fluid_out` (gas), no inlet.
-- **Parameters**: `composition` (mole fractions, default `gas.GRID_COMPOSITION`, a published grid
-  analysis).
-- **Model**: the outlet carries no flow at normal conditions and marks that the burner may draw grid
-  gas: purchased gas enters no stream, the burner reports it.
-- **Energy audit**: closed.
 
 ### GasMakeup
 
@@ -480,9 +466,7 @@ Pressure-maintenance (expansion) vessel that holds a closed circuit at its press
 
 - **Ports**: `fluid_in` -> `fluid_out`.
 - **Controls**: `pressure_setpoint` (`Pressure`, > 0).
-- **Outputs**: `pressure_correction`: setpoint minus inlet pressure; positive is pressure the
-  station adds, negative pressure it relieves. A persistent large value flags a loop pressure
-  profile that does not match the design.
+- **Outputs**: `pressure_correction`.
 - **Model**: the outlet leaves at `pressure_setpoint` with the inlet flow, temperature and
   fluid. Stateless by decision: at hourly or 15-minute steps the vessel holds its setpoint, and
   a water-volume state would change the vessel level but no circuit pressure or temperature.
@@ -538,7 +522,7 @@ Separates a share of the free gas carried by the brine and applies the vessel pr
   example plant), `heat_transfer_coefficient` (default 0, read only by the legacy import and
   export), `separation_efficiency` (`Fraction`, default 0;
   no industry-typical value, set it from design data or a measured gas flow).
-- **Outputs**: `gas_mass_flow`, `pressure_drop` (soft sensors).
+- **Outputs**: `pressure_drop` (soft sensor).
 - **Model**: with `eta = separation_efficiency` and `x = inlet.fluid.gas_mass_fraction`:
   `gas.m_dot = eta x m_dot`, `liquid.m_dot = m_dot - gas.m_dot`, liquid gas fraction
   `(1 - eta) x / (1 - eta x)`; both outlets at `outlet_pressure` (or `p_in - nominal_pressure_drop`) and the inlet
@@ -572,8 +556,7 @@ Systems and Equipment, "Cooling Towers").
 - **Ports**: `fluid_in` -> `fluid_out`, `waste_out`.
 - **Controls**: `blowdown_fraction` (`Fraction`, required): share of the feed sent to drain;
   for make-up `M` at `C` cycles of concentration it is `M / C`.
-- **Outputs**: `blowdown_mass_flow`. No `heat_loss`: the drained stream carries its enthalpy
-  out of the plant through its port.
+- **Outputs**: none.
 - **Model**: `waste_out.m_dot = f m_dot`, `fluid_out.m_dot = m_dot - f m_dot`, both at
   feed T, p and fluid.
 - **Physics**: `separation.split_flow`
@@ -593,13 +576,13 @@ assert bled.outputs.blowdown_mass_flow == 0.4 and bled.outlets.fluid_out.m_dot =
 
 Hydrocyclone sand separator ahead of heat exchangers and injection.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in` -> `fluid_out`, `waste_out`.
 - **Parameters** (all required, design specific): `separation_efficiency` (`Fraction`, lumped
   removal share of the sand mass), `nominal_pressure_drop` (`PressureDifference`, >= 0, of the order of
   1 bar) at `nominal_mass_flow` (`MassFlow`, > 0).
 - **Boundaries**: `sand_concentration` (`MassConcentration`, kg of sand per m3 of liquid,
   accepted as `"20 mg/l"` or `"20 g/m3"`).
-- **Outputs**: `pressure_drop`, `sand_removal_rate` (soft sensors),
+- **Outputs**: `pressure_drop` (soft sensor), `sand_removal_rate` (soft sensor),
   `residual_sand_concentration`.
 - **Model**: `Q = m_dot (1 - x_gas) / rho`, `sand_removal_rate = eta c Q`, residual `(1 - eta)
   c`, `pressure_drop = nominal_pressure_drop (m_dot / nominal_mass_flow)^2`.
@@ -627,14 +610,13 @@ assert result.outputs.get("pressure_drop", unit="bar") == 1.0
 
 Scale or corrosion inhibitor injection proportional to the treated flow.
 
-- **Ports**: `fluid_in` -> `fluid_out` (stream unchanged).
+- **Ports**: `fluid_in`, `chemical_in` -> `fluid_out`.
 - **Parameters**: `product_concentration` (`Fraction`, > 0, required): active share of the
   commercial product.
 - **Controls**: `dose` (`Fraction`): product mass per treated mass, accepted as `"10 ppm"`;
   typical geothermal scale-inhibitor doses are a few to some tens of ppm (Gallup 2009,
   *Geothermics* 38, 326-334).
-- **Outputs**: `product_mass_flow = dose m_dot`, `active_mass_flow = product_concentration
-  product_mass_flow`.
+- **Outputs**: `active_mass_flow`.
 - **Physics**: `separation.dosing_flows`
 - **Assumptions**: the dosed mass is not added to the stream (it is below flowmeter
   resolution, and adding it would need a product inlet), so the neglected mass is
@@ -653,48 +635,17 @@ assert round(result.outputs.product_mass_flow, 12) == 4e-4
 assert round(result.outputs.active_mass_flow, 12) == 1.2e-4
 ```
 
-### Vent
-
-Vent stack or flare releasing separated non-condensable gas, with CO2 and methane emissions.
-
-- **Ports**: `fluid_in` -> `fluid_out`: the gas as released at the stack or flare tip, upstream of
-  combustion, so mass and energy leave the plant through a port.
-- **Parameters**: `mode` (`"vent"` or `"flare"`, required), `co2_mass_fraction` (`Fraction`,
-  required, from a gas analysis), `methane_mass_fraction` (`Fraction`, default 0, the
-  combustible share treated as methane), `heating_value` (`SpecificEnthalpy`, default
-  50.0 MJ/kg, methane LHV from the NIST Chemistry WebBook), `combustion_efficiency`
-  (`Efficiency`, default 0.98, US EPA AP-42, 5th ed., section 13.5).
-- **Outputs**: `vented_mass_flow`, `co2_emission`, `methane_emission` (`MassFlow`), `fuel`,
-  `heat_loss` (zero when venting).
-- **Model**: burnt methane `m_b = eta_c x_CH4 m` when flaring; `co2_emission = x_CO2 m + m_b
-  M_CO2 / M_CH4`; `methane_emission = x_CH4 m - m_b`; `fuel = heat_loss = m_b heating_value`.
-- **Physics**: `combustion.flare_emissions`
-- **Assumptions and validity**: H2S and other combustibles are not burnt; the inert rest
-  passes. `co2_mass_fraction + methane_mass_fraction > 1` raises `ValidationError`; reverse
-  flow raises `PhysicsError`.
-- **Energy audit**: closed.
-
-```python
-import gemini as gm
-from gemini.modules import Vent
-
-vent = Vent().update_params(mode="flare", co2_mass_fraction=0.85, methane_mass_fraction=0.1)
-flared = vent(fluid_in=gm.Stream(m_dot=0.076, T="80 C", p="4.85 bar"))
-assert round(flared.outputs.co2_emission, 6) == 0.085032
-assert round(flared.outputs.get("heat_loss", unit="kW"), 1) == 372.4
-```
-
 ### Flare
 
 Burns the gas that reaches it; the gas leaves the plant here.
 
-- **Ports**: `fluid_in` (gas), no outlet.
+- **Ports**: `gas_in` -> `flue_out`, `loss_out` (power).
 - **Parameters**: `combustion_efficiency` (default 0.98, US EPA AP-42 section 13.5).
-- **Outputs**: `burned_mass_flow`, `co2_emission`, `methane_emission` (kg/s).
+- **Outputs**: `burned_mass_flow`, `fuel`.
 - **Model**: from the composition of the stream, `co2_emission = m (x_CO2 + eta f_CO2)` with
   `f_CO2` the CO2 complete combustion forms per kg of gas, `methane_emission = m x_CH4 (1 - eta)`.
 - **Physics**: `combustion.burnt_gas_emissions`, `gas.mass_fraction`, `gas.combustion_co2`
-- **Assumptions**: a stream without a composition emits nothing. A `Vent` with `mode="flare"` burns
+- **Assumptions**: a stream without a composition emits nothing. A `Flare` burns
   by mass-fraction parameters; both end in the stoichiometry of `combustion`.
 - **Energy audit**: closed; the sensible enthalpy of the gas leaves through `burned_mass_flow`.
 
@@ -709,8 +660,9 @@ Two-stream effectiveness-NTU heat exchanger with fouling diagnostics.
   (`"counterflow"` or `"parallel"`, default counterflow), `hot_nominal_pressure_drop`, `cold_nominal_pressure_drop`
   (>= 0, required) at `hot_nominal_mass_flow`, `cold_nominal_mass_flow` (> 0, required),
   `fouling_threshold` (`Fraction`, default 0.15).
-- **Outputs**: `duty`, `effectiveness` (soft sensors), `transfer_units`, `log_mean_temperature_difference`, `hot_out_T`,
-  `cold_out_T`, `hot_pressure_drop`, `cold_pressure_drop`, `approach_temperature`.
+- **Outputs**: `duty` (soft sensor), `effectiveness` (soft sensor), `transfer_units`,
+  `log_mean_temperature_difference`, `hot_out_T`, `cold_out_T`, `hot_pressure_drop`,
+  `cold_pressure_drop`, `approach_temperature`.
 - **Model**: `C_min`, `C_max` from `m_dot cp`; `NTU = UA / C_min`; `heat_transfer.exchanger_balance` takes the effectiveness of the arrangement;
   `duty = eps C_min (T_h,in - T_c,in)`; each side loses `nominal_pressure_drop (m_dot / nominal_mass_flow)^2`.
   A stopped stream transfers nothing.
@@ -743,19 +695,18 @@ assert round(result.outputs.hot_pressure_drop, 6) == 20000
 
 Dry or wet (evaporative) closed-circuit cooler rejecting heat to ambient air.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in`, `air_in`, `power_in` (power) -> `fluid_out`, `air_out`.
 - **Parameters**: `cooler_type` (`"dry"` or `"wet"`), `capacity` (`Power`, > 0), `approach`
   (`TemperatureDifference`, >= 0; typically 5 to 15 K dry and 3 to 8 K wet, ASHRAE Handbook,
   HVAC Systems and Equipment), `specific_fan_power` (`Ratio`, W of fan per W rejected), all
   required; `latent_heat` (default 2.43 MJ/kg, water at about 30 degC, IAPWS-IF97).
 - **Controls**: `temperature_setpoint` (outlet).
-- **Boundaries**: `ambient_temperature` (dry bulb, required), `wet_bulb_temperature`
+- **Boundaries**: the temperature of `air_in` (dry bulb, required), `wet_bulb_temperature`
   (`Temperature | None`, default `None`).
-- **Outputs**: `duty`, `fluid_out_T`, `electricity` (fan), `heat_loss`, `evaporation_rate`
-  (0 for dry), `is_capped`.
+- **Outputs**: `evaporation_rate`, `is_capped`.
 - **Model**: target `max(T_set, T_ref + approach)` with `T_ref` the dry bulb (dry) or wet bulb
-  (wet); `duty = min(m_dot cp max(0, T_in - target), capacity)`; `electricity = sfp duty`;
-  `heat_loss = duty + electricity`; `evaporation_rate = duty / latent_heat` (wet).
+  (wet); `duty = min(m_dot cp max(0, T_in - target), capacity)`; `power_in = sfp duty`;
+  `loss_out = duty + electricity`; `evaporation_rate = duty / latent_heat` (wet).
 - **Physics**: `heat_transfer.fan_power`, `heat_transfer.setpoint_duty`,
   `heat_transfer.temperature_change`, `psychrometrics.evaporation_rate`
 - **Assumptions**: closed circuit (the process stream keeps its mass); the evaporation rate is
@@ -774,7 +725,7 @@ cooler = Cooler().update_params(
 )
 result = cooler(
     fluid_in=gm.Stream(flow="20 kg/s", T="40 C", p="3 bar"), temperature_setpoint="20 C",
-    ambient_temperature="30 C", wet_bulb_temperature="22 C",
+    air_in=gm.modules.Atmosphere.ambient_air("30 degC"), wet_bulb_temperature="22 C",
 )
 assert round(result.outputs.outlet_T - 273.15, 9) == 26.0
 assert round(result.outputs.evaporation_rate, 3) == 0.486
@@ -786,8 +737,7 @@ assert round(result.outputs.evaporation_rate, 3) == 0.486
 
 Electric vapour-compression heat pump; in `cooling` mode it is an electric chiller.
 
-- **Ports**: `source_in` -> `source_out` (evaporator, cooled), `sink_in` -> `sink_out`
-  (condenser, heated).
+- **Ports**: `source_in`, `sink_in`, `power_in` (power) -> `source_out`, `sink_out`.
 - **Parameters**:
   - `mode` (`"heating"` or `"cooling"`, required), `capacity` (`Power`, > 0, required): cap on
     the useful duty.
@@ -805,10 +755,7 @@ Electric vapour-compression heat pump; in `cooling` mode it is an electric chill
     outlet, for example freeze or scaling protection of the evaporator (upstream GEMINI
     `Ts_in_minimum`).
 - **Controls**: `temperature_setpoint`: sink outlet when heating, source outlet when cooling.
-- **Outputs**: `cop` (`None` when off), `useful_duty`, `evaporator_duty`, `condenser_duty`,
-  `electricity`, `temperature_lift`, `is_capped` (limited by capacity or by the minimum source
-  outlet), `is_running`,
-  `source_out_T`, `sink_out_T`.
+- **Outputs**: `cop`, `temperature_lift`, `is_capped`, `is_running`.
 - **Model**: requested duty `C |T_in - T_set|` on the controlled circuit, then
   `refrigeration.part_load_duty`; `COP = eta T_sink_out / max(lift, L)` when heating and
   `eta T_source_out / max(lift, L)` when cooling, at the outlet temperatures. Because
@@ -863,15 +810,13 @@ assert round(result.outputs.cop, 4) == 6.531 and round(result.outputs.electricit
 
 Auxiliary gas boiler heating a stream to a setpoint, burning co-produced gas first.
 
-- **Ports**: `fluid_in` -> `fluid_out` (water); `fuel_in` -> `gas_out` (gas).
+- **Ports**: `fluid_in`, `fuel_in` -> `fluid_out`, `flue_out`, `loss_out` (power).
 - **Parameters** (all required): `capacity` (`Power`, > 0), `efficiency` (`Efficiency`).
 - **Controls**: `temperature_setpoint` (`Temperature`).
-- **Outputs**: `duty`, `fuel_or_power`, `fluid_out_T`, `is_capped`, `heat_loss` (conversion loss), `fuel`
-  (total), `fuel_coproduced`, `fuel_purchased`, `burned_mass_flow` (co-produced gas burned),
-  `co2_emission` (kg/s, formed and carried, of everything burned).
+- **Outputs**: `is_capped`, `fuel`.
 - **Model**: `duty = min(m_dot cp max(0, T_set - T_in), limit)`, `fuel = duty / efficiency`,
-  `heat_loss = fuel - duty`. With `F = fuel_in.m_dot LHV`: `fuel_coproduced = min(fuel, F)`,
-  `fuel_purchased = fuel - fuel_coproduced`; `gas_out` is `fuel_in` less what was burned. `limit` is
+  `loss_out = fuel - duty`. With `F = fuel_in.m_dot LHV`: the burner burns the co-produced gas first and buys the rest
+  through `fuel_in`, which shows what it took. `limit` is
   the `capacity`, and `min(capacity, F efficiency)` on a stream no `GasMakeup` or `GasGrid` marked.
 - **Physics**: `energy.input_power`, `energy.output_power`, `heat_transfer.setpoint_duty`,
   `heat_transfer.temperature_change`, `combustion.fuel_power`, `combustion.fuel_split`,
@@ -895,28 +840,28 @@ assert round(result.outputs.duty) == 843480 and round(result.outputs.fuel) == 93
 
 ### ElectricBoiler
 
-The water side of `Boiler` without gas ports: `electricity = fuel_or_power = duty / efficiency`. It
-has `electricity` and no `fuel` outputs. **Energy audit**: closed.
+The water side of `Boiler` without gas ports: `power_in = fuel_or_power = duty / efficiency`. It
+has `power_in` and no `fuel` outputs. **Energy audit**: closed.
 
 ### CHP
 
-Burns as `Boiler` does: `fuel_in` -> `gas_out`, with `fuel_coproduced`, `fuel_purchased`,
+Burns as `Boiler` does: `fuel_in` shows what it took,
 `burned_mass_flow` and `co2_emission`; on a stream without the grid mark the gas limits the load.
 
 Gas-engine combined heat and power unit heating a water circuit.
 
-- **Ports**: `fluid_in` -> `fluid_out` (water); `fuel_in` -> `gas_out` (gas).
+- **Ports**: `fluid_in`, `fuel_in` -> `fluid_out`, `flue_out`, `power_out` (power), `loss_out`
+  (power).
 - **Parameters**: `electric_capacity` (`Power`, > 0), `electric_efficiency`,
   `thermal_efficiency` (`Efficiency`, full load, LHV; typical gas engines 0.35 to 0.44 and 0.40
   to 0.50), `maximum_outlet_temperature` (`Temperature`), all required;
   `no_load_fuel_fraction` (`Fraction`, < 1, default 0; 0.05 to 0.15 reproduces the half-load
   efficiency drop of a lean-burn engine).
 - **Controls**: `load_fraction` (`Fraction`, 0 is off).
-- **Outputs**: `fuel`, `electricity_generated`, `heat_recovered`, `dumped_heat`, `heat_loss`,
-  `fluid_out_T`.
+- **Outputs**: `fuel`, `dumped_heat`.
 - **Model**: Willans line (Heywood 1988) `F = (P_cap / eta_el) (f0 + (1 - f0) L)` for L > 0;
   `P = L P_cap`; `heat_recovered = min(eta_th F, m_dot cp (T_max - T_in))`; the rest of the
-  engine heat is `dumped_heat`; `heat_loss = F - P - heat_recovered`.
+  engine heat is `dumped_heat`; `loss_out = F - P - heat_recovered`.
 - **Physics**: `combustion.engine_energy_flows`, `combustion.willans_fuel_input`,
   `heat_transfer.setpoint_duty`, `heat_transfer.temperature_change`
 - **Validity**: `electric_efficiency + thermal_efficiency > 1` raises `ValidationError`. No
@@ -936,7 +881,7 @@ result = chp(
     fuel_in=gm.modules.GasGrid()().outlets.fluid_out,
     load_fraction=0.5,
 )
-assert round(result.outputs.fuel) == 1375000 and round(result.outputs.heat_recovered) == 618750
+assert round(result.outputs.fuel) == 1375000
 ```
 
 ## Cooling
@@ -945,9 +890,8 @@ assert round(result.outputs.fuel) == 1375000 and round(result.outputs.heat_recov
 
 Single-effect water/LiBr absorption chiller or heat pump driven by hot water.
 
-- **Ports**: three circuits `generator_in`/`generator_out` (driving hot water, cooled),
-  `chilled_in`/`chilled_out` (evaporator, cooled), `cooling_in`/`cooling_out` (absorber and
-  condenser, heated).
+- **Ports**: `generator_in`, `chilled_in`, `cooling_in`, `power_in` (power) -> `generator_out`,
+  `chilled_out`, `cooling_out`.
 - **Parameters**:
   - `mode` (`"chiller"` or `"heat_pump"`, required), `capacity` (`Power`, > 0, required): cap on
     the useful duty (evaporator duty, or absorber plus condenser heat).
@@ -960,15 +904,12 @@ Single-effect water/LiBr absorption chiller or heat pump driven by hot water.
   - `minimum_driving_temperature` (default 353.15 K): below it at the generator inlet the unit
     is off.
 - **Controls**: `temperature_setpoint`: chilled outlet (chiller) or cooling outlet (heat pump).
-- **Outputs**: `cop`, `useful_duty`, `generator_duty`, `evaporator_duty`,
-  `absorber_condenser_duty`, `electricity`, `driving_temperature_difference` (at the mean
-  circuit temperatures), `is_capped` (short of the request for any reason), the three
-  `<port>_out_T`.
+- **Outputs**: `cop`, `driving_temperature_difference`, `is_capped`.
 - **Model**: characteristic equation `Q_E = s (ddt - ddt_min)`, `ddt = t_G - a t_AC + r t_E`
   at the mean circuit temperatures in degC (Hellmann, Schweigler and Ziegler 1999; Kuehn and
   Ziegler 2005), solved in closed form from the inlets
   (`refrigeration.sorption_evaporator_capacity`); delivered `Q_E` is the least of that, the
-  request and the capacity; `Q_G = Q_E / thermal_cop`, `electricity = aux Q_E`, `Q_AC = Q_G +
+  request and the capacity; `Q_G = Q_E / thermal_cop`, `power_in = aux Q_E`, `Q_AC = Q_G +
   Q_E + electricity`.
 - **Physics**: `heat_transfer.mean_temperature`, `heat_transfer.setpoint_duty`,
   `heat_transfer.temperature_change`, `refrigeration.characteristic_temperature_difference`,
@@ -1000,16 +941,15 @@ assert round(result.outputs.evaporator_duty) == 247643 and result.outputs.is_cap
 
 Silica-gel/water adsorption chiller driven by hot water of 55 to 90 degC; a chiller only.
 
-- **Ports**: the three circuits of `AbsorptionUnit` (the cooling circuit serves the adsorbing
-  bed and the condenser).
+- **Ports**: `generator_in`, `chilled_in`, `cooling_in`, `power_in` (power) -> `generator_out`,
+  `chilled_out`, `cooling_out`.
 - **Parameters**: `capacity` (cap on the evaporator duty), the four fitted characteristic
   coefficients and `auxiliary_power_ratio` (pumps, valves, controls), all required;
   `thermal_cop` (default 0.55; Wang and Oliveira 2006, Prog. Energy Combust. Sci. 32,
   424-458, report 0.5 to 0.6); `minimum_driving_temperature` (default 328.15 K, off below it);
   `maximum_driving_temperature` (default 363.15 K).
 - **Controls**: `temperature_setpoint` (chilled outlet).
-- **Outputs**: `cop`, `generator_duty`, `evaporator_duty`, `adsorber_condenser_duty`,
-  `electricity`, `driving_temperature_difference`, `is_capped`, the three `<port>_out_T`.
+- **Outputs**: `cop`, `driving_temperature_difference`, `is_capped`.
 - **Model**: the closed-form characteristic equation of `AbsorptionUnit` with the adsorption
   machine's own coefficients; cycle-averaged duties, which suit steps much longer than the
   batch cycle.
@@ -1041,8 +981,7 @@ assert round(result.outputs.evaporator_duty) == 45733 and round(result.outputs.c
 
 ## Subsurface
 
-Ground and aquifer heat that enters a circuit is `heat_absorbed` and heat given to them is
-`heat_loss`: the ground is the plant's environment.
+Ground and aquifer heat is `loss_out`, signed: the ground is the plant's environment.
 
 ### ProductionReservoir and InjectionReservoir
 
@@ -1050,7 +989,7 @@ The aquifer supplying the production well and the one receiving the injected bri
 open boundaries: `mass_balance` and `energy_balance` count the production rate as a source and
 the injected stream as a sink.
 
-- **Ports**: `ProductionReservoir` emits `sandface`; `InjectionReservoir` takes `sandface`.
+- **Ports**: none -> `sandface_out`.
 - **Parameters**: `pressure` (calibratable), `temperature`, `permeability`, `aquifer_thickness`
   (> 0), `drainage_radius` (0 leaves the radial diagnostics unavailable), `top_depth`,
   `wellbore_radius` (> 0), all required; `productivity_index` (required by the production
@@ -1058,9 +997,9 @@ the injected stream as a sink.
   `ProductivityIndex | None` in m3/s/Pa, calibratable; `skin` (default 0, calibratable);
   `decline_threshold` (default 0.15); `role` (fixed by the class).
 - **Controls**: `ProductionReservoir.production_rate` (`MassFlow`, >= 0).
-- **Outputs**: `bottomhole_pressure` (soft sensor), `drawdown` (production), `overpressure`
-  (injection), `flow_pressure_drop`, `skin_pressure_drop`, `radial_bottomhole_pressure` (`None` without a drainage
-  radius), `hydrostatic_pressure_drop`.
+- **Outputs**: `bottomhole_pressure` (soft sensor), `drawdown`, `overpressure`,
+  `flow_pressure_drop`, `skin_pressure_drop`, `hydrostatic_pressure_drop`,
+  `radial_bottomhole_pressure`, `liquid_flow`.
 - **Model**: linear IPR `p_bh = p_res - Q / PI` (production) and `p_bh = p_res + Q / II`
   (injection); radial Darcy diagnostics through `hydraulics.radial_pressure_drops`.
 - **Physics**: `diagnostics.below_limit`, `diagnostics.bounded_score`,
@@ -1092,14 +1031,14 @@ assert round(source.outputs.drawdown / 1e5, 6) == 7.2
 Production temperature decline of a balanced doublet once the cooled region around the
 injector reaches the producer; placed between a `ProductionReservoir` sandface and the well.
 
-- **Ports**: `fluid_in` (reservoir stream at the reservoir temperature) -> `fluid_out`.
+- **Ports**: `fluid_in` -> `fluid_out`.
 - **Parameters** (all required site data): `well_spacing` (L), `aquifer_thickness` (H),
   `porosity` (in (0, 1)), `rock_volumetric_heat_capacity` ((rho c)_r). The fluid (rho c)_w
   comes from the inlet stream.
 - **Boundaries**: `injection_temperature`.
 - **States**: `injected_volume` (`Volume`, default 0), advanced by `V + Q dt` (exact for a
   constant flow).
-- **Outputs**: `breakthrough_time` (`None` at zero flow), `temperature_drop`, `fluid_out_T`.
+- **Outputs**: `breakthrough_time`, `temperature_drop`.
 - **Model**: `(rho c)_a = phi (rho c)_w + (1 - phi) (rho c)_r`; breakthrough volume
   `V_B = pi L^2 H (rho c)_a / (3 (rho c)_w)` (Gringarten and Sauty 1975, J. Geophys. Res.
   80(35), 4956-4962); the dipole streamline at angle theta arrives cold when `V / V_B = 3 (sin
@@ -1135,14 +1074,13 @@ assert round(result.outputs.temperature_drop, 2) == 20.98
 Shallow closed-loop borehole field (ground-source heat pump field or BTES) with a lumped mean
 ground temperature.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in` -> `fluid_out`, `loss_out` (power).
 - **Parameters** (all required): `borehole_count` (N), `borehole_depth` (H), `borehole_radius`
   (r_b, typically 0.055 to 0.075 m), `borehole_spacing` (s, square cells),
   `borehole_resistance` (`LinearThermalResistance`, calibratable), `ground_conductivity`
   (calibratable), `ground_volumetric_heat_capacity`, `undisturbed_ground_temperature` (T_u).
 - **States**: `ground_temperature_change` (theta, default 0) of the field volume `N s^2 H`.
-- **Outputs**: `heat_extraction_rate` (signed, positive from the ground), `fluid_mean_temperature`,
-  `ground_temperature`, `fluid_out_T`, `heat_absorbed`, `heat_loss`.
+- **Outputs**: `fluid_mean_temperature`, `ground_temperature`.
 - **Model**: cell radius `r_e = s / sqrt(pi)` and steady-flux resistance R_sf
   (`ground.steady_flux_resistance`, Hellstrom 1991); `UA = N H / (R_b + R_sf)`,
   `eps = 1 - exp(-UA / (m_dot cp))`, `Q = eps m_dot cp (T_g - T_in)`; the field exchanges with
@@ -1178,12 +1116,12 @@ assert round(state["ground_temperature_change"], 3) == -0.769
 
 Deep coaxial closed-loop heat exchanger in a linear geothermal gradient (steady).
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in` -> `fluid_out`, `loss_out` (power).
 - **Parameters** (all required): `borehole_depth`, `surface_temperature`, `geothermal_gradient`
   (`TemperatureGradient`, accepts `"30 K/km"`), `ground_conductivity` (calibratable),
   `ground_diffusivity`, `borehole_radius`, `borehole_resistance` (calibratable),
   `operating_time` (`Duration`, seconds).
-- **Outputs**: `heat_extraction_rate` (signed), `fluid_out_T`, `heat_absorbed`, `heat_loss`.
+- **Outputs**: none.
 - **Model**: the fluid flows down the annulus and returns through an insulated centre pipe;
   `R = R_b + f(t) / (2 pi k)` with Ramey's `f(t) = ln(2 sqrt(alpha t) / r_b) - gamma/2`
   (Ramey 1962, J. Pet. Technol. 14(4), 427-435); Ramey's steady profile with `A = m_dot cp R`
@@ -1215,14 +1153,14 @@ Wells traversing a geothermal `PipePath` with the original GEMINI DPDT equations
 Swamee–Jain friction, Beggs–Brill two-phase flow and explicit heat loss
 (`hydraulics.pipe_path_profile`).
 
-- **Ports**: `ProductionWell` `bottom_in` -> `wellhead_out`; `InjectionWell` `wellhead` -> `bottom`.
+- **Ports**: `bottom_in` -> `wellhead_out`, `loss_out` (power).
 - **Parameters**: `pipe_path` (`geometry.PipePath`, required), `soil_temperature` (required),
   `heat_transfer_coefficient` (default 10 W/m2/K, calibratable), `correction_factors` (affine pressure
   correction, default `(1, 0)`, calibratable), `friction_correlation` (`"darcy_weisbach"`),
   `two_phase_friction_correlation` (`"BeggsBrill"`). The production well adds `segment` (`"full"`,
   `"below_esp"`, `"above_esp"`, default full) and `esp_depth` (default `None`).
-- **Outputs**: wellhead (production) or bottomhole (injection) pressure and temperature,
-  `friction_pressure_drop`, `gravity_pressure_drop`, `section_pressure`, `section_temperature`, `heat_loss`.
+- **Outputs**: `friction_pressure_drop`, `gravity_pressure_drop`, `section_pressure`,
+  `section_temperature`.
 - **Model**: see [physics.md](physics.md) and [refactor-notes.md](refactor-notes.md); the
   injection traversal uses the legacy negative flow internally, while its ports keep the
   incoming sign. Helpers: `intake_conditions`, `wellhead_from_discharge`,
@@ -1230,7 +1168,7 @@ Swamee–Jain friction, Beggs–Brill two-phase flow and explicit heat loss
 - **Physics**: `fluid.heat_capacity_rate`, `heat_transfer.heat_rate`,
   `hydraulics.affine_correction`, `hydraulics.corrosion_profile`, `hydraulics.erosion_check`,
   `hydraulics.pipe_path_profile`
-- **Energy audit**: closed; `heat_loss` is signed here (negative when the soil heats the brine).
+- **Energy audit**: closed; `loss_out` is signed here (negative when the soil heats the brine).
 
 ```python
 import math
@@ -1244,7 +1182,7 @@ path = PipePath(sections=[vertical])
 well = ProductionWell().update_params(pipe_path=path, soil_temperature="40 C")
 result = well(bottom_in=gm.Stream(m_dot=40, T="80 C", p="180 bar"))
 assert round(result.outputs.gravity_pressure_drop / 1e5, 2) == 147.15
-assert round(result.outputs.heat_loss) == 376991
+assert round(result.outlets.loss_out) == 376991
 ```
 
 ## Storage
@@ -1253,16 +1191,15 @@ assert round(result.outputs.heat_loss) == 376991
 
 Fully mixed hot or chilled water tank with a charge and a discharge circuit.
 
-- **Ports**: `charge_in` -> `charge_out`, `discharge_in` -> `discharge_out`.
+- **Ports**: `charge_in`, `discharge_in`, `air_in` -> `charge_out`, `discharge_out`, `loss_out`
+  (power).
 - **Parameters**: `service` (`"hot"` or `"chilled"`, the sign of the reported energies),
   `volume` (> 0), `heat_loss_conductance` (UA to ambient), `reference_temperature` (zero of
   `stored_energy`), all required; `charge_effectiveness`, `discharge_effectiveness`
   (`Fraction`, default 1, a direct connection).
-- **Boundaries**: `ambient_temperature`.
+- **Boundaries**: the temperature of `air_in`.
 - **States**: `temperature` (default 293.15 K).
-- **Outputs**: `tank_temperature` (start of step), `stored_energy`, `charge_duty`,
-  `discharge_duty` (negative when the circuit works against the service),
-  `heat_accumulation` (signed), `heat_loss`, `heat_absorbed`.
+- **Outputs**: `tank_temperature`, `stored_energy`, `heat_accumulation`.
 - **Model**: tank content `module.fluid`, `C = rho cp V`; circuit `i` transfers `Q_i = e_i C_i
   (T_i,in - T)` and leaves at `T_i,in - e_i (T_i,in - T)`; `Q_amb = UA (T - T_amb)`;
   `C dT/dt = Q_c + Q_d - Q_amb` (Duffie and Beckman 2013, section 8.3) solved exactly over `dt`
@@ -1282,7 +1219,6 @@ from gemini.modules import ThermalStorage
 tank = ThermalStorage().update_params(
     service="hot", volume="20 m3", heat_loss_conductance="15 W/K", reference_temperature="40 C"
 )
-tank.ambient_temperature = "15 C"
 charge = gm.Stream(flow="10 m3/h", T="80 C", p="3 bar")
 discharge = gm.Stream(flow="5 m3/h", T="45 C", p="3 bar")
 state = {"temperature": gm.units.convert(60, "degC", "K")}
@@ -1296,7 +1232,7 @@ assert round(state["temperature"] - 273.15, 3) == 64.375
 Lumped ice-on-coil or encapsulated ice store on one glycol circuit, for state-of-charge
 tracking.
 
-- **Ports**: `fluid_in` -> `fluid_out` (glycol).
+- **Ports**: `fluid_in` -> `fluid_out`.
 - **Parameters**: `water_mass` (`Mass`, > 0), `thermal_conductance` (coil, > 0), both required; `latent_heat`
   (default 333.55 kJ/kg; IAPWS R10-06 gives 333.44 at the triple point),
   `freezing_temperature` (default 273.15 K), `water_specific_heat` (default 4219.9 J/kg/K,
@@ -1304,8 +1240,7 @@ tracking.
 - **States**: `ice_fraction` (default 0) and `temperature` (default 273.15 K): at the freezing
   temperature while partly frozen, above it only with no ice, below it only fully frozen;
   anything else raises `ValidationError`.
-- **Outputs**: `stored_cold = M L x`, `duty` (heat from the glycol into the store; negative
-  while charging), `fluid_out_T`, `is_full`, `is_empty`.
+- **Outputs**: `stored_cold`, `heat_accumulation`, `is_full`, `is_empty`.
 - **Model**: `e = 1 - exp(-UA / (m_dot cp))` against a uniform store; `duty = e C (T_in - T)`;
   an exact piecewise enthalpy integration crosses at most three segments (sensible liquid,
   latent, sensible ice) per step.
@@ -1335,9 +1270,7 @@ assert round(state["ice_fraction"], 4) == 0.1269 and not result.outputs.is_full
 Aquifer thermal energy storage (ATES) well pair with a warm and a cold store. Ground heat is counted
 as in [Subsurface](#subsurface).
 
-- **Ports**: `injection_in` -> `production_out`: the balanced pair produces the injected mass
-  flow, pressure and fluid at the temperature of the store produced from (the aquifer
-  temperature when idle). Well hydraulics belong to well modules.
+- **Ports**: `injection_in` -> `production_out`, `loss_out` (power).
 - **Parameters**: `aquifer_temperature`, `aquifer_thickness` (H), `porosity`,
   `rock_volumetric_heat_capacity`, `ground_conductivity` (calibratable as an effective value),
   all required; `storage_period` (`Duration`, default 182.625 days, one season).
@@ -1345,9 +1278,8 @@ as in [Subsurface](#subsurface).
   (produce from warm, inject into cold), `"idle"` (requires zero flow).
 - **States** (all default 0): `warm_volume`, `cold_volume`, `warm_temperature_change`,
   `cold_temperature_change` (theta = T - T_aq), `charged_heat`, `recovered_heat`.
-- **Outputs**: `stored_energy` (cold store counts negative), `production_out_T`,
-  `recovery_efficiency` (`None` until heat was charged), `warm_temperature`,
-  `cold_temperature`, `heat_loss`, `heat_absorbed`.
+- **Outputs**: `stored_energy`, `recovery_efficiency`, `warm_temperature`, `cold_temperature`,
+  `heat_accumulation`.
 - **Model**: fully mixed stores of excess heat `(rho c)_w V theta` in a cylinder of height H;
   losses `UA = 2 k A / sqrt(pi alpha t_p)` over the envelope `A = 2 pi R (R + H)`
   (`ground.cylinder_store_conductance`, Carslaw and Jaeger 1959; Bloemendal and Hartog 2018,
@@ -1393,7 +1325,7 @@ parent cannot run under `gm.no_outputs()`.
   (default 0). Times are SI seconds; text such as `"15 min"` converts.
 - **Controls**: `setpoint`. **Boundaries**: `measurement` (both `Dimensionless`).
 - **States**: `integral` (default 0), `previous_error`, `previous_step` (default `None`).
-- **Outputs**: `error`, `command`, `is_saturated` (the command was clamped).
+- **Outputs**: `error`, `command`, `is_saturated`.
 - **Model**: `e = setpoint - measurement` for `"reverse"` (a heating valve), the opposite for
   `"direct"`; `u = clamp(K e + I + D)` with `D = K Td (e - e_prev) / h_prev` and
   `I += K h / Ti e` (Astrom and Hagglund 2006, *Advanced PID Control*, chapter 3). The command
@@ -1425,14 +1357,13 @@ assert state == {"integral": 0.75, "previous_error": 5.0, "previous_step": 900.0
 
 Binary organic Rankine cycle plant heated by brine, with an air-cooled condenser.
 
-- **Ports**: `fluid_in` -> `fluid_out`.
+- **Ports**: `fluid_in`, `air_in` -> `fluid_out`, `power_out` (power), `loss_out` (power).
 - **Parameters** (all required): `minimum_brine_outlet_temperature`, `pinch` (>= 0),
   `carnot_fraction` (`Efficiency`; operating plants about 0.3 to 0.6, DiPippo 2004),
   `condenser_approach` (>= 0), `parasitic_fraction` (`Fraction`, < 1), `capacity` (gross).
-- **Boundaries**: `ambient_temperature` (condenser air).
-- **Outputs**: `heat_input`, `gross_power`, `parasitic_power`, `electricity_generated` (net),
-  `condenser_duty`, `heat_loss` (condenser duty plus parasitic power), `thermal_efficiency`
-  (`None` without heat input), `condensing_temperature`, `fluid_out_T`, `is_capped`.
+- **Boundaries**: the temperature of `air_in` (condenser air).
+- **Outputs**: `gross_power`, `parasitic_power`, `condenser_duty`, `thermal_efficiency`,
+  `condensing_temperature`, `is_capped`.
 - **Model**: `T_c = T_amb + approach`; design outlet `T_out = max(T_min, T_c + pinch)`;
   working-fluid temperatures `T_a = T_in - pinch`, `T_b = T_out - pinch`; Lorenz work `W_rev =
   Q (1 - T_c ln(T_a/T_b) / (T_a - T_b))`; gross `= fraction W_rev` (DiPippo 2007, Geothermics 36,
@@ -1441,7 +1372,7 @@ Binary organic Rankine cycle plant heated by brine, with an air-cooled condenser
   `power_cycles.cycle_design`, `power_cycles.plant_balance`
 - **Assumptions and validity**: single-phase brine, constant efficiency at part load, bypass
   control. The parasitic load is supplied from the generator, so it is `parasitic_power`, not
-  `electricity`. An inlet no hotter than `T_out` produces nothing.
+  `power_in`. An inlet no hotter than `T_out` produces nothing.
 - **Energy audit**: closed.
 
 ```python
@@ -1452,8 +1383,8 @@ orc = ORC().update_params(
     minimum_brine_outlet_temperature="70 degC", pinch=5, carnot_fraction=0.5,
     condenser_approach=15, parasitic_fraction=0.15, capacity="5 MW",
 )
-result = orc(fluid_in=gm.Stream(m_dot=100, T="150 degC", p="10 bar"), ambient_temperature="15 degC")
-assert round(result.outputs.get("electricity_generated", unit="MW"), 3) == 2.801
+result = orc(fluid_in=gm.Stream(m_dot=100, T="150 degC", p="10 bar"), air_in=gm.modules.Atmosphere.ambient_air("15 degC"))
+assert round(result.outlets.power_out / 1e6, 3) == 2.801
 assert result.outlets.fluid_out.T == 343.15
 ```
 
@@ -1462,10 +1393,9 @@ assert result.outlets.fluid_out.T == 343.15
 Two-phase flash separator for liquid-dominated reservoirs (DiPippo 2016, *Geothermal Power
 Plants*, 4th ed., section 5.2).
 
-- **Ports**: `fluid_in` (pressurised liquid) -> `liquid_out` (saturated brine), `gas` (dry saturated
-  steam, fluid `STEAM`).
+- **Ports**: `fluid_in` -> `liquid_out`, `gas_out`.
 - **Controls**: `pressure_setpoint` (> 0), the separator pressure.
-- **Outputs**: `steam_fraction`, `steam_mass_flow`, `saturation_temperature`.
+- **Outputs**: `steam_fraction`, `saturation_temperature`.
 - **Model**: `h_in` from IF97 region 1 at `max(p_in, p_sat(T_in))` and `T_in`; `x = (h_in -
   h_f) / h_fg` at the setpoint (`steam.flash_fraction`, zero when subcooled); both outlets at
   the setpoint and `T_sat` (a subcooled liquid keeps its temperature).
@@ -1492,13 +1422,11 @@ assert separated.outlets.gas_out.fluid.kind == "steam"
 
 Single-flash condensing steam turbine with generator and condenser.
 
-- **Ports**: `fluid_in` (dry saturated steam, fluid kind `"steam"`) -> `fluid_out` (condensate,
-  `WATER` at the condenser saturation state).
+- **Ports**: `fluid_in` -> `fluid_out`, `power_out` (power), `loss_out` (power).
 - **Parameters**: `isentropic_efficiency` (default 0.85, DiPippo 2016), `baumann_factor`
   (`Ratio`, default 1, the classical Baumann rule), `condenser_pressure` (> 0, required),
   `generator_efficiency` (required).
-- **Outputs**: `gross_power`, `electricity_generated`, `condenser_duty`, `heat_loss`
-  (condenser duty plus generator loss), `exhaust_quality`.
+- **Outputs**: `gross_power`, `condenser_duty`, `exhaust_quality`.
 - **Model**: saturated steam at the inlet pressure (its temperature is not used); isentropic
   exhaust from `s_g(p_in)`; Baumann wet efficiency `eta = eta_d (1 - a (1 - x_out) / 2)` solved
   in closed form (`steam.baumann_expansion`; Baumann 1921); `gross = m (h_in - h_out)`;
@@ -1518,40 +1446,57 @@ geofluid = gm.Stream(m_dot=100, T="250 degC", p="40 bar")
 separated = Separator()(fluid_in=geofluid, pressure_setpoint="6 bar")
 turbine = FlashTurbine().update_params(condenser_pressure="0.1 bar", generator_efficiency=0.98)
 expanded = turbine(fluid_in=separated.outlets.gas_out)
-assert round(expanded.outputs.get("electricity_generated", unit="MW"), 3) == 9.532
+assert round(expanded.outlets.power_out / 1e6, 3) == 9.532
 assert round(expanded.outputs.exhaust_quality, 4) == 0.8678
 ```
 
-### GridConnection
+## Grids
+
+The plant's edge: what the plant buys or delivers crosses here, and a plant total is read from
+these ports. Every root plant takes what it buys from them; see
+[modules.md](modules.md#energy-flow).
+
+### ElectricityGrid
 
 Electricity exchange of a plant with the public grid.
 
-- **Ports**: none.
-- **Parameters**: `import_limit`, `export_limit` (`Power | None`, default `None` = unlimited),
-  `import_price`, `export_price` (`MoneyPerEnergy`, required).
-- **Boundaries**: `consumption`, `generation` (`Power`, >= 0), passed by the parent plant.
+- **Ports**: `power_in` (power) -> `power_out` (power).
+- **Parameters**: `import_limit`, `export_limit` (`Power | None`, default `None` = unlimited).
 - **Outputs**: `net_import`, `net_export`, `unserved_consumption`, `curtailed_generation`,
-  `is_import_limited`, `is_export_limited`, `cost_rate` (`MoneyRate`, negative is revenue).
+  `is_import_limited`, `is_export_limited`.
 - **Model**: import `max(0, consumption - generation)` and export `max(0, generation -
-  consumption)`, each capped by its limit; `cost_rate = p_import import - p_export export`.
-- **Physics**: `electricity.net_exchange`
-- **Energy audit**: not applicable: it declares none of the audited energy outputs, so plant
-  electricity is not counted twice.
+  consumption)`, each capped by its limit. Prices are in `gm.economics.Assumptions`.
+- **Physics**: `modules/grids/_physics.net_exchange`
+- **Energy audit**: open boundary.
 
-```python
-from gemini.modules import GridConnection
+### GasGrid
 
-grid = GridConnection().update_params(
-    import_price="0.2 currency/kWh", export_price="0.08 currency/kWh", export_limit="5 MW"
-)
-out = grid(consumption="0.4 MW", generation="9.5 MW").outputs
-assert out.net_export == 5e6 and out.is_export_limited
-assert round(out.get("cost_rate", unit="currency/h"), 9) == -400
-```
+Fuel source of a burner without co-produced gas: `grid.fluid_out` to `boiler.fuel_in`.
 
-## Demand
+- **Ports**: none -> `gas_out`.
+- **Parameters**: `composition` (mole fractions, default `gas.GRID_COMPOSITION`, a published grid
+  analysis).
+- **Model**: the outlet carries no flow at normal conditions and marks that the burner may draw grid
+  gas: purchased gas enters no stream, the burner reports it.
+- **Energy audit**: closed.
 
-### HeatConsumer
+### WasteGrid
+
+Where the solids and bleed streams of a plant go.
+
+- **Ports**: `waste_in` -> none.
+- **Energy audit**: open boundary. `gm.kpi.totals` reads `waste_in.mass_flow`, the bill
+  `waste_disposal_price`.
+
+### ChemicalGrid
+
+Where the chemicals a plant doses come from.
+
+- **Ports**: none -> `chemical_out`.
+- **Energy audit**: open boundary. `gm.kpi.totals` reads `chemical_out.mass_flow`, the bill
+  `chemical_price`.
+
+### HeatingGrid
 
 Space or process heat demand on a hydronic circuit; the return temperature follows from the
 delivered heat at the imposed flow.
@@ -1560,8 +1505,7 @@ delivered heat at the imposed flow.
 - **Parameters**: `minimum_return_temperature` (required): the lowest temperature the emitters
   can cool the water to.
 - **Boundaries**: `heat_demand` (`Power`, >= 0).
-- **Outputs**: `heat_supplied`, `unmet_demand`, `return_out_T`, `temperature_difference`,
-  `is_unmet`.
+- **Outputs**: `unmet_demand`, `is_unmet`.
 - **Model**: `Q = min(heat_demand, m_dot cp max(0, T_supply - T_min))`, `T_return = T_supply -
   Q / (m_dot cp)` (ASHRAE Handbook, HVAC Systems and Equipment 2020, chapter 13).
 - **Physics**: `heat_transfer.setpoint_duty`, `heat_transfer.temperature_change`
@@ -1571,26 +1515,25 @@ delivered heat at the imposed flow.
 
 ```python
 import gemini as gm
-from gemini.modules import HeatConsumer
+from gemini.modules import HeatingGrid
 
-consumer = HeatConsumer().update_params(minimum_return_temperature="40 degC")
+consumer = HeatingGrid().update_params(minimum_return_temperature="40 degC")
 supply = gm.Stream(flow="7.2 m3/h", T="70 degC", p="3 bar")
 result = consumer(supply_in=supply, heat_demand="100 kW")
-assert round(result.outputs.get("return_out_T", unit="degC"), 2) == 58.14
+assert round(result.outlets.return_out.T - 273.15, 2) == 58.14
 ```
 
-### CoolingConsumer
+### CoolingGrid
 
 Building or process cooling demand on a chilled-water circuit, with a sensible and a latent load
 and a dew-point test.
 
-- **Ports**: `supply_in` -> `return_out` (condensate drains on the air side).
+- **Ports**: `supply_in` -> `return_out`.
 - **Parameters** (required): `maximum_return_temperature`, `dew_point_margin` (>= 0, the coil
   surface approach; coil specific, so no default).
 - **Boundaries**: `sensible_cooling_demand`, `latent_cooling_demand` (`Power`, >= 0),
   `indoor_temperature`, `indoor_relative_humidity` (`Fraction`, > 0).
-- **Outputs**: `heat_absorbed`, `unmet_sensible`, `unmet_latent`, `dew_point`, `return_out_T`,
-  `is_unmet`.
+- **Outputs**: `unmet_sensible`, `unmet_latent`, `dew_point`, `is_unmet`.
 - **Model**: `T_limit = min(T_max, T_indoor)`; `Q_available = m_dot cp max(0, T_limit -
   T_supply)`; the sensible load is served first; the latent load only when `T_supply <= T_dew -
   margin` (`psychrometrics.dew_point`; ASHRAE Handbook, HVAC Systems and Equipment 2020,
@@ -1602,9 +1545,9 @@ and a dew-point test.
 
 ```python
 import gemini as gm
-from gemini.modules import CoolingConsumer
+from gemini.modules import CoolingGrid
 
-building = CoolingConsumer().update_params(
+building = CoolingGrid().update_params(
     maximum_return_temperature="16 degC", dew_point_margin="3 K"
 )
 result = building(
@@ -1613,8 +1556,29 @@ result = building(
     indoor_temperature="24 degC", indoor_relative_humidity=0.5,
 )
 assert round(result.outputs.get("dew_point", unit="degC"), 2) == 12.95
-assert result.outputs.heat_absorbed == 60000 and not result.outputs.is_unmet
+assert not result.outputs.is_unmet
 ```
+
+## Environment
+
+The air and the ground at the plant's edge. `co2_emission` and `methane_emission` exist only on
+`Atmosphere`, computed from the gas that reaches it.
+
+### Atmosphere
+
+The air around a plant.
+
+- **Ports**: `air_in`, `heat_in` (power), `gas_in` -> `air_out`, `wet_air_out`.
+- **Boundaries**: `temperature`, `wet_bulb_temperature`.
+- **Outputs**: `co2_emission`, `methane_emission`.
+- **Energy audit**: open boundary. One `Atmosphere` serves every `air_in` of a plant.
+
+### Formation
+
+The rock around a doublet's wells; `Doublet` creates it.
+
+- **Ports**: `heat_in` (power) -> none.
+- **Energy audit**: open boundary. `Doublet.well`, `riser` and `injector` connect `loss_out` here.
 
 ## Plants
 
@@ -1632,7 +1596,7 @@ A plant built from a spec: `plants/specs/Doublet.json`, no handwritten class.
   `esp` (`ESP`), `riser` (`ProductionWell` above the ESP), `injector` (`InjectionWell`),
   `sink` (`InjectionReservoir`).
 - **Ports**: `return_in` -> `supply_out`.
-- **Outputs**: `electricity` and `heat_loss` (automatic sums over the leaves).
+- **Outputs**: `power_in` and `loss_out` .
 - **Model**: the connections list the injection limb first, so the plan injects `return_in`
   through injector and sink, then produces through reservoir, lower well, ESP and riser, the
   order of the class it replaced. Inside `DoubletHeatPlant` the doublet is *opened* (the surface
@@ -1696,8 +1660,8 @@ limbs fed from one return. A spec plant of variable size: `gm.plants.from_templa
 - Ports: `return_in` -> `supply_out`.
 - Parameters, controls, boundaries, states: none of its own (children's: `production_rate` per
   reservoir, `frequency` per ESP, `split_fraction` per splitter).
-- Outputs: `electricity`, `heat_loss` (automatic sums), `supply_out_T` (`Output.of` the last
-  mixer's `fluid_out_T`, or the single riser's `wellhead_temperature`).
+- Outputs: `supply_out_T` (`Output.of` the last mixer's `fluid_out.T`, or the single riser's
+  `wellhead_out.T`).
 - Model: each limb is traversed like the production limb of `Doublet`. N-way mixing is a cascade
   of two-way mixers, the running mix entering `branch1_in`; capacity-rate weighting is associative,
   so the cascade gives `sum(m_i cp_i T_i) / sum(m_i cp_i)` at the lowest wellhead pressure. The
@@ -1734,15 +1698,15 @@ Purpose: indirect district-heating substation (Frederiksen and Werner 2013, *Dis
 and Cooling*).
 
 - Children: `valve` (`Valve`, network side), `heat_exchanger` (network on `hot_in`, building on
-  `cold_in`), `consumer` (`HeatConsumer`).
+  `cold_in`), `consumer` (`HeatingGrid`).
 - Ports: `supply_in` -> `return_out`.
 - Parameters: `building_flow` (`MassFlow`, > 0, required), `building_pressure` (`Pressure`,
   > 0, required); the building fluid is the substation's `fluid`. No defaults: both are design
   data of the building circuit.
 - Controls / boundaries: the children's (`valve.opening`, `consumer.heat_demand`).
 - States: none.
-- Outputs: `duty` (exchanger), `heat_supplied` (total), `unmet_demand`, `is_unmet`,
-  `building_supply_temperature`, `building_return_temperature`, `network_out_T`, `valve_pressure_drop`.
+- Outputs: `duty` (exchanger), `unmet_demand`, `is_unmet`,
+  `building_supply_temperature`, `building_return_temperature`, `valve_pressure_drop`.
 - Model: the building loop (exchanger cold side -> consumer -> back) closes within one call:
   `close_loop` finds the building return temperature that one pass reproduces, starting at
   `min(consumer.minimum_return_temperature, T_network)`, clamped to at most the network
@@ -1769,7 +1733,7 @@ substation.heat_exchanger.update_params(
 substation.consumer.update_params(minimum_return_temperature="30 degC")
 substation.set_inputs({"valve.opening": 0.8, "consumer.heat_demand": "150 kW"})
 result = substation(supply_in=gm.Stream(flow=2.0, T="75 degC", p="6 bar"))
-print(result.outputs.heat_supplied, result.outputs.building_return_temperature)  # 150000.0 325.44 K
+print(result.outputs.building_return_temperature)  # 325.44 K
 assert energy_balance(substation, result)["relative_residual"] < 1e-12
 ```
 
@@ -1779,12 +1743,12 @@ Purpose: indirect district-cooling energy transfer station (ASHRAE 2013, *Distri
 Guide*).
 
 - Children: `valve` (network side), `heat_exchanger` (building on `hot_in`, network on
-  `cold_in`), `consumer` (`CoolingConsumer`).
+  `cold_in`), `consumer` (`CoolingGrid`).
 - Ports: `supply_in` -> `return_out`.
 - Parameters: `building_flow`, `building_pressure` (required, as above).
 - Controls / boundaries: the children's (`valve.opening`, the consumer's sensible and latent
   demand, indoor temperature and relative humidity).
-- Outputs: `duty`, `heat_absorbed` (total), `unmet_sensible`, `unmet_latent`, `is_unmet`,
+- Outputs: `duty`, `unmet_sensible`, `unmet_latent`, `is_unmet`,
   `dew_point`, `building_supply_temperature`, `building_return_temperature`, `network_out_T`,
   `valve_pressure_drop`.
 - Model: as the heating substation with the roles of the exchanger sides swapped. The iteration
@@ -1795,7 +1759,7 @@ Guide*).
   a steady state (meeting the latent load warms the supply above the threshold, dropping it
   cools it below). The iteration then raises `PhysicsError`; with the test configuration
   (latent 50 kW) a band of about 2 K of network temperature (280.6 to 282.4 K) fails. A partial
-  dehumidification model in `CoolingConsumer` would remove the band (open question).
+  dehumidification model in `CoolingGrid` would remove the band (open question).
 - First-law closed, mass residual 0.
 
 ```python
@@ -1817,7 +1781,7 @@ substation.set_inputs({
     "consumer.indoor_relative_humidity": 0.5,
 })
 out = substation(supply_in=gm.Stream(flow=3.0, T="6 degC", p="6 bar")).outputs
-print(out.heat_absorbed, out.unmet_latent)  # 70000.0 0.0
+print(out.unmet_latent)  # 0.0
 ```
 
 ### DistrictNetwork
@@ -1836,8 +1800,8 @@ the file `plants/specs/DistrictNetwork.json` is the default size (2 heating cons
   loop inside one call.
 - Ports: `supply_in` -> `return_out`.
 - Parameters, controls, boundaries, states: none of its own.
-- Outputs: `heat_supplied` (heating networks only: a cooling network has no leaf declaring
-  it), `heat_absorbed`, `heat_loss`, `electricity` (totals), `return_out_T`.
+- Outputs: `return_out_T`. `power_in` and `loss_out` are plant ports, one for the pump and both
+  pipes.
 - Model: flow order pump -> supply pipe -> splitter cascade -> substations -> mixer cascade ->
   return pipe. Cascades as in `MultiWellPlant` (substation i receives `f_i prod_{j<i}(1-f_j)`,
   equal shares with `f_i = 1 / (N - i)`); splitters stand for balancing valves and branch
@@ -1858,7 +1822,6 @@ network.pump.update_params(
 network.pump.frequency = "50 Hz"
 for pipe in (network.supply_pipe, network.return_pipe):
     pipe.update_params(length=500, inner_diameter=0.1, elevation_change=0, heat_transfer_coefficient=1.0)
-    pipe.ambient_temperature = "10 degC"
 network.splitters[0].split_fraction = 0.5
 for substation in network.substations:
     substation.update_params(building_flow=3.0, building_pressure="3 bar")
@@ -1870,7 +1833,7 @@ for substation in network.substations:
     substation.consumer.update_params(minimum_return_temperature="30 degC")
     substation.set_inputs({"valve.opening": 0.8, "consumer.heat_demand": "150 kW"})
 result = network(supply_in=gm.Stream(flow=4.0, T="75 degC", p="6 bar"))
-print(result.outputs.heat_supplied, result.outputs.return_out_T)  # 300000.0 329.36 K
+print(result.outputs.return_out_T)  # 329.36 K
 audit = energy_balance(network, result)
 print(audit["residual"], result.children["pump"].outputs.hydraulic_power)  # 1536.0 1536.0
 ```
@@ -1887,8 +1850,8 @@ Geothermics 71, 306-319).
 - Parameters: `groundwater_pressure` (`Pressure`, > 0, required).
 - Controls: `groundwater_flow` (`MassFlow`, >= 0, required); season via `storage.mode`.
 - States: through the storage (`Module.step` steps it, also nested in a parent).
-- Outputs: `electricity`, `heat_loss`, `heat_absorbed`, `heat_accumulation` (totals),
-  `stored_energy`, `production_out_T`, `recovery_efficiency` (from the storage).
+- Outputs: `heat_accumulation`,
+  `stored_energy`, `recovery_efficiency` (from the storage).
 - Topology by `storage.mode`: `"charge"` (summer): cold-well groundwater -> pump -> exchanger
   cold side (building water on the hot side is cooled) -> warm well; heat pump not called.
   `"discharge"` (winter): warm-well groundwater -> pump -> heat pump evaporator -> cold well;
@@ -1935,7 +1898,7 @@ state, result = plant.step(state, 3600, {"return_in": summer})
 print(result.outlets.supply_out.T, result.outputs.stored_energy)  # 285.84 K 2.62e9 J
 plant.storage.mode = "discharge"
 state, result = plant.step(state, 3600, {"return_in": summer.with_(T=303.15)})
-print(result.outputs.production_out_T, result.outlets.supply_out.T)  # 289.91 K 313.15 K
+print(result.outlets.supply_out.T)  # 313.15 K
 ```
 
 ### Loop closure inside one call
@@ -2035,8 +1998,7 @@ cooling spec whose units switch on and off. It is a plain template: no value shi
 - **Ports.** Plant inlets: `heating_return_in`, `cooling_return_in` and the heat-rejection circuits
   `absorption_cooling_in`, `adsorption_cooling_in`, `compression_rejection_in` (each goes with its
   chiller). Plant outlets: `heating_return_out`, `cooling_return_out`, `gas` and the three
-  rejection outlets. The outputs are the automatic sums (`electricity`, `fuel`, `heat_loss`,
-  `heat_supplied`, `heat_absorbed`).
+  rejection outlets. Totals are read from the edge modules (`gm.kpi.totals`).
 - **Parameters.** `<unit>.enabled` for `heat_pump`, `peak_boiler`, `absorption_chiller`,
   `adsorption_chiller`, `compression_chiller` and `cooling_loop` (the chillers, the cooling pipes
   and the cooling consumer together); sizes `heat_exchanger.thermal_conductance`, the chiller, heat pump and boiler

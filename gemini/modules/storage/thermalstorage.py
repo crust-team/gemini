@@ -48,8 +48,8 @@ class ThermalStorage(Module):
     ``stored_energy = rho cp V (T - T_ref)``, ``charge_duty = Q_charge`` and ``discharge_duty =
     -Q_discharge``; a ``"chilled"`` tank stores cold, so every sign flips and ``stored_energy =
     rho cp V (T_ref - T)``. A negative duty means the circuit works against the service (for
-    example charge water colder than a hot tank). ``Q_amb > 0`` is reported as ``heat_loss``,
-    ``Q_amb < 0`` (a chilled tank in a warm room) as ``heat_absorbed``; the other one is zero.
+    example charge water colder than a hot tank). ``loss_out`` is ``Q_amb``, negative for a chilled
+    tank in a warm room.
 
     ``heat_accumulation`` is the rate of increase of the tank's sensible heat
     ``rho cp V dT/dt`` at the start of the step; ``energy_balance`` counts it as the signed

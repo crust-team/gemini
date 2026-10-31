@@ -131,11 +131,9 @@ Nothing that computes outputs today is lost; the user does not mark anything in 
 
 - **Output declarations** (all in `__init__`): leaves compute outputs in `_compute_outputs`
   (per-output compute methods may come later). Composites use `Output.of(self.child.output)` and
-  `Output.ratio(self.a, self.b)` with direct references, not strings. Additive semantic types
-  (`Electricity`, `HeatLoss`, `HeatSupplied`, `HeatAbsorbed`, `HeatAccumulation`, mass flow) are
-  summed automatically: a composite that declares `Output(Electricity)` without a formula gets
-  the sum over its descendants by name and type; `Output.total` is gone.
-- **`_compute_outputs` and formula outputs** (`Output.of`, automatic sums, `Output.ratio`) are
+  `Output.ratio(self.a, self.b)` with direct references, not strings. A parent never sums its
+  children; a total is read from the ports of the edge modules.
+- **`_compute_outputs` and formula outputs** (`Output.of`, `Output.ratio`) are
   part of the module call, not hooks. They are traced together with `forward`, in the same
   fixed order (`forward` -> `_compute_outputs` -> formula outputs -> forward hooks ->
   `_check_outputs`), and become part of the module graph. `_check_outputs` runs once at trace
@@ -306,7 +304,7 @@ Where the implementation differs from sections 1 to 11, and why:
   `Trace.child`, and `Trace.run` goes through `Module._evaluate`, the one call sequence. A child's controls, boundaries and numeric parameters are graph inputs named
   `<relative path>.<name>` (the root keeps plain names); a child called twice reuses them; supplied
   keywords win without validation. The `ModuleResult` of traced values joins the parent's
-  `call_records`, so `Output.of`, automatic sums, `Output.ratio` (now `where(bottom == 0, None,
+  `call_records`, so `Output.of`, `Output.ratio` (now `where(bottom == 0, None,
   truediv(top, bottom))`) and helpers such as the `produce()` of the nodal doublet example work unchanged. Guards cover every
   module of the tree. This replaces section 2's "each Module is traced on its own".
 - **Breaks.** A stateful, pre-hooked or untraceable *leaf* child becomes one `break` node after the

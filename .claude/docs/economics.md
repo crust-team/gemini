@@ -8,17 +8,18 @@ API only, and every return is plain JSON (`to_plain`: no NumPy types, `NaN` and 
 
 ## What a run gives
 
-`Results` stores leaf output columns (`path.field`), not the streams that cross the leaves and not
-the composite outputs. Everything below is therefore built from declared leaf outputs:
+`Results` stores the leaf columns (`path.field`, the outputs and the port quantities), not the
+composite outputs. Everything below is read from the edge modules:
 
-- Heat delivered is `heat_supplied` of the `HeatConsumer` leaves and cold delivered is
-  `heat_absorbed` of the `CoolingConsumer` leaves (`analysis/series.py`: `leaf_total`).
-- Electricity, fuel and generation are the leaf columns of those names, summed over every path
-  (`results_total`). Grid electricity per tick is `max(0, electricity - electricity_generated)`,
-  through `gemini.modules.balance.emissions` with weights of 0 and 1. The fuel bought is the column
-  `fuel_purchased`.
-- CO2 comes from the emitters: every module that emits declares the additive output `co2_emission`,
-  and `Vent` and `Flare` also `methane_emission`, in kg/s.
+- Heat delivered is what the water loses across the `HeatingGrid` leaves and cold delivered what
+  it gains across the `CoolingGrid` leaves (`analysis/series.py`: `delivered_heat`,
+  `delivered_cold`).
+- Electricity bought and sold are `net_import` and `net_export` of the `ElectricityGrid`, gas
+  bought is `gas_out.chemical_flow` of the `GasGrid`, waste `waste_in.mass_flow` of the `WasteGrid`
+  and chemicals `chemical_out.mass_flow` of the `ChemicalGrid` (`edge_total`). `gm.kpi.totals`
+  gives them, with the emissions and the losses.
+- CO2 comes from one place: `Atmosphere` computes `co2_emission` and `methane_emission` [kg/s] from
+  the gas that reaches `gas_in`.
 - A tick with no value (a skipped or failed row) adds no energy and is left out of ratios and peaks.
 - The window of a run is the sum of its tick durations. Annual figures scale the window to one year
   (`SECONDS_PER_YEAR`, 365.25 days): the run is taken as representative of a year.
@@ -109,11 +110,11 @@ E(x) the sum over ticks of x times the tick duration:
 
 | Name | Unit | Definition |
 |---|---|---|
-| `heating_coverage` | - | E(`heat_supplied`) / E(`heat_supplied` + `unmet_demand`) over the `HeatConsumer` leaves |
-| `cooling_coverage` | - | E(`heat_absorbed`) / E(`heat_absorbed` + `unmet_sensible` + `unmet_latent`) over the `CoolingConsumer` leaves |
-| `cop` | - | E(`heat_supplied` of the heat consumers) / E(`electricity` of every leaf); cooling not counted |
-| `peak_heat` | W | largest tick sum of `heat_supplied` (delivered power, not the demand peak) |
-| `peak_cold` | W | largest tick sum of `heat_absorbed` |
+| `heating_coverage` | - | E(heat delivered) / E(heat delivered + `unmet_demand`) over the `HeatingGrid` leaves |
+| `cooling_coverage` | - | E(cold delivered) / E(cold delivered + `unmet_sensible` + `unmet_latent`) over the `CoolingGrid` leaves |
+| `cop` | - | E(heat delivered) / E(`ElectricityGrid.power_out`); cooling not counted |
+| `peak_heat` | W | largest tick sum of heat delivered (delivered power, not the demand peak) |
+| `peak_cold` | W | largest tick sum of cold delivered |
 
 ## `gm.checks`
 
@@ -126,6 +127,7 @@ it, and the checks audit what the columns hold:
 | Check | Covers | `value`, `limit` |
 |---|---|---|
 | `energy_balance(results)` | the leaf columns named in `ENERGY_INPUTS` and `ENERGY_OUTPUTS` of `_utils/balance.py`, except the signed `heat_accumulation`: finite or missing, not negative | smallest power [W], 1e-9 W |
+| `plant_balance(plant, run)` | mass and energy in = out + losses + change of stored energy, per module (1e-9) and for the root (1e-6) | a list of checks, the worst relative residual of each |
 | `mass_balance(results)` | the leaf outputs whose unit in `results.units` is kg/s: finite or missing, not negative | smallest flow [kg/s], 1e-12 kg/s |
 | `bounds(plant, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
 | `run_all(plant, results)` | the three above | `{passed, checks}` |

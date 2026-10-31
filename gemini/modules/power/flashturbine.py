@@ -30,7 +30,7 @@ class FlashTurbine(Module):
     with ``generator_efficiency``. The condenser condenses the exhaust to saturated liquid at
     the condenser pressure, which leaves through ``outlet`` as water.
 
-    ``heat_loss`` is the condenser duty plus the generator loss, so the module is closed in
+    ``loss_out`` is the condenser duty plus the generator loss, so the module is closed in
     IF97 enthalpies: m h_g(p_in) = electricity_generated + heat_loss + m h_f(p_cond).
 
     NOTE(refactor): ``energy_balance`` audits sensible enthalpy ``m_dot * cp_l * T`` and

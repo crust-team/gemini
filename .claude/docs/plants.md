@@ -1,7 +1,7 @@
 # Building plants
 
 A plant can be built three ways, and there is one representation. A built plant is a normal
-composite `Module`: `describe()`, the automatic output sums, `gm.simulate`, `gm.replay` and
+composite `Module`: `describe()`, `gm.simulate`, `gm.replay` and
 `gm.live` work on it unchanged, on every backend, because its `forward` runs the modules in
 connection order and is traced like any other module. A plant has no run method of its own: run
 it with `results = gm.simulate(plant, profile)`. How it is computed is in
@@ -92,9 +92,9 @@ assert plant.to_spec() == spec
 - An inlet has one source and an outlet feeds one inlet (`port_in_use`), except a `many` port.
   Splitting and mixing streams are `Splitter` and `Mixer`.
 - A port no connection uses is named in `inlets` / `outlets`, or it is `unconnected_port`.
-- Without `outputs` a plant has the automatic sum of each energy output its leaves declare.
+- Without `outputs` a plant has none: a total is read from the ports of its edge modules.
 - The order of connections sets the order of the calls where the wiring leaves it open, which is
-  what a composite's float sum depends on. The key order of a dictionary carries no meaning for
+  what a float sum over the ports depends on. The key order of a dictionary carries no meaning for
   numbers.
 - The round trip `to_spec(from_spec(x)) == x` is exact, unit strings included: a stated value stays
   as written while it equals the current one. The backend digests sorted-key JSON.

@@ -36,7 +36,7 @@ class GasCompressor(Module):
     ``T_2 = T_1 + T_1 (r**((k - 1) / (k N)) - 1) / eta_s``,
     ``P_shaft = m_dot N cp (T_2 - T_1)``, ``electricity = P_shaft / motor_efficiency``.
 
-    The gas leaves the last stage at ``T_2`` (no aftercooler). ``heat_loss`` is the
+    The gas leaves the last stage at ``T_2`` (no aftercooler). ``loss_out`` is the
     intercooler duty ``m_dot (N - 1) cp (T_2 - T_1)`` plus the motor losses, so the model is
     first-law closed in gas enthalpy: ``electricity = m_dot cp (T_2 - T_1) + heat_loss``.
     NOTE(refactor): ``energy_balance`` values every stream with its fluid's liquid ``cp_l``, not
