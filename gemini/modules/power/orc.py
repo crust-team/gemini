@@ -86,6 +86,7 @@ class ORC(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="brine")
+        self.power_out = Outlet(Power, kind="electricity")
 
     def forward(self, inlets):
         """Cool the brine by the heat the cycle takes at the operating point."""
@@ -98,20 +99,17 @@ class ORC(Module):
         )
 
         fluid_out = fluid_in.with_(T=fluid_out_T)
+        balance = self._balance(fluid_in, fluid_out, design)
 
-        outlets = dict(fluid_out=fluid_out)
+        outlets = dict(fluid_out=fluid_out, power_out=balance.electricity_generated)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         fluid_in = inlets.fluid_in
         fluid_out = outlets.fluid_out
         design = self._design(fluid_in)
-        self.heat_input = heat_transfer.heat_rate(
-            fluid_in.heat_capacity_rate(), fluid_in.T - fluid_out.T
-        )
-        balance = _physics.plant_balance(
-            self.heat_input, design.cycle_efficiency, self.parasitic_fraction
-        )
+        self.heat_input = self._heat_input(fluid_in, fluid_out)
+        balance = self._balance(fluid_in, fluid_out, design)
         self.gross_power = balance.gross_power
         self.parasitic_power = balance.parasitic_power
         self.electricity_generated = balance.electricity_generated
@@ -121,6 +119,16 @@ class ORC(Module):
         self.condensing_temperature = design.condensing_temperature
         self.fluid_out_T = fluid_out.T
         self.is_capped = design.is_capped
+
+    def _heat_input(self, fluid_in, fluid_out):
+        """Return the heat [W] the cycle takes from the brine."""
+        return heat_transfer.heat_rate(fluid_in.heat_capacity_rate(), fluid_in.T - fluid_out.T)
+
+    def _balance(self, fluid_in, fluid_out, design):
+        """Return the energy balance of the plant at the operating point."""
+        return _physics.plant_balance(
+            self._heat_input(fluid_in, fluid_out), design.cycle_efficiency, self.parasitic_fraction
+        )
 
     def _design(self, fluid_in):
         """Return the ``_physics.cycle_design`` of the brine inlet."""

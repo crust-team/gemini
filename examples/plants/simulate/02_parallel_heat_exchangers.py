@@ -110,7 +110,7 @@ class ParallelExchangerPlant(gm.modules.Module):
         """Produce and treat the brine, exchange in parallel, remix and inject it."""
 
         # Modules
-        supply = self.doublet.produce()
+        supply, _ = self.doublet.produce()
         degassed = self.degasser(fluid_in=supply)
         filtered = self.inlet_filter(fluid_in=degassed.outlets.liquid_out)
         primaries = divide(self.primary_splitters, filtered.outlets.fluid_out)

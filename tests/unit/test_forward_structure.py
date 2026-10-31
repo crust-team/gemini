@@ -7,7 +7,7 @@ import textwrap
 import tokenize
 
 from gemini.modules.module import Module
-from gemini.types import Stream
+from gemini.types import Power, Stream
 
 FORWARD_SECTIONS = ("# Modules", "# Outlets")
 LIFECYCLE = ("__init__", "forward", "_compute_outputs", "_advance_states")
@@ -155,10 +155,12 @@ def test_registered_forward_structure(module_class):
 
     declarations = list(module.inlets().values()) + list(module.outlets().values())
     assert all(
-        isinstance(declaration.type, type) and issubclass(declaration.type, Stream)
+        declaration.type is Power
+        or isinstance(declaration.type, type)
+        and issubclass(declaration.type, Stream)
         for declaration in declarations
     )
-    _assert_return_block(cls, tree, list(module.outlets()))
+    _assert_return_block(cls, tree, [*module._given_outlets(), *module._drawn_inlets()])
 
 
 def test_leaf_and_composite_output_conventions(module_class):

@@ -63,13 +63,15 @@ def record_break(graph, module, inlets, supplied, call_outputs, reason):
     inputs = _probe_inputs(module, supplied)
     fluids = _probe_fluids(module, inlets, inputs)
     names = tuple(supplied)
-    operands = [getattr(stream, field) for stream in inlets.values() for field, _ in STREAM_FIELDS]
+    streams = {port: inlets[port] for port in module._fed_inlets()}
+    operands = [getattr(stream, field) for stream in streams.values() for field, _ in STREAM_FIELDS]
     operands.extend(supplied[name] for name in names)
     keys = [("outlets", port, field) for port in fluids for field, _ in STREAM_FIELDS]
+    keys.extend(("outlets", port) for port in _power_outlets(module))
     keys.extend(("outputs", name) for name in (module._outputs if call_outputs else ()))
     attributes = {
         "module": module,
-        "inlets": tuple((port, stream.fluid) for port, stream in inlets.items()),
+        "inlets": tuple((port, stream.fluid) for port, stream in streams.items()),
         "names": names,
         "fluids": fluids,
         "keys": tuple(keys),
@@ -84,8 +86,14 @@ def record_break(graph, module, inlets, supplied, call_outputs, reason):
         )
         for port, fluid in fluids.items()
     }
+    outlets |= {port: values["outlets", port] for port in _power_outlets(module)}
     outputs = {key[1]: value for key, value in values.items() if key[0] == "outputs"}
-    return Ports(outlets, path=module.path), outputs, {**inputs, **supplied}
+    return Ports(outlets, path=module.path), outputs, {**inputs, **supplied}, inlets
+
+
+def _power_outlets(module):
+    """Return the outlets of ``module`` that carry a power."""
+    return [port for port, declaration in module._outlets.items() if not declaration.carries_stream]
 
 
 def _guard(graph, module, ok, outputs, reason):
@@ -125,18 +133,23 @@ def _probe_inputs(module, supplied):
 
 def _probe_fluids(module, inlets, inputs):
     """Run ``forward`` once on representative inlets and return the fluid of every outlet."""
-    streams = {port: Stream(**PROBE, fluid=stream.fluid) for port, stream in inlets.items()}
+    streams = {port: Stream(**PROBE, fluid=inlets[port].fluid) for port in module._fed_inlets()}
     call = _Call(
         module=module, inputs=inputs, outputs=None, parent=None, states=module._call_states(None)
     )
     token = _current_call.set(call)
     try:
-        outlets = module._check_outlets(module.forward(Ports(streams, path=module.path)))
+        returned = module.forward(Ports(streams | module._empty_ports(), path=module.path))
+        module._check_outlet_names(returned)
     except Exception as error:
         raise TraceError(f"{module.path}: cannot probe the outlet fluids: {error}") from error
     finally:
         _current_call.reset(token)
-    return {port: stream.fluid for port, stream in outlets.items()}
+    return {
+        port: returned[port].fluid
+        for port in module._given_outlets()
+        if module._outlets[port].carries_stream
+    }
 
 
 def evaluate_break(node, operands):
@@ -177,6 +190,8 @@ def _call_row(attributes, items):
 
 
 def _value(result, key):
+    if key[0] == "outlets" and len(key) == 2:
+        return result.outlets[key[1]]
     if key[0] == "outlets":
         return getattr(result.outlets[key[1]], key[2])
     value = result.outputs[key[1]]

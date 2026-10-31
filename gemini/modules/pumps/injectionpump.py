@@ -46,6 +46,7 @@ class InjectionPump(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="brine")
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.pressure_setpoint = Control(Pressure | None, default=None)
@@ -76,22 +77,23 @@ class InjectionPump(Module):
 
         discharge = suction.with_(p=suction.p + head)
 
-        outlets = dict(fluid_out=discharge)
+        outlets = dict(fluid_out=discharge, power_in=self._power(suction, head))
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         suction = inlets.fluid_in
         discharge = outlets.fluid_out
-        flow = suction.volumetric_flow()
         self.head = discharge.p - suction.p
-        if self.head_coefficients is not None and self.power_coefficients is not None:
-            self.power = pumps.power(
-                flow, self.frequency, self.stage_count, self.power_coefficients
-            )
-        else:
-            self.power = energy.input_power(pumps.hydraulic_power(flow, self.head), self.efficiency)
+        self.power = inlets.power_in
         self.discharge_pressure = discharge.p
-        self.electricity = self.power
+        self.electricity = inlets.power_in
+
+    def _power(self, suction, head):
+        """Return the pump power [W] from the power curve, else from the efficiency."""
+        flow = suction.volumetric_flow()
+        if self.head_coefficients is not None and self.power_coefficients is not None:
+            return pumps.power(flow, self.frequency, self.stage_count, self.power_coefficients)
+        return energy.input_power(pumps.hydraulic_power(flow, head), self.efficiency)
 
     def _head(self, suction):
         """Return the pressure rise [Pa] from the head curve, else from the pressure setpoint.

@@ -915,7 +915,7 @@ def test_listings_recurse_by_default_and_ports_stay_local(fresh_plant):
         "injection_temperature",
         "brine_cooling",
     ]
-    assert list(doublet.inlets()) == ["return_in"]
+    assert list(doublet.inlets()) == ["return_in", "power_in"]
     assert list(doublet.outlets()) == ["supply_out"]
 
 

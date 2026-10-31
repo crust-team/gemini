@@ -30,7 +30,7 @@ def root_break_graph(module, fluids, stepped, reason):
     has nothing to advance and the break is a plain call.
     """
     graph = Graph(module.path)
-    for port in module._inlets:
+    for port in module._fed_inlets():
         for field, unit in STREAM_FIELDS:
             graph.input(f"{port}.{field}", "inlet", unit)
     for role, declarations in (("control", module.controls()), ("boundary", module.boundaries())):
@@ -38,7 +38,7 @@ def root_break_graph(module, fluids, stepped, reason):
             graph.input(path, role, declaration.unit)
     graph.root = module
     graph.stepped = stepped and any(member.stateful for member in module.modules())
-    graph.inlet_fluids = {port: fluids[port] for port in module._inlets}
+    graph.inlet_fluids = {port: fluids[port] for port in module._fed_inlets()}
     graph.breaks.append((module.path, reason))
     return graph
 

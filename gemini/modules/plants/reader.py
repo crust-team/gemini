@@ -97,15 +97,17 @@ def _connection(plant, item, report):
         plant._candidates(item[end], end, explicit=True)
 
 
-def _port(plant, side, name, end, report):
-    if not isinstance(end, str):
-        raise ValidationError(f"{name}: expected 'path.port'", code="invalid_format")
-    if report.skips(end):
-        return
-    if side == "inlets":
-        plant._link(name, end, None, explicit=True)
-    else:
-        plant._link(end, name, None, explicit=True)
+def _port(plant, side, name, ends, report):
+    """Name one plant port; several ends share a power port or the air."""
+    for end in ends if isinstance(ends, list) else [ends]:
+        if not isinstance(end, str):
+            raise ValidationError(f"{name}: expected 'path.port'", code="invalid_format")
+        if report.skips(end):
+            continue
+        if side == "inlets":
+            plant._link(name, end, None, explicit=True)
+        else:
+            plant._link(end, name, None, explicit=True)
 
 
 def _outputs(plant, specs, report):
@@ -125,7 +127,10 @@ def _ends(spec):
     """Return every port the spec names, also those of an entry that failed to read."""
     connections = [item for item in spec.get("connections", []) if isinstance(item, dict)]
     ends = {item.get(end) for item in connections for end in ("source", "target")}
-    return ends | set(spec.get("inlets", {}).values()) | set(spec.get("outlets", {}).values())
+    for side in ("inlets", "outlets"):
+        for named in spec.get(side, {}).values():
+            ends |= set(named) if isinstance(named, list) else {named}
+    return ends
 
 
 def _check_ports(plant, spec, report):

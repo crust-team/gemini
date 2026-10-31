@@ -155,7 +155,7 @@ def bindable(module, path):
     return {
         "controls": list(target._controls),
         "boundaries": list(target._boundaries),
-        "inlets": {port: list(STREAM_FIELDS) for port in target._inlets},
+        "inlets": {port: list(STREAM_FIELDS) for port in target._fed_inlets()},
         "measured": list(target._outputs),
         "state": list(target._states),
     }
@@ -164,7 +164,7 @@ def bindable(module, path):
 def _flat_names(target):
     """Return every key a binding of ``target`` may have, each a declaration name."""
     names = [name for section in NAMED for name in getattr(target, NAMED[section])]
-    return names + [f"{port}.{field}" for port in target._inlets for field in STREAM_FIELDS]
+    return names + [f"{port}.{field}" for port in target._fed_inlets() for field in STREAM_FIELDS]
 
 
 def _unknown(target, key):
@@ -216,7 +216,7 @@ def _add_named(target, bound, key, value):
 def _add_field(target, bound, key, value):
     """Add the binding of an inlet field, ``key`` being ``port.field``."""
     port, _, field = key.rpartition(".")
-    if port not in target._inlets or field not in FIELD_UNITS:
+    if port not in target._fed_inlets() or field not in FIELD_UNITS:
         raise _unknown(target, key)
     binding = _binding(key, value, FIELD_UNITS[field][0])
     if not _fits(binding.unit, FIELD_UNITS[field]):

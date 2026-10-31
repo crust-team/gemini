@@ -1,5 +1,6 @@
 """Declarations registered by :class:`gemini.modules.Module`."""
 
+import numbers
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, fields
@@ -17,7 +18,7 @@ from gemini.errors import DefinitionError, PhysicsError, ValidationError
 from gemini.physics import units
 from gemini.types import streams
 from gemini.types.flows import Stream
-from gemini.types.quantities import Ratio
+from gemini.types.quantities import Power, Ratio
 from gemini.utils.strings import did_you_mean, join_names
 
 
@@ -314,27 +315,33 @@ class Parameter(Declaration):
 
 
 class _Port(Declaration):
-    """Port declaration; ``type`` must be a ``Stream`` type.
+    """Port declaration; ``type`` is a ``Stream`` type or the quantity ``Power``.
 
-    A port has no JSON schema, quantity or unit: ``schema`` is empty, ``quantity`` and ``unit``
-    are ``None`` and ``additive`` is false. Stream dataclasses do not go through Pydantic.
-    ``kind`` is the label of the connection, one of ``streams.NAMES``, or ``None`` for a port
-    that takes whatever flows through it (a pipe, a valve, either side of a heat exchanger).
+    A stream port has no JSON schema, quantity or unit: ``schema`` is empty, ``quantity`` and
+    ``unit`` are ``None`` and ``additive`` is false. Stream dataclasses do not go through Pydantic.
+    A ``Power`` port has the unit of its quantity. ``kind`` is the label of the connection, one of
+    ``streams.NAMES``, or ``None`` for a port that takes whatever flows through it (a pipe, a
+    valve, either side of a heat exchanger). ``many`` lets several ports connect: the value of the
+    port is the list of what they give. ``drawn`` says that the taker decides the flow, see
+    ``modules.md``.
     """
 
-    def __init__(self, type=Stream, *, kind=None, description=None):
+    def __init__(self, type=Stream, *, kind=None, many=False, drawn=False, description=None):
         """Declare a port carrying values of ``type`` with the connection label ``kind``."""
         if kind is not None and kind not in streams.NAMES:
             raise DefinitionError(
                 f"{self.__class__.__name__}: kind = {kind!r}; expected one of "
                 f"{join_names(streams.NAMES)}{did_you_mean(kind, streams.NAMES)}"
             )
-        if not isclass(type) or not issubclass(type, Stream):
+        self.carries_stream = isclass(type) and issubclass(type, Stream)
+        if not self.carries_stream and type is not Power:
             raise DefinitionError(
-                f"{self.__class__.__name__}: type = {type!r}; expected a fluid Stream type"
+                f"{self.__class__.__name__}: type = {type!r}; expected a Stream type or Power"
             )
         self.type = type
         self.kind = kind
+        self.many = many
+        self.drawn = drawn
         self.default = UNSET
         self.description = description
         self.bounds = {}
@@ -342,9 +349,19 @@ class _Port(Declaration):
         self.owner = None
         self._limits = None
         self.schema, self.quantity, self.unit, self.additive = {}, None, None, False
+        if not self.carries_stream:
+            self.quantity, self.unit = "power", "W"
 
     def validate(self, value):
-        """Return a stream of ``type``: an instance passes, a mapping of its fields builds one."""
+        """Return the value of the port; a ``many`` port holds a list of them."""
+        if self.many:
+            return [self._item(item) for item in value]
+        return self._item(value)
+
+    def _item(self, value):
+        """Return a stream of ``type``, or a number: a mapping of fields builds a stream."""
+        if not self.carries_stream:
+            return self._power(value)
         if isinstance(value, self.type):
             return value
         if isinstance(value, Mapping):
@@ -353,11 +370,36 @@ class _Port(Declaration):
             f"{self.path}: invalid {self.section} value {value!r}; expected a {self.type.__name__}"
         )
 
+    def _power(self, value):
+        """Return a power [W]: a unit string or a number; an array over rows passes unchanged."""
+        if isinstance(value, ops.Symbolic) or (isinstance(value, np.ndarray) and value.ndim):
+            return value
+        value = units.value_in_si(ops.scope.plain(value), self.unit, self.path, self.quantity)
+        if isinstance(value, bool) or not isinstance(value, numbers.Real):
+            raise ValidationError(f"{self.path}: value = {value!r}; expected a power [W]")
+        return float(value)
+
 
 class Inlet(_Port):
-    """Incoming flow port."""
+    """Incoming port: a ``Stream`` by default.
+
+    A single ``Power`` inlet is drawn: the module decides the value and returns it from ``forward``
+    under the name of the port. A stream inlet with ``drawn=True`` receives the conditions its
+    source offers, and the module returns the stream it took.
+    """
 
     section = "inlet"
+
+    def __init__(self, type=Stream, *, kind=None, many=False, drawn=None, description=None):
+        """Declare an incoming port; a single ``Power`` inlet is drawn unless stated."""
+        if drawn is None:
+            drawn = type is Power and not many
+        super().__init__(type, kind=kind, many=many, drawn=drawn, description=description)
+
+    @property
+    def gives(self):
+        """Return whether a call computes this port and nobody supplies it."""
+        return self.drawn and not self.carries_stream
 
 
 class Control(Declaration):
@@ -427,9 +469,21 @@ class Output(Declaration):
 
 
 class Outlet(_Port):
-    """Outgoing fluid stream port."""
+    """Outgoing port.
+
+    ``offered`` says the value exists before the other modules run: ``Module._offer`` gives it. A
+    ``many`` outlet feeds several ports. With ``drawn=True``, always so for ``many``, its takers
+    decide the flow and the module receives what they took under the name of the port.
+    """
 
     section = "outlet"
+
+    def __init__(
+        self, type=Stream, *, kind=None, many=False, drawn=False, offered=False, description=None
+    ):
+        """Declare an outgoing port."""
+        super().__init__(type, kind=kind, many=many, drawn=drawn or many, description=description)
+        self.offered = offered
 
     def field(self, name):
         """Return a reference to one ``Stream`` field of this outlet for ``Output.of``."""

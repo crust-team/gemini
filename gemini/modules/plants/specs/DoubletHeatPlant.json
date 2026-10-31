@@ -2,33 +2,89 @@
   "format": 2,
   "name": "DoubletHeatPlant",
   "modules": {
-    "doublet": {"type": "Doublet", "params": {}},
-    "degasser": {"type": "Degasser", "params": {}},
+    "doublet": {
+      "type": "Doublet",
+      "params": {}
+    },
+    "degasser": {
+      "type": "Degasser",
+      "params": {}
+    },
     "filters": {
       "type": "ModuleDict",
       "modules": {
-        "hot": {"type": "Filter", "params": {}},
-        "cold": {"type": "Filter", "params": {}}
+        "hot": {
+          "type": "Filter",
+          "params": {}
+        },
+        "cold": {
+          "type": "Filter",
+          "params": {}
+        }
       }
     },
-    "heat_exchanger": {"type": "HeatExchanger", "params": {}},
-    "injection_pump": {"type": "InjectionPump", "params": {}}
+    "heat_exchanger": {
+      "type": "HeatExchanger",
+      "params": {}
+    },
+    "injection_pump": {
+      "type": "InjectionPump",
+      "params": {}
+    }
   },
   "connections": [
-    {"source": "doublet.supply_out", "target": "degasser.fluid_in"},
-    {"source": "degasser.liquid_out", "target": "filters.hot.fluid_in"},
-    {"source": "filters.hot.fluid_out", "target": "heat_exchanger.hot_in"},
-    {"source": "heat_exchanger.hot_out", "target": "filters.cold.fluid_in"},
-    {"source": "filters.cold.fluid_out", "target": "injection_pump.fluid_in"},
-    {"source": "injection_pump.fluid_out", "target": "doublet.return_in"}
+    {
+      "source": "doublet.supply_out",
+      "target": "degasser.fluid_in"
+    },
+    {
+      "source": "degasser.liquid_out",
+      "target": "filters.hot.fluid_in"
+    },
+    {
+      "source": "filters.hot.fluid_out",
+      "target": "heat_exchanger.hot_in"
+    },
+    {
+      "source": "heat_exchanger.hot_out",
+      "target": "filters.cold.fluid_in"
+    },
+    {
+      "source": "filters.cold.fluid_out",
+      "target": "injection_pump.fluid_in"
+    },
+    {
+      "source": "injection_pump.fluid_out",
+      "target": "doublet.return_in"
+    }
   ],
-  "inlets": {"return_in": "heat_exchanger.cold_in"},
-  "outlets": {"supply_out": "heat_exchanger.cold_out", "gas_out": "degasser.gas_out"},
+  "inlets": {
+    "return_in": "heat_exchanger.cold_in",
+    "power_in": [
+      "doublet.power_in",
+      "injection_pump.power_in"
+    ]
+  },
+  "outlets": {
+    "supply_out": "heat_exchanger.cold_out",
+    "gas_out": "degasser.gas_out"
+  },
   "outputs": {
-    "thermal_power": {"of": "heat_exchanger.duty"},
-    "electricity": {"sum": "electricity"},
-    "cop": {"ratio": ["thermal_power", "electricity"]},
-    "heat_loss": {"sum": "heat_loss"}
+    "thermal_power": {
+      "of": "heat_exchanger.duty"
+    },
+    "electricity": {
+      "sum": "electricity"
+    },
+    "cop": {
+      "ratio": [
+        "thermal_power",
+        "electricity"
+      ]
+    },
+    "heat_loss": {
+      "sum": "heat_loss"
+    }
   },
   "bindings": {},
   "param_history": {}

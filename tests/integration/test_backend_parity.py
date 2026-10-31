@@ -315,6 +315,9 @@ def _leaf_types(tree, found):
     for section in ("outputs", "inputs"):
         found.update(type(value).__name__ for value in tree[section].values())
     for stream in (*tree["outlets"].values(), *tree["inlets"].values()):
+        if not isinstance(stream, dict):
+            found.add(type(stream).__name__)
+            continue
         found.update(type(stream[field]).__name__ for field in ("m_dot", "T", "p"))
     for child in tree["children"].values():
         _leaf_types(child, found)

@@ -79,7 +79,7 @@ assert plant.to_spec() == spec
 | `connections` | yes | `[{source, target, type?}]`, ends are `"path.port"` |
 | `bindings` | yes | `{path: {name: column}}`, flat; see [bindings](#parameters-by-date-and-bindings) |
 | `param_history` | yes | `{path: [{valid_from, params}]}`; one undated entry is the same as `params` and is not written |
-| `inlets`, `outlets` | no | `{plant port: "path.port"}` |
+| `inlets`, `outlets` | no | `{plant port: "path.port"}`, a list when several ends share a power or air port |
 | `outputs` | no | `{name: {"of": "path.output", "field"?}, {"sum": name}, {"ratio": [a, b]} or {"difference": [a, b]}}` |
 | `fluids`, `boundary` | no | `{path: {...}}`, the fluid and the stored assumptions of a module |
 | `type`, `params` | no | root of a handwritten module: its registry name and flat dotted values |
@@ -89,8 +89,8 @@ assert plant.to_spec() == spec
 - `ModuleDict` and `ModuleList` are groups: they hold children and have no wiring of their own.
   Connections reach through a group (`filters.hot.fluid_out`) but never into a plant child:
   `doublet.supply_out` is right, `doublet.esp.fluid_out` is an error.
-- An inlet has one source and an outlet feeds one inlet (`port_in_use`). Splitting and mixing are
-  `Splitter` and `Mixer`.
+- An inlet has one source and an outlet feeds one inlet (`port_in_use`), except a `many` port.
+  Splitting and mixing streams are `Splitter` and `Mixer`.
 - A port no connection uses is named in `inlets` / `outlets`, or it is `unconnected_port`.
 - Without `outputs` a plant has the automatic sum of each energy output its leaves declare.
 - The order of connections sets the order of the calls where the wiring leaves it open, which is

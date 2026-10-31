@@ -30,6 +30,7 @@ from gemini.graph.graph import Graph
 from gemini.graph.limits import certain
 from gemini.graph.node import STREAM_FIELDS
 from gemini.graph.proxy import Proxy
+from gemini.types.flows import Stream
 
 
 @dataclass
@@ -46,17 +47,15 @@ def run(module, inlets, inputs=None, *, backend="numpy", cache=None):
     """Evaluate ``module`` on every row of ``inlets`` and ``inputs`` and return a ``Run``."""
     inputs = dict(inputs or {})
     rows = _row_count(inlets, inputs)
-    fluids = {name: inlets[name].fluid for name in module._inlets}
+    fluids = {name: inlets[name].fluid for name in module._fed_inlets()}
     graph = (cache or GraphCache()).graph(module, fluids)
     feeds = graph_feeds(graph, module, inlets, inputs)
     with backends.settings(backend=backend):
         evaluation = evaluate(graph, feeds, rows)
     evaluation.raise_first()
     result = evaluation.result
-    outlets = {
-        port: {field: getattr(result.outlets[port], field) for field, _ in STREAM_FIELDS}
-        for port in module._outlets
-    }
+    outlets = {port: _fields(result.outlets[port]) for port in module._given_outlets()}
+    outlets |= {port: _fields(result.inlets[port]) for port in module._drawn_inlets()}
     breaks = [reason for _, reason in graph.breaks] if graph.root is not None else []
     return Run(outputs=dict(result.outputs.items()), outlets=outlets, breaks=breaks, graph=graph)
 
@@ -68,6 +67,13 @@ def _row_count(inlets, inputs):
     ]
     sizes += [np.size(value) for value in inputs.values()]
     return max(sizes, default=1)
+
+
+def _fields(value):
+    """Return the values of one port by field: the stream fields, or ``power``."""
+    if isinstance(value, Stream):
+        return {field: getattr(value, field) for field, _ in STREAM_FIELDS}
+    return {"power": value}
 
 
 def graph_feeds(graph, module, inlets, inputs):

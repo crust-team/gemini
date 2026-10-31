@@ -68,8 +68,10 @@ def test_ports_are_immutable_and_copy_the_source_mapping(streams):
 
 def test_ports_reject_non_stream_values(streams):
     """The port mapping never carries scalar controls or computed outputs."""
-    with pytest.raises(ValidationError, match="plant.esp.*fluid_in.*Stream.*valid names: fluid_in"):
-        Ports({"fluid_in": 1.0}, path="plant.esp")
+    with pytest.raises(
+        ValidationError, match="plant.esp.*fluid_in.*Stream or a power.*valid names: fluid_in"
+    ):
+        Ports({"fluid_in": "1 W"}, path="plant.esp")
 
 
 def test_ports_accept_streams_of_arrays():

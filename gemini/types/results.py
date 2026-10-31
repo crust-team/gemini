@@ -11,7 +11,7 @@ from gemini.errors import PhysicsError, ValidationError
 from gemini.errors.lookup import UnknownPort
 from gemini.physics import units
 from gemini.types.flows import Stream
-from gemini.types.ports import Ports
+from gemini.types.ports import Ports, map_port_value
 from gemini.utils.mappings import AttributeMapping
 from gemini.utils.strings import did_you_mean, join_names, join_path
 
@@ -191,7 +191,8 @@ class ModuleResult:
         """Return the tree with ``function`` applied to every value, keeping its structure.
 
         The values are the outputs, the ``m_dot``, ``T`` and ``p`` of every inlet and outlet
-        stream and the inputs, of this result and of all descendants; fluids and a child shared
+        stream, the power of a power port and the inputs, of this result and of all descendants;
+        fluids and a child shared
         by ``children`` and ``call_records`` stay as they are. The runner maps the proxies of a
         trace to arrays with it.
         """
@@ -226,20 +227,13 @@ class ModuleResult:
 
 
 def _mapped_ports(ports, function):
-    """Return ports whose streams carry ``function`` of their ``m_dot``, ``T`` and ``p``."""
-    streams = {
-        name: Stream._trusted(
-            function(stream.m_dot), function(stream.T), function(stream.p), stream.fluid
-        )
-        for name, stream in ports.items()
-    }
-    return Ports._trusted(streams, ports._path)
+    """Return ports with ``function`` applied to the numbers of every value."""
+    values = {name: map_port_value(value, function) for name, value in ports.items()}
+    return Ports._trusted(values, ports._path)
 
 
 def _mapped_input(value, function):
     """Return one input mapped; a stream input maps like a port stream."""
     if isinstance(value, Stream):
-        return Stream._trusted(
-            function(value.m_dot), function(value.T), function(value.p), value.fluid
-        )
+        return map_port_value(value, function)
     return function(value)

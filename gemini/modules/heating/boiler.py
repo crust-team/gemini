@@ -149,6 +149,9 @@ class ElectricBoiler(_BoilerBody):
         """Declare boiler design data, ports and computed performance."""
         super().__init__()
 
+        # Inlets
+        self.power_in = Inlet(Power, kind="electricity")
+
         # Outputs
         self.electricity = Output(Electricity)
 
@@ -157,9 +160,10 @@ class ElectricBoiler(_BoilerBody):
 
         # Outlets
         inlet = inlets.fluid_in
-        outlet = self._heated(inlet, ops.minimum(self._requested_duty(inlet), self.capacity))
+        duty = ops.minimum(self._requested_duty(inlet), self.capacity)
+        outlet = self._heated(inlet, duty)
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, power_in=energy.input_power(duty, self.efficiency))
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

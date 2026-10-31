@@ -68,6 +68,8 @@ def wire(plant):
     plant.connect("production.fluid_out", "degasser.fluid_in")
     plant.connect("degasser.liquid_out", "hx.hot_in")
     plant.connect("degasser.gas_out", "gas_out")
+    plant.connect("power_in", "d0.power_in")
+    plant.connect("power_in", "d1.power_in")
     plant.connect("hx.hot_out", "injection.fluid_in")
     plant.connect("injection.branch1_out", "d0.return_in")
     plant.connect("injection.branch2_out", "d1.return_in")

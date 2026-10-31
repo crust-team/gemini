@@ -280,7 +280,11 @@
     }
   ],
   "inlets": {
-    "return_in": "heat_exchanger.cold_in"
+    "return_in": "heat_exchanger.cold_in",
+    "power_in": [
+      "doublet.power_in",
+      "injection_pump.power_in"
+    ]
   },
   "outlets": {
     "supply_out": "heat_exchanger.cold_out",

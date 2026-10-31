@@ -126,6 +126,12 @@ def connect_brine(plant):
     plant.connect("injection.branch2_out", "d1.return_in")
 
 
+def connect_power(plant):
+    """Name the plant port that takes the electricity of every consumer."""
+    for name in ("d0", "d1", "heat_pump", "chiller"):
+        plant.connect("power_in", f"{name}.power_in")
+
+
 def connect_gas(plant):
     """Wire the co-produced gas: the boiler takes what it needs and the flare burns the rest."""
     plant.connect("degasser.gas_out", "makeup.fluid_in")
@@ -177,6 +183,7 @@ def build():
     plant = gm.Plant("Hackathon")
     add_modules(plant)
     connect_brine(plant)
+    connect_power(plant)
     connect_gas(plant)
     connect_water(plant)
     set_boundaries(plant)

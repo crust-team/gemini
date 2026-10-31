@@ -5,6 +5,7 @@ from gemini.modules.plants import nodal
 from gemini.modules.pumps import ESP, InjectionPump
 from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
 from gemini.modules.wells import InjectionWell, ProductionWell
+from gemini.physics import energy
 from gemini.types import (
     Boundary,
     Electricity,
@@ -14,6 +15,7 @@ from gemini.types import (
     Outlet,
     Output,
     Parameter,
+    Power,
     Pressure,
     Stream,
 )
@@ -55,6 +57,7 @@ class NodalDoublet(Module):
 
         # Inlets
         self.return_in = Inlet(Stream)
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Boundaries
         self.wellhead_pressure = Boundary(Pressure)
@@ -70,16 +73,17 @@ class NodalDoublet(Module):
         """Inject the return stream and produce the supply stream."""
 
         # Modules
-        self.inject(inlets.return_in)
+        injection_power = self.inject(inlets.return_in)
 
         # Outlets
-        supply_out = self.produce()
+        supply_out, lift_power = self.produce()
+        power_in = energy.total_power([injection_power, lift_power])
 
-        outlets = dict(supply_out=supply_out)
+        outlets = dict(supply_out=supply_out, power_in=power_in)
         return outlets
 
     def produce(self):
-        """Solve the production rate for the wellhead pressure and traverse the limb at it."""
+        """Solve the rate for the wellhead pressure; return the stream and the lift power [W]."""
         rate = nodal.solve_production_rate(
             self.reservoir,
             self.well,
@@ -92,13 +96,14 @@ class NodalDoublet(Module):
         lower = self.well(bottom_in=source.outlets.sandface_out)
         lifted = self.esp(fluid_in=lower.outlets.wellhead_out)
         upper = self.riser(bottom_in=lifted.outlets.fluid_out)
-        return upper.outlets.wellhead_out
+        return upper.outlets.wellhead_out, lifted.inlets.power_in
 
     def inject(self, stream):
-        """Pump ``stream`` to the solved wellhead pressure, or not at all, and inject it."""
+        """Pump ``stream`` to the solved pressure and inject it; return the pump power [W]."""
         bracket = (stream.p, self.maximum_injection_pressure)
         required = nodal.solve_injection_pressure(self.injector, self.sink, stream, bracket)
         setpoint = stream.p if required is None else required
         pumped = self.injection_pump(fluid_in=stream, pressure_setpoint=setpoint)
         injection = self.injector(wellhead_in=pumped.outlets.fluid_out)
         self.sink(sandface_in=injection.outlets.bottom_out)
+        return pumped.inlets.power_in

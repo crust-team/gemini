@@ -124,7 +124,7 @@ class BindingPlan:
         self._dates = _parameter_dates(plant)
         root_inputs = plant.boundary.get("root_inputs", {})
         self.root_inlets = {
-            name: value for name, value in root_inputs.items() if name in plant.inlets()
+            name: value for name, value in root_inputs.items() if name in plant._fed_inlets()
         }
         self.twins, self.columns = [], set()
         if kind == "simulate":
@@ -284,7 +284,7 @@ def _named_inlet_fields(plant, dataset):
     The rule of a leaf control, whose column is named after its dotted path, for a plant port.
     """
     inlets = {}
-    for port in plant.inlets():
+    for port in plant._fed_inlets():
         for name in STREAM_FIELDS:
             column = f"{port}.{name}"
             if column in dataset.names:

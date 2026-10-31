@@ -69,6 +69,7 @@ class LineShaftPump(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="brine")
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.frequency = Control(Frequency)
@@ -93,12 +94,25 @@ class LineShaftPump(Module):
         head = self._head(suction.volumetric_flow())
 
         discharge = suction.with_(p=suction.p + head)
+        shaft_power = sum(self._powers(suction.volumetric_flow()))
+        power_in = energy.input_power(shaft_power, self.motor_efficiency)
 
-        outlets = dict(fluid_out=discharge)
+        outlets = dict(fluid_out=discharge, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         flow = inlets.fluid_in.volumetric_flow()
+        pump_power, friction = self._powers(flow)
+        self.flow = flow
+        self.head = outlets.fluid_out.p - inlets.fluid_in.p
+        self.pump_power = pump_power
+        self.shaft_friction_power = friction
+        self.shaft_power = pump_power + friction
+        self.efficiency = _physics.pump_efficiency(flow, self.head, pump_power)
+        self.electricity = inlets.power_in
+
+    def _powers(self, flow):
+        """Return the pump power and the shaft friction power [W] at a volume flow [m3/s]."""
         pump_power = pumps.power(flow, self.frequency, self.stage_count, self.power_coefficients)
         ops.check(
             pump_power >= 0,
@@ -113,13 +127,7 @@ class LineShaftPump(Module):
         friction = _physics.line_shaft_friction_power(
             self.shaft_friction_loss, self.setting_depth, speed
         )
-        self.flow = flow
-        self.head = outlets.fluid_out.p - inlets.fluid_in.p
-        self.pump_power = pump_power
-        self.shaft_friction_power = friction
-        self.shaft_power = pump_power + friction
-        self.efficiency = _physics.pump_efficiency(flow, self.head, pump_power)
-        self.electricity = energy.input_power(self.shaft_power, self.motor_efficiency)
+        return pump_power, friction
 
     def _head(self, flow):
         """Return the pump-curve pressure rise [Pa] at a suction volume flow [m3/s]."""

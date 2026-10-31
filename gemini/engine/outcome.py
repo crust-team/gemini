@@ -92,7 +92,7 @@ def _streams(twin, block, selected):
     An inlet with neither is refused as the module refuses a call without it.
     """
     streams = {}
-    for port in twin.module._inlets:
+    for port in twin.module._fed_inlets():
         if port in block.fluids:
             m_dot, temperature, pressure = (
                 block.fields[port, name][selected] for name in STREAM_FIELDS
@@ -100,7 +100,7 @@ def _streams(twin, block, selected):
             streams[port] = Stream._trusted(m_dot, temperature, pressure, block.fluids[port])
         elif port in twin.constants:
             streams[port] = _constant(twin, port, len(selected))
-    if len(streams) < len(twin.module._inlets):
+    if len(streams) < len(twin.module._fed_inlets()):
         twin.module._split_call_args((), streams)
     return streams
 

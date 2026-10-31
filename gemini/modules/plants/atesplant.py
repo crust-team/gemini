@@ -5,6 +5,7 @@ from gemini.modules.heating import HeatPump
 from gemini.modules.module import Module
 from gemini.modules.pumps import CentrifugalPump
 from gemini.modules.storage import AquiferStorage
+from gemini.physics import energy
 from gemini.types import (
     Control,
     Electricity,
@@ -16,6 +17,7 @@ from gemini.types import (
     Outlet,
     Output,
     Parameter,
+    Power,
     Pressure,
     Stream,
 )
@@ -73,6 +75,7 @@ class ATESPlant(Module):
 
         # Inlets
         self.return_in = Inlet(Stream)
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.groundwater_flow = Control(MassFlow, ge=0)
@@ -99,10 +102,13 @@ class ATESPlant(Module):
             p=self.groundwater_pressure,
             fluid=self.storage.fluid,
         )
-        groundwater = self.pump(fluid_in=production).outlets.fluid_out
+        pumped = self.pump(fluid_in=production)
+        groundwater = pumped.outlets.fluid_out
+        power = [pumped.inlets.power_in]
         if self.storage.mode == "discharge":
             lifted = self.heat_pump(source_in=groundwater, sink_in=inlets.return_in)
             injected, building = lifted.outlets.source_out, lifted.outlets.sink_out
+            power.append(lifted.inlets.power_in)
         else:
             cooled = self.heat_exchanger(hot_in=inlets.return_in, cold_in=groundwater)
             injected, building = cooled.outlets.cold_out, cooled.outlets.hot_out
@@ -111,5 +117,7 @@ class ATESPlant(Module):
         # Outlets
         supply_out = building
 
-        outlets = dict(supply_out=supply_out)
+        power_in = energy.total_power(power)
+
+        outlets = dict(supply_out=supply_out, power_in=power_in)
         return outlets

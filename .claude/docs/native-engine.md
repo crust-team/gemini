@@ -391,6 +391,10 @@ and `from_dict` are one function, `plant.to_spec()` and `plant.to_dict()` one me
   registered with `registry.register_plant`), `factory.py` (a registry type or a group to a module).
   The dated parameters and bindings of `Module` are `modules/_utils/design.py`; the sections every
   tree shares are `modules/_utils/serialization.py`.
+- **Value order.** A connection orders its modules by the way the value travels: the source first
+  on a plain connection, the taker first on a drawn one. An `offered` outlet gives its module one
+  offer step and one call, and a loop that passes through an offer is no cycle
+  ([ports](modules.md#ports)).
 - **Rules.** Only `connect` wires. An inlet has one source and an outlet one target
   (`port_in_use`); a bare module takes its only fitting free port, several raise `ambiguous_port`
   with the candidates; different stream types raise `stream_mismatch`; a loop of leaves without a

@@ -53,6 +53,7 @@ def designed(**extra):
     plant = gm.Plant("Holder")
     doublet = plant.add("Doublet", name="d0", params=DESIGN | extra)
     plant.connect("return_in", "d0.return_in")
+    plant.connect("power_in", "d0.power_in")
     plant.connect("d0.supply_out", "supply_out")
     doublet.fluid = BRINE
     return plant, doublet

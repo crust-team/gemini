@@ -71,6 +71,37 @@ A port declares its label: `Inlet(Stream, kind="brine")`, one of `gm.streams.nam
 A port without one, `kind=None`, takes whatever flows through it: piping, `CentrifugalPump`,
 `HeatExchanger` and the source side of `HeatPump`. Labels never change a calculation; they say what may be connected.
 
+## Ports
+
+A port carries a `Stream` or a `Power`, and connections check that their `kind`s match:
+`Inlet(Power, kind="electricity")`, `Outlet(Power, kind="heat")`. `many=True` lets several ports
+connect to one port; its value is the list of what arrives, and the module sums it with an explicit
+function (`energy.total_power`). A `many` port may stay empty.
+
+A plant runs its modules in the order the values travel, and on some connections the value travels
+against the energy, because the module that receives the energy decides how much it takes:
+
+- **A drawn port.** A single `Power` inlet is drawn: a call needs no value for it, `forward` computes
+  it and returns it under the name of the port, beside the outlets, and `result.inlets.power_in`
+  shows it. A stream inlet is drawn with `Inlet(Stream, drawn=True)`: it receives the conditions the
+  source offers and `forward` returns the stream it took. A `many` outlet is drawn, as is any
+  `Outlet(..., drawn=True)`: the module receives what its takers drew under the name of the outlet
+  (`outlets.power_out` in `_compute_outputs`, `inlets.power_out` in `forward`). The taker runs before
+  the source.
+- **An offered outlet.** `Outlet(Stream, offered=True)` exists before the other modules run. Its
+  module defines `_offer(self, inlets)`, reading parameters, controls, boundaries and the inlets it
+  names in `offer_inlets`, and the plan gives the module one offer step and one call. This is how an
+  edge module both feeds modules and receives from them without a cycle, and how a connection back
+  to such a module is no loop. A direct call that leaves a drawn outlet out gets its offer, and one
+  that leaves out a `many` port an empty list.
+
+A sub-plant exposes one port for what several children share: `plant.connect("power_in",
+"esp.power_in")` twice, or `"inlets": {"power_in": ["esp.power_in", "pump.power_in"]}` in the spec.
+Its value is the sum of what the ends carry (`energy.total_power`), so from outside a sub-plant reads
+like a leaf. Several ends may share a plant port that carries a power or air, never a plain stream. A
+handwritten composite does the same in code: it returns `power_in` from the `result.inlets.power_in`
+of its children.
+
 ## Describing a module
 
 `Module.describe()`, `Module.parameter_schema()` and `Module.validate_params(params)` work on a
@@ -580,7 +611,7 @@ helpers. Signatures are always
 `forward(self, inlets)` and `_compute_outputs(self, inlets, outlets)`, including modules with no
 ports; parameters have no defaults or variadic forms.
 
-Inlets and outlets accept `Stream` types only. Electricity, fuel use and heat exchanged with the
+Inlets and outlets accept a `Stream` or a `Power`. Fuel use and heat exchanged with the
 environment or a consumer are additive outputs with the fixed names and quantities of
 [types.md](types.md#energy-outputs-and-balances). Results keep the same dotted
 `<module path>.<name>` addressing scheme. Port, control and output names follow the naming rule

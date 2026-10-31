@@ -83,7 +83,7 @@ class BoilerChpPlant(gm.modules.Module):
         """Produce, treat, exchange and inject the brine; heat and remix the secondary water."""
 
         # Modules
-        supply = self.doublet.produce()
+        supply, _ = self.doublet.produce()
         degassed = self.degasser(fluid_in=supply)
         filtered = self.hot_filter(fluid_in=degassed.outlets.liquid_out)
         split = self.splitter(fluid_in=inlets.return_in)

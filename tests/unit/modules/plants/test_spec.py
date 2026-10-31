@@ -65,7 +65,7 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
             "filters": {"type": "ModuleDict", "modules": {"hot": {"type": "Filter", "params": {}}}},
         },
         "connections": [{"source": "doublet.supply_out", "target": "filters.hot.fluid_in"}],
-        "inlets": {"return_in": "doublet.return_in"},
+        "inlets": {"return_in": "doublet.return_in", "power_in": "doublet.power_in"},
         "outlets": {"product": "filters.hot.fluid_out"},
         "bindings": {},
         "param_history": {},

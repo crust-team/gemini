@@ -166,7 +166,11 @@
       }
     ],
     "inlets": {
-      "heating_return_in": "heating_return_pipe.fluid_in"
+      "heating_return_in": "heating_return_pipe.fluid_in",
+      "power_in": [
+        "doublet.power_in",
+        "injection_pump.power_in"
+      ]
     },
     "outlets": {
       "heating_return_out": "heating_consumer.return_out",

@@ -260,7 +260,8 @@
     }
   ],
   "inlets": {
-    "return_in": "injector.wellhead_in"
+    "return_in": "injector.wellhead_in",
+    "power_in": "esp.power_in"
   },
   "outlets": {
     "supply_out": "riser.wellhead_out"

@@ -114,9 +114,9 @@ def test_all_sections_list_own_declarations():
 
 def test_inlets_and_outlets_accept_fluid_stream_types_only():
     """Scalar and energy values belong in inputs or outputs, never flow ports."""
-    with pytest.raises(DefinitionError, match="fluid Stream"):
+    with pytest.raises(DefinitionError, match="Stream type or Power"):
         Inlet(float)
-    with pytest.raises(DefinitionError, match="fluid Stream"):
+    with pytest.raises(DefinitionError, match="Stream type or Power"):
         Outlet(float)
 
 

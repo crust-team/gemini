@@ -45,9 +45,11 @@ def built_by_hand(spec):
     for connection in spec["connections"]:
         plant.connect(connection["source"], connection["target"])
     for name, end in spec["inlets"].items():
-        plant.connect(name, end)
+        for item in end if isinstance(end, list) else [end]:
+            plant.connect(name, item)
     for name, end in spec["outlets"].items():
-        plant.connect(end, name)
+        for item in end if isinstance(end, list) else [end]:
+            plant.connect(item, name)
     _fill_sections(plant, spec)
     return plant
 

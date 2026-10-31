@@ -88,6 +88,7 @@ class CHP(Module):
         # Outlets
         self.fluid_out = Outlet(Stream, kind="hot_water")
         self.gas_out = Outlet(Stream, kind="gas")
+        self.power_out = Outlet(Power, kind="electricity")
 
     def forward(self, inlets):
         """Heat the water circuit by the recovered engine heat and pass on the gas not burned."""
@@ -98,7 +99,7 @@ class CHP(Module):
         outlet = inlet.with_(T=values["fluid_out_T"])
         gas_out = burner.unburned_gas(values["fuel"], fuel)
 
-        outlets = dict(fluid_out=outlet, gas_out=gas_out)
+        outlets = dict(fluid_out=outlet, gas_out=gas_out, power_out=values["electricity_generated"])
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

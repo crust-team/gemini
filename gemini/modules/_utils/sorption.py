@@ -4,12 +4,15 @@ from gemini import ops
 from gemini.errors import PhysicsError
 from gemini.modules.cooling import _physics
 from gemini.physics import heat_transfer
+from gemini.types.flows import Stream
 
 
 def rates(path, inlets):
     """Return each inlet's heat capacity rate m_dot * cp [W/K]; reject negative flow."""
     rate_of = {}
     for port, stream in inlets.items():
+        if not isinstance(stream, Stream):
+            continue
         ops.check(
             stream.m_dot >= 0,
             PhysicsError,

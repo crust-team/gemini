@@ -67,7 +67,7 @@ def _guards(module, fluids, stepped):
         tree,
         outputs_enabled(),
         runtime.get_precision(),
-        tuple(fluids[name] for name in module._inlets),
+        tuple(fluids[name] for name in module._fed_inlets()),
         stepped,
     )
 

@@ -69,6 +69,7 @@ class CentrifugalPump(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream)
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.frequency = Control(Frequency)
@@ -96,15 +97,16 @@ class CentrifugalPump(Module):
         rise = heat_transfer.temperature_change(losses, suction.heat_capacity_rate())
 
         discharge = suction.with_(p=suction.p + performance["head"], T=suction.T + rise)
+        power_in = energy.input_power(performance["shaft_power"], self.motor_efficiency)
 
-        outlets = dict(fluid_out=discharge)
+        outlets = dict(fluid_out=discharge, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         performance = self._performance(inlets.fluid_in)
         for name, value in performance.items():
             setattr(self, name, value)
-        self.electricity = energy.input_power(performance["shaft_power"], self.motor_efficiency)
+        self.electricity = inlets.power_in
         self.heat_loss = self.electricity - performance["shaft_power"]
         self.fluid_out_T = outlets.fluid_out.T
 

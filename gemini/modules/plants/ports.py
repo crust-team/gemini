@@ -2,7 +2,7 @@
 
 from gemini.errors import ValidationError
 from gemini.modules.module import Module
-from gemini.modules.plants.plan import is_group, members, split_end
+from gemini.modules.plants.plan import is_group, members, port_ends, split_end
 from gemini.types.declarations import Declaration
 from gemini.utils.strings import close_matches, did_you_mean, join_names, join_path
 
@@ -10,6 +10,8 @@ SIDE_OF = {"source": "outlets", "target": "inlets"}
 
 
 def _compatible(first, second):
+    if first.carries_stream != second.carries_stream:
+        return False
     return first.kind is None or second.kind is None or first.kind == second.kind
 
 
@@ -29,13 +31,27 @@ class PortResolver:
         candidates = self._candidates(end, field, explicit)
         if len(candidates) != 1:
             raise self._ambiguous(list(map(_describe_end, candidates)), field)
+        if name in self._listed[side] and self._shareable(candidates[0][2]):
+            return self._join_port(side, name, candidates[0])
         if name in self._listed[side] or name in self._children:
             raise ValidationError(
                 f"{name}: plant port name is already taken", path="", code="invalid_connection"
             )
-        path, port, _ = candidates[0]
+        path, port, declaration = candidates[0]
         self._listed[side][name] = (path, port)
         self._refresh()
+
+    def _join_port(self, side, name, candidate):
+        """Add ``candidate`` to the plant port ``name``, which several ends share."""
+        path, port, declaration = candidate
+        kept = self._listed[side][name]
+        self._listed[side][name] = [*port_ends(kept), (path, port)]
+        self._refresh()
+
+    @staticmethod
+    def _shareable(declaration):
+        """Return whether several ends may share a plant port: a power, or air at no flow."""
+        return not declaration.carries_stream or declaration.kind == "air"
 
     def _candidates(self, value, field, explicit):
         side = SIDE_OF[field]
@@ -46,7 +62,7 @@ class PortResolver:
         free = [
             (path, name, item)
             for name, item in declared.items()
-            if not self._in_use(path, name, side)
+            if item.many or not self._in_use(path, name, side)
         ]
         if not free:
             code = "port_in_use" if declared else "unknown_port"
@@ -62,7 +78,7 @@ class PortResolver:
                 code="unknown_port",
                 suggestions=close_matches(port, declared),
             )
-        if self._in_use(path, port, side):
+        if not declared[port].many and self._in_use(path, port, side):
             raise ValidationError(
                 f"{join_path(path, port)}: {side[:-1]} is already connected",
                 path=field,
@@ -73,7 +89,8 @@ class PortResolver:
     def _in_use(self, path, port, side):
         key = "source" if side == "outlets" else "target"
         used = {split_end(item[key]) for item in self._connections}
-        return (path, port) in used | set(self._listed[side].values())
+        named = {end for ends in self._listed[side].values() for end in port_ends(ends)}
+        return (path, port) in used | named
 
     def _locate(self, value, field, explicit):
         path, port = self._parse(value, field)
@@ -160,6 +177,6 @@ class PortResolver:
             (side, path, port)
             for side in SIDE_OF.values()
             for path, module in members(self)
-            for port in getattr(module, side)()
-            if not self._in_use(path, port, side)
+            for port, declaration in getattr(module, side)().items()
+            if not declaration.many and not self._in_use(path, port, side)
         ]

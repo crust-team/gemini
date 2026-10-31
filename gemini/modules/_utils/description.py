@@ -81,7 +81,11 @@ def _ports(declarations):
     return {
         name: {
             "kind": declaration.kind,
-            "fields": {k: dict(v) for k, v in STREAM_FIELDS.items()},
+            "fields": (
+                {k: dict(v) for k, v in STREAM_FIELDS.items()}
+                if declaration.carries_stream
+                else {"power": {"unit": declaration.unit}}
+            ),
         }
         for name, declaration in declarations.items()
     }

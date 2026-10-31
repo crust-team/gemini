@@ -60,19 +60,16 @@ class Tracer:
     def _record(self, module, graph, fluids):
         """Record the call of ``module`` into ``graph`` and return it."""
         trace = Trace(graph, module)
-        inlets = Ports(
-            {name: _inlet(graph, name, fluids[name]) for name in module._inlets},
-            path=module.path,
-        )
+        fed = {name: _inlet(graph, name, fluids[name]) for name in module._fed_inlets()}
+        inlets = Ports(fed | module._empty_ports(), path=module.path)
         trace.limit_checks.extend(graph.checks)
         outlets, call = trace.run(module, inlets, {}, None)
+        settled = module._settled_inlets(inlets, call)
         graph.result = ModuleResult.of(
-            module, call.outputs or {}, outlets, inlets, call.inputs, call.call_records
+            module, call.outputs or {}, outlets, settled, call.inputs, call.call_records
         )
-        for port, stream in outlets.items():
-            graph.outlet_fluids[port] = stream.fluid
-            for field, _ in STREAM_FIELDS:
-                graph.output(f"outlets.{port}.{field}", getattr(stream, field))
+        for port, value in outlets.items():
+            _record_outlet(graph, port, value)
         for name, value in (call.outputs or {}).items():
             graph.output(f"outputs.{name}", value)
         certain(graph, trace.limit_checks + graph.unframed)
@@ -116,17 +113,34 @@ class Trace:
                 raise TraceError(f"{module.path}: {reasons[0]}")
             outlets, call = self.run(module, inlets, supplied, parent)
             outputs, inputs, records = call.outputs or {}, call.inputs, call.call_records
+            settled = module._settled_inlets(inlets, call)
         except TraceError as error:
             if not module.is_leaf:
                 raise
             self._rollback(mark)
-            outlets, outputs, inputs = record_break(
+            outlets, outputs, inputs, settled = record_break(
                 self.graph, module, inlets, supplied, outputs_enabled(), str(error)
             )
             records = []
-        result = ModuleResult.of(module, outputs, outlets, inlets, inputs, records)
+        result = ModuleResult.of(module, outputs, outlets, settled, inputs, records)
         parent.call_records.append((module._relative_path(parent.module), result))
         return result
+
+    def offer(self, module, inlets, parent):
+        """Return the offered outlets of ``module`` on traced values; no call is recorded."""
+        call = _Call(
+            module=module,
+            inputs=self._call_inputs(module, {}),
+            outputs=None,
+            parent=parent,
+            parameters=self._call_parameters(module),
+            trace=self,
+        )
+        token = _current_call.set(call)
+        try:
+            return module._offer(inlets)
+        finally:
+            _current_call.reset(token)
 
     def _mark(self):
         return self.graph.mark(), dict(self._inputs), dict(self._parameters)
@@ -207,6 +221,18 @@ def _untraceable(module, stepped):
     if runtime.get_precision() != "float64":
         reasons.append("runtime precision is not float64")
     return reasons
+
+
+def _record_outlet(graph, port, value):
+    """Record the graph outputs of one outlet: the stream fields, or the power."""
+    if isinstance(value, list):
+        return
+    if not isinstance(value, Stream):
+        graph.output(f"outlets.{port}", value)
+        return
+    graph.outlet_fluids[port] = value.fluid
+    for field, _ in STREAM_FIELDS:
+        graph.output(f"outlets.{port}.{field}", getattr(value, field))
 
 
 def _inlet(graph, name, fluid):

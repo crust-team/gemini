@@ -210,9 +210,10 @@ def test_a_plant_child_outside_a_cycle_is_called_as_one_unit():
     plant = gm.Plant("Nested")
     plant.add("Doublet", "doublet")
     plant.connect("return_in", "doublet.return_in")
+    plant.connect("power_in", "doublet.power_in")
     plant.connect("doublet.supply_out", "supply_out")
     assert [step.path for step in plant._compiled().steps] == ["doublet"]
-    assert list(plant.inlets()) == ["return_in"]
+    assert list(plant.inlets()) == ["return_in", "power_in"]
 
 
 def test_the_doublet_runs_injection_before_production():

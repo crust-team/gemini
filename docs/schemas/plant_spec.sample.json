@@ -342,6 +342,10 @@
   },
   "format": 2,
   "inlets": {
+    "power_in": [
+      "doublet.power_in",
+      "injection_pump.power_in"
+    ],
     "return_in": "heat_exchanger.cold_in"
   },
   "modules": {

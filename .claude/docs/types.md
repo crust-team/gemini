@@ -38,8 +38,8 @@ give the unit actually used.
 ## Quantities and declarations
 
 Use `Parameter`, `Inlet`, `Control`, `Boundary`, `State`, `Output` and `Outlet` in module
-constructors. Output kinds may be quantity aliases or Python types; inlet and outlet kinds must
-be `Stream` types. `Parameter(kind, default=, shape=, calibratable=, description=, **bounds)`
+constructors. Output types may be quantity aliases or Python types; inlet and outlet types are a
+`Stream` type or `Power`. `Parameter(kind, default=, shape=, calibratable=, description=, **bounds)`
 holds design data; `Control` and `Boundary` take `kind`, `default`, `description` and bounds;
 `State(kind, default=)` declares a stepped value (see [modules.md](modules.md#state-and-health));
 `Output(kind, soft_sensor=, description=)`, the formulas `Output.of` and `Output.ratio` and the
@@ -136,7 +136,8 @@ field is an array over time or a traced value it is kept as given and the limits
 a trusted fast copy: it reuses the `Fluid`, checks only the changed fields against the same
 limits and raises `ValidationError` for an unknown field. A traced inlet is a `Stream` of graph
 inputs with the concrete `Fluid`, so `volumetric_flow()` divides by a plain float density.
-`Ports` accept only `Stream`. Ports have no JSON schema, quantity or unit in `Declaration`.
+`Ports` hold a `Stream`, a power (a number, an array or a traced value) or the list of a `many` port.
+A stream port has no JSON schema, quantity or unit in `Declaration`.
 
 `Parameter(..., structural=True)` marks a parameter that decides the shape of the computation (a
 loop count, a value that changes a `Fluid`): a trace reads it as a plain value and its value is a

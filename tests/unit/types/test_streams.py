@@ -8,7 +8,18 @@ from gemini.types import Inlet, Outlet, Stream, streams
 
 def test_names_are_the_fixed_list():
     """The list is what the frontend colours."""
-    assert streams.names() == ["brine", "hot_water", "chilled_water", "gas", "electricity", "fuel"]
+    assert streams.names() == [
+        "brine",
+        "hot_water",
+        "chilled_water",
+        "gas",
+        "electricity",
+        "fuel",
+        "heat",
+        "air",
+        "waste",
+        "chemical",
+    ]
 
 
 def test_a_port_keeps_its_stream():

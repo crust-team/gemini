@@ -36,7 +36,7 @@ def test_the_plan_names_where_every_inlet_comes_from():
     assert sink.arguments == {"sandface_in": ("step", "injector", "bottom_out")}
     injector = steps.steps[0]
     assert injector.arguments == {"wellhead_in": ("inlet", "return_in")}
-    assert steps.outlets == {"supply_out": ("riser", "wellhead_out")}
+    assert steps.outlets == {"supply_out": [("riser", "wellhead_out")]}
 
 
 def test_state_connections_cannot_run_yet():
@@ -57,6 +57,7 @@ def test_a_loop_through_a_plant_child_opens_it():
     plant.add("Pipe", "pipe")
     plant.connect("doublet.supply_out", "pipe.fluid_in")
     plant.connect("pipe.fluid_out", "doublet.return_in")
+    plant.connect("power_in", "doublet.power_in")
     assert [step.path for step in plant._compiled().steps][-2:] == [
         "doublet.injector",
         "doublet.sink",

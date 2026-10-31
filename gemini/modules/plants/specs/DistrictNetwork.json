@@ -77,7 +77,8 @@
     }
   ],
   "inlets": {
-    "supply_in": "pump.fluid_in"
+    "supply_in": "pump.fluid_in",
+    "power_in": "pump.power_in"
   },
   "outlets": {
     "return_out": "return_pipe.fluid_out"

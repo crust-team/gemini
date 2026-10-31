@@ -114,6 +114,13 @@ def _current_end(end, side):
     return join_path(path, _current_port(port, side))
 
 
+def _current_ends(ends, side):
+    """Return one end of a plant port, or the list of ends several share, with current ports."""
+    if isinstance(ends, list):
+        return [_current_end(end, side) for end in ends]
+    return _current_end(ends, side)
+
+
 def _current_binding_names(bindings):
     """Return flat bindings of one module with the current port of each ``port.field`` key."""
     current = {}
@@ -145,7 +152,7 @@ def _current_ports(spec):
         item["target"] = _current_end(item["target"], "inlets")
     for side in ("inlets", "outlets"):
         if side in spec:
-            spec[side] = {name: _current_end(end, side) for name, end in spec[side].items()}
+            spec[side] = {name: _current_ends(ends, side) for name, ends in spec[side].items()}
     spec["bindings"] = {
         path: _current_binding_names(values) for path, values in spec.get("bindings", {}).items()
     }

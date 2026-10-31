@@ -68,6 +68,7 @@ class GasCompressor(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="gas")
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.pressure_setpoint = Control(Pressure)
@@ -93,28 +94,33 @@ class GasCompressor(Module):
         )
 
         discharge = suction.with_(p=self.pressure_setpoint, T=fluid_out_T)
+        power_in = energy.input_power(self._shaft_power(suction), self.motor_efficiency)
 
-        outlets = dict(fluid_out=discharge)
+        outlets = dict(fluid_out=discharge, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         suction = inlets.fluid_in
         discharge = outlets.fluid_out
         self.pressure_ratio = self._pressure_ratio(suction)
+        self.shaft_power = self._shaft_power(suction)
+        self.electricity = inlets.power_in
+        self.fluid_out_T = discharge.T
+        self.heat_loss = _physics.heat_rejected(
+            self.electricity, self.shaft_power, self.stage_count
+        )
+
+    def _shaft_power(self, suction):
+        """Return the shaft power [W] of the compression at the operating point."""
         work = _physics.specific_compression_work(
             suction.T,
-            self.pressure_ratio,
+            self._pressure_ratio(suction),
             self.heat_capacity_ratio,
             self.gas_specific_heat,
             self.isentropic_efficiency,
             self.stage_count,
         )
-        self.shaft_power = _physics.shaft_power(suction.m_dot, work)
-        self.electricity = energy.input_power(self.shaft_power, self.motor_efficiency)
-        self.fluid_out_T = discharge.T
-        self.heat_loss = _physics.heat_rejected(
-            self.electricity, self.shaft_power, self.stage_count
-        )
+        return _physics.shaft_power(suction.m_dot, work)
 
     def _pressure_ratio(self, suction):
         """Return the overall pressure ratio [-]; reject reverse flow and expansion."""

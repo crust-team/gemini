@@ -164,21 +164,35 @@ class _ScalarParameters(dict):
         return value
 
 
+def _holds_array(value):
+    """Return whether a port value holds an array over rows; a 0-d array is a scalar."""
+    if isinstance(value, list):
+        return any(_holds_array(item) for item in value)
+    if isinstance(value, Stream):
+        return any(_holds_array(item) for item in (value.m_dot, value.T, value.p))
+    return isinstance(value, np.ndarray) and bool(value.ndim)
+
+
 def _has_arrays(inlets, inputs):
     """Return whether a call holds arrays over rows, which leaves its scope unwrapped.
 
     A 0-d array is a scalar: ops give one under a forced NumPy backend.
     """
-    for stream in inlets.values():
-        for value in (stream.m_dot, stream.T, stream.p):
-            if isinstance(value, np.ndarray) and value.ndim:
-                return True
-    return any(isinstance(value, np.ndarray) and value.ndim for value in inputs.values())
+    return any(_holds_array(value) for value in (*inlets.values(), *inputs.values()))
+
+
+def _numpy_value(value):
+    """Return a port value for the eager scope: a stream's fields or a power as ``np.float64``."""
+    if isinstance(value, list):
+        return [_numpy_value(item) for item in value]
+    return value._numpy() if isinstance(value, Stream) else ops.scope.wrap(value)
 
 
 def _numpy_ports(inlets):
-    """Return ``inlets`` with stream fields as ``np.float64`` for the eager scope."""
-    return Ports._trusted({name: stream._numpy() for name, stream in inlets.items()}, inlets._path)
+    """Return ``inlets`` with stream fields and powers as ``np.float64`` for the eager scope."""
+    return Ports._trusted(
+        {name: _numpy_value(value) for name, value in inlets.items()}, inlets._path
+    )
 
 
 def _read(call, value):
@@ -197,8 +211,10 @@ def _restored(returned, scoped, inlets):
 
 
 def _plain_outlet(value):
-    """Return an outlet stream with plain scalar fields; a ``Failed`` field raises its error."""
-    return value._plain() if isinstance(value, Stream) else value
+    """Return an outlet value with plain scalars; a ``Failed`` field raises its error."""
+    if isinstance(value, list):
+        return [_plain_outlet(item) for item in value]
+    return value._plain() if isinstance(value, Stream) else ops.scope.plain(value)
 
 
 @dataclass
@@ -225,6 +241,7 @@ class _Call:
     parameters: dict | None = None
     trace: object | None = None
     wrapping: bool = False
+    drawn: dict = field(default_factory=dict)
 
     def owned_by(self, module):
         """Return the innermost call of ``module`` in this chain, or ``None``."""
@@ -285,6 +302,7 @@ class Module:
     """
 
     repr_fields = ()
+    offer_inlets = ()
     category = _FolderCategory()
     describe = _ClassOrInstance(description.describe, values=False)
     parameter_schema = _ClassOrInstance(description.parameter_schema)
@@ -772,6 +790,34 @@ class Module:
         """Move inlet fluids to declared outlets; subclasses implement this."""
         raise NotImplementedError(f"{type(self).__name__} has no forward method")
 
+    def _offer(self, inlets):
+        """Return the ``offered`` outlets; a module that declares one overrides this.
+
+        It runs before the other modules and reads only controls, boundaries, parameters and
+        the inlets named in ``offer_inlets``.
+        """
+        raise NotImplementedError(f"{type(self).__name__} offers nothing")
+
+    def offered_outlets(self):
+        """Return the outlets that exist before the other modules run."""
+        return {name: port for name, port in self._outlets.items() if port.offered}
+
+    def offer(self, inlets=None):
+        """Return the values of the ``offered`` outlets, for a plant to pass on before they run."""
+        self._prepare()
+        parent = _current_call.get()
+        ports = Ports(inlets or {}, path=self.path)
+        if parent is not None and parent.trace is not None:
+            return parent.trace.offer(self, ports, parent)
+        with ops.scope.Scope(self._scalar_mode(), _has_arrays(ports, {})) as scope:
+            call = self._eager_call(self._resolve_inputs({}), parent, None, scope.wrapping)
+            token = _current_call.set(call)
+            try:
+                offered = self._offer(_numpy_ports(ports) if scope.wrapping else ports)
+            finally:
+                _current_call.reset(token)
+        return {name: _plain_outlet(value) for name, value in offered.items()}
+
     def _compute_outputs(self, inlets, outlets):
         """Compute leaf outputs after ``forward``; overrides never call ``super()``."""
 
@@ -803,7 +849,7 @@ class Module:
             self,
             call.outputs or {},
             outlets,
-            inlets,
+            self._settled_inlets(inlets, call),
             ops.scope.plain(dict(call.inputs)),
             call.call_records,
         )
@@ -848,14 +894,50 @@ class Module:
         for hook in tuple(self._pre_hooks.values()):
             hook(self, inlets)
         returned = self.forward(scoped)
+        self._check_outlet_names(returned)
+        given = {name: returned[name] for name in self._given_outlets()}
+        taken = {name: scoped[name] for name in self._drawn_outlets() if name in scoped}
         if call.trace is None:
-            outlets = self._check_outlets(_restored(returned, scoped, inlets))
+            outlets = self._check_outlets(_restored(given, scoped, inlets), taken)
+            call.drawn = self._checked_drawn(returned)
         else:
-            self._check_outlet_names(returned)
-            outlets = Ports({name: returned[name] for name in self._outlets}, path=self.path)
+            outlets = Ports({name: (given | taken)[name] for name in self._outlets}, path=self.path)
+            call.drawn = {name: returned[name] for name in self._drawn_inlets()}
         if call.outputs is not None:
-            self._output_step(scoped, inlets, outlets, call)
+            self._output_step(self._settled_inlets(scoped, call), inlets, outlets, call)
         return outlets
+
+    def _settled_inlets(self, inlets, call):
+        """Return the declared inlets of a call, each drawn one with the value the module drew."""
+        values = {
+            name: call.drawn[name] if name in call.drawn else inlets[name] for name in self._inlets
+        }
+        return Ports._trusted(values, self.path)
+
+    def _given_outlets(self):
+        """Return the outlets ``forward`` returns: all but those whose takers decide the flow."""
+        return [name for name, port in self._outlets.items() if not port.drawn]
+
+    def _drawn_outlets(self):
+        """Return the outlets that receive what their takers drew."""
+        return [name for name, port in self._outlets.items() if port.drawn]
+
+    def _drawn_inlets(self):
+        """Return the inlets whose value ``forward`` returns."""
+        return [name for name, port in self._inlets.items() if port.drawn]
+
+    def _fed_inlets(self):
+        """Return the single stream inlets a caller supplies, in declaration order."""
+        return {
+            name: port for name, port in self._inlets.items() if not port.gives and not port.many
+        }
+
+    def _checked_drawn(self, returned):
+        """Return what ``forward`` drew through its drawn inlets, validated."""
+        return {
+            name: self._inlets[name].validate(_plain_outlet(returned[name]))
+            for name in self._drawn_inlets()
+        }
 
     def _output_step(self, scoped, inlets, outlets, call):
         """Compute the outputs after ``forward``, the one sequence of an eager and a traced call.
@@ -878,8 +960,9 @@ class Module:
 
     def _split_call_args(self, args, kwargs):
         """Return validated inlet ``Ports`` and the supplied control/boundary keywords."""
-        inlet_names = list(self._inlets)
-        valid_names = inlet_names + list(self._controls) + list(self._boundaries)
+        inlet_names = list(self._fed_inlets())
+        ports = inlet_names + list(self._optional_ports())
+        valid_names = ports + list(self._controls) + list(self._boundaries)
         self._check_keywords(kwargs, valid_names)
         if len(args) == 1 and isinstance(args[0], Mapping):
             inlet_values = self._mapping_inlets(args[0], kwargs)
@@ -893,12 +976,38 @@ class Module:
                 code="invalid_call",
             )
         inlets = self._validated_ports(
-            "inlet", self._inlets, inlet_values, partial(ValidationError, code="invalid_call")
+            "inlet",
+            self._call_ports(),
+            self._with_optional_ports(inlet_values),
+            partial(ValidationError, code="invalid_call"),
         )
         inputs = {
             name: kwargs[name] for name in self._controls | self._boundaries if name in kwargs
         }
         return inlets, inputs
+
+    def _optional_ports(self):
+        """Return the ports a call may leave out: ``many`` inlets and drawn outlets, by name."""
+        many = {name: port for name, port in self._inlets.items() if port.many}
+        return many | {name: self._outlets[name] for name in self._drawn_outlets()}
+
+    def _call_ports(self):
+        """Return every port a call holds a value for: fed inlets, then the optional ports."""
+        return self._fed_inlets() | self._optional_ports()
+
+    def _empty_ports(self):
+        """Return what the optional ports hold when nothing is taken: no list items, the offer."""
+        optional = self._optional_ports()
+        values = {name: [] for name, port in optional.items() if port.many}
+        if len(values) < len(optional):
+            values |= {name: self.offer()[name] for name in optional if name not in values}
+        return values
+
+    def _with_optional_ports(self, values):
+        """Return ``values`` with the optional ports the call left out."""
+        if all(name in values for name in self._optional_ports()):
+            return values
+        return self._empty_ports() | dict(values)
 
     def _check_keywords(self, kwargs, valid_names):
         unknown = [name for name in kwargs if name not in valid_names]
@@ -911,26 +1020,27 @@ class Module:
             )
 
     def _mapping_inlets(self, mapping, kwargs):
-        valid = join_names(self._inlets)
-        mixed = [name for name in self._inlets if name in kwargs]
+        ports = self._call_ports()
+        valid = join_names(ports)
+        mixed = [name for name in ports if name in kwargs]
         if mixed:
             raise ValidationError(
                 f"{self.path}: cannot mix inlet mapping with inlet keyword {mixed[0]!r}; "
                 f"valid names: {valid}",
                 code="invalid_call",
             )
-        unknown = [name for name in mapping if name not in self._inlets]
+        unknown = [name for name in mapping if name not in ports]
         if unknown:
             name = unknown[0]
             raise ValidationError(
                 f"{self.path}: unknown inlet {name!r}; valid names: {valid}"
-                f"{did_you_mean(name, self._inlets)}",
+                f"{did_you_mean(name, ports)}",
                 code="invalid_call",
             )
         return mapping
 
     def _positional_inlets(self, args, kwargs):
-        inlet_names = list(self._inlets)
+        inlet_names = list(self._fed_inlets())
         valid = join_names(inlet_names)
         if len(args) > len(inlet_names):
             raise ValidationError(
@@ -946,7 +1056,8 @@ class Module:
                 f"valid names: {valid}",
                 code="invalid_call",
             )
-        values.update({name: kwargs[name] for name in inlet_names if name in kwargs})
+        ports = self._call_ports()
+        values.update({name: kwargs[name] for name in ports if name in kwargs})
         return values
 
     def _validated_ports(self, kind, declarations, values, error, prepare=lambda value: value):
@@ -968,21 +1079,22 @@ class Module:
         return Ports(validated, path=self.path)
 
     def _check_outlet_names(self, returned):
-        """Reject a ``forward`` result that is not a dict of exactly the declared outlets."""
+        """Reject a ``forward`` result that is not a dict of what the module gives."""
         if not isinstance(returned, dict):
             raise DefinitionError(f"{self.path}: forward must return an outlet dict")
-        missing = self._outlets.keys() - returned.keys()
-        extra = returned.keys() - self._outlets.keys()
+        expected = [*self._given_outlets(), *self._drawn_inlets()]
+        missing = set(expected) - returned.keys()
+        extra = returned.keys() - set(expected)
         if missing or extra:
             raise DefinitionError(
                 f"{self.path}: outlet names missing={sorted(missing)}, extra={sorted(extra)}; "
-                f"valid names: {join_names(self._outlets)}"
+                f"valid names: {join_names(expected)}"
             )
 
-    def _check_outlets(self, returned):
-        self._check_outlet_names(returned)
+    def _check_outlets(self, given, taken):
+        """Return the outlet ``Ports``: what ``forward`` gave and what its takers took."""
         return self._validated_ports(
-            "outlet", self._outlets, returned, DefinitionError, _plain_outlet
+            "outlet", self._outlets, given | taken, DefinitionError, _plain_outlet
         )
 
     def _resolve_inputs(self, supplied):

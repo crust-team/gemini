@@ -111,6 +111,8 @@ def assert_health_matches(module, results, measured):
 
 
 def _stacked_stream(streams):
+    if not isinstance(streams[0], Stream):
+        return np.array(streams)
     return Stream(
         **{field: np.array([getattr(s, field) for s in streams]) for field in STREAM_FIELDS},
         fluid=streams[0].fluid,
@@ -128,7 +130,7 @@ def assert_module_matches(module, rows, breaks=False):
     """
     calls = [module(**row) for row in rows]
     inlets = {
-        name: _stacked_stream([row[name] for row in rows]) for name in module.inlets() if rows
+        name: _stacked_stream([row[name] for row in rows]) for name in module._fed_inlets() if rows
     }
     inputs = {
         name: np.array([row[name] for row in rows], dtype=float)
@@ -148,18 +150,24 @@ def _assert_matches_calls(module, calls, outcome, backend):
     for name in calls[0].outputs:
         values = [call.outputs[name] for call in calls]
         assert_close(outcome.outputs[name], values, f"{backend}: {module.path}.{name}")
-    for port in module.outlets():
-        for field in STREAM_FIELDS:
-            values = [getattr(call.outlets[port], field) for call in calls]
+    for port, fields in outcome.outlets.items():
+        for field, traced in fields.items():
+            values = [_port_field(module, call, port, field) for call in calls]
             label = f"{backend}: {module.path}.{port}.{field}"
-            assert_close(outcome.outlets[port][field], values, label)
+            assert_close(traced, values, label)
+
+
+def _port_field(module, call, port, field):
+    """Return one field of a port of a direct call: a stream field, or the ``power``."""
+    value = (call.inlets if port in module._inlets else call.outlets)[port]
+    return value if field == "power" else getattr(value, field)
 
 
 def _assert_matches_run(module, reference, outcome, backend):
     assert outcome.outputs.keys() == reference.outputs.keys()
     for name, values in reference.outputs.items():
         assert_close(outcome.outputs[name], values, f"{backend} against reference: {name}")
-    for port in module.outlets():
-        for field in STREAM_FIELDS:
+    for port, fields in reference.outlets.items():
+        for field, values in fields.items():
             label = f"{backend} against reference: {port}.{field}"
-            assert_close(outcome.outlets[port][field], reference.outlets[port][field], label)
+            assert_close(outcome.outlets[port][field], values, label)

@@ -88,13 +88,16 @@ Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
    `Output.of` and `Output.ratio` declarations with direct references and additive outputs
    without a formula, which sum their descendant leaves; they override `_compute_outputs` only
    to record their own value for such an additive output.
-7. End every `forward` with `outlets = dict(...)` in declaration order, then `return outlets`.
+7. End every `forward` with `outlets = dict(...)`, the outlets in declaration order and then the
+   drawn inlets, then `return outlets`.
    Zero- and one-outlet modules use the same dictionary shape.
 8. Do not construct `ModuleResult` in module code; `Module.__call__` creates it.
 9. Keep value arguments out of `__init__`; structural tree-shape arguments are the exception.
    Build a configured module with `ESP().update_params(...)`.
 10. Never declare metadata or lists that `Module` derives.
-11. Inlets and outlets carry `Stream` types only. Electricity, fuel and heat loss are outputs.
+11. Inlets and outlets carry a `Stream` or a `Power`: see [ports](modules.md#ports). A single
+    `Power` inlet is drawn: the module computes it in `forward` and returns it under the port's
+    name.
 12. Pre-hooks are exactly `(module, inlets)` and forward hooks are exactly
     `(module, inlets, outlets)`.
 
@@ -248,6 +251,10 @@ reason it is needed:
   `gemini.utils.mappings.AttributeMapping`, so `result.outlets.fluid_out` equals
   `result.outlets["fluid_out"]`, and `Results[path].field` returns a pandas Series through
   `ModuleSeries.__getattr__`.
+- `Plant.forward` runs a module with an `offered` outlet twice in one step: `Module.offer` first,
+  which no call records, then its call. A drawn inlet takes its value from what `forward` returns,
+  so `ModuleResult.inlets` shows what was drawn. Both are needed because the value on a connection
+  can travel against the energy ([ports](modules.md#ports)).
 - Two optional method protocols: a module that defines `capex(assumptions)` returning a `Cost`
   declares its own cost for `gemini.types.cost.total_cost(plant, assumptions)`, which looks the method up by name; a
   module that overrides `health(result, measured)` gets a diagnostic, which the engine calls

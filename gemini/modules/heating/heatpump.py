@@ -86,6 +86,7 @@ class HeatPump(Module):
         # Inlets
         self.source_in = Inlet(Stream)
         self.sink_in = Inlet(Stream, kind="hot_water")
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -114,7 +115,7 @@ class HeatPump(Module):
         source_out = inlets.source_in.with_(T=values["source_out_T"])
         sink_out = inlets.sink_in.with_(T=values["sink_out_T"])
 
-        outlets = dict(source_out=source_out, sink_out=sink_out)
+        outlets = dict(source_out=source_out, sink_out=sink_out, power_in=values["electricity"])
         return outlets
 
     def _compute_outputs(self, inlets, outlets):

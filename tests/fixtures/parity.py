@@ -94,8 +94,10 @@ def plain(result):
     }
 
 
-def _stream(stream):
-    return {field: getattr(stream, field) for field in (*STREAM_FIELDS, "fluid")}
+def _stream(value):
+    if not isinstance(value, gm.Stream):
+        return value
+    return {field: getattr(value, field) for field in (*STREAM_FIELDS, "fluid")}
 
 
 class Recorder(Callback):

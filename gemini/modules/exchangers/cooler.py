@@ -65,6 +65,7 @@ class Cooler(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="hot_water")
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -91,15 +92,16 @@ class Cooler(Module):
         inlet = inlets.fluid_in
         duty, rate, _ = self._duty(inlet)
         outlet = inlet.with_(T=inlet.T - heat_transfer.temperature_change(duty, rate))
+        power_in = heat_transfer.fan_power(duty, self.specific_fan_power)
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         duty, _, requested = self._duty(inlets.fluid_in)
         self.duty = duty
         self.fluid_out_T = outlets.fluid_out.T
-        self.electricity = heat_transfer.fan_power(duty, self.specific_fan_power)
+        self.electricity = inlets.power_in
         self.heat_loss = duty + self.electricity
         self.evaporation_rate = (
             psychrometrics.evaporation_rate(duty, self.latent_heat)

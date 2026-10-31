@@ -157,8 +157,19 @@
     },
     "inlets": {
       "additionalProperties": {
-        "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
-        "type": "string"
+        "anyOf": [
+          {
+            "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+            "type": "string"
+          },
+          {
+            "items": {
+              "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        ]
       },
       "type": "object"
     },
@@ -173,8 +184,19 @@
     },
     "outlets": {
       "additionalProperties": {
-        "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
-        "type": "string"
+        "anyOf": [
+          {
+            "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+            "type": "string"
+          },
+          {
+            "items": {
+              "pattern": "^[^.\\s]+(\\.[^.\\s]+)+$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        ]
       },
       "type": "object"
     },

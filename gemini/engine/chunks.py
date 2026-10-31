@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from gemini.errors import ValidationError
+from gemini.types.flows import Stream
 
 MISSING = float("nan")
 """What a row without a path holds in an object column, as an absent key of a row dict did."""
@@ -122,7 +123,8 @@ def _with_none(value, nullable):
 
 def _operating(result, length):
     """Return, per tick, whether any port carries flow; a module without ports is operating."""
-    flows = [*result.inlets.values(), *result.outlets.values()]
+    ports = [*result.inlets.values(), *result.outlets.values()]
+    flows = [port for port in ports if isinstance(port, Stream)]
     if not flows:
         return np.ones(length, dtype=bool)
     moving = [np.broadcast_to(np.asarray(flow.m_dot) != 0, (length,)) for flow in flows]

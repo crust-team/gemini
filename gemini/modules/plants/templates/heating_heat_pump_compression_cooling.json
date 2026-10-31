@@ -272,7 +272,13 @@
     "inlets": {
       "heating_return_in": "heating_return_pipe.fluid_in",
       "cooling_return_in": "cooling_return_pipe.fluid_in",
-      "compression_rejection_in": "compression_chiller.sink_in"
+      "compression_rejection_in": "compression_chiller.sink_in",
+      "power_in": [
+        "doublet.power_in",
+        "heat_pump.power_in",
+        "injection_pump.power_in",
+        "compression_chiller.power_in"
+      ]
     },
     "outlets": {
       "heating_return_out": "heating_consumer.return_out",

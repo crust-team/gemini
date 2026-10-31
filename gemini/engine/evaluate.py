@@ -4,7 +4,7 @@ from gemini.errors import GeminiError, ValidationError
 from gemini.errors.base import check_on_error
 from gemini.modules._utils import registry
 from gemini.modules.module import Module
-from gemini.types.flows import STREAM_FIELDS
+from gemini.types.flows import STREAM_FIELDS, Stream
 from gemini.types.shapes import OutputUnits
 
 STREAM_UNITS = {
@@ -67,13 +67,17 @@ def _failed(error, on_error):
 
 
 def _outlets(outlets, output):
-    """Return each outlet stream as ``{field: {value, unit}}``."""
-    return {
-        port: {
-            name: output.value(getattr(stream, name), *STREAM_UNITS[name]) for name in STREAM_FIELDS
-        }
-        for port, stream in outlets.items()
-    }
+    """Return each outlet as ``{field: {value, unit}}``; a power port has the field ``power``."""
+    return {port: _outlet(value, output) for port, value in outlets.items()}
+
+
+def _outlet(value, output):
+    """Return one outlet: its stream fields, or ``{power: {value, unit}}``."""
+    if isinstance(value, list):
+        return [_outlet(item, output) for item in value]
+    if not isinstance(value, Stream):
+        return {"power": output.value(value, "W", "power")}
+    return {name: output.value(getattr(value, name), *STREAM_UNITS[name]) for name in STREAM_FIELDS}
 
 
 def _outputs(instance, outputs, output):

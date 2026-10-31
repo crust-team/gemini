@@ -1,16 +1,42 @@
-"""Immutable named fluid ports passed through module calls."""
+"""Immutable named ports passed through module calls: streams, powers and lists of them."""
+
+import numbers
+
+import numpy as np
 
 from gemini.errors import ValidationError
 from gemini.errors.lookup import UnknownPort
+from gemini.ops import Symbolic
 from gemini.types.flows import Stream
 from gemini.utils.mappings import AttributeMapping
 from gemini.utils.strings import did_you_mean, join_names
 
 
-class Ports(AttributeMapping):
-    """Read-only, ordered mapping of port names to fluid streams.
+def is_port_value(value):
+    """Return whether ``value`` can cross a port: a stream, a power or a list of them."""
+    if isinstance(value, list):
+        return all(is_port_value(item) for item in value)
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, (Stream, numbers.Real, np.ndarray, Symbolic))
 
-    Values are ``Stream`` objects, whose fields may be floats, arrays or traced values.
+
+def map_port_value(value, function):
+    """Return a port value with ``function`` applied to each number; a fluid stays as it is."""
+    if isinstance(value, list):
+        return [map_port_value(item, function) for item in value]
+    if isinstance(value, Stream):
+        return Stream._trusted(
+            function(value.m_dot), function(value.T), function(value.p), value.fluid
+        )
+    return function(value)
+
+
+class Ports(AttributeMapping):
+    """Read-only, ordered mapping of port names to what crosses them.
+
+    A value is a ``Stream``, whose fields may be floats, arrays or traced values, a power of the
+    same three forms, or the list a ``many`` port holds.
     """
 
     key_error = UnknownPort
@@ -26,9 +52,9 @@ class Ports(AttributeMapping):
                     f"valid names: {join_names(self._values)}",
                     code="invalid_call",
                 )
-            if not isinstance(value, Stream):
+            if not is_port_value(value):
                 raise ValidationError(
-                    f"{path}: port {name!r} = {value!r}; expected a Stream; "
+                    f"{path}: port {name!r} = {value!r}; expected a Stream or a power; "
                     f"valid names: {join_names(self._values)}",
                     code="invalid_call",
                 )

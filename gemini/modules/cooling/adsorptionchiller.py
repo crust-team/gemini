@@ -77,6 +77,7 @@ class AdsorptionChiller(Module):
         self.generator_in = Inlet(Stream, kind="hot_water")
         self.chilled_in = Inlet(Stream, kind="chilled_water")
         self.cooling_in = Inlet(Stream, kind="hot_water")
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.temperature_setpoint = Control(Temperature)
@@ -102,12 +103,14 @@ class AdsorptionChiller(Module):
         """Cool the generator and chilled circuits and heat the cooling circuit."""
 
         # Outlets
-        generator_out, chilled_out, cooling_out = sorption.outlet_streams(
-            inlets, self._performance(inlets)
-        )
+        values = self._performance(inlets)
+        generator_out, chilled_out, cooling_out = sorption.outlet_streams(inlets, values)
 
         outlets = dict(
-            generator_out=generator_out, chilled_out=chilled_out, cooling_out=cooling_out
+            generator_out=generator_out,
+            chilled_out=chilled_out,
+            cooling_out=cooling_out,
+            power_in=values["electricity"],
         )
         return outlets
 

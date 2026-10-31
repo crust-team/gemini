@@ -99,14 +99,19 @@ def _check(**counts):
         raise ValidationError(f"{given}; expected >= 1", code="invalid_design")
 
 
+def _one_or_list(ends):
+    """Return the ends of a plant port as the spec writes them: one end alone is not a list."""
+    return ends[0] if len(ends) == 1 else ends
+
+
 def multi_well_spec(producers=2, injectors=1):
     """Return the spec of a well field of ``producers`` and ``injectors`` limbs.
 
     Each production limb is a ``ModuleDict`` of ``reservoir``, ``well``, ``esp`` and ``riser``
     and each injection limb of ``well`` and ``sink``, in the lists ``producers`` and
     ``injectors``. The risers join through ``producers - 1`` mixers and the return divides over
-    ``injectors - 1`` splitters. Ports: ``return_in``, ``supply_out``. Outputs: ``electricity``,
-    ``heat_loss`` and ``supply_out_T``.
+    ``injectors - 1`` splitters. Ports: ``return_in``, ``power_in``, ``supply_out``. Outputs:
+    ``electricity``, ``heat_loss`` and ``supply_out_T``.
     """
     _check(producers=producers, injectors=injectors)
     mixing, supply = _mix("mixers", [f"producers.{i}.riser.wellhead_out" for i in range(producers)])
@@ -133,7 +138,12 @@ def multi_well_spec(producers=2, injectors=1):
             + _flow("injectors", INJECTION_FLOW, injectors)
             + splitting
         ),
-        "inlets": {"return_in": return_in},
+        "inlets": {
+            "return_in": return_in,
+            "power_in": _one_or_list(
+                [f"producers.{index}.esp.power_in" for index in range(producers)]
+            ),
+        },
         "outlets": {"supply_out": supply},
         "outputs": {
             "electricity": {"sum": "electricity"},
@@ -182,7 +192,7 @@ def district_network_spec(consumers=2, service="heating"):
             + mixing
             + [_link(returned, "return_pipe.fluid_in")]
         ),
-        "inlets": {"supply_in": "pump.fluid_in"},
+        "inlets": {"supply_in": "pump.fluid_in", "power_in": "pump.power_in"},
         "outlets": {"return_out": "return_pipe.fluid_out"},
         "outputs": _network_outputs(service),
         "bindings": {},

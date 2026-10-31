@@ -74,7 +74,10 @@ def _output():
 
 def spec_schema():
     """Return the JSON Schema (draft 2020-12) of a format 2 plant spec."""
-    ports = {"type": "object", "additionalProperties": PORT}
+    ports = {
+        "type": "object",
+        "additionalProperties": {"anyOf": [PORT, {"type": "array", "items": PORT}]},
+    }
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "GEMINI plant spec",

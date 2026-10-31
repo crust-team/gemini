@@ -67,6 +67,13 @@ def modules_spec(plant, container, prefix=""):
     return result
 
 
+def _port_text(ends):
+    """Return the ``"path.port"`` text of a plant port, a list when several ends share it."""
+    if isinstance(ends, list):
+        return [join_path(*end) for end in ends]
+    return join_path(*ends)
+
+
 def plant_spec(plant):
     """Return the format 2 spec of ``plant``."""
     spec = {
@@ -77,7 +84,7 @@ def plant_spec(plant):
     }
     for side in ("inlets", "outlets"):
         if plant._listed[side]:
-            spec[side] = {name: join_path(*end) for name, end in plant._listed[side].items()}
+            spec[side] = {name: _port_text(end) for name, end in plant._listed[side].items()}
     if plant._output_specs is not None:
         spec["outputs"] = deepcopy(plant._output_specs)
     return spec | write_sections(plant, plant._sections)

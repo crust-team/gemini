@@ -12,8 +12,10 @@ from gemini.modules.plants.plan import (
     compile_plan,
     is_group,
     loop_through,
+    port_ends,
 )
 from gemini.modules.plants.ports import PortResolver
+from gemini.physics import energy
 from gemini.types.declarations import Inlet, Outlet
 from gemini.utils.strings import join_path, snake_case
 
@@ -143,7 +145,8 @@ class Plant(PortResolver, Module):
         for declarations in (self._inlets, self._outlets, self._outputs):
             declarations.clear()
         for side, declare in (("inlets", Inlet), ("outlets", Outlet)):
-            for name, (path, port) in self._port_map(side).items():
+            for name, ends in self._port_map(side).items():
+                path, port = port_ends(ends)[0]
                 end = getattr(self.get_module(path), side)()[port]
                 self._register_declaration(name, declare(end.type, kind=end.kind))
         if self._output_specs is None:
@@ -181,26 +184,42 @@ class Plant(PortResolver, Module):
             self._plan = compile_plan(self)
         return self._plan
 
-    def _argument(self, source, inlets, results):
+    def _argument(self, source, inlets, results, offers):
+        if source[0] == "many":
+            return [self._argument(item, inlets, results, offers) for item in source[1]]
         if source[0] == "inlet":
             return inlets[source[1]]
+        if source[0] == "offer":
+            return offers[source[1]][source[2]]
+        if source[0] == "drawn":
+            return results[source[1]].inlets[source[2]]
         return results[source[1]].outlets[source[2]]
 
+    def _plant_value(self, values):
+        """Return the value of a plant port: its one end, or the sum of what its ends carry."""
+        return values[0] if len(values) == 1 else energy.total_power(values)
+
     def _plan_outlets(self, results):
-        for name, (path, port) in self._compiled().outlets.items():
-            yield name, results[path].outlets[port]
+        plan = self._compiled()
+        for name, ends in plan.outlets.items():
+            yield name, self._plant_value([results[path].outlets[port] for path, port in ends])
+        for name, ends in plan.given.items():
+            yield name, self._plant_value([results[path].inlets[port] for path, port in ends])
 
     def forward(self, inlets):
         """Call the modules in connection order and return the plant outlets."""
 
         # Modules
-        results = {}
+        results, offers = {}, {}
         for step in self._compiled().steps:
             arguments = {
-                port: self._argument(source, inlets, results)
+                port: self._argument(source, inlets, results, offers)
                 for port, source in step.arguments.items()
             }
-            results[step.path] = step.module(**arguments)
+            if step.offer:
+                offers[step.path] = step.module.offer(arguments)
+            else:
+                results[step.path] = step.module(**arguments)
 
         # Outlets
         outlets = dict(self._plan_outlets(results))

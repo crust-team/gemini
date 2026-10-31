@@ -4,6 +4,12 @@ from gemini import ops
 
 
 @ops.physics
+def total_power(powers):
+    """Return the sum [W] of the powers a ``many`` port holds, or of a plant port's ends."""
+    return sum(powers, start=0.0)
+
+
+@ops.physics
 def input_power(useful_power: float, efficiency: float) -> float:
     """Return the power a converter draws for a useful power, ``P_in = P_out / eta``.
 

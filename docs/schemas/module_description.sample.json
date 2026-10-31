@@ -38,6 +38,14 @@
   "controls": {},
   "doc": "A plant built from named modules and connections, a normal composite ``Module``.\n\n    ``add`` registers a module, ``connect`` wires an outlet to an inlet and ``to_spec`` writes the\n    plant file. Every port of a child is connected or named as a plant port; a plant port exists\n    only when named. ``name`` is the name given.",
   "inlets": {
+    "power_in": {
+      "fields": {
+        "power": {
+          "unit": "W"
+        }
+      },
+      "kind": "electricity"
+    },
     "return_in": {
       "fields": {
         "T": {

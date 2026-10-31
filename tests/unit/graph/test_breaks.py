@@ -21,7 +21,7 @@ def _break_graph(tank):
             )
         }
     )
-    outlets, outputs, _ = record_break(graph, tank, inlets, {}, True, "stateful")
+    outlets, outputs, _, _ = record_break(graph, tank, inlets, {}, True, "stateful")
     graph.output("content", outputs["content"])
     graph.output("p", outlets.fluid_out.p)
     return graph

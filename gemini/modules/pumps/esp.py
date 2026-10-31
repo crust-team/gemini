@@ -74,6 +74,7 @@ class ESP(Module):
 
         # Inlets
         self.fluid_in = Inlet(Stream, kind="brine")
+        self.power_in = Inlet(Power, kind="electricity")
 
         # Controls
         self.frequency = Control(Frequency)
@@ -117,8 +118,11 @@ class ESP(Module):
         head = self.head_function(flow, self.frequency)
 
         discharge = suction.with_(p=suction.p + head)
+        power_in = energy.input_power(
+            self.power_function(flow, self.frequency), self.motor_efficiency
+        )
 
-        outlets = dict(fluid_out=discharge)
+        outlets = dict(fluid_out=discharge, power_in=power_in)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
@@ -136,7 +140,7 @@ class ESP(Module):
         self.best_efficiency_ratio = pumps.best_efficiency_ratio(
             self.flow, scale, self.best_efficiency_flow
         )
-        self.electricity = energy.input_power(self.power, self.motor_efficiency)
+        self.electricity = inlets.power_in
 
     def head_function(self, flow: float, frequency: float) -> float:
         """Return pump head [Pa] for flow [m3/s] and frequency [Hz]."""

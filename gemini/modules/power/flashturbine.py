@@ -71,36 +71,40 @@ class FlashTurbine(Module):
 
         # Outlets
         self.fluid_out = Outlet(Stream, kind="gas")
+        self.power_out = Outlet(Power, kind="electricity")
 
     def forward(self, inlets):
         """Expand the steam and return the condensate at the condenser saturation state."""
 
         # Outlets
         inlet = inlets.fluid_in
-        ops.require(self._expansion(inlet))
         condenser = _physics.saturation_properties(self.condenser_pressure)
 
         outlet = inlet.with_(T=condenser.temperature, p=self.condenser_pressure, fluid=WATER)
+        power_out = self._balance(inlet, self._expansion(inlet)).electricity_generated
 
-        outlets = dict(fluid_out=outlet)
+        outlets = dict(fluid_out=outlet, power_out=power_out)
         return outlets
 
     def _compute_outputs(self, inlets, outlets):
         inlet = inlets.fluid_in
         expansion = self._expansion(inlet)
-        condensate = _physics.saturation_properties(self.condenser_pressure).liquid_enthalpy
-        balance = _physics.turbine_balance(
-            inlet.m_dot,
-            expansion.inlet_enthalpy,
-            expansion.outlet_enthalpy,
-            condensate,
-            self.generator_efficiency,
-        )
+        balance = self._balance(inlet, expansion)
         self.gross_power = balance.gross_power
         self.electricity_generated = balance.electricity_generated
         self.condenser_duty = balance.condenser_duty
         self.heat_loss = balance.heat_loss
         self.exhaust_quality = expansion.outlet_quality
+
+    def _balance(self, inlet, expansion):
+        """Return the enthalpy balance of the turbine, generator and condenser."""
+        return _physics.turbine_balance(
+            inlet.m_dot,
+            expansion.inlet_enthalpy,
+            expansion.outlet_enthalpy,
+            _physics.saturation_properties(self.condenser_pressure).liquid_enthalpy,
+            self.generator_efficiency,
+        )
 
     def _expansion(self, inlet):
         """Return the Baumann expansion of the inlet steam to the condenser pressure.

@@ -180,6 +180,8 @@ def test_emissions_without_energy_outputs_are_zero():
 
 
 def _stack_streams(streams):
+    if not isinstance(streams[0], Stream):
+        return np.array(streams)
     return Stream(
         **{field: np.array([getattr(s, field) for s in streams]) for field in STREAM_FIELDS},
         fluid=streams[0].fluid,

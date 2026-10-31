@@ -34,6 +34,8 @@ MAX_NESTING = 3
 MAX_LINES = 40
 LONG_FUNCTIONS = {
     "tests/e2e/test_quickstart.py::test_quickstart": "one end-to-end quickstart path",
+    "gemini/modules/cooling/absorptionunit.py::__init__": "the declarations of three circuits",
+    "gemini/modules/cooling/adsorptionchiller.py::__init__": "the declarations of three circuits",
 }
 EARLY_EXITS = (ast.Return, ast.Raise, ast.Continue, ast.Break)
 BUILTIN_ERRORS = {"ValueError", "TypeError", "KeyError", "RuntimeError"}

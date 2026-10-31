@@ -515,7 +515,11 @@
     }
   ],
   "inlets": {
-    "return_in": "injectors.0.well.wellhead_in"
+    "return_in": "injectors.0.well.wellhead_in",
+    "power_in": [
+      "producers.0.esp.power_in",
+      "producers.1.esp.power_in"
+    ]
   },
   "outlets": {
     "supply_out": "mixers.0.fluid_out"

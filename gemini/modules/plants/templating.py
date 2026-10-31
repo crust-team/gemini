@@ -150,10 +150,18 @@ def _remove_connections(spec, template, members):
     spec["connections"] = connections
 
 
+def _kept_ends(end, gone):
+    """Return the ends of a plant port that survive, a list when several share it."""
+    if isinstance(end, list):
+        return [item for item in end if not _touches(item, gone)]
+    return None if _touches(end, gone) else end
+
+
 def _remove_ports(spec, gone):
     for side in ("inlets", "outlets"):
         if side in spec:
-            spec[side] = {name: end for name, end in spec[side].items() if not _touches(end, gone)}
+            kept = {name: _kept_ends(end, gone) for name, end in spec[side].items()}
+            spec[side] = {name: end for name, end in kept.items() if end}
 
 
 def _remove_outputs(spec, gone):
