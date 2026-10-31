@@ -10,6 +10,9 @@ Test with the development profile (`make test`); see
 Physics lives in `gemini/physics/` or `gemini/modules/<category>/_physics.py`: a module declares and
 wires, and calls physics functions. Helpers of the module package live in `gemini/modules/_utils/`.
 
+Learn the package from [examples/README.md](examples/README.md): quickstart, basics 01 to 06, any
+recipe, then the cases. Data lives in `datasets/`, never in `examples/`.
+
 Run a plant with `gm.simulate(plant, profile)`, `gm.replay`, `gm.live` and `gm.resume`; keep
 `gm.Engine` for complex tasks ([functions or engine](.claude/docs/engine.md#functions-or-engine)).
 `gm.schedule` plans the run input of a design from its demand
@@ -85,9 +88,9 @@ gemini/
 └── profiles/         # demand profiles
 docs/schemas/         # JSON Schemas and samples of the exchanged documents
 datasets/             # committed data: doublet_heat/ (plant file and CSVs), legacy_project/
-examples/             # quickstart.py, basics/, recipes/, cases/
+examples/             # quickstart.py, basics/, recipes/, cases/, scripts only
 scripts/              # test_changed.py, write_schemas.py, migrate_plants.py
-tests/                # unit mirror, integration, e2e and immutable fixtures
+tests/                # unit mirror, integration, e2e (expected/ holds example outputs), fixtures
 ```
 
 Modules declare parameters and ports in `__init__`; `forward(self, inlets)` receives one

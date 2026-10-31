@@ -1,4 +1,4 @@
-Assumptions: a 2500 m doublet, 40 MW boiler, return at 60 degC, supply at 100 degC
+Assumptions: a 2500 m doublet, 40 MW boiler, return at 60 °C, supply at 100 °C
 Days planned:     365
 Doublet flow:     58 to 300 m³/h
 Boiler, peak:     16.27 MW

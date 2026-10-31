@@ -3,10 +3,11 @@
 Each file under ``examples/`` runs as a subprocess from an empty temporary folder, without
 ``PYTHONPATH``, which proves it is standalone: its paths come from ``__file__``, and anything it
 writes stays in that folder. ``GEMINI_EXAMPLE_DATASET`` hands it the selected dataset. On the fast
-dataset its output is compared with ``tests/e2e/expected/`` line by line, the text exactly and the
+dataset its output is compared with ``tests/e2e/expected/`` line by line: the text exactly, the
 numbers within ``RELATIVE``, ``ABSOLUTE`` or one unit of the last printed digit (1.5 units, so that
-a difference of one is not lost to rounding), so a silent change in physics shows up. ``tests/fixtures/capture_example_outputs.py`` writes the expected files; a
-changed number there is evidence of a numerical change, as a changed golden is.
+a difference of one is not lost to rounding), so a silent change in physics shows up.
+``tests/fixtures/capture_example_outputs.py`` writes the expected files; a changed number there is
+evidence of a numerical change, as a changed golden is.
 """
 
 import os

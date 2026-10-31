@@ -18,7 +18,9 @@ print(results.summary(units={"power": "MW", "temperature": "degC"}))
 `gm.simulate`, `gm.replay`, `gm.live` and `gm.resume` cover a run in one call; `gm.Engine` is the
 level for complex tasks, such as a run held in memory or a callback that reads the engine.
 
-The longer tour, from the repository root with Python 3.11, 3.12, 3.13 or 3.14:
+[examples/README.md](examples/README.md) lists every example in reading order, starting with
+`python examples/quickstart.py`. The longer tour, from the repository root with Python 3.11, 3.12,
+3.13 or 3.14:
 
 ```python
 import pandas as pd

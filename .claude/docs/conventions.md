@@ -106,7 +106,14 @@ skips only its measured twin; in simulation it skips the step. Never disguise a 
 audit as full first-law closure or tune against a holdout merely to meet a threshold.
 
 Examples live in `examples/`: `quickstart.py`, numbered `basics/`, then `recipes/` and `cases/`
-([README](../../examples/README.md)).
+([README](../../examples/README.md)). An example is a script for a new reader: a module docstring
+that says what it shows, the names it uses and how to run it, then constants, small functions and
+`main()` under the `__main__` guard. It runs alone from any folder, with paths from `__file__`;
+it uses the public API (`gemini`, and `gemini.types` for the declarations of a new module); values
+are unit strings, prints are labelled in MW, kW, °C, bar and m³/h, and an assumption that is not
+source data is printed as one. A case stays within about 150 lines: plant building beyond that
+belongs in gemini, as a registered plant. `GEMINI_EXAMPLE_DATASET` is the one way to change the
+dataset, the fast month by default. `tests/unit/test_code_quality.py` checks what can be checked.
 Data lives in `datasets/`, and generated output goes under ignored `runs/`.
 
 ## Naming

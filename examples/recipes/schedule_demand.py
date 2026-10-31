@@ -66,7 +66,7 @@ def build():
 def main():
     """Schedule the demand of 2027, simulate the plan and print what it covers."""
     plant = build()
-    print("Assumptions: a 2500 m doublet, 40 MW boiler, return at 60 degC, supply at 100 degC")
+    print("Assumptions: a 2500 m doublet, 40 MW boiler, return at 60 °C, supply at 100 °C")
     plan = gm.schedule(plant, gm.profiles.get("heating_demand"), RULES)
     lowest = gm.units.convert(plan["d0.flow"].min(), "m3/s", "m3/h")
     highest = gm.units.convert(plan["d0.flow"].max(), "m3/s", "m3/h")
