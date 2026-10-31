@@ -57,6 +57,8 @@ def modules_spec(plant, container, prefix=""):
     for name, child in container.named_children():
         key = join_path(prefix, name)
         entry = {"type": type_name(child)}
+        if getattr(child, "_size", None):
+            entry["size"] = deepcopy(child._size)
         if is_group(child):
             entry["modules"] = modules_spec(plant, child, key)
         else:

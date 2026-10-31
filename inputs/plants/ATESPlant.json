@@ -1,7 +1,7 @@
 {
   "plant": "ATESPlant",
   "params": {
-    "groundwater_pressure": "3 bar",
+    "storage.groundwater_pressure": "3 bar",
     "storage.aquifer_temperature": "11 degC",
     "storage.aquifer_thickness": "30 m",
     "storage.porosity": 0.3,

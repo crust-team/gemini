@@ -6,6 +6,7 @@ import io
 import textwrap
 import tokenize
 
+from gemini.modules.plant import Plant
 from gemini.types import Power, Stream
 
 FORWARD_SECTIONS = ("# Modules", "# Outlets", "# Outputs")
@@ -19,6 +20,16 @@ INIT_SECTIONS = (
     "# States",
     "# Outputs",
     "# Outlets",
+)
+
+
+PLANT_SECTIONS = (
+    "# Modules",
+    "# Parameters",
+    "# Inlets",
+    "# Outlets",
+    "# Connections",
+    "# Outputs",
 )
 
 
@@ -42,7 +53,10 @@ def _assert_ordered_sections(cls, source, allowed):
         name for name in allowed if name in mentioned
     ], f"{cls.__name__}: sections are out of order"
     for comment, _ in _comments(source):
-        if comment.startswith("# ") and comment.split(":", 1)[0] in INIT_SECTIONS:
+        if comment.startswith("# ") and comment.split(":", 1)[0] in {
+            *INIT_SECTIONS,
+            *PLANT_SECTIONS,
+        }:
             assert comment in allowed, f"{cls.__name__}: invalid section {comment!r}"
 
 
@@ -182,4 +196,5 @@ def test_method_and_declaration_section_order(module_class):
     assert methods == expected, f"{cls.__name__}: lifecycle method order is {methods}"
     if "__init__" in cls.__dict__:
         source, _ = _source_tree(cls.__dict__["__init__"])
-        _assert_ordered_sections(cls, source, INIT_SECTIONS)
+        allowed = PLANT_SECTIONS if issubclass(cls, Plant) else INIT_SECTIONS
+        _assert_ordered_sections(cls, source, allowed)

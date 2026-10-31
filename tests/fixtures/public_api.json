@@ -422,8 +422,12 @@
   "plants": {
    "ATESPlant": "class",
    "CoolingSubstation": "class",
+   "DistrictNetwork": "class",
    "Doublet": "class",
+   "DoubletHeatPlant": "class",
+   "HackathonPlant": "class",
    "HeatingSubstation": "class",
+   "MultiWellPlant": "class",
    "Plant": "class",
    "convert_legacy": [
     "folder"

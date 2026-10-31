@@ -14,6 +14,7 @@ import pytest
 
 import gemini as gm
 from gemini.modules._utils.serialization import SECTIONS
+from gemini.modules.plant import Plant
 from gemini.utils import paths
 from gemini.utils.files import read_json
 from tests.fixtures import ROOT
@@ -28,6 +29,7 @@ SECTION_HEADERS = {
     "# States",
     "# Outputs",
     "# Outlets",
+    "# Connections",
 }
 TOOL_DIRECTIVE = re.compile(
     r"# (noqa: [A-Z]+\d+(, [A-Z]+\d+)*|type: ignore\[[\w-]+\]|pragma: no cover)"
@@ -189,6 +191,36 @@ PACKAGE_FILES = [
 ]
 
 
+PENDING_COMPOSITES = {
+    "HeatingSubstation",
+    "CoolingSubstation",
+    "NodalDoublet",
+    "BoilerChpPlant",
+    "ParallelExchangerPlant",
+}
+"""Composites that close a loop or solve a rate, until the engine does it for them."""
+
+
+def test_a_leaf_has_no_children_and_every_composite_is_a_plant():
+    """Only a ``Plant`` or a group holds modules: a class computes or connects, never both."""
+    composites = {
+        name
+        for name in gm.modules.names()
+        if not issubclass(gm.modules.get(name), Plant) and not gm.modules.get(name)().is_leaf
+    }
+    assert composites == PENDING_COMPOSITES
+
+
+def test_no_plant_class_writes_forward():
+    """``Plant.forward`` is written once."""
+    written = [
+        name
+        for name in gm.modules.names()
+        if issubclass(gm.modules.get(name), Plant) and "forward" in vars(gm.modules.get(name))
+    ]
+    assert written == []
+
+
 def test_no_module_defines_compute_outputs():
     """A leaf computes once, in ``forward``: no class of ``gemini/modules/`` has a second step."""
     found = [
@@ -228,11 +260,15 @@ def test_functions_nest_at_most_three_blocks(path):
 
 @pytest.mark.parametrize("path", PYTHON_FILES)
 def test_functions_are_short_or_documented_exceptions(path):
-    """Functions stay within about 40 lines; each longer one is listed with its reason."""
+    """Functions stay within about 40 lines; each longer one is listed with its reason.
+
+    The ``__init__`` of a plant class is exempt: it is one list of declarations and connections.
+    """
     long = {
         f"{path}::{function.name}"
         for function in functions(path)
         if body_lines(function) > MAX_LINES
+        and not (path.startswith("gemini/modules/plants/") and function.name == "__init__")
     }
     assert long == {name for name in LONG_FUNCTIONS if name.startswith(f"{path}::")}
 

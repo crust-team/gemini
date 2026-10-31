@@ -1,37 +1,37 @@
-"""The doublet, a shipped spec plant that can also be designed from its depth."""
+"""A doublet: production and injection limbs, designed from its depth or set by hand."""
 
-from gemini.modules._utils.serialization import module_spec
-from gemini.modules.module import Module
+from gemini.modules.environment import Formation
 from gemini.modules.plant import Plant
-from gemini.modules.plants._utils import library, writer
-from gemini.physics import constants, geometry, ground, hydraulics, pumps
+from gemini.modules.pumps import ESP
+from gemini.modules.subsurface import InjectionReservoir, ProductionReservoir
+from gemini.modules.wells import InjectionWell, ProductionWell
+from gemini.physics import constants, doublet, ground, pumps
 from gemini.types import (
     Efficiency,
+    Inlet,
     Length,
+    Outlet,
     Parameter,
     Permeability,
+    Power,
     Pressure,
+    Stream,
     Temperature,
     TemperatureGradient,
     VolumeFlow,
 )
 from gemini.types.cost import scaled_cost
 
-REQUIRED = ("depth", "gradient", "surface_temperature")
-RESERVOIR = ("permeability", "thickness", "well_diameter")
-PUMP = ("nominal_flow", "pump_efficiency", "nominal_wellhead_pressure")
-RESERVOIRS = ("reservoir", "sink")
-WELLS = ("well", "riser", "injector")
 WELL_COUNT = 2
 """The producer and the injector of a doublet."""
 
 
 class Doublet(Plant):
-    """The shipped doublet, wired by its spec, with its children's values derived from a design.
+    """Production and injection limbs, with the children's values derived from a design.
 
     ``depth`` is the true vertical depth of the reservoir midpoint, ``thickness`` its gross
     thickness and ``well_diameter`` the inner diameter of both vertical wells. ``set_params``
-    derives, through ``gemini/physics/``:
+    derives, through ``gemini/physics/doublet.py``:
 
     - from ``depth``, ``gradient`` and ``surface_temperature``: the reservoir temperature at the
       midpoint, the hydrostatic reservoir pressure from the fluid density, the top depth and the
@@ -49,9 +49,17 @@ class Doublet(Plant):
     """
 
     def __init__(self):
-        """Add the modules and wiring of the shipped spec and declare the design values."""
-        super().__init__("Doublet")
-        library.fill(self, "Doublet")
+        """Declare the limbs, the design values, the ports and the connections."""
+        super().__init__()
+
+        # Modules
+        self.reservoir = ProductionReservoir()
+        self.well = ProductionWell()
+        self.esp = ESP()
+        self.riser = ProductionWell()
+        self.injector = InjectionWell()
+        self.sink = InjectionReservoir()
+        self.formation = Formation()
 
         # Parameters
         self.depth = Parameter(Length | None, default=None)
@@ -65,38 +73,55 @@ class Doublet(Plant):
         self.pump_efficiency = Parameter(Efficiency | None, default=None)
         self.nominal_wellhead_pressure = Parameter(Pressure | None, default=None)
 
-        self._baselines[""] = writer.baseline_of(self)
-        self._stated[""] = {}
+        # Inlets
+        self.return_in = Inlet(Stream)
+        self.power_in = Inlet(Power, kind="electricity")
 
-    @property
-    def fluid(self):
-        """Return the fluid of the doublet, which all its children carry."""
-        return Module.fluid.fget(self)
+        # Outlets
+        self.supply_out = Outlet(Stream)
 
-    @fluid.setter
-    def fluid(self, value):
-        """Set the fluid of the doublet and of every child and derive again."""
-        Module.fluid.fset(self, value)
-        for child in self.modules():
-            if child is not self:
-                child.fluid = value
-        self.set_params("", {})
+        # Connections
+        self.connect("return_in", "injector.wellhead_in")
+        self.connect("power_in", "esp.power_in")
+        self.connect("injector.bottom_out", "sink.sandface_in")
+        self.connect("reservoir.sandface_out", "well.bottom_in")
+        self.connect("well.wellhead_out", "esp.fluid_in")
+        self.connect("esp.fluid_out", "riser.bottom_in")
+        self.connect("well.loss_out", "formation.heat_in")
+        self.connect("riser.loss_out", "formation.heat_in")
+        self.connect("injector.loss_out", "formation.heat_in")
+        self.connect("riser.wellhead_out", "supply_out")
+
+        # Outputs
+        self._output_specs = {
+            "flow": {"of": "reservoir.liquid_flow"},
+            "production_temperature": {"of": "riser.wellhead_out", "field": "T"},
+            "injection_temperature": {"of": "injector.wellhead_in", "field": "T"},
+            "brine_cooling": {"difference": ["production_temperature", "injection_temperature"]},
+        }
+        self._refresh()
 
     def set_params(self, path, params, valid_from=None):
         """Derive the children's values from the design, unless the same call states them."""
         if path:
             return super().set_params(path, params, valid_from)
-        derived = self._derived(self._own_values(params, valid_from), params)
-        self._stated[""] |= params
-        kept = self._keep_derived(derived, params)
-        return super().set_params("", kept | params, valid_from)
+        fluid = self.fluid.properties(0, 0)
+        derived = doublet.design(
+            self._own_values(params, valid_from),
+            fluid.rho_l,
+            fluid.mu_l,
+            {name: self.get_module(name).skin for name in doublet.RESERVOIRS},
+            self._stated_pressure(params),
+        )
+        return super().set_params("", self._keep_derived(derived, params) | params, valid_from)
 
-    def to_spec(self):
-        """Return the plant file: a design as flat values, a plain doublet as the shipped wiring."""
-        params = writer.params_spec(self, "", self)
-        if not set(params) & set(self._parameters):
-            return super().to_spec()
-        return module_spec(self) | {"params": params}
+    def _stated_pressure(self, params):
+        """Return the reservoir pressure [Pa] stated by hand, in this call or earlier, or None."""
+        if "reservoir.pressure" in params:
+            return self.get_parameter("reservoir.pressure").validate(params["reservoir.pressure"])
+        return (
+            self.reservoir.pressure if "reservoir.pressure" in self._stated_child_params else None
+        )
 
     def capex(self, assumptions):
         """Return the cost of the design: both wells by the metre and the pump by its power.
@@ -117,97 +142,3 @@ class Doublet(Plant):
         pump = scaled_cost(assumptions, "pump_cost", power)
         source = f"{wells.source}; {pump.source}"
         return wells.model_copy(update={"capex": wells.capex + pump.capex, "source": source})
-
-    def _derived(self, values, params):
-        """Return the child values the design ``values`` give, with ``params`` read for the pump."""
-        if any(values[name] is None for name in REQUIRED):
-            return {}
-        fluid = self.fluid.properties(0, 0)
-        derived = _column(values, fluid.rho_l)
-        if all(values[name] is not None for name in RESERVOIR):
-            derived |= self._flow_paths(values, fluid.mu_l)
-            if all(values[name] is not None for name in PUMP):
-                derived |= self._pump(values, fluid, self._pressure(params, derived), derived)
-        return derived
-
-    def _pressure(self, params, derived):
-        """Return the reservoir pressure [Pa]: of this call, stated earlier, or derived."""
-        if "reservoir.pressure" in params:
-            return self.get_parameter("reservoir.pressure").validate(params["reservoir.pressure"])
-        if "reservoir.pressure" in self._stated_child_params:
-            return self.reservoir.pressure
-        return derived["reservoir.pressure"]
-
-    def _flow_paths(self, values, viscosity):
-        """Return the values that follow from the permeability, thickness and well diameter."""
-        path = geometry.vertical_path(
-            values["depth"], values["well_diameter"], hydraulics.COMMERCIAL_STEEL_ROUGHNESS
-        ).model_dump()
-        radius = values["well_diameter"] / 2
-        derived = {f"{well}.pipe_path": path for well in WELLS}
-        for name in RESERVOIRS:
-            derived[f"{name}.permeability"] = values["permeability"]
-            derived[f"{name}.aquifer_thickness"] = values["thickness"]
-            derived[f"{name}.top_depth"] = values["depth"] - values["thickness"] / 2
-            derived[f"{name}.drainage_radius"] = values["drainage_radius"]
-            derived[f"{name}.wellbore_radius"] = radius
-        index = {
-            name: hydraulics.radial_index(
-                viscosity,
-                values["permeability"],
-                values["thickness"],
-                values["drainage_radius"],
-                radius,
-                self.get_module(name).skin,
-            )
-            for name in RESERVOIRS
-        }
-        derived["reservoir.productivity_index"] = index["reservoir"]
-        derived["sink.injectivity_index"] = index["sink"]
-        return derived
-
-    def _pump(self, values, fluid, pressure, derived):
-        """Return the pump setting depth and the curves of a pump sized at the nominal flow."""
-        flow, wellhead = values["nominal_flow"], values["nominal_wellhead_pressure"]
-        drawdown = hydraulics.productivity_pressure(
-            0.0, -flow, derived["reservoir.productivity_index"]
-        )
-        setting = hydraulics.pump_setting_depth(
-            values["depth"], pressure, drawdown, wellhead, fluid.rho_l
-        )
-        head = hydraulics.design_pump_head(
-            wellhead,
-            pressure,
-            drawdown,
-            fluid.rho_l,
-            fluid.mu_l,
-            values["depth"],
-            values["well_diameter"],
-            hydraulics.COMMERCIAL_STEEL_ROUGHNESS,
-            flow,
-        )
-        head_curve, power_curve = pumps.constant_head_curves(head, values["pump_efficiency"])
-        return {
-            "esp.stage_count": 1,
-            "esp.head_coefficients": head_curve,
-            "esp.power_coefficients": power_curve,
-            "esp.setting_depth": setting,
-            "well.esp_depth": setting,
-            "well.segment": "below_esp",
-            "riser.esp_depth": setting,
-            "riser.segment": "above_esp",
-        }
-
-
-def _column(values, density):
-    """Return the values that follow from the depth, the geotherm and the fluid density."""
-    depth, gradient, surface = values["depth"], values["gradient"], values["surface_temperature"]
-    temperature = ground.geotherm_temperature(surface, gradient, depth)
-    mean = ground.geotherm_temperature(surface, gradient, depth / 2)
-    derived = {f"{well}.soil_temperature": mean for well in WELLS}
-    derived["formation.geothermal_gradient"] = gradient
-    derived["formation.surface_temperature"] = surface
-    for name in RESERVOIRS:
-        derived[f"{name}.temperature"] = temperature
-        derived[f"{name}.pressure"] = hydraulics.hydrostatic_pressure(density, depth)
-    return derived

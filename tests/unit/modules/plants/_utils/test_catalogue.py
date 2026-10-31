@@ -12,10 +12,10 @@ from gemini.utils import paths
 from tests.fixtures.errors import raises
 
 FORMER_EXAMPLES = {
-    "ATESPlant": "87116c4886ba501555865302700e7de155271b690ef063e406d75f7360df95a7",
+    "ATESPlant": "29d157ac8c1b6006d60bacfc6fb821bb7cbc0c21b058cb8e69642c02f24873da",
     "BoilerChpPlant": "19bff192bf5cd02cf5af650ffb292b578be6d6089be141d167c51cc63d0ad8b3",
     "CoolingSubstation": "82db77af60518de0843dee1c28ba6692a98cef1f1317a9393afcdc9df621e7bc",
-    "DistrictEnergyPlant": "fb141f0a261aea2823c6f0e9330edb3d4a2eda32a9a3f9486de220b1792501d4",
+    "DistrictEnergyPlant": "f1b791703c00013700561a5660de5a028fc490ac9ee637aea337c828223cd1af",
     "DistrictNetwork": "a7c09b8338303f47dbac5d0cd71b9a3a5fb4675b86187a8f08eb596df32f4f16",
     "Doublet": "7e38703b880e458aef5d3957bc7cc7d51ffc8c9b067d8da0b6c3568dd88249e2",
     "DoubletHeatPlant": "a83a084462d47570c0b880efa2dd0a932500e07af8e306edbab3b5203d18a670",

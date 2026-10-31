@@ -5,10 +5,8 @@ from gemini.modules.plants._utils import library
 from gemini.utils.paths import ASSET_PLANTS
 
 
-def test_shipped_specs_are_registered_as_plants():
-    """The registry builds a new plant for each shipped name."""
-    assert {"Doublet", "DoubletHeatPlant"} <= set(gm.modules.names("plants"))
-    assert gm.modules.get("Doublet") is not gm.modules.get("Doublet")
+def test_has_names_a_shipped_file():
+    """Only a file that ships counts."""
     assert library.has("Doublet") and not library.has("Nothing")
 
 

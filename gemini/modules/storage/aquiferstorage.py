@@ -3,7 +3,7 @@
 from typing import Literal
 
 from gemini import ops
-from gemini.errors import PhysicsError
+from gemini.errors import PhysicsError, ValidationError
 from gemini.modules.module import Module
 from gemini.physics import energy, fluid, ground, heat_transfer
 from gemini.types import (
@@ -15,10 +15,12 @@ from gemini.types import (
     HeatAccumulation,
     Inlet,
     Length,
+    MassFlow,
     Outlet,
     Output,
     Parameter,
     Power,
+    Pressure,
     State,
     Stream,
     Temperature,
@@ -86,9 +88,10 @@ class AquiferStorage(Module):
     storage outflow of ``energy_balance``, so the well pair is first-law closed per call.
 
     The production temperature does not depend on the injected stream, so a plant that closes
-    the groundwater loop through this module (production, pump, heat exchanger, injection)
-    reads it first with ``production_temperature()`` and then calls the module once with the
-    returned groundwater.
+    the groundwater loop through this module (production, pump, heat exchanger, injection) needs
+    no iteration: with ``groundwater_flow`` and ``groundwater_pressure`` set, ``production_out`` is
+    offered before the other modules run, and the module is called once with the returned
+    groundwater, which it produces again at ``groundwater_pressure``.
 
     NOTE(refactor): written with ops, but a graph break while the graph has no ``scan``: the
     store volumes, temperature changes and heat totals are states.
@@ -105,12 +108,14 @@ class AquiferStorage(Module):
         self.rock_volumetric_heat_capacity = Parameter(VolumetricHeatCapacity)
         self.ground_conductivity = Parameter(ThermalConductivity, calibratable=True)
         self.storage_period = Parameter(Duration, default=ground.HALF_YEAR, gt=0)
+        self.groundwater_pressure = Parameter(Pressure | None, default=None, gt=0)
 
         # Inlets
         self.injection_in = Inlet(Stream, kind="brine")
 
         # Controls
         self.mode = Control(Literal["charge", "discharge", "idle"])
+        self.groundwater_flow = Control(MassFlow | None, default=None, ge=0)
 
         # States
         self.warm_volume = State(Volume, default=0)
@@ -128,7 +133,7 @@ class AquiferStorage(Module):
         self.heat_accumulation = Output(HeatAccumulation)
 
         # Outlets
-        self.production_out = Outlet(Stream, kind="brine")
+        self.production_out = Outlet(Stream, kind="brine", offered=True)
         self.loss_out = Outlet(Power, kind="heat")
 
     def forward(self, inlets):
@@ -138,6 +143,8 @@ class AquiferStorage(Module):
         injection_in = inlets.injection_in
         self._volume_flow(injection_in)
         production_out = injection_in.with_(T=self.production_temperature())
+        if self.groundwater_pressure is not None:
+            production_out = production_out.with_(p=self.groundwater_pressure)
 
         losses = self._store_losses(injection_in)
         loss_out = energy.total_power(losses)
@@ -162,6 +169,22 @@ class AquiferStorage(Module):
 
         outlets = dict(production_out=production_out, loss_out=loss_out)
         return outlets
+
+    def _offer(self, inlets):
+        """Offer the produced groundwater of a loop through the well pair."""
+        if self.groundwater_pressure is None or self.groundwater_flow is None:
+            raise ValidationError(
+                f"{self.path}: groundwater_pressure and groundwater_flow are needed to offer "
+                "production_out; expected both on a loop through the well pair",
+                code="invalid_design",
+            )
+        offered = Stream(
+            m_dot=self.groundwater_flow,
+            T=self.production_temperature(),
+            p=self.groundwater_pressure,
+            fluid=self.fluid,
+        )
+        return {"production_out": offered}
 
     def _store_losses(self, injection):
         """Return the conduction loss [W] of each store to the aquifer around it."""
@@ -214,17 +237,11 @@ class AquiferStorage(Module):
         return states
 
     def production_temperature(self):
-        """Return the temperature [K] that ``production_out`` has in the running step.
-
-        It uses ``start_states()``: the start-of-step states inside a parent's ``Module.step``,
-        otherwise the initial states, like a call of the module would. ``mode`` resolves as in
-        a call without a ``mode`` keyword (persisted value, then default). Plants call this
-        before the module to evaluate the equipment between production and injection.
-        """
+        """Return the temperature [K] that ``production_out`` has in the running step."""
         source, _ = self._source_and_target()
         if source is None:
             return self.aquifer_temperature
-        return self.aquifer_temperature + self.start_states()[f"{source}_temperature_change"]
+        return self.aquifer_temperature + self._change(source)
 
     def _moved_store(self, store, volume, injected_change):
         """Return a store's volume [m3] and temperature change [K] after this step's flow."""

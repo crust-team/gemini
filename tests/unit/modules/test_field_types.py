@@ -2,6 +2,8 @@
 
 import inspect
 
+from gemini.modules.plant import Plant
+
 SECTIONS = [
     "# Modules",
     "# Parameters",
@@ -10,6 +12,14 @@ SECTIONS = [
     "# Boundaries",
     "# Outputs",
     "# Outlets",
+]
+PLANT_SECTIONS = [
+    "# Modules",
+    "# Parameters",
+    "# Inlets",
+    "# Outlets",
+    "# Connections",
+    "# Outputs",
 ]
 
 
@@ -30,6 +40,7 @@ def test_init_section_comments_are_ordered(module_class):
     """Module declarations use fixed plain-text section comments in order."""
     cls = module_class
     source = inspect.getsource(cls.__init__)
-    positions = [source.find(section) for section in SECTIONS if section in source]
+    sections = PLANT_SECTIONS if issubclass(cls, Plant) else SECTIONS
+    positions = [source.find(section) for section in sections if section in source]
     assert positions == sorted(positions), cls
     assert not any(section + " -" in source for section in SECTIONS)

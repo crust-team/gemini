@@ -1,8 +1,5 @@
 """The plants that ship as structure files in ``gemini/assets/plants/``, under their file names."""
 
-from functools import partial
-
-from gemini.modules._utils import registry
 from gemini.modules._utils.serialization import Report
 from gemini.modules.plant import Plant
 from gemini.modules.plants._utils import reader
@@ -23,15 +20,6 @@ def build(name):
 def fill(plant, name):
     """Add the modules, wiring and outputs of the shipped spec ``name`` to an empty ``plant``."""
     reader.populate(plant, shipped(name), Report(strict=True))
-
-
-def register_shipped(classes):
-    """Register every shipped spec as a plant under its file name.
-
-    ``classes`` maps a name to the ``Plant`` subclass that builds that spec itself.
-    """
-    for path in sorted(ASSET_PLANTS.glob("*.json")):
-        registry.register_plant(path.stem, classes.get(path.stem, partial(build, path.stem)))
 
 
 def has(name):
