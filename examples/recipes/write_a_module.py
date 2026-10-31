@@ -1,7 +1,8 @@
 """Write a small module of your own and use it in a plant.
 
-Shows ``gm.modules.Module``, the declarations of ``gemini.types`` (``Parameter``, ``Inlet``,
-``Output``, ``Outlet``), ``gm.modules.check`` and ``gm.modules.register``.
+Shows ``gm.modules.Module``, the declarations of ``gm.modules`` (``Parameter``, ``Inlet``,
+``Output``, ``Outlet``) and ``gm.modules.check``. A class that states a ``category`` registers
+itself.
 
 Run with ``python examples/recipes/write_a_module.py``.
 """
@@ -56,7 +57,6 @@ def main():
     alone = Orifice().set_params("", {"pressure_drop": "1 bar"})(fluid_in=STREAM)
     print(f"Alone:                {alone.outputs.get('outlet_pressure', unit='bar'):.3f} bar")
 
-    gm.modules.register(Orifice)
     plant = gm.Plant("Throttled")
     plant.add("Filter", name="filter")
     plant.add("Orifice", name="orifice", params={"pressure_drop": "1 bar"})

@@ -7,14 +7,15 @@ never writes `forward`. `forward` receives a read-only `Ports` mapping and retur
 containing exactly the declared fluid outlets. Controls and boundaries are applied by the base class
 and read from `self`.
 
-Write a module with `Module` from `gemini.modules` (also `gm.modules.Module`) and the
-declarations from `gemini.types`. The base class has no string catalogue, sequential
+Write a module with `Module` and the declarations (`Parameter`, `Inlet`, `Outlet`, `Output`,
+`Control`, `Boundary`, `State`) from `gemini.modules` (`gm.modules.Module`), and the quantity types
+and streams from `gemini.types`. The base class has no string catalogue, sequential
 container, fidelity flag or cost method. The shipped equipment, with each model's ports, parameters, equations and energy-audit status, is
 listed in [equipment.md](equipment.md); its classes are good references for new modules.
 
 **Physics lives in `gemini/physics/` or a `_physics.py`.** Modules declare and wire; they never
 define physics. `gemini/physics/` keeps the textbook formulas and anything more than one category,
-or `analysis`, `optim`, `economics` or `checks`, reads. Physics of one category lives in
+or `analysis`, `optim` or `evaluate`, reads. Physics of one category lives in
 `gemini/modules/<category>/_physics.py`, which imports only `gemini.physics`, `gemini.ops`,
 `gemini.types` and `gemini.errors`, never another category's `_physics.py`; when a second category
 needs a function it moves up into `gemini/physics/`. Its functions keep `@ops.physics` and stay
@@ -22,15 +23,18 @@ traceable on every backend. Reuse existing physics functions wherever possible a
 a new physics function only when nothing existing can do the job, and generalise an existing one
 rather than writing a second copy. Never write a formula inside a module, and never write the same
 formula twice.
-Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules.
+Fitting and calibration belong in `gm.analysis` or `gm.optim`, not in modules. A plant class
+belongs in `gemini/plants/`; `gemini.modules` never imports `gemini.plants`.
 
 **Where a file goes under `gemini/modules/`.** There are four homes:
 
 - A file that defines a core class users subclass or build goes directly in `gemini/modules/`:
-  `module.py` (`Module`), `plant.py` (`Plant`) and `container.py` (`ModuleList`, `ModuleDict`).
+  `module.py` (`Module`), `declarations.py` (`Parameter`, `Inlet`, `Outlet`, `Output`, `Control`,
+  `Boundary`, `State`), `container.py` (`ModuleList`, `ModuleDict`) and `check.py`
+  (`gm.modules.check`). `Plant` is `gemini/plants/plant.py`.
 - Machinery goes in an `_utils/` folder, even if some of its functions are exported publicly:
-  `gemini/modules/_utils/` (`balance`, `description`, `design`, `registry`, `serialization`,
-  `wiring`), and `gemini/plants/_utils/` for the plant tools.
+  `gemini/modules/_utils/` (`balance`, `description`, `design`, `serialization`, `wiring`),
+  `gemini/plants/_utils/` for the plant tools and `gemini/_utils/registry.py` for the registry.
 - Code shared by the modules of one category goes in that category folder as a private file:
   `heating/_burner.py`, `cooling/_sorption.py`.
 - `gemini/plants/` holds only plant classes.
@@ -50,37 +54,34 @@ only import-by-string in the package.
 
 ## Registry, categories and streams
 
-`gemini/_utils/registry.py` is the one registry of module and plant classes. A class joins it
-under its class name with `gm.modules.register(cls)`, and every shipped equipment class is
-registered when `gm.modules` is imported. `gm.modules.names(category=None)`, `get(name)` and
-`categories()` read it; an unknown name raises `ValidationError` with its close matches in
-`suggestions`.
+`gemini/_utils/registry.py` is the one registry of module and plant classes. A class that states a
+`category` joins it under its class name when it is defined (`Module.__init_subclass__`), so every
+shipped equipment class is registered when `gm.modules` is imported and a new class needs no call.
+`abstract = True` in the body of a class leaves it out (`Module` and `Plant` are abstract); a
+subclass does not inherit it. A second class of a registered name raises `ValidationError` (code
+`duplicate_name`); defining the same class again replaces it. `gm.modules.names(category=None)`,
+`get(name)` and `categories()` read the registry; an unknown name raises `ValidationError` with its
+close matches in `suggestions`. A class in a file of the user is a class like any other: import the
+file, and a plant dict can then name it by `type`. There is no `register` and no `load_file`.
 
-`gm.modules.load_file(path)` imports a Python file, registers every `Module` class it defines that
-states a `category` (a base class without one is skipped) and returns their names, so a new module
-can join a plant dict by `type`. It executes the file; a file that does not import, or defines no
-such class, raises `ValidationError` (code `invalid_format` or `invalid_value`), and a name that is
-already taken by another class is refused.
-
-Before registering a new class, run `gm.modules.check(cls, example=None)`. It never raises
+Once a new class is written, run `gm.modules.check(cls, example=None)`. It never raises
 and returns `{module, passed, checks}`, each check `{name, passed, message}` with `passed` `True`,
 `False` or `None` (undecided). The checks are `is_module`, `instantiate` (the declaration rules
 run in `__init__`), `category`, `forward_signature` (exactly `forward(self, inlets)`), `units`
 (every scalar numeric parameter, control, boundary and output is declared with a quantity type
 that has a unit; coefficient arrays are exempt), `describe` (plain JSON) and `call` (one
-`gm.evaluate` call). A module that needs parameters, controls or inlet streams is undecided on
-`call` until `example` gives them in the shape of `gm.evaluate`:
+`gm.call` call). A module that needs parameters, controls or inlet streams is undecided on
+`call` until `example` gives them in the shape of `gm.call`:
 `{"parameters": {...}, "inlets": {...}, "controls": {...}}`.
 
 There is one classification: a shipped module's category is the name of the folder of
 `gemini/modules/` that holds its file, and a new module goes in the folder of what it does.
-`registry.CATEGORIES` is the fixed list of those folders, one word each, in display order;
+`CATEGORIES` of `gemini/_utils/registry.py` is the fixed list of those folders, one word each, in display order;
 [equipment.md](equipment.md#overview) lists the modules of each. `Module.category` reads the folder
 from the import path of the class, so a shipped class never declares it and the two cannot disagree
-(`tests/unit/modules/_utils/test_registry.py` checks the folders, the list and every class). `Plant`
-is the one class outside its folder: `gemini/plants/plant.py` reads `plants`. A class
-from outside (`register`, `load_file`) has no folder: it states the class attribute `category`, one
-of the list, and a subclass of a shipped class states its own.
+(`tests/unit/_utils/test_registry.py` checks the folders, the list and every class). The classes of
+`gemini/plants/` read `plants`. A class from outside has no folder: it states the class attribute
+`category`, one of the list, and a subclass of a shipped class states its own.
 
 A port declares its label: `Inlet(Stream, kind="brine")`, one of `gm.types.streams.names()`.
 A port without one, `kind=None`, takes whatever flows through it: piping, `CentrifugalPump`,
@@ -175,11 +176,10 @@ A leaf computes once, in `forward(self, inlets)`: it calls physics, assigns its 
 reading `self.flow` afterwards gives it back.
 
 ```python
-from gemini.modules import Module
+from gemini.modules import Control, Inlet, Module, Outlet, Output, Parameter
 from gemini.physics import pumps
 from gemini.types import (
-    Control, Count, Electricity, Frequency, Inlet, Outlet, Output, Parameter, Power,
-    PressureDifference, Stream, VolumeFlow,
+    Count, Electricity, Frequency, Power, PressureDifference, Stream, VolumeFlow,
 )
 
 
@@ -247,10 +247,10 @@ A plant may derive its children's parameters from its own. It overrides `set_par
 child values with functions from `gemini/physics/` and calls `super().set_params` with them:
 
 ```python
-from gemini.modules import ProductionReservoir
-from gemini.plants.plant import Plant
+from gemini.modules import Parameter, ProductionReservoir
 from gemini.physics import hydraulics
-from gemini.types import Density, Length, Parameter
+from gemini.plants import Plant
+from gemini.types import Density, Length
 
 
 class Column(Plant):
@@ -307,7 +307,7 @@ Parameters, controls and boundaries are set by attribute assignment or in bulk:
 - `missing_parameters()` lists uninitialized parameters and `is_initialized` is true when there
   are none.
 - `state_dict()` returns JSON-safe parameter values and the fluid of every module path, and
-  `load_state_dict(state, strict=True)` validates all of them before applying any. With
+  `set_state_dict(state, strict=True)` validates all of them before applying any. With
   `strict=False` only the modules named in `state` are filled; unknown paths are always rejected.
   `to_dict()`/`from_dict()` and `save(path)`/`load(path)` of a `Plant` add dated histories,
   overrides, bindings and boundary defaults; a single module is stored by wrapping it in a plant.
@@ -462,7 +462,8 @@ leaves (`ThermalDecline`, `AquiferStorage`, `BoreholeField`, `ThermalStorage`, `
 
 ```python
 from gemini.physics import heat_transfer
-from gemini.types import Power, State, Temperature
+from gemini.modules import State
+from gemini.types import Power, Temperature
 
 
 class Tank(Module):

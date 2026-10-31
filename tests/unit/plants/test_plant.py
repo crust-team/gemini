@@ -241,7 +241,7 @@ def test_to_spec_is_json_and_validate_is_empty(chain):
         "outlets.gas_out",
         "outlets.product",
     ]
-    assert gm.plants.from_dict(spec).to_dict() == spec
+    assert gm.Plant.from_dict(spec).to_dict() == spec
 
 
 def test_a_plant_has_no_run_method():

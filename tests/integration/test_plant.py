@@ -39,7 +39,7 @@ def test_handwritten_wiring_and_split_helpers(example):
     }
     traced = trace_wiring(plant, inputs)
     assert len(traced) == 10
-    project = legacy.read_project(OLD_PROJECT)
+    project = legacy.GeminiProject.from_folder(OLD_PROJECT)
     assert legacy.check_wiring(plant, project) == []
     well = plant.doublet.well
     bottom = leaves["doublet.reservoir"].outlets["sandface_out"]

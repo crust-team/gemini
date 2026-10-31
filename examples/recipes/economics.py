@@ -1,6 +1,6 @@
 """Price a small plant: investment, yearly cost, levelised cost of heat and CO2.
 
-Shows ``gm.Assumptions``, ``capex``, ``opex``, ``lcoh`` and ``co2`` on a boiler that
+Shows ``gm.Assumptions``, ``gm.Problem``, ``capex``, ``opex``, ``lcoh`` and ``co2`` on a boiler that
 serves a heating grid. Every price is an assumption of this recipe, not data, and it prints them.
 
 Run with ``python examples/recipes/economics.py``.
@@ -45,11 +45,13 @@ def main():
         for path, (value, unit) in INPUTS.items()
     }
     plant = build()
-    results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=DAY)
-    investment = gm.evaluate.capex(plant, ASSUMPTIONS)
-    yearly = gm.evaluate.opex(plant, results, ASSUMPTIONS)
-    heat = gm.evaluate.lcoh(plant, results, assumptions=ASSUMPTIONS)
-    emitted = gm.evaluate.co2(plant, results, ASSUMPTIONS)
+    demand = gm.data.from_values([500] * 24, "kW", "2027-01-01", "1 h", "heating_demand")
+    problem = gm.Problem(demand, assumptions=ASSUMPTIONS)
+    results = gm.simulate(plant, plan=gm.Dataset.from_profiles(profiles), clock=DAY)
+    investment = gm.evaluate.capex(plant, problem)
+    yearly = gm.evaluate.opex(plant, problem, results)
+    heat = gm.evaluate.lcoh(plant, problem, results)
+    emitted = gm.evaluate.co2(plant, problem, results)
     prices = investment["price_year"]["value"]
     print(f"Capex:  {investment['value'] / 1e3:8.1f} kEUR, prices of {prices}")
     print(f"Opex:   {yearly['value'] / 1e3:8.1f} kEUR/year")

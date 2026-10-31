@@ -15,7 +15,7 @@ from tests.fixtures.errors import raises
 @pytest.fixture(scope="module")
 def project():
     """Parse the example old project once; tests copy it before editing."""
-    return legacy.read_project(OLD_PROJECT)
+    return legacy.GeminiProject.from_folder(OLD_PROJECT)
 
 
 @pytest.fixture(scope="module")
@@ -64,12 +64,12 @@ def test_to_plant_rejects_an_ambiguous_data_csv(tmp_path):
     shutil.copytree(OLD_PROJECT, folder)
     (folder / "extra.csv").write_text("Timestamp;x\n", encoding="utf-8")
     with raises(ValidationError, "invalid_format", match="exactly one"):
-        legacy.to_plant(legacy.read_project(folder), gm.plants.get("DoubletHeatPlant"))
+        legacy.to_plant(legacy.GeminiProject.from_folder(folder), gm.plants.get("DoubletHeatPlant"))
 
 
 def test_to_dataset_converts_and_reports_missing_columns(project):
     """Old columns are renamed and converted to SI; absent bound columns are listed."""
-    frame = legacy.read_csv(OLD_PROJECT / "doublet_2024_old.csv").head(2)
+    frame = legacy.from_csv(OLD_PROJECT / "doublet_2024_old.csv").head(2)
     data = legacy.to_dataset(project, frame)
     values = data.to_frame()
     assert values["doublet.esp.suction.p"].iloc[0] == pytest.approx(59.491e5)

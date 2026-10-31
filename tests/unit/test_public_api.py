@@ -10,7 +10,7 @@ from tests.fixtures.capture_public_api import SNAPSHOT, capture, fingerprint
 
 SNAPSHOTS = {
     "0.1.0": "f19ae90f18bb5a5a85e1b1f730276c9a50fdba0d46108c4bcd56488b48178a8b",
-    "0.2.0": "4c16f7d1dee55da2ed39d85af2feec3cd180cee4c26375ca7d006d4240345bd2",
+    "0.2.0": "76f9c41276d93261e7ddabb80399d14d4585813375a0bc067f2b0e9882a4ac71",
 }
 """Hash of the snapshot per ``gm.__version__``: a released entry never changes."""
 
@@ -116,7 +116,6 @@ def test_utils_stays_private():
     assert "_utils" not in gm.__all__
 
 
-def test_the_old_project_import_is_public_only_through_convert_legacy():
-    """``gm.legacy`` is gone; ``gm.data.convert_legacy`` is the one public entry."""
-    assert not hasattr(gm, "legacy")
-    assert "convert_legacy" in gm.data.__all__
+def test_the_old_project_import_is_public_only_through_from_legacy():
+    """``gm.legacy`` is gone; ``gm.Plant.from_legacy`` is the one public entry."""
+    assert not hasattr(gm, "legacy") and callable(gm.Plant.from_legacy)

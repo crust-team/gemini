@@ -76,7 +76,7 @@ def test_every_spec_plant_and_special_case_has_an_example_that_round_trips(name)
     """An example builds, has no problems and writes the spec it was read from."""
     spec = catalogue.example(name).to_dict()
     assert gm.plants.validate(spec) == []
-    assert gm.plants.from_dict(spec).to_dict() == spec
+    assert gm.Plant.from_dict(spec).to_dict() == spec
 
 
 @pytest.mark.parametrize("name", EXAMPLES)
@@ -117,7 +117,7 @@ def test_a_state_dictionary_fills_a_plant_without_values():
     assert isinstance(example.filters, gm.modules.ModuleDict)
     fresh = catalogue.get("DoubletHeatPlant")
     assert not fresh.is_initialized
-    fresh.load_state_dict(example.state_dict())
+    fresh.set_state_dict(example.state_dict())
     assert fresh.is_initialized
 
 

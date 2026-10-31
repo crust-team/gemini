@@ -1,8 +1,10 @@
 # Data types
 
 Import public types from `gemini.types`; quantity aliases are defined in
-`types/quantities.py`. Types depend on the standard library, Pydantic, pandas/NumPy for
-profiles, `gemini.physics` for property calculations, `gemini.errors` and `gemini._utils`. They never
+`types/quantities.py`. The declarations (`Parameter`, `Inlet`, `Outlet`, `Output`, `Control`,
+`Boundary`, `State`) are in `gemini.modules`, and `Quantity` in `gemini.units`. Types depend on the
+standard library, Pydantic, pandas/NumPy for profiles, `gemini.physics` for property calculations,
+`gemini.units`, `gemini.errors` and `gemini._utils`. They never
 import equipment or the engine. `Stream.__init__` reads the runtime default fluid
 through a function-level import of `gemini.runtime` (see
 [conventions.md](conventions.md#dependencies)).
@@ -12,7 +14,7 @@ through a function-level import of `gemini.runtime` (see
 | `Stream` | Immutable mass flow, absolute temperature, pressure and fluid |
 | `Ports` | Immutable, ordered module inlet or outlet streams |
 | `Fluid` | Immutable composition and overrides; `BRINE`, `WATER`, `GLYCOL_30`, `STEAM` |
-| `Parameter`, `Control`, ... | Declared values with a physical unit and validation bounds |
+| `Parameter`, `Control`, ... (in `gemini.modules`) | Declared values with a physical unit and validation bounds |
 | `ModuleResult` | Recorded outputs, outlets and retained evaluation tree of one call |
 | `Values` | Read-only recorded outputs with unit conversion |
 | `Health` | Diagnostic comparison of a prediction with measurements |
@@ -47,7 +49,7 @@ the combinations of a plant, described in [plants.md](plants.md#outputs). `UNSET
 the same object under copy, deep copy and pickling. `shape=` checks fixed vectors; bounds can
 tighten quantity defaults.
 
-`declaration.validate(value)` converts a unit string or `gm.types.Quantity(value, unit)` to the declared
+`declaration.validate(value)` converts a unit string or `gm.units.Quantity(value, unit)` to the declared
 SI unit and then validates it with a Pydantic `TypeAdapter`; a failure raises
 `gm.errors.ValidationError`. Plain numbers are taken as SI. A cheap check built once per
 declaration is tried first and accepts only the common case, returned unchanged: an exact `float`
@@ -60,7 +62,7 @@ optional kind describes its non-null variant and a list describes its items.
 
 Use `Annotated[float, quantity(...)]` aliases for physical numeric declarations, including list
 items. Each has its own quantity name. Integer stage counts use `Count`. Every quantity's unit is its own SI unit in the unit
-table of `physics/units.py` (`test_every_quantity_unit_is_a_known_si_unit`); add the unit
+table of `gemini/units/conversions.py` (`test_every_quantity_unit_is_a_known_si_unit`); add the unit
 there together with a new quantity. Use signed pressure/temperature *differences* separately
 from nonnegative absolute pressure and strictly positive absolute temperature. A difference
 converts by scale only: `"5 degC"` as a `TemperatureDifference` is 5 K, not 278.15 K.
@@ -95,7 +97,7 @@ JSON schema metadata. `Health.metrics` is a heterogeneous diagnostic map, not a 
 quantity. Calibration accepts the `Parameter` object directly, so no separate parameter
 reference type exists. Corrosion/erosion diagnostic helpers retain **mm/year** as an explicit
 literature-unit exception; `CorrosionRate` is available for new SI contracts, and conversion
-helpers remain in `physics.units`.
+helpers remain in `gemini.units`.
 
 ## Fluid
 
@@ -105,10 +107,10 @@ kg/s; text without a unit such as `flow="150"` raises `gm.errors.ValidationError
 `flow` and `m_dot` raises `gm.errors.ValidationError`, as do an unknown keyword (with a did-you-mean),
 a missing field and a `fluid` that is neither a `Fluid` nor a mapping of its fields. The explicit
 SI `m_dot` field remains supported. Without `fluid` the constructor uses the runtime default
-fluid. All public numeric declarations accept a unit string or `gm.types.Quantity(value, unit)`.
+fluid. All public numeric declarations accept a unit string or `gm.units.Quantity(value, unit)`.
 `gm.units.convert(value, from_unit, to_unit, quantity=None)` handles explicit output conversion.
 
-`gm.units` is the one unit implementation (`physics/units.py`, one table). Its public names:
+`gm.units` is the one unit implementation (`gemini/units/conversions.py`, one table). Its public names:
 `names(quantity=None)` lists every unit, or those of a named quantity such as `"pressure"`;
 `parse("150 m3/h")` returns `(150.0, "m3/h")` (a number, a space and a known unit, else
 `ValidationError`); `convert(value, from_unit, to_unit, quantity=None)`; and `fits(unit, quantity)` tells
@@ -235,7 +237,7 @@ and `methane_emission` outputs, which follow the gas composition.
 ## Profiles and costs
 
 `Profile.from_series(series, unit, tz="UTC")` converts an in-memory pandas Series in any unit of
-the `physics.units` table whose SI unit is W, K, Pa, kg/s, m3/s, Hz, J, currency/J or `-`
+the `gemini.units` table whose SI unit is W, K, Pa, kg/s, m3/s, Hz, J, currency/J or `-`
 (for example degC, bar, kW, MW, kWh, m3/h and currency/kWh). Naive timestamps are interpreted in
 `tz`; storage is UTC. `Profile.constant(value, unit=..., clock=...)` builds a constant profile on
 every tick of a clock from a raw-unit value. Indices must be nonempty, unique and strictly
@@ -244,7 +246,7 @@ before the first sample raise `RunError`. `resample(step, how)` supports mean/su
 rejects empty bins with `RunError`. Sum is a sum of sample values, not time integration.
 
 Simulate profiles by combining them into a dataset keyed by dotted control or boundary paths:
-`gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock)`. Profiles combined into a
+`gm.simulate(plant, plan=gm.Dataset.from_profiles(profiles), clock=clock)`. Profiles combined into a
 dataset must share one index; resample explicitly.
 
 `Cost` stores investment, annual fixed cost and variable currency/J of useful output, together

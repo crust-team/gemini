@@ -5,7 +5,8 @@ or the engine. Its topic files are a leaf package: they import only the standard
 installed dependencies, never another part of `gemini` (`tests/unit/test_package_boundaries.py`
 enforces this). They therefore cannot raise `gm.errors` classes; their helpers raise built-in exceptions such
 as `TypeError` and `ValueError`, and callers that need a GEMINI error convert them. `paths.py` is the
-one exception: it imports `gemini.errors`, the other leaf, to raise `inputs_missing`. Import helpers
+exception, and `registry.py` another: they import `gemini.errors`, the other leaf, to raise
+`inputs_missing` and `duplicate_name`. Import helpers
 from their topic module, for example `from gemini._utils.strings import did_you_mean`;
 `gemini/_utils/__init__.py` exports nothing.
 
@@ -13,13 +14,16 @@ from their topic module, for example `from gemini._utils.strings import did_you_
   `close_matches`, `did_you_mean`.
 - `jsonable.py`: `to_plain`, the one conversion of returned data to plain JSON (NumPy to Python,
   NaN and infinity to `None`); every public function that returns data uses it.
-- `time.py`: `to_utc`, `to_utc_index`, `parse_duration`, `median_step`, `interval_seconds`,
+- `time.py`: `to_utc`, `to_utc_index`, `to_timedelta`, `median_step`, `interval_seconds`,
   `DEFAULT_STEP`.
 - `hooks.py`: `RemovableHandle` (ordered hook dicts, safe double `remove()`), `has_signature`.
 - `mappings.py`: `AttributeMapping` (base of `Ports` and `Values`), `get_nested`, `set_nested`.
 - `context.py`: `ContextSetting`, a context variable change usable as `with` and as a decorator.
-- `files.py`: `read_json`, `write_json` and the lossless JSON-cell tables (`encode_cell`,
-  `encode_cells`, `decode_cells`) used by the rows a checkpoint keeps.
+- `files.py`: `from_json`, `to_json` and the lossless JSON-cell tables (`encode_cell`,
+  `encode_cells`, `decode_cells`, `to_cells`, `from_cells`) used by the rows a checkpoint keeps.
+- `registry.py`: the one registry of module and plant classes (`register`, `names`, `get`,
+  `categories`, `CATEGORIES`), filled by `Module.__init_subclass__`
+  ([modules.md](modules.md#registry-categories-and-streams)).
 - `paths.py`: where the data folder is, and the only code that knows ([data.md](data.md#where-data-lives)):
   `plant_values(name)`,
   `doublet_heat(name)` and `legacy_project()` below `inputs/`, which raise `inputs_missing` when it
@@ -28,16 +32,15 @@ from their topic module, for example `from gemini._utils.strings import did_you_
   `is_older`, the rule that refuses files written before `OLDEST_READABLE`.
 - `collect_env.py`: `python -m gemini._utils.collect_env` prints the versions a bug report needs.
 
-Two folders live here without being leaf helpers, and the topic files never import them:
-`data/`, the in-memory `Dataset` and `Loader` ([data.md](data.md)), and `legacy/`, the old-format
-bridge ([legacy.md](legacy.md)). Their place in the dependency order is in
-[conventions.md](conventions.md#dependencies).
+The demand frame is not here: it is `gemini/run/_utils/demand.py`, and the old-format bridge is
+`gemini/data/legacy/` ([legacy.md](legacy.md)). The place of every folder in the dependency order is
+in [conventions.md](conventions.md#dependencies).
 
 ## Adding a helper
 
 Add a helper only when at least two places need it, or when it removes a duplicate. Put it in the
 file of its topic (no `misc.py` or `helpers.py`), give it a docstring, replace every duplicate in
-the same commit and add a test to the mirrored `tests/unit/utils/test_<file>.py`. A new topic file
+the same commit and add a test to the mirrored `tests/unit/_utils/test_<file>.py`. A new topic file
 needs its own mirror, which `tests/unit/test_mirror.py` requires. Physics, units and quantities
 belong in `physics` and `types`; code that needs modules or the engine stays in those
 packages.

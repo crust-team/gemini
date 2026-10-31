@@ -23,7 +23,7 @@ def main():
     """Simulate the data and read one series, one summary and one table of the run."""
     plant = gm.plants.example("DoubletHeatPlant")
     frame = pd.read_csv(DATA, parse_dates=["time"])
-    results = gm.simulate(plant, gm.Dataset.from_frame(frame, time_column="time"))
+    results = gm.simulate(plant, plan=gm.Dataset.from_frame(frame, time_column="time"))
     print(f"Steps:            {len(results)}, failed rows: {len(results.errors())}")
 
     duty = results.get("heat_exchanger", "duty", units=UNITS)

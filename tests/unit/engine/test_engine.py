@@ -52,10 +52,10 @@ def test_arguments_and_checkpoint_states_are_validated(setup, tmp_path):
         gm.Engine(plant, backend="nunpy")
     engine = gm.Engine(plant)
     engine.replay(data)
-    engine.save_checkpoint(tmp_path / "replay.ckpt")
+    engine.to_checkpoint(tmp_path / "replay.ckpt")
     with raises(gm.errors.RunError, "checkpoint", match="run_kind = 'replay'; expected 'live'"):
         gm.Engine(plant).live(data, tmp_path / "replay.ckpt")
-    loaded = gm.Engine.load_checkpoint(tmp_path / "replay.ckpt")
+    loaded = gm.Engine.from_checkpoint(tmp_path / "replay.ckpt")
     loaded.position = None
     with raises(gm.errors.RunError, "checkpoint", match="no stored rows"):
         loaded.resume()

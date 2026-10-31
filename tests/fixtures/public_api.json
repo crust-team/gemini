@@ -8,12 +8,44 @@
   "units"
  ],
  "classes": {
+  "Assumptions": {
+   "co2_cost": [],
+   "from_dict": [
+    "data"
+   ],
+   "price": [
+    "carrier",
+    "required"
+   ],
+   "schema": [],
+   "to_dict": []
+  },
+  "Constraint": {
+   "__init__": [
+    "path",
+    "min",
+    "max",
+    "equals",
+    "over",
+    "when"
+   ],
+   "from_dict": [
+    "data"
+   ],
+   "schema": [],
+   "to_dict": []
+  },
   "Engine": {
    "__init__": [
     "plant",
     "backend",
     "callbacks",
-    "on_error"
+    "on_error",
+    "compile"
+   ],
+   "from_checkpoint": [
+    "path",
+    "callbacks"
    ],
    "live": [
     "source",
@@ -21,10 +53,6 @@
     "step",
     "now",
     "sink"
-   ],
-   "load_checkpoint": [
-    "path",
-    "callbacks"
    ],
    "replay": [
     "data",
@@ -35,12 +63,12 @@
     "only"
    ],
    "resume": [],
-   "save_checkpoint": [
-    "path"
-   ],
    "simulate": [
     "profile",
     "clock"
+   ],
+   "to_checkpoint": [
+    "path"
    ]
   },
   "Module": {
@@ -107,13 +135,13 @@
    "from_dict": [
     "data"
    ],
+   "from_json": [
+    "path"
+   ],
+   "from_legacy": [
+    "folder"
+   ],
    "input_value": [
-    "path"
-   ],
-   "load": [
-    "path"
-   ],
-   "save": [
     "path"
    ],
    "set_inputs": [
@@ -129,8 +157,33 @@
    "to_dict": [
     "structure"
    ],
+   "to_json": [
+    "path"
+   ],
    "validate": [
     "on_error"
+   ]
+  },
+  "Problem": {
+   "__init__": [
+    "demand",
+    "site",
+    "constraints",
+    "assumptions"
+   ],
+   "apply_site": [
+    "plant"
+   ],
+   "from_dict": [
+    "data"
+   ],
+   "from_json": [
+    "path"
+   ],
+   "schema": [],
+   "to_dict": [],
+   "to_json": [
+    "path"
    ]
   },
   "Results": {
@@ -141,6 +194,9 @@
    "from_bytes": [
     "data"
    ],
+   "from_npz": [
+    "path"
+   ],
    "get": [
     "path",
     "field",
@@ -148,13 +204,7 @@
     "end",
     "units"
    ],
-   "load": [
-    "path"
-   ],
    "names": [],
-   "save": [
-    "path"
-   ],
    "summary": [
     "path",
     "start",
@@ -168,6 +218,9 @@
    "to_frame": [
     "units",
     "table"
+   ],
+   "to_npz": [
+    "path"
    ]
   }
  },
@@ -340,10 +393,12 @@
     "units"
    ]
   },
+  "compiler": {
+   "compile": [
+    "plant"
+   ]
+  },
   "data": {
-   "convert_legacy": [
-    "folder"
-   ],
    "from_csv": [
     "path",
     "columns",
@@ -357,128 +412,411 @@
     "step",
     "quantity"
    ],
-   "profile_schema": []
+   "profile_schema": [],
+   "synthesize": [
+    "heating",
+    "cooling",
+    "start",
+    "step",
+    "length",
+    "season",
+    "seed"
+   ]
   },
   "evaluate": {
-   "Limits": "class",
    "annualised_cost": [
     "plant",
+    "problem",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions",
     "on_error"
    ],
    "bounds": [
     "plant",
+    "problem",
+    "results"
+   ],
+   "capacities": [
+    "plant",
+    "problem",
     "results"
    ],
    "capex": [
     "plant",
-    "assumptions",
+    "problem",
     "on_error"
    ],
    "co2": [
     "plant",
+    "problem",
     "results",
-    "assumptions",
     "on_error"
    ],
+   "compare": [
+    "plant",
+    "problem",
+    "results",
+    "other"
+   ],
+   "constraints": [
+    "plant",
+    "problem",
+    "results"
+   ],
    "energy_balance": [
+    "plant",
+    "problem",
     "results"
    ],
    "lcoc": [
     "plant",
+    "problem",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions",
     "on_error"
    ],
    "lcoh": [
     "plant",
+    "problem",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions",
     "on_error"
    ],
    "lcts": [
     "plant",
+    "problem",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions",
     "on_error"
    ],
-   "limits": [
-    "plant",
-    "results",
-    "limits"
-   ],
    "mass_balance": [
+    "plant",
+    "problem",
     "results"
    ],
    "npv": [
     "plant",
+    "problem",
     "results",
     "discount_rate",
     "lifetime",
-    "assumptions",
     "on_error"
-   ],
-   "operating_time": [
-    "plant",
-    "results",
-    "duration"
    ],
    "opex": [
     "plant",
+    "problem",
     "results",
-    "assumptions",
     "on_error"
    ],
    "payback": [
     "plant",
+    "problem",
     "results",
-    "assumptions",
     "on_error"
    ],
    "plant_balance": [
     "plant",
-    "run"
+    "problem",
+    "results"
+   ],
+   "report": [
+    "plant",
+    "problem",
+    "results"
    ],
    "run_all": [
     "plant",
-    "results",
-    "duration"
+    "problem",
+    "results"
    ],
    "totals": [
     "plant",
+    "problem",
     "results"
+   ]
+  },
+  "ops": {
+   "Constant": "class",
+   "Failed": "class",
+   "Operators": "class",
+   "Symbolic": "class",
+   "abs": [
+    "value"
+   ],
+   "acos": [
+    "value"
+   ],
+   "add": [
+    "left",
+    "right"
+   ],
+   "any_nan": [
+    "values"
+   ],
+   "asin": [
+    "value"
+   ],
+   "atan": [
+    "value"
+   ],
+   "atan2": [
+    "left",
+    "right"
+   ],
+   "brentq": [
+    "function",
+    "low",
+    "high",
+    "args",
+    "xtol",
+    "rtol",
+    "maxiter"
+   ],
+   "ceil": [
+    "value"
+   ],
+   "check": [
+    "condition",
+    "error",
+    "message",
+    "code",
+    "values"
+   ],
+   "check_numbers": [
+    "function",
+    "values"
+   ],
+   "clip": [
+    "first",
+    "second",
+    "third"
+   ],
+   "control": "module",
+   "cos": [
+    "value"
+   ],
+   "cosh": [
+    "value"
+   ],
+   "cumsum": [
+    "values"
+   ],
+   "dispatch": [
+    "name",
+    "operands",
+    "attributes"
+   ],
+   "eq": [
+    "left",
+    "right"
+   ],
+   "exp": [
+    "value"
+   ],
+   "expm1": [
+    "value"
+   ],
+   "floor": [
+    "value"
+   ],
+   "floordiv": [
+    "left",
+    "right"
+   ],
+   "ge": [
+    "left",
+    "right"
+   ],
+   "getitem": [
+    "value",
+    "index"
+   ],
+   "gt": [
+    "left",
+    "right"
+   ],
+   "interp": [
+    "x",
+    "xp",
+    "fp"
+   ],
+   "isfinite": [
+    "value"
+   ],
+   "isinf": [
+    "value"
+   ],
+   "isnan": [
+    "value"
+   ],
+   "le": [
+    "left",
+    "right"
+   ],
+   "log": [
+    "value"
+   ],
+   "log10": [
+    "value"
+   ],
+   "logical_and": [
+    "left",
+    "right"
+   ],
+   "logical_not": [
+    "value"
+   ],
+   "logical_or": [
+    "left",
+    "right"
+   ],
+   "lt": [
+    "left",
+    "right"
+   ],
+   "maximum": [
+    "left",
+    "right"
+   ],
+   "mean": [
+    "values"
+   ],
+   "minimum": [
+    "left",
+    "right"
+   ],
+   "mod": [
+    "left",
+    "right"
+   ],
+   "mul": [
+    "left",
+    "right"
+   ],
+   "ne": [
+    "left",
+    "right"
+   ],
+   "neg": [
+    "value"
+   ],
+   "newton": [
+    "function",
+    "start",
+    "derivative",
+    "args",
+    "tolerance",
+    "max_iterations"
+   ],
+   "physics": [
+    "function"
+   ],
+   "pow": [
+    "left",
+    "right"
+   ],
+   "register_backend": [
+    "backend"
+   ],
+   "require": [
+    "value"
+   ],
+   "round": [
+    "left",
+    "right"
+   ],
+   "scope": "module",
+   "sign": [
+    "value"
+   ],
+   "sin": [
+    "value"
+   ],
+   "sinh": [
+    "value"
+   ],
+   "sqrt": [
+    "value"
+   ],
+   "sub": [
+    "left",
+    "right"
+   ],
+   "sum": [
+    "values"
+   ],
+   "tan": [
+    "value"
+   ],
+   "tanh": [
+    "value"
+   ],
+   "truediv": [
+    "left",
+    "right"
+   ],
+   "where": [
+    "first",
+    "second",
+    "third"
    ]
   },
   "optim": {
    "minimize": [
     "plant",
-    "profile",
+    "problem",
     "variables",
     "objective",
     "constraints",
     "evaluations",
-    "rules",
-    "assumptions"
+    "plan"
    ],
    "sample": [
     "plant",
-    "profile",
+    "problem",
     "distributions",
     "metrics",
     "count",
     "seed",
-    "rules",
-    "assumptions"
+    "plan"
+   ],
+   "sensitivity": [
+    "plant",
+    "problem",
+    "parameters",
+    "metrics",
+    "plan"
+   ],
+   "size": [
+    "plant",
+    "problem",
+    "plan"
    ]
+  },
+  "physics": {
+   "chemistry": "module",
+   "combustion": "module",
+   "constants": "module",
+   "corrosion": "module",
+   "diagnostics": "module",
+   "dispatch": "module",
+   "doublet": "module",
+   "energy": "module",
+   "erosion": "module",
+   "fluid": "module",
+   "gas": "module",
+   "geometry": "module",
+   "ground": "module",
+   "heat_transfer": "module",
+   "hydraulics": "module",
+   "psychrometrics": "module",
+   "pumps": "module",
+   "refrigeration": "module",
+   "separation": "module"
   },
   "plants": {
    "ATESPlant": "class",
@@ -498,11 +836,9 @@
    "NodalDoublet": "class",
    "ParallelExchangerPlant": "class",
    "Plant": "class",
+   "capabilities": [],
    "example": [
     "name"
-   ],
-   "from_dict": [
-    "data"
    ],
    "get": [
     "name"
@@ -583,17 +919,19 @@
   ],
   "simulate": [
    "plant",
-   "profile",
+   "problem",
+   "plan",
    "clock",
    "checkpoint",
    "checkpoint_every",
    "backend",
    "callbacks",
-   "on_error"
+   "on_error",
+   "compile"
   ]
  },
  "schemas": {
-  "check.schema.json": "8a57d8429749d44399831d8dcedf4288c77070665171246949e55476f138c3b3",
+  "check.schema.json": "c380e8735b88c2e0a926c9985c39ed77c06564faea3e61bbc68108e713aa7d18",
   "module_description.schema.json": "f40388d592d69073cba6a90dc83a23e69e7b3a8c7f9e88d48fdd3e19c6d1779e",
   "plant_dict.schema.json": "805fcf66162f3690ab37a8764cb7b916070b2c72f2cf6144fa358756a2b4813f",
   "problem.schema.json": "98fbbd71c3cdb8b5c55b3cca2d2829999ab8665e4eb7dd1062fcc77d970383b4",

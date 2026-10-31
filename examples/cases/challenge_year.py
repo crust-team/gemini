@@ -4,17 +4,13 @@ Plans 2027 for the plant dict ``plant.json`` of the sample problem, two doublets
 a boiler and three chillers, and simulates it. The reservoir, the brine, the limits and the supply
 temperatures are the sample problem's; what this case assumes it prints as assumptions.
 
-Shows ``gm.plants.from_dict``, ``gm.data.from_csv``, ``gm.schedule``, ``gm.simulate``,
-``gm.evaluate.Limits.from_dict``, ``gm.evaluate.limits``, ``gm.evaluate.operating_time``,
-``gm.evaluate.totals`` and ``gm.evaluate.lcts``.
+Shows ``gm.Problem.from_json``, ``gm.Plant.from_json``, ``gm.simulate``, ``gm.evaluate.totals``,
+``gm.evaluate.constraints`` and ``gm.evaluate.lcts``.
 
 Run with ``python examples/cases/challenge_year.py``.
 """
 
-import json
 from pathlib import Path
-
-import pandas as pd
 
 import gemini as gm
 
@@ -22,26 +18,6 @@ MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
 SAMPLE = Path(__file__).resolve().parents[2] / "inputs/examples/hackathon_2027"
 """The sample problem, read by this example only."""
-HEATING_FILE = "GEMINI_Heating_Demand_Daily_2027.csv"
-COOLING_FILE = "GEMINI_Cooling_Demand_Daily_2027.csv"
-
-
-def sample(name):
-    """Return the JSON file ``name`` of the sample problem as data."""
-    return json.loads((SAMPLE / name).read_text())
-
-
-def demand():
-    """Return the heating and cooling demand of the two files of the sample problem."""
-    heat = {"heating_demand_MWth": "heating_demand"}
-    cool = {"cooling_demand_MWcool": "cooling_demand"}
-    return pd.concat(
-        [
-            gm.data.from_csv(SAMPLE / HEATING_FILE, heat, "MW", time_column="date"),
-            gm.data.from_csv(SAMPLE / COOLING_FILE, cool, "MW", time_column="date"),
-        ],
-        axis=1,
-    )
 
 
 ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
@@ -52,9 +28,9 @@ ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
   discount rate, lifetime, every price and the cost factors without a source"""
 
 
-def print_year(plant, results):
+def print_year(plant, problem, results):
     """Print the energy of the year and the supply temperatures, in daily steps."""
-    totals = gm.evaluate.totals(plant, results)
+    totals = gm.evaluate.totals(plant, problem, results)
     frame = results.to_frame()
     boiler = frame["peak_boiler.fluid_out.enthalpy_flow"]
     boiler = boiler - frame["peak_boiler.fluid_in.enthalpy_flow"]
@@ -104,20 +80,15 @@ def print_checks(checks):
 
 
 def main():
-    """Plan and simulate the year, then print what it delivered and each requirement."""
-    plant = gm.plants.from_dict(sample("plant.json"))
+    """Simulate the year of the sample problem, then print what it delivered and each constraint."""
+    problem = gm.Problem.from_json(SAMPLE / "problem.json")
+    plant = gm.Plant.from_json(SAMPLE / "plant.json")
     print(ASSUMPTIONS)
-    rules = sample("rules.json")
-    plan = gm.schedule(plant, demand(), rules)
-    results = gm.simulate(plant, plan, on_error="record")
+    results = gm.simulate(plant, problem, on_error="record")
     print(f"\nFailed days: {len(results.errors())}")
-    print_year(plant, results)
-    requirements = gm.evaluate.Limits.from_dict(sample("limits.json"))
-    times = gm.evaluate.operating_time(plant, results, rules["operating_time"])
-    print_checks(gm.evaluate.limits(plant, results, requirements) + times)
-    lcts = gm.evaluate.lcts(
-        plant, results, assumptions=gm.Assumptions(**sample("assumptions.json"))
-    )
+    print_year(plant, problem, results)
+    print_checks(gm.evaluate.constraints(plant, problem, results))
+    lcts = gm.evaluate.lcts(plant, problem, results)
     print(f"\nLCTS, on the placeholder prices above: {lcts['value'] * MWH:.2f} EUR/MWh")
 
 

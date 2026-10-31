@@ -1,1 +1,45 @@
-"""GEMINI physics."""
+"""GEMINI physics: the textbook formulas, one topic per file."""
+
+from . import (
+    chemistry,
+    combustion,
+    constants,
+    corrosion,
+    diagnostics,
+    dispatch,
+    doublet,
+    energy,
+    erosion,
+    fluid,
+    gas,
+    geometry,
+    ground,
+    heat_transfer,
+    hydraulics,
+    psychrometrics,
+    pumps,
+    refrigeration,
+    separation,
+)
+
+__all__ = [
+    "chemistry",
+    "combustion",
+    "constants",
+    "corrosion",
+    "diagnostics",
+    "dispatch",
+    "doublet",
+    "energy",
+    "erosion",
+    "fluid",
+    "gas",
+    "geometry",
+    "ground",
+    "heat_transfer",
+    "hydraulics",
+    "psychrometrics",
+    "pumps",
+    "refrigeration",
+    "separation",
+]

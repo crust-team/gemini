@@ -17,11 +17,11 @@ The three weeks, in hourly steps:
   heating supply       65.00 °C, lowest
   cooling supply       16.00 °C, warmest
 
-Limits:
+Constraints:
   d0.reservoir.liquid_flow                ok        worst 35 m³/h
   d0.brine_cooling                        ok        worst 19.86 K
+  d0.reservoir.liquid_flow                ok        worst 450 h
   d0.pump_efficiency                      ok        worst 0.65 -
   d0.volume_imbalance                     ok        worst -6.939e-18 m3/s
   heating_consumer.supply_in.temperature  ok        worst 65 °C
   cooling_consumer.supply_in.temperature  ok        worst 16 °C
-  d0.operating_time                       ok        worst 450 h

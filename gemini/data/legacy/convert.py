@@ -15,7 +15,7 @@ from gemini.run.dataset import Dataset
 from gemini.types import Binding, ModuleBindings
 
 from . import tables
-from ._loader import load_legacy_design, node_kinds, node_paths
+from ._loader import from_legacy_design, node_kinds, node_paths
 
 _SECTIONS = ("controls", "boundaries", "inlets", "measured", "state")
 
@@ -101,14 +101,14 @@ def to_plant(project, plant):
 
     Old fields the bridge cannot map are listed in one ``GeminiWarning``.
     """
-    design = load_legacy_design(project)
+    design = from_legacy_design(project)
     if design.unmapped:
         warnings.warn(
             f"Unmapped GEMINI fields: {', '.join(design.unmapped)}", GeminiWarning, stacklevel=2
         )
     state = {path: _filled_module(plant, path, item) for path, item in design.modules.items()}
     state[""] = {"params": {}, "fluid": next(iter(design.modules.values())).fluid.model_dump()}
-    plant.load_state_dict(state, strict=False)
+    plant.set_state_dict(state, strict=False)
     plant.bindings, _ = _converted_bindings(design)
     plant.boundary = deepcopy(design.boundary)
     return plant.set_inputs(design.inputs)
@@ -119,7 +119,7 @@ def to_dataset(project, frame):
 
     Status columns are kept as text and ``tables.EXTRA_COLUMNS`` are kept converted to SI.
     """
-    _, sources = _converted_bindings(load_legacy_design(project))
+    _, sources = _converted_bindings(from_legacy_design(project))
     frame = frame.copy()
     time_column = next(
         (name for name in frame.columns if pd.api.types.is_datetime64_any_dtype(frame[name])),
@@ -190,7 +190,7 @@ def from_plant(plant, template):
 def _coefficient_value(values, original):
     """Return new coefficients in the old spelling, or the original if they are unchanged."""
     values = list(values)
-    if tables.parse_coefficients(original) == values:
+    if tables.from_coefficients(original) == values:
         return original
     if isinstance(original, str):
         return ";".join(format(value, ".17g") for value in values)
@@ -227,7 +227,7 @@ def _legacy_property(name, params, original):
 
 def results_to_frame(results, project):
     """Convert predicted bound outputs to their old tag columns and units."""
-    design = load_legacy_design(project)
+    design = from_legacy_design(project)
     frame = results.to_frame()
     output = pd.DataFrame({"Timestamp": frame.index.tz_convert("UTC").tz_localize(None)})
     for path, bound in design.bindings.items():

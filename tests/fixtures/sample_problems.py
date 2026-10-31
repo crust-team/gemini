@@ -34,7 +34,7 @@ def shallow_problem():
 
 def treatment_plant():
     """Return the design with desander and inhibitor dosing, with the site of its problem."""
-    plant = gm.plants.from_dict(sample_json("plant_with_treatment.json"))
+    plant = gm.Plant.from_dict(sample_json("plant_with_treatment.json"))
     return sample_problem("problem_with_treatment.json").apply_site(plant)
 
 
@@ -45,7 +45,7 @@ def template_dict(name):
 
 def template_plant(name):
     """Return template plant ``name`` with the site of the sample problem applied."""
-    return sample_problem().apply_site(gm.plants.from_dict(template_dict(name)))
+    return sample_problem().apply_site(gm.Plant.from_dict(template_dict(name)))
 
 
 def filled_plant(name):

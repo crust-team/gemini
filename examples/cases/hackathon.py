@@ -1,19 +1,15 @@
 """The hackathon case: two doublets, heat exchanger, heat pump, gas boiler and absorption chiller.
 
-Schedules 2027 from the daily demand on the plant dict ``plant_with_treatment.json`` of the sample
-problem and simulates it. The reservoir, brine, limits and supply temperatures are the sample
-problem's; what this case assumes it prints as assumptions. Shows ``gm.plants.from_dict``,
-``gm.data.from_csv``, ``gm.evaluate.Limits.from_dict``, ``gm.Assumptions``,
-``gm.schedule``, ``gm.simulate``,
-``gm.evaluate.limits``, ``gm.evaluate.plant_balance`` and ``gm.evaluate.totals``.
+Simulates 2027 from the problem ``problem_with_treatment.json`` of the sample folder on the plant
+dict ``plant_with_treatment.json``. The reservoir, brine, limits and supply temperatures are the
+sample problem's; what this case assumes it prints as assumptions. Shows ``gm.Problem.from_json``,
+``gm.Plant.from_json``, ``gm.simulate``, ``gm.evaluate.constraints``,
+``gm.evaluate.plant_balance`` and ``gm.evaluate.totals``.
 
 Run with ``python examples/cases/hackathon.py``.
 """
 
-import json
 from pathlib import Path
-
-import pandas as pd
 
 import gemini as gm
 
@@ -21,26 +17,6 @@ MWH = 1000 * gm.units.convert(1, "kWh", "J")
 GWH = 1000 * MWH
 SAMPLE = Path(__file__).resolve().parents[2] / "inputs/examples/hackathon_2027"
 """The sample problem, read by this example only."""
-HEATING_FILE = "GEMINI_Heating_Demand_Daily_2027.csv"
-COOLING_FILE = "GEMINI_Cooling_Demand_Daily_2027.csv"
-
-
-def sample(name):
-    """Return the JSON file ``name`` of the sample problem as data."""
-    return json.loads((SAMPLE / name).read_text())
-
-
-def demand():
-    """Return the heating and cooling demand of the two files of the sample problem."""
-    heat = {"heating_demand_MWth": "heating_demand"}
-    cool = {"cooling_demand_MWcool": "cooling_demand"}
-    return pd.concat(
-        [
-            gm.data.from_csv(SAMPLE / HEATING_FILE, heat, "MW", time_column="date"),
-            gm.data.from_csv(SAMPLE / COOLING_FILE, cool, "MW", time_column="date"),
-        ],
-        axis=1,
-    )
 
 
 ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
@@ -51,12 +27,12 @@ ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
   discount rate, lifetime, every price and the cost factors without a source"""
 
 
-def print_run(plant, results):
+def print_run(plant, problem, results):
     """Print the delivered energy, what remained unmet and the peaks, for daily steps."""
     frame = results.to_frame()
     gwh = 24.0 / 1e9
     gas = frame["gas_grid.gas_out.chemical_flow"]
-    totals = gm.evaluate.totals(plant, results)
+    totals = gm.evaluate.totals(plant, problem, results)
     boiler = frame["boiler.fluid_out.enthalpy_flow"] - frame["boiler.fluid_in.enthalpy_flow"]
     sink = frame["heat_pump.sink_out.enthalpy_flow"] - frame["heat_pump.sink_in.enthalpy_flow"]
     rows = (
@@ -75,9 +51,9 @@ def print_run(plant, results):
         print(f"  {label:<17} {value:8.2f} {unit}")
 
 
-def print_limits(checks):
-    """Print each limit of the sample problem, in its units."""
-    print("\nLimits:")
+def print_constraints(checks):
+    """Print each constraint of the sample problem, in its units."""
+    print("\nConstraints:")
     for item in checks:
         value, unit = item["value"]["value"], item["value"]["unit"]
         if unit == "m3/s":
@@ -98,32 +74,38 @@ def print_balance(checks):
         print(f"  {item['name']:<18} {result:<5} worst {item['value']['value']:.3g}")
 
 
-def print_totals(plant, results):
+def print_totals(plant, problem, results):
     """Print what crossed the plant's edge and the KPIs of the run."""
     print("\nAt the plant's edge:")
-    for name, item in gm.evaluate.totals(plant, results).items():
-        scale, unit = (GWH, "GWh") if item["unit"] == "J" else (1e6, "kt")
-        print(f"  {name:<20} {item['value'] / scale:10.3f} {unit}")
+    totals = gm.evaluate.totals(plant, problem, results)
+    for name, item in totals.items():
+        if item["unit"] in ("J", "kg"):
+            scale, unit = (GWH, "GWh") if item["unit"] == "J" else (1e6, "kt")
+            print(f"  {name:<20} {item['value'] / scale:10.3f} {unit}")
     print("\nKPIs:")
-    for name, item in gm.evaluate.totals(plant, results).items():
-        scale, unit = (1e6, "MW") if item["unit"] == "W" else (1, "")
-        print(f"  {name:<18} {item['value'] / scale:.4g} {unit}".rstrip())
+    for name, item in totals.items():
+        if item["unit"] not in ("J", "kg"):
+            scale, unit = (1e6, "MW") if item["unit"] == "W" else (1, "")
+            print(f"  {name:<18} {item['value'] / scale:.4g} {unit}".rstrip())
 
 
-def print_economics(plant, results):
+def print_economics(plant, problem, results):
     """Print the economics in the units people read; every price is a placeholder."""
-    totals = gm.evaluate.totals(plant, results)
+    totals = gm.evaluate.totals(plant, problem, results)
     heat, cold = totals["heat_delivered"]["value"], totals["cold_delivered"]["value"]
-    values = gm.Assumptions(heat_cost_share=heat / (heat + cold), **sample("assumptions.json"))
-    capex = gm.evaluate.capex(plant, values)
+    assumptions = problem.assumptions.to_dict() | {"heat_cost_share": heat / (heat + cold)}
+    shared = gm.Problem(
+        problem.demand, problem.site, problem.constraints, gm.Assumptions(**assumptions)
+    )
+    capex = gm.evaluate.capex(plant, shared)
     rows = (
         ("capex", capex["value"] / 1e6, f"MEUR ({capex['price_year']['value']})"),
-        ("opex", gm.evaluate.opex(plant, results, values)["value"] / 1e6, "MEUR/year"),
-        ("CO2-eq", gm.evaluate.co2(plant, results, values)["value"] / 1e6, "kt/year"),
-        ("LCOH", gm.evaluate.lcoh(plant, results, assumptions=values)["value"] * MWH, "EUR/MWh"),
-        ("LCOC", gm.evaluate.lcoc(plant, results, assumptions=values)["value"] * MWH, "EUR/MWh"),
-        ("NPV", gm.evaluate.npv(plant, results, assumptions=values)["value"] / 1e6, "MEUR"),
-        ("payback", gm.evaluate.payback(plant, results, values)["value"], "years"),
+        ("opex", gm.evaluate.opex(plant, shared, results)["value"] / 1e6, "MEUR/year"),
+        ("CO2-eq", gm.evaluate.co2(plant, shared, results)["value"] / 1e6, "kt/year"),
+        ("LCOH", gm.evaluate.lcoh(plant, shared, results)["value"] * MWH, "EUR/MWh"),
+        ("LCOC", gm.evaluate.lcoc(plant, shared, results)["value"] * MWH, "EUR/MWh"),
+        ("NPV", gm.evaluate.npv(plant, shared, results)["value"] / 1e6, "MEUR"),
+        ("payback", gm.evaluate.payback(plant, shared, results)["value"], "years"),
     )
     print("\nEconomics, on the placeholder prices above:")
     for label, value, unit in rows:
@@ -131,17 +113,16 @@ def print_economics(plant, results):
 
 
 def main():
-    """Plan and simulate the year, then print what it delivered and what it costs."""
-    plant = gm.plants.from_dict(sample("plant_with_treatment.json"))
-    rules = sample("rules.json") | {"operating_time": None}
-    limits = gm.evaluate.Limits.from_dict(sample("limits_with_treatment.json"))
+    """Simulate the year, then print what it delivered and what it costs."""
+    problem = gm.Problem.from_json(SAMPLE / "problem_with_treatment.json")
+    plant = gm.Plant.from_json(SAMPLE / "plant_with_treatment.json")
     print(ASSUMPTIONS)
-    results = gm.simulate(plant, gm.schedule(plant, demand(), rules))
-    print_run(plant, results)
-    print_limits(gm.evaluate.limits(plant, results, limits))
-    print_balance(gm.evaluate.plant_balance(plant, results))
-    print_totals(plant, results)
-    print_economics(plant, results)
+    results = gm.simulate(plant, problem)
+    print_run(plant, problem, results)
+    print_constraints(gm.evaluate.constraints(plant, problem, results))
+    print_balance(gm.evaluate.plant_balance(plant, problem, results))
+    print_totals(plant, problem, results)
+    print_economics(plant, problem, results)
 
 
 if __name__ == "__main__":

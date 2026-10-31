@@ -18,7 +18,7 @@ import pandas as pd
 
 from gemini import units
 from gemini._utils.strings import join_path
-from gemini._utils.time import parse_duration
+from gemini._utils.time import to_timedelta
 from gemini.errors import ValidationError
 
 FLOW = "reservoir.liquid_flow"
@@ -67,7 +67,7 @@ def _duration(constraint):
     """Return the duration of a duration constraint as a ``Timedelta``."""
     bound = constraint.equals if constraint.equals is not None else constraint.max
     try:
-        return parse_duration(bound)
+        return to_timedelta(bound)
     except (TypeError, ValueError) as error:
         raise ValidationError(
             f"schedule: constraint {constraint.path} duration = {bound!r}; expected a duration",

@@ -17,12 +17,12 @@ def _field(doublet, producers=2, injectors=1, rates=(40.0, 30.0)):
     field = gm.plants.MultiWellPlant(producers=producers, injectors=injectors)
     for limb, rate in zip(field.producers, rates):
         for name in LIMB:
-            getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
+            getattr(limb, name).set_state_dict(getattr(doublet, name).state_dict())
         limb.reservoir.production_rate = rate
         limb.esp.frequency = 50.0
     for limb in field.injectors:
-        limb.well.load_state_dict(doublet.injector.state_dict())
-        limb.sink.load_state_dict(doublet.sink.state_dict())
+        limb.well.set_state_dict(doublet.injector.state_dict())
+        limb.sink.set_state_dict(doublet.sink.state_dict())
     return field
 
 

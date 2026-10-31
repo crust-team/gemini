@@ -98,4 +98,4 @@ def test_auto_checkpoint_intervals(tmp_path):
         AutoCheckpoint(tmp_path / "a", every=0)
     path = tmp_path / "auto.ckpt"
     run([1.0, 2.0, 3.0], AutoCheckpoint(path, every=np.int64(2)))
-    assert len(gm.Engine.load_checkpoint(path).results) == 2
+    assert len(gm.Engine.from_checkpoint(path).results) == 2

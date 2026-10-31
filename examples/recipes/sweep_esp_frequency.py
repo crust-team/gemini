@@ -29,8 +29,8 @@ def main():
     """Simulate each frequency and print the energy of each module that has one."""
     plant = gm.plants.example("DoubletHeatPlant")
     for frequency in FREQUENCIES:
-        results = gm.simulate(plant, inputs(frequency), clock=DAY)
-        closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, results))
+        results = gm.simulate(plant, plan=inputs(frequency), clock=DAY)
+        closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, None, results))
         print(f"{frequency}: {len(results.errors())} failed rows, balance closes: {closed}")
         for (module, port), row in results.to_frame(table="energy").iterrows():
             if row["energy_MWh"] > 0:

@@ -119,7 +119,7 @@ class Problem:
             ``gm.data.from_csv`` raises for the demand.
         """
         path = Path(path)
-        data = _read_json(path)
+        data = _from_json(path)
         _checked_keys(data)
         spec = data["demand"]
         for key in ("file", "columns", "unit"):
@@ -190,7 +190,7 @@ class Problem:
         }
 
 
-def _read_json(path):
+def _from_json(path):
     """Return the JSON object of ``path``, or raise ``invalid_format``."""
     try:
         data = json.loads(path.read_text())

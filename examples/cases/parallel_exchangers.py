@@ -89,7 +89,7 @@ def main():
     print(f"Secondary outlet:            {outlet:.2f} °C")
     print(f"Electricity (ESP and pump):  {electricity / 1e6:.4f} MW")
     print(f"Mass residual:               {gm.modules.mass_balance(plant, result)['residual']} kg/s")
-    closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
+    closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, None, result))
     print(f"Plant balance closes:        {closed}")
 
 

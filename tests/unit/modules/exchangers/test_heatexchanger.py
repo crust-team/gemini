@@ -38,7 +38,7 @@ def measured_row(row):
 def exchanger_for(row, measured, ua):
     """Return the example heat exchanger sized for one row and the inlet streams."""
     base = mapping.heatexchanger_params_from_gemini(
-        mapping.read_property(OLD_PROJECT / "heat_exchanger_3410.param")
+        mapping.from_property(OLD_PROJECT / "heat_exchanger_3410.param")
     )
     params = base | dict(
         thermal_conductance=ua,

@@ -48,8 +48,8 @@ def test_hx_apply_and_save(tmp_path, fresh_plant, reference_dataset):
     gm.replay(plant, dataset)
     assert plant.heat_exchanger.thermal_conductance == fitted.fitted["thermal_conductance"]
     assert len(plant.heat_exchanger._param_history) == count
-    plant.save(tmp_path / "plant.json")
-    loaded = gm.Plant.load(tmp_path / "plant.json")
+    plant.to_json(tmp_path / "plant.json")
+    loaded = gm.Plant.from_json(tmp_path / "plant.json")
     assert loaded.state_dict() == plant.state_dict()
     assert loaded.heat_exchanger._param_history == plant.heat_exchanger._param_history
     assert loaded.bindings == plant.bindings

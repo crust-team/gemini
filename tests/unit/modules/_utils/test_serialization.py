@@ -5,7 +5,7 @@ import json
 import pytest
 
 import gemini as gm
-from gemini._utils.files import read_json
+from gemini._utils.files import from_json
 from gemini.errors import ValidationError
 from gemini.modules._utils import serialization
 from tests.fixtures import FIXTURES
@@ -37,10 +37,10 @@ def test_fluids_bindings_and_history_round_trip():
 def test_old_files_are_refused():
     """Format 1 raises ``old_format``."""
     with raises(ValidationError, "old_format") as caught:
-        gm.plants.from_dict({"version": 1, "modules": {}})
+        gm.Plant.from_dict({"version": 1, "modules": {}})
     assert caught.value.code == "old_format"
     with raises(ValidationError, "old_format"):
-        gm.plants.from_dict(read_json(FIXTURES / "plant_format1.json"))
+        gm.Plant.from_dict(from_json(FIXTURES / "plant_format1.json"))
     assert serialization.format_error({"format": 3}).code == "invalid_format"
 
 

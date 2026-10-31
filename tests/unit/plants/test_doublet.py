@@ -151,7 +151,7 @@ def test_the_file_holds_the_design_and_rebuilds_the_same_numbers():
     spec = plant.to_dict()
     params = spec["modules"]["d0"]["params"]
     assert params == DESIGN | PUMP | {"reservoir.skin": 2.0}
-    rebuilt = gm.plants.from_dict(json.loads(json.dumps(spec))).d0
+    rebuilt = gm.Plant.from_dict(json.loads(json.dumps(spec))).d0
     assert rebuilt.reservoir.productivity_index == doublet.reservoir.productivity_index
     assert rebuilt.reservoir.pressure == doublet.reservoir.pressure
     assert rebuilt.esp.head_coefficients == doublet.esp.head_coefficients
@@ -165,7 +165,7 @@ def test_a_designed_doublet_as_the_root_round_trips():
     doublet.set_params("", DESIGN)
     spec = doublet.to_dict()
     assert spec["type"] == "Doublet" and spec["params"] == DESIGN
-    assert gm.plants.from_dict(spec).reservoir.temperature == pytest.approx(360.15)
+    assert gm.Plant.from_dict(spec).reservoir.temperature == pytest.approx(360.15)
 
 
 def test_a_dated_design_derives_at_its_date():
@@ -190,9 +190,9 @@ def test_the_values_of_a_stored_doublet_rebuild_in_any_order():
     spec = plant.to_dict()
     params = spec["modules"]["d0"]["params"]
     spec["modules"]["d0"]["params"] = dict(reversed(list(params.items())))
-    assert gm.plants.from_dict(spec).d0.reservoir.temperature == pytest.approx(360.15)
+    assert gm.Plant.from_dict(spec).d0.reservoir.temperature == pytest.approx(360.15)
     spec["modules"]["d0"]["params"] = params
-    assert gm.plants.from_dict(spec).d0.reservoir.temperature == pytest.approx(360.15)
+    assert gm.Plant.from_dict(spec).d0.reservoir.temperature == pytest.approx(360.15)
 
 
 def test_the_old_way_keeps_working(fresh_plant):

@@ -6,12 +6,12 @@ from pathlib import Path
 import pandas as pd
 
 
-def read_json(path):
+def from_json(path):
     """Read one UTF-8 JSON file."""
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def write_json(path, data, indent=2):
+def to_json(path, data, indent=2):
     """Write indented UTF-8 JSON with a trailing newline, creating parent folders."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -38,7 +38,7 @@ def decode_cells(frame):
     return frame.map(json.loads)
 
 
-def write_cells(path, frame, metadata, index_label=None):
+def to_cells(path, frame, metadata, index_label=None):
     """Write ``frame`` as JSON cells in a CSV file and its sidecar.
 
     ``metadata`` goes to the JSON file ``<path>.json``; ``index_label`` heads the index column
@@ -46,11 +46,11 @@ def write_cells(path, frame, metadata, index_label=None):
     """
     encoded = encode_cells(frame)
     encoded.to_csv(path, index_label=index_label)
-    write_json(str(path) + ".json", metadata)
+    to_json(str(path) + ".json", metadata)
 
 
-def read_cells(path):
-    """Return the decoded frame (index not yet converted) and the metadata of ``write_cells``."""
-    metadata = read_json(str(path) + ".json")
+def from_cells(path):
+    """Return the decoded frame (index not yet converted) and the metadata of ``to_cells``."""
+    metadata = from_json(str(path) + ".json")
     frame = pd.read_csv(path, index_col=0, dtype=str, keep_default_na=False)
     return decode_cells(frame), metadata

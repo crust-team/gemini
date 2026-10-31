@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from gemini._utils.files import read_json, write_json
+from gemini._utils.files import from_json, to_json
 from gemini.errors import ValidationError
 
 OLD_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -62,7 +62,7 @@ class GeminiTags(BaseModel):
 class GeminiProject(BaseModel):
     """Typed old project plus private raw material for lossless round trips.
 
-    ``read_project`` also keeps the raw diagram and .param files, every other file of the
+    ``from_folder`` also keeps the raw diagram and .param files, every other file of the
     folder as bytes (the data CSV and trajectory files), and each node's timestamp axis, which
     the typed parameters cannot hold for a node without properties.
     """
@@ -76,6 +76,15 @@ class GeminiProject(BaseModel):
     _param_files: dict[str, dict] = PrivateAttr(default_factory=dict)
     _timestamps: dict[str, list[datetime | None]] = PrivateAttr(default_factory=dict)
     _auxiliary: dict[str, bytes] = PrivateAttr(default_factory=dict)
+
+    @classmethod
+    def from_folder(cls, folder):
+        """Read and validate old diagram/.param files without interpreting physical values."""
+        return _from_folder(folder)
+
+    def to_folder(self, folder):
+        """Write old project files; parsed projects keep values exactly after normalisation."""
+        _to_folder(self, folder)
 
 
 def parameter_times(project, node_id):
@@ -91,15 +100,15 @@ def parameter_times(project, node_id):
     return timestamps
 
 
-def _read_json(path, what):
+def _from_json(path, what):
     """Read one old JSON file, naming the file in any error."""
     try:
-        return read_json(path)
+        return from_json(path)
     except (OSError, ValueError) as exc:
         raise ValidationError(f"{path}: invalid {what}: {exc}", code="invalid_format") from exc
 
 
-def _parse_node(cell, path):
+def _from_node(cell, path):
     properties = cell.get("properties", {})
     node_id = cell.get("id")
     try:
@@ -115,7 +124,7 @@ def _parse_node(cell, path):
         ) from exc
 
 
-def _parse_link(cell, path):
+def _from_link(cell, path):
     try:
         return GeminiLink(
             source=cell["source"]["id"],
@@ -127,15 +136,15 @@ def _parse_link(cell, path):
         raise ValidationError(f"{path}: malformed link field {exc}", code="invalid_format") from exc
 
 
-def _parse_diagram(diagram, path):
+def _from_diagram(diagram, path):
     """Return the typed model nodes by id and the links of an old diagram."""
     cells = diagram.get("cells", [])
-    nodes = [_parse_node(cell, path) for cell in cells if cell.get("type") == "devs.Model"]
-    links = [_parse_link(cell, path) for cell in cells if cell.get("type") == "devs.Link"]
+    nodes = [_from_node(cell, path) for cell in cells if cell.get("type") == "devs.Model"]
+    links = [_from_link(cell, path) for cell in cells if cell.get("type") == "devs.Link"]
     return {node.id: node for node in nodes}, links
 
 
-def _parse_tags(raw, path):
+def _from_tags(raw, path):
     """Collapse each tag's per-timestamp column list to one column ("" when unbound)."""
     tags = {}
     for kind in TAG_KINDS:
@@ -152,7 +161,7 @@ def _parse_tags(raw, path):
     return GeminiTags(**tags)
 
 
-def _parse_param_file(raw, path):
+def _from_param_file(raw, path):
     """Return the node id, parsed timestamps and typed properties of one .param file."""
     try:
         node_id = raw["id"]
@@ -176,22 +185,22 @@ def _parse_param_file(raw, path):
     return node_id, times, params
 
 
-def read_project(folder):
+def _from_folder(folder):
     """Read and validate old diagram/.param files without interpreting physical values."""
     folder = Path(folder)
     diagram_path = folder / "diagram.json"
-    diagram = _read_json(diagram_path, "old diagram JSON")
-    nodes, links = _parse_diagram(diagram, diagram_path)
+    diagram = _from_json(diagram_path, "old diagram JSON")
+    nodes, links = _from_diagram(diagram, diagram_path)
     params, tags, timestamps, raw_files = {}, {}, {}, {}
     for path in sorted(folder.glob("*.param")):
-        raw = _read_json(path, "old parameter file")
-        node_id, times, properties = _parse_param_file(raw, path)
+        raw = _from_json(path, "old parameter file")
+        node_id, times, properties = _from_param_file(raw, path)
         if node_id not in nodes:
             raise ValidationError(
                 f"{path}: node id {node_id!r} is absent from diagram.json", code="invalid_format"
             )
         params[node_id], timestamps[node_id] = properties, times
-        tags[node_id] = _parse_tags(raw, path)
+        tags[node_id] = _from_tags(raw, path)
         raw_files[path.name] = raw
     if set(params) != set(nodes):
         raise ValidationError(
@@ -264,9 +273,9 @@ def _updated_param_files(project):
 
     Raw tag sections the typed model does not know are kept, in their original order.
     """
-    if _parse_diagram(project._diagram, "diagram.json") != (project.nodes, project.links):
+    if _from_diagram(project._diagram, "diagram.json") != (project.nodes, project.links):
         raise ValidationError(
-            "write_project: nodes or links differ from the parsed diagram.json; expected "
+            "to_folder: nodes or links differ from the parsed diagram.json; expected "
             "the parsed topology (edit parameters and tags only)",
             code="invalid_format",
         )
@@ -283,7 +292,7 @@ def _updated_param_files(project):
     return param_files
 
 
-def write_project(project, folder):
+def _to_folder(project, folder):
     """Write old project files; parsed projects retain values exactly after JSON normalisation."""
     folder = Path(folder)
     if project._diagram is None:
@@ -293,14 +302,14 @@ def write_project(project, folder):
         }
     else:
         diagram, param_files = project._diagram, _updated_param_files(project)
-    write_json(folder / "diagram.json", diagram, indent=4)
+    to_json(folder / "diagram.json", diagram, indent=4)
     for name, raw in param_files.items():
-        write_json(folder / name, raw, indent=4)
+        to_json(folder / name, raw, indent=4)
     for name, value in project._auxiliary.items():
         (folder / name).write_bytes(value)
 
 
-def _parse_times(column, path):
+def _from_times(column, path):
     """Parse old timestamps written as ``OLD_TIME_FORMAT`` or ISO 8601, never guessing order."""
     for time_format in (OLD_TIME_FORMAT, "ISO8601"):
         try:
@@ -313,7 +322,7 @@ def _parse_times(column, path):
     )
 
 
-def read_csv(path):
+def from_csv(path):
     """Read an old semicolon CSV and parse its first column as timestamps."""
     path = Path(path)
     try:
@@ -322,11 +331,11 @@ def read_csv(path):
         raise ValidationError(f"{path}: invalid old CSV: {exc}", code="invalid_format") from exc
     if len(frame.columns):
         first = frame.columns[0]
-        frame[first] = _parse_times(frame[first], path)
+        frame[first] = _from_times(frame[first], path)
     return frame
 
 
-def write_csv(frame, path):
+def to_csv(frame, path):
     """Write the old semicolon CSV with its conventional timestamp representation."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

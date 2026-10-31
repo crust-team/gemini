@@ -14,7 +14,7 @@ import pytest
 
 import gemini as gm
 from gemini._utils import paths
-from gemini._utils.files import read_json
+from gemini._utils.files import from_json
 from gemini.modules._utils.serialization import SECTIONS
 from gemini.plants.plant import Plant
 from tests.fixtures import ROOT
@@ -635,7 +635,7 @@ def test_a_file_of_example_values_has_only_the_allowed_keys_and_names_a_register
     files = sorted(paths.INPUTS.glob("plants/*.json"))
     assert files
     for path in files:
-        values = read_json(path)
+        values = from_json(path)
         assert set(values) <= VALUE_KEYS, path.name
         assert values["plant"] == path.stem and path.stem in gm.plants.names(), path.name
         assert isinstance(values["params"], dict), path.name
@@ -678,3 +678,82 @@ def test_no_framework_names_in_tracked_text_files():
             if FRAMEWORK.search(line)
         )
     assert found == []
+
+
+RUN_FOLDERS = (
+    "modules",
+    "plants",
+    "physics",
+    "ops",
+    "runtime",
+    "engine",
+    "run",
+    "types",
+    "units",
+    "errors",
+    "_utils",
+)
+ABOVE_THE_RUN = ("compiler", "data", "optim", "evaluate", "analysis")
+LAZY_IMPORTS = {
+    ("gemini/plants/plant.py", "gemini.data.legacy.project"),
+    ("gemini/plants/plant.py", "gemini.data.legacy.project.from_folder"),
+}
+"""What a run folder imports inside a function: an old project reader on ``gm.Plant``."""
+REMOVED_FOLDERS = {"core", "base", "testing", "backends", "checks", "economics", "profiles"}
+READ_WRITE_PREFIX = re.compile(r"_?(read|write|load|save|parse|dump)_")
+"""What a reader or a writer is never called: ``from_<format>`` and ``to_<format>`` are the rule."""
+
+
+def every_import(path):
+    """Return the absolute names of the modules one file imports, in functions too."""
+    return imported_modules(path) | {
+        f"{node.module}.{alias.name}"
+        for node in ast.walk(ast.parse((ROOT / path).read_text()))
+        if isinstance(node, ast.ImportFrom) and node.module
+        for alias in node.names
+    }
+
+
+def test_the_run_folders_import_nothing_above_the_run():
+    """A run needs no compiler, no data readers and no evaluation."""
+    wrong = {
+        (path, name)
+        for path in PACKAGE_FILES + [f for f in PYTHON_FILES if f.startswith("gemini/_utils/")]
+        if path.split("/")[1] in RUN_FOLDERS
+        for name in every_import(path)
+        if name.startswith(tuple(f"gemini.{folder}" for folder in ABOVE_THE_RUN))
+    }
+    assert wrong - LAZY_IMPORTS == set()
+
+
+def test_modules_never_import_plants():
+    """A plant is built from modules, never the other way round."""
+    assert [
+        (path, name)
+        for path in PACKAGE_FILES
+        if path.startswith("gemini/modules/")
+        for name in every_import(path)
+        if name.startswith("gemini.plants")
+    ] == []
+
+
+def test_no_folder_keeps_a_removed_name():
+    """The layers have one name each."""
+    folders = {
+        part
+        for path in tracked_files()
+        if path.startswith("gemini/")
+        for part in path.split("/")[:-1]
+    }
+    assert folders & REMOVED_FOLDERS == set()
+
+
+def test_no_reader_or_writer_breaks_the_naming_rule():
+    """Every reader is ``from_<format>`` and every writer ``to_<format>``."""
+    assert [
+        f"{path}::{node.name}"
+        for path in PYTHON_FILES
+        if path.startswith("gemini/")
+        for node in ast.walk(ast.parse((ROOT / path).read_text()))
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and READ_WRITE_PREFIX.match(node.name)
+    ] == []

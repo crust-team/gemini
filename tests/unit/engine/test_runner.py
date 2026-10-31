@@ -133,7 +133,7 @@ def test_autocheckpoint_and_resume_equal_an_uninterrupted_run(tmp_path):
     _, whole, _ = _run("python", pair_frame())
     with pytest.raises(KeyboardInterrupt):
         _run("numpy", pair_frame(), callbacks=(lambda: AutoCheckpoint(path, every=4), Interrupt))
-    resumed = gm.Engine.load_checkpoint(path).resume()
+    resumed = gm.Engine.from_checkpoint(path).resume()
     pd.testing.assert_frame_equal(resumed.to_frame(), whole.to_frame(), check_exact=True)
 
 

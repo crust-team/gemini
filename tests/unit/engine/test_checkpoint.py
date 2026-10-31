@@ -23,13 +23,13 @@ def test_save_publishes_generations_and_removes_the_previous_one(tmp_path):
     rows = gm.Dataset.from_frame(
         pd.DataFrame({"x": [0.1 + 0.2, 2.0]}, index=index), units={"x": "W"}
     )
-    storage.save(path, manifest(), Results(), rows, pd.Timedelta(minutes=30))
-    first = storage.load(path)
-    data, max_gap = storage.read_dataset(tmp_path / first.remaining_data_file)
+    storage.to_file(path, manifest(), Results(), rows, pd.Timedelta(minutes=30))
+    first = storage.from_file(path)
+    data, max_gap = storage.from_rows(tmp_path / first.remaining_data_file)
     assert data.fingerprint() == rows.fingerprint()
     assert max_gap == pd.Timedelta(minutes=30)
-    storage.save(path, manifest(), Results())
-    second = storage.load(path)
+    storage.to_file(path, manifest(), Results())
+    second = storage.from_file(path)
     assert second.remaining_data_file is None
     names = {file.name for file in tmp_path.iterdir()}
     assert first.remaining_data_file not in names and first.results_file not in names
@@ -41,11 +41,11 @@ def test_load_rejects_escaping_sibling_paths_and_invalid_manifests(tmp_path):
     path = tmp_path / "bad.ckpt"
     path.write_text(manifest(results_file="../outside.csv").model_dump_json())
     with raises(gm.errors.RunError, "checkpoint", match="results_file = '../outside.csv'"):
-        storage.load(path)
+        storage.from_file(path)
     data = json.loads(manifest().model_dump_json()) | {"backend": 2}
     path.write_text(json.dumps(data))
     with raises(gm.errors.RunError, "checkpoint", match="manifest is invalid"):
-        storage.load(path)
+        storage.from_file(path)
 
 
 @pytest.mark.parametrize("version", [1, 2, None, "0.0.9", "0.1.0"])
@@ -54,7 +54,7 @@ def test_a_checkpoint_written_before_the_oldest_version_does_not_load(tmp_path, 
     path = tmp_path / "old.ckpt"
     path.write_text(json.dumps(json.loads(manifest().model_dump_json()) | {"version": version}))
     with pytest.raises(gm.errors.ValidationError, match="version = ") as caught:
-        storage.load(path)
+        storage.from_file(path)
     assert caught.value.code == "old_format"
 
 

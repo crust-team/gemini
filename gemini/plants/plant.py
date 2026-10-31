@@ -1,6 +1,6 @@
 """Plants: a ``Module`` that connects its children and whose forward runs them in that order."""
 
-from gemini._utils.files import read_json, write_json
+from gemini._utils import files
 from gemini._utils.strings import join_path, snake_case
 from gemini.errors import ValidationError
 from gemini.errors.base import reported
@@ -335,7 +335,7 @@ class Plant(PortResolver, Module):
         A plant of a class stores its class, its size and the values that were given, never its
         structure or a derived value. A plant built with ``add`` and ``connect``, or a class plant
         with ``structure=True``, stores its modules and connections, which is how an agent edits
-        a plant: ``gm.plants.from_dict`` reads either.
+        a plant: ``gm.Plant.from_dict`` reads either.
         """
         if type(self) is Plant or structure:
             return writer.structure_dict(self)
@@ -347,19 +347,36 @@ class Plant(PortResolver, Module):
             return writer.structure_dict(self)
         return writer.class_dict(self, fresh)
 
-    def save(self, path):
-        """Save the plant dict as JSON."""
-        write_json(path, self.to_dict())
+    def to_json(self, path):
+        """Write the plant dict as JSON."""
+        files.to_json(path, self.to_dict())
 
     @classmethod
-    def load(cls, path):
-        """Load a plant from the JSON file of a plant dict."""
-        return cls.from_dict(read_json(path))
+    def from_json(cls, path):
+        """Return the plant of the JSON file of a plant dict."""
+        return cls.from_dict(files.from_json(path))
+
+    @classmethod
+    def from_legacy(cls, folder):
+        """Return the plant of the old GEMINI project in ``folder``.
+
+        The folder holds what the old application saved: ``diagram.json`` (the nodes and links),
+        one ``<node>_<id>.param`` file per diagram node with its properties, dated values and tag
+        names, and any other file (the data CSV, ``well_trajectory.csv``, ``plant.conf``), which is
+        read as-is and not converted. See ``gemini.data.legacy.project.from_folder``.
+        ``gemini.data`` sits above this package in the import order, so it is imported here.
+        """
+        from gemini.data.legacy.project import from_folder
+
+        return from_folder(folder)
 
     @classmethod
     def from_dict(cls, data):
-        """Build a plant from a plant dict; one ``ValidationError`` lists every problem."""
-        return reader.read(cls, data)
+        """Build any plant, of a class or without one, from a plant dict.
+
+        One ``ValidationError`` lists every problem.
+        """
+        return reader.from_dict(cls, data)
 
     def validate(self, on_error="raise"):
         """Check the plant's structure as ``gm.plants.validate`` does; the same ``on_error``."""

@@ -1716,9 +1716,14 @@ plant.d0.fluid = gm.Fluid(density="1030 kg/m3", viscosity="0.4 mPa*s")
 
 | From | Derived |
 | --- | --- |
-| `depth`, `gradient` (default 30 K/km), `surface_temperature` (default 12 degC) | `temperature` of both reservoirs at the midpoint (`ground.geotherm_temperature`), hydrostatic `pressure` from the fluid density (`hydraulics.hydrostatic_pressure`), `soil_temperature` of the wells at half depth |
+| `depth`, `gradient`, `surface_temperature`, none with a default | `temperature` of both reservoirs at the midpoint (`ground.geotherm_temperature`), hydrostatic `pressure` from the fluid density (`hydraulics.hydrostatic_pressure`), `soil_temperature` of the wells at half depth |
 | and `permeability`, `thickness`, `well_diameter` | `productivity_index`, `injectivity_index` (`hydraulics.radial_index`, with the fluid viscosity, `drainage_radius`, the wellbore radius and the reservoir's `skin`), `permeability`, `aquifer_thickness`, `top_depth`, `drainage_radius`, `wellbore_radius`, the vertical `pipe_path` of the wells (`geometry.vertical_path`, commercial steel) |
 | and `nominal_flow`, `pump_efficiency`, `nominal_wellhead_pressure` | `esp.setting_depth`, `esp_depth` and `segment` of `well` and `riser` (`hydraulics.pump_setting_depth`), and a one-stage ESP of constant head (`hydraulics.design_pump_head`, `pumps.constant_head_curves`) |
+
+A `depth` without `gradient` and `surface_temperature` derives nothing yet: the doublet waits for
+them, so a plant holds the design and the `site` of a `gm.Problem` (`"d*.gradient": "30 K/km"`)
+gives the rest, applied on a copy of the plant at the start of a run. A site value for a parameter
+the plant states too raises `conflicting_value`.
 
 `drainage_radius` defaults to `ground.DOUBLET_WELL_SPACING`, 1000 m. Every derived value can be
 overridden in the same call, by a child name such as `reservoir.pressure` or `well.pipe_path`, and
@@ -1762,12 +1767,12 @@ doublet = gm.plants.example("DoubletHeatPlant").doublet
 field = gm.plants.MultiWellPlant(producers=2, injectors=2)
 for limb, rate in zip(field.producers, (40.0, 30.0)):
     for name in ("reservoir", "well", "esp", "riser"):
-        getattr(limb, name).load_state_dict(getattr(doublet, name).state_dict())
+        getattr(limb, name).set_state_dict(getattr(doublet, name).state_dict())
     limb.reservoir.production_rate = rate
     limb.esp.frequency = "50 Hz"
 for limb in field.injectors:
-    limb.well.load_state_dict(doublet.injector.state_dict())
-    limb.sink.load_state_dict(doublet.sink.state_dict())
+    limb.well.set_state_dict(doublet.injector.state_dict())
+    limb.sink.set_state_dict(doublet.sink.state_dict())
 field.splitters[0].split_fraction = 0.5
 returned = gm.Stream(flow=70, T=330, p=5e6, fluid=field.producers[0].riser.fluid)
 result = field(return_in=returned)

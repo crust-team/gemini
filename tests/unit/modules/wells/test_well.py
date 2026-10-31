@@ -16,8 +16,8 @@ def production_well():
     return ProductionWell().set_params(
         "",
         mapping.productionwell_params_from_gemini(
-            mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
-            esp_property=mapping.read_property(OLD_PROJECT / "esp_1ee3.param"),
+            mapping.from_property(OLD_PROJECT / "production_well_c774.param"),
+            esp_property=mapping.from_property(OLD_PROJECT / "esp_1ee3.param"),
         ),
     )
 

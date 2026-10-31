@@ -110,7 +110,7 @@ the physics line.
 
 ## 7. Backends
 
-- `Backend` base class with one method per op; `gm.backends.register(...)`;
+- `Backend` base class with one method per op; `gm.ops.register_backend(backend)`;
   `gm.runtime.settings(backend=...)`; automatic choice from input type, manual override possible.
 - Fallback: an op missing in a backend runs on numpy.
 - `python` backend: scalars with `math` — the current pure-Python path. It stays as the debug
@@ -156,29 +156,26 @@ Nothing that computes outputs today is lost; the user does not mark anything in 
 ```
 gemini/
   ops/
-    __init__.py      gm.log, gm.where, gm.check, ...
+    __init__.py      the math API: log, where, check, ...; register_backend
+    backend.py       Backend, the backend registry, settings, select, implementation
     registry.py      op registration: name, kind, signature
-    math.py          arithmetic, exp/log/pow, trig
-    logic.py         comparisons, where, maximum/minimum, clip
-    reduce.py        sum, mean, cumsum
-    interp.py        table interpolation
-    check.py         check and per-row error codes
-    solvers.py       newton, brentq
-    control.py       scan (definition only for now)
-  graph/
-    node.py, graph.py, proxy.py, tracer.py, interpreter.py, cache.py
-    passes/          units.py now; fusion.py later
-  backends/
-    base.py          Backend, register, settings
-    python.py        scalar, math module
-    numpy.py         arrays, NumPy and SciPy
-  types/
-    declarations.py  Parameter, State
+    dispatch.py      the dispatcher, Operators, Constant
+    math.py, logic.py, reductions.py, elementwise.py, check.py, solvers.py, control.py
+    kernels/         python.py (scalars, math module), numpy.py (arrays, NumPy and SciPy),
+                     scalars.py, solvers.py
+  compiler/
+    __init__.py      registers the executor when imported
+    executor.py      GraphExecutor, compile(plant)
+    graph/           node.py, graph.py, proxy.py, tracer.py, interpreter.py, cache.py, ...
+      passes/        cse.py now; unit check and fusion later
+  modules/
+    declarations.py  Parameter, State, ...
 native/              C++ sources and ops.yaml, later, outside the Python package
 ```
 
-`ops` only describes ops (name, kind, signature); implementations live in the backends, so a new
-backend is one new file.
+`ops` only describes ops (name, kind, signature); implementations live in the kernels, so a new
+backend is one new file. The compiler is optional: the engine runs without it
+([engine.md](engine.md#folders-and-imports)).
 
 ## 11. Later C++ decisions (already agreed, not started)
 
@@ -192,9 +189,9 @@ backend. Solvers as dedicated ops with per-element stopping.
 
 Implemented for one leaf module, the ESP, and everything its call needs:
 
-- `gemini/ops/kernels`: `Backend`, `register`, `get`, `settings(backend=...)`, `select` (NumPy for
-  array operands, Python for scalars) and `implementation` (NumPy fallback for a missing op);
-  `python.py` and `numpy.py` with the ops the ESP uses plus `where` and `check`.
+- `gemini/ops/backend.py`: `Backend`, `register` (`gm.ops.register_backend`), `get`, `settings(backend=...)`,
+  `select` (NumPy for array operands, Python for scalars) and `implementation` (NumPy fallback for a
+  missing op); `gemini/ops/kernels`: `python.py` and `numpy.py` with the ops the ESP uses plus `where` and `check`.
 - `gemini/ops`: the registry (name, kind, arity), `dispatch`, `Operators`, `Constant`,
   `where`, `check`, `logical_and`, comparisons, arithmetic, `getitem` and the `scan` definition.
 - `gemini/compiler/graph`: `Node` (op, kind, operands, name, role, unit, shape, source line, guards),
@@ -202,7 +199,7 @@ Implemented for one leaf module, the ESP, and everything its call needs:
   `describe()`), `Proxy`, `Tracer` (one leaf module), `Interpreter` (value pass, then error
   pass), `GraphCache` (guards) and `run` (one traced call over arrays, or untraced calls per
   row on a graph break).
-- The roles are `Parameter` and `State` of `types/declarations.py` and `Constant` of `gemini/ops`;
+- The roles are `Parameter` and `State` of `modules/declarations.py` and `Constant` of `gemini/ops`;
   the ESP constants are `Constant`s; the ESP is written with `ops.check`, `ops.where` and
   `ops.logical_and`; `Stream` is one slots dataclass used on every path.
 - The traced ESP on NumPy equals the untraced ESP exactly on the July data (tolerance 1e-12,
@@ -339,8 +336,8 @@ Where the implementation differs from sections 1 to 11, and why:
   `changes_run = True`; so stepping in time order and section 9's chunked callbacks are the same
   loop. Per chunk and twin: `columns.read` converts the bound columns to SI and gives each tick a
   status in the order a plain call meets its problems (the first missing column is a skip, an
-  inlet the stream limits refuse is an error); `outcome.evaluate_twin` evaluates the cached graph
-  and gives each failing row the check's class and message; `health.assess` runs `Module.health`
+  inlet the stream limits refuse is an error); `outcome.evaluate_twin` evaluates the twin with the engine's
+  executor (the cached graph, or the eager call) and gives each failing row the check's class and message; `health.assess` runs `Module.health`
   once on the arrays, or row by row on the Python backend or when the array call raises;
   `PathColumns` put the columns on the chunk's ticks and `Results.commit` stores them. Callbacks are
   replayed tick by tick from the results: start, the tick's inputs, commit, position and states,
@@ -357,7 +354,7 @@ Where the implementation differs from sections 1 to 11, and why:
 - **Not done.** `scan`, the unit-check pass, `gm.explain`.
 
 Validation stays off the hot path: `Declaration` has one cheap check for the common case, and
-everything else takes the unchanged full path. Traced rows are validated by `graph/limits.py`.
+everything else takes the unchanged full path. Traced rows are validated by `compiler/graph/limits.py`.
 
 Measured (`.tmp/native-engine/step3-benchmark.md`), CPU on the July dataset: replay 1.13 s to 0.058 s
 and simulate 0.27 s to 0.044 s on NumPy, both identical to the old tick loop. An eager ESP call
@@ -375,13 +372,14 @@ Every composite is a `Plant` (`gemini/plants/plant.py`, with its tools in
 builds one with `add` and `connect`. There is one `forward`. JSON exists only as the plant dict
 ([plants.md](plants.md#the-plant-dict)).
 
-- **Files.** `modules/plant.py` (`Plant`: `add`, `connect`, `constrain`, `summary`, `validate`,
+- **Files.** `plants/plant.py` (`Plant`: `add`, `connect`, `constrain`, `summary`, `validate`,
   `to_dict`) and, in `plants/_utils/`, `ports.py` (port lookup and the connection rules), `plan.py`
   (order and wiring of the steps, tears and constraints), `run.py` (one plant call), `loops.py` (the
   iteration on the tear streams), `constraints.py` (the solve of a constraint), `outputs.py` (the
   combinations), `reader.py` and `writer.py` (the plant dict in and out), `schema.py`, `factory.py`
   (a registry type or a group to a module) and `catalogue.py` (`names`, `get`, `example`,
-  `from_dict`, `validate`). The dated parameters and bindings of `Module` are
+  `capabilities`, `validate`); `from_dict`, `from_json`, `to_json` and `from_legacy` are methods of
+  `Plant`. The dated parameters and bindings of `Module` are
   `modules/_utils/design.py`; the sections every plant shares are `modules/_utils/serialization.py`.
 - **Value order.** A connection orders its modules by the way the value travels: the source first
   on a plain connection, the taker first on a drawn one. An `offered` outlet gives its module one

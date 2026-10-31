@@ -10,7 +10,7 @@ import pandas as pd
 from gemini import runtime
 from gemini._utils.jsonable import to_plain
 from gemini._utils.strings import close_matches, did_you_mean
-from gemini._utils.time import parse_duration, to_utc
+from gemini._utils.time import to_timedelta, to_utc
 from gemini.engine import checkpoint as storage
 from gemini.engine import eager  # noqa: F401
 from gemini.engine.clock import Clock
@@ -34,7 +34,7 @@ def _live_ticks(position, start, end, step):
     The grid is anchored at the committed position, so it stays the same across live calls;
     the first call anchors it at the first supplied row.
     """
-    step = parse_duration(step)
+    step = to_timedelta(step)
     if position is None:
         return pd.date_range(to_utc(start), to_utc(end), freq=step)
     ticks = pd.date_range(to_utc(position), to_utc(end), freq=step)
@@ -146,7 +146,7 @@ class Engine:
         with self._saved_settings():
             self._run("live", dataset, clock, continuing=True)
         if checkpoint is not None:
-            self.save_checkpoint(checkpoint)
+            self.to_checkpoint(checkpoint)
         fresh = self.results.slice(offset)
         if sink is not None and len(fresh):
             sink(fresh)
@@ -162,7 +162,7 @@ class Engine:
 
     def _restore_live(self, path):
         """Take the run state of a live checkpoint saved for this engine's plant class."""
-        checkpoint = storage.load(path)
+        checkpoint = storage.from_file(path)
         if checkpoint.run_kind != "live":
             raise RunError(
                 f"{path}: run_kind = {checkpoint.run_kind!r}; expected 'live'", code="checkpoint"
@@ -286,7 +286,7 @@ class Engine:
         """Return the position and module states as plain JSON: the input of ``state=``."""
         return to_plain({"position": self.position, "module_states": self.module_states})
 
-    def save_checkpoint(self, path):
+    def to_checkpoint(self, path):
         """Save at a step boundary; before the first run the checkpoint holds no results."""
         if self._in_step:
             raise RunError(
@@ -305,7 +305,7 @@ class Engine:
             backend=self.backend,
             runtime=self.runtime_state,
         )
-        storage.save(path, checkpoint, self.results, self._unfinished_rows(), self._max_gap)
+        storage.to_file(path, checkpoint, self.results, self._unfinished_rows(), self._max_gap)
 
     def _unfinished_rows(self):
         """Return the rows a resumed simulation or replay still reads, or None.
@@ -322,9 +322,9 @@ class Engine:
         return self.dataset.window(start=self.position - self._max_gap)
 
     @classmethod
-    def load_checkpoint(cls, path, callbacks=None):
+    def from_checkpoint(cls, path, callbacks=None):
         """Restore a plant, dataset handle, finite schedule, states and completed results."""
-        checkpoint = storage.load(path)
+        checkpoint = storage.from_file(path)
         plant = _rebuilt(import_class(checkpoint.plant_class), checkpoint.plant)
         engine = cls(plant, checkpoint.backend, callbacks, checkpoint.on_error)
         engine._restore(checkpoint, Path(path).parent)
@@ -342,11 +342,11 @@ class Engine:
         self.dataset = None
         self._max_gap = None
         if checkpoint.remaining_data_file:
-            self.dataset, self._max_gap = storage.read_dataset(
-                folder / checkpoint.remaining_data_file
-            )
+            self.dataset, self._max_gap = storage.from_rows(folder / checkpoint.remaining_data_file)
         self.results = (
-            Results.load(folder / checkpoint.results_file) if checkpoint.results_file else Results()
+            Results.from_npz(folder / checkpoint.results_file)
+            if checkpoint.results_file
+            else Results()
         )
 
     def resume(self):

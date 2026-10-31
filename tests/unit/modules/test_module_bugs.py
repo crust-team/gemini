@@ -91,7 +91,7 @@ def test_assigned_fluid_survives_parameter_changes_and_is_saved():
     module.fluid = gm.WATER
     module.nominal_pressure_drop = 1000
     assert module.fluid == gm.WATER
-    assert Filter().load_state_dict(module.state_dict()).fluid == gm.WATER
+    assert Filter().set_state_dict(module.state_dict()).fluid == gm.WATER
 
 
 def test_a_reservoir_fluid_applies_as_soon_as_it_is_set(fresh_plant):

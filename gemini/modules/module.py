@@ -1221,7 +1221,7 @@ class Module:
             for path, module in self.named_modules()
         }
 
-    def load_state_dict(self, state, strict=True):
+    def set_state_dict(self, state, strict=True):
         """Validate snapshots before applying any of them.
 
         With ``strict`` the snapshot paths must equal the tree's module paths; otherwise only the

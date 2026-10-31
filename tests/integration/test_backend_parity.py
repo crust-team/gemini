@@ -284,7 +284,7 @@ def resumed(shared_plant, window, tmp_path_factory):
         )
         with pytest.raises(KeyboardInterrupt):
             engine.replay(short)
-        engine = gm.Engine.load_checkpoint(path)
+        engine = gm.Engine.from_checkpoint(path)
         return engine.resume().to_frame(), engine.position, engine.module_states
 
     return {

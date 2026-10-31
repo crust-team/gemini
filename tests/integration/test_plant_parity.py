@@ -66,7 +66,7 @@ def window(fast_frame):
 
 BUILDERS = {
     "builder": built_by_hand,
-    "spec": lambda spec: gm.plants.from_dict(copy.deepcopy(spec)),
+    "spec": lambda spec: gm.Plant.from_dict(copy.deepcopy(spec)),
 }
 
 
@@ -92,7 +92,7 @@ def runs(spec, window):
 def test_the_two_ways_give_the_same_plant(spec):
     """Builder, spec and file write the same sections; only the spec states the outputs."""
     by_hand = built_by_hand(spec).to_dict()
-    assert gm.plants.from_dict(copy.deepcopy(spec)).to_dict() == spec
+    assert gm.Plant.from_dict(copy.deepcopy(spec)).to_dict() == spec
     assert by_hand.pop("outputs", None) is None
     assert by_hand == {key: value for key, value in spec.items() if key != "outputs"}
 

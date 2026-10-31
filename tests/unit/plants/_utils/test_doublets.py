@@ -111,7 +111,7 @@ def test_a_size_outside_the_range_of_the_class_is_refused(count):
 def stored(request):
     """Return ``(count, plant dict, plant read from it)``."""
     data = designed(request.param).to_dict()
-    return request.param, data, gm.plants.from_dict(data)
+    return request.param, data, gm.Plant.from_dict(data)
 
 
 def test_a_plant_round_trips(stored):
@@ -151,7 +151,7 @@ def test_an_explicit_temperature_wins_and_stays_stated():
     plant.set_params("", {"depth": "2000 m"})
     assert plant.d0.reservoir.temperature == pytest.approx(345.15)
     assert plant.d1.reservoir.temperature == pytest.approx(363.15)
-    assert gm.plants.from_dict(plant.to_dict()).d1.reservoir.temperature == pytest.approx(363.15)
+    assert gm.Plant.from_dict(plant.to_dict()).d1.reservoir.temperature == pytest.approx(363.15)
 
 
 def test_the_stored_plant_keeps_the_depth_and_no_derived_value():

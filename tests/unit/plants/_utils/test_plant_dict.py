@@ -8,16 +8,17 @@ import gemini as gm
 from tests.fixtures.sample_problems import filled_plant
 
 
-def test_from_dict_and_from_dict_are_one_function():
-    """The plant file and the spec are the same document and the same function."""
-    assert gm.plants.from_dict is gm.plants.from_dict
-    assert gm.plants.validate({"format": 2, "name": "x", "modules": {}, "connections": []}) == []
+def test_from_dict_builds_a_plant_of_any_class():
+    """``gm.Plant.from_dict`` gives the class of the dict, and a class-less plant without one."""
+    typed = gm.Plant.from_dict(gm.plants.example("Doublet").to_dict())
+    assert isinstance(typed, gm.plants.Doublet)
+    assert not hasattr(gm.plants, "from_dict")
 
 
 def test_the_stored_plant_file_round_trips_exactly():
     """``to_spec(from_dict(x)) == x`` for the migrated example plant, JSON-safe."""
     spec = gm.plants.example("DoubletHeatPlant").to_dict()
-    plant = gm.plants.from_dict(spec)
+    plant = gm.Plant.from_dict(spec)
     assert plant.to_dict() == spec
     assert plant.to_dict() == spec
     assert json.loads(json.dumps(plant.to_dict(), allow_nan=False)) == spec
@@ -45,12 +46,12 @@ def test_a_spec_with_unit_strings_and_sections_round_trips_exactly():
         "fluids": {"pipe": gm.WATER.model_dump(mode="json")},
     }
     complete = {"bindings": {}, "param_history": {}} | spec
-    plant = gm.plants.from_dict(complete)
+    plant = gm.Plant.from_dict(complete)
     written = plant.to_dict()
     assert written["modules"]["pipe"]["params"] == {"length": "100 ft", "inner_diameter": 0.1}
     assert written == {key: complete[key] for key in written}
     assert set(written) - set(complete) == set()
-    assert gm.plants.from_dict(written).to_dict() == written
+    assert gm.Plant.from_dict(written).to_dict() == written
 
 
 def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
@@ -68,7 +69,7 @@ def test_a_nested_spec_and_a_group_round_trip_and_run_parameters_through():
         "bindings": {},
         "param_history": {},
     }
-    plant = gm.plants.from_dict(spec)
+    plant = gm.Plant.from_dict(spec)
     assert plant.doublet.esp.stage_count == 12
     assert plant.to_dict() == spec
 
@@ -78,7 +79,7 @@ def test_an_opened_plant_round_trips_its_nested_wiring():
     plant = gm.plants.get("DoubletHeatPlant")
     spec = plant.to_dict(structure=True)
     assert spec["modules"]["doublet"] == {"type": "Doublet", "params": {}}
-    assert gm.plants.from_dict(spec).to_dict() == spec
+    assert gm.Plant.from_dict(spec).to_dict() == spec
 
 
 def test_params_set_since_and_validation_agree_with_the_builder():
@@ -110,7 +111,7 @@ def test_a_raised_error_carries_every_problem_of_the_list_record_returns():
     }
     recorded = gm.plants.validate(spec, on_error="record")
     assert [item["path"] for item in recorded] == ["modules.a.type", "modules.pipe.params.length"]
-    for call in (gm.plants.validate, gm.plants.from_dict, gm.plants.from_dict):
+    for call in (gm.plants.validate, gm.Plant.from_dict, gm.Plant.from_dict):
         with pytest.raises(gm.errors.ValidationError) as caught:
             call(spec)
         assert caught.value.problems == recorded and caught.value.code == recorded[0]["code"]
@@ -166,17 +167,17 @@ def test_every_plant_rebuilds_from_its_dict_with_the_same_values(name):
     plant = filled_plant(name)
     data, structure = plant.to_dict(), plant.to_dict(structure=True)
     assert "modules" not in data and data["type"] == name
-    rebuilt = gm.plants.from_dict(data)
+    rebuilt = gm.Plant.from_dict(data)
     assert type(rebuilt) is type(plant) and rebuilt.to_dict() == data
     assert rebuilt.state_dict() == plant.state_dict()
-    assert gm.plants.from_dict(structure).to_dict(structure=True) == structure
+    assert gm.Plant.from_dict(structure).to_dict(structure=True) == structure
 
 
 def test_a_size_is_stored_next_to_the_type():
     """A structural argument rebuilds the same shape."""
     data = gm.plants.MultiWellPlant(producers=3, injectors=2).to_dict()
     assert data["size"] == {"producers": 3, "injectors": 2}
-    assert len(gm.plants.from_dict(data).producers) == 3
+    assert len(gm.Plant.from_dict(data).producers) == 3
 
 
 def test_a_class_plant_edited_by_hand_stores_its_structure():

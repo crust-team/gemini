@@ -23,7 +23,7 @@ def test_state_round_trip():
     """Serializable runtime state restores all global settings."""
     before = gm.runtime.state()
     with gm.runtime.settings(display_units="field"):
-        gm.runtime.load_state(before)
+        gm.runtime.set_state(before)
         assert gm.runtime.state() == before
     assert gm.runtime.state() == before
 
@@ -40,12 +40,12 @@ def test_unknown_settings_are_rejected():
 
 
 def test_partial_or_unknown_state_is_rejected():
-    """load_state needs every setting and nothing else, so later reads cannot fail."""
+    """set_state needs every setting and nothing else, so later reads cannot fail."""
     before = gm.runtime.state()
     with raises(ValidationError, "unknown_name", match="precision"):
-        gm.runtime.load_state({})
+        gm.runtime.set_state({})
     with raises(ValidationError, "unknown_name", match="colour"):
-        gm.runtime.load_state(before | {"colour": "red"})
+        gm.runtime.set_state(before | {"colour": "red"})
     assert gm.runtime.state() == before
 
 

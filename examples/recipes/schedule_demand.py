@@ -1,10 +1,10 @@
 """Plan a year of one doublet and a boiler from the heating demand, then simulate the plan.
 
-Shows ``gm.data.from_csv``, ``gm.schedule`` and ``gm.simulate`` on a small plant built from a
-doublet's depth. The doublet design, the sizes and the return temperature are assumptions of this
-recipe and it prints them as such. The daily heating demand is a file of the sample problem in
-``inputs/examples/hackathon_2027/``; any file with a time column and a demand column in a unit of
-power works the same, at any step.
+Shows ``gm.data.from_csv``, ``gm.Problem``, ``gm.Constraint``, ``gm.schedule`` and ``gm.simulate``
+on a small plant built from a doublet's depth. The doublet design, the sizes, the prices and the
+return temperature are assumptions of this recipe and it prints them as such. The daily heating
+demand is a file of the sample problem in ``inputs/examples/hackathon_2027/``; any file with a
+time column and a demand column in a unit of power works the same, at any step.
 
 Run with ``python examples/recipes/schedule_demand.py``.
 """
@@ -34,12 +34,11 @@ EXCHANGER = {
     "hot_nominal_mass_flow": "85 kg/s",
     "cold_nominal_mass_flow": "85 kg/s",
 }
-RULES = {
-    "order": ["geothermal", "boiler"],
-    "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
-    "max_brine_cooling": "40 K",
-    "operating_time": None,
-}
+CONSTRAINTS = [
+    gm.Constraint("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h", when="running"),
+    gm.Constraint("d*.brine_cooling", max="40 K", when="running"),
+]
+PRICES = gm.Assumptions(prices={"electricity": "100 EUR/MWh", "gas": "40 EUR/MWh"})
 
 
 def build():
@@ -73,16 +72,18 @@ def main():
     """Schedule the demand of a year, simulate the plan and print what it covers."""
     plant = build()
     print("Assumptions: a 2500 m doublet, 40 MW boiler, return at 60 °C, supply at 100 °C")
+    print("             electricity at 100 EUR/MWh, gas at 40 EUR/MWh")
     columns = {"heating_demand_MWth": "heating_demand"}
     demand = gm.data.from_csv(DEMAND / "GEMINI_Heating_Demand_Daily_2027.csv", columns, "MW")
-    plan = gm.schedule(plant, demand, RULES)
+    problem = gm.Problem(demand, constraints=CONSTRAINTS, assumptions=PRICES)
+    plan = gm.schedule(plant, problem)
     lowest = gm.units.convert(plan["d0.flow"].min(), "m3/s", "m3/h")
     highest = gm.units.convert(plan["d0.flow"].max(), "m3/s", "m3/h")
     print(f"Days planned:     {len(plan)}")
     print(f"Doublet flow:     {lowest:.0f} to {highest:.0f} m³/h")
     print(f"Boiler, peak:     {plan['boiler_duty'].max() / 1e6:.2f} MW")
-    results = gm.simulate(plant, plan)
-    totals = gm.evaluate.totals(plant, results)
+    results = gm.simulate(plant, problem, plan=plan)
+    totals = gm.evaluate.totals(plant, problem, results)
     print(f"Heat delivered:   {totals['heat_delivered']['value'] / 3.6e12:.2f} GWh")
     print(f"Gas bought:       {totals['gas_bought']['value'] / 3.6e12:.2f} GWh")
     print(f"Electricity:      {totals['electricity_bought']['value'] / 3.6e12:.2f} GWh")

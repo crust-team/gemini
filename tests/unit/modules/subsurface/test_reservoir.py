@@ -15,11 +15,11 @@ from tests.fixtures.equivalence import assert_health_matches, assert_module_matc
 def test_example_production_and_decline():
     """The example PI controls drawdown, and a 16% decline raises an alarm."""
     p = mapping.reservoir_params_from_gemini(
-        mapping.read_property(OLD_PROJECT / "reservoir_c1b5.param"),
-        mapping.read_property(OLD_PROJECT / "production_well_c774.param"),
+        mapping.from_property(OLD_PROJECT / "reservoir_c1b5.param"),
+        mapping.from_property(OLD_PROJECT / "production_well_c774.param"),
     )
     c = ProductionReservoir().set_params("", p)
-    c.fluid = mapping.reservoir_fluid(mapping.read_property(OLD_PROJECT / "reservoir_c1b5.param"))
+    c.fluid = mapping.reservoir_fluid(mapping.from_property(OLD_PROJECT / "reservoir_c1b5.param"))
     result = c(production_rate=40)
     out, flow = result.outputs, 40 / 1068
     assert out.drawdown == pytest.approx(flow / c.productivity_index)
@@ -31,8 +31,8 @@ def test_example_production_and_decline():
 def test_injection_zero_radius_is_explicit():
     """Unconfigured example drainage radius leaves only radial diagnostics unavailable."""
     p = mapping.reservoir_params_from_gemini(
-        mapping.read_property(OLD_PROJECT / "reservoir_28fc.param"),
-        mapping.read_property(OLD_PROJECT / "injection_well_a06b.param"),
+        mapping.from_property(OLD_PROJECT / "reservoir_28fc.param"),
+        mapping.from_property(OLD_PROJECT / "injection_well_a06b.param"),
         "injection",
     )
     c = InjectionReservoir().set_params("", p)

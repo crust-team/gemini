@@ -54,7 +54,7 @@ def test_inputs_round_trip_in_both_dict_forms(structure):
     plant.set_inputs({path: "100 degC"})
     data = plant.to_dict(structure=structure)
     assert data["inputs"] == {path: "100 degC"}
-    built = gm.plants.from_dict(data)
+    built = gm.Plant.from_dict(data)
     assert built.get_submodule("peak_boiler").temperature_setpoint == pytest.approx(373.15)
     assert built.to_dict(structure=structure) == data
 
@@ -82,7 +82,7 @@ def test_a_plant_inlet_field_is_an_input():
 def test_from_dict_then_schedule_needs_no_extra_call():
     """A stored design with a setpoint schedules and runs as it is read."""
     plant = boiler_plant().set_inputs(SETPOINT)
-    built = gm.plants.from_dict(plant.to_dict())
+    built = gm.Plant.from_dict(plant.to_dict())
     index = pd.date_range("2027-01-01", periods=2, freq="D", tz="UTC", name="time")
     demand = pd.DataFrame({"heating_demand": [1e5, 2e5]}, index=index)
     limits = [
@@ -102,7 +102,7 @@ def test_a_bad_path_gives_unknown_name_with_suggestions():
     data = boiler_plant().to_dict()
     data["inputs"] = {"pump_heater.temperature_setpoin": "100 degC"}
     with raises(ValidationError, "unknown_name") as caught:
-        gm.plants.from_dict(data)
+        gm.Plant.from_dict(data)
     found = caught.value.problems[0]
     assert found["path"] == "inputs.pump_heater.temperature_setpoin"
     assert found["suggestions"] == ["pump_heater.temperature_setpoint"]

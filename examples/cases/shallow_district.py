@@ -1,17 +1,16 @@
 """Three winter weeks of a small district network on one shallow doublet.
 
-Plans the hourly demand of the sample problem ``shallow_district`` for its plant dict
+Runs the hourly demand of the sample problem ``shallow_district`` for its plant dict
 ``plant.json``: one doublet at 1300 m, a heat pump and a boiler for a 65 °C network, and a small
 compression chiller. The file names, the unit and the step differ from the challenge's. The values
 are invented for testing; what this case assumes it prints as assumptions.
 
-Shows ``gm.plants.from_dict``, ``gm.data.from_csv``, ``gm.schedule``, ``gm.simulate``,
-``gm.evaluate.Limits.from_dict``, ``gm.evaluate.limits`` and ``gm.evaluate.operating_time``.
+Shows ``gm.Problem.from_json``, ``gm.Plant.from_json``, ``gm.simulate`` and
+``gm.evaluate.constraints``.
 
 Run with ``python examples/cases/shallow_district.py``.
 """
 
-import json
 from pathlib import Path
 
 import gemini as gm
@@ -28,20 +27,9 @@ ASSUMPTIONS = """Assumptions of this case, not of the sample problem:
   of the sample problem"""
 
 
-def sample(name):
-    """Return the JSON file ``name`` of the sample problem as data."""
-    return json.loads((SAMPLE / name).read_text())
-
-
-def demand():
-    """Return the hourly heating and cooling demand file of the sample problem."""
-    columns = {"heat_kw": "heating_demand", "cool_kw": "cooling_demand"}
-    return gm.data.from_csv(SAMPLE / "demand.csv", columns, "kW", time_column="timestamp")
-
-
-def print_run(plant, results):
+def print_run(plant, problem, results):
     """Print the energy of the run and the supply temperatures, in hourly steps."""
-    totals = gm.evaluate.totals(plant, results)
+    totals = gm.evaluate.totals(plant, problem, results)
     frame = results.to_frame()
     boiler = frame["peak_boiler.fluid_out.enthalpy_flow"]
     boiler = boiler - frame["peak_boiler.fluid_in.enthalpy_flow"]
@@ -71,8 +59,8 @@ def print_run(plant, results):
 
 
 def print_checks(checks):
-    """Print each limit: its verdict and the worst value of the run."""
-    print("\nLimits:")
+    """Print each constraint: its verdict and the worst value of the run."""
+    print("\nConstraints:")
     for item in checks:
         result = "ok" if item["passed"] else "VIOLATED"
         worst, unit = item["value"]["value"], item["value"]["unit"]
@@ -86,17 +74,14 @@ def print_checks(checks):
 
 
 def main():
-    """Plan and simulate the three weeks, then print what they delivered and each limit."""
-    plant = gm.plants.from_dict(sample("plant.json"))
+    """Simulate the three weeks, then print what they delivered and each constraint."""
+    problem = gm.Problem.from_json(SAMPLE / "problem.json")
+    plant = gm.Plant.from_json(SAMPLE / "plant.json")
     print(ASSUMPTIONS)
-    rules = sample("rules.json")
-    plan = gm.schedule(plant, demand(), rules)
-    results = gm.simulate(plant, plan, on_error="record")
+    results = gm.simulate(plant, problem, on_error="record")
     print(f"\nFailed hours: {len(results.errors())}")
-    print_run(plant, results)
-    limits = gm.evaluate.Limits.from_dict(sample("limits.json"))
-    times = gm.evaluate.operating_time(plant, results, rules["operating_time"])
-    print_checks(gm.evaluate.limits(plant, results, limits) + times)
+    print_run(plant, problem, results)
+    print_checks(gm.evaluate.constraints(plant, problem, results))
 
 
 if __name__ == "__main__":

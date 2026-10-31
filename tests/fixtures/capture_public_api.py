@@ -15,12 +15,15 @@ ROOT = Path(__file__).parents[2]
 SNAPSHOT = ROOT / "tests" / "fixtures" / "public_api.json"
 NAMESPACES = (
     "plants",
+    "physics",
+    "ops",
     "units",
     "data",
     "analysis",
     "evaluate",
     "optim",
     "runtime",
+    "compiler",
 )
 RUN_FUNCTIONS = ("simulate", "replay", "live", "resume")
 METHODS = {
@@ -52,16 +55,17 @@ METHODS = {
         "validate",
         "to_dict",
         "from_dict",
-        "save",
-        "load",
+        "to_json",
+        "from_json",
+        "from_legacy",
     ),
     "Engine": (
         "__init__",
         "simulate",
         "replay",
         "live",
-        "save_checkpoint",
-        "load_checkpoint",
+        "to_checkpoint",
+        "from_checkpoint",
         "resume",
     ),
     "Results": (
@@ -71,8 +75,8 @@ METHODS = {
         "errors",
         "to_frame",
         "to_dict",
-        "save",
-        "load",
+        "to_npz",
+        "from_npz",
         "to_bytes",
         "from_bytes",
         "energy_report",
@@ -131,6 +135,22 @@ def capture():
         "namespaces": {name: _namespace(getattr(gm, name)) for name in NAMESPACES},
         "modules": _package_api(gm.modules),
         "classes": {
+            "Problem": _methods(
+                gm.Problem,
+                (
+                    "__init__",
+                    "apply_site",
+                    "to_dict",
+                    "from_dict",
+                    "schema",
+                    "to_json",
+                    "from_json",
+                ),
+            ),
+            "Constraint": _methods(gm.Constraint, ("__init__", "to_dict", "from_dict", "schema")),
+            "Assumptions": _methods(
+                gm.Assumptions, ("price", "co2_cost", "to_dict", "from_dict", "schema")
+            ),
             "Module": _methods(gm.modules.Module, METHODS["Module"]),
             "Plant": _methods(gm.Plant, METHODS["Plant"]),
             "Engine": _methods(gm.Engine, METHODS["Engine"]),

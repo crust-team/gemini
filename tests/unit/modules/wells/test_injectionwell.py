@@ -16,7 +16,7 @@ def test_injection_flow_sign_and_pressure():
     c = InjectionWell().set_params(
         "",
         mapping.injectionwell_params_from_gemini(
-            mapping.read_property(OLD_PROJECT / "injection_well_a06b.param")
+            mapping.from_property(OLD_PROJECT / "injection_well_a06b.param")
         ),
     )
     result = c(wellhead_in=Stream(m_dot=40, T=300, p=5e6))
@@ -31,7 +31,7 @@ def test_corrosion_profile_uses_injection_flow_sign():
     well = InjectionWell().set_params(
         "",
         mapping.injectionwell_params_from_gemini(
-            mapping.read_property(OLD_PROJECT / "injection_well_a06b.param")
+            mapping.from_property(OLD_PROJECT / "injection_well_a06b.param")
         ),
     )
     stream = Stream(m_dot=40, T=300, p=5e6)
@@ -45,7 +45,7 @@ def _well():
     return InjectionWell().set_params(
         "",
         mapping.injectionwell_params_from_gemini(
-            mapping.read_property(OLD_PROJECT / "injection_well_a06b.param")
+            mapping.from_property(OLD_PROJECT / "injection_well_a06b.param")
         ),
     )
 

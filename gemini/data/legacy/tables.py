@@ -10,7 +10,7 @@ import io
 from pathlib import Path
 
 from gemini import units
-from gemini._utils.files import read_json
+from gemini._utils.files import from_json
 from gemini.errors import ValidationError
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.pumps import ESP, InjectionPump
@@ -327,12 +327,12 @@ COEFFICIENT_PROPERTIES = {
 """Old ``;``-separated coefficient lists -> new list parameters."""
 
 
-def parse_coefficients(value):
+def from_coefficients(value):
     """Return old coefficients, a ``;``-separated string or a list, as a list of floats."""
     return list(map(float, value.split(";"))) if isinstance(value, str) else list(value)
 
 
-def parse_trajectory_csv(text):
+def from_trajectory_csv(text):
     """Parse the old semicolon trajectory schema; depths, ID and roughness are metres."""
     return [
         {
@@ -343,9 +343,9 @@ def parse_trajectory_csv(text):
     ]
 
 
-def read_property(path: str | Path, index: int = 0) -> dict:
+def from_property(path: str | Path, index: int = 0) -> dict:
     """Read an example .param file and return its property snapshot at timestamp ``index``."""
-    properties = read_json(path)["parameters"]["property"]
+    properties = from_json(path)["parameters"]["property"]
     return {
         key: value[index] if isinstance(value, list) else value for key, value in properties.items()
     }
@@ -353,11 +353,11 @@ def read_property(path: str | Path, index: int = 0) -> dict:
 
 def esp_params_from_gemini(properties: dict) -> dict:
     """Convert ESP flow limits [m3/h] and VLP correction offset [bar] to SI parameters."""
-    correction = parse_coefficients(properties.get("esp_correction_factor", "1;0"))
+    correction = from_coefficients(properties.get("esp_correction_factor", "1;0"))
     return dict(
         stage_count=properties["esp_no_stage"],
-        head_coefficients=parse_coefficients(properties["esp_head_coeff"]),
-        power_coefficients=parse_coefficients(properties["esp_power_coeff"]),
+        head_coefficients=from_coefficients(properties["esp_head_coeff"]),
+        power_coefficients=from_coefficients(properties["esp_power_coeff"]),
         pump_type=properties.get("esp_type"),
         setting_depth=properties.get("esp_depth", 0),
         minimum_flow=units.m3h_to_m3s(properties.get("esp_min_flow", 0)),
@@ -424,7 +424,7 @@ def _well_params(properties, prefix, base_path):
                 f"{prefix}: provide a trajectory table or trajectory file", code="invalid_format"
             )
         text = (Path(base_path) / filename).read_text(encoding="utf-8-sig")
-        table = parse_trajectory_csv(text)
+        table = from_trajectory_csv(text)
     tally = [
         dict(row, ID=units.inch_to_m(float(row["ID"])))
         for row in properties.get(f"{prefix}_tally_table", [])

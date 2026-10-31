@@ -1,9 +1,18 @@
-# In-memory data
+# Data
 
-`gm.Dataset` owns one pandas-backed, sorted, unique, timezone-aware UTC table of raw values; units
-are metadata. The data package contains no file readers, database clients, network calls, or
-source handles. The user or backend reads files/services and passes the resulting in-memory
-values to one of:
+Readers are `from_<format>` and writers `to_<format>`. A reader is a classmethod of the class it
+returns (`gm.Problem.from_json(path)`, `gm.Plant.from_json(path)`, `gm.Results.from_npz(path)`,
+`Dataset.from_frame(...)`); a writer is a method of the object (`problem.to_json(path)`,
+`results.to_npz(path)`, `plant.to_dict()`). Only a reader that returns no gemini class, a demand
+frame, is a plain function in its folder: `gm.data.from_csv` and `gm.data.from_values`. No name
+starts with `read_`, `write_`, `load_`, `save_`, `parse_` or `dump_`.
+
+## In-memory data
+
+`gm.Dataset` (`gemini/run/dataset.py`) owns one pandas-backed, sorted, unique, timezone-aware UTC
+table of raw values; units are metadata. `Dataset` and the engine contain no file readers, database
+clients, network calls, or source handles. The user or backend reads files/services and passes the
+resulting in-memory values to one of:
 
 - `Dataset.from_frame(df, time_column=None, units=None, tz="UTC")`
 - `Dataset.from_dict(data, time, units=None, tz="UTC")`
@@ -66,16 +75,19 @@ convert in-memory raw values to SI. Profiles combined into a dataset must share 
 
 ## Demand profiles
 
-`gm.data` ships no profile: a demand is the caller's. `from_csv(path, columns, unit,
-time_column=None)` reads a file, and `columns` maps its columns to the quantities of gemini, so a
+`gm.data` ships no profile: a demand is the caller's. The code is `gemini/run/_utils/demand.py`,
+which `gm.data` exports, because a `gm.Problem` holds a demand and `run` imports no `data`.
+`from_csv(path, columns, unit, time_column=None)` reads a file, and `columns` maps its columns to the quantities of gemini, so a
 file adapts to gemini and gemini takes no name or unit from it. `from_values(values, unit, start,
 step, quantity)` takes numbers. A quantity is `heating_demand` or `cooling_demand`. Both return a
-DataFrame in the run-input format, the `demand` of `gm.schedule`: a UTC `DatetimeIndex` called `time`
+DataFrame in the run-input format, the `demand` of a `gm.Problem`: a UTC `DatetimeIndex` called `time`
 at any constant step and of any length, one column per quantity in W, and `frame.attrs` with `units`
 and `quantities`. Both validate through one check: a monotonic index with no gaps or repeats, a
 constant step, no negative or missing value, a known quantity. `profile_schema()` is the JSON Schema
-of the same frame as a document: `columns` (unit and quantity), `time` and `values`. A profile column
-becomes a run input when a plant binding names it as its `column`.
+of the same frame as a document: `columns` (unit and quantity), `time` and `values`.
+`gm.data.synthesize(heating, cooling, start, step, ...)` will make a demand from a few figures and
+raises `NotImplementedYet`. A profile column becomes a run input when a plant binding names it as
+its `column`.
 
 The committed CSVs under `inputs/doublet_heat/` are immutable source data. Two
 of their naming choices predate the naming rule and stay: columns named `*.m_dot` hold volumetric
@@ -95,11 +107,30 @@ with code `inputs_missing` when it is absent, as in an installed wheel, and the 
 file. Nothing fails at import time, and `gm.plants.get` works without it.
 
 `inputs/examples/<problem>/` holds one folder per sample problem, a whole problem in the shapes of
-gemini: its source files with a README, `plant.json` (a plant dict), `rules.json` (the rules of
-`gm.schedule`), `limits.json` (a `gm.evaluate.Limits` dict) and `assumptions.json` when it uses prices.
-`hackathon_2027/` and `shallow_district/` are the two today. **Only `examples/` and `tests/` read this
-folder**: nothing under `gemini/` names it, or a problem, and `tests/unit/test_code_quality.py` checks
-that. A problem is a test of the code, never the source of a default, a name or a structure.
+gemini. Each has:
+
+- `problem.json`: a `gm.Problem` (`gm.Problem.from_json`). It names the demand CSV and states its
+  `columns` and `unit`, then `site` (parameter paths with `*` and their values), `constraints` (the
+  fields of `gm.Constraint`) and `assumptions` (`prices`, `co2_price`, rates; see
+  `gm.Assumptions`). The format is the docstring of `gm.Problem`. A second problem on the same
+  plant is another `problem_*.json`.
+- the demand CSV, read by `problem.json` through `gm.data.from_csv`;
+- `plant.json`: a plant dict (`gm.Plant.from_json`), the design without the site;
+- `README.md`: the source of the files and what the problem asks.
+
+`hackathon_2027/` also keeps its organiser files, `plant_with_treatment.json` and `templates/`, and
+`shallow_district/` is the other sample. A whole run is:
+
+```python
+problem = gm.Problem.from_json("inputs/examples/hackathon_2027/problem.json")
+plant = gm.Plant.from_json("inputs/examples/hackathon_2027/plant.json")
+results = gm.simulate(plant, problem)
+```
+
+**Only `examples/` and `tests/` read this folder** (tests through
+`tests/fixtures/sample_problems.py`): nothing under `gemini/` names it, or a problem, and
+`tests/unit/test_code_quality.py` checks that. A problem is a test of the code, never the source of a
+default, a name or a structure.
 
 `docs/schemas/` is generated documentation, not data. `tests/fixtures/` holds goldens and
 `tests/e2e/expected/` example outputs. `gemini/_utils/paths.py` is the one place that knows where the

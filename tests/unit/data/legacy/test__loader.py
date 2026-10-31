@@ -8,7 +8,7 @@ import pytest
 
 import gemini as gm
 from gemini.data import legacy
-from gemini.data.legacy._loader import _data_columns, load_legacy_design, node_kinds
+from gemini.data.legacy._loader import _data_columns, from_legacy_design, node_kinds
 from gemini.errors import GeminiWarning, ValidationError
 from tests.fixtures import OLD_PROJECT
 from tests.fixtures.errors import raises
@@ -17,7 +17,7 @@ from tests.fixtures.errors import raises
 @pytest.fixture(scope="module")
 def project():
     """Parse the example old project once; tests copy it before editing."""
-    return legacy.read_project(OLD_PROJECT)
+    return legacy.GeminiProject.from_folder(OLD_PROJECT)
 
 
 def _copy(tmp_path):
@@ -33,7 +33,7 @@ def test_a_project_without_the_power_column_of_its_pump_has_no_efficiency(projec
         lambda parsed: _data_columns(parsed) - {"InjectorPump_PowerDraw"},
     )
     with raises(ValidationError, "missing_value") as caught:
-        load_legacy_design(project)
+        from_legacy_design(project)
     assert caught.value.path == "injection_pump.efficiency"
 
 
@@ -46,7 +46,7 @@ def _edit_param(folder, name, edit):
 
 def test_design_maps_every_node_and_the_riser(project):
     """Every old node becomes one plant path; the buried ESP splits the production well."""
-    design = load_legacy_design(project)
+    design = from_legacy_design(project)
     assert set(design.modules) == set(legacy.tables.NODE_PATHS.values()) | {"doublet.riser"}
     assert design.modules["doublet.riser"].params[0].params["segment"] == "above_esp"
     assert design.modules["doublet.well"].params[0].params["esp_depth"] == 600
@@ -71,7 +71,7 @@ def test_neighbour_parameters_compare_parsed_times(tmp_path):
 
     folder = _copy(tmp_path)
     _edit_param(folder, "esp_1ee3", iso_times)
-    design = load_legacy_design(legacy.read_project(folder))
+    design = from_legacy_design(legacy.GeminiProject.from_folder(folder))
     assert design.modules["doublet.well"].params[0].params["esp_depth"] == 600
 
 
@@ -84,8 +84,8 @@ def test_unmapped_fields_warn_once(tmp_path):
 
     folder = _copy(tmp_path)
     _edit_param(folder, "esp_1ee3", add_unknown)
-    project = legacy.read_project(folder)
-    assert load_legacy_design(project).unmapped == [
+    project = legacy.GeminiProject.from_folder(folder)
+    assert from_legacy_design(project).unmapped == [
         "esp_1ee3.parameters.esp_colour",
         "esp_1ee3.tagnames.measured.esp_noise",
     ]
@@ -103,4 +103,4 @@ def test_unknown_nodes_are_rejected(tmp_path, project):
     node_id = next(iter(edited.nodes))
     edited.nodes[node_id] = edited.nodes[node_id].model_copy(update={"name": "boiler_1"})
     with raises(ValidationError, "invalid_format", match="boiler_1"):
-        load_legacy_design(edited)
+        from_legacy_design(edited)

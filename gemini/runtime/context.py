@@ -57,7 +57,7 @@ def state():
     return result
 
 
-def load_state(values):
+def set_state(values):
     """Replace runtime settings from a complete dictionary returned by ``state()``."""
     _check_names(values, required=True)
     _state.set(_validated(dict(values)))

@@ -60,7 +60,7 @@ def test_registration_construction_and_state():
     assert module.value == 3
     state = module.state_dict()
     module.value = 4
-    module.load_state_dict(state)
+    module.set_state_dict(state)
     assert module.value == 3
     with pytest.raises(gm.errors.ValidationError):
         module.value = -1
@@ -353,7 +353,7 @@ def test_hooks_are_ordered_removable_and_observe_named_ports():
     first.remove()
     assert module(fluid_in=stream).outlets.fluid_out is stream
     state = module.state_dict()
-    restored = PassThrough().set_params("", {"value": 1}).load_state_dict(state)
+    restored = PassThrough().set_params("", {"value": 1}).set_state_dict(state)
     assert not restored._pre_hooks and not restored._hooks
 
 
@@ -673,7 +673,7 @@ PUBLIC_METHODS = {
     "register_forward_pre_hook",
     "register_forward_hook",
     "state_dict",
-    "load_state_dict",
+    "set_state_dict",
     "health",
     "describe",
     "parameter_schema",

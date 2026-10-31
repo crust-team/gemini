@@ -1,8 +1,9 @@
 # Economics, KPIs, checks and well analysis
 
-The packages `gemini.evaluate`, `gemini.evaluate`, `gemini.analysis` (with `gm.evaluate`), `gemini.modules`
-and `gemini.optim` sit above `gemini.engine`. They read a plant and a finished run through the public
-API only, and every return is plain JSON (`to_plain`: no NumPy types, `NaN` and infinity are `null`) in the
+The packages `gemini.evaluate`, `gemini.analysis` and `gemini.optim` sit above the run folders
+(`engine`, `run`, `modules`, `plants`, ...), which import none of them. They read a plant, a
+`gm.Problem` and a finished run through the public API only, every `gm.evaluate` function takes
+`(plant, problem, results, ...)`, and and every return is plain JSON (`to_plain`: no NumPy types, `NaN` and infinity are `null`) in the
 [return shapes](api.md#return-shapes). A value the inputs cannot give is never a guess. Each name is
 `real` or raises `NotImplementedYet` with its final signature and a full docstring.
 
@@ -12,7 +13,7 @@ API only, and every return is plain JSON (`to_plain`: no NumPy types, `NaN` and 
 composite outputs. Everything below is read from the edge modules:
 
 - Heat delivered is what the water loses across the `HeatingGrid` leaves and cold delivered what
-  it gains across the `CoolingGrid` leaves (`analysis/series.py`: `delivered_heat`,
+  it gains across the `CoolingGrid` leaves (`evaluate/_utils/series.py`: `delivered_heat`,
   `delivered_cold`). **Useful** heat and cold are that less the `surplus` of the grid, so at most the
   demand (`useful_heat`, `useful_cold`). `gm.evaluate.totals` gives all three; every KPI and levelised
   cost reads the useful energy: a heat nobody needed costs money and earns nothing.
@@ -29,27 +30,28 @@ composite outputs. Everything below is read from the edge modules:
 A plant without a consumer leaf, such as the doublet heat plant, delivers no heat in these terms, so
 its heat and cold KPIs and levelised costs are `null` with that reason.
 
-## `gm.evaluate`
+## Costs
 
 Every function returns a value with the parts of its result as more keys, each a value or a text;
 `unit` is the currency (`EUR`), `EUR/year`, `EUR/J`, `year` or `kg`. `A` is the annuity factor, the
 sum over the lifetime years of `1 / (1 + discount_rate) ** t`, in years. Every function takes
 `on_error="raise"`: a value the inputs cannot give raises `ValidationError`, code `no_value`, or
-`missing_assumption`, naming it, for an assumption nobody gave. With `on_error="record"` nothing is raised and it is
-`{value: null, unit, reason}`.
+`missing_assumption`, naming it, for an assumption nobody gave. With `on_error="record"` nothing is
+raised and it is `{value: null, unit, reason}`. The prices, rates and cost factors are those of
+`problem.assumptions` (`gm.Assumptions`).
 
 | Name | Returns |
 |---|---|
-| `Assumptions` | frozen object; see the table of sources below |
-| `capex(plant, assumptions=None)` | `total_cost(plant)`: investment in the currency of the declared costs, with `price_year` and `source` |
-| `opex(plant, results, assumptions=None)` | fixed + variable cost per year + yearly bill of grid electricity and purchased gas (`fuel_purchased` at `gas_price`; co-produced gas costs nothing); `components` lists the parts |
-| `lcoh(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `(capex + opex A) / (useful heat A)` in currency/J, `A` the annuity factor |
-| `lcoc(...)` | the same with the useful cold |
-| `annualised_cost(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `capex / A + opex` in currency/year, with `capex`, `opex`, `annuity_factor`, `discount_rate`, `lifetime_years` |
-| `lcts(...)` | levelised cost of thermal supply, the team's design metric: `annualised_cost / (heat + cold)` in currency/J, heat and cold delivered per year, with `annualised_cost`, `heat`, `cold`; it needs no `heat_cost_share` |
-| `co2(plant, results, assumptions=None)` | kg of CO2-equivalent over the window: the leaf `co2_emission`, `methane_emission` times `methane_gwp`, grid electricity times `electricity_emission_factor` |
-| `npv(plant, results, discount_rate=None, lifetime=None, assumptions=None)` | `-capex + (revenue - opex) A` |
-| `payback(plant, results, assumptions=None)` | `capex / (revenue - opex)` in years, undiscounted |
+| `gm.Assumptions` | frozen object of the problem; see the table of sources below |
+| `gm.evaluate.capex(plant, problem)` | `total_cost(plant)`: investment in the currency of the declared costs, with `price_year` and `source` |
+| `opex(plant, problem, results)` | fixed + variable cost per year + yearly bill of grid electricity, purchased gas, waste and chemicals at `prices` (a profile price is integrated step by step; co-produced gas costs nothing) + the CO2 emitted at `co2_price` when given; `components` lists the parts |
+| `lcoh(plant, problem, results, discount_rate=None, lifetime=None)` | `(capex + opex A) / (useful heat A)` in currency/J, `A` the annuity factor |
+| `lcoc(...)` (as `lcoh`) | the same with the useful cold |
+| `annualised_cost(plant, problem, results, discount_rate=None, lifetime=None)` | `capex / A + opex` in currency/year, with `capex`, `opex`, `annuity_factor`, `discount_rate`, `lifetime_years` |
+| `lcts(...)` (as `lcoh`) | levelised cost of thermal supply, the team's design metric: `annualised_cost / (heat + cold)` in currency/J, heat and cold delivered per year, with `annualised_cost`, `heat`, `cold`; it needs no `heat_cost_share` |
+| `co2(plant, problem, results)` | kg of CO2-equivalent over the window: the leaf `co2_emission`, `methane_emission` times `methane_gwp`, grid electricity times `electricity_emission_factor` |
+| `npv(plant, problem, results, discount_rate=None, lifetime=None)` | `-capex + (revenue - opex) A` |
+| `payback(plant, problem, results)` | `capex / (revenue - opex)` in years, undiscounted |
 
 `Cost` and `total_cost` (`types/cost.py`) are the one cost implementation. Every equipment module
 that has a cost declares `capex(assumptions)`, which returns a `Cost` from its own design values and
@@ -89,9 +91,9 @@ for grid electricity drawn. A price is asked for only when its energy is non-zer
 | `methane_gwp` | - | 29.8 | IPCC Sixth Assessment Report, Working Group I, ch. 7, table 7.15 (Forster et al. 2021): fossil methane over 100 years |
 | `discount_rate` | per year | None | depends on the project; the user gives it |
 | `lifetime_years` | years | None | depends on the equipment; the user gives it |
-| `electricity_price` | currency/J | None | depends on country, year and contract |
-| `gas_price` | currency/MWh | None | per MWh of fuel energy; depends on country, year and contract |
-| `heat_price`, `cold_price` | currency/J | None | depends on the contract |
+| `prices["electricity"]`, `prices["gas"]`, `prices["heat"]`, `prices["cold"]` | currency/J | None | depends on country, year and contract; a number in SI, a text such as `"100 EUR/MWh"`, or a profile on the demand index |
+| `prices["waste_disposal"]`, `prices["chemical"]` | currency/kg | None | depends on the contract |
+| `co2_price` | currency/kg | None | a choice of the assessment; a number in SI or a text with its unit |
 | `heat_cost_share` | - | None | a choice of the assessment |
 | `electricity_emission_factor` | kg/J | None | depends on the grid and the year |
 
@@ -111,11 +113,14 @@ citation of each in `COST_SOURCES`, and `capex` returns it in `source`.
 
 Convert at the boundary: EUR/MWh divided by 3.6e9 is EUR/J, kg/GJ divided by 1e9 is kg/J.
 
-## `gm.evaluate`
+## Totals and KPIs
 
-`gm.evaluate.totals(plant, results)` returns `{name: {value, unit}}` for `gm.evaluate.names()`; a KPI the run
-cannot give is `null` with a `reason`. With
-E(x) the sum over ticks of x times the tick duration:
+`gm.evaluate.totals(plant, problem, results)` returns `{name: {value, unit}}` of what crossed the
+plant's edge (`heat_delivered`, `heat_useful`, `heat_surplus`, `cold_delivered`, `cold_useful`,
+`cold_surplus`, `electricity_bought`, `electricity_sold`, `gas_bought`, `losses`, `co2_emitted`,
+`methane_emitted`, `waste`, `chemicals`) and of the KPIs below; one the run cannot give is `null`
+with a `reason`. There is no separate KPI call. With E(x) the sum over ticks of x times the tick
+duration:
 
 | Name | Unit | Definition |
 |---|---|---|
@@ -125,7 +130,7 @@ E(x) the sum over ticks of x times the tick duration:
 | `peak_heat` | W | largest tick sum of useful heat (delivered power, not the demand peak) |
 | `peak_cold` | W | largest tick sum of useful cold |
 
-## `gm.evaluate`
+## Checks and constraints
 
 Each check returns the check `{name, passed, value, limit}`, `value` and `limit` being values; a
 violated limit is `passed: false`, never an error (`passed` is `None`, with a `reason` in `value`,
@@ -135,43 +140,57 @@ it, and the checks audit what the columns hold:
 
 | Check | Covers | `value`, `limit` |
 |---|---|---|
-| `energy_balance(results)` | the leaf columns named in `ENERGY_INPUTS` and `ENERGY_OUTPUTS` of `_utils/balance.py`, except the signed `heat_accumulation`: finite or missing, not negative | smallest power [W], 1e-9 W |
-| `plant_balance(plant, run)` | mass and energy in = out + losses + change of stored energy, per module (1e-9) and for the root (1e-6) | a list of checks, the worst relative residual of each |
-| `mass_balance(results)` | the leaf outputs whose unit in `results.units` is kg/s: finite or missing, not negative | smallest flow [kg/s], 1e-12 kg/s |
-| `bounds(plant, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
-| `operating_time(plant, results, duration)` | the time each doublet ran: the sum of the steps in which `<doublet>.reservoir.liquid_flow`, the column behind `Doublet.flow`, is above zero; `duration` is a text or seconds, and it passes within half a step, the rounding of a plan | one check per doublet |
-| `run_all(plant, results, duration=None)` | the first three above, and `operating_time` when `duration` is given | `{passed, checks}` |
+| `energy_balance(plant, problem, results)` | the leaf columns named in `ENERGY_INPUTS` and `ENERGY_OUTPUTS` of `modules/_utils/balance.py`, except the signed `heat_accumulation`: finite or missing, not negative | smallest power [W], 1e-9 W |
+| `plant_balance(plant, problem, results)` | mass and energy in = out + losses + change of stored energy, per module (1e-9) and for the root (1e-6) | a list of checks, the worst relative residual of each |
+| `mass_balance(plant, problem, results)` | the leaf outputs whose unit in `results.units` is kg/s: finite or missing, not negative | smallest flow [kg/s], 1e-12 kg/s |
+| `bounds(plant, problem, results)` | every recorded output with a declared limit (`ge`, `gt`, `le`, `lt` of its `Declaration`) | number of values outside, 0 |
+| `constraints(plant, problem, results)` | every `gm.Constraint` of the problem, below | one check per matched module and constraint |
+| `run_all(plant, problem, results)` | the first three, `bounds` and `constraints` | `{passed, checks}` |
 
-`gm.evaluate.Limits` holds limits a user sets, `(path pattern, output, min, max)`:
+The limits of a run are the `constraints` of its `gm.Problem`, built without a plant:
 
 ```python
-limits = gm.evaluate.Limits()
-limits.add("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h")
-limits.add("d*.brine_cooling", max="40 K")
-limits.add("heat_users.supply_in_T", min="100 degC")
-checks = gm.evaluate.limits(plant, results, limits)
+problem = gm.Problem(
+    demand,
+    constraints=[
+        gm.Constraint("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h", when="running"),
+        gm.Constraint("d*.brine_cooling", max="40 K"),
+        gm.Constraint("heat_users.supply_in_T", min="100 degC"),
+        gm.Constraint("d*.reservoir.liquid_flow", max="330 d", over="duration", when="running"),
+    ],
+)
+checks = gm.evaluate.constraints(plant, problem, results)
 ```
 
-A parameter takes a limit too (`limits.add("d*.pump_efficiency", min=0.7)`): it is judged once
-against its value in the run, or at each date inside the run when it changes, in the same check.
-`d*.volume_imbalance` is the produced less the injected liquid volume flow of a doublet.
+A path is `<module path>.<field>`, `*` stays within one name (`d*.power` is not `d0.esp.power`). It
+names a result field or a parameter. `over` says how the run is read: `each` judges every step and
+reports the worst (`worst_step` gives its time); `sum`, `mean`, `max` and `min` judge one figure of
+the run; `duration` judges the total time of the steps that count, `min` and `max` then being
+durations, passing within half a step. `when="running"` counts only the steps on which the module
+carried flow: the minimum flow holds while a doublet runs. A parameter takes `over="each"` and is
+judged once against its value with the site of the problem applied, or at each date inside the run
+when it changes. `d*.volume_imbalance` is the produced less the injected liquid volume flow of a
+doublet. A bound is a number in SI or a text with its unit; a value on the limit passes within a
+relative 1e-9.
 
-`add` checks the units and needs no plant; `to_dict` and `from_dict` give a plain dictionary to store.
-`gm.evaluate.limits` matches each pattern against the module paths, name by name (`*` stays within one
-name, so `d*.power` is not `d0.esp.power`); a pattern or output that matches nothing raises
-`ValidationError`, code `unknown_name`, with suggestions. It returns one check per matched module and
-output, `value` the worst value of the run and `limit` the limit, `[min, max]` with both. Only ticks
-on which the module carried flow are judged: the minimum flow holds while a doublet runs. A violated
-limit is an answer, and a run with no value of it, every row having failed, gives `passed: null` with
-the reason `no_value`. `Results` holds leaf columns, so an output of a composite is read through the
-paths its combination names: `Doublet` declares `brine_cooling`
+`gm.evaluate.constraints` returns one check `{name, passed, value, limit, path, worst_step}` per
+matched module and constraint, `value` the worst value of the run (or the figure) and `limit` the
+bound that was violated, else the nearest. A path that matches nothing raises `ValidationError`,
+code `unknown_name`, with suggestions. A violated limit is an answer, and a run with no value of
+the field, every row having failed, gives `passed: null` with the reason `no_value`. `Results`
+holds leaf columns, so an output of a composite is read through the paths its combination names:
+`Doublet` declares `brine_cooling`
 (`Output.difference("riser.wellhead_out.T", "injector.wellhead_in.T")`), and the liquid volume flow of
-a doublet is `reservoir.liquid_flow` of its reservoir.
+a doublet is `reservoir.liquid_flow` of its reservoir. `gm.schedule` enforces some forms of the same
+constraints and lists the others in `plan.attrs["check_only"]`, see
+[engine.md](engine.md#schedule); `constraints` judges them all.
 
 A real closure check needs the engine to record each call's residual (`balance.energy_balance`)
 as a result column; that is a change to the engine, not to this package.
 
 ## `gm.analysis`
+
+`gm.analysis.calibrate` and `CalibrationResult` fit parameters through replay; the other names:
 
 | Name | Status | Notes |
 |---|---|---|
@@ -199,28 +218,29 @@ the pressure. A rate the column of brine injects alone has no pressure to give: 
 `pump_curve` head is a pressure difference in Pa; the head of a fluid column in metres is
 `head / (density g)`. The correction is `theoretical = slope * measured + offset` (offset in Pa).
 
-## `gm.testing` and `gm.optim`
+## `gm.optim`
 
-`gm.modules.check` and `gm.modules.load_file` are described in
-[modules.md](modules.md#registry-categories-and-streams).
+`gm.modules.check` is described in [modules.md](modules.md#registry-categories-and-streams).
 
-`gm.optim.minimize(plant, profile, variables, objective, constraints=None, evaluations=100, *,
-rules=None, assumptions=None)` searches design values. Each trial copies the plant, sets the variables with
-`set_params`, plans a demand on that design, simulates and reads the metric, so the plant is not
-changed. A demand frame is planned with `gm.schedule` and `rules` for each trial and a plan stays
-fixed; `profile=None`, or a demand without `rules`, raises `missing_value`. A trial reads a
+`gm.optim.minimize(plant, problem, variables, objective, constraints=None, evaluations=100, *,
+plan=None)` searches design values. Each trial copies the plant, sets the variables with
+`set_params`, plans the demand of the problem on that design with `gm.schedule`, simulates and reads
+the metric, so the plant is not changed. A `plan` stays fixed over the trials and lets `problem` be
+`None` for a building block; with neither the call raises `missing_value`. A trial reads a
 finished run in about 0.15 s; simulating the year takes 0.3 s on a plant without a loop and 6 to 9 s
-on one with the drive-water loop of a heat-driven chiller, which runs row by row. The search is `scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
+on one with the drive-water loop of a heat-driven chiller, which runs row by row. The search is
+`scipy.optimize.differential_evolution` from a Latin hypercube, seed fixed,
 with five candidates per variable: the population times the generations is the number of
 simulations, so `evaluations` is a hard limit and a smaller budget than one population raises
 `ValidationError`. A trial that fails, has no value or breaks a constraint is in `history` with its
-`reason` and is never `best`. `gm.optim.sample(plant, profile, distributions, metrics, count, seed=0,
-*, rules=None, assumptions=None)` draws `normal`, `uniform` and `triangular` parameters with
+`reason` and is never `best`. `gm.optim.sample(plant, problem, distributions, metrics, count, seed=0,
+*, plan=None)` draws `normal`, `uniform` and `triangular` parameters with
 `numpy.random.default_rng(seed)`, one simulation each, and summarises each metric as `mean`, `p5`,
 `p50`, `p95`; a draw whose run failed has its `reason` and stays out of the summary.
+`gm.optim.size` and `gm.optim.sensitivity` have their final signature and raise `NotImplementedYet`.
 
-A metric is a name of `gm.evaluate.names()` or `lcoh`, `lcoc`, `lcts`, `annualised_cost`, `co2`; these
-read `assumptions`. `profile` is required: the run input of a design comes from `gm.schedule`, which
-needs the rules `doublet_flow` and `max_brine_cooling`, and it stays fixed over the trials, so a
-plan made for one design is what every trial runs. `parameters` in `best`, `history` and `samples`
-are numbers in SI, the input of the next `set_params`.
+A metric is a KPI or total of `gm.evaluate.totals` or one of `lcoh`, `lcoc`, `lcts`,
+`annualised_cost`, `co2`; the economic ones read the assumptions of `problem`, so they need a
+problem. The constraints of the problem that `gm.schedule` enforces (the flow range and the brine
+cooling per doublet) are required for a demand, as for `gm.schedule`. `parameters` in `best`,
+`history` and `samples` are numbers in SI, the input of the next `set_params`.

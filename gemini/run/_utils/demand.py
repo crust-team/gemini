@@ -11,7 +11,7 @@ import pandas as pd
 
 from gemini import units
 from gemini._utils.strings import close_matches, did_you_mean, join_names
-from gemini._utils.time import parse_duration, to_utc, to_utc_index
+from gemini._utils.time import to_timedelta, to_utc, to_utc_index
 from gemini.errors import RunError, ValidationError
 
 QUANTITIES = {"heating_demand": "power", "cooling_demand": "power"}
@@ -96,7 +96,7 @@ def from_values(values, unit, start, step, quantity):
         time.
     """
     try:
-        interval = parse_duration(step)
+        interval = to_timedelta(step)
         first = to_utc(start)
     except (TypeError, ValueError) as error:
         raise ValidationError(

@@ -4,26 +4,29 @@ A leaf module computes and a plant connects: no class does both ([modules.md](mo
 composite is a `Plant`. A plant declares its children, ports and connections and never writes
 `forward`: `Plant.forward` is written once. `describe()`, `gm.simulate`, `gm.replay` and `gm.live`
 work on any plant, on every backend, and a plant has no run method of its own: run it with
-`results = gm.simulate(plant, profile)`. How it is computed is in
+`results = gm.simulate(plant, problem)`. How it is computed is in
 [native-engine.md](native-engine.md#14-the-plant-class-and-the-plant-dict).
 
-`Plant` is in `gemini/plants/plant.py`, beside `Module`. `gemini/plants/` holds only plant
-classes, and every tool of the plants (the plan, the run, ports, loops, constraints, outputs, the
+`Plant` is in `gemini/plants/plant.py`, with the plant classes, one file each; `gemini.modules`
+never imports `gemini.plants`. Every tool of the plants (the plan, the run, ports, loops, constraints, outputs, the
 reader and writer of the plant dict, the schema, the catalogue) is in
 `gemini/plants/_utils/`.
 
 Plants are defined in Python. gemini keeps no JSON file; JSON exists only as the plant dict that
-agents use: `gm.plants.from_dict`, `plant.to_dict`, `gm.plants.schema`, `gm.plants.validate`.
+agents use: `gm.Plant.from_dict`, `plant.to_dict`, `gm.Plant.from_json`, `plant.to_json`,
+`gm.plants.schema`, `gm.plants.validate`. `gm.Plant.from_legacy(folder)` returns the plant of an old
+project folder ([legacy.md](legacy.md)).
 
 ## A plant class
 
 ```python
+from gemini.modules import Inlet, Outlet, Output
 from gemini.modules.exchangers import HeatExchanger
 from gemini.modules.grids import HeatingGrid
 from gemini.modules.piping import Valve
-from gemini.plants.plant import Plant
 from gemini.modules.pumps import CirculationPump
-from gemini.types import Inlet, Outlet, Output, Power, Stream
+from gemini.plants import Plant
+from gemini.types import Power, Stream
 
 
 class HeatingSubstation(Plant):
@@ -154,7 +157,7 @@ taking the unit out of `modules` and `connections` and joining what it joined.
 
 ```python
 problems = gm.plants.validate(data, on_error="record")   # every problem at once
-plant = gm.plants.from_dict(data)
+plant = gm.Plant.from_dict(data)
 assert plant.to_dict() == data
 ```
 
@@ -199,7 +202,7 @@ codes of [errors.md](errors.md) on the paths of the dict, such as `connections[1
 stored heat pump is schedulable as it is read, `from_dict` applies it and `gm.schedule` reads it
 through `plant.input_value`. A column of the run wins over it. A value assigned on a module
 (`plant.pump.frequency = 50`) and the last tick a run leaves on a module are not stored.
-`plant.save(path)` and `gm.Plant.load(path)` write and read it as JSON. A plant dict of an older
+`plant.to_json(path)` and `gm.Plant.from_json(path)` write and read it as JSON. A plant dict of an older
 format raises `ValidationError` with code `old_format`.
 
 ## Loops
@@ -295,15 +298,17 @@ The five template plants derive from `DoubletsPlant` (`plants/_utils/doublets.py
 n}`, 1 to 3 (`minimum_doublets`, `maximum_doublets` of the class, `invalid_design` outside), gives the
 doublets `d0` to `d{n-1}` in parallel through `production_mixers` and `injection_splitters`. A
 plant-level `depth` goes to every doublet, which derives its reservoir from it; a value stated on one
-doublet wins, now and later.
+doublet wins, now and later. A `Doublet` with a `depth` and no geotherm waits for it instead of
+raising: a plant holds the design and the `site` of a `gm.Problem` the geotherm and the rest of the
+site, so `gm.simulate(plant, problem)` applies them to a copy.
 
-**Schedulable or a building block.** `gm.schedule` plans a plant that has `Doublet` children and a
+**Schedulable or a building block.** `gm.schedule(plant, problem)` plans a plant that has `Doublet` children and a
 grid, and its setpoints as `inputs`:
 
 | A plant with values plus `gm.schedule` | Status |
 | --- | --- |
 | `HeatingPlant`, `HeatingCoolingPlant`, `HeatingFullCoolingPlant`, `HeatingAbsorptionCoolingPlant`, `HeatingHeatPumpCoolingPlant`, and a plant dict of the same units | schedulable: a design is a plant dict, and `inputs/examples/` holds two that run with no failed step |
-| `DoubletHeatPlant` | schedulable up to 165 m3/h: the measured ESP curve, which the replay goldens hold, has no head at 60 Hz for more, so `doublet_flow` must stop there |
+| `DoubletHeatPlant` | schedulable up to 165 m3/h: the measured ESP curve, which the replay goldens hold, has no head at 60 Hz for more, so the flow range constraint must stop there |
 | `Doublet`, `NodalDoublet`, `HeatingSubstation`, `CoolingSubstation`, `DistrictNetwork`, `MultiWellPlant`, `ATESPlant` | building blocks: a run sets their controls and boundaries |
 | `DistrictEnergyPlant`, `BoilerChpPlant`, `ParallelExchangerPlant` | cases: their examples set their inputs |
 

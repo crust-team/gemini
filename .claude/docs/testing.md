@@ -4,7 +4,11 @@ Always test what changed and everything that imports it; never run the full suit
 
 Every test belongs to one automatically marked folder tier:
 
-- `tests/unit/` mirrors source files and receives `unit`.
+- `tests/unit/` mirrors source files and receives `unit`. Its folders are those of `gemini/`:
+  `_utils`, `analysis`, `compiler`, `data`, `engine`, `errors`, `evaluate`, `modules`, `ops`,
+  `optim`, `physics`, `plants`, `run`, `runtime`, `types` and `units`; the files at its top
+  (`test_code_quality.py`, `test_package_boundaries.py`, `test_public_api.py`, `test_mirror.py`, ...)
+  guard the package as a whole.
 - `tests/integration/` combines runtime components and receives `integration`.
 - `tests/e2e/` runs complete public workflows on committed real data and receives `e2e`.
 - `tests/fixtures/` contains immutable captured values, generators and golden outputs.
@@ -161,8 +165,8 @@ on arrays directly. A module with a list output (the wells' section profiles) co
 
 `BACKENDS = ("python", "numpy")` in `tests/fixtures/parity.py` is the one list of backends under
 test; the first is the reference, every other one is compared with it, and no test names a
-backend. **Adding a backend means adding its name to `BACKENDS`** (after registering it in
-`gemini.ops.kernels`); nothing else changes, and every test below then runs on it.
+backend. **Adding a backend means adding its name to `BACKENDS`** (after registering it with
+`gm.ops.register_backend`); nothing else changes, and every test below then runs on it.
 
 - **Modules.** `assert_module_matches` runs the graph on every backend, forced around the whole
   call (tracing included), compares each with the eager calls and each with the reference, so every
@@ -200,21 +204,34 @@ The suite must remain safe under `pytest -n auto`:
 ## Structure and quality tests
 
 `tests/unit/test_code_quality.py` also enforces the [data layout](data.md#where-data-lives): no file
-under `gemini/` names a sample problem or `inputs/examples/`, no data
-file in `gemini/`, only the allowed keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the data
-folders outside `gemini/_utils/paths.py`. It also enforces the layout of `gemini/modules/`
-([where a file goes](conventions.md#module-rules)): only `__init__.py`, `module.py`, `plant.py`,
-`container.py` and folders at its top, and a registered plant class in every public file of
-`plants/`.
+under `gemini/` names a sample problem or `inputs/examples/`, no data file in `gemini/`, only the
+allowed keys and a registered plant in `inputs/plants/`, no `datasets/` folder, and no path to the
+data folders outside `gemini/_utils/paths.py`. It enforces the structure of the package:
+
+- the run folders (`modules`, `plants`, `physics`, `ops`, `runtime`, `engine`, `run`, `types`,
+  `units`, `errors`, `_utils`) import none of `compiler`, `data`, `optim`, `evaluate`, `analysis`,
+  apart from `Plant.from_legacy` and `gm.modules.check`, which import inside a function ([conventions.md](conventions.md#dependencies));
+- `modules` never imports `plants`;
+- no folder named `core`, `base`, `testing`, `backends`, `checks`, `economics` or `profiles`
+  exists in `gemini/`;
+- a snapshot of `gm.__all__` and of the `__all__` of each folder, so a public name changes only on
+  purpose;
+- no function or method starts with `read_`, `write_`, `load_`, `save_`, `parse_` or `dump_`
+  ([read/write naming](conventions.md#public-names-and-readwrite-naming));
+- the layout of `gemini/modules/` ([where a file goes](conventions.md#module-rules)): only
+  `__init__.py`, the core files and folders at its top, and a registered plant class in every public
+  file of `plants/`.
+
 `test_every_example_equals_the_plant_of_its_former_file` in
-`tests/unit/modules/plants/_utils/test_catalogue.py` pins the hash of each example plant.
+`tests/unit/plants/_utils/test_catalogue.py` pins the hash of each example plant.
 `tests/unit/test_mirror.py` enforces source mirroring: every `gemini/<path>/<name>.py` except
 `__init__.py`, including `gemini/_utils/` and `gemini/errors/`, has a mirrored
 `tests/unit/<path>/test_<name>.py` that defines at least one test. Its `PLACEHOLDERS` set of
 mirrors still holding only a docstring is empty and must never grow.
 `tests/unit/test_package_boundaries.py` checks that `gemini.errors` and the topic files of
-`gemini._utils` import nothing else from `gemini`, and that `gemini.run` imports no module
-or engine code and `gemini.data.legacy` no engine code. `tests/unit/test_code_quality.py` enforces the comment rule, the
+`gemini._utils` import nothing else from `gemini` (`paths.py` and `registry.py` may import
+`gemini.errors`), that `gemini/run/dataset.py` imports no module or engine code and that
+`gemini.data.legacy` imports no engine code. `tests/unit/test_code_quality.py` enforces the comment rule, the
 nesting limit, the function-length limit with its `LONG_FUNCTIONS` exceptions and the ban on the
 framework name (see [conventions.md](conventions.md#code-quality)); flake8 enforces complexity.
 The same file fails on a formula in a module and on two physics functions with one normalised body;
@@ -258,12 +275,15 @@ terms, so a sample problem is never the only proof that gemini can do it:
 - a levelised cost of heat and cold together (LCTS).
 
 `inputs/examples/hackathon_2027/` and `inputs/examples/shallow_district/` run through these same
-general functions in `examples/cases/`. Tests read a sample problem through
-`tests/fixtures/sample_problems.py`.
+general functions in `examples/cases/`. Tests read a sample problem only through
+`tests/fixtures/sample_problems.py`: it holds the folders (`HACKATHON_2027`, `SHALLOW_DISTRICT`) and
+builds the problem and the plants of a sample (`sample_problem()`, `shallow_problem()`,
+`template_plant(name)`, `treatment_plant()`, `filled_plant(name)`) with `gm.Problem.from_json` and
+`gm.Plant.from_dict`, so no test builds a path into `inputs/examples/` by hand.
 
 ## Old formats, examples and e2e coverage
 
-Old-format files are read only by `tests/unit/utils/legacy/`, `tests/e2e/test_legacy_bridge.py`,
+Old-format files are read only by `tests/unit/data/legacy/`, `tests/e2e/test_legacy_bridge.py`,
 the `check_wiring` audit in `tests/e2e/test_full_replay.py`, and the golden reconstructions that
 build equipment from the original `.param` files: the subsurface, wells and exchangers unit tests,
 `tests/unit/physics/test_geometry.py`, `tests/integration/test_plant.py` and the historical
@@ -281,7 +301,8 @@ within 1e-6 relative, 1e-6 absolute or one unit of the last printed digit. Regen
 with `python tests/fixtures/capture_example_outputs.py` and review the diff: a changed number is a
 changed result, as a changed golden is.
 `tests/unit/test_code_quality.py` checks the style of an example: a docstring with `Shows` and the
-command, `main()` under the `__main__` guard, imports of `gemini` and `gemini.types` only, no
+command, `main()` under the `__main__` guard, imports of `gemini` and the public names of `gemini.engine`, `gemini.modules` and
+`gemini.types` only, no
 `__init__.py` under `examples/`, and no code that imports from `examples`.
 Expensive module-scoped e2e fixtures carry `pytest.mark.xdist_group`; the default
 `--dist loadgroup` runs each group on one worker so the fixture is built once. E2E retains the

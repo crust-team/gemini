@@ -4,7 +4,7 @@ import pytest
 
 import gemini as gm
 from tests.fixtures.balance import assert_plant_closes
-from tests.fixtures.heating_cooling import RULES, two_days
+from tests.fixtures.heating_cooling import two_days_problem
 from tests.fixtures.sample_problems import template_plant
 
 pytestmark = pytest.mark.e2e
@@ -21,7 +21,7 @@ PLANTS = (
 def test_a_heating_and_cooling_plant_closes(name):
     """The root's in and out are the ports of its grids, its air and its aquifers."""
     plant = template_plant(name)
-    results = gm.simulate(plant, gm.schedule(plant, two_days(), RULES), on_error="raise")
+    results = gm.simulate(plant, plan=gm.schedule(plant, two_days_problem()), on_error="raise")
     assert_plant_closes(plant, results)
 
 
@@ -39,5 +39,5 @@ def test_the_doublet_heat_plant_closes(frequency):
             51.5, unit="bar", clock=clock
         ),
     }
-    results = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
+    results = gm.simulate(plant, plan=gm.Dataset.from_profiles(profiles), clock=clock)
     assert_plant_closes(plant, results)

@@ -36,7 +36,7 @@ def _saved_after(engine, checkpoint):
         yield
     finally:
         if checkpoint is not None and engine.run_kind is not None:
-            engine.save_checkpoint(checkpoint)
+            engine.to_checkpoint(checkpoint)
 
 
 def simulate(
@@ -146,7 +146,7 @@ def resume(checkpoint, callbacks=None):
     or stops early. A finished run returns its stored results. A live checkpoint raises
     ``RunError``: ``gm.live`` continues those.
     """
-    engine = Engine.load_checkpoint(checkpoint, callbacks)
+    engine = Engine.from_checkpoint(checkpoint, callbacks)
     if engine.run_kind == "live":
         raise RunError(
             f"{checkpoint}: run_kind = 'live'; expected a simulate or replay checkpoint; "

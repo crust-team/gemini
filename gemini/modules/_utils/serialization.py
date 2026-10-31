@@ -128,7 +128,7 @@ def _bindings(root, stated):
     return result
 
 
-def _parse_history(entries):
+def _dated_params(entries):
     return [DatedParams.model_validate(item) for item in entries]
 
 
@@ -153,14 +153,14 @@ def _history(root, stated):
         current = module._param_history
         if len(current) == 1 and current[0].valid_from is None:
             continue
-        kept = keep_stated(stated.get(path), current, _parse_history)
+        kept = keep_stated(stated.get(path), current, _dated_params)
         written = kept if kept is not None else _own_history(path, module, derived)
         if written is not None:
             result[path] = written
     return to_plain(result)
 
 
-def write_sections(root, stated=None, baselines=None):
+def to_sections(root, stated=None, baselines=None):
     """Return the ``fluids``, ``boundary``, ``bindings`` and ``param_history`` of a tree.
 
     ``stated`` holds the sections of the data the tree was read from and ``baselines`` the
@@ -192,7 +192,7 @@ def _module_at(root, path):
     return modules[path]
 
 
-def _read_fluid(module, value, alone):
+def _from_fluid(module, value, alone):
     """Set the fluid of ``module``; ``alone`` keeps it from passing to the children."""
     try:
         if alone:
@@ -203,13 +203,13 @@ def _read_fluid(module, value, alone):
         raise ValidationError(f"fluid: {error}", code="invalid_value") from error
 
 
-def _read_boundary(module, value):
+def _from_boundary(module, value):
     if not isinstance(value, dict):
         raise ValidationError("boundary: expected a mapping", code="invalid_format")
     module.boundary = dict(value)
 
 
-def _read_history(module, entries):
+def _from_history(module, entries):
     if not isinstance(entries, list):
         raise ValidationError("param_history: expected a list", code="invalid_format")
     snapshots = []
@@ -227,11 +227,11 @@ def _read_history(module, entries):
             module.set_params("", snapshot.params, snapshot.valid_from)
 
 
-def _read_bindings(root, path, value):
+def _from_bindings(root, path, value):
     design.set_bindings(root, path, value)
 
 
-def _read_order(section, entries):
+def _from_order(section, entries):
     """Return the items of a section; the history of a child before its deriving parent's."""
     if section == "param_history":
         return sorted(entries.items(), key=lambda item: item[0].count("."), reverse=True)
@@ -244,26 +244,26 @@ def _names_below(entries, path):
     return any(name != path and name.startswith(prefix) for name in entries)
 
 
-def read_sections(root, data, report):
+def from_sections(root, data, report):
     """Apply the sections of ``data`` to the tree, adding each problem to ``report``."""
     fluids = data.get("fluids", {})
     readers = {
-        "fluids": lambda path, value: _read_fluid(
+        "fluids": lambda path, value: _from_fluid(
             _module_at(root, path), value, _names_below(fluids, path)
         ),
-        "boundary": lambda path, value: _read_boundary(_module_at(root, path), value),
-        "param_history": lambda path, value: _read_history(_module_at(root, path), value),
-        "bindings": lambda path, value: _read_bindings(root, path, value),
+        "boundary": lambda path, value: _from_boundary(_module_at(root, path), value),
+        "param_history": lambda path, value: _from_history(_module_at(root, path), value),
+        "bindings": lambda path, value: _from_bindings(root, path, value),
     }
     for section, read in readers.items():
-        for path, value in _read_order(section, data.get(section, {})):
+        for path, value in _from_order(section, data.get(section, {})):
             if report.skips(path):
                 continue
             with report.guard(f"{section}.{path}"):
                 read(path, value)
 
 
-def read_params(root, params, report, prefix="params"):
+def from_params(root, params, report, prefix="params"):
     """Set flat dotted ``params`` on the tree as undated design values.
 
     All in one call, so that values which need each other, a depth and its geotherm, may come in
@@ -283,7 +283,7 @@ def tree_dict(module):
     """Return the parameters and sections of a module tree that is no plant, for a checkpoint."""
     derived = design.derived_names(module)
     params = {name: value for name, value in tree_params(module).items() if name not in derived}
-    return {"format": FORMAT, "params": params} | write_sections(module)
+    return {"format": FORMAT, "params": params} | to_sections(module)
 
 
 def tree_from_dict(cls, data):
@@ -293,6 +293,6 @@ def tree_from_dict(cls, data):
         raise error
     report = Report(strict=True)
     root = cls()
-    read_params(root, data.get("params", {}), report)
-    read_sections(root, data, report)
+    from_params(root, data.get("params", {}), report)
+    from_sections(root, data, report)
     return root

@@ -5,15 +5,20 @@ simulation, historical replay, and externally scheduled live updates.
 
 ## Quickstart
 
-The short form, with `profile` a DataFrame or `gm.Dataset` of the plant's inputs:
+The short form, on a sample problem of the repository:
 
 ```python
 import gemini as gm
 
-plant = gm.plants.example("DoubletHeatPlant")
-results = gm.simulate(plant, profile)
-print(results.summary(units={"power": "MW", "temperature": "degC"}))
+problem = gm.Problem.from_json("inputs/examples/hackathon_2027/problem.json")
+plant = gm.Plant.from_json("inputs/examples/hackathon_2027/plant.json")
+results = gm.simulate(plant, problem)
+print(gm.evaluate.totals(plant, problem, results), gm.evaluate.constraints(plant, problem, results))
 ```
+
+A `gm.Problem` holds the demand, the site, the constraints and the assumptions of a run; for
+measured inputs, `gm.simulate(plant, plan=frame)` runs a DataFrame or `gm.Dataset` of the plant's
+inputs.
 
 `gm.simulate`, `gm.replay`, `gm.live` and `gm.resume` cover a run in one call; `gm.Engine` is the
 level for complex tasks, such as a run held in memory or a callback that reads the engine.
@@ -63,44 +68,54 @@ while assignment (`esp.frequency = 50.0`) persists them.
 A leaf module computes and a plant connects: every composite is a `Plant` class that declares its
 children, ports and connections, and `gm.Plant(name)` builds one with `add` and `connect`.
 `gm.plants.names()` lists the plant classes, `gm.plants.example(name)` returns one with real values,
-and `gm.plants.convert_legacy(folder)` turns an old project folder into a plant dict, the JSON form
-agents read and write: `plant.to_dict()`, `gm.plants.from_dict`, `gm.plants.schema()`. `gm.data`
-reads your demand, from a CSV file (`gm.data.from_csv`) or from values (`from_values`).
+and `gm.Plant.from_legacy(folder)` turns an old project folder into a plant. The plant dict is the
+JSON form agents read and write: `plant.to_dict()`, `gm.Plant.from_dict`, `gm.plants.schema()`, and
+`plant.to_json(path)`, `gm.Plant.from_json(path)` for a file. `gm.data` reads your demand, from a CSV
+file (`gm.data.from_csv`) or from values (`from_values`). Readers are `from_<format>` and writers
+`to_<format>` everywhere.
 
 gemini holds no data file. `gm.plants.example` reads `inputs/`, which is in a
 source checkout and not installed, and outside one it raises `inputs_missing`:
 
 ```text
 inputs/             # repository only
-  examples/         # sample problems: plant dict, rules, limits, demand; examples and tests only
+  examples/         # sample problems: problem.json, demand CSV, plant.json; examples and tests only
   plants/           # example values of plants
   doublet_heat/     # measured data
   legacy_project/   # an old project folder
 ```
 
 A plant can be designed from its depth. A `Doublet` derives its reservoir, wells and pump from a few
-design values, `gm.schedule` plans each day from the demand with no bindings to write, and
-`gm.evaluate.limits` and `gm.evaluate` judge the run:
+design values. The site (geotherm, permeability, thickness) belongs to the problem, so one design
+runs on several sites. `gm.schedule` plans each step from the demand with no bindings to write, and
+`gm.evaluate.constraints` judges the run:
 
 ```python
-plant.add("Doublet", name="d0", params={
-    "depth": "2500 m", "gradient": "30 K/km", "surface_temperature": "12 degC",
-    "permeability": "200 mD", "thickness": "100 m", "well_diameter": "0.244 m"})
-plan = gm.schedule(plant, demand, rules)
-results = gm.simulate(plant, plan)
+plant.add("Doublet", name="d0", params={"depth": "2500 m", "well_diameter": "0.244 m"})
+problem = gm.Problem(
+    demand,
+    site={"d0.gradient": "30 K/km", "d0.surface_temperature": "12 degC",
+          "d0.permeability": "200 mD", "d0.thickness": "100 m"},
+    constraints=[
+        gm.Constraint("d0.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h", when="running"),
+        gm.Constraint("d0.brine_cooling", max="40 K"),
+    ],
+)
+results = gm.simulate(plant, problem)
+checks = gm.evaluate.constraints(plant, problem, results)
 ```
 
 `examples/cases/challenge_year.py` and `examples/cases/hackathon.py` run that path on the sample
 problem of `inputs/examples/hackathon_2027/`, and `examples/cases/shallow_district.py` on a different
-one, an hourly demand on one shallow doublet, each with its own limits. A stored design keeps its setpoints:
+one, an hourly demand on one shallow doublet, each with its own constraints. A stored design keeps its setpoints:
 `plant.set_inputs({"peak_boiler.temperature_setpoint": "100 degC"})` is part of `plant.to_dict()`, and
 a template plant takes its size, `gm.plants.HeatingCoolingPlant(doublets=2)`.
 
 Everything in the energy flow is a module and everything that crosses between modules goes through
 a port. A plant starts at its edge modules: `ElectricityGrid`, `GasGrid`, `HeatingGrid`,
 `CoolingGrid`, `WasteGrid`, `ChemicalGrid`, `Atmosphere` and `Formation`. Totals are read from them
-(`gm.evaluate.totals(plant, results)`) and `gm.evaluate.plant_balance(plant, results)` closes mass and
-energy on them.
+(`gm.evaluate.totals(plant, problem, results)`) and `gm.evaluate.plant_balance(plant, problem,
+results)` closes mass and energy on them.
 
 The application, not the package, reads CSV, databases, or APIs. `Dataset` accepts pandas, dicts,
 records, NumPy, and profiles already in memory. A plant owns bindings and dated parameters, so

@@ -251,11 +251,19 @@ def test_the_walker_finds_a_broken_return():
 
 
 def test_every_data_entry_of_the_page_is_walked(entries):
-    """A new name of ``analysis``, ``economics``, ``kpi`` or ``checks`` joins the walk."""
+    """A new name of ``analysis`` or ``evaluate`` joins the walk."""
     page = PAGE.read_text()
-    listed = set(re.findall(r"gm\.(?:analysis|economics|kpi|checks)\.(\w+)\(", page))
+    listed = set(re.findall(r"gm\.(?:analysis|evaluate)\.(\w+)\(", page))
     listed |= set(re.findall(r"`(mass_balance|bounds)\(", page))
-    later = {"injectivity", "calibrate_pump", "calibrate_corrosion", "erosion", "names"}
+    later = {
+        "injectivity",
+        "calibrate_pump",
+        "calibrate_corrosion",
+        "erosion",
+        "capacities",
+        "report",
+        "compare",
+    }
     assert listed - later <= entries.keys()
 
 

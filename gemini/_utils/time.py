@@ -56,7 +56,7 @@ _DAY_UNIT = re.compile(r"(?<=[\d\s])d$")
 """The unit ``d`` at the end of a duration text."""
 
 
-def parse_duration(step):
+def to_timedelta(step):
     """Parse a positive duration given as seconds or as pandas syntax such as ``"15min"``.
 
     Any real number counts as seconds, including NumPy scalars such as ``np.int64(900)``, which

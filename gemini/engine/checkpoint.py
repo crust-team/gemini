@@ -10,7 +10,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticError
 
-from gemini._utils.files import read_cells, read_json, write_cells
+from gemini._utils.files import from_cells, from_json, to_cells
 from gemini._utils.version import OLDEST_CHECKPOINT, is_older, package_version
 from gemini.errors import RunError, ValidationError
 from gemini.run.dataset import Dataset
@@ -47,7 +47,7 @@ def _fsync(*paths):
             os.close(descriptor)
 
 
-def _write_dataset(path, dataset, max_gap):
+def _to_rows(path, dataset, max_gap):
     """Write unfinished rows, their unit metadata and the run's ``max_gap``, then flush them.
 
     The names are unique per generation and unreferenced until the manifest is replaced, so the
@@ -55,13 +55,13 @@ def _write_dataset(path, dataset, max_gap):
     """
     units = {name: info.model_dump(mode="json") for name, info in dataset.columns.items()}
     gap = str(max_gap) if max_gap is not None else None
-    write_cells(path, dataset.to_frame(), {"units": units, "max_gap": gap}, index_label="time")
+    to_cells(path, dataset.to_frame(), {"units": units, "max_gap": gap}, index_label="time")
     _fsync(path, Path(str(path) + ".json"))
 
 
-def read_dataset(path):
+def from_rows(path):
     """Return the checkpoint-owned rows and the stored ``max_gap`` (None when not recorded)."""
-    frame, metadata = read_cells(path)
+    frame, metadata = from_cells(path)
     frame.index = pd.to_datetime(frame.index, utc=True)
     gap = metadata.get("max_gap")
     return (
@@ -70,7 +70,7 @@ def read_dataset(path):
     )
 
 
-def save(path, checkpoint, results, remaining_data=None, max_gap=None):
+def to_file(path, checkpoint, results, remaining_data=None, max_gap=None):
     """Publish results and data first and atomically replace the manifest last.
 
     Generation filenames ensure a crash cannot pair an old manifest with newer results.
@@ -80,15 +80,15 @@ def save(path, checkpoint, results, remaining_data=None, max_gap=None):
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    old = load(path) if path.exists() else None
+    old = from_file(path) if path.exists() else None
     generation = uuid.uuid4().hex
     if results is not None:
-        result_path = results.save(path.with_name(path.name + ".results." + generation))
+        result_path = results.to_npz(path.with_name(path.name + ".results." + generation))
         checkpoint.results_file = result_path.name
         _fsync(result_path)
     if remaining_data is not None and len(remaining_data):
         data_path = path.with_name(path.name + ".data." + generation + ".csv")
-        _write_dataset(data_path, remaining_data, max_gap)
+        _to_rows(data_path, remaining_data, max_gap)
         checkpoint.remaining_data_file = data_path.name
     _publish(path, checkpoint, generation)
     if old is not None:
@@ -130,9 +130,9 @@ def _check_version(path, manifest):
         )
 
 
-def load(path):
+def from_file(path):
     """Validate the version and prevent sibling result paths from escaping the checkpoint folder."""
-    manifest = read_json(path)
+    manifest = from_json(path)
     _check_version(path, manifest)
     try:
         checkpoint = Checkpoint.model_validate(manifest)

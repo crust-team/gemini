@@ -76,7 +76,7 @@ def test_from_dict_derives_and_keeps_only_what_was_stated():
     plant = plant_with(GIVEN)
     spec = plant.to_dict()
     assert spec["modules"]["column"]["params"] == GIVEN
-    assert gm.plants.from_dict(spec).column.reservoir.pressure == PRESSURE
+    assert gm.Plant.from_dict(spec).column.reservoir.pressure == PRESSURE
 
 
 def test_an_explicit_child_value_in_the_same_call_wins():
@@ -87,7 +87,7 @@ def test_an_explicit_child_value_in_the_same_call_wins():
     assert plant.column.reservoir.pressure == 1e7
     spec = plant.to_dict()
     assert spec["modules"]["column"]["params"]["reservoir.pressure"] == "100 bar"
-    assert gm.plants.from_dict(spec).column.reservoir.pressure == 1e7
+    assert gm.Plant.from_dict(spec).column.reservoir.pressure == 1e7
 
 
 def test_an_explicit_child_value_through_a_path_wins():
@@ -96,7 +96,7 @@ def test_an_explicit_child_value_through_a_path_wins():
     plant.set_params("column.reservoir", {"pressure": 2e7})
     plant.set_params("column", {"height": 1000.0})
     assert plant.column.reservoir.pressure == 2e7
-    assert gm.plants.from_dict(plant.to_dict()).column.reservoir.pressure == 2e7
+    assert gm.Plant.from_dict(plant.to_dict()).column.reservoir.pressure == 2e7
 
 
 def test_a_child_override_survives_a_later_derivation():
@@ -124,7 +124,7 @@ def test_param_history_is_derived_and_written_without_the_derived_values():
     plant.set_params("column", {"height": 1000.0}, valid_from="2030-01-01")
     spec = plant.to_dict()
     assert "column.reservoir" not in spec["param_history"]
-    rebuilt = gm.plants.from_dict(spec)
+    rebuilt = gm.Plant.from_dict(spec)
     assert rebuilt.params_at("column.reservoir", "2031-01-01")["pressure"] == pytest.approx(
         hydraulics.hydrostatic_dp(DENSITY, 1000.0)
     )
@@ -137,4 +137,4 @@ def test_a_handwritten_root_stores_no_derived_value():
     column.set_params("", GIVEN)
     spec = column.to_dict()
     assert "reservoir.pressure" not in spec["params"]
-    assert gm.plants.from_dict(spec).reservoir.pressure == PRESSURE
+    assert gm.Plant.from_dict(spec).reservoir.pressure == PRESSURE

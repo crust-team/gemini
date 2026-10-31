@@ -1,5 +1,35 @@
 # Engine
 
+## Folders and imports
+
+The run lives in `engine/` (`Engine`, `Clock`, `executor.py`, `eager.py`, `rows.py`, `evaluation.py`,
+`loader.py`, `runner.py`, `chunks.py`, `checkpoint.py`, ...) and `run/` (`Problem`, `Constraint`,
+`Assumptions`, `schedule`, `simulate`, `replay`, `live`, `resume`, `call`, `Results`, `Dataset`, and
+`run/_utils/` with `demand.py`, `roles.py`, `limits.py`, `sources.py`).
+
+**Dependency rules.** The run folders are `modules`, `plants`, `physics`, `ops`, `runtime`,
+`engine`, `run`, `types`, `units`, `errors` and `_utils`. They import none of `compiler`, `data`,
+`optim`, `evaluate` and `analysis`; those sit above the run and import it. Two exceptions run inside
+a function: `Plant.from_legacy` imports `gemini.data.legacy`, and `gm.modules.check` imports
+`gemini.run.call`. `modules` never imports `plants`.
+
+`engine` imports `run` for `Results` and `Dataset`, and `run` imports `engine.engine`.
+`gemini/engine/__init__.py` imports `gemini.run` first and never `.engine`, which keeps one import
+order from either side of that cycle.
+
+`gemini/run/_utils/demand.py` holds the demand frame (`from_csv`, `from_values`, `from_frame`,
+`from_dict`, `to_dict`), because a `Problem` reads it and `run` imports no `data`; `gm.data`
+exports `from_csv` and `from_values` from it.
+
+**The compiler is optional.** `gemini/compiler/__init__.py` registers its executor
+(`register_executor(COMPILED, compile)`) when it is imported, and `gemini/__init__.py` imports it.
+The run works without it: `executor_for(plant, compile)` (`gemini/engine/executor.py`) takes the
+compiled executor when `compile=True` and one is registered, else the eager one. The eager executor
+(`gemini/engine/eager.py`) runs `forward` on arrays over a chunk, and row by row
+(`gemini/engine/rows.py`) for a module with state, a loop or a pre-hook, on the python backend, at a
+precision other than float64, or when the array call raises. `gm.simulate(..., compile=False)` and
+`Engine(..., compile=False)` force eager. The numbers are the same either way.
+
 ## Functions or engine
 
 A run has two levels and one implementation. `gm.simulate`, `gm.replay`, `gm.live` and `gm.resume`
@@ -11,16 +41,22 @@ memory, a manual checkpoint.
 ```python
 import gemini as gm
 
-plant = gm.plants.example("DoubletHeatPlant")
-results = gm.simulate(plant, profile)
+problem = gm.Problem.from_json("inputs/examples/hackathon_2027/problem.json")
+plant = gm.Plant.from_json("inputs/examples/hackathon_2027/plant.json")
+results = gm.simulate(plant, problem)
 print(results.summary(units={"power": "MW", "temperature": "degC"}))
 ```
 
-No object is kept between calls of the functions, except the traced graphs, which the plant holds
-(`gemini.compiler.graph.graph_cache`): calling a function hundreds of times on one plant traces it once,
-and an `Engine` built on the plant shares the same graphs. The guards of
-[`GraphCache`](native-engine.md) decide: a changed numeric parameter does not retrace, a changed
-structure does. A copied or pickled plant starts with an empty cache.
+`gm.simulate(plant, problem=None, plan=None, ...)` applies the site of the problem to a copy of the
+plant, schedules the demand unless a `plan` is given and runs the plan. A building block has no
+demand: `problem` may be `None` only with a `plan`, else `ValidationError` (code `missing_value`).
+
+No object is kept between calls of the functions, except the traced graphs of the compiled
+executor, which the plant holds (`gemini.compiler.graph.graph_cache`): calling a function hundreds
+of times on one plant traces it once, and an `Engine` built on the plant shares the same graphs. The
+guards of [`GraphCache`](native-engine.md) decide: a changed numeric parameter does not retrace, a
+changed structure does. A copied or pickled plant starts with an empty cache. The eager executor
+keeps nothing.
 
 The arguments are those of `Engine` and of the matching method, with `plant` first. On `simulate`
 and `replay`, `checkpoint=path` writes a checkpoint at the end of the run, also one that stops
@@ -30,9 +66,9 @@ the run through `AutoCheckpoint` and needs `checkpoint`, or raises `ValidationEr
 
 The on_error default is `"raise"`, on the functions and on `gm.Engine`.
 
-`gm.resume(checkpoint, callbacks=None)` is `Engine.load_checkpoint(path, callbacks).resume()`, and
+`gm.resume(checkpoint, callbacks=None)` is `Engine.from_checkpoint(path, callbacks).resume()`, and
 it writes to the same file when the run ends or stops early. `checkpoint_every` is not stored in
-the file: pass `callbacks=[AutoCheckpoint(path, every)]` for periodic saves on a resumed run. A live checkpoint raises `RunError` (code `checkpoint`) naming `gm.live`. The files are the ones `save_checkpoint`
+the file: pass `callbacks=[AutoCheckpoint(path, every)]` for periodic saves on a resumed run. A live checkpoint raises `RunError` (code `checkpoint`) naming `gm.live`. The files are the ones `to_checkpoint`
 writes, so either level resumes the other's.
 
 `gm.live(plant, source, checkpoint, ...)` requires the path, which is all that carries a live run
@@ -45,50 +81,69 @@ it was, so its rows are processed again by the next call.
 ## Schedule
 
 ```python
-plan = gm.schedule(plant, demand, rules={
-    "order": ["geothermal", "heat_pump", "boiler"],
-    "doublet_flow": {"min": "50 m3/h", "max": "300 m3/h"},
-    "max_brine_cooling": "40 K",
-    "operating_time": "330 d",
-    "cooling_order": ["absorption", "adsorption", "compression"]})
-results = gm.simulate(plant, plan)
+problem = gm.Problem(
+    demand,
+    site={"d*.gradient": "30 K/km", "d*.surface_temperature": "12 degC"},
+    constraints=[
+        gm.Constraint("d*.reservoir.liquid_flow", min="50 m3/h", max="300 m3/h",
+                      over="each", when="running"),
+        gm.Constraint("d*.brine_cooling", max="40 K"),
+        gm.Constraint("d*.reservoir.liquid_flow", max="330 d", over="duration", when="running"),
+    ],
+    assumptions=gm.Assumptions(prices={"electricity": "100 EUR/MWh", "gas": "40 EUR/MWh"}),
+)
+plan = gm.schedule(plant, problem)
+results = gm.simulate(plant, problem, plan)
 ```
 
-`doublet_flow` and `max_brine_cooling` have no default: a missing one raises `ValidationError` code
-`missing_value` naming it. `order` and `cooling_order` have the default orders below, and without
-`operating_time` no doublet has an outage.
+`gm.schedule(plant, problem)` (`gemini/run/schedule.py`, formulas in `physics/dispatch.py`) decides
+the controls of each step of the demand, at any constant step (hourly, daily, ...) and any length,
+from an energy balance on the plant's design values, with no simulation inside. The site of the
+problem is applied on a copy (`Problem.apply_site`); `plant` never changes. It reads the `Doublet`
+children, the grids and the units by **role, from the wiring** (`gemini/run/_utils/roles.py`, on
+`plant.feeds`): a unit whose useful outlet feeds the `HeatingGrid` is a heating unit and one that
+feeds the `CoolingGrid` a cooling unit, directly or through mixers, splitters and other units. A
+`HeatPump` is either: on the cooling grid it is the compression chiller, with its condenser heat
+going to its cooler. At most one unit per role and kind, or `invalid_design`.
 
-`gm.schedule` (`gemini/run/schedule.py`, formulas in `physics/dispatch.py`) decides the controls
-of each step of `demand`, at any constant step (hourly, daily, ...) and any length, from an energy
-balance on the plant's design values, with no simulation inside. It reads the `Doublet` children, the grids and the units by **role, from the wiring**
-(`gemini/run/_utils/roles.py`, on `plant.feeds`): a unit whose useful outlet feeds the `HeatingGrid` is
-a heating unit and one that feeds the `CoolingGrid` a cooling unit, directly or through mixers,
-splitters and other units. A `HeatPump` is either: on the cooling grid it is the compression chiller,
-with its condenser heat going to its cooler. At most one unit per role and kind, or `invalid_design`.
+**Cost dispatch.** Every heat and cold source gets a marginal cost at each step
+(`gemini/run/_utils/sources.py`, `physics/dispatch.marginal_cost`): `price / efficiency +
+co2_price * emission`, with the prices of `problem.assumptions` and the efficiency of the source at
+its design values: the COP of a heat pump or compression chiller, the efficiency of a boiler, the
+pump electricity of a doublet, the `thermal_cop` of a heat-driven chiller on the cheapest heat. A
+price a source needs and the assumptions lack raises `ValidationError` (code `missing_value`). A
+price may be a profile, so the order of the sources can change from step to step. Sources load from
+the cheapest to the dearest up to their capacity (`dispatch.loaded_by_cost`), ties in plant order.
+Unmet demand is no error: the run reports `unmet_demand`. The drive heat of a heat-driven unit, its
+cold over its `thermal_cop`, adds to the heat need. On one chilled-water circuit the last unit
+brings the water to its setpoint and each unit before it gets the setpoint that leaves the rest to
+the units after it. The heat pump, the boilers and the last cooling unit take the
+`temperature_setpoint` set on them with `set_inputs`. `ATESPlant` is not scheduled: its three
+seasonal commands (`storage.mode`, `source_valve.split_fraction`, `load_valve.split_fraction`)
+stay inputs of a run.
 
-Cooling units take the cold in `rules["cooling_order"]`, by default heat-driven first (`absorption`,
-`adsorption`, `compression`), each up to its capacity. Unmet cold is no error. The drive heat of a
-heat-driven unit, its cold over its `thermal_cop`, adds to the heat need. On one chilled-water
-circuit the last unit brings the water to its setpoint and each unit before it gets the setpoint
-that leaves the rest to the units after it. `ATESPlant` is not scheduled: its three seasonal commands
-(`storage.mode`, `source_valve.split_fraction`, `load_valve.split_fraction`) stay inputs of a run.
+**Constraints.** The schedule reads the constraints of the problem by their general form
+(`gemini/run/_utils/limits.py`): a path with `*` matches one name, and `over`, `when` and the
+bounds choose the form. Per doublet:
 
-Sources follow `order`: each doublet, in plant order, runs at the flow that gives the
-heat at `max_brine_cooling`, clipped to `doublet_flow`, below the minimum at the minimum with less
-cooling. The heat pump and boiler take the `temperature_setpoint` set on them, the design's supply
-temperatures, and cover what is left in the run. Unmet demand is no error: the run reports
-`unmet_demand`.
+- a flow range: path `<doublet>.reservoir.liquid_flow`, `over="each"`, `when="running"`, `min` and
+  `max`;
+- a maximum brine cooling: path `<doublet>.brine_cooling`, `over="each"`, `max`;
+- an operating duration: path `<doublet>.reservoir.liquid_flow`, `over="duration"`,
+  `when="running"`, `max` or `equals` a duration (`"330 d"`, `"7920 h"`).
 
-`rules["operating_time"]` takes doublets out of service, in whole steps. A duration (`"330 d"`,
-`"7920 h"`) or a fraction of the period (a number in [0, 1]) runs each doublet that long, to the
-nearest whole step: its outages are the steps of lowest total demand, the first doublet taking the
-lowest and the next the lowest left, so at most one doublet is off on a step; the steps of equal
-demand go earliest first. It needs at least two rows at a constant step. A list of outages takes every
-doublet off in each: a date is that whole UTC day and `{"start": ..., "end": ...}` an interval up to,
-not including, its end. On an outage a doublet has no flow and its heat goes to the next sources; a
-heat pump fed only by doublets that are off stops. Under a rule a doublet runs every other step, at
-the minimum flow when no need is left for it. `attrs["outages"]` lists the steps, and
-`gm.evaluate.operating_time(plant, results, duration)` counts the time each doublet carried flow.
+The flow range and the brine cooling have no default: a doublet without one raises
+`ValidationError` code `missing_value`. Each doublet, in plant order, runs at the flow that gives
+its heat at the maximum brine cooling, clipped to the flow range, and below the minimum at the
+minimum with less cooling. A duration takes doublets out of service, in whole steps: it rounds to
+the nearest whole step, and the outages are the steps of lowest total demand, heating plus cooling,
+the first doublet taking the lowest and the next the lowest left, so at most one doublet is off on a
+step; steps of equal demand go earliest first. It needs at least two rows at a constant step. On an
+outage step a doublet has no flow and its heat goes to the next sources; a heat pump fed only by
+doublets that are off stops. Every other step a doublet with a duration runs, at the minimum flow
+when no heat is left for it. Every other constraint, and a duration with only `min`, is left to
+the check of a run: `plan.attrs["check_only"]` lists them (`to_dict()` of each), and
+`gm.evaluate.constraints(plant, problem, results)` judges all of them, the enforced ones too.
 
 A heat-driven chiller on a bypass (a `Splitter` whose branches reach the users and the generator) has
 the drive water pass the users: the plan sets the split from the balance, the heat the users take
@@ -96,19 +151,20 @@ against the heat the generators draw, and the `flow` of the heating grid carries
 alone. Without a bypass all the water passes the users, so it carries both.
 
 The plan needs no bindings and changes nothing on the plant: **its columns are named after what they
-drive**, in the SI units `attrs["units"]` states, so `gm.simulate(plant, plan)` binds them by the rule
-of a run, below, and a binding in another unit does not misread them. Leaf controls and
+drive**, in the SI units `attrs["units"]` states, so `gm.simulate(plant, plan=plan)` binds them by
+the rule of a run, below, and a binding in another unit does not misread them. Leaf controls and
 boundaries have a column named after their dotted path (`d0.reservoir.production_rate`,
 `injection.split_fraction`), and a plant inlet field a column named `port.field`
 (`heating_return.m_dot`); ports `heating_return` and `cooling_return` take their temperature from
-`inputs` of the plant (`heating_return.T`). `boiler_duty`, `<doublet>.flow` and `<doublet>.is_running` and
-`<heat pump>.is_running` are for reading.
+`inputs` of the plant (`heating_return.T`). `boiler_duty`, `<doublet>.flow`, `<doublet>.is_running`
+and `<heat pump>.is_running` are for reading. `attrs["outages"]` is `{doublet path: [ISO time of
+each outage step]}`.
 
 ## The engine
 
-`Engine(plant, backend="numpy", callbacks=None, on_error="raise")` runs one plant on a finite clock
+`Engine(plant, backend="numpy", callbacks=None, on_error="raise", compile=True)` runs one plant on a finite clock
 and raises on a failure, unless `on_error="record"`.
-`simulate(profile, clock=None)` evaluates the plant from root-bound assumptions.
+`simulate(profile, clock=None)` evaluates the plant from root-bound run input (the plan).
 `replay(data, start=None, end=None, state=None, clock=None, only=None)` evaluates equipment twins on
 measured boundaries. `live(source, checkpoint=None, step=None, now=None, sink=None)` evaluates only
 newly supplied timestamps. All calls are finite; scheduling, sleeping, and fetching new data
@@ -117,7 +173,7 @@ belong to the caller. Every call returns `Results`.
 The pieces fit together as follows: the plant `Module` owns its design and bindings, the
 in-memory `Dataset` holds raw observations, the internal `Loader` aligns rows to the engine
 `Clock`, one private `Engine._run` hands the run to the `Runner`, which evaluates chunks of ticks and replays the callbacks,
-`save_checkpoint`/`load_checkpoint`/`resume` persist and continue a run, and `optim.calibrate`
+`to_checkpoint`/`from_checkpoint`/`resume` persist and continue a run, and `gm.analysis.calibrate`
 fits parameters by calling `Engine.replay` on a copy of the plant.
 
 ## Run input
@@ -142,7 +198,7 @@ except that a unit recorded in `Dataset` metadata replaces it (the rule below st
 
 Plants and engines are not shared across threads. An engine keeps run state (results, position,
 module states) and a plant keeps persisted inputs and traced graphs, so a worker loads its own plant
-(`gm.plants.from_dict(...)`) and builds its own engine; settings from `gm.runtime` are
+(`gm.Plant.from_dict(...)`) and builds its own engine; settings from `gm.runtime` are
 context-local and a new thread starts from the defaults.
 
 `backend` is applied to every run of the engine with `gm.runtime.settings(backend=...)`:
@@ -211,10 +267,13 @@ equipment twins of a replay; the plant in simulate) evaluated over **chunks** of
   meets its problems: the first missing column (a skip counted by its name; the missing rule is
   `Aligned.present`), or an inlet stream the limits refuse (an error with the text of the real
   `Stream` constructor). `outcome.evaluate_twin` builds the inlet streams of the ticks that can be
-  evaluated, takes the graph from the plant's `GraphCache` (`graph.breaks` per twin path are in
-  `engine.graph_breaks`), feeds it with `graph_feeds` and calls `gemini.compiler.graph.evaluate`: the backend
-  is the one of `gm.runtime.settings(backend=...)`, NumPy over arrays by default, Python row by
-  row (`backend="python"` is how to debug) and the results are the same. A failing row gets the
+  evaluated and hands them to the engine's executor (`executor.prepare`, then `executor.evaluate`;
+  the places an executor ran a module for real are `Evaluation.breaks`, kept per twin path in
+  `engine.graph_breaks`). The compiled executor (`gemini/compiler/executor.py`) takes the graph
+  from the plant's `GraphCache` and calls `gemini.compiler.graph.evaluate`; the eager executor
+  calls the module on arrays, or row by row where [it must](#folders-and-imports). The backend is
+  the one of `gm.runtime.settings(backend=...)`, NumPy over arrays by default, Python row by row
+  (`backend="python"` is how to debug) and the results are the same. A failing row gets the
   check's class and exact message from `Evaluation.error`; a bound violation on a declaration reads
   `declaration.validate`. Then `health.assess` runs `Module.health` once on the arrays (row by row on
   the Python backend, or when the call on arrays raises, which finds the rows whose health fails:
@@ -294,7 +353,8 @@ the columns.
 The ports of a leaf are columns too, by `Stream.quantities()`: `<port>.<quantity>` for a fluid
 (`results.get("hp", "hot_out.enthalpy_flow")`) and the port's name for a `Power`
 (`results.get("grid", "power_out")`); the quantities are listed in [types.md](types.md). A limit
-of `gm.evaluate.Limits` may name one, and `gm.evaluate`, `gm.evaluate` and the energy report read them.
+of a `gm.Constraint` may name one, and `gm.evaluate.totals`, `gm.evaluate.constraints` and the
+energy report read them.
 
 `Results[path]` returns the series of one module path; `Results[path].field` is a pandas Series
 and an unknown path or field raises `ValidationError`. Only leaf results are stored: twins in
@@ -330,7 +390,7 @@ operating hours, alarms, skips and errors, which `repr(results)` prints. `skip_c
 reason, and `failures` the rows where a module raised (the part of `errors()` that is not a
 skip; `EventLog` logs these).
 
-**Files.** `save(path)` and `Results.load(path)` write and read one `.npz` file (the suffix is added
+**Files.** `to_npz(path)` and `Results.from_npz(path)` write and read one `.npz` file (the suffix is added
 when missing); `to_bytes()` and `Results.from_bytes(data)` do the same without a file path.
 `gemini/engine/archive.py` writes a float, integer or boolean column as that array and any
 other column (lists, strings, `None`, mixed cells) as one JSON text with exact floats; the
@@ -345,7 +405,7 @@ Checkpoints keep their results in the same file.
 **End state.** `results.end_state` is plain JSON `{position, module_states}`: the last committed
 tick (ISO text or `null`) and the state tree of each stateful twin (`{path: tree}`; in a
 simulation `{"": tree}`). It is set at the end of every run, also of a cancelled or failed one,
-survives `save` and `to_bytes`, and is the input of `replay(..., state=...)`: stateful modules
+survives `to_npz` and `to_bytes`, and is the input of `replay(..., state=...)`: stateful modules
 continue from it and ticks up to its position are not evaluated again, so
 `replay(data, end=t)` followed by `replay(data, state=first.end_state)` gives the numbers of one
 `replay(data)`, in any engine built for a plant of the same shape. A state that is not of this
@@ -363,8 +423,8 @@ JSON-encoded CSV cells to preserve exact float bits, and their JSON sidecar reco
 units and the run's `max_gap`, which a resumed run reuses. A checkpoint never depends on the file
 or service that originally supplied data.
 
-`Engine.load_checkpoint(path, callbacks=None)` rebuilds the plant from the manifest and restores
-the run state with the saved backend and error policy. `save_checkpoint(path)` also works before
+`Engine.from_checkpoint(path, callbacks=None)` rebuilds the plant from the manifest and restores
+the run state with the saved backend and error policy. `to_checkpoint(path)` also works before
 the first run; the checkpoint then holds the plant and no results. `resume()` continues strictly after the saved
 position, or returns the stored results when the clock is finished; a resumed run gives the same
 results as an uninterrupted one. Resume and live calls re-apply the saved precision and display

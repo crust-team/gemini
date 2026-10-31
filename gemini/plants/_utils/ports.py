@@ -101,7 +101,7 @@ class PortResolver:
         return (path, port) in used | named
 
     def _locate(self, value, field, explicit):
-        path, port = self._parse(value, field)
+        path, port = self._from_handle(value, field)
         module = self._find_submodule(path)
         if module is None:
             paths = [item for item, _ in members(self)]
@@ -122,7 +122,7 @@ class PortResolver:
             )
         return path, port
 
-    def _parse(self, value, field):
+    def _from_handle(self, value, field):
         if isinstance(value, Declaration):
             return self._descendant_path(value.owner) or "", value.name
         if isinstance(value, Module):

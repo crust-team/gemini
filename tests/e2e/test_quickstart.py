@@ -32,8 +32,8 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
         plant, data, params=[plant.get("heat_exchanger.thermal_conductance")]
     )
     print(fit)
-    plant.save("runs/my_plant.json")
-    assert gm.Plant.load("runs/my_plant.json").state_dict() == plant.state_dict()
+    plant.to_json("runs/my_plant.json")
+    assert gm.Plant.from_json("runs/my_plant.json").state_dict() == plant.state_dict()
 
     clock = gm.engine.Clock.days(2027, 1, 1, days=1)
     profiles = {
@@ -45,7 +45,7 @@ def test_quickstart(tmp_path, monkeypatch, dataset_path):
             51.5, unit="bar", clock=clock
         ),
     }
-    sim = gm.simulate(plant, gm.Dataset.from_profiles(profiles), clock=clock)
+    sim = gm.simulate(plant, plan=gm.Dataset.from_profiles(profiles), clock=clock)
     print(sim.to_frame(table="energy"))
 
     start = df["time"].iloc[0]

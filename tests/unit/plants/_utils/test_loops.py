@@ -126,7 +126,7 @@ def test_the_iterate_stays_within_the_limits_of_the_modules():
 
 def test_a_loop_that_does_not_converge_names_its_tear():
     """A pass that keeps moving raises ``PhysicsError`` with the code and the tear path."""
-    relaxer = type("Drifting", (Relaxer,), {"forward": _drifting})
+    relaxer = type("Drifting", (Relaxer,), {"forward": _drifting, "abstract": True})
     plant = type("Ring", (Circuit,), {"relaxer_class": relaxer})()
     with raises(gm.errors.PhysicsError, "loop_not_converged") as caught:
         plant()

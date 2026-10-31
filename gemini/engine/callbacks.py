@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic_core import to_jsonable_python
 
 from gemini._utils.strings import join_path
-from gemini._utils.time import parse_duration
+from gemini._utils.time import to_timedelta
 from gemini.errors import ValidationError
 
 
@@ -128,7 +128,7 @@ class AutoCheckpoint(Callback):
         self.path = path
         self._elapsed = 0.0
         if not isinstance(every, numbers.Integral):
-            self.every = parse_duration(every)
+            self.every = to_timedelta(every)
             return
         if every <= 0:
             raise ValidationError(
@@ -146,5 +146,5 @@ class AutoCheckpoint(Callback):
             else self._elapsed >= self.every.total_seconds()
         )
         if due:
-            engine.save_checkpoint(self.path)
+            engine.to_checkpoint(self.path)
             self._elapsed = 0.0

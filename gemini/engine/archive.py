@@ -54,7 +54,7 @@ def pack(frame, metadata):
     return arrays
 
 
-def write(file, frame, metadata):
+def to_file(file, frame, metadata):
     """Write the archive of a table to a path or a binary file object."""
     np.savez(file, **pack(frame, metadata))
 
@@ -62,11 +62,11 @@ def write(file, frame, metadata):
 def to_bytes(frame, metadata):
     """Return the archive of a table as bytes."""
     buffer = io.BytesIO()
-    write(buffer, frame, metadata)
+    to_file(buffer, frame, metadata)
     return buffer.getvalue()
 
 
-def read(file):
+def from_file(file):
     """Return ``(times, columns, metadata)`` of an archive path or binary file object.
 
     ``times`` is a UTC ``DatetimeIndex``; ``columns`` lists ``(path, field, values)`` with a NumPy

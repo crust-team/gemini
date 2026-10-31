@@ -27,7 +27,7 @@ from tests.fixtures.reading import reading
 
 def _old_property(name):
     """Read the first-timestamp property block of one old ``.param`` file."""
-    return tables.read_property(OLD_PROJECT / (name + ".param"))
+    return tables.from_property(OLD_PROJECT / (name + ".param"))
 
 
 def _esp_theoretical_values(row, esp_property):

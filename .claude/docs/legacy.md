@@ -1,11 +1,11 @@
 # Legacy bridge
 
 `gemini.data.legacy` is the only old-format boundary. It is internal: the one public entry is
-`gm.plants.convert_legacy(folder)`, and everything else on this page is imported from
+`gm.Plant.from_legacy(folder)`, and everything else on this page is imported from
 `gemini.data.legacy`.
-`read_project(folder)`/`write_project(project, folder)` handle raw diagram and `.param` files
-through typed `GeminiProject` models; the in-memory project, including edits to it, is what the
-conversion reads. `read_csv`/`write_csv` handle semicolon data and old timestamps
+`GeminiProject.from_folder(folder)`/`project.to_folder(folder)` handle raw diagram and `.param`
+files through typed models; the in-memory project, including edits to it, is what the conversion
+reads. `from_csv`/`to_csv` handle semicolon data and old timestamps
 (`%Y-%m-%d %H:%M:%S`, or ISO 8601 when reading). Parsed projects write the same values after
 JSON whitespace normalisation, keeping each `.param` file's tag-name order; auxiliary files are
 copied byte-for-byte. Malformed or unconvertible files raise `gm.errors.ValidationError`.
@@ -21,23 +21,24 @@ tag columns and converts values to SI; old timestamps are taken as UTC wall time
 one step on a copy of the plant with its assumed root inputs and `tables.TRACE_CONTROLS`, so the
 caller's plant is not changed, and returns an empty list when the wiring matches.
 
-`gm.plants.convert_legacy(folder)` returns the plant dict of an old project folder: it reads the
-folder with `read_project`, fills `DoubletHeatPlant` (`gm.plants.get`) with `to_plant` and writes
-`to_dict()`. The folder holds `diagram.json`, one `.param` file per diagram node and any other file
-(the data CSV, `well_trajectory.csv`, `plant.conf`), which is read as-is and not converted; the data
-CSV is converted with `to_dataset`. On the example project the result equals
-`gm.plants.example("DoubletHeatPlant").to_dict()` exactly (`tests/unit/modules/plants/_utils/
-test_legacy_project.py`). The function lives in `modules/plants/_utils/legacy_project.py` and imports
-`gemini.data.legacy` inside the function, because `gemini.data.legacy` sits above `gemini.modules`.
+`gm.Plant.from_legacy(folder)` returns the plant of an old project folder: it reads the folder with
+`GeminiProject.from_folder`, fills `DoubletHeatPlant` (`gm.plants.get`) with `to_plant` and returns it;
+`plant.to_json(path)` stores it. The folder holds `diagram.json`, one `.param` file per diagram node
+and any other file (the data CSV, `well_trajectory.csv`, `plant.conf`), which is read as-is and not
+converted; the data CSV is converted with `to_dataset`. On the example project the result equals
+`gm.plants.example("DoubletHeatPlant")` exactly (`tests/unit/data/legacy/test_project.py`). The
+function is `gemini/data/legacy/project.py: from_folder`; `Plant.from_legacy` (`gemini/plants/
+plant.py`) imports it inside the function, because `gemini.data` sits above the plants in the
+import order.
 
 The bridge maps exactly the example project: its ten old nodes (`tables.NODE_PATHS`), a project
 folder with exactly one data CSV besides trajectory files, and its data columns and assumptions.
 Any other node set is rejected rather than guessed. Type, property, port, tag and old-node path
 tables, the deliberately unbound tags with their reasons (`IGNORED_TAGS`) and the property
-converters live in `utils/legacy/tables.py`; `utils/legacy/_loader.py` interprets a parsed project
+converters live in `data/legacy/tables.py`; `data/legacy/_loader.py` interprets a parsed project
 with them. New engine/modules/examples contain no old naming or conversion logic. The recipe
 `examples/recipes/legacy_project.py` is the only example that reads old files, through
-`gm.plants.convert_legacy` alone; `tests/e2e/test_legacy_bridge.py` covers the rest of the bridge.
+`gm.Plant.from_legacy` alone; `tests/e2e/test_legacy_bridge.py` covers the rest of the bridge.
 
 Converted control columns use their owning leaf path. The shared doublet therefore uses
 `doublet.reservoir.production_rate`, `doublet.esp.frequency`, and

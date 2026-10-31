@@ -11,7 +11,7 @@ from gemini._utils.time import (
     DEFAULT_STEP,
     interval_seconds,
     median_step,
-    parse_duration,
+    to_timedelta,
     to_utc,
     to_utc_index,
 )
@@ -35,22 +35,22 @@ def test_to_utc_treats_naive_values_as_utc_and_converts_aware_values():
 
 def test_parse_duration_accepts_seconds_and_pandas_syntax():
     """Numbers are seconds; strings use pandas syntax; zero and negative steps fail."""
-    assert parse_duration(900) == pd.Timedelta(minutes=15)
-    assert parse_duration(0.5) == pd.Timedelta(milliseconds=500)
-    assert parse_duration("15min") == pd.Timedelta(minutes=15)
-    assert parse_duration(timedelta(hours=1)) == pd.Timedelta(hours=1)
-    assert parse_duration(np.int64(900)) == pd.Timedelta(minutes=15)
-    assert parse_duration(np.float64(1.5)) == pd.Timedelta(seconds=1.5)
+    assert to_timedelta(900) == pd.Timedelta(minutes=15)
+    assert to_timedelta(0.5) == pd.Timedelta(milliseconds=500)
+    assert to_timedelta("15min") == pd.Timedelta(minutes=15)
+    assert to_timedelta(timedelta(hours=1)) == pd.Timedelta(hours=1)
+    assert to_timedelta(np.int64(900)) == pd.Timedelta(minutes=15)
+    assert to_timedelta(np.float64(1.5)) == pd.Timedelta(seconds=1.5)
     for invalid in (0, -1, "0s"):
         with pytest.raises(ValueError, match="expected a positive duration"):
-            parse_duration(invalid)
+            to_timedelta(invalid)
 
 
 @pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize("text", ["330 d", "330d", "330 D", "330 days"])
 def test_parse_duration_reads_a_day_without_a_deprecated_spelling(text):
     """``d`` is what a person writes; pandas deprecates it, so the parser never passes it on."""
-    assert parse_duration(text) == pd.Timedelta(days=330)
+    assert to_timedelta(text) == pd.Timedelta(days=330)
 
 
 def test_median_step_and_interval_seconds():

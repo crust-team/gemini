@@ -13,22 +13,23 @@ is raised and the problems go to the call's fixed place:
 | Call | Under `on_error="record"` |
 | --- | --- |
 | `validate_params`, `p.validate`, `gm.plants.validate` | return the list of problems |
-| `gm.evaluate` | returns them under `errors`, with empty `outlets` and `outputs` |
+| `gm.call` | returns them under `errors`, with empty `outlets` and `outputs` |
 | `gm.simulate`, `gm.replay`, `gm.live`, `gm.Engine` | record them in `results.errors()` and continue |
 | `gm.evaluate.*` | a value the inputs cannot give is `{value: null, unit, reason}` |
 | `gm.analysis.nodal` | the case holds its problem in `error`; the other cases still run |
 
-`gm.evaluate` has no "never raises" rule. The "never raises" behaviour agents need belongs to
+`gm.call` has no "never raises" rule. The "never raises" behaviour agents need belongs to
 geomind's tool layer, which catches `GeminiError` and calls `to_dict()`.
 
-A raised error that comes from several problems (`gm.plants.from_dict`, `validate`) carries all of
+A raised error that comes from several problems (`gm.Plant.from_dict`, `validate`) carries all of
 them in `error.problems`, a list of problem dicts: the same list `on_error="record"` returns, so a
 caller sees every problem in one try. A single error has itself as the one item. A problem is
 `{path, code, message, suggestions}`, built by `gemini.errors.base.problem`, which
 `gemini.types.shapes` exports with the other return shapes; `code` is the stable key for machines.
 
-**Checks are not errors.** `gm.evaluate.*` always return check dicts with `passed`; a violated limit
-never raises. A real failure inside a check (wrong input) still raises.
+**Checks are not errors.** The checks of `gm.evaluate` (`constraints`, `plant_balance`,
+`energy_balance`, `mass_balance`, `bounds`, `run_all`) always return check dicts with `passed`; a
+violated limit never raises. A real failure inside a check (wrong input) still raises.
 
 ## The classes
 
@@ -40,7 +41,7 @@ GeminiError
   RunError           dataset, clock, checkpoint, step
   Cancelled          a callback stopped a run; committed ticks stay readable
   NotImplementedYet  the name is final, its work lands in a later step
-GeminiWarning        root of warnings; legacy.to_plant lists what it cannot map in one
+GeminiWarning        root of warnings; the legacy conversion lists what it cannot map in one
 ```
 
 `GeminiError` takes `path=`, `code=`, `suggestions=` and `problems=` as keywords. `code` defaults to
@@ -81,6 +82,8 @@ code is never renamed without raising the minor number of `gm.__version__`.
 | `missing_value` | `ValidationError` | A required value is absent |
 | `missing_assumption` | `ValidationError` | An economics function needs an assumption nobody gave; the path names it |
 | `no_value` | `ValidationError` | The inputs cannot give this value, such as a plant without a declared cost |
+| `conflicting_value` | `ValidationError` | Two sources give one value: a site path of a `gm.Problem` sets a parameter the plant states too; the path names it |
+| `duplicate_name` | `ValidationError` | A second class takes the registry name of another class |
 | `invalid_unit` | `ValidationError` | A unit is unknown or does not fit the quantity |
 | `unknown_name` | `ValidationError` | A module type, path, parameter, category, correlation or field does not exist |
 | `unknown_port` | `ValidationError` | A port does not exist on that module |
@@ -105,7 +108,7 @@ code is never renamed without raising the minor number of `gm.__version__`.
 | `invalid_data` | `RunError` | A dataset or profile cannot be built or read |
 | `inputs_missing` | `RunError` | A file of `inputs/` is needed and the folder is absent: it takes a source checkout, because `inputs/` is not installed |
 | `clock` | `RunError` | An invalid clock, or a timestamp that is not a tick |
-| `checkpoint` | `RunError` | A checkpoint cannot be saved, loaded or resumed |
+| `checkpoint` | `RunError` | A checkpoint cannot be written, read or resumed |
 | `step` | `RunError` | A replayed twin failed under `on_error="raise"`; the cause is chained |
 | `cancelled` | `Cancelled` | A callback stopped the run |
 | `not_implemented` | `NotImplementedYet` | The name is final, its work lands later |

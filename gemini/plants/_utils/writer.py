@@ -10,8 +10,8 @@ from gemini.modules._utils.serialization import (
     FORMAT,
     keep_stated,
     plain_value,
+    to_sections,
     tree_params,
-    write_sections,
 )
 from gemini.plants._utils.plan import is_group, is_plant
 
@@ -96,7 +96,7 @@ def class_dict(plant, fresh):
         data["size"] = deepcopy(plant._size)
     data["params"] = params_entry(plant, "", plant)
     fluids = {path: module._fluid for path, module in fresh.named_modules()}
-    return data | write_sections(plant, plant._sections, fluids) | _inputs_section(plant)
+    return data | to_sections(plant, plant._sections, fluids) | _inputs_section(plant)
 
 
 def structure_dict(plant):
@@ -114,4 +114,4 @@ def structure_dict(plant):
         data["outputs"] = deepcopy(plant._output_entries)
     if plant._constraints:
         data["constraints"] = [item.as_dict() for item in plant._constraints]
-    return data | write_sections(plant, plant._sections) | _inputs_section(plant)
+    return data | to_sections(plant, plant._sections) | _inputs_section(plant)

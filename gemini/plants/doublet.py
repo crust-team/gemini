@@ -32,9 +32,9 @@ class Doublet(Plant):
     derives, through ``gemini/physics/doublet.py``:
 
     - from ``depth``, ``gradient`` and ``surface_temperature``, which have no default: a depth
-      without them raises ``missing_value``. They give the reservoir temperature at the midpoint,
-      the hydrostatic reservoir pressure from the fluid density, the top depth and the soil
-      temperature of the wells, the geotherm at half the depth;
+      waits for them, which a ``gm.Problem`` may give as site values. They give the reservoir
+      temperature at the midpoint, the hydrostatic reservoir pressure from the fluid density, the
+      top depth and the soil temperature of the wells, the geotherm at half the depth;
     - with ``permeability``, ``thickness`` and ``well_diameter``: the productivity and injectivity
       indices of radial Darcy flow, with the fluid viscosity, ``drainage_radius``, the wellbore
       radius and the ``skin`` of each reservoir, and the vertical pipe paths of the wells;

@@ -1,6 +1,6 @@
 """Simulate the doublet heat plant on one month of data and print a few results.
 
-Shows ``gm.Plant.load``, ``gm.Dataset.from_frame``, ``gm.simulate`` and ``Results.summary``.
+Shows ``gm.plants.example``, ``gm.Dataset.from_frame``, ``gm.simulate`` and ``Results.summary``.
 
 Run with ``python examples/quickstart.py``.
 """
@@ -21,7 +21,7 @@ def main():
     """Load the plant, simulate the data and print its heat, electricity and temperature."""
     plant = gm.plants.example("DoubletHeatPlant")
     frame = pd.read_csv(DATA, parse_dates=["time"])
-    results = gm.simulate(plant, gm.Dataset.from_frame(frame, time_column="time"))
+    results = gm.simulate(plant, plan=gm.Dataset.from_frame(frame, time_column="time"))
     summary = results.summary(units={"power": "MW", "temperature": "degC"})
     print(f"Steps:              {len(results)}")
     print(f"Mean heat duty:     {summary['heat_exchanger']['duty']['mean']['value']:.2f} MW")

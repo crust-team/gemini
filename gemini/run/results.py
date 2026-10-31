@@ -476,8 +476,8 @@ class Results:
         )
         return self._cached_frame(), metadata
 
-    def save(self, path):
-        """Save every cell exactly as one ``.npz`` file and return its path.
+    def to_npz(self, path):
+        """Write every cell exactly as one ``.npz`` file and return its path.
 
         A path without the ``.npz`` suffix gets it. Numeric columns are stored as arrays and
         other columns as JSON text, so loading needs no pickle and gives the same bits.
@@ -486,25 +486,25 @@ class Results:
         if path.suffix != ".npz":
             path = Path(str(path) + ".npz")
         path.parent.mkdir(parents=True, exist_ok=True)
-        archive.write(path, *self._archive())
+        archive.to_file(path, *self._archive())
         return path
 
     def to_bytes(self):
-        """Return the ``.npz`` archive of ``save`` as bytes, for storage without a file."""
+        """Return the ``.npz`` archive of ``to_npz`` as bytes, for storage without a file."""
         return archive.to_bytes(*self._archive())
 
     @classmethod
-    def load(cls, path):
-        """Restore results saved by ``save``, with identical cells, units and end state."""
+    def from_npz(cls, path):
+        """Return the results written by ``to_npz``, with identical cells, units and end state."""
         path = Path(path)
         if not path.exists() and Path(str(path) + ".npz").exists():
             path = Path(str(path) + ".npz")
-        return cls._restored(*archive.read(path))
+        return cls._restored(*archive.from_file(path))
 
     @classmethod
     def from_bytes(cls, data):
         """Restore results from the bytes of ``to_bytes``."""
-        return cls._restored(*archive.read(io.BytesIO(data)))
+        return cls._restored(*archive.from_file(io.BytesIO(data)))
 
     @classmethod
     def _restored(cls, times, columns, metadata):

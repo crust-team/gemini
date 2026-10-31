@@ -26,7 +26,7 @@ def frame_of(columns):
 
 def round_trip(frame, metadata=None):
     """Write a table to bytes and read it back: times, columns and metadata."""
-    return archive.read(io.BytesIO(archive.to_bytes(frame, metadata or {})))
+    return archive.from_file(io.BytesIO(archive.to_bytes(frame, metadata or {})))
 
 
 def test_numeric_columns_are_arrays_and_others_json_text():
@@ -64,7 +64,7 @@ def test_a_file_written_before_the_oldest_version_is_refused():
         buffer = io.BytesIO()
         np.savez(buffer, metadata=np.array(metadata))
         with pytest.raises(ValidationError, match="version = ") as caught:
-            archive.read(io.BytesIO(buffer.getvalue()))
+            archive.from_file(io.BytesIO(buffer.getvalue()))
         assert caught.value.code == "old_format"
 
 

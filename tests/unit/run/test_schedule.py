@@ -365,7 +365,7 @@ def split_sources():
         {"source": "grid.gas_out", "target": "boiler.fuel_in"},
         {"source": "boiler.fluid_out", "target": "users.supply_in"},
     ]
-    built = gm.plants.from_dict(spec)
+    built = gm.Plant.from_dict(spec)
     built.boiler.temperature_setpoint = "100 degC"
     built.heat_pump.temperature_setpoint = "100 degC"
     return built

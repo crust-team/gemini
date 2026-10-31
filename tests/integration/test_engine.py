@@ -160,7 +160,7 @@ class StopAndSave(Callback):
 
     def on_error(self, engine, error):
         """Save the completed boundary after cancellation."""
-        engine.save_checkpoint(self.path)
+        engine.to_checkpoint(self.path)
 
 
 @pytest.mark.parametrize("kind", ["replay", "simulate"])
@@ -177,7 +177,7 @@ def test_interrupt_resume(setup, tmp_path, kind):
         getattr(engine, kind)(*args)
     checkpoint = json.loads(path.read_text())
     assert checkpoint["position"] == list(clock)[4].isoformat().replace("+00:00", "Z")
-    loaded = gm.Engine.load_checkpoint(path)
+    loaded = gm.Engine.from_checkpoint(path)
     assert loaded.plant.state_dict() == plant.state_dict()
     actual = loaded.resume()
     pd.testing.assert_frame_equal(actual.to_frame(), expected.to_frame(), check_exact=True)
@@ -207,7 +207,7 @@ def test_live_idempotency(tmp_path):
     engine = gm.Engine(plant)
     assert len(engine.live(data, path, now=second_now)) == 0
     assert len(engine.results) == 2
-    assert len(gm.Engine.load_checkpoint(path).resume()) == 2
+    assert len(gm.Engine.from_checkpoint(path).resume()) == 2
 
 
 def test_missing_data_dates_events_and_export(setup, tmp_path):
@@ -236,8 +236,8 @@ def test_missing_data_dates_events_and_export(setup, tmp_path):
     assert (
         json.loads((tmp_path / "events.jsonl").read_text().splitlines()[0])["kind"] == "run_start"
     )
-    path = result.save(tmp_path / "results.npz")
-    loaded = Results.load(path)
+    path = result.to_npz(tmp_path / "results.npz")
+    loaded = Results.from_npz(path)
     pd.testing.assert_frame_equal(loaded.to_frame(), result.to_frame())
     pd.testing.assert_frame_equal(loaded.to_frame(table="energy"), result.to_frame(table="energy"))
     assert loaded.errors() == result.errors()
@@ -274,7 +274,7 @@ def test_autocheckpoint_and_callback_order(setup, tmp_path):
     engine = gm.Engine(plant, callbacks=[Observe(), AutoCheckpoint(path, every="1h")])
     actual = engine.replay(data.window(end="2024-06-07T01:00:00Z"))
     assert calls == ["start"] + ["before", "after"] * 5 + ["end"]
-    loaded = gm.Engine.load_checkpoint(path)
+    loaded = gm.Engine.from_checkpoint(path)
     assert len(loaded.results) == 4
     pd.testing.assert_frame_equal(loaded.resume().to_frame(), actual.to_frame())
 
@@ -309,8 +309,8 @@ def test_plant_only_checkpoint(setup, tmp_path):
     plant.heat_exchanger.set_params("", {"thermal_conductance": 123456})
     engine = gm.Engine(plant)
     path = tmp_path / "design.ckpt"
-    engine.save_checkpoint(path)
-    other = gm.Engine.load_checkpoint(path)
+    engine.to_checkpoint(path)
+    other = gm.Engine.from_checkpoint(path)
     assert other.plant.state_dict() == plant.state_dict()
     assert other.plant.bindings == plant.bindings
     assert len(other.resume()) == 0
@@ -330,7 +330,7 @@ def test_stateful_measured_and_integrated(tmp_path):
     path = tmp_path / "state.ckpt"
     with pytest.raises(Interrupted):
         gm.Engine(plant, callbacks=[StopAndSave(path, 1)]).replay(data)
-    assert gm.Engine.load_checkpoint(path).resume()[""].value.tolist() == [1, 2, 3]
+    assert gm.Engine.from_checkpoint(path).resume()[""].value.tolist() == [1, 2, 3]
     plant.bindings[""].state = {"value": Binding(column="observed", unit="-")}
     assert engine.replay(data)[""].value.tolist() == [11, 21, 31]
     assert engine.module_states[""] == {"value": 30}
@@ -341,14 +341,14 @@ def test_empty_live_and_checkpoint_results_file(setup, tmp_path):
     plant, data = setup
     path = tmp_path / "empty.ckpt"
     assert len(gm.Engine(plant).live(data, path, now="2024-01-01")) == 0
-    assert len(gm.Engine.load_checkpoint(path).resume()) == 0
+    assert len(gm.Engine.from_checkpoint(path).resume()) == 0
     engine = gm.Engine(plant)
     expected = engine.replay(data.window(end=data.start))
     path = tmp_path / "fallback.ckpt"
-    engine.save_checkpoint(path)
+    engine.to_checkpoint(path)
     assert json.loads(path.read_text())["results_file"].endswith(".npz")
     pd.testing.assert_frame_equal(
-        gm.Engine.load_checkpoint(path).resume().to_frame(), expected.to_frame()
+        gm.Engine.from_checkpoint(path).resume().to_frame(), expected.to_frame()
     )
 
 
@@ -358,7 +358,7 @@ def test_failed_checkpoint_publication_keeps_previous(setup, tmp_path, monkeypat
     engine = gm.Engine(plant)
     engine.replay(data.window(end=data.start))
     path = tmp_path / "atomic.ckpt"
-    engine.save_checkpoint(path)
+    engine.to_checkpoint(path)
     previous = path.read_bytes()
 
     def fail(source, destination):
@@ -368,9 +368,9 @@ def test_failed_checkpoint_publication_keeps_previous(setup, tmp_path, monkeypat
     monkeypatch.setattr(checkpoint.os, "replace", fail)
     engine.replay(data)
     with pytest.raises(OSError, match="rename"):
-        engine.save_checkpoint(path)
+        engine.to_checkpoint(path)
     assert path.read_bytes() == previous
-    assert len(gm.Engine.load_checkpoint(path).resume()) == 1
+    assert len(gm.Engine.from_checkpoint(path).resume()) == 1
 
 
 def accumulator(frame):
@@ -392,7 +392,7 @@ def test_resume_keeps_held_rows_when_the_clock_is_finer_than_the_data(tmp_path, 
         gm.Engine(plant, callbacks=[StopAndSave(path, count)], on_error="raise").simulate(
             data, clock
         )
-    actual = gm.Engine.load_checkpoint(path).resume()
+    actual = gm.Engine.from_checkpoint(path).resume()
     pd.testing.assert_frame_equal(actual.to_frame(), expected.to_frame(), check_exact=True)
 
 
@@ -540,9 +540,9 @@ def test_two_consecutive_replays_give_the_numbers_of_one(tmp_path):
     pd.testing.assert_frame_equal(both, whole.to_frame(), check_exact=True)
     assert second.end_state == whole.end_state
     json.dumps(whole.end_state, allow_nan=False)
-    path = first.save(tmp_path / "first")
+    path = first.to_npz(tmp_path / "first")
     windowed = gm.Engine(plant).replay(
-        data, start=data.start + pd.Timedelta(minutes=60), state=Results.load(path).end_state
+        data, start=data.start + pd.Timedelta(minutes=60), state=Results.from_npz(path).end_state
     )
     pd.testing.assert_frame_equal(windowed.to_frame(), second.to_frame(), check_exact=True)
 

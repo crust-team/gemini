@@ -25,7 +25,7 @@ def _problem():
 
 
 def _run(data):
-    plant = gm.plants.from_dict(data)
+    plant = gm.Plant.from_dict(data)
     return plant, gm.simulate(plant, _problem(), on_error="raise")
 
 

@@ -1,11 +1,11 @@
 """The plant catalogue: which plants exist and how to get one."""
 
 from gemini._utils import paths, registry
-from gemini._utils.files import read_json
+from gemini._utils.files import from_json
 from gemini._utils.strings import close_matches, did_you_mean, join_names
 from gemini.errors import NotImplementedYet, ValidationError
 from gemini.errors.base import reported
-from gemini.modules._utils.serialization import SECTIONS, Report, read_sections
+from gemini.modules._utils.serialization import SECTIONS, Report, from_sections
 from gemini.plants._utils import reader
 from gemini.plants.plant import Plant
 
@@ -63,7 +63,7 @@ def example(name):
     ``inputs``, under the keys of a plant dict. ``Doublet`` and ``DoubletHeatPlant`` carry the
     values of the measured doublet, and the other plants the values their unit tests use, the
     design parameters only: controls and boundaries are inputs of a run. A template plant has no
-    values of its own, a design is its plant dict (``gm.plants.from_dict``). A registered plant
+    values of its own, a design is its plant dict (``gm.Plant.from_dict``). A registered plant
     without a file raises ``NotImplementedYet`` naming it, and without ``inputs/`` this raises
     ``inputs_missing``.
     """
@@ -71,18 +71,26 @@ def example(name):
     path = paths.plant_values(name)
     if not path.exists():
         raise NotImplementedYet(f"plants.example: {name!r} has no sourced parameter values yet")
-    values = read_json(path)
+    values = from_json(path)
     plant = registry.get(name)(**values.get("size", {}))
     plant.set_params("", values["params"])
-    read_sections(plant, values, Report(strict=True))
+    from_sections(plant, values, Report(strict=True))
     plant._sections = {key: values.get(key, {}) for key in SECTIONS}
     plant._stated[""] = {}
     return plant.set_inputs(values.get("inputs", {}))
 
 
-def from_dict(data):
-    """Build a plant from a plant dict; one ``ValidationError`` lists every problem."""
-    return reader.read(Plant, data)
+def capabilities():
+    """Return what each plant class can serve and be sized by.
+
+    A stub: the name is final and its work lands later.
+
+    Raises
+    ------
+    NotImplementedYet
+        Always.
+    """
+    raise NotImplementedYet("plants.capabilities: not built yet")
 
 
 def validate(data, on_error="raise"):

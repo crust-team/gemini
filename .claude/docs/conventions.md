@@ -18,14 +18,31 @@ loader in `examples/`, never the other way round.
 A package may import only the packages to its left:
 
 `gemini._utils`, `gemini.errors` ← `gemini.ops.kernels` ← `gemini.ops` ← `gemini.physics`
-← `gemini.types` ← `gemini.runtime` ← `gemini.modules` ← `gemini.compiler.graph`
-← `gemini.run` ← `gemini.engine` ← `gemini.data.legacy` ← `optim`, `analysis`,
-`economics`, `checks`, `testing`, `profiles` ← `gemini/__init__`.
+← `gemini.units`, `gemini.types` ← `gemini.runtime` ← `gemini.modules` ← `gemini.plants`
+← `gemini.run` ⇄ `gemini.engine` ← `gemini.compiler`, `gemini.data`, `gemini.optim`,
+`gemini.evaluate`, `gemini.analysis` ← `gemini/__init__`.
 
-Three files and folders live in a package lower in the order than their own place in it:
-`gemini/runtime/context.py`, `gemini/run/` and `gemini/data/legacy/`. They stay safe
-because neither `gemini/ops/kernels/__init__.py` nor `gemini/_utils/__init__.py` imports them, so
-importing the lower package never loads them.
+The **run folders** are `modules`, `plants`, `physics`, `ops`, `runtime`, `engine`, `run`, `types`,
+`units`, `errors` and `_utils`. They import none of `compiler`, `data`, `optim`, `evaluate` and
+`analysis`. `modules` never imports `plants`. The exceptions run inside a function:
+
+- `Plant.from_legacy` imports `gemini.data.legacy`, because the legacy bridge sits above the plants.
+- `gm.modules.check` imports `gemini.run.call`, because `run` sits above `modules`.
+- `Stream.__init__` in `gemini.types.flows` imports `gemini.runtime` to read the default fluid,
+  because a module-level import would form a cycle through `gemini.types.fluid`.
+- `gemini.physics.hydraulics` imports `Stream` and `Fluid` for type checking only.
+
+`engine` imports `run` for `Results` and `Dataset`, and `run` imports `engine.engine`.
+`gemini/engine/__init__.py` imports `gemini.run` first and never `.engine`, which keeps one import
+order from either side. `gemini/compiler/__init__.py` registers its executor when it is imported,
+and `gemini/__init__.py` imports it; the run works without it, see
+[engine.md](engine.md#folders-and-imports). `gemini/run/_utils/demand.py` holds the demand frame,
+because a `Problem` reads it and `run` imports no `data`; `gm.data` exports `from_csv` and
+`from_values` from it.
+
+`gemini/runtime/context.py` and `gemini/run/` sit in a package lower in the order than their own
+place. They stay safe because neither `gemini/ops/kernels/__init__.py` nor
+`gemini/_utils/__init__.py` imports them, so importing the lower package never loads them.
 
 `gemini.ops.kernels` and `gemini.ops` sit below the physics because physics is written with the
 ops; `gemini.compiler.graph` sits above `gemini.modules` because its tracer runs module calls (see
@@ -35,23 +52,32 @@ ops; `gemini.compiler.graph` sits above `gemini.modules` because its tracer runs
 they import only the standard library, installed dependencies and themselves, never another part
 of `gemini` (`tests/unit/test_package_boundaries.py` enforces this). One topic file differs:
 `gemini/_utils/paths.py` imports `gemini.errors`, the other leaf, because a missing `inputs/` folder
-raises `inputs_missing` wherever it is needed. There are two documented exceptions to
-the order. `gemini.physics.hydraulics` imports `Stream` and `Fluid` for type checking only, and
-`Stream.__init__` in `gemini.types.flows` imports `gemini.runtime` inside the function to read the
-default fluid, because a module-level import would form a cycle through `gemini.types.fluid`.
-`gm.plants.convert_legacy` imports `gemini.data.legacy` inside the function, because the legacy
-bridge sits above `gemini.modules`.
-`gemini.run` imports no module or engine code and `gemini.data.legacy` imports no engine
-code (the same test file enforces both).
+raises `inputs_missing` wherever it is needed.
+`tests/unit/test_code_quality.py` enforces the run-folder rule and the rule on `modules`
+([testing.md](testing.md#structure-and-quality-tests)).
 
 Packages outside `gemini.data.legacy` never interpret old project names, tags, tables or node
 mappings. Old-format knowledge stays in `gemini.data.legacy`, which is internal; its one public entry is
-`gm.plants.convert_legacy(folder)`.
+`gm.Plant.from_legacy(folder)`.
 Equipment performs no file or database access. Calibration predicts only through public replay.
 A leaf module computes and a plant connects; no class does both. A leaf `Module` has physics calls
 and `forward`. Every composite is a `Plant`, a class that declares children, ports and connections
 and never writes `forward`, or `gm.Plant(name)` with `add` and `connect`. gemini keeps no JSON file:
-the plant dict (`to_dict`, `gm.plants.from_dict`) is the interface agents use.
+the plant dict (`to_dict`, `gm.Plant.from_dict`) is the interface agents use.
+
+## Public names and read/write naming
+
+A folder exports its public names flat from its `__init__`: `gm.<folder>.<Name>`. Inner files are
+private and no caller imports from them. There is no `core`, `base`, `registry`, `testing`,
+`backends`, `checks`, `economics`, `profiles`, `utils` or `graph` folder at the top of `gemini/`.
+
+**Read/write naming.** Every reader is `from_<format>` and every writer `to_<format>`: `from_csv`,
+`from_json`, `from_dict`, `from_values`, `from_bytes`, ... and `to_csv`, `to_json`, `to_dict`,
+`to_bytes`, .... A reader is a classmethod on the class it returns (`gm.Problem.from_json(path)`); a
+writer is a method of the object (`problem.to_json(path)`). Only a reader that returns no gemini
+class, such as a demand frame, is a plain function in its folder (`gm.data.from_csv`). No `read_*`,
+`write_*`, `load_*`, `save_*`, `parse_*` or `dump_*` name exists, public or private;
+`tests/unit/test_code_quality.py` rejects those prefixes.
 
 ## Public API freeze
 
@@ -67,7 +93,7 @@ to `SNAPSHOTS` for the new version; never edit the hash of a released version.
 
 **Physics lives in `gemini/physics/` or a `_physics.py`.** Modules declare and wire; they never
 define physics. `gemini/physics/` keeps the textbook formulas and anything more than one category,
-or `analysis`, `optim`, `economics` or `checks`, reads. Physics of one category lives in
+or `analysis`, `optim` or `evaluate`, reads. Physics of one category lives in
 `gemini/modules/<category>/_physics.py`, which imports only `gemini.physics`, `gemini.ops`,
 `gemini.types` and `gemini.errors`, never another category's `_physics.py`; when a second category
 needs a function it moves up into `gemini/physics/`. Its functions keep `@ops.physics` and stay
@@ -79,17 +105,19 @@ formula twice.
 **Where a file goes under `gemini/modules/`.** There are four homes:
 
 - A file that defines a core class users subclass or build goes directly in `gemini/modules/`:
-  `module.py` (`Module`), `plant.py` (`Plant`) and `container.py` (`ModuleList`, `ModuleDict`).
+  `module.py` (`Module`), `declarations.py` (`Parameter`, `Inlet`, `Outlet`, `Output`, `Control`,
+  `Boundary`, `State`), `container.py` (`ModuleList`, `ModuleDict`) and `check.py`
+  (`gm.modules.check`). `Plant` is `gemini/plants/plant.py`.
 - Machinery goes in an `_utils/` folder, even if some of its functions are exported publicly:
-  `gemini/modules/_utils/` (`balance`, `description`, `design`, `registry`, `serialization`,
-  `wiring`), and `gemini/plants/_utils/` for the plant tools.
+  `gemini/modules/_utils/` (`balance`, `description`, `design`, `serialization`, `wiring`),
+  `gemini/plants/_utils/` for the plant tools and `gemini/_utils/registry.py` for the registry.
 - Code shared by the modules of one category goes in that category folder as a private file:
   `heating/_burner.py`, `cooling/_sorption.py`.
 - `gemini/plants/` holds only plant classes.
 
 `tests/unit/test_code_quality.py` checks the first and the last. A class in `_utils` belongs to no
 category, and the public names stay in `gm.modules`. Fitting and calibration belong in `gm.analysis`
-or `gm.optim`, not in modules.
+or `gm.optim`, not in modules; a plant class belongs in `gemini/plants/`, never in `modules`.
 
 1. Assign declarations and children only in `__init__`, after `super().__init__()`.
 2. Constructor sections are `# Parameters`, `# Inlets`, `# Controls`, `# Boundaries`, `# States`,
@@ -99,7 +127,7 @@ or `gm.optim`, not in modules.
    `_advance_states(self, inlets, outlets, dt)`; see [modules.md](modules.md#state-and-health).
 3. Controls are settable commands; boundaries are uncontrollable external conditions.
 4. `forward` is exactly `forward(self, inlets)` and reads declared streams through the immutable
-   `Ports` mapping, such as `inlets.fluid_in`. Controls and boundaries are applied before the call
+   `Ports` mapping (`gemini.types.Ports`), such as `inlets.fluid_in`. Controls and boundaries are applied before the call
    and read as plain attributes such as `self.frequency`.
 5. `forward` sections are `# Outlets` and `# Outputs`, in that order with empty sections omitted;
    `forward` assigns on `self` only its declared outputs, and computes each thing once. No subclass
@@ -270,8 +298,11 @@ reason it is needed:
   as a decorator, restored on exit.
 - `Module.category` is `_FolderCategory` in `gemini/modules/module.py`, a descriptor that reads
   the folder from the import path of the class, so the folder is the one source of a module's
-  category. `Plant` alone reads `plants`: its file sits beside `module.py`, not in that folder. A
-  class from outside assigns `category` itself, which replaces the descriptor.
+  category; a class in `gemini/plants/` reads `plants`. A class from outside assigns `category`
+  itself, which replaces the descriptor.
+- `Module.__init_subclass__` registers every class that has a category under its class name
+  (`gemini/_utils/registry.py`); `abstract = True` in its own body leaves it out, and a second class
+  of a registered name raises `duplicate_name`. There is no `register` call and no file loader.
 - `class_path`/`import_class` in `gemini/modules/module.py` are the only import-by-string.
   Only checkpoints use them: a checkpoint names the plant class whose `from_dict` rebuilds the tree
   from the plant dict it stores. A plant dict names registry types.
@@ -305,7 +336,7 @@ reason it is needed:
   For speed the op functions evaluate plain scalars (`float`, `int`, `bool`, `None`, NumPy
   `float64`/`bool_`) directly on the Python backend and a `Constant` computes its operators on its
   value without `dispatch`; arrays, other NumPy scalars, traced values and an active
-  `backends.settings(backend=...)` take the full `dispatch` path. A `Constant` is not a `float`.
+  `gm.runtime.settings(backend=...)` take the full `dispatch` path. A `Constant` is not a `float`.
 - The eager scope (`gemini/ops/scope.py`, `gemini/ops/failed.py`), entered by `@ops.physics` and
   by `Module._run`, is what makes a direct call behave like the graph. The outermost entry enters
   `np.errstate(all="ignore")` and gives plain Python numbers to the function as NumPy scalars (an exact

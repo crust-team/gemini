@@ -9,8 +9,7 @@ figures. ``profile_schema()`` is the JSON Schema of the profile document.
 
 from gemini.run._utils.demand import from_csv, from_values
 
-from .legacy.project import convert_legacy
 from .schema import profile_schema
 from .synthesize import synthesize
 
-__all__ = ["from_csv", "from_values", "profile_schema", "synthesize", "convert_legacy"]
+__all__ = ["from_csv", "from_values", "profile_schema", "synthesize"]

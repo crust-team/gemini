@@ -9,4 +9,4 @@ def test_the_example_is_complete_and_rebuilds():
     plant = template_plant("HeatingFullCoolingPlant")
     assert plant.is_initialized
     assert plant.validate(on_error="record") == []
-    assert gm.plants.from_dict(plant.to_dict()).to_dict() == plant.to_dict()
+    assert gm.Plant.from_dict(plant.to_dict()).to_dict() == plant.to_dict()

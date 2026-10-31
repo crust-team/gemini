@@ -168,10 +168,10 @@ def test_resume_keeps_writing_to_the_same_file_and_the_saved_backend(tmp_path):
     whole = _run_replay()
     with pytest.raises(Cancelled):
         _run_replay(checkpoint=path, callbacks=[Stop(3)], backend=backend)
-    assert gm.Engine.load_checkpoint(path).backend == backend
+    assert gm.Engine.from_checkpoint(path).backend == backend
     with pytest.raises(Cancelled):
         gm.resume(path, callbacks=[Stop(2)])
-    assert len(gm.Engine.load_checkpoint(path).results) == 5
+    assert len(gm.Engine.from_checkpoint(path).results) == 5
     _same(gm.resume(path), whole)
     stored = gm.resume(path)
     _same(stored, whole)
@@ -199,11 +199,11 @@ def test_function_and_engine_checkpoints_are_one_format(tmp_path):
     by_function, by_engine = tmp_path / "function.ckpt", tmp_path / "engine.ckpt"
     with pytest.raises(Cancelled):
         _run_replay(checkpoint=by_function, callbacks=[Stop(3)])
-    _same(gm.Engine.load_checkpoint(by_function).resume(), whole)
+    _same(gm.Engine.from_checkpoint(by_function).resume(), whole)
 
     class SaveAndStop(Stop):
         def on_error(self, engine, error):
-            engine.save_checkpoint(by_engine)
+            engine.to_checkpoint(by_engine)
 
     with pytest.raises(Cancelled):
         gm.Engine(pair_plant(True), callbacks=[SaveAndStop(3)]).replay(_pairs())
@@ -216,7 +216,7 @@ def test_a_user_autocheckpoint_stays_available_through_callbacks(tmp_path):
     with pytest.raises(Cancelled):
         _run_replay(checkpoint=path, callbacks=[Stop(3)])
     gm.resume(path, callbacks=[AutoCheckpoint(path, every=2)])
-    assert len(gm.Engine.load_checkpoint(path).results) == len(TICKS)
+    assert len(gm.Engine.from_checkpoint(path).results) == len(TICKS)
 
 
 def test_live_starts_on_the_first_call_and_continues_from_the_file(tmp_path):

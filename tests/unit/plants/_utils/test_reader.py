@@ -52,7 +52,7 @@ def test_an_unconnected_port_is_reported_with_its_path(spec):
         ("unconnected_port", "degasser.gas_out")
     ]
     with pytest.raises(ValidationError) as caught:
-        gm.plants.from_dict(spec)
+        gm.Plant.from_dict(spec)
     assert caught.value.code == "unconnected_port" and caught.value.problems == found
 
 
@@ -148,6 +148,6 @@ def test_read_raises_one_error_that_lists_every_problem(spec):
     spec["modules"]["degasser"]["type"] = "Degaser"
     spec["modules"]["pipe"]["params"] = {"lenght": 1}
     with pytest.raises(ValidationError) as caught:
-        reader.read(gm.Plant, spec)
+        reader.from_dict(gm.Plant, spec)
     assert caught.value.path == "modules.degasser.type"
     assert "modules.pipe.params.lenght" in str(caught.value)

@@ -16,7 +16,7 @@ The year, in daily steps:
   gas purchased         0.00 GWh
   supply, lowest      100.00 °C
 
-Limits:
+Constraints:
   d0.reservoir.liquid_flow          ok        worst 300 m³/h
   d1.reservoir.liquid_flow          ok        worst 300 m³/h
   d0.brine_cooling                  ok        worst 35.52 K
@@ -35,27 +35,27 @@ At the plant's edge:
   cold_delivered           23.743 GWh
   cold_useful              23.743 GWh
   cold_surplus              0.000 GWh
-  electricity_bought       26.459 GWh
+  electricity_bought       26.475 GWh
   electricity_sold          0.000 GWh
   gas_bought                0.000 GWh
-  co2_emitted               4.761 kt
+  co2_emitted               4.735 kt
   methane_emitted           0.028 kt
   waste                     0.055 kt
   chemicals                 0.032 kt
-  losses                   29.242 GWh
+  losses                   28.853 GWh
 
 KPIs:
   heating_coverage   1
   cooling_coverage   1
-  cop                4.22
+  cop                4.218
   peak_heat          30 MW
   peak_cold          10 MW
 
 Economics, on the placeholder prices above:
   capex       29.57 MEUR (2015)
-  opex         2.75 MEUR/year
-  CO2-eq      13.53 kt/year
+  opex         2.76 MEUR/year
+  CO2-eq      13.50 kt/year
   LCOH        35.81 EUR/MWh
   LCOC        35.81 EUR/MWh
-  NPV         46.21 MEUR
+  NPV         46.19 MEUR
   payback      5.50 years

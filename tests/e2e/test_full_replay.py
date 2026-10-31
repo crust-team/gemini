@@ -174,7 +174,7 @@ def verification(selected_dataset, module_plant):
     )
     report["calibration"] = fit.__dict__
     chain, chain_errors, balances = _chain(plant, dataset, data)
-    assert legacy.check_wiring(plant, legacy.read_project(OLD_PROJECT)) == []
+    assert legacy.check_wiring(plant, legacy.GeminiProject.from_folder(OLD_PROJECT)) == []
     report["electricity_chain_median_relative_error"] = float(
         np.median(abs(_total_electricity(chain) / measured_electricity - 1))
     )

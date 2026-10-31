@@ -60,7 +60,7 @@ def main():
     print(f"Electricity used:            {flows['electricity'] / 1e6:.3f} MW")
     print(f"Injection pump:              {injection_pump:.1f} W (no pump needed)")
     print(f"CO2 emissions:               {emitted:.0f} kg/day")
-    closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
+    closed = all(check["passed"] for check in gm.evaluate.plant_balance(plant, None, result))
     print(f"Plant balance closes:        {closed}")
 
 

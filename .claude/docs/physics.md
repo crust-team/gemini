@@ -3,7 +3,8 @@
 `gemini/physics` holds the textbook formulas and everything more than one category reads; physics of
 one category lives in `gemini/modules/<category>/_physics.py` (rule in
 [conventions.md](conventions.md#module-rules)). Modules declare parameters and wire streams; they
-call physics and write no correlation of their own. The files cover unit conversions,
+call physics and write no correlation of their own. The public names are `gm.physics.<topic>`.
+Unit conversions are not here: they are `gm.units` (`gemini/units/`, see below). The files cover
 constants, fluid properties, geometry, hydraulics, heat transfer, pumps, chemistry, corrosion and
 erosion, gas compression, refrigeration cycles, IAPWS-IF97 steam, ground heat transport,
 psychrometrics, separation, combustion, thermal storage, PID control, power cycles, grid
@@ -22,9 +23,10 @@ function carries `@ops.physics` except those named under "Functions without `@op
 Physical constants retained from the original GEMINI correlations. It holds constants and no
 functions.
 
-### `units.py`
+### Units (`gemini/units/conversions.py`)
 
-Unit conversions at package and correlation boundaries; historical factors retained.
+These are the functions of `gm.units`, not of `gm.physics`: unit conversions at package and
+correlation boundaries; historical factors retained.
 
 - `si_unit(unit)`: SI unit that `unit` converts to, or `None` for an unknown unit.
 - `si_conversion(unit, quantity)`: `(scale, offset)` with `to_si(value) == float(value) * scale +
@@ -527,10 +529,12 @@ Electricity exchange of a plant with a grid connection of limited capacity.
 
 ### `dispatch.py`
 
-The daily energy balance of `gm.schedule`, on arrays over the days: `doublet_flow(heat_need,
-heat_per_flow, minimum_flow, maximum_flow)`, `units_taken(demand, capacities)`, what each unit
-takes in order, `temperature_after(start, end, share)`, `circuit_flow(heat, specific_heat,
-temperature_difference)` and `flow_share(first, second)`.
+The energy balance of `gm.schedule` at each step, on arrays over the steps: `doublet_flow(heat_need,
+heat_per_flow, minimum_flow, maximum_flow)`, `loaded_by_cost(demand, capacities, costs)`, what each
+source takes when the cheapest loads first, `marginal_cost(price, efficiency, co2_price,
+emission_factor)`, `methane_emission_factor()`, `heat_pump_cop(heating, fraction, minimum_lift,
+sink_outlet, source_outlet)`, `temperature_after(start, end, share)`, `circuit_flow(heat,
+specific_heat, temperature_difference)` and `flow_share(first, second)`.
 
 ### `energy.py`
 
@@ -567,7 +571,7 @@ Health-scoring relations shared by the modules: drift, bounded score, margin, li
   first failing row; rows crossing a `where` around a check need a graph (`run_function`).
 - State dimensions, reference formulas and assumptions in docstrings.
 - Keep correlation-specific US or laboratory bases explicit at the formula boundary.
-- `units._UNITS` is the single table of public data units (SI unit, scale, offset). A declared
+- `gemini.units._UNITS` is the single table of public data units (SI unit, scale, offset). A declared
   difference quantity converts by scale only, so `"5 degC"` as a temperature difference is 5 K.
 - Do not perform database I/O, logging or mutate global state during calculations.
 - `Fluid` definitions in `gemini.types.fluid` own immutable overrides and cache their
@@ -1142,7 +1146,7 @@ modules score alike.
 
 ## Units
 
-`units.py` converts at the package and correlation boundaries.
+`gemini/units/conversions.py` converts at the package and correlation boundaries.
 
 - Each conversion factor is declared once as a named module constant (`PA_PER_BAR`,
   `M_PER_FOOT`, `SECONDS_PER_HOUR`, `PA_PER_FOOT_HEAD`, `W_PER_BHP`, ...). The table `_UNITS` and
@@ -1163,5 +1167,5 @@ modules score alike.
   and `FluidProperties` call them on every eager step, the decorator would make those calls about
   3.5 times slower, and they divide only by validated positive properties, so they need no eager
   scope.
-- `units.py`: the converters sit on the hot path of every binding and plain operators work on
+- `gemini/units/conversions.py`: the converters sit on the hot path of every binding and plain operators work on
   every backend, so the registry wrapper would only add cost.

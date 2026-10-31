@@ -70,7 +70,7 @@ def closes(plant, result):
     audit = gm.modules.energy_balance(plant, result)
     leaves = result.leaves().values()
     flow_work = sum(leaf.outputs.get("hydraulic_power", 0.0) for leaf in leaves)
-    balanced = all(check["passed"] for check in gm.evaluate.plant_balance(plant, result))
+    balanced = all(check["passed"] for check in gm.evaluate.plant_balance(plant, None, result))
     return balanced and abs(audit["residual"] - flow_work) <= 1e-9 * audit["in"]
 
 

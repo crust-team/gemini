@@ -201,7 +201,7 @@ def test_save_load_and_slice_equal_the_row_by_row_build(tmp_path):
     A loaded result takes further commits like any other.
     """
     expected, built = build_by_rows(), build_by_chunks([3, 5])
-    loaded = Results.load(built.save(tmp_path / "chunks.npz"))
+    loaded = Results.from_npz(built.to_npz(tmp_path / "chunks.npz"))
     pd.testing.assert_frame_equal(loaded.to_frame(), expected.to_frame())
     loaded.commit(ResultChunk([START + timedelta(hours=SIZE)], [3600.0], {}))
     assert len(loaded) == SIZE + 1 and len(loaded.to_frame()) == SIZE + 1

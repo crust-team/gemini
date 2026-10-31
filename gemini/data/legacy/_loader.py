@@ -116,7 +116,7 @@ def _with_trajectory(project, properties, prefix):
             code="invalid_format",
         )
     text = project._auxiliary[filename].decode("utf-8-sig")
-    return properties | {f"{prefix}_trajectory_table": tables.parse_trajectory_csv(text)}
+    return properties | {f"{prefix}_trajectory_table": tables.from_trajectory_csv(text)}
 
 
 def _converted(project, node_id, kinds, properties, at):
@@ -303,7 +303,7 @@ def _inputs(paths, kinds, fluid):
     return inputs
 
 
-def load_legacy_design(project) -> LegacyDesign:
+def from_legacy_design(project) -> LegacyDesign:
     """Convert every node snapshot of a parsed old project and list the fields it cannot map."""
     columns = _data_columns(project)
     paths = node_paths(project)

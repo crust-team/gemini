@@ -111,8 +111,8 @@ def test_slice_and_lossless_files(tmp_path):
     rows = results()
     tail = rows.slice(1)
     assert len(tail) == 1 and tail.skip_counts == {"pump": {"pump.fluid_in.p": 1}}
-    path = rows.save(tmp_path / "results.npz")
-    loaded = Results.load(path)
+    path = rows.to_npz(tmp_path / "results.npz")
+    loaded = Results.from_npz(path)
     pd.testing.assert_frame_equal(loaded.to_frame(), rows.to_frame())
     pd.testing.assert_frame_equal(loaded.to_frame(table="energy"), rows.to_frame(table="energy"))
 
@@ -216,7 +216,7 @@ def test_files_and_bytes_keep_units_end_state_and_every_cell(tmp_path):
     rows = with_units()
     rows.end_state = {"position": "2024-01-01T01:00:00+00:00", "module_states": {"a": {"x": 0.1}}}
     for loaded in (
-        Results.load(rows.save(tmp_path / "plain")),
+        Results.from_npz(rows.to_npz(tmp_path / "plain")),
         Results.from_bytes(rows.to_bytes()),
     ):
         pd.testing.assert_frame_equal(loaded.to_frame(), rows.to_frame())
@@ -228,7 +228,7 @@ def test_files_and_bytes_keep_units_end_state_and_every_cell(tmp_path):
 
 def test_an_archive_needs_no_pickle(tmp_path):
     """Every array of the archive loads with allow_pickle=False, and garbage is refused."""
-    path = with_units().save(tmp_path / "results.npz")
+    path = with_units().to_npz(tmp_path / "results.npz")
     with np.load(path, allow_pickle=False) as archive:
         assert "metadata" in archive.files
         assert all(archive[name].dtype != object for name in archive.files)
@@ -238,7 +238,7 @@ def test_an_archive_needs_no_pickle(tmp_path):
     old = tmp_path / "old.csv"
     old.write_text("time\n")
     with pytest.raises(gm.errors.ValidationError, match="results archive"):
-        Results.load(old)
+        Results.from_npz(old)
 
 
 def test_slices_keep_units_and_end_state():
@@ -330,7 +330,7 @@ def test_a_wrong_map_raises_on_every_view(call):
 def test_quantities_survive_files_and_slices(tmp_path):
     """A loaded result and a live slice convert as the run did."""
     rows = with_quantities()
-    loaded = Results.load(rows.save(tmp_path / "results.npz"))
+    loaded = Results.from_npz(rows.to_npz(tmp_path / "results.npz"))
     assert loaded.quantities == rows.quantities
     assert loaded.get("pump", "head", units=UNITS)["unit"] == "bar"
     assert rows.slice(1).get("pump", "head", units=UNITS)["unit"] == "bar"

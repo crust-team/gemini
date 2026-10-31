@@ -10,9 +10,9 @@ from gemini.modules._utils.serialization import (
     SECTIONS,
     Report,
     format_error,
+    from_params,
+    from_sections,
     located,
-    read_params,
-    read_sections,
 )
 from gemini.plants._utils import outputs
 from gemini.plants._utils.factory import built, make_module
@@ -81,7 +81,7 @@ def _entry(plant, prefix, name, entry, report, path):
                 _entry(plant, key, child, item, report, f"{path}.modules.{child}")
             return
         baseline = baseline_of(module)
-        read_params(module, entry.get("params", {}), report, f"{path}.params")
+        from_params(module, entry.get("params", {}), report, f"{path}.params")
         plant._attach(key, module, deepcopy(entry.get("params")), baseline)
 
 
@@ -163,7 +163,7 @@ def root_problems(data):
     ]
 
 
-def _read_inputs(plant, data, report):
+def _from_inputs(plant, data, report):
     """Set the ``inputs`` of ``data``, each path its own problem."""
     for path, value in data.get("inputs", {}).items():
         if report.skips(path):
@@ -189,8 +189,8 @@ def populate(plant, data, report):
     for index, item in enumerate(data.get("constraints", [])):
         with report.guard(f"constraints[{index}]"):
             plant.constrain(**item)
-    read_sections(plant, data, report)
-    _read_inputs(plant, data, report)
+    from_sections(plant, data, report)
+    _from_inputs(plant, data, report)
     plant._sections = {key: deepcopy(data.get(key, {})) for key in SECTIONS}
 
 
@@ -204,9 +204,9 @@ def _of_class(cls, data, report):
                 code="invalid_value",
             )
         plant = built(found, data.get("size"))
-        read_params(plant, data.get("params", {}), report)
-        read_sections(plant, data, report)
-        _read_inputs(plant, data, report)
+        from_params(plant, data.get("params", {}), report)
+        from_sections(plant, data, report)
+        _from_inputs(plant, data, report)
         plant._sections = {key: deepcopy(data.get(key, {})) for key in SECTIONS}
         return plant
     return None
@@ -233,7 +233,7 @@ def problems(cls, data):
     return build(cls, data)[1]
 
 
-def read(cls, data):
+def from_dict(cls, data):
     """Return the plant of ``data``, or raise a ``ValidationError`` that carries every problem."""
     error = format_error(data)
     if error is not None:

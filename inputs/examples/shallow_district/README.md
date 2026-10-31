@@ -5,7 +5,7 @@ colder doublet, a 65 °C network and other limits. Every value is invented for t
 measured data. Only `examples/` and `tests/` read this folder, and nothing under `gemini/` knows it.
 
 `examples/cases/shallow_district.py` runs it through the same general functions as any problem:
-`gm.Problem.from_json`, `gm.plants.from_dict`, `gm.schedule` and `gm.simulate`.
+`gm.Problem.from_json`, `gm.Plant.from_json`, `gm.schedule` and `gm.simulate`.
 
 | File | Holds |
 | --- | --- |
